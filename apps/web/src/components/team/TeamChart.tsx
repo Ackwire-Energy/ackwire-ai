@@ -8,11 +8,11 @@ import { Link } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
-import { useAgentDrag } from "@/components/AgentGroups";
+import { GroupNameDialog, useAgentDrag } from "@/components/AgentGroups";
 import { useOrg } from "@/components/org-context";
 import { OrgMark } from "@/components/ProfilePhoto";
 import { colorOf } from "@/components/Sky";
-import { SectorMark, sectorStyle, useTeamLookups } from "./shared";
+import { NoSectors, SectorMark, sectorStyle, useTeamLookups } from "./shared";
 
 /**
  * Equipe › Organograma (ADR 0148): the workspace on top with its right hand, then each person with the agents that
@@ -151,12 +151,12 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
   const look = useTeamLookups(groups);
   const arranges = can(org, "manage_agents");
   const drag = useAgentDrag(groups);
+  const [creating, setCreating] = useState(false);
   const by = agentSections(
     team.agents.filter((a) => !look.isLodi(a)),
     groups,
     (a) => a.id,
   );
-  if (groups.length === 0) return <p className="team-empty">{t("team.sectors.emptyTitle")}</p>;
   const column = (key: string, group: AgentGroup | null, agents: TeamAgent[]) => {
     const leads = [...new Set(agents.map((a) => reportsTo(a, groups, look.members)).filter(Boolean))];
     const others = agents.filter((a) => a.id !== drag.dragging);
@@ -176,8 +176,8 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
           <span className="team-frame__title">
             {group && <SectorMark group={group} size={18} />}
             <b>{group?.name ?? t("agentGroups.none")}</b>
-            <span className="muted">{t("team.agents", { count: agents.length })}</span>
           </span>
+          <span className="muted small">{t("team.agents", { count: agents.length })}</span>
           {leads.length > 0 && (
             <span className="muted small">
               {t("team.chart.responsible", { names: leads.map((id) => look.personName(id)).join(", ") })}
@@ -198,9 +198,16 @@ function BySector({ team, groups }: { team: Team; groups: AgentGroup[] }) {
     );
   };
   return (
-    <div className="team-frames">
-      {by.groups.map(({ group, items }) => column(group.id, group, items))}
-      {by.ungrouped.length > 0 && column("none", null, by.ungrouped)}
-    </div>
+    <>
+      {groups.length === 0 ? (
+        <NoSectors lodi={look.lodi} onCreate={arranges ? () => setCreating(true) : undefined} />
+      ) : (
+        <div className="team-frames">
+          {by.groups.map(({ group, items }) => column(group.id, group, items))}
+          {by.ungrouped.length > 0 && column("none", null, by.ungrouped)}
+        </div>
+      )}
+      {creating && <GroupNameDialog purpose={{ mode: "create" }} onClose={() => setCreating(false)} />}
+    </>
   );
 }

@@ -12,11 +12,13 @@ import {
   formatUsd,
 } from "@agenteschat/client/lib/format";
 import { covers } from "@agenteschat/client/lib/repos";
+import { excerpt } from "@agenteschat/client/lib/text";
 import {
   type AgentColor,
   Button,
   Card,
   Chip,
+  EmptyState,
   Icon,
   Meter,
   type MonthDay,
@@ -30,10 +32,12 @@ import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
-import { LoadingList } from "@/components/Loading";
+import { AskAgentButton } from "@/components/AskAgentButton";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { groupByDay, isRoutineRun, type RunFilter, runMatches } from "@/lib/agent-edit";
+import { lookOf } from "@/lib/look";
 import { usageShown } from "@/lib/plan-usage";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
@@ -271,17 +275,34 @@ export function ActivityTab() {
         </Toolbar>
         {runs.isLoading ? (
           <LoadingList count={4} />
+        ) : runs.isError && !runs.data ? (
+          <ErrorState error={runs.error} onRetry={() => void runs.refetch()} />
+        ) : list.length === 0 ? (
+          <EmptyState
+            size="panel"
+            agent={lookOf(agent) ?? true}
+            title={t("agentPage.activity.emptyTitle")}
+            actions={<AskAgentButton agent={agent} variant="primary" />}
+          >
+            {t("agentPage.activity.emptyText", g)}
+          </EmptyState>
         ) : visible.length === 0 ? (
-          <div className="agp-empty">
-            <b>
-              {q.trim()
-                ? t("agent.runsEmpty", { q })
-                : list.length === 0
-                  ? t("agent.runsNone")
-                  : t("agentPage.activity.noneFilter")}
-            </b>
-            {(q.trim() || filter !== "all") && <span className="small muted">{t("agentPage.activity.clear")}</span>}
-          </div>
+          <EmptyState
+            size="inline"
+            actions={
+              <Button
+                size="sm"
+                onClick={() => {
+                  setQ("");
+                  setFilter("all");
+                }}
+              >
+                {t("filters.clearAll")}
+              </Button>
+            }
+          >
+            {q.trim() ? t("agent.runsEmpty", { q }) : t("agentPage.activity.noneFilter")}
+          </EmptyState>
         ) : (
           <div className="agp-runs">
             {days.map((d) => (
@@ -301,7 +322,7 @@ export function ActivityTab() {
                       <li key={r.id} className="agp-run">
                         <time dateTime={r.createdAt}>{formatTime(locale, r.createdAt)}</time>
                         <span className="agp-run__t">
-                          <b>{r.private ? t("agent.runPrivate") : r.what || t("agent.runNoText")}</b>
+                          <b>{r.private ? t("agent.runPrivate") : excerpt(r.what, 200) || t("agent.runNoText")}</b>
                           <span className="agp-chips">
                             <RunChip run={r} />
                             <Chip icon={x.where.startsWith("#") ? "channel" : "person"}>

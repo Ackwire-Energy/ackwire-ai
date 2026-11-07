@@ -229,7 +229,7 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-/* ── The header search's results, in the thread panel (SearchResultsPanel.tsx) ── */
+/* ── The header search's results, in the conversation's side pane (SearchResultsPanel.tsx) ── */
 [data-theme="light"] {
   /* A search hit: its own cool tint and underline, never the tan of a mention of you. */
   --search-hit: color-mix(in srgb, var(--info) 16%, transparent);
@@ -283,8 +283,11 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+/* "Ir para" has its own column: however long the words, they stop before it. */
 .search-result {
-  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   border-radius: var(--radius-lg);
   background: var(--raised);
   box-shadow: var(--e1);
@@ -294,9 +297,7 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   --msg-inline: 12px;
 }
 .search-result__jump.ac-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  margin: 4px 8px 0 0;
   opacity: 0;
 }
 .search-result:is(:hover, :focus-within) {
@@ -317,6 +318,28 @@ html:not([data-pointer]) .search-box__x:focus-visible {
   background: var(--search-hit);
   box-shadow: inset 0 -2px 0 var(--search-hit-line);
   color: inherit;
+}
+/* Narrow beside the conversation: the count keeps its line with the ×, the filters and the sort go under it. */
+@media (min-width: 761px) {
+  @container thread-dock (max-width: 479px) {
+    .search-panel__head > .thread-head__who {
+      align-self: center;
+    }
+    .search-panel__head > .thread-head__text {
+      flex: 1 1 calc(100% - 64px);
+    }
+    .search-panel__head > :last-child {
+      order: 1;
+    }
+    .search-panel__filters,
+    .search-panel__head > :nth-last-child(2) {
+      order: 2;
+    }
+    /* Its line is what was searched, not the channel a thread's narrow head drops. */
+    .search-panel__head .thread-head__meta > .thread-head__where {
+      display: block;
+    }
+  }
 }
 @media (max-width: 760px) {
   .search-panel__words {

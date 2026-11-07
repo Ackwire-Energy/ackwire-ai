@@ -277,6 +277,13 @@ test("its turn goes to the runner as the locked-down chat profile, with no check
   expect(events.at(-1)).toMatchObject({ type: "done" });
   expect(prepared).toBe(0);
   expect(sent[0]).toMatchObject({ op: "brain.turn", permissions: { mode: "chat" }, personalMcp: false, cwd: "" });
+  expect(sent[0]).not.toHaveProperty("personWaiting");
+  sent.length = 0;
+  for await (const _ of brain.run(
+    { ...turn, personWaiting: true },
+    { signal: new AbortController().signal, executeTool: async () => ({ content: "" }) },
+  ));
+  expect(sent[0]).toMatchObject({ personWaiting: true });
   // An older runner reads any mode but `plan` as `work`: nothing is sent to it.
   sent.length = 0;
   hub.status = async (id: string) => statusOf(id, { protocol: LOCKED_BRAIN_PROTOCOL - 1 });

@@ -64,10 +64,13 @@ export interface AgentEdit {
   pickRepos: (add?: string) => void;
   /** "João" (the saved owner's first name), or null. */
   ownerFirst: string | null;
-  /** Opens a dialog of the sentence under the name (who thinks, where it works, the browser); each saves at once. */
+  /** Opens a dialog of How it works (who thinks, where it works, the browser); each saves at once. */
   openWork: (dialog: "brain" | "computer" | "browser") => void;
-  /** "Como trabalha" sits in the overview's side column (the full page, wide), else under the name on every tab. */
-  workInAside: boolean;
+  /** Which of those dialogs is open (the fact sheet marks its row). */
+  workOpen: "brain" | "computer" | "browser" | null;
+  /** Saves every unsaved change, as the save bar does: false when something failed or was refused. */
+  save: () => Promise<boolean>;
+  saving: boolean;
 }
 
 const Ctx = createContext<AgentEdit | null>(null);

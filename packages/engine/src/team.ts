@@ -15,6 +15,7 @@ import { cutText, editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { parseMentionHandles } from "./messages";
 import { requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
@@ -515,7 +516,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
               eq(channels.kind, "channel"),
               isNull(channels.archivedAt),
               isNull(channels.deletedAt),
-              sql`(${channels.visibility} = 'public' or exists (select 1 from ${channelMembers} me where me.channel_id = ${channels.id} and me.user_id = ${actorId}) or ${channelAudienceSql("channels", sql`${actorId}`)})`,
+              sql`(${channels.visibility} = 'public' or exists (select 1 from ${channelMembers} me where me.channel_id = ${channels.id} and me.user_id = ${actorId}) or ${channelAudienceSql("channels", sql`${actorId}`)} or ${maySql(sql`${orgId}::uuid`, sql`${actorId}::text`, "administrator")})`,
             ),
           )
           .orderBy(asc(channels.position), asc(channels.name)),

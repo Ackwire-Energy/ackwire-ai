@@ -16,6 +16,7 @@ import {
   ForbiddenError,
   getAgentMergeRepositories,
   getAgentRepositories,
+  githubOrgAccess,
   insertMessage,
   invokeToolForRun,
   listOrgRepositories,
@@ -508,6 +509,50 @@ describe("the organization's repositories", () => {
     pushed_at: "2026-10-01T00:00:00Z",
     owner: { login: full.split("/")[0], type: full.startsWith("acme/") ? "Organization" : "User" },
     ...extra,
+  });
+
+  test("the organizations a connection reaches, read live, for who manages connectors", async () => {
+    f = await setup();
+    await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_user_token" });
+    let orgs = [{ login: "acme" }];
+    const fetch = (async (input: string | URL | Request) =>
+      String(input) === `${API}/user/orgs?per_page=100`
+        ? Response.json(orgs)
+        : new Response("no", { status: 500 })) as typeof globalThis.fetch;
+    const connectors = { ...depsOf(f), oauthApps: { github: { clientId: "Ov23li", clientSecret: "fake" } } };
+    const deps = { db: f.db, connectors, github: { apiUrl: API, fetch } };
+
+    // An API key isn't our app's: no page of ours on GitHub to send anyone to.
+    expect(await githubOrgAccess(deps, f.owner.id, f.org.id)).toEqual({ orgs: ["acme"], manageUrl: null });
+    await f.db
+      .update(schema.connectorConnections)
+      .set({ authType: "oauth" })
+      .where(eq(schema.connectorConnections.orgId, f.org.id));
+    orgs = [{ login: "acme" }, { login: "beta" }];
+    expect(await githubOrgAccess(deps, f.owner.id, f.org.id)).toEqual({
+      orgs: ["acme", "beta"],
+      manageUrl: "https://github.com/settings/connections/applications/Ov23li",
+    });
+    const down = { ...deps, github: { apiUrl: API, fetch: (async () => new Response("", { status: 502 })) as never } };
+    expect((await githubOrgAccess(down, f.owner.id, f.org.id)).orgs).toBeNull();
+    const member = await addMember(f.db, f.org.id, "member");
+    await expect(githubOrgAccess(deps, member.id, f.org.id)).rejects.toThrow();
+  });
+
+  test("back from granting an organization on GitHub, its repositories show at once, not when the listing expires", async () => {
+    f = await setup();
+    await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_user_token" });
+    let repos = [repo("walt/one")];
+    const fetch = (async (input: string | URL | Request) =>
+      Response.json(String(input).includes("/user/orgs") ? [{ login: "acme" }] : repos)) as typeof globalThis.fetch;
+    const deps = { db: f.db, connectors: depsOf(f), github: { apiUrl: API, fetch } };
+    const logins = async () => (await listOrgRepositories(deps, f.owner.id, f.org.id)).accounts.map((a) => a.login);
+
+    expect(await logins()).toEqual(["walt"]);
+    repos = [repo("walt/one"), repo("acme/two")];
+    expect(await logins()).toEqual(["walt"]);
+    await githubOrgAccess(deps, f.owner.id, f.org.id);
+    expect(await logins()).toEqual(["acme", "walt"]);
   });
 
   test("the connection's and the bound installations', merged by account, cached, without tokens", async () => {

@@ -17,6 +17,7 @@ import {
   Icon,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   OptionList,
@@ -34,6 +35,7 @@ import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useSignInAgain } from "@/hooks/useSignInAgain";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
@@ -85,6 +87,7 @@ export function AiAppsSection() {
       error={list.isError && !list.data ? list.error : null}
       onRetry={() => void list.refetch()}
       whole={view === "all"}
+      onConnect={() => setConnecting(true)}
       onCreate={() => setCreating(true)}
       onConfirm={setConfirm}
     />
@@ -101,9 +104,12 @@ export function AiAppsSection() {
         <div className="apps-server__address">
           {data ? <CommandBlock command={data.serverUrl} copied={t("apps.serverCopied")} /> : <LoadingList count={1} />}
         </div>
-        <Button className="apps-server__connect" variant="primary" icon="plus" onClick={() => setConnecting(true)}>
-          {t("apps.connect")}
-        </Button>
+        {/* The empty list below takes over this button: one way in, in the middle of the page. */}
+        {!(isAppsEmpty(data) && view === "mine") && (
+          <Button className="apps-server__connect" variant="primary" icon="plus" onClick={() => setConnecting(true)}>
+            {t("apps.connect")}
+          </Button>
+        )}
       </Card>
       {admin ? (
         <Tabs
@@ -147,6 +153,7 @@ function AppsBody({
   error,
   onRetry,
   whole,
+  onConnect,
   onCreate,
   onConfirm,
 }: {
@@ -155,11 +162,13 @@ function AppsBody({
   error: unknown;
   onRetry: () => void;
   whole: boolean;
+  onConnect: () => void;
   onCreate: () => void;
   onConfirm: (c: Confirm) => void;
 }) {
   const { t } = useTranslation();
   const myId = useMe().data?.user.id;
+  const look = useRightHandLook();
   if (loading) return <LoadingList count={2} trailing />;
   if (error || !list) return <ErrorState error={error} onRetry={onRetry} />;
   // In the whole workspace's list, one's own rows say no "De …".
@@ -168,7 +177,18 @@ function AppsBody({
   return (
     <>
       {isAppsEmpty(list) && !whole ? (
-        <EmptyState icon="link">{t("apps.empty")}</EmptyState>
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("apps.emptyTitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={onConnect}>
+              {t("apps.connect")}
+            </Button>
+          }
+        >
+          {t("apps.empty")}
+        </EmptyState>
       ) : (
         list.apps.length > 0 && (
           <Card aria-labelledby="apps-connected">
@@ -640,43 +660,45 @@ export function TokenDialog({ onClose }: { onClose: () => void }) {
           );
         }}
       >
-        <DialogBody className="apps-token">
-          <Field label={t("apps.tokens.name")} id="apps-token-name">
-            <Input
-              value={name}
-              maxLength={60}
-              placeholder={t("apps.tokens.namePlaceholder")}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <div className="apps-field" style={{ gap: 6 }}>
-            <span className="newag__label" id="apps-token-access">
-              {t("apps.tokens.access")}
-            </span>
-            <OptionList
-              aria-labelledby="apps-token-access"
-              value={access}
-              onValueChange={setAccess}
-              options={[
-                { value: "manage", title: t("apps.consent.manage"), description: t("apps.consent.manageHelp") },
-                { value: "write", title: t("apps.consent.write"), description: t("apps.consent.writeHelp") },
-                { value: "read", title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
-              ]}
-            />
-          </div>
-          <Field label={t("apps.tokens.validity")} id="apps-token-validity">
-            <Select
-              value={validity}
-              onValueChange={(v) => {
-                setValidity(v as Validity);
-                setReauth(false);
-                setError(null);
-              }}
-              options={VALIDITIES.map((v) => ({ value: v, label: t(`apps.tokens.days.${v}`) }))}
-            />
-          </Field>
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
+        <Locked when={createToken.isPending}>
+          <DialogBody className="apps-token">
+            <Field label={t("apps.tokens.name")} id="apps-token-name">
+              <Input
+                value={name}
+                maxLength={60}
+                placeholder={t("apps.tokens.namePlaceholder")}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <div className="apps-field" style={{ gap: 6 }}>
+              <span className="newag__label" id="apps-token-access">
+                {t("apps.tokens.access")}
+              </span>
+              <OptionList
+                aria-labelledby="apps-token-access"
+                value={access}
+                onValueChange={setAccess}
+                options={[
+                  { value: "manage", title: t("apps.consent.manage"), description: t("apps.consent.manageHelp") },
+                  { value: "write", title: t("apps.consent.write"), description: t("apps.consent.writeHelp") },
+                  { value: "read", title: t("apps.consent.read"), description: t("apps.consent.readHelp") },
+                ]}
+              />
+            </div>
+            <Field label={t("apps.tokens.validity")} id="apps-token-validity">
+              <Select
+                value={validity}
+                onValueChange={(v) => {
+                  setValidity(v as Validity);
+                  setReauth(false);
+                  setError(null);
+                }}
+                options={VALIDITIES.map((v) => ({ value: v, label: t(`apps.tokens.days.${v}`) }))}
+              />
+            </Field>
+            {error && <Alert>{error}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

@@ -389,6 +389,7 @@ export class CodexBrain implements Brain {
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
       ...(freeTier ? { freeTier } : {}),
+      ...(turn.personWaiting ? { personWaiting: true } : {}),
     };
 
     const events = channel<BrainEvent>();

@@ -230,7 +230,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Ketik kode ini untuk menghapus seluruh akun ",
       { b: email },
-      ", bukan hanya satu ruang kerja. Akun ini langsung hilang, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
+      ", bukan hanya satu ruang kerja. Akun ini langsung keluar di semua perangkat dan dihapus permanen 7 hari kemudian, dan ruang kerja yang hanya berisi kamu ikut ditutup.",
     ],
     support: (address) => [
       "Berlaku 10 menit, dan tidak ada yang dihapus tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan kirim email ke ",
@@ -273,6 +273,24 @@ export const words: EmailWords = {
     note: "Bukan kamu yang menghubungkannya? Putuskan sekarang dan ganti kata sandimu.",
     button: "Lihat aplikasi yang terhubung",
     why: (org) => `Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ${org} di agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Akun agentes.chat kamu akan dihapus pada ${day}`,
+    preheader: "Kamu punya 7 hari untuk berubah pikiran.",
+    headline: "Akunmu sedang dihapus",
+    body: (email, day, time) => [
+      "Kami akan menghapus akun ",
+      { b: email },
+      ` pada ${day} pukul ${time}. Akun ini sudah keluar di semua perangkat, dan tidak ada yang bisa menghubungimu di sini sampai kamu kembali.`,
+    ],
+    closes: (_count, names) => [
+      "Ruang kerja yang hanya berisi kamu sudah ditutup dan hilang pada tanggal yang sama: ",
+      ...names,
+      ".",
+    ],
+    undo: "Berubah pikiran? Masuk sebelum tanggal itu dan tekan Pulihkan.",
+    button: "Masuk untuk memulihkan",
+    why: "Kamu menerima email ini karena alamat ini punya akun di agentes.chat.",
   },
   accountDeleted: {
     subject: "Akun agentes.chat kamu sudah dihapus",
@@ -356,5 +374,21 @@ export const words: EmailWords = {
     note: "Tarik kembali dengan satu klik dari notifikasimu, dan agen itu berhenti berpikir dengan paketmu.",
     button: "Buka notifikasi",
     why: (org) => `Kamu menerima email ini karena seseorang di ${org} menghubungkan paketmu ke sebuah agen.`,
+  },
+  planWaiting: {
+    subject: "Timmu sedang menunggu",
+    preheader: "Ruang kerjamu sudah siap. Perlu paket agentes.chat untuk mulai.",
+    headline: "Timmu sedang menunggu",
+    body: (agents, channels, routines) => {
+      const a = `${agents} agen`;
+      const c = `${channels} kanal`;
+      const r = `${routines} rutinitas`;
+      return routines > 0
+        ? `${a}, ${c}, dan ${r} sudah siap. Perlu paket agentes.chat untuk mulai.`
+        : `${a} dan ${c} sudah siap. Perlu paket agentes.chat untuk mulai.`;
+    },
+    button: "Lihat paket agentes.chat",
+    why: (org) =>
+      `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
   },
 };

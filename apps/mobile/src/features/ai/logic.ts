@@ -17,6 +17,8 @@ import {
   type ExistingAi,
   existingAi,
   lendable,
+  ownSignInLower,
+  signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
@@ -46,13 +48,28 @@ import type { TFunction } from "i18next";
 
 /**
  * "Usar uma chave de API agora" under a plan that can't sign in on the agent's computer yet. On the phone the key's
- * row is a page away, so every wait for the workspace's computer offers it (not on hold: nothing runs then), as do
- * an offline computer, none and one that can't take the plan.
+ * row is a page away, so every wait for the workspace's computer offers it, as do an offline computer, none and one
+ * that can't take the plan, all but on a hold, when nothing runs and a key is no way around it.
  */
 export const offersKeyNow = (gate: PlanGate, held: boolean) =>
   gate.state === "preparing"
     ? gate.view !== null && !held
-    : gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported";
+    : !held && (gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported");
+
+/** Where the flow is: the first page, the plans, one plan's page, the API key's, or that key's makers. */
+export type FlowView =
+  | { page: "home" }
+  | { page: "plans" }
+  | { page: "plan"; choice: PlanChoice }
+  | { page: "key" }
+  | { page: "makers" };
+
+/** What Back opens: a list's pick goes back to its list, and a sign-in from a row of what the person has to that row. */
+export const flowBack = (view: FlowView, fromRow: boolean): FlowView | null => {
+  if (view.page === "home") return null;
+  if (view.page === "makers") return { page: "key" };
+  return view.page === "plan" && !fromRow ? { page: "plans" } : { page: "home" };
+};
 
 /** How often a plan's page asks again while it waits (the web's first run asks as often). */
 export const PLAN_POLL_MS = 5000;
@@ -205,7 +222,7 @@ export function accountSaved(
   if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
   return a
     ? t("agentPage.work.saved.account", { ...g, account: a.label })
-    : t("aiAccounts.done.savedAgent", { agent: agentName, label: t("connectAi.own.sharedLower") });
+    : t("aiAccounts.done.savedAgent", { agent: agentName, label: ownSignInLower(t, saved.brain) });
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */
@@ -223,7 +240,7 @@ export const accountRow = (t: TFunction, choice: AccountChoice<MachineAccount>, 
   label: accountTitle(choice.login),
   sub: accountAbout(t, choice, agentName),
   mark: choice.login.provider ?? choice.login.kind,
-  off: choice.login.status === "signed_out",
+  off: signInOf(choice.login) === "signed_out",
 });
 
 /**

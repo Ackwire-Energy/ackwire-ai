@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MAX_INLINE_FILE_BYTES } from "@agenteschat/adapters";
+import { FILE_PULL_PROTOCOL, MAX_INLINE_FILE_BYTES } from "@agenteschat/adapters";
 import {
   ASK_AGAIN,
   approvalMessage,
@@ -22,12 +22,14 @@ import {
   NotFoundError,
   notAllowedMessage,
   postPersonMessage,
+  REMOVED_COMPUTER_MESSAGE,
   setAgentAccess,
   setAgentMergeRepositories,
   setAgentSkills,
   type ToolContext,
   toolAccess,
   updateSandboxSettings,
+  vaultUpdateText,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { connectedComputer } from "./machine-fixtures";
@@ -133,7 +135,7 @@ describe("access", () => {
     expect(await call(ctx, "run_code", { language: "python", code: "print(1)" })).toMatchObject({
       isError: true,
       content:
-        "Not allowed: this agent lacks the scope sandbox:run. If the request needs it, ask for it with request_permission",
+        'Not allowed: this agent lacks the scope sandbox:run. If the request needs it, call request_permission now with permission "sandbox:run": a card asks a person and your work goes on once they decide. Never ask the person to try again',
     });
     // "All tools" doesn't include running code.
     const all = new Set([grantKey(null, "*")]);
@@ -150,6 +152,9 @@ describe("access", () => {
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).toContain("run_code");
     // Granted, but no computer was chosen for it: computer_status says so.
     expect(await call(ctx, "computer_status", {})).toMatchObject({ isError: true, content: NO_COMPUTER_MESSAGE });
+    // Where people connect their own, that is what to do.
+    expect(NO_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to connect one (Settings → Computers).");
+    expect(REMOVED_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to choose another one.");
   });
 });
 
@@ -283,7 +288,7 @@ describe("network", () => {
       exec: () => ({ exitCode: 6, stdout: "", stderr: "curl: (6) Could not resolve host: example.com" }),
     });
     const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://example.com" });
-    expect(out.content).toContain("network failure: this is a connected computer");
+    expect(out.content).toContain("network failure: this computer is on its own network");
     expect(out.content).not.toContain("no internet");
   });
 });
@@ -348,20 +353,23 @@ describe("Drive and skills", () => {
     await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
     const ctx = await runCtx();
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "scripts/plot.py" })).isError).toBe(true);
-    // Too large for one write to the computer: said, not hidden.
+    // Too large for one write: the computer fetches it itself.
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
-      "Not saved on your computer: .skills/graficos/manual.pdf is too large to copy",
+      "saved to .skills/graficos/manual.pdf in your folder",
     );
+    runner.files.clear();
     const out = await call(ctx, "run_skill_script", {
       skill: "graficos",
       path: "scripts/plot.py",
       args: ["--n", "it's"],
     });
     expect(out).toMatchObject({ isError: false });
-    expect(out.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
+    expect(out.content).not.toContain("Not copied");
     expect([...runner.files.keys()].sort()).toEqual([
+      ".skills/graficos/.copied-large-v1",
       ".skills/graficos/.copied-v1",
       ".skills/graficos/logo.png",
+      ".skills/graficos/manual.pdf",
       ".skills/graficos/ref.md",
       ".skills/graficos/scripts/plot.py",
     ]);
@@ -370,15 +378,62 @@ describe("Drive and skills", () => {
       command: "python3 .skills/graficos/scripts/plot.py '--n' 'it'\\''s'",
     });
     expect((await call(ctx, "run_skill_script", { skill: "graficos", path: "ref.md" })).isError).toBe(true);
-    // The version is on the computer now: the next run writes its scripts alone, so one changed there never runs, and
-    // still says what stayed behind.
+    // The version is on the computer now: the next run writes its scripts alone, so one changed there never runs.
     const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
     const before = writes().length;
     runner.files.set(".skills/graficos/scripts/plot.py", new TextEncoder().encode("changed on the computer"));
-    const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
-    expect(again.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
+    await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
     expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
     expect(new TextDecoder().decode(runner.files.get(".skills/graficos/scripts/plot.py"))).not.toContain("changed");
+  });
+
+  test("an older runner: what it can't receive stays behind and is said, and comes once it is updated", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner, paired } = await connectedComputer(f, { protocol: FILE_PULL_PROTOCOL - 1 });
+    const md = "---\nname: graficos\ndescription: Faz gráficos.\n---\nRode scripts/plot.py.";
+    const zip = await zipOf({
+      "SKILL.md": md,
+      "scripts/plot.py": "print('plot')",
+      "manual.pdf": new Uint8Array(MAX_INLINE_FILE_BYTES + 1),
+    });
+    const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    const ctx = await runCtx();
+    const out = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(out).toMatchObject({ isError: false });
+    const left =
+      "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.";
+    expect(out.content).toContain(left);
+    expect(vaultUpdateText({ name: "Box", kind: "managed" }, "use Vault keys")).toBe(
+      "The computer Box needs an update to use Vault keys. It updates by itself, so try again later.",
+    );
+    expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
+      "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
+    );
+    // What it could take is there: the next run sends the scripts alone, and says again what stayed behind.
+    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
+    const before = writes().length;
+    const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(again.content).toContain(left);
+    expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
+
+    // Updated: what stayed behind comes, once, and the rest isn't copied again.
+    await f.db
+      .update(schema.machines)
+      .set({ protocol: FILE_PULL_PROTOCOL })
+      .where(eq(schema.machines.id, paired.machineId));
+    const pulls = () => runner.sent.filter((s) => s.type === "request" && s.op === "pull");
+    const updated = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(updated.content).not.toContain("Not copied");
+    expect(runner.files.get(".skills/graficos/manual.pdf")?.byteLength).toBe(MAX_INLINE_FILE_BYTES + 1);
+    expect(pulls()).toHaveLength(1);
+    expect(
+      writes()
+        .slice(before + 1)
+        .map((w) => w.path),
+    ).toEqual([".skills/graficos/scripts/plot.py", ".skills/graficos/.copied-large-v1"]);
+    await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(pulls()).toHaveLength(1);
   });
 });
 

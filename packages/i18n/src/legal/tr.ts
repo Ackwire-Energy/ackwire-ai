@@ -8,7 +8,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
       "agentes.chat'in kullanımına ilişkin sözleşme: çalışma alanınız, ajanlarınız ve her bir tarafın neden sorumlu olduğu.",
     courtesy:
       "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Süre ve fesih",
         blocks: [
-          "Hizmeti kullanmayı dilediğiniz zaman bırakabilir ve hesabınızı uygulama içinden silebilirsiniz. İşbu Koşulların esaslı ihlali hâlinde, kanunun gerektirdiği hâllerde veya Hizmeti sonlandırmamız durumunda 30 gün önceden bildirimde bulunarak erişiminizi askıya alabilir veya sona erdirebiliriz. Hizmeti sizin ihlaliniz dışındaki nedenlerle sona erdirdiğimizde, Çalışma Alanı İçeriğinizi 30 gün boyunca dışa aktarılabilir hâlde tutarız. Ardından Gizlilik Politikasında açıklandığı şekilde sileriz. Niteliği gereği fesihten sonra da geçerliliğini koruyan bölümler (6, 9, 11, 13, 14 ve 15 dahil) geçerliliğini korur.",
+          "Hizmeti kullanmayı dilediğiniz zaman bırakabilir ve hesabınızı uygulama içinden silebilirsiniz. Hesabınız 7 gün sonra kaldırılır ve o zamana kadar geri yükleyebilirsiniz. İşbu Koşulların esaslı ihlali hâlinde, kanunun gerektirdiği hâllerde veya Hizmeti sonlandırmamız durumunda 30 gün önceden bildirimde bulunarak erişiminizi askıya alabilir veya sona erdirebiliriz. Hizmeti sizin ihlaliniz dışındaki nedenlerle sona erdirdiğimizde, Çalışma Alanı İçeriğinizi 30 gün boyunca dışa aktarılabilir hâlde tutarız. Ardından Gizlilik Politikasında açıklandığı şekilde sileriz. Niteliği gereği fesihten sonra da geçerliliğini koruyan bölümler (6, 9, 11, 13, 14 ve 15 dahil) geçerliliğini korur.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
       "Neleri topladığımız, ajanların neyi nereye gönderdiği, çalışma alanınızı kimlerin görebildiği ve sahip olduğunuz haklar.",
     courtesy:
       "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "overview",
@@ -220,7 +220,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Çalışma alanları adına işlenen Çalışma Alanı İçeriği",
         blocks: [
           "Çalışma Alanı İçeriği, kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları, Drive'daki dosyaları ve wiki sayfalarını kapsar. Ayrıca görevleri, rutinleri, takvim etkinliklerini ve onayları, ajanların talimatlarını, ayarlarını ve hafızasını, ajanların yazdıklarını ve yaptıklarını ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri de kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
-          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
+          "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Çalışma alanının sahipleri ve yöneticileri, özel olanlar dahil tüm kanalları, görevleri ve wiki sayfalarını görebilir. Başka kişiler arasındaki doğrudan mesajları okuyamazlar. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
         ],
       },
       {
@@ -265,7 +265,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Hesap verileri:** hesap var olduğu sürece. Hesabınızı uygulama içinden sildiğinizde, kanunen saklamamız gereken kayıtlar hariç, derhâl kaldırılır ve 30 gün içinde yedeklerimizden çıkar. Tek üyesi olduğunuz her çalışma alanı aynı anda kapanır ve içeriği aşağıda açıklandığı şekilde 7 gün sonra silinir. Bulunduğunuz çalışma alanları, her biri var olduğu sürece adınızı ve e-posta adresinizi denetim kayıtlarında tutar.",
+              "**Hesap verileri:** hesap var olduğu sürece. Hesabınızı uygulama içinden sildiğinizde, kanunen saklamamız gereken kayıtlar hariç, her yerde oturumu derhâl kapatılır, bundan önce geri yüklemediğiniz sürece 7 gün sonra kaldırılır ve ardından 30 gün içinde yedeklerimizden çıkar. Tek üyesi olduğunuz her çalışma alanı aynı anda kapanır ve içeriği aşağıda açıklandığı şekilde 7 gün sonra silinir. Bulunduğunuz çalışma alanları, her biri var olduğu sürece adınızı ve e-posta adresinizi denetim kayıtlarında tutar.",
               "**Çalışma Alanı İçeriği:** çalışma alanı var olduğu sürece, çalışma alanı belirli içerikleri sildiğinde ise daha erken. Bir çalışma alanının agentes.chat planı sona erdiğinde, içeriği 90 gün boyunca erişilebilir kalır ve ardından silinir. Bir sahip bir çalışma alanını sildiğinde, çalışma alanı herkes için derhâl kapanır ve içeriği, bir sahip bu süreden önce geri yüklemedikçe 7 gün sonra silinir. Bundan sonraki 30 gün içinde de, kanunen veya kötüye kullanım kaydı olarak (aşağıya bakınız) saklamamız gereken içerik hariç, yedeklerimizden çıkar.",
               "**Kayıtlar (loglar):** istek ve güvenlik kayıtları 90 güne kadar. Model kullanım kayıtları (token ve maliyet), bütçeler ve kullanım raporları bunlara dayandığından, çalışma alanı var olduğu sürece.",
               "**Faturalandırma verileri:** bir çalışma alanı için ödeme yaptığınız sürece ve bundan sonra vergi ve muhasebe mevzuatının gerektirdiği süre boyunca.",

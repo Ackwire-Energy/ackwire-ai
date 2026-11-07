@@ -9,14 +9,18 @@ import {
   endsOnClaude,
   existingAi,
   groupPlans,
+  identityUnknown,
   lendable,
   listsExisting,
+  offersSignInAgain,
   ownSignInListed,
+  ownSignInLower,
   ownSignInName,
   ownSignInReady,
   ownSignIns,
   planWordOf,
   reusableAccount,
+  signInOf,
   signInPlan,
   unusedCopies,
 } from "../src/lib/ai-accounts";
@@ -93,6 +97,35 @@ describe("groupPlans: one row per account, its logins together", () => {
       ["e", ["e"]],
       ["f", ["f"]],
     ]);
+  });
+
+  test("one email in two of Claude's organizations is two accounts", () => {
+    const claude = (id: string, providerOrgId: string | null) =>
+      login(id, { provider: null, keyHint: null, email: "ana@example.com", providerOrgId });
+    expect(rows([claude("a", "org-personal"), claude("b", "org-team"), claude("c", "org-team")])).toEqual([
+      ["a", ["a"]],
+      ["b", ["b", "c"]],
+    ]);
+    // A login that doesn't say its organization is a login of either, as the server reads it.
+    expect(rows([claude("a", null), claude("b", "org-team"), claude("c", null)])).toEqual([["a", ["a", "b", "c"]]]);
+    expect(rows([claude("a", "org-personal"), claude("b", null), claude("c", "org-team")])).toEqual([
+      ["a", ["a", "b"]],
+      ["c", ["c"]],
+    ]);
+  });
+
+  test("a login the computer couldn't check is neither signed in nor signed out", () => {
+    const [plan] = groupPlans([
+      login("a"),
+      login("b", { status: "signed_out" }),
+      login("c", { status: "signed_out", statusKnown: false }),
+      login("d", { statusKnown: false }),
+    ]);
+    expect(plan?.signedOut.map((l) => l.id)).toEqual(["b"]);
+    expect(plan?.unknown.map((l) => l.id)).toEqual(["c"]);
+    expect(plan?.logins.map(signInOf)).toEqual(["active", "signed_out", "unknown", "active"]);
+    // Still refused by the server, so signing in again stays offered; only the words change.
+    expect(plan?.logins.map(offersSignInAgain)).toEqual([false, true, true, false]);
   });
 
   test("logins whose email or key the viewer can't see stay apart", () => {
@@ -254,6 +287,26 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignIns(undefined)).toEqual([]);
   });
 
+  test("OpenCode's free tier is a choice where its CLI runs, never a sign-in anyone has", () => {
+    const t = ((key: string) => key) as unknown as TFunction;
+    const running = { brains: { opencode: true } as AiComputer["brains"], own: {} };
+    // Nobody signed in: no row in "Seus planos", whatever an older server still sends.
+    expect(ownSignIns({ computers: [computer({ ...running, own: { opencode: {} } })] })).toEqual([]);
+    const agent = { ownSignIn: false, brain: "opencode", account: null, canUsePlans: true } as const;
+    // On a computer nobody connected, for anyone's agent.
+    expect(ownSignInReady(agent, computer({ ...running, mine: false }), "opencode")).toBe(true);
+    // On someone else's computer, no.
+    expect(ownSignInReady(agent, computer({ ...running, mine: false, canAdd: false }), "opencode")).toBe(false);
+    // On a computer the agent's owner connected, for that owner's agents.
+    expect(ownSignInReady({ ownSignIn: true }, computer(running), "opencode")).toBe(true);
+    expect(ownSignInReady(agent, computer(running), "opencode")).toBe(false);
+    // Not where the CLI can't run.
+    expect(ownSignInReady({ ownSignIn: true }, computer({ own: {} }), "opencode")).toBe(false);
+    expect(ownSignInName(t, true, "Mac", "opencode")).toBe("connectAi.own.free");
+    expect(ownSignInName(t, true, "Mac", "claude_code")).toBe("connectAi.own.shared");
+    expect(ownSignInLower(t, "opencode")).toBe("connectAi.own.freeLower");
+  });
+
   test("an agent's account choice offers the computer's own sign-in only where it can think for the agent", () => {
     type View = Parameters<typeof ownSignInListed>[0];
     const theirs: View = { ownSignIn: true, brain: "model", account: null, canUsePlans: true };
@@ -318,7 +371,7 @@ describe("the computer's own sign-in by name", () => {
   test("the viewer's own computer: the account their agents share; someone else's: that computer's", () => {
     expect(ownSignInName(t, true, "MacBook")).toBe("The account your agents share");
     expect(ownSignInName(t, false, "MacBook")).toBe("MacBook's account");
-    const own = { label: null, machineName: "MacBook", mine: true };
+    const own = { label: null, machineName: "MacBook", mine: true, kind: "claude_code" as const };
     expect(accountName(t, own)).toBe("The account your agents share");
     expect(accountName(t, { ...own, mine: false })).toBe("MacBook's account");
     expect(accountName(t, { ...own, label: "Trabalho" })).toBe("Trabalho");
@@ -375,6 +428,14 @@ describe("an account for all of its owner's agents", () => {
     expect(endsOnClaude({ ...token, shared: false }, { mode: "system" })).toBe(false);
     expect(endsOnClaude({ ...token, kind: "codex" }, { mode: "system" })).toBe(false);
   });
+
+  test("such a token names no account: its owner reads that it isn't known, never where an email says it", () => {
+    const token = login("t", { shared: true, provider: null, keyHint: null });
+    expect(identityUnknown(token, { mode: "system" })).toBe(true);
+    expect(identityUnknown({ ...token, email: "ana@example.com" }, { mode: "system" })).toBe(false);
+    expect(identityUnknown({ ...token, mine: false }, { mode: "system" })).toBe(false);
+    expect(identityUnknown(token, { mode: "single" })).toBe(false);
+  });
 });
 
 describe("an account's line in an agent's account choice", () => {
@@ -388,6 +449,12 @@ describe("an account's line in an agent's account choice", () => {
       "agentPage.work.brain.accountSignedOut",
     );
     expect(about({})).toBe("aiAccounts.page.keyEnds");
+  });
+
+  test("one the computer couldn't check says so, never signed out", () => {
+    expect(about({ status: "signed_out", statusKnown: false, provider: null, keyHint: null })).toBe(
+      "agentPage.work.brain.accountUnknown",
+    );
   });
 });
 

@@ -1,6 +1,8 @@
 import {
+  BROWSER_FPS,
   type BrowserHandoff,
   drivesOnDesktop,
+  HANDOFF_OVER,
   handoffIsMine,
   handoffScreen,
   useBrowserHandoff,
@@ -129,7 +131,10 @@ function HandoffAsk({
   // Someone else's: who it waits for in the header when known, no buttons here.
   const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, org);
   const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
-  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  // It ended meanwhile: the card settles on its own (`useBrowserHandoffMutations`), with nothing to tell.
+  const failed = (err: unknown) => {
+    if ((err as { code?: string }).code !== HANDOFF_OVER) toast({ title: t("mobile.app.failed"), icon: "x" });
+  };
 
   // `Button` gives the press's haptic: none more here, or a press taps twice.
   const take = async () => {
@@ -138,8 +143,8 @@ function HandoffAsk({
       await actions.takeControl(h.id);
       asks?.settle(h.id);
       if (opensScreen) router.push(`/computer/${h.agentId}`);
-    } catch {
-      failed();
+    } catch (err) {
+      failed(err);
     }
   };
   // A push or the inbox opened this request: it takes the control once (first one wins), when it is the person's.
@@ -192,7 +197,8 @@ function HandoffAsk({
 /** The agent's page as it is now, to look at before taking it (watching only: taps do nothing). */
 function ScreenPeek({ agentId }: { agentId: string }) {
   const c = useColors();
-  const live = useLiveConnection(agentId, true);
+  // A small look before taking it: a frame a second is enough (ADR 0040 §7.1).
+  const live = useLiveConnection(agentId, true, BROWSER_FPS.preview);
   return (
     <View style={[styles.peek, { backgroundColor: c.sunken }]}>
       {live.frame ? (
@@ -210,7 +216,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   // A line that wraps keeps its icon on the first.
   done: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
@@ -251,8 +256,9 @@ export function useNotNow(h: BrowserHandoff | null, onDone?: () => void) {
           try {
             await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
             onDone?.();
-          } catch {
-            toast({ title: t("mobile.app.failed"), icon: "x" });
+          } catch (err) {
+            // It ended meanwhile: the card settles on its own (`useBrowserHandoffMutations`), with nothing to tell.
+            if ((err as { code?: string }).code !== HANDOFF_OVER) toast({ title: t("mobile.app.failed"), icon: "x" });
           }
         }}
       />,

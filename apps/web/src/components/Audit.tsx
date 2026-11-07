@@ -23,7 +23,18 @@ import {
   TOOL_CALL,
 } from "@agenteschat/client/lib/audit";
 import { dayLabel, formatTime, whenAt } from "@agenteschat/client/lib/format";
-import { Button, Chip, type ChipProps, Icon, Menu, MenuItem, Segmented, Select, Toolbar } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  type ChipProps,
+  EmptyState,
+  Icon,
+  Menu,
+  MenuItem,
+  Segmented,
+  Select,
+  Toolbar,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -34,6 +45,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
 import "@/components/threads/threads.css";
 import "./audit.css";
@@ -50,6 +62,7 @@ export function AuditSection({ agent }: { agent?: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const look = useRightHandLook();
   const [show, setShow] = useState<AuditShow>("all");
   const [agentId, setAgentId] = useState(agent ?? ANY);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -98,9 +111,27 @@ export function AuditSection({ agent }: { agent?: string }) {
       ) : audit.isError ? (
         <ErrorState error={audit.error} onRetry={() => void audit.refetch()} />
       ) : rows.length === 0 ? (
-        <p className="audit__empty">
-          {show === "all" && agentId === ANY ? t("audit.empty") : t("audit.emptyFiltered")}
-        </p>
+        show === "all" && agentId === ANY ? (
+          <EmptyState size="page" agent={look} mood="deal" title={t("audit.emptyTitle")}>
+            {t("audit.empty")}
+          </EmptyState>
+        ) : (
+          <EmptyState
+            size="panel"
+            actions={
+              <Button
+                onClick={() => {
+                  setShow("all");
+                  setAgentId(ANY);
+                }}
+              >
+                {t("filters.clearAll")}
+              </Button>
+            }
+          >
+            {t("audit.emptyFiltered")}
+          </EmptyState>
+        )
       ) : (
         <ul className="audit__list">
           {rows.map((row) => {

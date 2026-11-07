@@ -8,7 +8,7 @@ import { useOrgMaybe } from "@/providers/org";
  */
 export interface AiOrg {
   orgId: string;
-  org: Pick<OrgSummary, "name" | "standing"> | null;
+  org: OrgSummary | null;
 }
 
 const AiOrgContext = createContext<AiOrg | null>(null);

@@ -4,6 +4,7 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { followWork } from "./agent-status";
 import { openApprovalCard, publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
+import { readableChannelIds } from "./channels";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { liveTurnToolStarted, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
@@ -15,6 +16,7 @@ import { notifyQuestion } from "./notification-producers";
 import {
   type AgentQuestionRow,
   ASK_USER_TOOL,
+  impliedAddressee,
   publishQuestion,
   QUESTION_TTL_MS,
   questionCardMeta,
@@ -24,7 +26,7 @@ import {
 import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
-import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
+import { publishSecret, type SecretRequestRow, secretLabelOf, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
@@ -669,7 +671,15 @@ export type RunPause = Exclude<InvokeResult, { type: "result" }> | { type: "wait
 export interface PauseRequests {
   approvals: Approval[];
   /** `why`: the agent's required reason (ADR 0053 §8), shown on the card. */
-  questions: { id: string; toolUseId: string; text: string; choices: string[] | null; why?: string }[];
+  questions: {
+    id: string;
+    toolUseId: string;
+    text: string;
+    choices: string[] | null;
+    /** The person the agent said it is for; else `impliedAddressee` reads it from the run. */
+    requestedForUserId?: string | null;
+    why?: string;
+  }[];
   secretRequestIds: string[];
 }
 
@@ -788,8 +798,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .returning();
     if (!request) continue;
     // The card names the key itself: this text is for previews and notifications, a sentence of its own.
-    const message = await card(asked, `${agentName} asked for a key: ${request.name}`, {
-      ...bodyCode("secret_request", { agent: agentName, name: request.name }),
+    const what = secretLabelOf(request);
+    const message = await card(asked, `${agentName} asked for a key: ${what}`, {
+      ...bodyCode("secret_request", { agent: agentName, name: what }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
     });
@@ -806,6 +817,12 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
   }
 
   for (const ask of requests.questions) {
+    // Someone who can't read where the card goes could never answer it: it waits on the room instead.
+    const requestedForUserId =
+      ask.requestedForUserId &&
+      (await readableChannelIds(tx, run.orgId, ask.requestedForUserId, [asked.channelId])).size > 0
+        ? ask.requestedForUserId
+        : await impliedAddressee(tx, run, asked, ask.text);
     const [inserted] = await tx
       .insert(agentQuestions)
       .values({
@@ -813,12 +830,13 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
         orgId: run.orgId,
         runId: run.id,
         agentId: run.agentId,
-        // Whoever can read that conversation may answer it (`answerQuestion`).
+        // Whoever can read that conversation may answer it, unless it is for one person (`answerQuestion`).
         channelId: asked.channelId,
         threadId: asked.threadId,
         toolUseId: ask.toolUseId,
         text: ask.text,
         choices: ask.choices,
+        requestedForUserId,
         expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
       })
       .onConflictDoNothing()
@@ -964,7 +982,16 @@ export async function suspendRunForTool(
       approvals: gated.type === "approval" ? [gated.approval] : [],
       questions:
         gated.type === "question" && questionId
-          ? [{ id: questionId, toolUseId: call.id, text: gated.text, choices: gated.choices, why: gated.why }]
+          ? [
+              {
+                id: questionId,
+                toolUseId: call.id,
+                text: gated.text,
+                choices: gated.choices,
+                requestedForUserId: gated.requestedForUserId,
+                why: gated.why,
+              },
+            ]
           : [],
       secretRequestIds: gated.type === "secret" ? [gated.requestId] : [],
     });

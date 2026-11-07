@@ -14,9 +14,9 @@
 }
 
 /* Avatars at the design's sizes (the engine draws to the box). */
-.nt-av40 {
-  width: 40px;
-  height: 40px;
+.nt-av32 {
+  width: 32px;
+  height: 32px;
 }
 .nt-av28 {
   width: 28px;
@@ -65,117 +65,45 @@
   }
 }
 
-/* ── Counts in the "Esperando você" head ────────────────────────────────── */
-.nt-n {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--faint);
-}
-.nt-n.ac-num {
-  font-weight: 600;
-}
-
 /* ── "Esperando você": what blocks an agent or a decision ───────────────── */
+/* The day groups' head, then each request as the conversation draws it: the agent's face beside its card. */
 .nt-wait {
-  position: relative;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 4px;
 }
-/* A raised container: its buttons lift one step in dark (the kit's elevation context). */
-.nt-wait > * {
-  --raised: var(--raised-2);
-  --surface-raised: var(--raised-2);
-  --card-face-top: var(--raised-2);
-  --card-key-bottom: var(--raised-2);
-}
-.nt-wh {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px 13px;
-}
-.nt-faces {
-  display: flex;
-  flex: none;
-}
-.nt-faces > * {
-  margin-left: -6px;
-  transition: transform 0.2s var(--spring);
-}
-.nt-faces > *:first-child {
-  margin-left: 0;
-}
-.nt-faces > *:hover {
-  transform: translateY(-3px);
-}
-.nt-wh__t {
-  flex: 1;
-  min-width: 0;
-}
-.nt-wh h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.nt-wh small {
-  display: block;
-  font-size: 13px;
-  color: var(--muted);
+.nt-wait > .list-group-head {
+  margin-bottom: -4px;
 }
 .nt-wi {
   position: relative;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 2px 14px;
-  padding: 14px 16px 16px;
-  border-top: 1px solid var(--line);
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: start;
+  border-radius: 18px;
   outline: none;
-  overflow: hidden;
   cursor: pointer;
-  transition: background 0.15s;
 }
-.nt-wi:last-child {
-  border-radius: 0 0 20px 20px;
+/* The face on the card's first line (its kind), as in the conversation. */
+.nt-wi > .nt-face {
+  display: flex;
+  padding-top: 12px;
 }
-.nt-wi:hover {
-  background: color-mix(in srgb, var(--sunken) 35%, transparent);
+.nt-wi > .rq {
+  max-width: none;
+  margin: 0;
 }
-.nt-wi.is-cur {
-  background: color-mix(in srgb, var(--sunken) 70%, transparent);
+/* The one the keys are on (J/K): its card's edge a step stronger. */
+.nt-wi.is-cur > :is(.rq, .nt-wr__main) {
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
-html:not([data-pointer]) .nt-wi:focus-visible,
+html:not([data-pointer]) .nt-wi:focus-visible {
+  box-shadow: var(--focus-ring);
+}
 html:not([data-pointer]) .nt-item:focus-visible {
   box-shadow: var(--focus-ring-inset);
-}
-.nt-face {
-  grid-row: 1 / span 3;
-  padding-top: 2px;
-}
-.nt-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  font-size: 12.5px;
-  color: var(--faint);
-  min-width: 0;
-}
-.nt-meta b {
-  color: var(--ink2);
-  font-weight: 600;
-}
-.nt-wi h3 {
-  margin: 3px 0 0;
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.35;
 }
 .nt-ctx {
   margin: 2px 0 0;
@@ -186,196 +114,50 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-weight: 600;
   color: var(--ink2);
 }
-/* An approval in one sentence (AprovacaoConector B): who wants what. */
-.nt-say {
-  margin: 3px 0 0;
-  font-size: 16px;
-  line-height: 1.45;
-  color: var(--ink2);
+/* Its agent stopped until I answer: in attention once it has waited a while. */
+.nt-late {
+  color: var(--warn);
+  font-weight: 600;
 }
-.nt-say b {
-  font-weight: 650;
-  color: var(--ink);
-}
-.nt-origin {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.nt-facts {
+/* Remind me later and Done end the footer, after the time. */
+.rq__end > .nt-tail.ac-acts {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-.nt-why-btn {
-  border: 0;
-  background: none;
-  padding: 0 2px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
-  text-decoration: underline;
-  text-decoration-color: var(--line);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.nt-why-btn:hover {
-  text-decoration-color: currentColor;
-}
-.nt-why {
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sunken);
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--ink2);
-}
-.nt-body {
-  grid-column: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-  min-width: 0;
-}
-/* A card's action line, an `.ac-acts` row. Remind me later and Done end it, in the rows' two columns. A nested
-   `.ac-acts` has no box, and a line that wraps would split the pair: here it keeps one, which the margin pushes. */
-.nt-wacts {
-  flex-wrap: wrap;
-  row-gap: 8px;
-}
-.nt-wacts > .nt-tail.ac-acts {
-  display: flex;
-  margin-left: auto;
-}
-/* On touch a ghost at the item's edge reaches to 2px from it (a phone's 14px padding, the 12px plate), and the item
-   clips: the ring goes inside, as the item's own does. */
-html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
-  box-shadow: var(--focus-ring-inset);
+  margin-right: -6px;
 }
 
-/* ── What only points somewhere: one row, opened by a click on it ─────────── */
-.nt-wr {
-  align-items: start;
-  padding: 12px 16px;
+/* ── What only points somewhere: a card of the requests' shape, opened by a click on it ── */
+.nt-wr > :not(.nt-face, .nt-wr__main) {
+  grid-column: 2;
 }
-/* A flex box, not a line: an avatar left on a line of text gets the line's descent under it. */
-.nt-wr > .nt-face {
-  grid-row: auto;
-  padding-top: 0;
-  display: flex;
-}
-/* The words, then the actions, as far from the words as the actions are from each other. */
 .nt-wr__main {
-  display: flex;
-  align-items: flex-start;
-  column-gap: calc(2 * var(--ghost-plate));
-  min-width: 0;
+  max-width: none;
+  margin: 0;
 }
-.nt-wr__text {
-  flex: 1;
-  min-width: 0;
+/* Where it is from, then when, as a request's kind; the time left on the right, as its state. */
+.nt-wr__left {
+  margin-left: auto;
 }
-/* The headline, its chips and its time on one line, the chips' 22px. Only the headline shrinks. */
-.nt-wr__l1 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 14px;
-  line-height: 22px;
-  color: var(--muted);
-}
-.nt-wr__l1 > .ac-chip,
-.nt-wr__tm {
-  flex: none;
-}
-.nt-wr__tm {
-  font-size: 12.5px;
-  color: var(--faint);
-  white-space: nowrap;
+/* The headline is the card's words: their size, its names in bold. */
+.nt-wr .rq__lead.nt-what {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
 }
 .nt-wr__sub {
-  margin: 0;
-  font-size: 14px;
-  color: var(--ink2);
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin: 4px 0 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
 }
-/* Open, Remind me later and Done on the face's middle. */
-.nt-wr__acts {
-  flex: none;
-  height: 40px;
-}
-/* The whole row opens: Open answers its hover. */
+/* The whole card opens: Open answers its hover. */
 @media (hover: hover) {
   .nt-wr:hover .nt-wr__open:not(:focus-visible) {
     box-shadow: var(--e2), var(--top);
   }
-}
-/* At every width a line alone centres on the face, (40 - 22) / 2, on the actions' middle. With a line under it, or
-   where the words wrap, the row gives the first line `.ac-captop`: its capitals start at the face's top. */
-.nt-wr__l1:not(.ac-captop) {
-  margin-block-start: 9px;
-}
-/* Under 1024px one line leaves the headline too little room beside the actions: the words wrap, three lines at most,
-   the time at their end and never alone on the last line. A name with no spaces (an email) breaks too. */
-@media (max-width: 1023px) {
-  .nt-wr__l1 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    text-wrap: pretty;
-  }
-  .nt-wr .nt-what {
-    white-space: normal;
-  }
-  /* A chip is an inline box as tall as the line: on the baseline it makes the line 3px taller, on its top none. */
-  .nt-wr__l1 > .ac-chip {
-    vertical-align: top;
-  }
-}
-.nt-sug {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-/* Choices can be whole sentences: each grows with its text and wraps inside the row. */
-.nt-sug button {
-  max-width: 100%;
-  min-height: var(--control-h-sm);
-  padding: 6px var(--control-px-sm);
-  border-radius: var(--control-r-sm);
-  border: 0;
-  background: var(--sunken);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: normal;
-  text-align: left;
-  overflow-wrap: anywhere;
-  color: var(--ink2);
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    transform 0.18s var(--spring);
-}
-.nt-sug button:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-}
-.nt-sug button:active {
-  transform: scale(0.96);
-}
-html:not([data-pointer]) .nt-sug button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
 }
 .nt-ok {
   color: var(--ok);
@@ -758,6 +540,22 @@ html:not([data-pointer]) .nt-more:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
+/* The bar floats over the row's end: the row's words always stop short of it, as many buttons as it has, so hovering
+   a row never moves them. */
+@media (min-width: 721px) {
+  .nt-item > .nt-c {
+    padding-right: var(--nt-acts-room, 48px);
+  }
+  .nt-item:has(.nt-acts > :nth-child(2)) {
+    --nt-acts-room: 82px;
+  }
+  .nt-item:has(.nt-acts > :nth-child(3)) {
+    --nt-acts-room: 116px;
+  }
+  .nt-item:has(.nt-acts > :nth-child(4)) {
+    --nt-acts-room: 150px;
+  }
+}
 .nt-nb {
   position: relative;
   width: var(--control-h-sm);
@@ -844,6 +642,11 @@ html:not([data-pointer]) .nt-nb:focus-visible {
 .nt-cmp textarea::placeholder {
   color: var(--faint);
 }
+.nt-cmp textarea:disabled {
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  cursor: not-allowed;
+}
 .nt-cmp__row {
   display: flex;
   align-items: center;
@@ -926,58 +729,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   }
 }
 
-/* ── Empty: everything done ─────────────────────────────────────────────── */
-.nt-calm {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 0 18px 26px;
-  border-radius: 20px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  overflow: hidden;
-  margin-bottom: 22px;
-  animation: nt-fi 0.4s var(--out);
-}
-.nt-calm__glow {
-  position: relative;
-  width: calc(100% + 36px);
-  margin: 0 -18px -4px;
-  height: 160px;
-}
-.nt-calm__glow .ac-sky-glow {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.nt-calm > b {
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 28px;
-  letter-spacing: -0.03em;
-}
-.nt-calm > p {
-  margin: 0;
-  color: var(--muted);
-  max-width: 46ch;
-  font-size: 14px;
-}
-.nt-nores {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 36px 16px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-  border-radius: 20px;
-  box-shadow: inset 0 0 0 1px var(--line);
-  margin-bottom: 22px;
-}
 .nt-more-pages {
   display: flex;
   justify-content: center;
@@ -997,19 +748,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
     mask-image: linear-gradient(90deg, #000 85%, transparent);
   }
-  .nt-wh {
-    padding: 12px 14px;
-  }
-  .nt-wi {
-    gap: 2px 10px;
-    padding: 14px 14px 16px;
-  }
-  .nt-body {
-    grid-column: 1 / -1;
-  }
-  .nt-wr {
-    padding: 12px 14px;
-  }
   /* A tap on the row opens it, so the words take Open's room. Open stays for screen readers and the keyboard. */
   .nt-wr__open:not(:focus-visible) {
     position: absolute;
@@ -1020,14 +758,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-  /* Where it opens is the chip's job on wide screens. Here the words need the room. */
-  .nt-wr__src {
-    display: none;
-  }
-  /* An expiring request says the time that matters: its chip in the time's place. */
-  .nt-wr__l1:has(> .nt-wr__left) > .nt-wr__tm {
-    display: none;
   }
   /* The source chips go under the headline: beside it, two of them (a task's number and its status change) took
      ~300px and never shrank, leaving the words nothing and running past the card. */
@@ -1120,10 +850,8 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-cmp,
   .nt-reps,
   .nt-resolved,
-  .nt-calm,
   .nt-more .ac-icon,
-  .nt-faces > *,
-  .nt-sug button {
+  .nt-faces > * {
     animation: none;
     transition: none;
   }

@@ -1,9 +1,25 @@
-import { type ConnectIntent, keys, useAiAccounts, useAiStatus, useApi } from "@agenteschat/client";
+import {
+  type ConnectIntent,
+  type Credential,
+  keys,
+  useAiAccounts,
+  useAiStatus,
+  useApi,
+  useModels,
+} from "@agenteschat/client";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, choiceOfIntent, freePlanAccount, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { keyLooksValid, type ProviderId, providerGuess, providerOf } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import {
+  keyLooksValid,
+  type ProviderId,
+  providerGuess,
+  providerLabel,
+  providerOf,
+} from "@agenteschat/client/lib/providers";
+import { isRightHand, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -11,10 +27,11 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import { Button, SheetScreen } from "@/ui";
+import { Button, SheetScreen, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { ConnectAiFlow, type FlowView, viewOf } from "./ConnectAiSteps";
-import { openPage } from "./parts";
+import { ConnectAiFlow, viewOf } from "./ConnectAiSteps";
+import type { FlowView } from "./logic";
+import { openPage, PlanHoldNote, usePlanHold } from "./parts";
 
 /**
  * The first run's API key (the web's key panel, saved by the step's button): a pay-as-you-go key for the
@@ -22,39 +39,64 @@ import { openPage } from "./parts";
  * pointing. `orgId` is passed in: the first run goes before a workspace is chosen.
  */
 export function useConnectKey(orgId: string, asked?: string) {
+  const { t } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
   const [provider, setProvider] = useState<ProviderId>(() => providerGuess(undefined, asked));
+  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
+  const [custom, setCustom] = useState(asked === CUSTOM_PROVIDER);
   const [key, setKeyRaw] = useState("");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
+  const [savedNote, setSavedNote] = useState<string>();
   const clean = key.trim();
   const looksRight = clean.length === 0 || keyLooksValid(provider, clean);
   // A pasted key says whose it is when only one provider's keys look like it.
   const setKey = (value: string) => {
     setKeyRaw(value);
     setFailed(false);
+    setRefused(null);
     if (value.trim().length > 12) setProvider(providerGuess(value, provider));
   };
-  const save = async (): Promise<boolean> => {
-    if (!clean || saving) return false;
+  const save = async (): Promise<Credential | null> => {
+    if (!clean || saving) return null;
     setSaving(true);
     setFailed(false);
+    setRefused(null);
     try {
       const entry = providerOf(provider);
-      await api.agents.addCredential(orgId, { provider, label: entry?.label ?? provider, apiKey: clean });
+      const saved = await api.agents.addCredential(orgId, { provider, label: entry?.label ?? provider, apiKey: clean });
+      if (saved.check === "unchecked")
+        setSavedNote(t("connectAi.key.savedUnchecked", { provider: providerLabel(provider) }));
       // `aiStatus` lives under `credentials`: both refresh.
       await qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-      return true;
-    } catch {
-      setFailed(true);
-      return false;
+      return saved;
+    } catch (error) {
+      const refusal = keyRefusal(t, error);
+      setRefused(refusal);
+      setFailed(!refusal);
+      return null;
     } finally {
       setSaving(false);
     }
   };
-  // `asked`: what opened the sheet, so "Outro provedor" (ADR 0146) opens on its own form.
-  return { provider, setProvider, key, setKey, looksRight, ready: clean.length > 0, saving, failed, save, asked };
+  return {
+    provider,
+    setProvider,
+    custom,
+    setCustom,
+    key,
+    setKey,
+    looksRight,
+    ready: clean.length > 0,
+    saving,
+    failed,
+    refused,
+    savedNote,
+    setSavedNote,
+    save,
+  };
 }
 
 export type ConnectKey = ReturnType<typeof useConnectKey>;
@@ -88,6 +130,7 @@ export function ConnectAiSheet() {
   }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
+  const hold = usePlanHold(orgId, org);
   // From the create-agent step: for the agent being made, never one I have.
   // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
   const mine = params.forNew === "1" ? [] : dir.agents.filter((a) => a.ownerUserId === meId || isRightHand(a));
@@ -100,6 +143,8 @@ export function ConnectAiSheet() {
     viewOf(PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(params.intent as ConnectIntent | undefined)),
   );
   const form = useConnectKey(orgId, params.provider);
+  const models = useModels();
+  const toast = useToast();
   const [keySaved, setKeySaved] = useState(false);
   const answer = () => {
     void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
@@ -127,7 +172,9 @@ export function ConnectAiSheet() {
   };
   return (
     <SheetScreen>
-      {dir.loading || status.isPending ? (
+      {hold ? (
+        <PlanHoldNote org={org} />
+      ) : dir.loading || status.isPending ? (
         <ActivityIndicator color={c.faint} style={styles.loading} />
       ) : (
         <ConnectAiFlow
@@ -154,14 +201,22 @@ export function ConnectAiSheet() {
           keyForm={form}
           keySaved={keySaved}
           onSaveKey={() =>
-            void form.save().then(async (ok) => {
-              if (!ok) return;
+            void form.save().then(async (key) => {
+              if (!key) return;
               // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
               // own DM goes back to it.
               if (one && rightHand) {
-                await api.agents.setBrain(orgId, one.id, { brain: "model" }).catch(() => null);
-                await api.agents.setBrain(orgId, one.id, { scope: "workspace", brain: "model" }).catch(() => null);
+                const moved = await rightHandOnKey(api, orgId, one, key, models.data?.models ?? []).then(
+                  () => true,
+                  (error) => {
+                    toast({ title: errorText(t, error), icon: "x" });
+                    return false;
+                  },
+                );
+                if (moved && key.check !== "unchecked")
+                  form.setSavedNote(thinksWithLine(t, "workspace", one.name, key.label));
                 void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+                void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, one.id) });
               }
               setKeySaved(true);
               answer();

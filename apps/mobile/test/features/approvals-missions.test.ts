@@ -358,6 +358,10 @@ describe("the exact request", () => {
       ),
     ).toBe("Por último");
     expect(approvalSaid(approval({ id: "c", why: null }))).toBeNull();
+    expect(approvalSaid(approval({ id: "d", why: "Os **testes** passaram." }))).toBe("Os testes passaram.");
+    expect(
+      approvalSaid(approval({ id: "e", why: null, trail: [{ text: "`deploy` feito", at: "2026-10-18T10:01:00Z" }] })),
+    ).toBe("deploy feito");
   });
 });
 

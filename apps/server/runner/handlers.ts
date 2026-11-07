@@ -20,6 +20,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import { realFoldersFor } from "./access";
+import type { AccountBrains } from "./account-brains";
 import type { AccountFolders, AccountGrant, AccountManager } from "./accounts";
 import { type BrainManager, brainKey } from "./brain";
 import { type AntigravityBrainTurnRequest, handleAntigravityBrainTurn } from "./brain-antigravity";
@@ -30,6 +31,7 @@ import { type GrokBrainTurnRequest, handleGrokBrainTurn } from "./brain-grok";
 import { handleOpencodeBrainTurn, type OpencodeBrainTurnRequest } from "./brain-opencode";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
+import type { BrowserViews } from "./browser-views";
 import { allowedMerge, commandApproval, ownBranches } from "./command-gate";
 import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
@@ -39,15 +41,16 @@ import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
-import { agentWorkspace, hiddenIn, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
+import { agentWorkspace, hiddenIn, isInside, resolveForAgent } from "./paths";
+import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
 import type { Spawn } from "./scope-gate";
-import { agentSecrets, handleSecret } from "./secrets";
+import { agentSecrets, handleSecret, holdsSecretFile } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
-import { openExecKeys, parseExecVault, runnerVault } from "./vault";
+import { openExecKeys, parseExecVault, runnerVault, sealMadePassword } from "./vault";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
@@ -62,6 +65,21 @@ export const MAX_IN_FLIGHT = 128;
 export const TURNS_WITHOUT_MEMORY = 8;
 /** What a coding CLI grows to once it runs (measured: about 0.6 GB). */
 export const TURN_BYTES = 0.6e9;
+/**
+ * A locked-down turn (`permissions.mode` `chat`, the team's right hand) has no folders, no browser and no tools of its
+ * own, so it is at most one CLI: it needs room for that and a margin, not `MIN_FREE_BYTES`. A person asks it what
+ * filled the computer, so it runs while the rest waits, and only a computer about to run out turns it away.
+ */
+export const LOCKED_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.3e9;
+/** Where memory isn't known: how many locked-down turns may run past `TURNS_WITHOUT_MEMORY`. */
+export const LOCKED_TURNS_PAST_COUNT = 2;
+/**
+ * The floor of the slot held for a person's turn (`personWaiting`): one turn and a margin, so a nearly dead computer
+ * doesn't get worse. Agents' turns stop at `MIN_FREE_BYTES` and grow by `TURN_BYTES`, so a computer they filled sits
+ * just above this: the slot is there whenever only their turns filled it. The margin is over a locked-down turn's
+ * because this one has tools.
+ */
+export const PERSON_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.4e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
@@ -73,6 +91,7 @@ export const RECLAIM_MS = 5_000;
  */
 const PEOPLE_OPS: ReadonlySet<string> = new Set([
   "stream.open",
+  "browser.view.open",
   "desktop.session.status",
   "desktop.session.stop",
   "desktop.text",
@@ -86,6 +105,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "write",
   "list",
   "push",
+  "pull",
   "task.start",
   "brain.turn",
   "brain.route",
@@ -101,6 +121,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "desktop.capture",
   "desktop.apps",
   "vault.key",
+  "vault.password",
 ]);
 
 /**
@@ -116,6 +137,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   write: "agent",
   list: "agent",
   push: "agent",
+  pull: "agent",
   // Keys and staged boxes stay in the root supervisor until DB-committed activation.
   secret: "machine",
   account: "machine",
@@ -147,6 +169,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.session.stop": "machine",
   "desktop.session.status": "machine",
   "stream.open": "machine",
+  // The live view's data socket is the process's that holds the server connection (only it has the token).
+  "browser.view.open": "machine",
   // The helper runs as the agent's own user, in its worker; the worker asks the supervisor for the desktop.
   "desktop.look": "agent",
   "desktop.act": "agent",
@@ -155,6 +179,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.text": "agent",
   // ADR 0144: the key lives in the process that opens the values (the agent's worker), so root never holds one.
   "vault.key": "agent",
+  // The password is made and sealed where the Vault's values open: root relays only the box.
+  "vault.password": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -189,12 +215,16 @@ export interface HandlerContext {
   cacheFill?: CacheFill;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
+  /** System mode: the turns of Claude sign-ins several agents share, which never reach a worker. */
+  accountBrains?: AccountBrains;
   /**
    * A brain turn found no room: closes one idle warm CLI on this computer (any agent's in system mode), least
    * recently used first, `spare` (the waiting turn's own session, `brainKey`) last, never one mid-turn or
    * holding the agent's work; false when none could close.
    */
   reclaimBrains?: (spare: string) => Promise<boolean>;
+  /** Whether the session `spare` (`brainKey`) has an open CLI: a turn on it takes no new process's memory. */
+  warmBrain?: (spare: string) => Promise<boolean>;
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
@@ -251,6 +281,8 @@ export interface HandlerContext {
   terminals?: Terminals;
   /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
   streams?: DataSockets;
+  /** Protocol 49: the live views of the agents' browsers (`browser.view.open`, ADR 0040 §7.1). */
+  browserViews?: BrowserViews;
   /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
   desktopUse?: DesktopManager;
   /** A person takes control of the agent's desktop: what the agent's pointer and keys are doing stops. */
@@ -380,12 +412,8 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
   if (inBrowserProfile(target.abs)) {
     throw new RunnerError("bad_request", `${requested} holds your browser's logins. It stays on this computer.`);
   }
-  if (!secrets || secrets.files.length === 0) return;
-  for (const file of secrets.files) {
-    const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
-    if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {
-      throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
-    }
+  if (secrets && (await holdsSecretFile(ctx.workspaceReal, secrets.files, target.abs))) {
+    throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
   }
 }
 
@@ -415,6 +443,26 @@ async function doRead(
   return { base64: data.toString("base64"), size: data.byteLength };
 }
 
+/** Where a file op may put `requested`, its parent folders made. */
+async function writeTarget(ctx: HandlerContext, requested: string) {
+  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
+  // without the "commands" switch): never written by a file op (`git-guard.ts`).
+  const gitInternal = () =>
+    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
+  if (isGitInternalPath(requested)) throw gitInternal();
+  const first = await resolvePath(ctx, requested);
+  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
+  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
+  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
+  // Check again now that the parents exist (nothing raced us outside).
+  const target = await resolvePath(ctx, requested);
+  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
+  if (target.exists && (await stat(target.abs)).isDirectory()) {
+    throw new RunnerError("bad_request", `${requested} is a folder`);
+  }
+  return target;
+}
+
 async function doWrite(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "write" }>,
@@ -427,22 +475,7 @@ async function doWrite(
   if (data.byteLength > MAX_INLINE_FILE_BYTES) {
     throw new RunnerError("too_large", `Files sent inline are limited to ${MAX_INLINE_FILE_BYTES} bytes`);
   }
-  const requested = requireString(req.path, "path");
-  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
-  // without the "commands" switch): never written by a file op (`git-guard.ts`).
-  const gitInternal = () =>
-    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
-  if (isGitInternalPath(requested)) throw gitInternal();
-  const first = await resolvePath(ctx, requested);
-  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
-  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
-  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
-  // Check again now that the parents exist (nothing raced us outside).
-  const target = await resolvePath(ctx, req.path);
-  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
-  if (target.exists && (await stat(target.abs)).isDirectory()) {
-    throw new RunnerError("bad_request", `${req.path} is a folder`);
-  }
+  const target = await writeTarget(ctx, requireString(req.path, "path"));
   await writeFile(target.abs, data);
   return { size: data.byteLength };
 }
@@ -529,6 +562,8 @@ async function scrubbed(ctx: HandlerContext, req: MachineRequest, err: unknown):
 async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+  // Protocol 49: an agent's (or a profile's) live view socket, this process's in every mode (ADR 0040 §7.1).
+  if (req.op === "browser.view.open") return openBrowserView(ctx, req);
   // Protocol 34: a browser profile's session, never an agent's worker or folder (ADR 0110).
   if (req.profile || req.op === "browser.profile.delete") return handleProfileBrowser(ctx, req, scope);
   if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
@@ -540,6 +575,27 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     }
     // An op this runner doesn't know (`OP_ROUTES` has no row) goes nowhere.
     if (OP_ROUTES[req.op] !== "agent") throw new RunnerError("bad_request", `Unknown op ${String(req.op)}`);
+    const hosted = ctx.accountBrains;
+    if (hosted?.takes(req)) return doHostedTurn(ctx, hosted, req, scope);
+    if (req.op === "brain.steer" && hosted?.brains.hosts(String(req.runId))) {
+      return doBrainSteer({ ...ctx, brains: hosted.brains }, req);
+    }
+    if (hosted?.onSharedLogin(req) && req.agent) {
+      const { agent } = req;
+      if (req.op === "brain.route") {
+        requireTool(ctx, "claude");
+        return hosted.route(req, agent, scope);
+      }
+      if (req.op === "task.start") {
+        const { workers } = ctx;
+        return hosted.startTask(
+          req,
+          agent,
+          () => workers.run(req, scope),
+          (final) => signedOut(ctx, req, final),
+        );
+      }
+    }
     const out = await ctx.workers.run(req, scope);
     // The account's folder is root's to mark: what the worker's turn found out is told here.
     if (req.op === "brain.turn") signedOut(ctx, req, (out as Partial<MachineReplies["brain.turn"]> | null)?.final);
@@ -565,6 +621,9 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
       throw new RunnerError("bad_request", "A Vault key belongs to an agent");
     }
     return { vaultKey: await runnerVault.issueKey(agentId) } satisfies MachineReplies["vault.key"];
+  }
+  if (req.op === "vault.password") {
+    return { box: await sealMadePassword(req, req.agent?.id) } satisfies MachineReplies["vault.password"];
   }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
@@ -662,6 +721,18 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
         fetch: ctx.fetch,
         signal: scope.signal,
         resolve: (p) => resolveToRead(ctx, p),
+      });
+    case "pull":
+      return pullFile({
+        abs: (await writeTarget(ctx, requireString(req.path, "path"))).abs,
+        token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
+        url: requireString(req.url, "url"),
+        pullId: requireString(req.pullId, "pullId"),
+        size: clampInt(req.size, 0, Number.MAX_SAFE_INTEGER, 0),
+        ...(typeof req.sha256 === "string" ? { sha256: req.sha256 } : {}),
+        fetch: ctx.fetch,
+        signal: scope.signal,
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
@@ -861,6 +932,26 @@ export const PROFILES_SYSTEM_MODE =
 const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * `browser.view.open` (protocol 49): the data socket of an agent's live view, or a browser profile's (its frames
+ * carry `profile:<id>` where an agent's id would be). Dialed here, whichever process runs that browser: in system
+ * mode root's, which passes the worker's frames on to it.
+ */
+async function openBrowserView(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "browser.view.open" }>,
+): Promise<MachineReplies["browser.view.open"]> {
+  if (!ctx.browserViews) throw new RunnerError("browser_unavailable", "This runner has no live view for browsers");
+  requireTool(ctx, "browser");
+  const profileId = req.profile?.id;
+  if (profileId !== undefined && (typeof profileId !== "string" || !PROFILE_ID.test(profileId))) {
+    throw new RunnerError("bad_request", "Which browser profile?");
+  }
+  const key = typeof profileId === "string" ? profileKey(profileId) : String(req.agent?.id ?? "");
+  if (!key || !isStreamId(req.streamId)) throw new RunnerError("bad_request", "A live view needs an agent and its id");
+  return ctx.browserViews.open(key, req.streamId);
+}
+
+/**
  * Protocol 34 (ADR 0110): a `browser.*` op in a browser profile's session. The session is keyed by the profile
  * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
  * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
@@ -946,6 +1037,7 @@ async function handleAccount(
         req.email === undefined ? undefined : requireString(req.email, "email"),
         req.provider === undefined ? undefined : requireString(req.provider, "provider"),
         req.shared === true,
+        req.method === undefined ? undefined : requireString(req.method, "method"),
       );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
@@ -1013,6 +1105,24 @@ async function doBrainTurn(
     ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
     ...(ctx.grant ? { grant: ctx.grant } : {}),
   });
+  signedOut(ctx, req, final);
+  scope.emit?.({ type: "brain.done", runId });
+  return { runId, final };
+}
+
+/** `brain.turn` on a Claude sign-in several agents share: root runs its CLI (`account-brains.ts`). */
+async function doHostedTurn(
+  ctx: HandlerContext,
+  hosted: AccountBrains,
+  req: Extract<MachineRequest, { op: "brain.turn" }>,
+  scope: RequestScope,
+): Promise<MachineReplies["brain.turn"]> {
+  requireTool(ctx, "claude");
+  if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
+  const runId = requireString(req.runId, "runId");
+  const final = await hosted.turn(req, req.agent, scope, (event) =>
+    scope.emit?.({ type: "brain.event", runId, event }),
+  );
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
@@ -1275,6 +1385,7 @@ function describeOp(req: MachineRequest): string {
     case "write":
     case "list":
     case "push":
+    case "pull":
       return `${req.op} ${String(req.path ?? "") || "."}`;
     case "secret":
       // Never the value: the action and the name or request.
@@ -1327,6 +1438,8 @@ function describeOp(req: MachineRequest): string {
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
       return `browser.input ${Array.isArray(req.events) ? req.events.length : 0} events`;
+    case "browser.view.open":
+      return "browser.view.open";
     case "stream.open":
       return req.kind === "terminal"
         ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
@@ -1383,6 +1496,10 @@ export class RequestRunner {
   private turns = 0;
   /** When brain turns were admitted, over the last `TURN_SETTLE_MS`. */
   private admitted: number[] = [];
+  /** When a person's turn was last admitted, by the floor or the slot. */
+  private lastPersonTurn = Number.NEGATIVE_INFINITY;
+  /** The request in the slot held for a person's turn (`reserve`). */
+  private reserved: string | null = null;
 
   constructor(
     private readonly ctx: HandlerContext,
@@ -1397,16 +1514,46 @@ export class RequestRunner {
    * Room for one more brain turn: `MemAvailable`, less what the turns admitted in the last
    * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
    * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
-   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead.
+   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead. `locked`:
+   * a locked-down turn, on its own floor and a little past the count. `person`: a person waits on it.
    */
-  private admit(): boolean {
+  private admit(locked: boolean, person: boolean): boolean {
     const now = (this.admission.now ?? Date.now)();
     this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
     const free = this.memAvailable();
+    const floor = locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES;
     const room =
-      free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
-    if (room) this.admitted.push(now);
+      free === null
+        ? this.turns < TURNS_WITHOUT_MEMORY + (locked ? LOCKED_TURNS_PAST_COUNT : 0)
+        : free - this.admitted.length * TURN_BYTES >= floor;
+    if (room) {
+      this.admitted.push(now);
+      if (person) this.lastPersonTurn = now;
+    }
     return room;
+  }
+
+  /**
+   * The floor turned away a turn a person waits on and closing idle CLIs didn't help: one such turn at a time goes
+   * ahead, down to `PERSON_TURN_MIN_FREE_BYTES`, if no person's turn was admitted in the last `TURN_SETTLE_MS` (the
+   * reading doesn't show that one yet). Agents' turns keep their floor, and what this one takes counts against it.
+   * Where memory isn't known there is no floor to keep, so no slot.
+   */
+  private reserve(id: string, person: boolean): boolean {
+    if (!person || this.reserved !== null) return false;
+    const now = (this.admission.now ?? Date.now)();
+    const free = this.memAvailable();
+    if (free === null || now - this.lastPersonTurn < TURN_SETTLE_MS) return false;
+    if (free - this.admitted.length * TURN_BYTES < PERSON_TURN_MIN_FREE_BYTES) return false;
+    this.admitted.push(now);
+    this.lastPersonTurn = now;
+    this.reserved = id;
+    return true;
+  }
+
+  private floorHolds(locked: boolean) {
+    const free = this.memAvailable();
+    return free !== null && free >= (locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES);
   }
 
   private memAvailable() {
@@ -1417,11 +1564,16 @@ export class RequestRunner {
    * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
    * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
    */
-  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal): Promise<boolean> {
+  private async reclaim(
+    close: () => Promise<boolean>,
+    signal: AbortSignal,
+    locked: boolean,
+    person: boolean,
+  ): Promise<boolean> {
     const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
     while (!signal.aborted && Date.now() < until) {
       if (!(await close())) return false;
-      if (!signal.aborted && this.admit()) return true;
+      if (!signal.aborted && this.admit(locked, person)) return true;
     }
     return false;
   }
@@ -1442,10 +1594,13 @@ export class RequestRunner {
       return Promise.resolve();
     }
     const controller = new AbortController();
+    const locked = req.op === "brain.turn" && req.permissions?.mode === "chat";
+    const person = req.op === "brain.turn" && req.personWaiting === true;
     // A paused computer says so (the handler refuses new work), never that it is full.
-    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit()) {
+    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit(locked, person)) {
       const close = this.ctx.reclaimBrains;
       if (!close || this.memAvailable() === null) {
+        if (this.reserve(id, person)) return this.run(id, req, controller);
         this.full(id);
         return Promise.resolve();
       }
@@ -1453,12 +1608,21 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      return this.reclaim(() => close(spare), controller.signal).then((room) => {
-        if (room && !this.closed) return this.run(id, req, controller);
-        this.inflight.delete(id);
-        if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
-        else this.full(id);
-      });
+      // A turn on its session's open CLI starts no process: the turns still settling don't count against it, the floor does.
+      const warm = this.ctx.warmBrain ? this.ctx.warmBrain(spare).catch(() => false) : Promise.resolve(false);
+      return warm
+        .then(
+          (open) =>
+            (open && this.floorHolds(locked)) || this.reclaim(() => close(spare), controller.signal, locked, person),
+        )
+        .then((room) => {
+          if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
+            return this.run(id, req, controller);
+          this.inflight.delete(id);
+          if (controller.signal.aborted)
+            this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
+          else this.full(id);
+        });
     }
     return this.run(id, req, controller);
   }
@@ -1533,6 +1697,7 @@ export class RequestRunner {
       .finally(() => {
         this.inflight.delete(id);
         if (turn) this.turns--;
+        if (this.reserved === id) this.reserved = null;
       });
   }
 

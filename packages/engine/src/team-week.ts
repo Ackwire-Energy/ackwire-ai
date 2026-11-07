@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { listApprovals } from "./approvals";
 import { canTalkTo, speakerFor } from "./audience";
-import { proposeSettings } from "./context/proposals";
+import { NO_CHANNEL_REASON, OVER_BUDGET_REASON, proposeSettings } from "./context/proposals";
 import { openPersonAgentDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated } from "./events";
@@ -15,6 +15,7 @@ import { isRightHand } from "./right-hand";
 import { createRoutine, type RoutineDeps } from "./routines";
 import { localDate, nextOccurrence, type ScheduleRule } from "./rrule";
 import { openOrg } from "./standing";
+import { taskSeenSql } from "./task-access";
 
 /**
  * "Semana da equipe" (ADR 0137 §9): once a week Lodi posts one card in each admin's DM with it, from what the server
@@ -202,7 +203,8 @@ export async function buildTeamWeek(
     .where(eq(agents.id, w.rightHandId));
   const budgetOf = (b: number | string | null | undefined) => (b == null ? defaultBudget : Number(b));
   const visible = sql`(c.visibility = 'public' or exists (select 1 from channel_members vm
-    where vm.channel_id = c.id and vm.user_id = ${w.userId}))`;
+    where vm.channel_id = c.id and vm.user_id = ${w.userId})
+    or (c.kind = 'channel' and ${maySql(w.orgId, sql`${w.userId}::text`, "administrator")}))`;
   const teamRuns = sql`r.org_id = ${w.orgId} and r.created_at >= ${start}::timestamptz and r.created_at < ${end}::timestamptz
     and r.agent_id in (select id from agents where org_id = ${w.orgId} and builtin is null)`;
 
@@ -227,6 +229,7 @@ export async function buildTeamWeek(
     await db.execute(sql`select assignee_id as agent_id, count(*) as n from issues
       where org_id = ${w.orgId} and status = 'done' and assignee_type = 'agent'
         and updated_at >= ${start}::timestamptz and updated_at < ${end}::timestamptz
+        and ${taskSeenSql("issues", sql`${w.userId}::text`)}
       group by assignee_id order by n desc limit 1`),
   );
   const worked: TeamWeekHighlight[] = [
@@ -347,7 +350,7 @@ export async function buildTeamWeek(
   const repeat = await repeatedRequest(db, w, teamIds);
   if (repeat) rows.push(repeat);
 
-  const stalled = await stalledSteps(db, w, visible);
+  const stalled = await stalledSteps(db, w);
   if (stalled) rows.push(stalled);
 
   const stats = {
@@ -399,7 +402,7 @@ async function settingsProposal(
       orgId: w.orgId,
       agentId: w.rightHandId,
       targets: [{ agentId, lines: [line] }],
-      rationale: field === "budget" ? "It stopped at its monthly budget this week." : "It is in no channel.",
+      rationale: field === "budget" ? OVER_BUDGET_REASON : NO_CHANNEL_REASON,
       requesterId: w.userId,
     },
   );
@@ -486,7 +489,7 @@ const mode = (list: number[]) => {
  * A task whose steps wait for hours while another step is in progress or in review (a reviewer rejecting step 1
  * while steps 2 to 4 wait on it): the one stalled the longest.
  */
-async function stalledSteps(db: Database, w: Window, visible: ReturnType<typeof sql>): Promise<TeamWeekRow | null> {
+async function stalledSteps(db: Database, w: Window): Promise<TeamWeekRow | null> {
   const [s] = rowsOf<{
     id: string;
     number: number;
@@ -504,10 +507,9 @@ async function stalledSteps(db: Database, w: Window, visible: ReturnType<typeof 
         (array_agg(s.assignee_id order by s.number) filter (where s.assignee_type = 'agent' and (s.status in ('in_progress', 'in_review') or s.blocked is not null)))[1] as on_agent,
         max(s.updated_at) as moved
       from issues p join issues s on s.parent_issue_id = p.id and s.org_id = p.org_id
-      left join channels c on c.id = p.channel_id
+        and ${taskSeenSql("s", sql`${w.userId}::text`)}
       where p.org_id = ${w.orgId} and p.status not in ('done', 'canceled')
-        and (p.channel_id is null or (c.kind = 'channel' and ${visible})
-          or exists (select 1 from channel_members tm where tm.channel_id = p.channel_id and tm.user_id = ${w.userId}))
+        and ${taskSeenSql("p", sql`${w.userId}::text`)}
       group by p.id
       having count(*) filter (where s.status = 'todo') >= 2
         and count(*) filter (where s.status in ('in_progress', 'in_review') or s.blocked is not null) >= 1

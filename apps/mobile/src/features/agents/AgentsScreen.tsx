@@ -19,11 +19,14 @@ import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
-import { EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
 import { usePins } from "../chats/pins";
+import { mayCreate } from "../new/logic";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
@@ -87,9 +90,14 @@ export function AgentsScreen() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {dir.loading ? null : dir.agents.length === 0 ? (
-        <EmptyState title={t("mobile.agents.empty")} sky />
+        <FirstUse
+          place="agents"
+          acts={mayCreate(org, "agent")}
+          label={t("mobile.homeNow.first.create")}
+          onPress={() => router.push("/new-agent")}
+        />
       ) : total === 0 ? (
-        <EmptyState title={t("mobile.agents.noneForYou")} subtitle={t("mobile.agents.noneForYouHint")} sky />
+        <FirstUse place="agentsForYou" acts={false} />
       ) : null}
       {/* Equipe's lists, org chart and map (ADR 0148). */}
       {total > 0 ? <TeamEntry /> : null}
@@ -216,9 +224,12 @@ function AgentRow({
   const when = useWhen();
   const now = useNow();
   const { agent: a, work: w, approval, computer } = l;
-  const ai = useAiStatus(useOrgId());
+  const { orgId, org } = useOrg();
+  const ai = useAiStatus(orgId);
+  // On a billing hold an AI comes after the plan: no "Sem IA" on a team just made.
+  const held = usePlanHold(orgId, org) !== null;
   // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
-  const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
+  const noAi = !held && !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
   const line = usePresenceOf().agent(a.id)?.line ?? null;
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import {
@@ -797,3 +797,18 @@ test.skipIf(!posix)("a mission task started with the server's token keeps it for
   });
   expect(tasks.mcpTask("0193aaaa-0000-7000-8000-000000000043")?.serverToken).toBeUndefined();
 });
+
+test.if(process.platform !== "win32")(
+  "a second socket for relays is open to whoever enters its folder, and goes with the bridge",
+  async () => {
+    const dir = tempDir("relays-");
+    dirs.push(dir);
+    const bridge = new McpBridge({ socketPath: path.join(dir, "mcp.sock"), task: () => null });
+    const relays = path.join(dir, "relays.sock");
+    await bridge.listenForRelays(relays);
+    await bridge.listenForRelays(relays);
+    expect(statSync(relays).mode & 0o777).toBe(0o666);
+    await bridge.close();
+    expect(existsSync(relays)).toBe(false);
+  },
+);

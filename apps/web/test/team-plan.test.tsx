@@ -166,9 +166,20 @@ describe("the team card", () => {
     await click(within(first).getAllByRole("button", { name: "Abrir com a tarefa" })[0] as HTMLElement, 12);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${iara?.id}`);
     const box = screen().getByRole("combobox", { name: "Mensagem para Iara" }) as HTMLTextAreaElement;
-    expect(box.value).toBe("Responder a última mensagem que espera");
+    expect(box.value).toBe("Responder a última mensagem que espera ");
     // Typed, never sent.
     expect(calls(state, "chat.post")).toEqual([]);
+  });
+
+  test("while the team is being made, Ajustar and Descartar are off and Ver como mapa stays to read", async () => {
+    const state = lodiDm();
+    const message = state.messages.find((m) => m.id === "m-team");
+    (message?.meta?.actionCard as TeamProposalCard).state = "creating";
+    await openDm(state);
+    expect((button("Ajustar Iara") as HTMLButtonElement).disabled).toBe(true);
+    expect((button("Descartar") as HTMLButtonElement).disabled).toBe(true);
+    const map = button("Ver como mapa") as HTMLButtonElement;
+    expect(map.disabled || map.closest("fieldset[disabled]") !== null).toBe(false);
   });
 
   test("Ajustar edits one agent's draft on the card", async () => {

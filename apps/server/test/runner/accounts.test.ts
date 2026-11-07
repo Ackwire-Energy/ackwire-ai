@@ -1,8 +1,26 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
-import { accountCodeAad, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
+import {
+  accountCodeAad,
+  CLAUDE_AUTH_PROTOCOL,
+  claudeLoginMethodsOf,
+  MACHINE_PROTOCOL_VERSION,
+  type MachineRequest,
+  parseBrainEvent,
+  parseRunnerFrame,
+} from "@agenteschat/adapters/machine-protocol";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
 import {
   AccountManager,
@@ -34,6 +52,8 @@ const FAKE_ENV = [
   "FAKE_ACCOUNT_CODE",
   "FAKE_CODEX_DELAY",
   "FAKE_CODEX_REFRESHED",
+  "FAKE_ACCOUNT_STATUS",
+  "FAKE_ACCOUNT_STATUS_DELAY",
 ];
 const dirs: string[] = [];
 const managers: AccountManager[] = [];
@@ -112,7 +132,6 @@ test("status commands: signed in through claude.ai with email and plan (short wo
     plan: "max",
   });
   expect(parseClaudeStatus(1, JSON.stringify({ loggedIn: false }))).toEqual({ loggedIn: false });
-  expect(parseClaudeStatus(0, "garbage")).toEqual({ loggedIn: false });
   expect(parseCodexStatus(0, `${ESC}[32mLogged in using ChatGPT${ESC}[0m\n`)).toEqual({ loggedIn: true });
   expect(parseCodexStatus(1, "Not logged in\n")).toEqual({ loggedIn: false });
   expect(parseCodexStatus(0, "Not logged in\n")).toEqual({ loggedIn: false });
@@ -161,7 +180,9 @@ function setup(over: Partial<AccountManagerOptions> = {}) {
         .trim()
         .split("\n")
         .filter(Boolean)
-        .map((l) => JSON.parse(l) as { args: string; home: string; terminal?: boolean });
+        .map(
+          (l) => JSON.parse(l) as { args: string; home: string; terminal?: boolean; authGroup?: true; asUser?: true },
+        );
     } catch {
       return [];
     }
@@ -206,13 +227,29 @@ test.if(posix)(
     await waitFor(() => m.status(id).state !== "waiting", 5000);
     expect(m.status(id)).toEqual({
       state: "done",
-      account: { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+      account: {
+        id,
+        kind: "claude_code",
+        loggedIn: true,
+        email: "dev@acme.test",
+        plan: "max",
+        shared: true,
+        authMethod: "cli_login",
+      },
     });
     expect(changes()).toBeGreaterThan(0);
     expect(m.accountDir("claude_code", id)).toBe(dir);
     expect(m.accountDir("codex", id)).toBeNull();
     expect(await m.list()).toEqual([
-      { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+      {
+        id,
+        kind: "claude_code",
+        loggedIn: true,
+        email: "dev@acme.test",
+        plan: "max",
+        shared: true,
+        authMethod: "cli_login",
+      },
     ]);
     expect(m.snapshot()).toHaveLength(1);
     // The same id can't start again.
@@ -241,12 +278,15 @@ test.if(posix)(
       email: "dev@acme.test",
       plan: "max",
       shared: true,
+      authMethod: "cli_login" as const,
     };
     expect(await m.list()).toEqual([account]);
     // Another login of the same account ended this one: its credentials stay, the turn's refusal decides.
     await m.refused("claude_code", id);
     m.invalidate();
-    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false, shared: true }]);
+    expect(await m.list()).toEqual([
+      { id, kind: "claude_code", loggedIn: false, shared: true, authMethod: "cli_login" },
+    ]);
     await signIn(true);
     expect(m.status(id)).toEqual({ state: "done", account });
     m.invalidate();
@@ -270,7 +310,9 @@ test.if(posix)(
       const dir = path.join(root, "claude_code", id);
       mkdirSync(dir, { recursive: true });
       // Signed out there: the key in the runner's env would have made it "signed in" (and billed the key).
-      expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false, shared: true }]);
+      expect(await m.list()).toEqual([
+        { id, kind: "claude_code", loggedIn: false, shared: true, authMethod: "cli_login" },
+      ]);
       const env = accountEnv("claude_code", dir);
       expect(env.CLAUDE_CONFIG_DIR).toBe(dir);
       for (const k of Object.keys(stray)) expect(env[k]).toBeUndefined();
@@ -317,9 +359,12 @@ test.if(posix)(
       "bad_request",
     );
     await waitFor(() => m.status(id).state !== "waiting", 5000);
-    expect(m.status(id)).toEqual({ state: "done", account: { id, kind: "codex", loggedIn: true, shared: true } });
+    expect(m.status(id)).toEqual({
+      state: "done",
+      account: { id, kind: "codex", loggedIn: true, shared: true, authMethod: "cli_login" },
+    });
     expect(runs().map((r) => r.args)).toContain("login status");
-    expect(await m.list()).toEqual([{ id, kind: "codex", loggedIn: true, shared: true }]);
+    expect(await m.list()).toEqual([{ id, kind: "codex", loggedIn: true, shared: true, authMethod: "cli_login" }]);
   },
   15_000,
 );
@@ -390,6 +435,18 @@ test.if(posix)("a CLI that prints no link, or isn't installed, fails the begin a
   );
   expect(err2?.message).toContain("not installed");
   expect(existsSync(path.join(missing.root, "claude_code", LOGIN(6)))).toBe(false);
+  // Behind the auth egress prefix too, which would otherwise start and exit 127.
+  const prefixed = setup({
+    commands: { claude_code: ["/nonexistent/claude-xyz"] },
+    lending: { chown: async () => {} },
+    authEgress: () => ["/usr/bin/env", "FAKE_AUTH_GROUP=1"],
+    beginWaitMs: 300,
+  });
+  const err3 = await prefixed.m.begin("claude_code", LOGIN(7)).then(
+    () => null,
+    (e: Error) => e,
+  );
+  expect(err3?.message).toContain("not installed");
 });
 
 test.if(posix)("a sign-in nobody finishes expires: the CLI is killed and the folder removed", async () => {
@@ -438,7 +495,15 @@ test.if(posix)("remove signs out in the account's folder and deletes it; ids tha
   writeFileSync(path.join(dir, "signed-in"), "");
   mkdirSync(path.join(root, "claude_code", "notes"), { recursive: true });
   expect(await m.list()).toEqual([
-    { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+    {
+      id,
+      kind: "claude_code",
+      loggedIn: true,
+      email: "dev@acme.test",
+      plan: "max",
+      shared: true,
+      authMethod: "cli_login",
+    },
   ]);
   const before = changes();
   expect(await m.remove("claude_code", id)).toBe(true);
@@ -526,6 +591,7 @@ test.if(posix)(
       provider: "zai",
       keyHint: "MnOp",
       shared: true,
+      authMethod: "api_key" as const,
     };
     expect(m.status(id)).toEqual({ state: "done", account });
     expect(changes()).toBeGreaterThan(before);
@@ -619,10 +685,10 @@ test.if(posix)(
     // Its status is what its turns say: root never runs the CLI on what the agent's user could write.
     const ran = runs().length;
     m.invalidate();
-    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: true, authMethod: "cli_login" }]);
     await m.refused("claude_code", id);
     m.invalidate();
-    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false, authMethod: "cli_login" }]);
     m.probeUsage([id]);
     await new Promise((r) => setTimeout(r, 100));
     expect(runs().length).toBe(ran);
@@ -664,7 +730,7 @@ test.if(posix)("system mode: a pipe an agent's user leaves where a key would be 
   expect(await planKeyOf(dir)).toBeNull();
   m.invalidate();
   const listed = await Promise.race([m.list(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
-  expect(listed).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
+  expect(listed).toEqual([{ id, kind: "claude_code", loggedIn: true, authMethod: "cli_login" }]);
 });
 
 test.if(posix)(
@@ -684,9 +750,9 @@ test.if(posix)(
     };
     expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
     // Nothing kept there: no plan, so the server keeps the one it knew.
-    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, authMethod: "cli_login" });
     writeFileSync(config, kept("claude_max", "default_claude_max_20x"));
-    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, plan: "ultra" });
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, plan: "ultra", authMethod: "cli_login" });
     writeFileSync(config, kept("claude_max", "default_claude_max_5x"));
     expect((await listed())?.plan).toBe("max");
     writeFileSync(config, kept("claude_team", "default_claude_max_20x"));
@@ -699,7 +765,7 @@ test.if(posix)(
     writeFileSync(elsewhere, kept("claude_pro"));
     rmSync(config);
     symlinkSync(elsewhere, config);
-    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, authMethod: "cli_login" });
     expect(runs()).toHaveLength(0);
   },
 );
@@ -808,6 +874,58 @@ test("Claude Code 2.1.314's own setup-token screen, read in pieces: its link and
 });
 
 test.if(posix)(
+  "system mode: root's Claude sign-in, status and sign-out CLIs run behind the auth egress prefix, asked once; Codex's never",
+  async () => {
+    let asked = 0;
+    const lines: string[] = [];
+    const { m, runs } = setup({
+      lending: { chown: async () => {} },
+      // Stands in for `setpriv --regid=<gid> --clear-groups --`.
+      authEgress: () => {
+        asked++;
+        return ["/usr/bin/env", "FAKE_AUTH_GROUP=1"];
+      },
+      log: (l) => lines.push(l),
+    });
+    expect(m.authEgressGroup()).toBe(true);
+    const all = LOGIN(80);
+    await m.begin("claude_code", all, false, undefined, undefined, true);
+    const one = LOGIN(81);
+    const begun = await m.begin("claude_code", one);
+    const { aad, box } = await sealed(begun.publicKey as string, one, "good-code");
+    await m.code(one, aad, box);
+    await waitFor(() => m.status(one).state !== "waiting", 8000);
+    expect(m.status(one).state).toBe("done");
+    expect(await m.remove("claude_code", one)).toBe(true);
+    await m.begin("codex", LOGIN(82));
+    const ran = runs();
+    expect(ran.filter((r) => r.authGroup).map((r) => r.args)).toEqual([
+      "setup-token",
+      "auth login",
+      "auth status --json",
+      "auth logout",
+    ]);
+    expect(ran.filter((r) => !r.authGroup).map((r) => r.args)).toEqual(["login --device-auth"]);
+    expect(asked).toBe(1);
+    expect(lines.join("\n")).not.toContain("agentes-auth");
+  },
+  20_000,
+);
+
+test.if(posix)("system mode without the auth egress group: the CLIs run as before, said once in the log", async () => {
+  const lines: string[] = [];
+  const { m, runs } = setup({ lending: { chown: async () => {} }, authEgress: () => null, log: (l) => lines.push(l) });
+  expect(m.authEgressGroup()).toBe(false);
+  await m.begin("claude_code", LOGIN(83));
+  expect(m.authEgressGroup()).toBe(false);
+  expect(runs()).toEqual([expect.objectContaining({ args: "auth login" })]);
+  expect(runs()[0]?.authGroup).toBeUndefined();
+  expect(lines.filter((l) => l.includes("agentes-auth"))).toHaveLength(1);
+  // Not system mode: nothing is asked.
+  expect(setup().m.authEgressGroup()).toBe(false);
+});
+
+test.if(posix)(
   "system mode, Claude for all agents: setup-token signs in in a terminal, root keeps only its token (600), never lent",
   async () => {
     const lines: string[] = [];
@@ -822,7 +940,13 @@ test.if(posix)(
     const { aad, box } = await sealed(begun.publicKey as string, id, "good-code");
     await m.code(id, aad, box);
     await waitFor(() => m.status(id).state !== "waiting", 8000);
-    const account = { id, kind: "claude_code" as const, loggedIn: true, shared: true };
+    const account = {
+      id,
+      kind: "claude_code" as const,
+      loggedIn: true,
+      shared: true,
+      authMethod: "setup_token" as const,
+    };
     expect(m.status(id)).toEqual({ state: "done", account });
     const file = path.join(dir, "token.json");
     expect(statSync(file).mode & 0o777).toBe(0o600);
@@ -899,7 +1023,14 @@ test.if(posix)(
     const begun = await m.begin("claude_code", all, false, undefined, "zai", true);
     const k = await sealed(begun.publicKey as string, all, GLM_KEY);
     await m.code(all, k.aad, k.box);
-    const account = { id: all, kind: "claude_code" as const, loggedIn: true, provider: "zai", keyHint: "MnOp" };
+    const account = {
+      id: all,
+      kind: "claude_code" as const,
+      loggedIn: true,
+      provider: "zai",
+      keyHint: "MnOp",
+      authMethod: "api_key" as const,
+    };
     expect(m.status(all)).toEqual({ state: "done", account: { ...account, shared: true } });
     expect(await m.grant("claude_code", all)).toEqual({ kind: "key", provider: "zai", key: GLM_KEY });
     expect(await m.lendTo("claude_code", all, 21001)).toBe(false);
@@ -929,7 +1060,7 @@ test.if(posix)(
     await waitFor(() => m.status(codex).state !== "waiting", 5000);
     expect(m.status(codex)).toEqual({
       state: "done",
-      account: { id: codex, kind: "codex", loggedIn: true, shared: true },
+      account: { id: codex, kind: "codex", loggedIn: true, shared: true, authMethod: "cli_login" },
     });
     const granted = await m.grant("codex", codex);
     expect(granted?.kind).toBe("codex_auth");
@@ -1026,7 +1157,15 @@ test.if(posix)("where every agent is the runner's own user, every account thinks
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, "signed-in"), "");
   expect(await m.list()).toEqual([
-    { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+    {
+      id,
+      kind: "claude_code",
+      loggedIn: true,
+      email: "dev@acme.test",
+      plan: "max",
+      shared: true,
+      authMethod: "cli_login",
+    },
   ]);
   // Nothing to hand over: every agent's CLI opens the folder itself.
   expect(await m.grant("claude_code", id)).toBeNull();
@@ -1081,3 +1220,569 @@ test.if(posix)(
   },
   20_000,
 );
+
+// ── Protocol 50: how each account signs in ───────────────────────────────────
+
+test("protocol 50 on the wire: an account's method, an inconclusive status, Claude's organization, hello's methods, a turn error's cause", () => {
+  expect(CLAUDE_AUTH_PROTOCOL).toBe(50);
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(CLAUDE_AUTH_PROTOCOL);
+  const frame = parseRunnerFrame(
+    JSON.stringify({
+      type: "accounts.changed",
+      accounts: [
+        {
+          id: LOGIN(90),
+          kind: "claude_code",
+          loggedIn: true,
+          authMethod: "cli_login",
+          statusUnknown: true,
+          providerOrgId: "0193aaaa-0000-7000-8000-00000000000a",
+          orgName: `  Ada\u0007 Labs ${"x".repeat(200)}`,
+        },
+        { id: LOGIN(91), kind: "claude_code", loggedIn: false, authMethod: "magic", statusUnknown: "yes" },
+        { id: LOGIN(92), kind: "claude_code", loggedIn: true, providerOrgId: "a b", orgName: "\u0007" },
+      ],
+    }),
+  );
+  if (frame?.type !== "accounts.changed") throw new Error("not parsed");
+  expect(frame.accounts[0]).toEqual({
+    id: LOGIN(90),
+    kind: "claude_code",
+    loggedIn: true,
+    authMethod: "cli_login",
+    statusUnknown: true,
+    providerOrgId: "0193aaaa-0000-7000-8000-00000000000a",
+    orgName: `Ada Labs ${"x".repeat(111)}`,
+  });
+  expect(frame.accounts[1]).toEqual({ id: LOGIN(91), kind: "claude_code", loggedIn: false });
+  expect(frame.accounts[2]).toEqual({ id: LOGIN(92), kind: "claude_code", loggedIn: true });
+
+  const hello = (claudeLoginMethods: unknown) =>
+    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 50, claudeLoginMethods }));
+  expect(hello(["setup_token", "magic", "setup_token"])).toMatchObject({ claudeLoginMethods: ["setup_token"] });
+  expect(hello("cli_login")).not.toHaveProperty("claudeLoginMethods");
+  const egress = (authEgressGroup: unknown) =>
+    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 50, authEgressGroup }));
+  expect(egress(true)).toMatchObject({ authEgressGroup: true });
+  expect(egress("yes")).not.toHaveProperty("authEgressGroup");
+  expect(egress(false)).not.toHaveProperty("authEgressGroup");
+  // An older runner says nothing: what runners did before.
+  expect(claudeLoginMethodsOf(undefined, true)).toEqual(["setup_token"]);
+  expect(claudeLoginMethodsOf(undefined, false)).toEqual(["cli_login"]);
+  expect(claudeLoginMethodsOf(["cli_login"], true)).toEqual(["cli_login"]);
+
+  const error = (extra: Record<string, unknown>) =>
+    parseBrainEvent({ type: "error", code: "claude_failed", message: "x", ...extra });
+  expect(error({ cause: "auth_rejected", httpStatus: 401 })).toEqual({
+    type: "error",
+    code: "claude_failed",
+    message: "x",
+    cause: "auth_rejected",
+    httpStatus: 401,
+  });
+  expect(error({ cause: "banned", httpStatus: 99 })).toEqual({ type: "error", code: "claude_failed", message: "x" });
+  expect(error({ httpStatus: 401.5 })).not.toHaveProperty("httpStatus");
+  expect(error({ httpStatus: 600 })).not.toHaveProperty("httpStatus");
+});
+
+test("Claude's status: no loggedIn to read says nothing for sure; its organization is kept when it is one", () => {
+  expect(parseClaudeStatus(0, "garbage")).toEqual({ loggedIn: false, statusUnknown: true });
+  expect(parseClaudeStatus(1, "")).toEqual({ loggedIn: false, statusUnknown: true });
+  expect(parseClaudeStatus(0, JSON.stringify({ email: "ada@example.com" }))).toEqual({
+    loggedIn: false,
+    statusUnknown: true,
+  });
+  const org = JSON.stringify({
+    loggedIn: true,
+    authMethod: "claude.ai",
+    orgId: "0193aaaa-0000-7000-8000-00000000000a",
+    orgName: "Ada Labs",
+  });
+  expect(parseClaudeStatus(0, org)).toEqual({
+    loggedIn: true,
+    providerOrgId: "0193aaaa-0000-7000-8000-00000000000a",
+    orgName: "Ada Labs",
+  });
+  expect(parseClaudeStatus(0, JSON.stringify({ loggedIn: true, authMethod: "claude.ai", orgId: "../x" }))).toEqual({
+    loggedIn: true,
+  });
+});
+
+const signInClaude = async (m: AccountManager, id: string, again = false, shared = false, method?: string) => {
+  const begun = await m.begin("claude_code", id, again, undefined, undefined, shared, method);
+  const { aad, box } = await sealed(begun.publicKey as string, id, "good-code");
+  await m.code(id, aad, box);
+  await waitFor(() => m.status(id).state !== "waiting", 8000);
+  return m.status(id);
+};
+
+test.if(posix)(
+  "the method a sign-in uses is kept beside its folder (600), reported with the account, kept signing in again, and goes with it",
+  async () => {
+    const { m, root, runs } = setup();
+    const id = LOGIN(93);
+    expect(m.claudeLoginMethods()).toEqual(["cli_login"]);
+    // A token needs a computer whose agents have their own users; the method is for Claude's subscriptions only.
+    expect(await errorCode(() => m.begin("claude_code", id, false, undefined, undefined, true, "setup_token"))).toBe(
+      "bad_request",
+    );
+    expect(await errorCode(() => m.begin("codex", id, false, undefined, undefined, true, "cli_login"))).toBe(
+      "bad_request",
+    );
+    expect(await errorCode(() => m.begin("claude_code", id, false, undefined, "zai", true, "cli_login"))).toBe(
+      "bad_request",
+    );
+    expect(await errorCode(() => m.begin("claude_code", id, false, undefined, undefined, true, "api_key"))).toBe(
+      "bad_request",
+    );
+    expect(runs()).toEqual([]);
+    expect(existsSync(path.join(root, "claude_code", id))).toBe(false);
+
+    expect(await signInClaude(m, id, false, true, "cli_login")).toMatchObject({
+      state: "done",
+      account: { authMethod: "cli_login", loggedIn: true },
+    });
+    const marker = path.join(root, "claude_code", `${id}.method`);
+    expect(readFileSync(marker, "utf8")).toBe("cli_login");
+    expect(statSync(marker).mode & 0o777).toBe(0o600);
+    m.invalidate();
+    expect(await m.list()).toEqual([
+      {
+        id,
+        kind: "claude_code",
+        loggedIn: true,
+        email: "dev@acme.test",
+        plan: "max",
+        shared: true,
+        authMethod: "cli_login",
+      },
+    ]);
+    expect(await signInClaude(m, id, true, true, "cli_login")).toMatchObject({ state: "done" });
+    expect(readFileSync(marker, "utf8")).toBe("cli_login");
+    expect(await m.remove("claude_code", id)).toBe(true);
+    expect(existsSync(marker)).toBe(false);
+
+    // A sign-in that never finishes leaves no method behind.
+    process.env.FAKE_ACCOUNT_MODE = "fail";
+    const failed = LOGIN(94);
+    expect((await signInClaude(m, failed, false, true, "cli_login")).state).toBe("failed");
+    // `discard` removes the folder, then the marker: wait for both.
+    await waitFor(
+      () =>
+        !existsSync(path.join(root, "claude_code", failed)) &&
+        !existsSync(path.join(root, "claude_code", `${failed}.method`)),
+    );
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "system mode: a Claude sign-in for all agents uses a token, never Claude's own login; one agent's login still can; signing in again another way is refused",
+  async () => {
+    const { m, root, runs } = setup({ lending: { chown: async () => {} } });
+    expect(m.claudeLoginMethods()).toEqual(["setup_token"]);
+    const id = LOGIN(95);
+    // From the server: the op hands its `method` over.
+    const ctx: HandlerContext = { workspaceReal: root, exec: true, token: "t", accounts: m };
+    const begin = {
+      op: "account",
+      action: "begin",
+      kind: "claude_code",
+      loginId: id,
+      shared: true,
+      method: "cli_login",
+    };
+    const scope = { signal: new AbortController().signal, output: () => {} };
+    expect(await errorCode(() => handleRequest(ctx, begin as unknown as MachineRequest, scope))).toBe("unsupported");
+    // Nothing ran (no token either) and nothing is left.
+    expect(runs()).toEqual([]);
+    expect(existsSync(path.join(root, "claude_code", id))).toBe(false);
+    expect(await errorCode(() => m.begin("claude_code", id, false, undefined, undefined, false, "setup_token"))).toBe(
+      "bad_request",
+    );
+
+    const done = await signInClaude(m, id, false, true, "setup_token");
+    const account = {
+      id,
+      kind: "claude_code" as const,
+      loggedIn: true,
+      shared: true,
+      authMethod: "setup_token" as const,
+    };
+    expect(done).toEqual({ state: "done", account });
+    expect(runs().map((r) => r.args)).toEqual(["setup-token"]);
+    expect(readFileSync(path.join(root, "claude_code", `${id}.method`), "utf8")).toBe("setup_token");
+    m.invalidate();
+    expect(await m.list()).toEqual([account]);
+    // Signing in again the other way: refused, the token kept.
+    expect(await errorCode(() => m.begin("claude_code", id, true, undefined, undefined, false, "cli_login"))).toBe(
+      "bad_request",
+    );
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "token", token: TOKEN });
+
+    // One agent's: Claude's own login, as root, before it is lent.
+    const one = LOGIN(96);
+    expect(await signInClaude(m, one, false, false, "cli_login")).toMatchObject({
+      state: "done",
+      account: { authMethod: "cli_login" },
+    });
+    expect(runs().map((r) => r.args)).toEqual(["setup-token", "auth login", "auth status --json"]);
+    // Signing it in again for all agents, its cli_login named or not: it starts over, as a token.
+    for (const method of ["cli_login", undefined]) {
+      expect(await signInClaude(m, one, true, true, method)).toMatchObject({
+        state: "done",
+        account: { shared: true, authMethod: "setup_token" },
+      });
+      expect(readFileSync(path.join(root, "claude_code", `${one}.method`), "utf8")).toBe("setup_token");
+      // Back to one agent's login, without a kept method, as an older runner left it.
+      rmSync(path.join(root, "claude_code", `${one}.shared`), { force: true });
+      rmSync(path.join(root, "claude_code", `${one}.method`), { force: true });
+    }
+    // A shared folder that does keep Claude's own login is still refused.
+    writeFileSync(path.join(root, "claude_code", `${one}.shared`), "");
+    writeFileSync(path.join(root, "claude_code", `${one}.method`), "cli_login");
+    expect(await errorCode(() => m.begin("claude_code", one, true, undefined, undefined, true, "cli_login"))).toBe(
+      "unsupported",
+    );
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "an account made before methods were kept: its method from what its folder holds for sure, nothing when it doesn't",
+  async () => {
+    const { m, root } = setup({ lending: { chown: async () => {} } });
+    const folder = (kind: string, id: string, files: Record<string, string>) => {
+      const dir = path.join(root, kind, id);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      for (const [name, text] of Object.entries(files)) writeFileSync(path.join(dir, name), text);
+    };
+    folder("claude_code", LOGIN(100), { "token.json": JSON.stringify({ token: TOKEN }) });
+    writeFileSync(path.join(root, "claude_code", `${LOGIN(100)}.shared`), "");
+    folder("claude_code", LOGIN(101), { "provider.json": JSON.stringify({ provider: "zai", key: GLM_KEY }) });
+    folder("claude_code", LOGIN(102), { "signed-in": "" });
+    folder("cursor", LOGIN(103), {
+      "cursor-key.json": JSON.stringify({ key: "crsr_0123456789abcdef0123456789abcdef" }),
+    });
+    folder("opencode", LOGIN(104), {});
+    // For all agents, but no token kept: nothing says how.
+    folder("claude_code", LOGIN(105), {});
+    writeFileSync(path.join(root, "claude_code", `${LOGIN(105)}.shared`), "");
+    const methods = Object.fromEntries((await m.list()).map((a) => [a.id, a.authMethod]));
+    expect(methods).toEqual({
+      [LOGIN(100)]: "setup_token",
+      [LOGIN(101)]: "api_key",
+      [LOGIN(102)]: "cli_login",
+      [LOGIN(103)]: "api_key",
+      [LOGIN(104)]: undefined,
+      [LOGIN(105)]: undefined,
+    });
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "a status look that says nothing for sure keeps the last answer; only the CLI saying signed out signs it out",
+  async () => {
+    const commands: AccountManagerOptions["commands"] = { claude_code: [process.execPath, FAKE] };
+    const { m, root } = setup({ commands });
+    const id = LOGIN(97);
+    await signInClaude(m, id);
+    const dir = path.join(root, "claude_code", id);
+    m.invalidate();
+    expect(await m.list()).toMatchObject([{ id, loggedIn: true }]);
+    expect((await m.list())[0]).not.toHaveProperty("statusUnknown");
+
+    // Its CLI won't start, then answers nothing readable: as it was, said to be unknown.
+    commands.claude_code = [path.join(dir, "no-such-cli")];
+    m.invalidate();
+    expect(await m.list()).toMatchObject([{ id, loggedIn: true, statusUnknown: true, authMethod: "cli_login" }]);
+    commands.claude_code = [process.execPath, FAKE];
+    process.env.FAKE_ACCOUNT_STATUS = "garbage";
+    m.invalidate();
+    expect(await m.list()).toMatchObject([{ id, loggedIn: true, statusUnknown: true }]);
+
+    // The CLI says it is signed out: it is, and an inconclusive look after that keeps it so.
+    delete process.env.FAKE_ACCOUNT_STATUS;
+    rmSync(path.join(dir, "signed-in"));
+    m.invalidate();
+    expect(await m.list()).toEqual([
+      { id, kind: "claude_code", loggedIn: false, shared: true, authMethod: "cli_login" },
+    ]);
+    process.env.FAKE_ACCOUNT_STATUS = "garbage";
+    m.invalidate();
+    expect(await m.list()).toMatchObject([{ id, loggedIn: false, statusUnknown: true }]);
+
+    // A runner that never had an answer: signed in, since a sign-in finished in its folder.
+    const fresh = new AccountManager({ root, commands: { claude_code: [path.join(dir, "no-such-cli")] } });
+    managers.push(fresh);
+    expect(await fresh.list()).toMatchObject([{ id, loggedIn: true, statusUnknown: true }]);
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "Claude's organization comes with the account when its status says it",
+  async () => {
+    process.env.FAKE_ACCOUNT_STATUS = "org";
+    const { m } = setup();
+    const id = LOGIN(98);
+    expect(await signInClaude(m, id)).toMatchObject({
+      state: "done",
+      account: { providerOrgId: "0193aaaa-0000-7000-8000-00000000000a", orgName: "Ada Labs" },
+    });
+  },
+  15_000,
+);
+
+test.if(posix)(
+  "an account's status look and usage probe never run at once",
+  async () => {
+    const { m, runs } = setup({ usageTtlMs: 0 });
+    const id = LOGIN(99);
+    await signInClaude(m, id);
+    process.env.FAKE_ACCOUNT_STATUS_DELAY = "500";
+    const before = runs().length;
+    m.invalidate();
+    const listing = m.list();
+    // The status look is running: the probe asked now waits for it.
+    await waitFor(() => runs().length > before, 5000);
+    m.probeUsage([id]);
+    await listing;
+    await waitFor(() => runs().length >= before + 3, 5000);
+    const order = runs()
+      .slice(before)
+      .map((r) => ("done" in r ? "status done" : r.args.startsWith("auth ") ? "status" : "probe"));
+    expect(order).toEqual(["status", "status done", "probe"]);
+  },
+  20_000,
+);
+
+// ── Claude's own login for all agents: the CLI runs as the sign-in's user ────
+
+function sharedLoginSetup(ready = true, over: Partial<AccountManagerOptions> = {}) {
+  const store = tempDir("accounts-store-");
+  dirs.push(store);
+  const removed: string[] = [];
+  const state = { ready };
+  const made = setup({
+    lending: { chown: async () => {} },
+    authEgress: () => ["/usr/bin/env", "FAKE_AUTH_GROUP=1"],
+    sharedLogin: {
+      ready: () => state.ready,
+      launcher: () => ({
+        // Stands in for the mount view and `setpriv`.
+        prefix: ["/usr/bin/env", "FAKE_ACCOUNT_USER=1"],
+        env: {
+          PATH: process.env.PATH,
+          CLAUDE_CONFIG_DIR: store,
+          FAKE_ACCOUNT_LOG: process.env.FAKE_ACCOUNT_LOG,
+          ...(process.env.FAKE_ACCOUNT_MODE ? { FAKE_ACCOUNT_MODE: process.env.FAKE_ACCOUNT_MODE } : {}),
+        } as Record<string, string>,
+        home: store,
+      }),
+      remove: (id) => void removed.push(id),
+    },
+    ...over,
+  });
+  return { ...made, store, removed, state };
+}
+
+test.if(posix)("whether a turn may run on a shared CLI login, from root's markers alone", async () => {
+  const ACCOUNT_ID = "0193eeee-0000-7000-8000-000000000001";
+  const { m, root, state } = sharedLoginSetup();
+  const marker = (name: string) => path.join(root, "claude_code", `${ACCOUNT_ID}.${name}`);
+  mkdirSync(path.join(root, "claude_code"), { recursive: true });
+  expect(m.isCliShared("claude_code", ACCOUNT_ID)).toBe(false);
+  writeFileSync(marker("method"), "cli_shared");
+  expect(m.isCliShared("claude_code", ACCOUNT_ID)).toBe(true);
+  expect(m.isCliShared("claude_code", "../../etc/passwd")).toBe(false);
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("ready");
+  writeFileSync(marker("shared"), "");
+  // A worker gets only the word that its task's CLI is root's: no token, no folder.
+  expect(await m.grant("claude_code", ACCOUNT_ID)).toEqual({ kind: "hosted" });
+  expect(grantOf({ kind: "hosted" })).toEqual({ kind: "hosted" });
+  writeFileSync(marker("invalid"), "");
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("signed_out");
+  expect(await m.grant("claude_code", ACCOUNT_ID)).toEqual({ kind: "none" });
+  state.ready = false;
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("off");
+  expect(m.sharedCommand(["/usr/bin/env"]).length).toBeGreaterThan(0);
+});
+
+test.if(posix)(
+  "Claude's own login for all agents: only with the self-check, every CLI as the sign-in's user, nothing kept by root",
+  async () => {
+    const { m, root, runs, store } = sharedLoginSetup();
+    expect(m.claudeLoginMethods()).toEqual(["setup_token", "cli_login"]);
+    const id = LOGIN(200);
+    const begun = await m.begin("claude_code", id, false, "ada@example.com", undefined, true, "cli_login");
+    const { aad, box } = await sealed(begun.publicKey as string, id, "good-code");
+    await m.code(id, aad, box);
+    await waitFor(() => m.status(id).state !== "waiting", 8000);
+    const account = {
+      id,
+      kind: "claude_code",
+      loggedIn: true,
+      email: "dev@acme.test",
+      plan: "max",
+      shared: true,
+      authMethod: "cli_login",
+    };
+    expect(m.status(id)).toEqual({ state: "done", account } as never);
+    expect(runs()).toEqual([
+      { args: "auth login --email ada@example.com", home: store, asUser: true },
+      { args: "auth status --json", home: store, asUser: true },
+    ] as never);
+    const dir = path.join(root, "claude_code");
+    expect(readFileSync(path.join(dir, `${id}.method`), "utf8")).toBe("cli_shared");
+    expect(existsSync(path.join(dir, `${id}.shared`))).toBe(true);
+    // The store is the CLI's: root's folder holds nothing to sign in with, and no turn gets a token from it.
+    expect(readdirSync(path.join(dir, id))).toEqual([]);
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "hosted" });
+    expect(await m.lendTo("claude_code", id, 21000)).toBe(false);
+    m.invalidate();
+    expect(await m.list()).toEqual([account] as never);
+    expect(runs().at(-1)).toEqual({ args: "auth status --json", home: store, asUser: true } as never);
+  },
+  20_000,
+);
+
+test.if(posix)("Claude's own login: its usage is looked up as the sign-in's user too", async () => {
+  const { m, runs } = sharedLoginSetup();
+  const id = LOGIN(201);
+  expect((await signInClaude(m, id, false, true, "cli_login")).state).toBe("done");
+  m.probeUsage([id]);
+  await waitFor(() => runs().some((r) => r.args.startsWith("-p ")));
+  expect(runs().find((r) => r.args.startsWith("-p "))).toMatchObject({ asUser: true });
+});
+
+test.if(posix)(
+  "Claude's own login signing in again: same store, same marker; another method is refused, an older server's stays",
+  async () => {
+    const { m, root, runs, removed } = sharedLoginSetup();
+    const id = LOGIN(202);
+    await signInClaude(m, id, false, true, "cli_login");
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect((await m.list())[0]).toMatchObject({ loggedIn: false, authMethod: "cli_login" });
+    const looks = runs().length;
+    expect(await errorCode(() => m.begin("claude_code", id, true, undefined, undefined, true, "setup_token"))).toBe(
+      "bad_request",
+    );
+    expect(runs()).toHaveLength(looks);
+
+    expect((await signInClaude(m, id, true, true, "cli_login")).state).toBe("done");
+    expect((await signInClaude(m, id, true, true)).state).toBe("done");
+    expect(runs().every((r) => r.asUser)).toBe(true);
+    expect(runs().map((r) => r.args)).not.toContain("setup-token");
+    expect(readFileSync(path.join(root, "claude_code", `${id}.method`), "utf8")).toBe("cli_shared");
+    expect(existsSync(path.join(root, "claude_code", `${id}.invalid`))).toBe(false);
+    expect(removed).toEqual([]);
+  },
+  30_000,
+);
+
+test.if(posix)(
+  "across methods: a token's sign-in never becomes this one; a one-agent folder starts over either way",
+  async () => {
+    const { m, root, runs, removed } = sharedLoginSetup();
+    const token = LOGIN(203);
+    await signInClaude(m, token, false, true, "setup_token");
+    expect(await errorCode(() => m.begin("claude_code", token, true, undefined, undefined, true, "cli_login"))).toBe(
+      "bad_request",
+    );
+    // An older folder with a token and no marker says the same through its token.
+    rmSync(path.join(root, "claude_code", `${token}.method`));
+    expect(await errorCode(() => m.begin("claude_code", token, true, undefined, undefined, true, "cli_login"))).toBe(
+      "bad_request",
+    );
+
+    const one = LOGIN(204);
+    await signInClaude(m, one);
+    expect((await signInClaude(m, one, true, true, "cli_login")).state).toBe("done");
+    expect(readFileSync(path.join(root, "claude_code", `${one}.method`), "utf8")).toBe("cli_shared");
+    expect(
+      runs()
+        .filter((r) => r.args === "auth login")
+        .map((r) => r.asUser),
+    ).toEqual([undefined, true] as never);
+
+    // Back to one agent: its user and store go, and root's own login runs.
+    expect((await signInClaude(m, one, true, false)).state).toBe("done");
+    expect(removed).toEqual([one]);
+    expect(readFileSync(path.join(root, "claude_code", `${one}.method`), "utf8")).toBe("cli_login");
+    expect(existsSync(path.join(root, "claude_code", `${one}.shared`))).toBe(false);
+    expect(
+      runs()
+        .filter((r) => r.args === "auth login")
+        .at(-1)?.asUser,
+    ).toBeUndefined();
+  },
+  30_000,
+);
+
+test.if(posix)("a new sign-in of this kind that fails or is canceled leaves no user behind", async () => {
+  process.env.FAKE_ACCOUNT_MODE = "fail";
+  const { m, root, removed } = sharedLoginSetup();
+  const id = LOGIN(205);
+  expect((await signInClaude(m, id, false, true, "cli_login")).state).toBe("failed");
+  await waitFor(() => !existsSync(path.join(root, "claude_code", id)));
+  expect(removed).toEqual([id]);
+  delete process.env.FAKE_ACCOUNT_MODE;
+  const canceled = LOGIN(206);
+  await m.begin("claude_code", canceled, false, undefined, undefined, true, "cli_login");
+  expect(await m.cancel(canceled)).toBe(true);
+  expect(removed).toEqual([id, canceled]);
+  expect(existsSync(path.join(root, "claude_code", `${canceled}.method`))).toBe(false);
+});
+
+test.if(posix)(
+  "switched off or failing its check: the sign-in stays as known, no CLI touches its store, and only removing ends it",
+  async () => {
+    const { m, root, runs, removed, state } = sharedLoginSetup();
+    const id = LOGIN(207);
+    await signInClaude(m, id, false, true, "cli_login");
+    state.ready = false;
+    expect(m.claudeLoginMethods()).toEqual(["setup_token"]);
+    const before = runs().length;
+    m.invalidate();
+    expect((await m.list())[0]).toMatchObject({ loggedIn: true, statusUnknown: true, authMethod: "cli_login" });
+    m.probeUsage([id]);
+    for (const again of ["cli_login", undefined]) {
+      expect(await errorCode(() => m.begin("claude_code", id, true, undefined, undefined, true, again))).toBe(
+        "unsupported",
+      );
+    }
+    expect(
+      await errorCode(() => m.begin("claude_code", LOGIN(208), false, undefined, undefined, true, "cli_login")),
+    ).toBe("unsupported");
+    expect(runs()).toHaveLength(before);
+    expect(removed).toEqual([]);
+
+    expect(await m.remove("claude_code", id)).toBe(true);
+    expect(runs()).toHaveLength(before);
+    expect(removed).toEqual([id]);
+    expect(existsSync(path.join(root, "claude_code", id))).toBe(false);
+    expect(existsSync(path.join(root, "claude_code", `${id}.method`))).toBe(false);
+  },
+  20_000,
+);
+
+test.if(posix)("removing it: signed out as its user first, then its store and user go", async () => {
+  const { m, runs, removed } = sharedLoginSetup();
+  const id = LOGIN(209);
+  await signInClaude(m, id, false, true, "cli_login");
+  expect(await m.remove("claude_code", id)).toBe(true);
+  expect(runs().at(-1)).toMatchObject({ args: "auth logout", asUser: true });
+  expect(removed).toEqual([id]);
+});
+
+test("a computer without the feature stays as it was: no shared login option, no new method", () => {
+  expect(setup({ lending: { chown: async () => {} } }).m.claudeLoginMethods()).toEqual(["setup_token"]);
+  expect(setup().m.claudeLoginMethods()).toEqual(["cli_login"]);
+  const hello = parseRunnerFrame(
+    JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 51, claudeLoginBlocked: "x".repeat(400) }),
+  ) as { claudeLoginBlocked?: string };
+  expect(hello.claudeLoginBlocked).toHaveLength(300);
+});

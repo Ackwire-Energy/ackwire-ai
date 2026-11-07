@@ -12,6 +12,7 @@ import {
   useMissionParticipants,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
@@ -22,6 +23,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -163,6 +165,12 @@ export function NewMissionDialog({
       },
     );
   };
+  const approvalsNote = (
+    <span className="ac-iconline">
+      <Icon name="shield" size={14} />
+      <span>{t("missions.new.approvals")}</span>
+    </span>
+  );
   return (
     <Dialog
       open={open}
@@ -171,195 +179,195 @@ export function NewMissionDialog({
       description={t("missions.new.text")}
       closeLabel={t("common.close")}
     >
-      <DialogBody>
-        <div className="mi-field">
-          <label className="mi-field__label" htmlFor={goalId}>
-            {t("missions.new.goal")}
-          </label>
-          <Textarea
-            id={goalId}
-            rows={3}
-            value={goal}
-            maxLength={2000}
-            placeholder={t("missions.new.goalPlaceholder")}
-            onChange={(e) => setGoal(e.target.value)}
-          />
-        </div>
-        {none ? (
-          <div className="mi-notes mi-agent-empty" role="status">
-            <span className="ac-iconline">
-              <Icon name="computer" size={14} />
-              <b>{t("missions.new.noEligibleTitle")}</b>
-            </span>
-            <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
-            {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
-            {!cloud && <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} folders={false} />}
-            {setupAgent && !cloud && (
-              <Link
-                className="ac-link mi-lnk"
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: setupAgent.id }}
-                search={{ tab: "settings", sec: "computer" }}
-                onClick={() => onOpenChange(false)}
-              >
-                <Icon name="settings" size={14} />
-                {t("missions.new.connectComputer", agentGrammar(setupAgent.name))}
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className={names ? "mi-grid2" : undefined}>
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.new.agent")}</span>
-              <Select
-                aria-label={t("missions.new.agent")}
-                value={agent?.id}
-                onValueChange={setAgentId}
-                placeholder={eligible.isPending ? "…" : undefined}
-                options={[...agents, ...blocked].map((a) => ({
-                  value: a.id,
-                  label: a.name,
-                  disabled: !a.eligible,
-                  description:
-                    a.eligible && a.machine
-                      ? names
-                        ? t("missions.new.agentOn", {
-                            computer: a.machine.name,
-                            state: a.machine.online ? t("missions.online") : t("missions.offline"),
-                          })
-                        : a.machine.online
-                          ? undefined
-                          : t("missions.computerOffline")
-                      : cloud && (a.reason ?? "no_computer") === "no_computer"
-                        ? waitWords
-                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
-                  leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
-                }))}
-              />
-            </div>
-            {names && (
-              <div className="mi-field">
-                <span className="mi-field__label">{t("missions.new.computer")}</span>
-                <span className="mi-pill mi-pill--field">
-                  <MachineIcon machineId={machine?.id} />
-                  {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
-                  {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-        {!none && blocked.some((a) => a.canManage) && (
-          <ul className="mi-blocked" aria-label={t("missions.new.blockedLabel")}>
-            {blocked
-              .filter((a) => a.canManage)
-              .map((a) => (
-                <li key={a.id} className="mi-blocked__row">
-                  <AgentAvatar agentId={a.id} name={a.name} size="xs" />
-                  <span className="mi-blocked__text">
-                    <b>{a.name}</b>
-                    <span>
-                      {cloud && (a.reason ?? "no_computer") === "no_computer"
-                        ? waitWords
-                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
-                    </span>
-                  </span>
-                  {!cloud && (
-                    <Link
-                      className="ac-link mi-lnk"
-                      to="/org/$orgId/agents/$agentId"
-                      params={{ orgId: org.id, agentId: a.id }}
-                      search={{ tab: "settings", sec: "computer" }}
-                      onClick={() => onOpenChange(false)}
-                    >
-                      {t("missions.new.connect")}
-                    </Link>
-                  )}
-                </li>
-              ))}
-          </ul>
-        )}
-        {agent && agent.executors.length > 0 && (
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.new.who")}</span>
-            <Select
-              aria-label={t("missions.new.who")}
-              value={executor}
-              onValueChange={(v) => setPicked(v as MissionExecutor)}
-              options={executorOptions(t, agent.executors, agent.name, agent.id)}
+      <Locked when={create.isPending}>
+        <DialogBody>
+          <div className="ac-field">
+            <label className="ac-field__label" htmlFor={goalId}>
+              {t("missions.new.goal")}
+            </label>
+            <Textarea
+              id={goalId}
+              rows={3}
+              value={goal}
+              maxLength={2000}
+              placeholder={t("missions.new.goalPlaceholder")}
+              onChange={(e) => setGoal(e.target.value)}
             />
-            {agent.codexTooOld && (
-              <span className="mi-hint ac-iconline">
-                <Icon name="info" size={14} />
-                {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
+          </div>
+          {none ? (
+            <div className="mi-notes mi-agent-empty" role="status">
+              <span className="ac-iconline">
+                <Icon name="computer" size={14} />
+                <b>{t("missions.new.noEligibleTitle")}</b>
               </span>
-            )}
-          </div>
-        )}
-        {!none && (
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.commandApproval.label")}</span>
-            <CommandApprovalSelect value={approval} onChange={setApproval} />
-          </div>
-        )}
-        <div className="mi-field">
-          <span className="mi-field__label">{t("missions.new.home")}</span>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Segmented
-              size="sm"
-              label={t("missions.new.home")}
-              value={home}
-              onValueChange={setHome}
-              options={[
-                { value: "channel", label: t("missions.new.channel") },
-                { value: "dm", label: t("missions.new.dm") },
-              ]}
-            />
-            {home === "channel" ? (
-              <div style={{ flex: 1, minWidth: 160 }}>
+              <span>{cloud ? waitWords : t("missions.new.noEligibleText")}</span>
+              {/* agentes for Mac: this Mac first, then the agent points at it (ADR 0036). */}
+              {!cloud && <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} folders={false} />}
+              {setupAgent && !cloud && (
+                <Link
+                  className="ac-link mi-lnk"
+                  to="/org/$orgId/agents/$agentId"
+                  params={{ orgId: org.id, agentId: setupAgent.id }}
+                  search={{ tab: "settings", sec: "computer" }}
+                  onClick={() => onOpenChange(false)}
+                >
+                  <Icon name="settings" size={14} />
+                  {t("missions.new.connectComputer", agentGrammar(setupAgent.name))}
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className={names ? "mi-grid2" : undefined}>
+              <div className="ac-field">
+                <span className="ac-field__label">{t("missions.new.agent")}</span>
                 <Select
-                  size="sm"
-                  aria-label={t("missions.new.channel")}
-                  value={channelId || undefined}
-                  onValueChange={setChannelId}
-                  placeholder={t("missions.new.pickChannel")}
-                  options={memberChannels.map((c) => ({ value: c.id, label: `#${c.name}` }))}
+                  aria-label={t("missions.new.agent")}
+                  value={agent?.id}
+                  onValueChange={setAgentId}
+                  placeholder={eligible.isPending ? "…" : undefined}
+                  options={[...agents, ...blocked].map((a) => ({
+                    value: a.id,
+                    label: a.name,
+                    disabled: !a.eligible,
+                    description:
+                      a.eligible && a.machine
+                        ? names
+                          ? t("missions.new.agentOn", {
+                              computer: computerNameOf(t, org.name, a.machine.name),
+                              state: a.machine.online ? t("missions.online") : t("missions.offline"),
+                            })
+                          : a.machine.online
+                            ? undefined
+                            : t("missions.computerOffline")
+                        : cloud && (a.reason ?? "no_computer") === "no_computer"
+                          ? waitWords
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            }),
+                    leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
+                  }))}
                 />
               </div>
-            ) : (
-              <span className="mi-hint">{t("missions.new.dmWith", { name: agent?.name ?? "" })}</span>
-            )}
+              {names && (
+                <div className="ac-field">
+                  <span className="ac-field__label">{t("missions.new.computer")}</span>
+                  <span className="mi-pill mi-pill--field">
+                    <MachineIcon machineId={machine?.id} />
+                    {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
+                    {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          {!none && blocked.some((a) => a.canManage) && (
+            <ul className="mi-blocked" aria-label={t("missions.new.blockedLabel")}>
+              {blocked
+                .filter((a) => a.canManage)
+                .map((a) => (
+                  <li key={a.id} className="mi-blocked__row">
+                    <AgentAvatar agentId={a.id} name={a.name} size="xs" />
+                    <span className="mi-blocked__text">
+                      <b>{a.name}</b>
+                      <span>
+                        {cloud && (a.reason ?? "no_computer") === "no_computer"
+                          ? waitWords
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            })}
+                      </span>
+                    </span>
+                    {!cloud && (
+                      <Link
+                        className="ac-link mi-lnk"
+                        to="/org/$orgId/agents/$agentId"
+                        params={{ orgId: org.id, agentId: a.id }}
+                        search={{ tab: "settings", sec: "computer" }}
+                        onClick={() => onOpenChange(false)}
+                      >
+                        {t("missions.new.connect")}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
+          {agent && agent.executors.length > 0 && (
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.new.who")}</span>
+              <Select
+                aria-label={t("missions.new.who")}
+                value={executor}
+                onValueChange={(v) => setPicked(v as MissionExecutor)}
+                options={executorOptions(t, agent.executors, agent.name, agent.id)}
+              />
+              {agent.codexTooOld && (
+                <span className="mi-hint ac-iconline">
+                  <Icon name="info" size={14} />
+                  {t("missions.new.codexOld", { computer: computerNameOf(t, org.name, agent.machine?.name ?? "") })}
+                </span>
+              )}
+            </div>
+          )}
+          {!none && (
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.commandApproval.label")}</span>
+              <CommandApprovalSelect value={approval} onChange={setApproval} />
+            </div>
+          )}
+          <div className="ac-field">
+            <span className="ac-field__label">{t("missions.new.home")}</span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <Segmented
+                size="sm"
+                label={t("missions.new.home")}
+                value={home}
+                onValueChange={setHome}
+                options={[
+                  { value: "channel", label: t("missions.new.channel") },
+                  { value: "dm", label: t("missions.new.dm") },
+                ]}
+              />
+              {home === "channel" ? (
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <Select
+                    size="sm"
+                    aria-label={t("missions.new.channel")}
+                    value={channelId || undefined}
+                    onValueChange={setChannelId}
+                    placeholder={t("missions.new.pickChannel")}
+                    options={memberChannels.map((c) => ({ value: c.id, label: `#${c.name}` }))}
+                  />
+                </div>
+              ) : (
+                <span className="mi-hint">{t("missions.new.dmWith", { name: agent?.name ?? "" })}</span>
+              )}
+            </div>
+            <span className="mi-hint ac-iconline">
+              <Icon name="thread" size={14} />
+              {t("missions.new.homeHint", agentGrammar(agent?.name ?? ""))}
+            </span>
           </div>
-          <span className="mi-hint ac-iconline">
-            <Icon name="thread" size={14} />
-            {t("missions.new.homeHint", agentGrammar(agent?.name ?? ""))}
-          </span>
-        </div>
-        {machine && !machine.online && (
+          {machine && !machine.online && (
+            <div className="mi-notes ac-iconline">
+              <MachineIcon machineId={machine.id} />
+              <span>{t("missions.new.offline", { name: machine.name })}</span>
+            </div>
+          )}
           <div className="mi-notes ac-iconline">
-            <MachineIcon machineId={machine.id} />
-            <span>{t("missions.new.offline", { name: machine.name })}</span>
+            <Icon name="bolt" size={14} />
+            <span>
+              {t("missions.new.commandHint")} <code className="mi-mono">{MISSION_COMMAND}</code>
+            </span>
           </div>
-        )}
-        <div className="mi-notes ac-iconline">
-          <Icon name="bolt" size={14} />
-          <span>
-            {t("missions.new.commandHint")} <code className="mi-mono">{MISSION_COMMAND}</code>
-          </span>
-        </div>
-        {error && (
-          <p className="ac-field__error" role="alert" style={{ marginTop: 12 }}>
-            {error}
-          </p>
-        )}
-      </DialogBody>
-      <DialogFooter
-        note={
-          <>
-            <Icon name="shield" size={14} /> {t("missions.new.approvals")}
-          </>
-        }
-      >
+          {error && (
+            <p className="ac-field__error" role="alert">
+              {error}
+            </p>
+          )}
+        </DialogBody>
+      </Locked>
+      <DialogFooter note={approvalsNote}>
         <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
@@ -431,69 +439,74 @@ export function CloseMissionDialog({
       })}
       closeLabel={t("common.cancel")}
     >
-      <DialogBody>
-        <RadioGroup
-          value={outcome}
-          onValueChange={setOutcome}
-          aria-label={t("missions.close.outcome")}
-          style={{ display: "grid", gap: 8 }}
-        >
-          <RadioCard
-            value="done"
-            id="mission-close-done"
-            checked={outcome === "done"}
-            title={t("missions.close.done")}
-            description={t("missions.close.doneText")}
-          />
-          <RadioCard
-            value="canceled"
-            id="mission-close-canceled"
-            checked={outcome === "canceled"}
-            title={t("missions.close.canceled")}
-            description={t("missions.close.canceledText")}
-          />
-        </RadioGroup>
-        {outcome === "canceled" && hasBranch && (
+      <Locked when={close.isPending}>
+        <DialogBody>
           <RadioGroup
-            value={branch}
-            onValueChange={setBranch}
-            aria-label={t("missions.close.branch")}
+            value={outcome}
+            onValueChange={setOutcome}
+            aria-label={t("missions.close.outcome")}
             style={{ display: "grid", gap: 8 }}
           >
             <RadioCard
-              value="keep"
-              id="mission-close-keep"
-              checked={branch === "keep"}
-              title={t("missions.close.keepBranch")}
-              description={t("missions.close.keepBranchText", { branch: mission.branch })}
+              value="done"
+              id="mission-close-done"
+              checked={outcome === "done"}
+              title={t("missions.close.done")}
+              description={t("missions.close.doneText")}
             />
             <RadioCard
-              value="delete"
-              id="mission-close-delete"
-              checked={branch === "delete"}
-              title={t("missions.close.deleteBranch")}
-              description={t("missions.close.deleteBranchText", { branch: mission.branch })}
+              value="canceled"
+              id="mission-close-canceled"
+              checked={outcome === "canceled"}
+              title={t("missions.close.canceled")}
+              description={t("missions.close.canceledText")}
             />
           </RadioGroup>
-        )}
-        <div className="mi-optrow">
-          <div>
-            <label htmlFor={wikiId}>{t("missions.close.wiki")}</label>
-            <small>{t("missions.close.wikiText", { name: agent, title: mission.title })}</small>
+          {outcome === "canceled" && hasBranch && (
+            <RadioGroup
+              value={branch}
+              onValueChange={setBranch}
+              aria-label={t("missions.close.branch")}
+              style={{ display: "grid", gap: 8 }}
+            >
+              <RadioCard
+                value="keep"
+                id="mission-close-keep"
+                checked={branch === "keep"}
+                title={t("missions.close.keepBranch")}
+                description={t("missions.close.keepBranchText", { branch: mission.branch })}
+              />
+              <RadioCard
+                value="delete"
+                id="mission-close-delete"
+                checked={branch === "delete"}
+                title={t("missions.close.deleteBranch")}
+                description={t("missions.close.deleteBranchText", { branch: mission.branch })}
+              />
+            </RadioGroup>
+          )}
+          <div className="mi-optrow">
+            <div>
+              <label htmlFor={wikiId}>{t("missions.close.wiki")}</label>
+              <small>{t("missions.close.wikiText", { name: agent, title: mission.title })}</small>
+            </div>
+            <Switch id={wikiId} checked={wiki} onCheckedChange={setWiki} />
           </div>
-          <Switch id={wikiId} checked={wiki} onCheckedChange={setWiki} />
-        </div>
-        {mission.runningTasks > 0 && (
-          <div className="mi-notes ac-iconline">
-            <Icon name="stop" size={14} />
-            <span>
-              {names
-                ? t("missions.close.running", { count: mission.runningTasks, computer: mission.machine?.name ?? "" })
-                : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
-            </span>
-          </div>
-        )}
-      </DialogBody>
+          {mission.runningTasks > 0 && (
+            <div className="mi-notes ac-iconline">
+              <Icon name="stop" size={14} />
+              <span>
+                {names
+                  ? t("missions.close.running", {
+                      count: mission.runningTasks,
+                      computer: computerNameOf(t, org.name, mission.machine?.name ?? ""),
+                    })
+                  : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
+              </span>
+            </div>
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={close.isPending} onClick={submit}>
@@ -596,134 +609,135 @@ export function ShareMissionDialog({
         closeLabel={t("common.close")}
         width={520}
       >
-        <DialogBody>
-          {manage && (
-            <>
-              <Toolbar
-                size="sm"
-                search={
-                  <SearchField
-                    size="sm"
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder={t("missions.share.search")}
-                    aria-label={t("missions.share.search")}
-                    onClear={() => setQ("")}
-                    clearLabel={t("filters.clearSearch")}
-                  />
-                }
-              >
-                <Segmented
+        <Locked when={busy}>
+          <DialogBody>
+            {manage && (
+              <>
+                <Toolbar
                   size="sm"
-                  label={t("missions.share.newRole")}
-                  value={role}
-                  onValueChange={setRole}
-                  options={roleOptions}
-                />
-              </Toolbar>
-              {matches.length > 0 && (
-                <ul className="mi-people" style={{ marginTop: 8 }}>
-                  {matches.map((m) => (
-                    <li key={m.userId} className="mi-person">
-                      <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="sm" />
-                      <span className="mi-person__name">{m.name}</span>
-                      <Button
-                        size="sm"
-                        icon="plus"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(
-                            () => api.missions.setParticipant(org.id, mission.id, m.userId, role),
-                            t("missions.share.added", { name: m.name }),
-                          ).then(() => setQ(""))
-                        }
-                      >
-                        {t("missions.share.add")}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {query && matches.length === 0 && <p className="mi-hint">{t("missions.share.noMatch")}</p>}
-            </>
-          )}
-          {mission.canAct && <JoinRequests mission={mission} enabled={open} />}
-          <h3 className="mi-section-title">{t("missions.share.who")}</h3>
-          <ul className="mi-people">
-            {list?.owner && (
-              <li className="mi-person">
-                <ActorAvatar actor={{ type: "person", id: list.owner.userId }} name={list.owner.name} size="sm" />
-                <span className="mi-person__name">
-                  {list.owner.name}
-                  {list.owner.userId === me.user.id && <small> · {t("missions.share.you")}</small>}
-                </span>
-                <span className="mi-hint">{t("missions.share.owner")}</span>
-              </li>
-            )}
-            {(list?.participants ?? []).map((p) => (
-              <li key={p.userId} className="mi-person">
-                <ActorAvatar actor={{ type: "person", id: p.userId }} name={p.name} size="sm" />
-                <span className="mi-person__name">
-                  {p.name}
-                  {p.userId === me.user.id && <small> · {t("missions.share.you")}</small>}
-                </span>
-                {manage ? (
-                  <>
-                    <div style={{ width: 150 }}>
-                      <Select
-                        size="sm"
-                        aria-label={t("missions.share.roleOf", { name: p.name })}
-                        value={p.role}
-                        onValueChange={(v) =>
-                          void run(() => api.missions.setParticipant(org.id, mission.id, p.userId, v, true))
-                        }
-                        options={roleOptions}
-                      />
-                    </div>
-                    <Menu
-                      align="end"
-                      label={t("missions.share.more", { name: p.name })}
-                      trigger={
+                  search={
+                    <SearchField
+                      size="sm"
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder={t("missions.share.search")}
+                      aria-label={t("missions.share.search")}
+                      onClear={() => setQ("")}
+                      clearLabel={t("filters.clearSearch")}
+                    />
+                  }
+                >
+                  <Segmented
+                    size="sm"
+                    label={t("missions.share.newRole")}
+                    value={role}
+                    onValueChange={setRole}
+                    options={roleOptions}
+                  />
+                </Toolbar>
+                {matches.length > 0 && (
+                  <ul className="mi-people" style={{ marginTop: 8 }}>
+                    {matches.map((m) => (
+                      <li key={m.userId} className="mi-person">
+                        <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="sm" />
+                        <span className="mi-person__name">{m.name}</span>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          iconOnly
-                          icon="more"
-                          aria-label={t("missions.share.more", { name: p.name })}
+                          icon="plus"
+                          onClick={() =>
+                            void run(
+                              () => api.missions.setParticipant(org.id, mission.id, m.userId, role),
+                              t("missions.share.added", { name: m.name }),
+                            ).then(() => setQ(""))
+                          }
+                        >
+                          {t("missions.share.add")}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {query && matches.length === 0 && <p className="mi-hint">{t("missions.share.noMatch")}</p>}
+              </>
+            )}
+            {mission.canAct && <JoinRequests mission={mission} enabled={open} />}
+            <h3 className="mi-section-title">{t("missions.share.who")}</h3>
+            <ul className="mi-people">
+              {list?.owner && (
+                <li className="mi-person">
+                  <ActorAvatar actor={{ type: "person", id: list.owner.userId }} name={list.owner.name} size="sm" />
+                  <span className="mi-person__name">
+                    {list.owner.name}
+                    {list.owner.userId === me.user.id && <small> · {t("missions.share.you")}</small>}
+                  </span>
+                  <span className="mi-hint">{t("missions.share.owner")}</span>
+                </li>
+              )}
+              {(list?.participants ?? []).map((p) => (
+                <li key={p.userId} className="mi-person">
+                  <ActorAvatar actor={{ type: "person", id: p.userId }} name={p.name} size="sm" />
+                  <span className="mi-person__name">
+                    {p.name}
+                    {p.userId === me.user.id && <small> · {t("missions.share.you")}</small>}
+                  </span>
+                  {manage ? (
+                    <>
+                      <div style={{ width: 150 }}>
+                        <Select
+                          size="sm"
+                          aria-label={t("missions.share.roleOf", { name: p.name })}
+                          value={p.role}
+                          onValueChange={(v) =>
+                            void run(() => api.missions.setParticipant(org.id, mission.id, p.userId, v, true))
+                          }
+                          options={roleOptions}
                         />
-                      }
-                    >
-                      {mission.role === "owner" && (
-                        <MenuItem icon="arrowRight" onSelect={() => setHanding({ userId: p.userId, name: p.name })}>
-                          {t("missions.share.handOver")}
-                        </MenuItem>
-                      )}
-                      {mission.role === "owner" && <MenuSeparator />}
-                      <MenuItem
-                        icon="trash"
-                        onSelect={() =>
-                          void run(
-                            () => api.missions.removeParticipant(org.id, mission.id, p.userId),
-                            t("missions.share.removed", { name: p.name }),
-                          )
+                      </div>
+                      <Menu
+                        align="end"
+                        label={t("missions.share.more", { name: p.name })}
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            iconOnly
+                            icon="more"
+                            aria-label={t("missions.share.more", { name: p.name })}
+                          />
                         }
                       >
-                        {t("missions.share.remove")}
-                      </MenuItem>
-                    </Menu>
-                  </>
-                ) : (
-                  <span className="mi-hint">{t(`missions.share.${p.role}`)}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {list && list.participants.length === 0 && <p className="mi-hint">{t("missions.share.onlyOwner")}</p>}
-          <div className="mi-notes ac-iconline">
-            <Icon name="lock" size={14} />
-            <span>{t("missions.share.seeing")}</span>
-          </div>
-        </DialogBody>
+                        {mission.role === "owner" && (
+                          <MenuItem icon="arrowRight" onSelect={() => setHanding({ userId: p.userId, name: p.name })}>
+                            {t("missions.share.handOver")}
+                          </MenuItem>
+                        )}
+                        {mission.role === "owner" && <MenuSeparator />}
+                        <MenuItem
+                          icon="trash"
+                          onSelect={() =>
+                            void run(
+                              () => api.missions.removeParticipant(org.id, mission.id, p.userId),
+                              t("missions.share.removed", { name: p.name }),
+                            )
+                          }
+                        >
+                          {t("missions.share.remove")}
+                        </MenuItem>
+                      </Menu>
+                    </>
+                  ) : (
+                    <span className="mi-hint">{t(`missions.share.${p.role}`)}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {list && list.participants.length === 0 && <p className="mi-hint">{t("missions.share.onlyOwner")}</p>}
+            <div className="mi-notes ac-iconline">
+              <Icon name="lock" size={14} />
+              <span>{t("missions.share.seeing")}</span>
+            </div>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button variant="primary" onClick={() => onOpenChange(false)}>
             {t("missions.share.done")}
@@ -742,21 +756,25 @@ export function ShareMissionDialog({
         })}
         closeLabel={t("common.cancel")}
       >
-        <DialogBody>
-          {mission.machine && (
-            <div className="mi-optrow">
-              <div>
-                <label htmlFor={lendId}>{t("missions.share.lend", { computer: mission.machine.name })}</label>
-                <small>{t("missions.share.lendText", { name: handing?.name ?? "" })}</small>
+        <Locked when={busy}>
+          <DialogBody>
+            {mission.machine && (
+              <div className="mi-optrow">
+                <div>
+                  <label htmlFor={lendId}>
+                    {t("missions.share.lend", { computer: computerNameOf(t, org.name, mission.machine.name) })}
+                  </label>
+                  <small>{t("missions.share.lendText", { name: handing?.name ?? "" })}</small>
+                </div>
+                <Switch id={lendId} checked={lend} onCheckedChange={setLend} />
               </div>
-              <Switch id={lendId} checked={lend} onCheckedChange={setLend} />
+            )}
+            <div className="mi-notes ac-iconline">
+              <Icon name="info" size={14} />
+              <span>{t("missions.share.handNote")}</span>
             </div>
-          )}
-          <div className="mi-notes ac-iconline">
-            <Icon name="info" size={14} />
-            <span>{t("missions.share.handNote")}</span>
-          </div>
-        </DialogBody>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => setHanding(null)}>{t("common.cancel")}</Button>
           <Button variant="primary" loading={busy} onClick={() => void handOver()}>
@@ -803,13 +821,15 @@ function JoinRequests({ mission, enabled }: { mission: Mission; enabled: boolean
             <span className="mi-person__name">{r.name}</span>
             <span className="mi-person__actions">
               <div style={{ width: 150 }}>
-                <Select
-                  size="sm"
-                  aria-label={t("missions.join.roleOf", { name: r.name })}
-                  value={roles[r.userId] ?? "comment"}
-                  onValueChange={(v) => setRoles((prev) => ({ ...prev, [r.userId]: v }))}
-                  options={roleOptions}
-                />
+                <Locked when={decide.isPending}>
+                  <Select
+                    size="sm"
+                    aria-label={t("missions.join.roleOf", { name: r.name })}
+                    value={roles[r.userId] ?? "comment"}
+                    onValueChange={(v) => setRoles((prev) => ({ ...prev, [r.userId]: v }))}
+                    options={roleOptions}
+                  />
+                </Locked>
               </div>
               <Button
                 size="sm"

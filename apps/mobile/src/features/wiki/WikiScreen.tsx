@@ -11,9 +11,9 @@ import {
   type WikiPageSummary,
   type WikiVersion,
 } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { toggleTask } from "@agenteschat/client/lib/wiki";
+import { titleOfSlug, toggleTask } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -31,6 +31,7 @@ import {
   Icon,
   IconButton,
   LineIcon,
+  Locked,
   PressScale,
   Row,
   SearchField,
@@ -45,6 +46,7 @@ import { aroundStar, wikiMap } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
+import { FirstUse, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
@@ -156,12 +158,24 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           </View>
         ) : null}
         {tree.isSuccess && pages.length === 0 ? (
-          <EmptyState icon="file" title={t("wiki.emptyTitle")} subtitle={t("mobile.wiki.empty")} />
+          <FirstUse
+            place="wiki"
+            size="panel"
+            acts={writes}
+            label={t("wiki.newPage")}
+            onPress={() => newWikiPage(folder ? { folder } : {})}
+          />
         ) : null}
         {search ? (
           found.length === 0 ? (
             pages.length > 0 ? (
-              <EmptyState icon="search" title={t("wiki.noMatch")} />
+              <EmptyState
+                size="inline"
+                title={t("wiki.noMatch")}
+                action={
+                  <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+                }
+              />
             ) : null
           ) : (
             <Animated.View key="found" {...fade}>
@@ -264,7 +278,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
-      {writes ? (
+      {writes && !(tree.isSuccess && pages.length === 0) ? (
         <PressScale
           accessibilityRole="button"
           accessibilityLabel={t("wiki.newPage")}
@@ -361,9 +375,10 @@ function WikiPage({ slug }: { slug: string }) {
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
   const page = useWikiPage(orgId, slug);
   const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
+  const look = useEmptyLook();
   const admin = can(org, "configure");
-  // Who sees a page: people who write the wiki and manage roles (the server checks the same).
-  const choosesAudience = writes && can(org, "manage_roles");
+  // Who sees a page: anyone who edits it (the server checks the same); agents and editors, who manages roles too.
+  const choosesAudience = writes;
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
   const graph = useWikiGraph(orgId, true);
@@ -457,7 +472,7 @@ function WikiPage({ slug }: { slug: string }) {
         key: "audience",
         icon: "eye",
         label: t("wiki.audience"),
-        run: () => router.push({ pathname: "/wiki-audience", params: { slug: p.slug } }),
+        run: () => router.push({ pathname: "/who-sees", params: { slug: p.slug } }),
       });
     if (admin)
       items.push({
@@ -537,8 +552,38 @@ function WikiPage({ slug }: { slug: string }) {
         {page.isError && !p ? (
           (page.error as { code?: string } | null)?.code === "wiki.no_access" ? (
             <EmptyState icon="lock" title={t("wiki.noAccessTitle")} subtitle={t("wiki.noAccessText")} />
+          ) : (page.error as { status?: number } | null)?.status === 404 ? (
+            <EmptyState
+              size="panel"
+              agent={look}
+              title={t("wiki.missingTitle")}
+              subtitle={t(writes ? "wiki.missingText" : "wiki.missingViewer")}
+              {...(writes
+                ? {
+                    action: (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon="plus"
+                        label={t("wiki.createPage")}
+                        onPress={() => newWikiPage({ title: capitalize(titleOfSlug(slug), i18n.language) })}
+                      />
+                    ),
+                  }
+                : {})}
+            />
           ) : (
-            <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />
+            <View style={styles.center}>
+              <Text tone="muted" style={styles.centerText}>
+                {t("common.loadFailed")}
+              </Text>
+              <Button
+                variant="secondary"
+                size="sm"
+                label={t("mobile.common.retry")}
+                onPress={() => void page.refetch()}
+              />
+            </View>
           )
         ) : null}
         {p ? (
@@ -797,34 +842,36 @@ export function WikiMoveScreen({ slug }: { slug: string }) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.form}
       >
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.title")}
-        </Text>
-        <TextInput
-          value={title ?? p?.title ?? ""}
-          onChangeText={setTitle}
-          placeholder={t("wiki.form.titlePlaceholder")}
-          placeholderTextColor={c.faint}
-          style={field}
-        />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.renameHelp")}
-        </Text>
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("wiki.form.folder")}
-        </Text>
-        <TextInput
-          value={folder ?? p?.folder ?? ""}
-          onChangeText={setFolder}
-          placeholder={t("wiki.form.folderPlaceholder")}
-          placeholderTextColor={c.faint}
-          autoCapitalize="words"
-          style={field}
-        />
-        <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.folderHelp")}
-        </Text>
+        <Locked when={saving} style={styles.formFields}>
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.title")}
+          </Text>
+          <TextInput
+            value={title ?? p?.title ?? ""}
+            onChangeText={setTitle}
+            placeholder={t("wiki.form.titlePlaceholder")}
+            placeholderTextColor={c.faint}
+            style={field}
+          />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.renameHelp")}
+          </Text>
+          <Text variant="footnote" tone="faint" style={styles.gapTop}>
+            {t("wiki.form.folder")}
+          </Text>
+          <TextInput
+            value={folder ?? p?.folder ?? ""}
+            onChangeText={setFolder}
+            placeholder={t("wiki.form.folderPlaceholder")}
+            placeholderTextColor={c.faint}
+            autoCapitalize="words"
+            style={field}
+          />
+          <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.folderHelp")}
+          </Text>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -908,6 +955,7 @@ const styles = StyleSheet.create({
   body: { paddingTop: 14 },
   diffWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
+  formFields: { gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4 },

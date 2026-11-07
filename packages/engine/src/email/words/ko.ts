@@ -232,7 +232,7 @@ export const words: EmailWords = {
     account: (email) => [
       "이 코드를 입력하면 계정 ",
       { b: email },
-      " 전체가 삭제돼요. 워크스페이스 하나만 삭제되는 게 아니에요. 바로 삭제되고, 나만 있는 워크스페이스도 함께 닫혀요.",
+      " 전체가 삭제돼요. 워크스페이스 하나만 삭제되는 게 아니에요. 즉시 모든 기기에서 로그아웃되고 7일 후에 완전히 삭제돼요. 나만 있는 워크스페이스도 함께 닫혀요.",
     ],
     support: (address) => [
       "10분 동안 유효하고, 이 코드 없이는 아무것도 삭제되지 않아요. 본인이 아니라면 공유하지 말고 ",
@@ -275,6 +275,20 @@ export const words: EmailWords = {
     note: "직접 연결하지 않았나요? 지금 연결을 끊고 비밀번호를 바꾸세요.",
     button: "연결된 앱 보기",
     why: (org) => `agentes.chat의 ${org}에서 내 계정에 앱이 연결되어 이 메일을 보내 드렸어요.`,
+  },
+  accountDeleting: {
+    subject: (day) => `agentes.chat 계정이 ${day}에 삭제돼요`,
+    preheader: "마음을 바꿀 수 있는 시간은 7일이에요.",
+    headline: "계정을 삭제하고 있어요",
+    body: (email, day, time) => [
+      "계정 ",
+      { b: email },
+      ` 을(를) ${day} ${time}에 삭제해요. 모든 기기에서 로그아웃됐고, 돌아올 때까지 여기서 아무도 연락할 수 없어요.`,
+    ],
+    closes: (_count, names) => ["나만 있던 워크스페이스는 지금 닫혔고 같은 날 삭제돼요: ", ...names, "."],
+    undo: "마음이 바뀌었나요? 그 전에 로그인해서 복원을 누르세요.",
+    button: "로그인해서 복원",
+    why: "이 주소로 agentes.chat 계정이 있어서 이 메일을 보내 드렸어요.",
   },
   accountDeleted: {
     subject: "agentes.chat 계정이 삭제됐어요",
@@ -354,5 +368,20 @@ export const words: EmailWords = {
     note: "알림에서 한 번의 클릭으로 되돌려 받으면 에이전트가 더 이상 내 플랜으로 생각하지 않아요.",
     button: "알림 열기",
     why: (org) => `${org}에서 누군가 내 플랜을 에이전트에 연결해서 이 이메일을 받았어요.`,
+  },
+  planWaiting: {
+    subject: "팀이 기다리고 있어요",
+    preheader: "워크스페이스가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.",
+    headline: "팀이 기다리고 있어요",
+    body: (agents, channels, routines) => {
+      const a = `에이전트 ${agents}개`;
+      const c = `채널 ${channels}개`;
+      const r = `루틴 ${routines}개`;
+      return routines > 0
+        ? `${a}, ${c}, ${r}가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.`
+        : `${a}, ${c}가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.`;
+    },
+    button: "agentes.chat 요금제 보기",
+    why: (org) => `agentes.chat에서 ${org}을(를) 운영하고 있어서 이 메일을 보내드려요. 이런 알림은 두 번만 보내요.`,
   },
 };

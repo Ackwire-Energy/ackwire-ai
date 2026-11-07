@@ -1,7 +1,19 @@
+import type { TFunction } from "i18next";
 import type { ConsultationStatus, MessageConsultation } from "../api/types";
+import { plainLine } from "./markdown";
+import { formatLineTime } from "./work";
 
 /** How long an agent waits for another one's answer (the server's `CONSULTATION_TTL_MS`). */
 export const CONSULTATION_MINUTES = 15;
+
+/**
+ * A pair row's time, from the ask to now or to what came back, waits included: the clock while it's out ("6 h"), then
+ * "took 6 h".
+ */
+export function consultTimeText(t: TFunction, locale: string, live: boolean, seconds: number) {
+  const time = formatLineTime(locale, seconds * 1000);
+  return live ? time : t("chat.consultPair.took", { time });
+}
 
 const STATUSES: ReadonlySet<string> = new Set<ConsultationStatus>(["answered", "expired", "failed"]);
 
@@ -51,11 +63,4 @@ export function forPeople<C extends { question: string }, M extends { body: stri
 }
 
 /** One line of an answer for the folded card: no Markdown marks, spaces collapsed. */
-export function previewOf(text: string) {
-  return withoutRelayLine(text)
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`#>~|]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export const previewOf = (text: string) => plainLine(withoutRelayLine(text));

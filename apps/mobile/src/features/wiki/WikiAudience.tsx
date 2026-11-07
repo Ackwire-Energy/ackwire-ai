@@ -22,7 +22,7 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Row, Text, useToast } from "@/ui";
+import { Locked, Row, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AccessList, type AccessListRow } from "../shared/AccessList";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -30,7 +30,7 @@ import { PushedHeader, successHaptic, Tile } from "../shared/parts";
 
 /**
  * "Acesso" to a wiki page or folder (ADR 0023 addenda), the web's dialog as a screen on the shared `AccessList`: a level
- * for everyone and one per role, person and agent. Owners always read and edit. Inside a limited folder it can only be
+ * for everyone and one per role, person and agent. Administrators always read and edit. Inside a limited folder it can only be
  * narrower.
  */
 export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: string }) {
@@ -179,53 +179,55 @@ function Form({
         action={{ label: t("common.save"), onPress: save, disabled: action.isPending || saveFolder.isPending }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-        <Text variant="footnote" tone="faint" style={styles.lead}>
-          {folder ? t("wiki.audienceFolderText") : t("wiki.audienceText")}
-        </Text>
-        {above ? (
+        <Locked when={action.isPending || saveFolder.isPending}>
           <Text variant="footnote" tone="faint" style={styles.lead}>
-            {t("wiki.audienceInFolder", { folder: above.folder })}
+            {folder ? t("wiki.audienceFolderText") : t("wiki.audienceText")}
           </Text>
-        ) : null}
-        <AccessList
-          levelName={levelName}
-          rows={[
-            base("people", t("wiki.audienceEveryone"), t("wiki.audienceEveryoneText"), "person"),
-            base("agents", t("wiki.audienceAgentsAll"), t("wiki.audienceAgentsAllText"), "person"),
-          ]}
-        />
-        <AccessList
-          title={t("wiki.audienceRoles")}
-          levelName={levelName}
-          rows={roleList.map((r) =>
-            row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
-          )}
-        />
-        <AccessList
-          title={t("wiki.audiencePeople")}
-          levelName={levelName}
-          rows={[...dir.memberById.values()].map((m) =>
-            row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
-          )}
-        />
-        <AccessList
-          title={t("wiki.audienceAgents")}
-          levelName={levelName}
-          rows={agents.map((a) =>
-            row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
-          )}
-        />
-        <Text variant="footnote" tone="faint" style={styles.lead}>
-          {t("wiki.audienceEditNote")}
-        </Text>
-        {inFolder ? (
-          <Row
-            leading={<Tile icon="archive" />}
-            title={t("wiki.audienceUseFolder", { folder: inFolder })}
-            chevron
-            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder: inFolder } })}
+          {above ? (
+            <Text variant="footnote" tone="faint" style={styles.lead}>
+              {t("wiki.audienceInFolder", { folder: above.folder })}
+            </Text>
+          ) : null}
+          <AccessList
+            levelName={levelName}
+            rows={[
+              base("people", t("wiki.audienceEveryone"), t("wiki.audienceEveryoneText"), "person"),
+              base("agents", t("wiki.audienceAgentsAll"), t("wiki.audienceAgentsAllText"), "person"),
+            ]}
           />
-        ) : null}
+          <AccessList
+            title={t("wiki.audienceRoles")}
+            levelName={levelName}
+            rows={roleList.map((r) =>
+              row("roles", draft.people, wikiRowCap(cap.people, cap.roles[r.id]), r.id, "shield", r.name),
+            )}
+          />
+          <AccessList
+            title={t("wiki.audiencePeople")}
+            levelName={levelName}
+            rows={[...dir.memberById.values()].map((m) =>
+              row("users", draft.people, "edit", m.userId, "person", m.name, m.email),
+            )}
+          />
+          <AccessList
+            title={t("wiki.audienceAgents")}
+            levelName={levelName}
+            rows={agents.map((a) =>
+              row("agentRows", draft.agents, wikiRowCap(cap.agents, cap.agentRows[a.id]), a.id, "person", a.name),
+            )}
+          />
+          <Text variant="footnote" tone="faint" style={styles.lead}>
+            {t("wiki.audienceEditNote")}
+          </Text>
+          {inFolder ? (
+            <Row
+              leading={<Tile icon="archive" />}
+              title={t("wiki.audienceUseFolder", { folder: inFolder })}
+              chevron
+              onPress={() => router.push({ pathname: "/wiki-audience", params: { folder: inFolder } })}
+            />
+          ) : null}
+        </Locked>
       </ScrollView>
     </View>
   );

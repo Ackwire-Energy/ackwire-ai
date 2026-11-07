@@ -6,6 +6,7 @@ import {
   useApi,
   useCredentials,
   useMachines,
+  usePlatformKey,
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
@@ -13,10 +14,16 @@ import {
   accountTitle,
   agentsToGive,
   endsOnClaude,
+  identityUnknown,
+  keyRemovalText,
+  offersSignInAgain,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
+  signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
+import { errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -30,12 +37,13 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
-import { Note } from "./parts";
+import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
@@ -91,6 +99,7 @@ export function AiAccountsScreen() {
   const meId = useMeId();
   const status = useAiStatus(orgId);
   const [again, setAgain] = useState<Account | null>(null);
+  const hold = usePlanHold(orgId, org);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -147,9 +156,9 @@ export function AiAccountsScreen() {
           ? t("aiAccounts.page.disconnectAgents", {
               count: a.usedBy.length,
               agents: names(a.usedBy),
-              computer: a.computer,
+              computer: computerNameOf(t, org?.name ?? "", a.computer),
             })
-          : t("aiAccounts.page.disconnectNone", { computer: a.computer }),
+          : t("aiAccounts.page.disconnectNone", { computer: computerNameOf(t, org?.name ?? "", a.computer) }),
         ...(endsOnClaude(a, machineOf(a)) ? [t("aiAccounts.page.revokeOnClaude")] : []),
       ].join(" "),
       [
@@ -169,7 +178,7 @@ export function AiAccountsScreen() {
     );
   const actions = (a: Account) => {
     const plan = planOf(a.provider);
-    const out = a.status === "signed_out";
+    const out = offersSignInAgain(a);
     const toGive = meId
       ? agentsToGive({
           account: a,
@@ -201,6 +210,8 @@ export function AiAccountsScreen() {
     );
   };
 
+  // Under a hold its note says what comes first: an invitation to connect a plan would contradict it.
+  const none = !hold && ai.isSuccess && rows.length === 0 && own.length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.ai.row")} solid={false} grouped />
@@ -219,12 +230,11 @@ export function AiAccountsScreen() {
             </Text>
           </InfoHint>
         </View>
+        {hold && !again ? <PlanHoldNote org={org} /> : null}
         {ai.isLoading ? <ActivityIndicator color={c.muted} /> : null}
         {ai.isError ? <Note icon="x">{t("common.loadFailed")}</Note> : null}
-        {ai.isSuccess && rows.length === 0 && own.length === 0 ? (
-          <Text variant="small" tone="muted">
-            {t("aiAccounts.page.empty")}
-          </Text>
+        {none ? (
+          <FirstUse place="ai" size="panel" acts label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
         ) : null}
         {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
@@ -250,10 +260,16 @@ export function AiAccountsScreen() {
           <GroupedList>
             {rows.map((a) => {
               const plan = planOf(a.provider);
-              const out = a.status === "signed_out";
+              const out = signInOf(a) === "signed_out";
+              const unknown = signInOf(a) === "unknown";
               const facts = [
-                a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
-                several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
+                a.email ??
+                  (a.keyHint
+                    ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                    : identityUnknown(a, machineOf(a))
+                      ? t("aiAccounts.page.identityUnknown")
+                      : null),
+                several ? t("aiAccounts.page.on", { computer: computerNameOf(t, org?.name ?? "", a.computer) }) : null,
                 a.usedBy.length > 0
                   ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
                   : t("aiAccounts.page.noAgent"),
@@ -267,13 +283,14 @@ export function AiAccountsScreen() {
                   more
                   onPress={() => actions(a)}
                   below={
-                    out || a.usage || (plan && !plan.usage) ? (
+                    out || unknown || a.usage || (plan && !plan.usage) ? (
                       <View style={styles.below}>
                         {out ? (
                           <Note icon="x">
                             {plan ? t("aiAccounts.page.keyRefused") : t("aiAccounts.page.signedOut")}
                           </Note>
                         ) : null}
+                        {unknown ? <Note icon="info">{t("aiAccounts.page.statusUnknown")}</Note> : null}
                         {a.usage ? (
                           <PlanMeter usage={a.usage} compact />
                         ) : plan && !plan.usage ? (
@@ -298,30 +315,36 @@ export function AiAccountsScreen() {
               </Text>
               <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
             </View>
-            <AddAccount
-              machineId={again.machineId}
-              kind={again.kind}
-              computer={again.computer}
-              again={again.id}
-              email={again.email}
-              local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-              {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
-              onAdded={() => {
-                setAgain(null);
-                refetch();
-              }}
-            />
+            {hold ? (
+              <PlanHoldNote org={org} />
+            ) : (
+              <AddAccount
+                machineId={again.machineId}
+                kind={again.kind}
+                computer={again.computer}
+                again={again.id}
+                email={again.email}
+                local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
+                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
+                onAdded={() => {
+                  setAgain(null);
+                  refetch();
+                }}
+              />
+            )}
           </View>
         ) : null}
-        <View style={styles.start}>
-          <Button
-            size="sm"
-            variant={rows.length || own.length ? "secondary" : "primary"}
-            icon="plus"
-            label={t("aiAccounts.page.connect")}
-            onPress={() => openConnectAi()}
-          />
-        </View>
+        {none || hold ? null : (
+          <View style={styles.start}>
+            <Button
+              size="sm"
+              variant={rows.length || own.length ? "secondary" : "primary"}
+              icon="plus"
+              label={t("aiAccounts.page.connect")}
+              onPress={() => openConnectAi()}
+            />
+          </View>
+        )}
         {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>
@@ -331,7 +354,8 @@ export function AiAccountsScreen() {
 /** The workspace's API keys (the web's "Chaves de provedor"): the default one, a key swapped or deleted. */
 function KeysSection({ locale }: { locale: string }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -341,10 +365,13 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => {
+  const failed = (error: unknown) => {
     errorHaptic();
-    toast({ title: t("agentPage.work.failed"), icon: "x" });
+    const refusal = keyRefusal(t, error);
+    if (refusal) alertKeyRefused(t, refusal);
+    else toast({ title: errorText(t, error), icon: "x" });
   };
+  const platform = usePlatformKey(orgId);
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -358,9 +385,15 @@ function KeysSection({ locale }: { locale: string }) {
           onPress: (value?: string) => {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
-            api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
+            api.agents.rotateCredential(orgId, k.id, { apiKey }).then((saved) => {
               successHaptic();
-              toast({ title: t("settings.rotated"), icon: "check" });
+              toast({
+                title:
+                  saved.check === "unchecked"
+                    ? t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) })
+                    : t("settings.rotated"),
+                icon: "check",
+              });
               refetch();
             }, failed);
           },
@@ -370,15 +403,17 @@ function KeysSection({ locale }: { locale: string }) {
     );
   };
   const remove = (k: Credential) =>
-    Alert.alert(t("settings.removeTitle", { label: k.label }), t("settings.removeText"), [
+    Alert.alert(t("settings.removeTitle", { label: k.label }), keyRemovalText(t, k, live, platform.data === true), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("settings.remove"),
         style: "destructive",
         onPress: () =>
-          api.agents.removeCredential(orgId, k.id, true).then(() => {
+          api.agents.removeCredential(orgId, k.id, true, true).then(() => {
             successHaptic();
             refetch();
+            void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+            void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
           }, failed),
       },
     ]);
@@ -389,8 +424,8 @@ function KeysSection({ locale }: { locale: string }) {
         ...(isDefault
           ? []
           : [{ label: t("settings.makeDefault"), onPress: () => update.mutate({ defaultCredentialId: k.id }) }]),
-        ...(Platform.OS === "ios" ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
-        ...(isDefault ? [] : [{ label: t("settings.remove"), destructive: true, onPress: () => remove(k) }]),
+        ...(Platform.OS === "ios" && !held ? [{ label: t("settings.rotate"), onPress: () => rotate(k) }] : []),
+        { label: t("settings.remove"), destructive: true, onPress: () => remove(k) },
       ],
       t("common.cancel"),
     );
@@ -433,20 +468,19 @@ function KeysSection({ locale }: { locale: string }) {
           })}
         </GroupedList>
       ) : null}
-      {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
-        <Text variant="small" tone="faint">
-          {t("settings.removeDefaultBlocked")}
-        </Text>
-      ) : null}
-      <View style={styles.start}>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="plus"
-          label={t("settings.addKey")}
-          onPress={() => openConnectAi({ intent: "api_key" })}
-        />
-      </View>
+      {held ? (
+        <PlanHoldNote org={org} keys />
+      ) : (
+        <View style={styles.start}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="plus"
+            label={t("settings.addKey")}
+            onPress={() => openConnectAi({ intent: "api_key" })}
+          />
+        </View>
+      )}
     </>
   );
 }

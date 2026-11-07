@@ -1,5 +1,5 @@
 import type { FormerAgent } from "@agenteschat/client";
-import { useAgentGroups, useAiStatus, useFormerAgents, useTeam } from "@agenteschat/client";
+import { useAgentGroups, useAiStatus, useChannels, useFormerAgents, useTeam } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -17,6 +17,7 @@ import { TeamMap } from "@/components/team/TeamMap";
 import { TeamSectors } from "@/components/team/TeamSectors";
 import { TeamUsage } from "@/components/team/TeamUsage";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import "./team.css";
 
@@ -33,7 +34,9 @@ export function TeamPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const team = useTeam(org.id);
-  const groups = useAgentGroups(org.id).data ?? [];
+  const sectors = useAgentGroups(org.id);
+  const channels = useChannels(org.id);
+  const groups = sectors.data ?? [];
   const dir = useDirectory(org.id);
   // Asked with the page, so every view says at once whether an agent can work.
   useAiStatus(org.id);
@@ -52,7 +55,28 @@ export function TeamPage() {
   const former = useFormerAgents(org.id);
   const archived = (former.data ?? []).filter((a) => !a.deleted);
   const [deleting, setDeleting] = useState<FormerAgent | null>(null);
-  const shown = view !== "usage" && data && agents.length > 0 ? data : null;
+  // Setores and the map read these two: before they answer, "no setor yet" or "no channel yet" would be a lie.
+  const lookups = [sectors, channels];
+  const lookupFailed = lookups.find((q) => q.isError && !q.data);
+  const shown = view !== "usage" && data && agents.length > 0 && lookups.every((q) => q.data) ? data : null;
+  const noAgents = view !== "usage" && !!data && agents.length === 0;
+  const look = useRightHandLook();
+  const maker = can(org, "create_agents");
+  // The empty state takes over the head's buttons: one way in, in the middle of the page.
+  const makes = maker && (
+    <>
+      <Button asChild icon="archiveBox">
+        <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
+          {t("shell.importAgents")}
+        </Link>
+      </Button>
+      <Button asChild variant="primary" icon="plus">
+        <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
+          {t("shell.createAgent")}
+        </Link>
+      </Button>
+    </>
+  );
   return (
     <div className="page team">
       <PageHeader
@@ -65,22 +89,7 @@ export function TeamPage() {
             t("team.sectorsCount", { count: groups.length }),
           ].join(" · ")
         }
-        actions={
-          can(org, "create_agents") && (
-            <>
-              <Button asChild icon="archiveBox">
-                <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
-                  {t("shell.importAgents")}
-                </Link>
-              </Button>
-              <Button asChild variant="primary" icon="plus">
-                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-                  {t("shell.createAgent")}
-                </Link>
-              </Button>
-            </>
-          )
-        }
+        actions={!noAgents && makes}
       >
         <Segmented
           value={view}
@@ -89,13 +98,24 @@ export function TeamPage() {
           options={VIEWS.map((v) => ({ value: v, label: t(`team.view.${v}`) }))}
         />
       </PageHeader>
-      {view !== "usage" && team.isLoading && <LoadingCards count={2} />}
+      {view !== "usage" &&
+        (team.isLoading || (data && agents.length > 0 && !lookupFailed && lookups.some((q) => q.isPending))) && (
+          <LoadingCards count={2} />
+        )}
       {view !== "usage" && team.isError && !data && (
         <ErrorState error={team.error} onRetry={() => void team.refetch()} />
       )}
-      {view !== "usage" && data && agents.length === 0 && (
-        <EmptyState sky title={t("team.emptyTitle")}>
-          {t("team.empty")}
+      {view !== "usage" && data && agents.length > 0 && lookupFailed && (
+        <ErrorState error={lookupFailed.error} onRetry={() => void lookupFailed.refetch()} />
+      )}
+      {noAgents && (
+        <EmptyState
+          size="page"
+          agent={look}
+          title={t(maker ? "team.emptyTitle" : "team.emptyViewerTitle")}
+          actions={makes}
+        >
+          {t(maker ? "team.empty" : "team.emptyViewer")}
         </EmptyState>
       )}
       {shown && view === "list" && <TeamList team={shown} groups={groups} />}

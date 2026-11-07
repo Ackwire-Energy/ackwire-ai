@@ -1,12 +1,12 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { AgentDeletionDeps } from "./agent-deletion";
 import { ARTIFACT_TRASH_DAYS } from "./artifacts";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { stopRun } from "./cancel";
 import { NotFoundError, ValidationError } from "./errors";
-import { publishOrgEvent } from "./events";
+import { publishChannelsChanged, publishOrgEvent } from "./events";
 import { concludeMission, OPEN_MISSION_STATUSES } from "./missions";
 import { clearChannelNotifications } from "./notifications";
 import { requirePermission } from "./organizations";
@@ -73,19 +73,8 @@ export async function deleteChannel(
   if (typed.trim().replace(/^#/, "").toLowerCase() !== channel.name) {
     throw new ValidationError("Type the channel's name to delete it", "channel.delete_name");
   }
-  const now = new Date();
   await db.transaction(async (tx) => {
-    const [gone] = await tx
-      .update(channels)
-      .set({
-        archivedAt: sql`coalesce(${channels.archivedAt}, now())`,
-        deletedAt: now,
-        name: deletedChannelName(channelId),
-        categoryId: null,
-      })
-      .where(and(eq(channels.id, channelId), isNull(channels.deletedAt)))
-      .returning({ id: channels.id });
-    if (!gone) throw new NotFoundError("Channel not found");
+    if (!(await markChannelDeleted(tx, orgId, channelId))) throw new NotFoundError("Channel not found");
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
@@ -93,13 +82,35 @@ export async function deleteChannel(
       target: { type: "channel", id: channelId },
       details: { name: channel.name, visibility: channel.visibility },
     });
-    await enqueue(tx, {
-      orgId,
-      kind: CHANNEL_DELETE_JOB,
-      payload: { channelId },
-      dedupeKey: `${CHANNEL_DELETE_JOB}:${channelId}`,
-    });
   });
+  await endChannelWork(deps, actorId, orgId, channelId);
+}
+
+/** Inside the caller's transaction: nothing lists the channel from here on, and the purge is queued. False: already gone. */
+export async function markChannelDeleted(tx: Executor, orgId: string, channelId: string) {
+  const [gone] = await tx
+    .update(channels)
+    .set({
+      archivedAt: sql`coalesce(${channels.archivedAt}, now())`,
+      deletedAt: new Date(),
+      name: deletedChannelName(channelId),
+      categoryId: null,
+    })
+    .where(and(eq(channels.id, channelId), isNull(channels.deletedAt)))
+    .returning({ id: channels.id });
+  if (!gone) return false;
+  await enqueue(tx, {
+    orgId,
+    kind: CHANNEL_DELETE_JOB,
+    payload: { channelId },
+    dedupeKey: `${CHANNEL_DELETE_JOB}:${channelId}`,
+  });
+  return true;
+}
+
+/** After `markChannelDeleted` commits: its routines go, its runs and missions stop, and clients drop it. */
+export async function endChannelWork(deps: AgentDeletionDeps, actorId: string, orgId: string, channelId: string) {
+  const { db } = deps;
   caches.channels.delete(`${orgId}:${channelId}`);
   caches.channelMembers.delete(`${orgId}:${channelId}`);
   await deleteChannelRoutines(deps, actorId, orgId, channelId);
@@ -131,6 +142,7 @@ export async function deleteChannel(
   }
   // Clients drop it as they drop an archived channel, and live subscriptions to it end.
   await publishOrgEvent(deps.pubsub, { type: "channel.archived", orgId, channelId });
+  await publishChannelsChanged(deps.pubsub, orgId);
 }
 
 /** Job: a deleted channel's contents go, in one transaction; a no-op for a channel that isn't deleted. */

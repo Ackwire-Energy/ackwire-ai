@@ -1,4 +1,4 @@
-import type { Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
+import type { BrainScope, Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import {
   keys,
   useAgentBrain,
@@ -18,15 +18,16 @@ import {
   planWordOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
-import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
+import { computerEdition, computerName, managedNamed, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
-import { holdText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AiChoice,
   behindComputer,
   catchUp,
+  dimmedLine,
   type ExistingSignIn,
   firstAgent,
   freePlanAccount,
@@ -35,23 +36,21 @@ import {
   KEY_MARKS,
   kindOf,
   ownSignInFor,
+  PLAN_CHOICES,
+  PLAN_MARKS,
   type PlanChoice,
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planHoldPhoneLine,
   planLabel,
   planMark,
   planOfAccount,
+  planPickText,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import {
-  geminiPersonal,
-  isPlanId,
-  PLAN_IDS,
-  planOf,
-  providerFitsChoice,
-  signInProviderOf,
-} from "@agenteschat/client/lib/plans";
+import { can } from "@agenteschat/client/lib/permissions";
+import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -62,7 +61,9 @@ import {
   providerOf,
   providersForKey,
 } from "@agenteschat/client/lib/providers";
+import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -74,6 +75,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  Locked,
   ProviderLogo,
   ProviderQuad,
   Text,
@@ -83,20 +85,32 @@ import {
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
+import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { EndpointForm } from "./EndpointForm";
-import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
+import { existingRows, type FlowView, flowBack, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
-import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
+import {
+  AiRow,
+  alertKeyRefused,
+  Note,
+  OpenPage,
+  PasteField,
+  PlanHoldNote,
+  PlanReplies,
+  Step,
+  StepsCard,
+  usePlanHold,
+} from "./parts";
 
 /*
  * "Conectar uma IA" on the phone: the web's content and rules
  * (ADR 0059, ADR 0061) in the app's own line. The first page is grouped lists like iOS Settings: what the person
- * already has (for an agent with no AI), your AI plan (Claude, ChatGPT, the coding plans in one row) and pay as you
- * go (the API key). Each row pushes its page inside
- * the sheet: a plan's mark, for which agent, and its numbered steps on the agent's computer (or why they wait); the
- * key's maker as a radio list, where its keys are made, and the key. A plan signs in on the agent's computer: with
+ * already has (for an agent with no AI), your AI plan and pay as you go (the API key), one row each. Each pushes its
+ * page inside the sheet: the plans with a search, then a plan's mark, for which agent, and its numbered steps on the
+ * agent's computer (or why they wait); the key's maker, chosen the same way, where its keys are made, and the key. A
+ * plan signs in on the agent's computer: with
  * none, "Conectar um computador", and the key stays one tap away.
  */
 
@@ -107,6 +121,7 @@ import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from 
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
   const api = useApi();
+  const { org } = useAiOrg();
   const asks = agentId !== undefined;
   const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
   const ai = useAiAccounts(orgId, asks, poll);
@@ -155,6 +170,7 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
           caughtUp: caught,
+          standing: org?.standing,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on. A read that failed with nothing to show
   // ends the page's wait with Tentar de novo.
@@ -170,26 +186,29 @@ export type PlanGates = ReturnType<typeof usePlanGates>;
 
 /** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
 export function useGatesWithoutAgent(orgId: string, on: boolean) {
+  const { org } = useAiOrg();
   const ai = useAiAccounts(orgId, on);
   const machines = useMachines(orgId, on);
   const setupQ = useComputerSetup(orgId, on);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const at = (choice: PlanChoice) =>
-    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+    planGateWithoutAgent({
+      choice,
+      edition,
+      setup,
+      computers: ai.data?.computers,
+      machines: machines.data,
+      standing: org?.standing,
+    });
   return { at, edition, accounts: ai.data?.accounts };
 }
 
 type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
 
-/** Where the flow is: the first page, the coding plans, one plan's page, or the API key's. */
-export type FlowView = { page: "home" } | { page: "coding" } | { page: "plan"; choice: PlanChoice } | { page: "key" };
-
 /** The page an intent opens on (a message that asked for a plan or a key). */
 export const viewOf = (choice: AiChoice | null): FlowView =>
   !choice ? { page: "home" } : choice === "key" ? { page: "key" } : { page: "plan", choice };
-
-const CODING_MARKS = ["zai", "kimi", "minimax", "opencode"] as const;
 
 export interface ConnectAiFlowProps {
   view: FlowView;
@@ -242,7 +261,7 @@ export interface ConnectAiFlowProps {
 export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const { orgId } = useAiOrg();
+  const { orgId, org } = useAiOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -287,7 +306,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     onView(next);
   };
   // A row of what the person already has, used in one tap: the agent thinks with it, said in a toast.
-  const save = async (to: { id: string; name: string }, label: string, run: () => Promise<unknown>) => {
+  const save = async (
+    to: { id: string; name: string },
+    label: string,
+    run: () => Promise<unknown>,
+    scope?: BrainScope,
+  ) => {
     setBusy(true);
     try {
       await run();
@@ -298,10 +322,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
         keys.aiStatus(orgId),
       ])
         void qc.invalidateQueries({ queryKey: key });
-      toast({ title: t("aiAccounts.done.savedAgent", { agent: to.name, label }), icon: "check" });
+      toast({ title: thinksWithLine(t, scope, to.name, label), icon: "check" });
       props.onPlanDone(to.id);
-    } catch {
-      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } catch (error) {
+      const refusal = keyRefusal(t, error);
+      if (refusal) alertKeyRefused(t, refusal);
+      else toast({ title: errorText(t, error), icon: "x" });
     } finally {
       setBusy(false);
     }
@@ -312,26 +338,38 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     if (row.kind === "key") {
       const k = row.key;
       // The workspace's model on that key: the agent's model where the key runs it, else Automático.
-      const model = agentRows.data?.find((a) => a.id === forAgent.id)?.model;
-      const fits = keyRuns(k, model, models.data?.models ?? []);
-      return void save(forAgent, k.label, async () => {
-        if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
-        // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
-        if (gates.view?.scope === "mine") {
-          await api.agents.setBrain(orgId, forAgent.id, { scope: "workspace", brain: "model" });
-        }
-        await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
-      });
+      // Tried first: a key kept earlier may have run out of credit, and "now thinks with it" has to be true.
+      const agentRow = agentRows.data?.find((a) => a.id === forAgent.id);
+      const fits = keyRuns(k, agentRow?.model, models.data?.models ?? []);
+      const rightHand = gates.view?.scope === "mine" && agentRow;
+      return void save(
+        forAgent,
+        k.label,
+        async () => {
+          const { check } = await api.agents.checkCredential(orgId, k.id);
+          if (check === "unchecked")
+            toast({ title: t("connectAi.key.savedUnchecked", { provider: providerLabel(k.provider) }), icon: "check" });
+          // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+          if (rightHand) return rightHandOnKey(api, orgId, rightHand, k, models.data?.models ?? []);
+          if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
+          await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
+        },
+        rightHand ? "workspace" : undefined,
+      );
     }
     const a = row.choice.login;
     const choice = planOfAccount(a);
     const take = (moveAccount: boolean) =>
-      void save(forAgent, a.label, () =>
-        api.agents.setBrain(orgId, forAgent.id, {
-          brain: a.kind,
-          account: a.id,
-          ...(moveAccount ? { moveAccount } : {}),
-        }),
+      void save(
+        forAgent,
+        a.label,
+        () =>
+          api.agents.setBrain(orgId, forAgent.id, {
+            brain: a.kind,
+            account: a.id,
+            ...(moveAccount ? { moveAccount } : {}),
+          }),
+        gates.view?.scope,
       );
     if (row.act === "use") return take(false);
     if (row.act === "move") {
@@ -351,16 +389,17 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       go({ page: "plan", choice });
     }
   };
-  const to: FlowView | null =
-    view.page === "home" ? null : view.page === "plan" && isPlanId(view.choice) ? { page: "coding" } : { page: "home" };
+  const to = flowBack(view, login !== null);
   const title =
     view.page === "home"
       ? (sheetTitle ?? t("connectAi.title.any"))
-      : view.page === "coding"
-        ? t("mobile.ai.coding")
+      : view.page === "plans"
+        ? t("connectAi.pick.placeholder")
         : view.page === "key"
           ? t("connectAi.key.title")
-          : planLabel(t, view.choice);
+          : view.page === "makers"
+            ? t("mobile.ai.whose")
+            : planLabel(t, view.choice);
   return (
     <>
       {sheetTitle !== undefined ? (
@@ -385,13 +424,26 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
             go(next);
           }}
           dims={dims}
+          dimmedWhy={(choice) =>
+            dimmedLine(t, agentId !== undefined ? gates.gateOf(choice) : bareGates.at(choice).gate, {
+              edition: gates.edition ?? bareGates.edition,
+              kind: kindOf(choice),
+              computer: computerName(
+                t,
+                org?.name ?? "",
+                managedNamed(gates.view?.computer ?? bareGates.at(choice).computer),
+              ),
+            })
+          }
           have={have}
           haveFor={startAgentId || theirs ? undefined : forAgent?.name}
           busy={busy}
           onHave={pickHave}
         />
-      ) : view.page === "coding" ? (
-        <Coding onView={go} dims={dims} />
+      ) : view.page === "plans" ? (
+        <Plans onView={go} dims={dims} />
+      ) : view.page === "makers" ? (
+        <Makers form={props.keyForm} withEndpoint={props.keyButton !== false} onDone={() => go({ page: "key" })} />
       ) : view.page === "plan" ? (
         <PlanPage
           key={view.choice}
@@ -405,7 +457,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
           {...(login?.choice === view.choice ? { login } : {})}
         />
       ) : (
-        <KeyPage {...props} />
+        <KeyPage {...props} onMakers={() => go({ page: "makers" })} />
       )}
     </>
   );
@@ -418,6 +470,7 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
 function Home({
   onView,
   dims,
+  dimmedWhy,
   have,
   haveFor,
   busy,
@@ -425,6 +478,8 @@ function Home({
 }: {
   onView: (v: FlowView) => void;
   dims: (choice: PlanChoice) => boolean;
+  /** Why a plan is dimmed, said once under the rows it dims. */
+  dimmedWhy: (choice: PlanChoice) => string;
   have: ReturnType<typeof existingRows>;
   /** The agent they are for, where the sheet's title doesn't say it. */
   haveFor?: string;
@@ -432,6 +487,9 @@ function Home({
   onHave: (row: ExistingAi) => void;
 }) {
   const { t } = useTranslation();
+  const dimmed = have.flatMap((r) =>
+    r.row.kind === "account" && dims(planOfAccount(r.row.choice.login)) ? [planOfAccount(r.row.choice.login)] : [],
+  )[0];
   return (
     <View>
       {have.length > 0 ? (
@@ -451,27 +509,26 @@ function Home({
                 onPress={() => onHave(r.row)}
               />
             ))}
+            {have.some((r) => r.row.kind === "key") ? (
+              <GroupedRow
+                icon="key"
+                label={t("connectAi.have.manageKeys")}
+                chevron
+                onPress={() => router.push("/ai-accounts" as never)}
+              />
+            ) : null}
           </GroupedList>
+          {dimmed ? <GroupedFooter>{dimmedWhy(dimmed)}</GroupedFooter> : null}
         </>
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(["claude", "chatgpt", "grok", "gemini"] as const).map((c) => (
-          <GroupedRow
-            key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
-            label={planLabel(t, c)}
-            sub={t(`connectAi.plan.${c}.tiers`)}
-            chevron
-            onPress={() => onView({ page: "plan", choice: c })}
-          />
-        ))}
         <GroupedRow
-          leading={<ProviderQuad ids={CODING_MARKS} off={PLAN_IDS.every(dims)} />}
-          label={t("mobile.ai.coding")}
-          sub={t("mobile.ai.codingSub")}
+          leading={<ProviderQuad ids={PLAN_MARKS} off={PLAN_CHOICES.every(dims)} />}
+          label={t("connectAi.pick.placeholder")}
+          sub={t("mobile.ai.plansSub")}
           chevron
-          onPress={() => onView({ page: "coding" })}
+          onPress={() => onView({ page: "plans" })}
         />
       </GroupedList>
       <GroupedFooter>{t("mobile.ai.plansFoot")}</GroupedFooter>
@@ -490,26 +547,58 @@ function Home({
   );
 }
 
-/** The four coding plans. */
-function Coding({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
+/** The plans, the most used first, with a search: what each is sold as under its name. */
+function Plans({ onView, dims }: { onView: (v: FlowView) => void; dims: (choice: PlanChoice) => boolean }) {
   const { t } = useTranslation();
   return (
-    <View>
-      <GroupedHeader>{t("mobile.ai.whichPlan")}</GroupedHeader>
-      <GroupedList>
-        {PLAN_IDS.map((c) => (
-          <GroupedRow
-            key={c}
-            leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
-            label={planLabel(t, c)}
-            sub={t(`connectAi.plan.${c}.tiers`)}
-            chevron
-            onPress={() => onView({ page: "plan", choice: c })}
-          />
-        ))}
-      </GroupedList>
-      <GroupedFooter>{t("mobile.ai.codingFoot")}</GroupedFooter>
-    </View>
+    <PickList
+      options={PLAN_CHOICES.map((c) => ({
+        value: c,
+        label: planLabel(t, c),
+        description: t(`connectAi.plan.${c}.tiers`),
+        mark: planMark(c),
+        off: dims(c),
+        keywords: planPickText(t, c),
+      }))}
+      value={undefined}
+      onPick={(o) => onView({ page: "plan", choice: o.value })}
+      placeholder={t("connectAi.pick.searchPlaceholder")}
+      searchLabel={t("connectAi.pick.search")}
+      noResults={t("connectAi.pick.noResults")}
+    />
+  );
+}
+
+/** Whose API key: the makers, the most used first, with a search, then "Outro provedor" (a sheet only: `withEndpoint`). */
+function Makers({ form, withEndpoint, onDone }: { form: ConnectKey; withEndpoint: boolean; onDone: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <PickList
+      options={[
+        ...PROVIDERS.map((p) => ({ value: p.id as string, label: p.label, mark: p.id as string, keywords: "" })),
+        ...(withEndpoint
+          ? [
+              {
+                value: CUSTOM_PROVIDER as string,
+                label: t("endpoint.option"),
+                description: t("endpoint.optionSub"),
+                mark: CUSTOM_PROVIDER as string,
+                keywords: "",
+              },
+            ]
+          : []),
+      ]}
+      value={form.custom ? CUSTOM_PROVIDER : form.provider}
+      onPick={(o) => {
+        const maker = PROVIDERS.find((p) => p.id === o.value);
+        form.setCustom(!maker);
+        if (maker) form.setProvider(maker.id);
+        onDone();
+      }}
+      placeholder={t("connectAi.pick.searchPlaceholder")}
+      searchLabel={t("connectAi.pick.search")}
+      noResults={t("connectAi.pick.noResults")}
+    />
   );
 }
 
@@ -967,7 +1056,7 @@ function PlanSteps({
         <GroupedList>
           {ownable ? (
             <GroupedRow
-              label={t("connectAi.own.shared")}
+              label={kind === "opencode" ? t("connectAi.own.free") : t("connectAi.own.shared")}
               {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
               onPress={() => void saveOwn()}
             />
@@ -1047,10 +1136,20 @@ function GateWait({
   const machines = useMachines(orgId, edition !== null);
   const hold = holdText(t, org?.standing);
   // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself: the page asks again).
-  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
+  const why = gateLine(t, {
+    gate,
+    edition,
+    kind,
+    computer,
+    hold,
+    machine: machines.data?.find((m) => m.id === machineId),
+  });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
-  else if (gate.state === "preparing") {
+  else if (gate.state === "billing") {
+    // A hold stops the Model Gateway for keys too, and paying happens on the web.
+    wait = <InfoCard icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false)}</InfoCard>;
+  } else if (gate.state === "preparing") {
     const setup = gate.view;
     // A hold decides when anything runs there: it speaks alone. The wait is the app's own (its steps, the time left,
     // who hears when it's ready), for the workspace these pages connect for: the first run's too.
@@ -1093,16 +1192,23 @@ function GateWait({
 }
 
 /**
- * The API key's page: whose key (a radio list; paid per use, straight to its maker), then the web's two numbered
- * steps: create the key on the maker's page, paste it here. Saved by its button.
+ * The API key's page: whose key (one row that opens the makers; paid per use, straight to its maker), then the web's
+ * two numbered steps: create the key on the maker's page, paste it here. Saved by its button.
  */
-function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
+function KeyPage({
+  mayAddKey,
+  keyForm: form,
+  keyButton = true,
+  keySaved,
+  onSaveKey,
+  onMakers,
+}: ConnectAiFlowProps & { onMakers: () => void }) {
   const { t } = useTranslation();
-  const { orgId } = useAiOrg();
+  const { orgId, org } = useAiOrg();
+  const hold = usePlanHold(orgId, org);
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
-  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
-  const [custom, setCustom] = useState(form.asked === CUSTOM_PROVIDER);
+  const { custom } = form;
   const [endpointSaved, setEndpointSaved] = useState(false);
   const maker = providerOf(form.provider);
   const hint = maker && keyStepHint(maker);
@@ -1110,13 +1216,14 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   const valid = keyLooksValid(form.provider, clean);
   const wrong = touched && clean.length > 0 && !valid;
   const others = wrong ? providersForKey(clean) : [];
+  if (hold) return <PlanHoldNote org={org} keys />;
   if (!mayAddKey) return <InfoCard icon="lock">{t("connectAi.keyLocked")}</InfoCard>;
   if (keySaved || endpointSaved) {
     return (
       <View style={styles.done}>
         <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
-          {t("connectAi.key.saved")}
+          {(!endpointSaved && form.savedNote) || t("connectAi.key.saved")}
         </Text>
       </View>
     );
@@ -1125,29 +1232,16 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   return (
     <View>
       <GroupedHeader>{t("mobile.ai.whose")}</GroupedHeader>
-      <GroupedList>
-        {PROVIDERS.map((p) => (
+      <Locked when={form.saving}>
+        <GroupedList>
           <GroupedRow
-            key={p.id}
-            leading={<ProviderLogo id={p.id} size="sm" />}
-            label={p.label}
-            checked={!custom && form.provider === p.id}
-            onPress={() => {
-              setCustom(false);
-              form.setProvider(p.id);
-            }}
+            leading={<ProviderLogo id={custom ? CUSTOM_PROVIDER : form.provider} size="sm" />}
+            label={custom ? t("endpoint.option") : providerLabel(form.provider)}
+            chevron
+            onPress={onMakers}
           />
-        ))}
-        {keyButton ? (
-          <GroupedRow
-            leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
-            label={t("endpoint.option")}
-            sub={t("endpoint.optionSub")}
-            checked={custom}
-            onPress={() => setCustom(true)}
-          />
-        ) : null}
-      </GroupedList>
+        </GroupedList>
+      </Locked>
       <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
       {custom ? (
         <View style={styles.keySteps}>
@@ -1171,19 +1265,21 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               }
             />
             <Step n={2} divider title={t("connectAi.key.paste")}>
-              <PasteField
-                value={form.key}
-                onChangeText={form.setKey}
-                onPasted={form.setKey}
-                onBlur={() => setTouched(true)}
-                label={t("connectAi.key.paste")}
-                placeholder={maker.placeholder}
-                secret
-                onSubmit={() => {
-                  setTouched(true);
-                  if (valid && keyButton) onSaveKey?.();
-                }}
-              />
+              <Locked when={form.saving}>
+                <PasteField
+                  value={form.key}
+                  onChangeText={form.setKey}
+                  onPasted={form.setKey}
+                  onBlur={() => setTouched(true)}
+                  label={t("connectAi.key.paste")}
+                  placeholder={maker.placeholder}
+                  secret
+                  onSubmit={() => {
+                    setTouched(true);
+                    if (valid && keyButton) onSaveKey?.();
+                  }}
+                />
+              </Locked>
               {wrong ? (
                 <View style={styles.others}>
                   <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
@@ -1211,7 +1307,14 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
               ) : null}
             </Step>
           </StepsCard>
-          {form.failed ? (
+          {form.refused ? (
+            <>
+              <Note icon="x" live>
+                {form.refused.text}
+              </Note>
+              {form.refused.href ? <OpenPage href={form.refused.href} label={form.refused.site} /> : null}
+            </>
+          ) : form.failed ? (
             <Note icon="x" live>
               {t("mobile.ai.failed")}
             </Note>
@@ -1224,7 +1327,8 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
                 variant="primary"
                 wide
                 label={form.saving ? t("mobile.ai.saving") : t("mobile.ai.save")}
-                disabled={!valid || form.saving}
+                loading={form.saving}
+                disabled={!valid}
                 onPress={() => onSaveKey?.()}
               />
             </View>

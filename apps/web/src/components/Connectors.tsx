@@ -40,9 +40,11 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EmptyState,
   Field,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -75,6 +77,7 @@ import {
 import { useOrg } from "@/components/org-context";
 import { ToolChanges } from "@/components/ToolChanges";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
@@ -193,6 +196,9 @@ export function ConnectorsSection({
       Boolean(url && !item?.server?.accountLabel) &&
       all.filter((i) => i.server && url && sameServer(i.server.serverUrl, url)).length > 1;
     if (item && admin && done === "connected") setFlow({ step: 1, item, naming });
+    // GitHub comes straight back when nothing is left to ask: the dialog says what it reaches now and where to add more.
+    if (item?.def?.id === "github" && admin && done === "reconnected")
+      setFlow({ step: 0, def: item.def, mode: "reconnect", item });
     window.history.replaceState(null, "", window.location.pathname);
   }, [connected, outcome, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
 
@@ -212,6 +218,14 @@ export function ConnectorsSection({
     />
   );
   const loaded = connections.isSuccess && servers.isSuccess;
+  const noneYet =
+    loaded &&
+    !mailAccounts.isLoading &&
+    !databases.isLoading &&
+    apps.length === 0 &&
+    accounts.length === 0 &&
+    dbList.length === 0;
+  const look = useRightHandLook();
 
   return (
     <>
@@ -221,7 +235,9 @@ export function ConnectorsSection({
           icon="plug"
           title={t("connectors.title")}
           action={
-            admin && (
+            // The empty state takes over this button: one way in, in the middle of the card.
+            admin &&
+            !noneYet && (
               <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
                 {t("connectors.add")}
               </Button>
@@ -233,8 +249,21 @@ export function ConnectorsSection({
         )}
         {admin && <ToolChanges orgId={org.id} />}
         {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
-        {loaded && apps.length === 0 && accounts.length === 0 && dbList.length === 0 && (
-          <p className="small muted">{t("connectors.none")}</p>
+        {noneYet && (
+          <EmptyState
+            size="panel"
+            agent={look}
+            title={t(admin ? "connectors.noneTitle" : "access.noConnectorsViewerTitle")}
+            actions={
+              admin && (
+                <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
+                  {t("connectors.add")}
+                </Button>
+              )
+            }
+          >
+            {t(admin ? "connectors.none" : "access.noConnectorsViewer")}
+          </EmptyState>
         )}
         {apps.length + accounts.length + dbList.length > 0 && (
           <List className="connected-list" aria-label={t("connectors.connectedList")}>
@@ -523,24 +552,26 @@ function RenameDialog({ item, onClose }: { item: ConnectedItem | null; onClose: 
           submit();
         }}
       >
-        <DialogBody>
-          <Field
-            label={t("connectFlow.name")}
-            id="connector-rename"
-            help={t("connectors.renameHelp")}
-            error={error ?? undefined}
-          >
-            <Input
-              value={label}
-              maxLength={80}
-              autoFocus
-              onChange={(e) => {
-                setLabel(e.target.value);
-                setError(null);
-              }}
-            />
-          </Field>
-        </DialogBody>
+        <Locked when={rename.isPending}>
+          <DialogBody>
+            <Field
+              label={t("connectFlow.name")}
+              id="connector-rename"
+              help={t("connectors.renameHelp")}
+              error={error ?? undefined}
+            >
+              <Input
+                value={label}
+                maxLength={80}
+                autoFocus
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  setError(null);
+                }}
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={rename.isPending} loading={rename.isPending}>

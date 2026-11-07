@@ -3,19 +3,21 @@ import { useApi } from "@agenteschat/client";
 import { type CostlyProposalCard, mayDecideCostly, mayRememberCostly } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Icon } from "@agenteschat/ui";
+import { EventPillAction, Locked } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /**
- * An agent asks before costly work nobody asked for directly (ADR 0131 §3): what it wants to run, and Pode fazer,
- * Agora não, Sempre or Nunca for this kind, for the person it is for, the agent's owner or who manages agents. Then one
- * line says who decided what.
+ * An agent asks before costly work nobody asked for directly (ADR 0131 §3), as a waiting pill: its question, what it
+ * wants to run under it, and "Go ahead" (primary), "Always", "Not now" or "Never" for this kind, for the person it is
+ * for, the agent's owner or who manages agents (anyone else reads who it waits for). Then a decided pill says who
+ * decided what, the command behind "See details".
  */
-export function CostlyProposalCardView({ message, card }: { message: Message; card: CostlyProposalCard }) {
+export function CostlyProposalCardView({ card }: { message: Message; card: CostlyProposalCard }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -39,39 +41,45 @@ export function CostlyProposalCardView({ message, card }: { message: Message; ca
   const by = card.decidedByUserId;
   const who =
     by === me.user.id ? t("costlyCard.you") : (dir.memberById.get(by ?? "")?.name ?? t("channel.unknownPerson"));
+  const sentence = t(`chat.body.autonomy_proposal.${card.cost}`);
+  const what = card.what ? <code className="small">{card.what}</code> : undefined;
+  if (decided)
+    return (
+      <RequestDone
+        done={card.state === "go" || card.state === "always"}
+        label={sentence}
+        more={what ? { label: t("approval.seeDetails"), content: what } : undefined}
+      >
+        {t(`costlyCard.decided.${card.state === "open" ? "go" : card.state}`, { name: who })}
+      </RequestDone>
+    );
   return (
-    <div className="waitcard" data-done={decided || undefined} data-message={message.id}>
-      <span className="waitcard__top ac-iconline">
-        <Icon name={decided ? "check" : "shield"} size={16} />
-        <span>{t(`chat.body.autonomy_proposal.${card.cost}`)}</span>
-      </span>
-      {card.what && <code className="small">{card.what}</code>}
-      {decided ? (
-        <span className="small muted">
-          {t(`costlyCard.decided.${card.state === "open" ? "go" : card.state}`, { name: who })}
-        </span>
-      ) : may ? (
-        <span className="waitcard__acts">
-          <Button size="sm" variant="primary" loading={pending === "go"} onClick={() => decide("go")}>
-            {t("costlyCard.go")}
-          </Button>
-          {remembers && (
-            <Button size="sm" loading={pending === "always"} onClick={() => decide("always")}>
-              {t("costlyCard.always")}
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" loading={pending === "not_now"} onClick={() => decide("not_now")}>
-            {t("costlyCard.notNow")}
-          </Button>
-          {remembers && (
-            <Button size="sm" variant="ghost" loading={pending === "never"} onClick={() => decide("never")}>
-              {t("costlyCard.never")}
-            </Button>
-          )}
-        </span>
-      ) : (
-        <span className="small muted">{t("costlyCard.waiting")}</span>
-      )}
-    </div>
+    <RequestOpen
+      mine={may}
+      icon="shield"
+      label={sentence}
+      action={
+        may ? (
+          <Locked when={pending !== null}>
+            <EventPillAction primary onClick={() => decide("go")}>
+              {t("costlyCard.go")}
+            </EventPillAction>
+            {remembers && <EventPillAction onClick={() => decide("always")}>{t("costlyCard.always")}</EventPillAction>}
+            <EventPillAction onClick={() => decide("not_now")}>{t("costlyCard.notNow")}</EventPillAction>
+            {remembers && <EventPillAction onClick={() => decide("never")}>{t("costlyCard.never")}</EventPillAction>}
+          </Locked>
+        ) : undefined
+      }
+      below={
+        what || !may ? (
+          <>
+            {what}
+            {!may && <span>{t("costlyCard.waiting")}</span>}
+          </>
+        ) : undefined
+      }
+    >
+      {sentence}
+    </RequestOpen>
   );
 }

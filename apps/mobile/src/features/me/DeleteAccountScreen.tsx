@@ -4,6 +4,7 @@ import {
   type AccountDeletionLine,
   accountDeletionLines,
   deletableWorkspaces,
+  deletionDueFrom,
   deletionProof,
   proofToSend,
   soleOwnerWaysOut,
@@ -12,7 +13,7 @@ import {
   workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { formatShortDate, joinNames } from "@agenteschat/client/lib/format";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { typedCode } from "@agenteschat/client/lib/join-requests";
 import { useRef, useState } from "react";
@@ -21,7 +22,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
 import { serverUrl } from "@/lib/server";
-import { Button, Card, HoldButton, type IconName, LineIcon, Text, useToast } from "@/ui";
+import { Button, Card, HoldButton, type IconName, LineIcon, Locked, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { openPage } from "../ai/parts";
@@ -30,6 +31,7 @@ import { PushedHeader } from "../shared/parts";
 import { preflightMissing } from "./logic";
 
 const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
+  when: "clock",
   closes: "x",
   leaves: "out",
   computers: "laptop",
@@ -40,8 +42,8 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
 };
 
 /**
- * Apagar conta (App Store 5.1.1(v)). The title and first line say it's the whole account, not one workspace. What goes
- * and what stays, from the preflight (each workspace that closes with what it holds, what they leave, the computers
+ * Apagar conta (App Store 5.1.1(v)). The title and first line say it's the whole account, not one workspace, 7 days out
+ * with a way back until then. What goes and what stays, from the preflight (each workspace that closes with what it holds, what they leave, the computers
  * removed, what stays behind with where to disconnect it on the website, and where plans are billed that theirs stop
  * renewing), the way to delete just a workspace on the website, then a hold. A workspace that still needs this person
  * as its only owner comes first, with its two ways out on the website (People, or deleting it; its onboarding, while
@@ -125,9 +127,12 @@ export function DeleteAccountScreen() {
     }
     const result = await deleteAccount(toSend?.input);
     setBusy(false);
-    // Deleted: the session ends and the gate shows sign-in.
-    if (result.ok) toast({ title: t("mobile.account.deleted") });
-    else if (result.reason === "sole_owner") {
+    // Scheduled: the session ends and the gate shows sign-in, which comes back to the waiting screen.
+    // An older server deletes at once: there is no date, and nothing to come back to.
+    if (result.ok) {
+      if (!legacy)
+        toast({ title: t("mobile.account.deleted", { date: formatShortDate(i18n.language, deletionDueFrom()) }) });
+    } else if (result.reason === "sole_owner") {
       if (legacy) setBlockedBy(result.organizations);
       else void plan.refetch();
     } else if (result.reason === "proof") {
@@ -175,7 +180,7 @@ export function DeleteAccountScreen() {
       >
         <Text variant="display">{t("deleteAccount.title")}</Text>
         <Text variant="body" tone="muted">
-          {t("deleteAccount.intro")}
+          {t("deleteAccount.intro")} {t(legacy ? "mobile.delete.intro" : "mobile.delete.introGrace")}
         </Text>
         <Card>
           <View style={styles.list}>
@@ -263,17 +268,19 @@ export function DeleteAccountScreen() {
             ) : null}
             {proof === "code" && sent ? (
               <View style={styles.proof}>
-                <AuthField
-                  code
-                  value={code}
-                  onChangeText={(value) => setCode(typedCode(value))}
-                  placeholder={t("proof.code")}
-                  accessibilityLabel={t("proof.code")}
-                  keyboardType="number-pad"
-                  textContentType="oneTimeCode"
-                  autoComplete="one-time-code"
-                  returnKeyType="done"
-                />
+                <Locked when={busy || sending}>
+                  <AuthField
+                    code
+                    value={code}
+                    onChangeText={(value) => setCode(typedCode(value))}
+                    placeholder={t("proof.code")}
+                    accessibilityLabel={t("proof.code")}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoComplete="one-time-code"
+                    returnKeyType="done"
+                  />
+                </Locked>
                 <Text variant="small" tone="muted">
                   {t("proof.sent", { email: sent.email })}
                 </Text>
@@ -281,16 +288,16 @@ export function DeleteAccountScreen() {
                   variant="ghost"
                   size="sm"
                   label={left > 0 ? t("proof.resendIn", { time: formatTimeLeft(left) }) : t("proof.resend")}
-                  disabled={left > 0}
+                  disabled={left > 0 || busy}
                   loading={sending}
                   onPress={() => void sendCode()}
                 />
               </View>
             ) : null}
             {proof === "password" ? (
-              <View style={styles.proof}>
+              <Locked when={busy} style={styles.proof}>
                 <PasswordField label={t("proof.password")} value={password} onChangeText={setPassword} />
-              </View>
+              </Locked>
             ) : null}
             {refused ? (
               <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
@@ -310,12 +317,7 @@ export function DeleteAccountScreen() {
                 <Button variant="ghost" label={t("mobile.common.retry")} onPress={() => void meQuery.refetch()} />
               </View>
             ) : null}
-            <HoldButton
-              label={t("mobile.delete.hold")}
-              holdLabel={t("mobile.delete.holding")}
-              disabled={!ready || busy}
-              onConfirm={() => void confirm()}
-            />
+            <HoldButton label={t("mobile.delete.hold")} disabled={!ready || busy} onConfirm={() => void confirm()} />
           </>
         )}
       </ScrollView>

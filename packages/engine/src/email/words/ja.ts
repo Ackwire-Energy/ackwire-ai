@@ -233,7 +233,7 @@ export const words: EmailWords = {
     account: (email) => [
       "このコードを入力すると、アカウント ",
       { b: email },
-      " 全体が削除されます。ワークスペース1つだけではありません。すぐに削除され、あなただけが参加しているワークスペースも一緒に閉じられます。",
+      " 全体が削除されます。ワークスペース1つだけではありません。すぐにすべての端末からログアウトされ、7日後に完全に削除されます。あなただけが参加しているワークスペースも一緒に閉じられます。",
     ],
     support: (address) => [
       "有効期限は10分で、このコードがなければ何も削除されません。心当たりがない場合は、コードを誰にも教えず、",
@@ -278,6 +278,24 @@ export const words: EmailWords = {
     note: "接続した覚えがない場合は、すぐに接続を解除してパスワードを変更してください。",
     button: "接続中のアプリを見る",
     why: (org) => `agentes.chat の ${org} であなたのアカウントにアプリが接続されたため、このメールをお送りしています。`,
+  },
+  accountDeleting: {
+    subject: (day) => `agentes.chat のアカウントは ${day}に削除されます`,
+    preheader: "考え直せる期間は7日間です。",
+    headline: "アカウントを削除しています",
+    body: (email, day, time) => [
+      "アカウント ",
+      { b: email },
+      ` を${day} ${time}に削除します。すべての端末からログアウトされ、戻るまでここであなたに連絡することはできません。`,
+    ],
+    closes: (_count, names) => [
+      "あなただけが参加していたワークスペースは閉じられ、同じ日に削除されます: ",
+      ...names,
+      "。",
+    ],
+    undo: "考え直しましたか？その日より前にログインして、「復元」を押してください。",
+    button: "ログインして復元",
+    why: "このアドレスに agentes.chat のアカウントがあるため、このメールをお送りしています。",
   },
   accountDeleted: {
     subject: "agentes.chat のアカウントが削除されました",
@@ -361,5 +379,20 @@ export const words: EmailWords = {
     note: "通知からワンクリックで取り戻せます。そのエージェントはあなたのプランで考えなくなります。",
     button: "通知を開く",
     why: (org) => `${org} の誰かがあなたのプランをエージェントに接続したため、このメールが送られました。`,
+  },
+  planWaiting: {
+    subject: "チームが待っています",
+    preheader: "ワークスペースの準備ができました。開始にはagentes.chatのプランが必要です。",
+    headline: "チームが待っています",
+    body: (agents, channels, routines) => {
+      const a = `エージェント${agents}体`;
+      const c = `チャンネル${channels}件`;
+      const r = `ルーティン${routines}件`;
+      return routines > 0
+        ? `${a}、${c}、${r}の準備ができています。開始にはagentes.chatのプランが必要です。`
+        : `${a}、${c}の準備ができています。開始にはagentes.chatのプランが必要です。`;
+    },
+    button: "agentes.chatのプランを見る",
+    why: (org) => `agentes.chatで${org}を管理しているため、このメールをお送りしています。このお知らせは2回だけです。`,
   },
 };

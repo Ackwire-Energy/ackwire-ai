@@ -130,9 +130,7 @@ describe("my own messages sit on the right", () => {
       .replace(/ \)/g, ")");
     const hanging =
       ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))";
-    expect(css).toContain(`${hanging} { padding-bottom: 6px; }`);
     expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: var(--own-cut); }`);
-    expect(css).toContain(`${hanging} + .ac-msg--own { padding-top: 6px; }`);
     expect(css).toContain(`${hanging} + .ac-msg--own .ac-msg__text { border-top-right-radius: 18px; }`);
   });
 
@@ -249,7 +247,7 @@ describe("own message styles", () => {
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
     // Keyboard focus in my row opens its time's details (the head that has them is hidden).
     expect(css).toMatch(
-      /\.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
+      /html:not\(\[data-pointer\]\) \.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
     );
   });
 
@@ -359,7 +357,9 @@ describe("the bar hugs my message, a GIF or a picture too", () => {
       expect(block(sel)).not.toContain("min(100%");
     // Others' rows keep their bar on the row's right, a keyboard's focus shows it too.
     expect(r.get(".ac-msg__actions")).toContain("right: 12px");
-    expect(r.get(".ac-msg:focus-within .ac-msg__actions")).toContain("transform: translateY(-50%)");
+    expect(r.get("html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions")).toContain(
+      "transform: translateY(-50%)",
+    );
   });
 });
 

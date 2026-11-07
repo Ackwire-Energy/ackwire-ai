@@ -25,6 +25,13 @@ async function translator(lng: "pt-BR" | "en"): Promise<TFunction> {
 /** What the phone's ProviderLogo draws for a brain line: the mark's id, or null (no logo). */
 const drawn = (line: { mark: string | null }) => (line.mark ? markOf(line.mark) : null);
 
+describe("Outro provedor", () => {
+  test("a workspace's own endpoint draws the generic server mark, never a letter", () => {
+    expect(markOf("custom")).toBe("custom");
+    expect(markShapes("custom", "light", "#111")?.shapes.length).toBeGreaterThan(0);
+  });
+});
+
 describe("Pensa com: the brain by its maker's mark", () => {
   test("each computer brain or plan account draws its maker's mark; the API draws none", async () => {
     const t = await translator("pt-BR");

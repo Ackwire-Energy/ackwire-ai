@@ -2,20 +2,24 @@ import { expect, test } from "bun:test";
 import { builtCss, declarations, topLevel } from "./built-css";
 
 const css = topLevel(
-  await builtCss(
-    "src/styles.css",
-    "src/components/notice-island.css",
-    "src/components/request-card.css",
-    "src/pages/notifications.css",
-  ),
+  await builtCss("src/styles.css", "src/components/notice-island.css", "src/components/request-card.css"),
 );
 const last = (selector: string, property: string) =>
   declarations(css, selector)
     .filter(([p]) => p === property)
     .at(-1)?.[1];
 
+test("the inbox's words keep clear of the hover bar at rest too, so hovering a row never moves them", async () => {
+  const inbox = await builtCss("src/pages/notifications.css");
+  expect(inbox).toContain(".nt-item>.nt-c{padding-right:var(--nt-acts-room,48px)}");
+});
+
+test("a wiki folder's name stops short of the button beside its count", async () => {
+  expect(await builtCss("src/pages/wiki.css")).toContain(".wiki-folder-row .wiki-row__t{margin-right:30px}");
+});
+
 test("an agent's answer choices grow with their text and wrap: the island, the conversation's card, notifications", () => {
-  for (const choice of [".ni__choice", ".rq__foot > .ac-btn[data-choice]", ".nt-sug button"]) {
+  for (const choice of [".ni__choice", ".rq__choice"]) {
     const own = declarations(css, choice);
     // A fixed height let a two-line choice spill over the next one.
     expect([choice, own.filter(([p, v]) => p === "height" && v !== "auto")]).toEqual([choice, []]);

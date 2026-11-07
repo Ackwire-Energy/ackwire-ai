@@ -1,7 +1,7 @@
 import { BROWSER_PROTOCOL } from "@agenteschat/adapters";
 import type { Database } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
-import type { MachineCaller } from "../machine-hub";
+import type { MachineCaller, MachineStatus } from "../machine-hub";
 import { REMOVED_COMPUTER_MESSAGE } from "../machines";
 
 /** Why the agent's browser isn't usable, as a code (for the app) and a sentence (for the agent). */
@@ -21,6 +21,7 @@ export type AgentBrowserStatus =
       online: boolean;
       /** The runner's protocol (17 and later: batched commands and images, ADR 0054). */
       protocol: number;
+      kind: MachineStatus["kind"];
     }
   | {
       available: false;
@@ -65,7 +66,14 @@ export async function agentBrowserStatus(
   if (!info.available) {
     return { ...none("not_installed", machineId, status.name), detail: info.reason?.slice(0, 500) ?? null };
   }
-  return { available: true, machineId, machineName: status.name, online: status.online, protocol: status.protocol };
+  return {
+    available: true,
+    machineId,
+    machineName: status.name,
+    online: status.online,
+    protocol: status.protocol,
+    kind: status.kind,
+  };
 }
 
 /** One sentence for the agent (tool errors) about an unavailable browser. */

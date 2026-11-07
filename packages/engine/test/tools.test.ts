@@ -110,7 +110,7 @@ describe("Tool Gateway", () => {
       type: "result",
       output: {
         content:
-          "Not allowed: this agent lacks the scope github:pr.merge. If the request needs it, ask for it with request_permission",
+          "Not allowed: this agent lacks the scope github:pr.merge, which request_permission can't offer. Only an admin can give it, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never ask the person to try again",
         isError: true,
       },
     });

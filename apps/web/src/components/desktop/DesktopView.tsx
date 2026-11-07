@@ -25,7 +25,7 @@ import { heldPicture, holdImage, holdPicture, liveCanvas, pictureOf, showsPictur
 import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { withAgentFace } from "../AgentAvatar";
-import { Cover } from "../browser/BrowserCard";
+import { Cover } from "../browser/Cover";
 import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { Egress } from "../computer/Egress";
@@ -59,6 +59,8 @@ const PICTURE_WAIT_MS = 10_000;
  */
 /** A stream that changes mode in place and hasn't this long after the mode changed opens again in the new one. */
 const SWITCH_WAIT_MS = 3_000;
+/** A browser card's screen (`preview`) opens again this many times after drops, then the card shows frames. */
+const PREVIEW_RETRIES = 3;
 
 /**
  * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
@@ -66,6 +68,10 @@ const SWITCH_WAIT_MS = 3_000;
  * handoff is this person's) it takes the pointer and the keys at quality 6, with the person's own copy and
  * paste (`useScreenKeys`). While someone else is in control the screen stays hidden; it opens again by itself
  * after drops, restarts and hand backs. Its sub-line and actions go in the dialog's head.
+ *
+ * `preview`: the browser card's view of the screen its browser runs on (ADR 0058 §7): watching only, the whole
+ * screen in the card, no question, notice or control, and no wait of its own on a screen it can't show: its state
+ * goes to `onView`, and the card shows its browser's frames instead.
  */
 export function DesktopView({
   agentId,
@@ -78,6 +84,8 @@ export function DesktopView({
   onTakeBrowser,
   onSettled,
   onHeld,
+  preview = false,
+  onView,
 }: {
   agentId: string;
   name: string;
@@ -95,6 +103,10 @@ export function DesktopView({
   onSettled?: () => void;
   /** Whether the held cover shows (the agent held and its screen not running), for the dialog's own pause line. */
   onHeld?: (held: boolean) => void;
+  /** A browser card's view: watch only, never started by it (ADR 0058 §7). */
+  preview?: boolean;
+  /** What it shows, on every change (the card goes back to frames on one it can't show). */
+  onView?: (state: DesktopViewState) => void;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -120,8 +132,10 @@ export function DesktopView({
   const attempts = useRef(0);
   // Nothing says when a screen is handed back: asked often while it may change any moment.
   const [poll, setPoll] = useState(5_000);
-  const status = useDesktopStatus(org.id, agentId, { poll });
-  const s = status.data;
+  const status = useDesktopStatus(org.id, agentId, { poll: preview ? 30_000 : poll });
+  // Access lost: React Query keeps the last good status, which would still say who may watch.
+  const lost = status.error instanceof ApiError && status.error.status === 403;
+  const s = lost ? undefined : status.data;
   const blocked: DesktopViewState | null = s
     ? desktopStatusState(s, me.user.id)
     : status.error instanceof ApiError && status.error.status === 403
@@ -129,7 +143,7 @@ export function DesktopView({
       : status.isError
         ? "unavailable"
         : "connecting";
-  const mode = s ? desktopMode(s, me.user.id) : "watch";
+  const mode = s && !preview ? desktopMode(s, me.user.id) : "watch";
   // The mode as a connection ends: a hand back keeps its picture (`holdPicture`).
   const modeNow = useRef(mode);
   modeNow.current = mode;
@@ -231,7 +245,12 @@ export function DesktopView({
         // The mode of the moment, which may have changed while noVNC loaded.
         const opening = modeNow.current;
         const socket = createSocket(
-          desktopSocketUrl(window.location, { orgId: org.id, agentId, mode: opening, switches: true }),
+          desktopSocketUrl(
+            window.location,
+            preview
+              ? { orgId: org.id, agentId, mode: "watch", preview: true }
+              : { orgId: org.id, agentId, mode: opening, switches: true },
+          ),
         ) as unknown as WebSocket;
         const opened = new DesktopLink(socket);
         link = opened;
@@ -245,16 +264,18 @@ export function DesktopView({
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
           setTaking(false);
-          const next = desktopCloseState(e.code, e.reason);
+          const next = desktopCloseState(e.code, e.reason, { preview });
+          // A card's screen that keeps dropping says so, and the card shows the frames.
+          const spent = preview && next.retry !== "never" && attempts.current >= PREVIEW_RETRIES;
           // Control ended (handed back): it opens again as a watcher over the picture it had; any other close says why.
           if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(el)) {
             heldPicture(el)?.remove();
             setReturning(false);
-            setView(next.state);
+            setView(spent ? "offline" : next.state);
           }
           // What changed shows at once (someone took control); a state that blocks it stops the retry.
           void refetch();
-          if (next.retry === "never") return setGaveUp(true);
+          if (next.retry === "never" || spent) return setGaveUp(true);
           // "now" still waits a moment: the new state (control handed back) usually changes the mode first.
           const delay = next.retry === "now" ? 250 : desktopRetryMs(attempts.current);
           attempts.current++;
@@ -347,7 +368,7 @@ export function DesktopView({
       window.removeEventListener("pagehide", leave);
       end();
     };
-  }, [connect, round, org.id, agentId, createSocket, refetch, copiedThere]);
+  }, [connect, round, org.id, agentId, createSocket, refetch, copiedThere, preview]);
   // The page's last picture, when the dialog switches from it to the screen, waits here dimmed for the screen's
   // first one; going, the screen leaves its own for the page. Layout effects: the one leaving writes it before the one
   // coming reads it, and nothing paints in between.
@@ -390,7 +411,7 @@ export function DesktopView({
   const live = shown === "live";
   // Handing back or taking, the last picture stays in sight under what is happening: never a cold cover.
   const switching = actions.done.isPending || actions.takeover.isPending || taking || returning;
-  const offer = live && !inControl && !switching && !head?.full && !s?.controllerUserId && canTakeOver;
+  const offer = !preview && live && !inControl && !switching && !head?.full && !s?.controllerUserId && canTakeOver;
   // Only the browser is theirs to drive here: the button and the question say so, and why.
   const words = askControlWords(s, Boolean(onTakeBrowser), Boolean(working));
   const { mayTake, browserOnly } = words;
@@ -409,6 +430,8 @@ export function DesktopView({
   useEffect(() => setPoll(settled ? 30_000 : 5_000), [settled]);
   const held = shown === "held";
   useEffect(() => onHeld?.(held), [held, onHeld]);
+  // Before paint: a card that leaves a refused view for its frames never shows this view's cover first.
+  useLayoutEffect(() => onView?.(shown), [shown, onView]);
   const handoff = s?.handoff ?? null;
   const asked = inControl && handoff?.kind === "ask" ? handoff.instructions : null;
   // Until the screen's state says who (right after a 4409), someone.
@@ -552,19 +575,24 @@ export function DesktopView({
   );
 
   return (
-    <div className={cx("dsk", inControl && "is-control", final && "is-final")} data-state={shown}>
-      <DialogHead
-        sub={withAgentFace(sub, name, agentId)}
-        actions={
-          <>
-            {!inControl && watchActs}
-            {(live || inControl || shown === "hidden") && <FullButton />}
-          </>
-        }
-      />
+    <div
+      className={cx("dsk", preview && "dsk--card", inControl && "is-control", final && "is-final")}
+      data-state={shown}
+    >
+      {!preview && (
+        <DialogHead
+          sub={withAgentFace(sub, name, agentId)}
+          actions={
+            <>
+              {!inControl && watchActs}
+              {(live || inControl || shown === "hidden") && <FullButton />}
+            </>
+          }
+        />
+      )}
       {asked && <p className="cmp-asked">“{asked}”</p>}
       <div
-        className="brw-ac__stage dsk-stage"
+        className={preview ? "dsk-stage" : "brw-ac__stage dsk-stage"}
         {...ask.stage}
         onPointerDownCapture={(e) => {
           // noVNC cancels its own mousedown, so the field keeps the focus a click on the screen gives it.
@@ -593,7 +621,10 @@ export function DesktopView({
           />
         )}
         {shown !== "live" ? (
-          cover[shown]
+          // A card's view says only that it opens: the card itself says every other state, on its frames.
+          preview && shown !== "connecting" ? null : (
+            cover[shown]
+          )
         ) : switchingTo ? (
           <Cover
             clear
@@ -687,6 +718,7 @@ export function DesktopView({
           onNote={setBackNote}
           noteFirst={handoffWantsWords(handoff)}
           pending={actions.done.isPending}
+          locked={actions.failed.isPending}
           onBack={finish}
           other={
             asked && (
@@ -700,7 +732,7 @@ export function DesktopView({
       {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
           sides and the screen opens in place. The ⓘ (what may be checked in control) comes with control;
           full screen keeps no line. */}
-      {!inControl && !final && !head?.full && <ScreenNotice name={name} machine={machine} />}
+      {!preview && !inControl && !final && !head?.full && <ScreenNotice name={name} machine={machine} />}
     </div>
   );
 }

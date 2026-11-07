@@ -8,6 +8,7 @@ import {
   DialogBody,
   DialogFooter,
   Field,
+  Locked,
   Segmented,
   Select,
   Switch,
@@ -101,60 +102,63 @@ export function PinToDashboard({
       width={480}
       className="wpin"
     >
-      <DialogBody className="wpin__body">
-        {read ? (
-          <div className="wpin__stage">
-            <WidgetCard
-              className="wg--preview"
-              title={read.title}
-              spec={read.spec}
-              status="ok"
-              color={color}
-              size={sizeToLayout(size)}
-              locale={i18n.language}
-              face={<AgentAvatar agentId={agentId} name={name} size="xs" />}
-              footer={
-                <span className="wg__when">
-                  <b>{name}</b> <span className="wg__dot">·</span> {t(`widgets.schedulesInline.${chosen}`)}
-                </span>
-              }
+      <Locked when={pin.isPending}>
+        <DialogBody>
+          {read ? (
+            <div className="wpin__stage">
+              <WidgetCard
+                className="wg--preview"
+                title={read.title}
+                spec={read.spec}
+                status="ok"
+                color={color}
+                size={sizeToLayout(size)}
+                locale={i18n.language}
+                face={<AgentAvatar agentId={agentId} name={name} size="xs" />}
+                footer={
+                  <span className="wg__when">
+                    <b>{name}</b> <span className="wg__dot">·</span> {t(`widgets.schedulesInline.${chosen}`)}
+                  </span>
+                }
+              />
+            </div>
+          ) : (
+            <Alert>{t("dashboards.errors.blockNotFound")}</Alert>
+          )}
+          <Field label={t("dashboards.newWidget.destination")}>
+            <Select
+              value={dest}
+              onValueChange={setDest}
+              options={[
+                { value: "home", label: t("widgets.home") },
+                ...editable.map((d) => ({ value: d.id, label: d.title })),
+              ]}
             />
+          </Field>
+          <div className="wpin__keep">
+            <Switch id={`${id}-keep`} checked={keep} onCheckedChange={setKeep} aria-describedby={`${id}-keep-hint`} />
+            <span className="wpin__keep-text">
+              <label htmlFor={`${id}-keep`}>{t("dashboards.newWidget.keepUpdated")}</label>
+              <small id={`${id}-keep-hint`}>
+                {keep
+                  ? t("dashboards.newWidget.steps.redoes", { name, schedule: t(`widgets.schedulesInline.${schedule}`) })
+                  : t("dashboards.newWidget.steps.noRedoHint")}
+              </small>
+            </span>
           </div>
-        ) : (
-          <Alert>{t("dashboards.errors.blockNotFound")}</Alert>
-        )}
-        <Field label={t("dashboards.newWidget.destination")}>
-          <Select
-            value={dest}
-            onValueChange={setDest}
-            options={[
-              { value: "home", label: t("widgets.home") },
-              ...editable.map((d) => ({ value: d.id, label: d.title })),
-            ]}
-          />
-        </Field>
-        <div className="wpin__keep">
-          <Switch id={`${id}-keep`} checked={keep} onCheckedChange={setKeep} aria-describedby={`${id}-keep-hint`} />
-          <span className="wpin__keep-text">
-            <label htmlFor={`${id}-keep`}>{t("dashboards.newWidget.keepUpdated")}</label>
-            <small id={`${id}-keep-hint`}>
-              {keep
-                ? t("dashboards.newWidget.steps.redoes", { name, schedule: t(`widgets.schedulesInline.${schedule}`) })
-                : t("dashboards.newWidget.steps.noRedoHint")}
-            </small>
-          </span>
-        </div>
-        {keep && (
-          <Segmented<KeepSchedule>
-            size="sm"
-            label={t("dashboards.newWidget.updates")}
-            value={schedule}
-            onValueChange={setSchedule}
-            options={KEEP_SCHEDULES.map((s) => ({ value: s, label: t(`widgets.schedulesShort.${s}`) }))}
-          />
-        )}
-        {pin.isError && <Alert>{errorText(t, pin.error, i18n.language)}</Alert>}
-      </DialogBody>
+          {keep && (
+            <Field label={t("dashboards.newWidget.updates")} group>
+              <Segmented<KeepSchedule>
+                label={t("dashboards.newWidget.updates")}
+                value={schedule}
+                onValueChange={setSchedule}
+                options={KEEP_SCHEDULES.map((s) => ({ value: s, label: t(`widgets.schedulesShort.${s}`) }))}
+              />
+            </Field>
+          )}
+          {pin.isError && <Alert>{errorText(t, pin.error, i18n.language)}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" icon="pin" loading={pin.isPending} disabled={!read || !target} onClick={submit}>

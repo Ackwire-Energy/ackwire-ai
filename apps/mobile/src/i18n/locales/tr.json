@@ -71,7 +71,7 @@
   },
   "account": {
     "deleteFailed": "Hesabınız şu anda silinemedi. Tekrar deneyin.",
-    "deleted": "Hesabınız silindi.",
+    "deleted": "Hesabınız {{date}} tarihinde kalıcı olarak kaybolur. Geri yüklemek için bundan önce giriş yapın.",
     "signedOut": "Çıkış yaptınız."
   },
   "theme": {

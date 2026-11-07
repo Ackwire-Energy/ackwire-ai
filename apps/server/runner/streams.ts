@@ -208,7 +208,11 @@ export class DataSockets {
 
   constructor(private readonly opts: { url: string; token: string; timeoutMs?: number; relayed?: RelayCount }) {}
 
-  async dial(streamId: string, kind: "desktop" | "terminal", signal?: AbortSignal): Promise<DataSocket> {
+  async dial(
+    streamId: string,
+    kind: "desktop" | "terminal" | "browserView",
+    signal?: AbortSignal,
+  ): Promise<DataSocket> {
     const { relayed, ...dial } = this.opts;
     const bytes = relayed?.[kind];
     let socket: DataSocket | null = null;

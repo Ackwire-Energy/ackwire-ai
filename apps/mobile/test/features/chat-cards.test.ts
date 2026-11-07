@@ -19,13 +19,13 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          "{opener}\n              {words}\n            </>\n          )}",
+          "{openerPart}\n                    {words}\n                  </>\n                )}",
           "<Receipts message={m} />",
-          "{cards}\n          {/* Its tools after",
+          "{cards}\n            {/* Its tools after",
           "<TurnTools",
           "<SavedTools",
           "<NoAiCard message={m} />",
-          "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+          "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
         ]),
       ),
     ).toBe(true);
@@ -43,7 +43,7 @@ describe("a reply's tools sit last, live and saved", () => {
     const row = source("MessageRow.tsx");
     const [toolsAt, footAt] = at(row, [
       "<SavedTools\n",
-      "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>\n    </>\n  );\n});",
     ]);
     const last = row.slice(toolsAt, footAt);
     for (const card of [
@@ -65,7 +65,7 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(live, [
-          "{run.text && !wordsOnTop ? (\n                <RevealText",
+          "{run.text && !wordsOnTop ? (\n                  <RevealText",
           '<TurnTools items={lines} agentName={agent?.name ?? ""}',
         ]),
       ),
@@ -76,8 +76,11 @@ describe("a reply's tools sit last, live and saved", () => {
 describe("agents it asked first: one pair row right before the reply, never inside it", () => {
   test("saved: the row sits before the reply's own row (which then shows its face and name), none in its body", () => {
     const row = source("MessageRow.tsx");
-    expect(ascending(at(row, ["const grouped = groupedIn && !pair;", "{pair}\n      <Pressable"]))).toBe(true);
-    const [bodyAt, endAt] = at(row, ["<View style={styles.body}>", "{foot}\n        </View>\n      </Pressable>"]);
+    expect(ascending(at(row, ["const grouped = groupedIn && !pair;", "{pair}\n      {quote && !inBubble"]))).toBe(true);
+    const [bodyAt, endAt] = at(row, [
+      "<View style={[styles.body, { gap: rhythm.part }]}>",
+      "{foot}\n          </RowPartContext.Provider>\n        </View>\n      </Pressable>",
+    ]);
     expect(row.slice(bodyAt, endAt)).not.toContain("Consult");
   });
 
@@ -201,15 +204,19 @@ describe("a shared approval card with actions approved ahead", () => {
   });
 });
 
-describe("a stretch's pause card on the phone (ADR 0089)", () => {
-  test("once someone let them go on, one quiet line: who and when, no card and no Continuar", () => {
+describe("a stretch's pause on the phone (ADR 0089)", () => {
+  test("waiting, a waiting pill with Continue tinted; once someone let them go on, a decided pill: who and when", () => {
     const card = source("../ai/StretchCard.tsx");
-    const [doneAt, cardAt] = at(card, ["if (continued) {", "<View style={[styles.card"]);
-    const done = card.slice(doneAt, cardAt);
+    const [doneAt, waitAt] = at(card, ["if (continued) {", "<AskWaiting"]);
+    const done = card.slice(doneAt, waitAt);
     expect(done).toContain("<AskDone");
     expect(done).toContain('t("stretchCard.continuedByYou", { time })');
-    expect(done).not.toContain("<Button");
-    expect(card.slice(cardAt)).not.toContain("continued");
+    expect(done).not.toContain("EventPillAction");
+    const waiting = card.slice(waitAt);
+    expect(waiting).not.toContain("continued");
+    expect(waiting).toContain("forMe={may}");
+    expect(waiting).toMatch(/<EventPillAction\s+key="continue"\s+primary/);
+    expect(card).not.toContain("<Button");
   });
 });
 
@@ -273,5 +280,32 @@ describe("an approval card's layout", () => {
       "approveAlwaysAlso(items, a)",
     ])
       expect([piece, group.includes(piece)]).toEqual([piece, true]);
+  });
+});
+
+describe("the secret card on the phone", () => {
+  const card = source("SecretCard.tsx");
+
+  test("people read its label: its internal name only binds the box", () => {
+    expect(card.match(/\br\.name\b/g)).toHaveLength(1);
+    expect(card).toContain("secretAad({ requestId: r.id, orgId, name: r.name, target: r.target })");
+    expect(card).toContain("title: label");
+    expect(card).toContain("accessibilityLabel={label}");
+  });
+
+  test("a refused send ends the card with the real reason and clears what was typed, unless only the computer is away", () => {
+    const failed = card.slice(card.indexOf("const failed = async"), card.indexOf("const showNewer"));
+    expect(failed.indexOf("secretRefusalKey(err)")).toBeLessThan(failed.indexOf("api.secrets.get(orgId, r.id)"));
+    expect(failed).toContain("secretClosedBy(err, r, fresh)");
+    expect(failed).toContain("done(closed)");
+    expect(failed).toContain('t(fresh ? "secret.changed" : "secret.failed")');
+    expect(card).toContain('if (!pending) setValue("");');
+    expect(card).toContain('t("secret.seeNewer")');
+  });
+
+  test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
+    const asks = source("asks.tsx");
+    expect(asks).toContain("numberOfLines={well.more ? (open ? 3 : 1) : undefined}");
+    expect(asks).toContain("numberOfLines={well && !well.more ? undefined : 4}");
   });
 });

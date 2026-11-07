@@ -3,6 +3,7 @@ import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
+import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type {
   SecretToVaultInput,
@@ -126,6 +127,7 @@ import type {
   GifPage,
   GifQuery,
   GitHubAppInstallation,
+  GitHubOrgAccess,
   GitHubRepositories,
   Health,
   HostComputer,
@@ -383,10 +385,12 @@ export interface ApiClient {
      */
     deletionCode(): Promise<CodeSent>;
     /**
-     * Deletes my account at once, with the emailed `code`, or `password` on a server that sends no email (`reauth.*`
-     * when refused, 429 after 5 passwords). `sole_owner` (409, `params.orgIds`) while a workspace needs me.
+     * Deletes my account in 7 days, with the emailed `code`, or `password` on a server that sends none (ADR 0088 §10):
+     * every session ends now. `sole_owner` (409) while a workspace needs me.
      */
     delete(input?: DeletionProofInput): Promise<void>;
+    /** Brings it back before its date. `account.not_restorable` (409) after. */
+    restore(): Promise<void>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {
@@ -614,6 +618,8 @@ export interface ApiClient {
       orgId: string,
       templateId: string,
       locale?: string,
+      /** On a billing hold: what the person tapped, kept as their message with no run. */
+      tap?: string,
     ): Promise<{ channelId: string; messageId: string }>;
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
@@ -659,8 +665,13 @@ export interface ApiClient {
       credentialId: string,
       input: { apiKey: string; label?: string },
     ): Promise<Credential>;
-    /** Revokes, or deletes for good with `purge` (refused while an agent uses it). */
-    removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
+    /**
+     * Revokes, or deletes for good with `purge`: refused while it's a default or an agent uses it, unless `release`
+     * says the person read what happens to them.
+     */
+    removeCredential(orgId: string, credentialId: string, purge?: boolean, release?: boolean): Promise<void>;
+    /** One cheap real call with a stored key, before an agent is pointed at it. A refusal comes as on saving one. */
+    checkCredential(orgId: string, credentialId: string): Promise<{ check: "ok" | "unchecked" }>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
@@ -709,9 +720,9 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /**
      * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
-     * when given (ADR 0128).
+     * when given (ADR 0128). `chain`: what it asked of other agents stops with it, all the way down.
      */
-    cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
+    cancelRun(orgId: string, runId: string, reason?: string, chain?: boolean): Promise<void>;
     /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
     stopReason?(orgId: string, runId: string, reason: string): Promise<void>;
     /**
@@ -895,6 +906,8 @@ export interface ApiClient {
     remove(orgId: string, id: string): Promise<void>;
     /** Repositories the organization's GitHub reaches, by account. */
     repositories(orgId: string): Promise<GitHubRepositories>;
+    /** The organizations the GitHub connection reaches now, and GitHub's page to grant more (admins). */
+    access(orgId: string): Promise<GitHubOrgAccess>;
   };
   search: {
     query(
@@ -1097,6 +1110,8 @@ export interface ApiClient {
   };
   /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
   secrets: {
+    /** The request as it stands now (only the person asked): what a refused answer reads to end its card. */
+    get(orgId: string, requestId: string): Promise<SecretRequest>;
     deliver(orgId: string, requestId: string, box: SecretBox): Promise<SecretRequest>;
     decline(orgId: string, requestId: string): Promise<SecretRequest>;
     /** Names on the agent's computers (its owner or an admin). */
@@ -1114,9 +1129,13 @@ export interface ApiClient {
     get(orgId: string, number: number): Promise<Issue>;
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
+    /** For good, with its steps and its conversation; what an agent is doing on it stops (`canDeleteIssue`). */
+    delete(orgId: string, id: string): Promise<void>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
     /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
     share(orgId: string, id: string): Promise<Issue>;
+    /** Who sees it (ADR 0151): anyone who can edit it changes it. */
+    setAudience(orgId: string, id: string, audience: AudienceChoice): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts its work in the task's conversation. */
@@ -1346,7 +1365,12 @@ export interface ApiClient {
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
-    audience(orgId: string, slug: string, access: WikiAccess): Promise<WikiPage>;
+    /** `audience` alone is for anyone who edits the page; the rest takes managing roles. */
+    audience(
+      orgId: string,
+      slug: string,
+      access: Partial<WikiAccess> & Pick<WikiAccess, "audience">,
+    ): Promise<WikiPage>;
     /** A folder's audience, and the closest limited folder above it. */
     folderAudience(
       orgId: string,

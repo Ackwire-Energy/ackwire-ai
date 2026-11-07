@@ -1,6 +1,16 @@
 import type { Agent } from "@agenteschat/client";
-import { ExpiryFuse } from "@agenteschat/ui";
-import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { EventPill, EventPillMore, ExpiryFuse, Icon, type IconName, Locked, Spinner } from "@agenteschat/ui";
+import {
+  createContext,
+  type FormEvent,
+  type HTMLAttributes,
+  type ReactNode,
+  type Ref,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
@@ -109,6 +119,7 @@ export function RequestCard({
   label,
   mine,
   waitingFor,
+  source,
   lead,
   object,
   details,
@@ -120,6 +131,7 @@ export function RequestCard({
   what,
   onSubmit,
   muted = false,
+  locked = false,
 }: {
   id: string;
   kind: RequestKind;
@@ -130,6 +142,8 @@ export function RequestCard({
   mine: boolean;
   /** Who it waits for when it isn't the viewer. */
   waitingFor?: string;
+  /** Where it was asked, after the kind ("Thread · #eng"), where the card stands away from its conversation. */
+  source?: ReactNode;
   /** The agent's own words: what it asks. */
   lead: ReactNode;
   /** The thing it is about, in two lines with a logo; `more` labels the button that opens `details`. */
@@ -151,6 +165,8 @@ export function RequestCard({
   onSubmit?: () => void;
   /** Overtaken (a newer card took its place): drawn quiet, nothing to do. */
   muted?: boolean;
+  /** Its decision is on its way or can't be made any more: what is filled in and clicked turns off, "Ver …" stays. */
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   const registry = useContext(AskRegistryContext);
@@ -180,11 +196,20 @@ export function RequestCard({
       {end && <span className="rq__end">{end}</span>}
     </div>
   );
+  const fill = (
+    <Locked when={locked}>
+      {body}
+      {foot}
+    </Locked>
+  );
   const inner = (
     <>
       <CardSky color={colorOf(agent)} />
       <div className="rq__head">
-        <span className="rq__kind">{tt(`ask.kind.${kind}`)}</span>
+        <span className="rq__kind">
+          {tt(`ask.kind.${kind}`)}
+          {source && <span className="rq__source"> · {source}</span>}
+        </span>
         {mine ? (
           <span className="rq__state">
             <WaitMark />
@@ -209,7 +234,11 @@ export function RequestCard({
           )}
         </div>
       )}
-      {open && details && <div className="rq__details">{details}</div>}
+      {open && details && (
+        <div className="rq__details">
+          <Locked when={locked}>{details}</Locked>
+        </div>
+      )}
       {onSubmit ? (
         // Only what is filled in and sent is the form (laid out as if it weren't there).
         <form
@@ -219,14 +248,10 @@ export function RequestCard({
             onSubmit();
           }}
         >
-          {body}
-          {foot}
+          {fill}
         </form>
       ) : (
-        <>
-          {body}
-          {foot}
-        </>
+        fill
       )}
     </>
   );
@@ -259,46 +284,220 @@ function RequestMore({ open, onClick, children }: { open: boolean; onClick: () =
 }
 
 /**
- * A decided request: no card, one quiet line in the conversation. A pixel mark (a square when it went through, a
- * short bar when it was refused, expired or not applied), its words, and "Ver …" opening the rest under the line.
+ * A decided request: no card, one event pill in the conversation (`EventPill`). A pixel mark (a square when it went
+ * through, a short bar when it was refused, expired or not applied), its words, its time, and its actions in the
+ * frame: "Ver …" opens the rest under it.
  */
 export function RequestDone({
   done,
   label,
   more,
   action,
+  time,
   children,
 }: {
   /** It went through. */
   done: boolean;
   /** The group's accessible name. */
   label: string;
-  /** What the line leaves out, and the button that opens it. */
+  /** What the pill leaves out, and the action that opens it. */
   more?: { label: string; content: ReactNode };
-  /** A button at the line's end (Desfazer). */
+  /** Its own actions (Desfazer, Cancelar): `EventPillAction`s. */
   action?: ReactNode;
-  /** The words: what it was, how it ended and, when the request has one, the time. */
+  /** When it was decided. */
+  time?: string;
+  /** The words: what it was and how it ended. */
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const actions =
+    action || more ? (
+      <>
+        {action}
+        {more && (
+          <EventPillMore open={open} onClick={() => setOpen((v) => !v)}>
+            {more.label}
+          </EventPillMore>
+        )}
+      </>
+    ) : undefined;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="rq-done" role="group" aria-label={label}>
-      <div className="rq-done__line">
+    <EventPill
+      className="rq-done"
+      role="group"
+      aria-label={label}
+      mark={
         <span className="rq-done__mark" data-done={done || undefined} aria-hidden="true">
           <span />
         </span>
-        <span className="rq-done__text">{children}</span>
+      }
+      time={time}
+      actions={actions}
+      below={open && more ? <div className="rq__details">{more.content}</div> : undefined}
+    >
+      <span className="rq-done__text">{children}</span>
+    </EventPill>
+  );
+}
+
+/**
+ * A request still waiting, as the same event pill it becomes once decided (`RequestDone`): its words in ink, and
+ * - waiting for the viewer (`mine`): the pulsing pixel square (`WaitMark`) and what it asks for as the `primary`
+ *   `EventPillAction` ("Connect", "Continue now"), the other actions plain after it;
+ * - waiting for someone else (or for something, a computer): a quiet icon and no primary action.
+ * Its words stay one sentence: a why, what a proposal gives or a command go under the frame (`below`), or behind
+ * "See details" (`more`). Never a card inside it.
+ */
+export function RequestOpen({
+  mine,
+  icon = "clock",
+  label,
+  action,
+  more,
+  below,
+  time,
+  children,
+  className,
+  ...rest
+}: Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
+  /** It waits for the viewer: the pulsing mark, and its main action is `primary`. */
+  mine: boolean;
+  /** The quiet mark while it waits for someone else. */
+  icon?: IconName;
+  /** The group's accessible name (its sentence when that is plain text). */
+  label?: string;
+  /** Its `EventPillAction`s, the main one first. */
+  action?: ReactNode;
+  /** What the pill leaves out, and the action that opens it. */
+  more?: { label: string; content: ReactNode };
+  /** Always under the frame: the why, what it gives, who may decide. */
+  below?: ReactNode;
+  time?: string;
+  /** The one sentence: what it asks. */
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const actions =
+    action || more ? (
+      <>
         {action}
         {more && (
-          <RequestMore open={open} onClick={() => setOpen((v) => !v)}>
+          <EventPillMore open={open} onClick={() => setOpen((v) => !v)}>
             {more.label}
-          </RequestMore>
+          </EventPillMore>
         )}
-      </div>
-      {open && more && <div className="rq__details">{more.content}</div>}
-    </div>
+      </>
+    ) : undefined;
+  const under =
+    below || (open && more) ? (
+      <>
+        {open && more && <div className="rq__details">{more.content}</div>}
+        {below && <div className="rq-open__below">{below}</div>}
+      </>
+    ) : undefined;
+  return (
+    <EventPill
+      waiting
+      className={className ? `rq-open ${className}` : "rq-open"}
+      role="group"
+      aria-label={label ?? (typeof children === "string" ? children : undefined)}
+      mark={mine ? <WaitMark /> : <Icon name={icon} size={14} />}
+      time={time}
+      actions={actions}
+      below={under}
+      {...rest}
+    >
+      {children}
+    </EventPill>
   );
+}
+
+/** The keys a request's answers take: one to nine. */
+const CHOICE_KEYS = 9;
+
+/** Number keys pick an answer while the focus is in the list (never while typing elsewhere). */
+function choiceKeys(pick: (index: number) => void) {
+  return (list: HTMLElement | null) => {
+    if (!list) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/.test(e.key)) return;
+      e.preventDefault();
+      pick(Number(e.key) - 1);
+    };
+    list.addEventListener("keydown", onKey);
+    return () => list.removeEventListener("keydown", onKey);
+  };
+}
+
+/**
+ * The answers an agent offers, in a request card's body: a list, one a line in the full width with its number key
+ * (1 to 9 pick while the focus is in the list), whole sentences wrapping in their line, and `other` ("Outra
+ * resposta") its last line. Only answers: deciding (approve, accept, create) stays the footer's buttons.
+ */
+export function RequestChoices({
+  choices,
+  onPick,
+  disabled = false,
+  other,
+}: {
+  choices: readonly { label: string; busy?: boolean }[];
+  onPick: (index: number) => void;
+  disabled?: boolean;
+  /** The last line, writing an answer of one's own; none while that field is open. */
+  other?: { label: string; onClick: () => void; ref?: Ref<HTMLButtonElement> };
+}) {
+  return (
+    <ul
+      className="rq__choices"
+      ref={choiceKeys((i) => {
+        if (!disabled && choices[i]) onPick(i);
+      })}
+    >
+      {choices.map((c, i) => (
+        <li key={c.label}>
+          <button
+            type="button"
+            className="rq__choice"
+            data-choice=""
+            disabled={disabled}
+            aria-busy={c.busy || undefined}
+            onClick={() => onPick(i)}
+          >
+            {i < CHOICE_KEYS && (
+              <span className="rq__key" aria-hidden="true">
+                {i + 1}
+              </span>
+            )}
+            <span className="rq__choice-text">{c.label}</span>
+            {c.busy && <Spinner size={14} />}
+          </button>
+        </li>
+      ))}
+      {other && (
+        <li>
+          <button
+            ref={other.ref}
+            type="button"
+            className="rq__choice rq__choice--other"
+            disabled={disabled}
+            onClick={other.onClick}
+          >
+            <span className="rq__key" aria-hidden="true">
+              <Icon name="edit" size={14} />
+            </span>
+            <span className="rq__choice-text">{other.label}</span>
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/** The footer's "Tecle 1–3 para responder" under a list of two or more answers. */
+export function RequestKeys({ count }: { count: number }) {
+  const { t } = useTranslation();
+  if (count < 2) return null;
+  return <span className="rq__keys">{t("question.keysHint", { count: Math.min(count, CHOICE_KEYS) })}</span>;
 }
 
 /** Waiting for you: a small pixel square outline that pulses (also in the bar above the composer). */

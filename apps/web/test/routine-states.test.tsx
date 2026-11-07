@@ -312,6 +312,54 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
     expect(card("Avaliações").textContent).not.toContain("Every");
   });
 
+  test("a run's record reads as Markdown, folded when long, with the rest a click away", async () => {
+    const record = `Contou o que achou\n\n- **Verificado:** PRs abertos em \`agentes.chat\`\n- ${"Nada novo. ".repeat(40)}`;
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: 400 });
+    await open([routine({ id: "rt-md", name: "Revisar PRs" })], {
+      "rt-md": [routineRun({ at: ago(5), status: "silent", summary: record })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    const words = panel.querySelector(".routine-runs__words") as HTMLElement;
+    expect(words.querySelector("strong")?.textContent).toBe("Verificado:");
+    expect(words.querySelector("code")?.textContent).toBe("agentes.chat");
+    expect(words.textContent).not.toContain("**");
+    expect(words.querySelector("[data-folded]")).toBeTruthy();
+    await click(within(words).getByRole("button", { name: "Mostrar mais" }));
+    expect(words.querySelector("[data-folded]")).toBeNull();
+    expect(within(words).getByRole("button", { name: "Mostrar menos" })).toBeTruthy();
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
+  });
+
+  test("a record's mentions say the name, as in a message", async () => {
+    await open([routine({ id: "rt-name", name: "Revisar PRs" })], {
+      "rt-name": [routineRun({ at: ago(5), status: "silent", summary: "Falei com @ada." })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    expect(panel.querySelector(".routine-runs__words")?.textContent).toContain("@Ada");
+  });
+
+  test("a long record that fits this width shows whole: no button, no fade", async () => {
+    await open([routine({ id: "rt-fits", name: "Revisar PRs" })], {
+      "rt-fits": [routineRun({ at: ago(5), status: "silent", summary: "Nada novo. ".repeat(40) })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    const words = panel.querySelector(".routine-runs__words") as HTMLElement;
+    expect(within(words).queryByRole("button")).toBeNull();
+    expect(words.querySelector("[data-cut]")).toBeNull();
+  });
+
+  test("a short record shows whole, with no button", async () => {
+    await open([routine({ id: "rt-short", name: "Revisar PRs" })], {
+      "rt-short": [routineRun({ at: ago(5), status: "silent", summary: "Nada novo." })],
+    });
+    const panel = await details("Revisar PRs");
+    await runsTab(panel);
+    expect(within(panel.querySelector(".routine-runs__words") as HTMLElement).queryByRole("button")).toBeNull();
+  });
+
   test("the strip's last runs read as sentences: each after the first starts with a capital", async () => {
     const now = routineRun({ at: ago(0.5), status: "reported" });
     const yesterday = routineRun({ at: ago(24 * 60), status: "silent" });
@@ -593,12 +641,12 @@ describe("Rotinas: every code in the person's words", () => {
 });
 
 describe("Rotinas: the form's two plain questions", () => {
-  test("no routines: the title and Nova rotina, nothing else", async () => {
+  test("no routines: what they give, and the one Nova rotina in the middle of the page", async () => {
     await open([]);
     const empty = document.querySelector(".ac-empty") as HTMLElement;
-    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Nenhuma rotina ainda");
-    expect(empty.querySelector(".ac-empty__text")).toBeNull();
+    expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Deixe o trabalho repetido com os agentes");
     expect(within(empty).getByRole("button", { name: "Nova rotina" })).toBeTruthy();
+    expect(screen().getAllByRole("button", { name: "Nova rotina" })).toHaveLength(1);
     expect(document.querySelector(".ac-pagehead")?.querySelectorAll("p")).toHaveLength(1);
   });
 
@@ -621,7 +669,7 @@ describe("Rotinas: the form's two plain questions", () => {
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
-    expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
+    expect(posts.closest(".ac-field")?.querySelectorAll(".ac-field__help")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
     );

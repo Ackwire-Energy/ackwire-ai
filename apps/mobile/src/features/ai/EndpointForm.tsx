@@ -12,6 +12,7 @@ import {
   endpointReady,
   pricesProblem,
   withListedModels,
+  withoutModel,
   withTypedModel,
 } from "@agenteschat/client/lib/endpoints";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,8 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
+  IconButton,
+  Locked,
   Segmented,
   Text,
   useTheme,
@@ -53,6 +56,7 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
   const setModel = (id: string, patch: Partial<EndpointDraft["models"][number]>) =>
     setDraft((d) => ({ ...d, models: d.models.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
   const input = [fieldText("callout"), styles.input, { color: c.ink }];
+  const locked = saving || listing;
 
   const fetchModels = async () => {
     setListing(true);
@@ -122,132 +126,160 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
 
   return (
     <View style={styles.gap}>
-      <GroupedList>
-        <GroupedField label={t("endpoint.name")}>
-          <TextInput
-            value={draft.name}
-            onChangeText={(name) => set({ name })}
-            placeholder={t("endpoint.namePlaceholder")}
-            placeholderTextColor={c.faint}
-            maxLength={80}
-            autoCorrect={false}
-            accessibilityLabel={t("endpoint.name")}
-            style={input}
+      <Locked when={locked} style={styles.gap}>
+        <GroupedList>
+          <GroupedField label={t("endpoint.name")}>
+            <TextInput
+              value={draft.name}
+              onChangeText={(name) => set({ name })}
+              placeholder={t("endpoint.namePlaceholder")}
+              placeholderTextColor={c.faint}
+              maxLength={80}
+              autoCorrect={false}
+              accessibilityLabel={t("endpoint.name")}
+              style={input}
+            />
+          </GroupedField>
+        </GroupedList>
+        <View>
+          <GroupedHeader>{t("endpoint.style")}</GroupedHeader>
+          <Segmented
+            wide="fit"
+            items={ENDPOINT_STYLES.map((s) => ({ key: s, label: t(`endpoint.styles.${s}`) }))}
+            value={draft.style}
+            onChange={(style) => set({ style: style as EndpointDraft["style"] })}
           />
-        </GroupedField>
-        <GroupedField label={t("endpoint.address")}>
-          <TextInput
-            value={draft.baseURL}
-            onChangeText={(baseURL) => set({ baseURL })}
-            placeholder={endpointBaseExample(draft.style)}
-            placeholderTextColor={c.faint}
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            accessibilityLabel={t("endpoint.address")}
-            style={input}
+        </View>
+        <GroupedList>
+          <GroupedField label={t("endpoint.address")}>
+            <TextInput
+              value={draft.baseURL}
+              onChangeText={(baseURL) => set({ baseURL })}
+              placeholder={endpointBaseExample(draft.style)}
+              placeholderTextColor={c.faint}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              accessibilityLabel={t("endpoint.address")}
+              style={input}
+            />
+          </GroupedField>
+          <GroupedField label={t("endpoint.key")}>
+            <TextInput
+              value={draft.apiKey}
+              onChangeText={(apiKey) => set({ apiKey })}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel={t("endpoint.key")}
+              style={input}
+            />
+          </GroupedField>
+        </GroupedList>
+        <GroupedFooter>
+          {t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })} {t("endpoint.keyHelp")}
+        </GroupedFooter>
+      </Locked>
+      <GroupedHeader
+        aside={
+          <Button
+            variant="text"
+            size="sm"
+            label={t("endpoint.fetch")}
+            loading={listing}
+            disabled={saving || !endpointAddressLooksValid(draft.baseURL)}
+            onPress={() => void fetchModels()}
           />
-        </GroupedField>
-        <GroupedField label={t("endpoint.key")}>
-          <TextInput
-            value={draft.apiKey}
-            onChangeText={(apiKey) => set({ apiKey })}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel={t("endpoint.key")}
-            style={input}
-          />
-        </GroupedField>
-      </GroupedList>
-      <GroupedFooter>
-        {t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })} {t("endpoint.keyHelp")}
-      </GroupedFooter>
-      <Segmented
-        items={ENDPOINT_STYLES.map((s) => ({ key: s, label: t(`endpoint.styles.${s}`) }))}
-        value={draft.style}
-        onChange={(style) => set({ style: style as EndpointDraft["style"] })}
-      />
-      <Button
-        variant="secondary"
-        icon="search"
-        label={t("endpoint.fetch")}
-        loading={listing}
-        disabled={!endpointAddressLooksValid(draft.baseURL)}
-        onPress={() => void fetchModels()}
-      />
-      {listError ? <Note icon="x">{t("endpoint.listFailed", { error: listError })}</Note> : null}
-      {draft.models.length > 0 ? (
-        <>
-          <GroupedHeader>{t("endpoint.choose")}</GroupedHeader>
-          <GroupedList>
-            {draft.models.map((m) => (
-              <GroupedRow key={m.id} label={m.id} checked={m.on} onPress={() => setModel(m.id, { on: !m.on })} />
-            ))}
-          </GroupedList>
-          {draft.models
-            .filter((m) => m.on)
-            .map((m) => {
-              const problem = pricesProblem(m);
-              return (
-                <View key={m.id} style={styles.gap}>
-                  <GroupedHeader>{`${m.id} · ${t("endpoint.priceUnit")}`}</GroupedHeader>
-                  <GroupedList>
-                    <GroupedField label={t("endpoint.priceInShort")}>
-                      <TextInput
-                        value={m.input}
-                        onChangeText={(v) => setModel(m.id, { input: v })}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel={t("endpoint.priceIn", { model: m.id })}
-                        style={input}
-                      />
-                    </GroupedField>
-                    <GroupedField label={t("endpoint.priceOutShort")}>
-                      <TextInput
-                        value={m.output}
-                        onChangeText={(v) => setModel(m.id, { output: v })}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel={t("endpoint.priceOut", { model: m.id })}
-                        style={input}
-                      />
-                    </GroupedField>
-                  </GroupedList>
-                  {problem ? (
-                    <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-                      {t(problem === "both" ? "endpoint.priceBoth" : "endpoint.priceInvalid")}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-        </>
-      ) : null}
-      <GroupedList>
-        <GroupedField label={t("endpoint.addModel")}>
-          <TextInput
-            value={typed}
-            onChangeText={(v) => {
-              setTyped(v);
-              setTypedWrong(false);
-            }}
-            placeholder={t("endpoint.modelPlaceholder")}
-            placeholderTextColor={c.faint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            returnKeyType="done"
-            onSubmitEditing={addTyped}
-            accessibilityLabel={t("endpoint.addModel")}
-            style={input}
-          />
-        </GroupedField>
-      </GroupedList>
-      {typedWrong ? (
-        <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-          {t("endpoint.modelInvalid")}
-        </Text>
-      ) : null}
+        }
+      >
+        {t("endpoint.addModel")}
+      </GroupedHeader>
+      <Locked when={locked} style={styles.gap}>
+        <GroupedList>
+          <GroupedField label={t("endpoint.models")}>
+            <View style={styles.addRow}>
+              <TextInput
+                value={typed}
+                onChangeText={(v) => {
+                  setTyped(v);
+                  setTypedWrong(false);
+                }}
+                placeholder={t("endpoint.modelPlaceholder")}
+                placeholderTextColor={c.faint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                returnKeyType="done"
+                onSubmitEditing={addTyped}
+                accessibilityLabel={t("endpoint.addModel")}
+                style={input}
+              />
+              <IconButton icon="plus" label={t("endpoint.add")} disabled={!typed.trim()} onPress={addTyped} />
+            </View>
+          </GroupedField>
+        </GroupedList>
+        {typedWrong ? (
+          <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+            {t("endpoint.modelInvalid")}
+          </Text>
+        ) : null}
+        {listError ? <Note icon="x">{t("endpoint.listFailed", { error: listError })}</Note> : null}
+        {draft.models.length > 0 ? (
+          <>
+            <GroupedHeader>{t("endpoint.choose")}</GroupedHeader>
+            <GroupedList>
+              {draft.models.map((m) => (
+                <GroupedRow
+                  key={m.id}
+                  label={m.id}
+                  checked={m.on}
+                  onPress={() => setModel(m.id, { on: !m.on })}
+                  remove={{
+                    label: t("common.removeName", { name: m.id }),
+                    onPress: () => setDraft((d) => withoutModel(d, m.id)),
+                  }}
+                />
+              ))}
+            </GroupedList>
+            {draft.models
+              .filter((m) => m.on)
+              .map((m) => {
+                const problem = pricesProblem(m);
+                return (
+                  <View key={m.id} style={styles.gap}>
+                    <GroupedHeader>{`${m.id} · ${t("endpoint.priceUnit")}`}</GroupedHeader>
+                    <GroupedList>
+                      <GroupedField label={t("endpoint.priceInShort")}>
+                        <TextInput
+                          value={m.input}
+                          onChangeText={(v) => setModel(m.id, { input: v })}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel={t("endpoint.priceIn", { model: m.id })}
+                          style={input}
+                        />
+                      </GroupedField>
+                      <GroupedField label={t("endpoint.priceOutShort")}>
+                        <TextInput
+                          value={m.output}
+                          onChangeText={(v) => setModel(m.id, { output: v })}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel={t("endpoint.priceOut", { model: m.id })}
+                          style={input}
+                        />
+                      </GroupedField>
+                    </GroupedList>
+                    {problem ? (
+                      <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+                        {t(problem === "both" ? "endpoint.priceBoth" : "endpoint.priceInvalid")}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+          </>
+        ) : null}
+      </Locked>
       {draft.models.some((m) => m.on && !m.input.trim() && !m.output.trim()) ? (
         <Note icon="info">{t("endpoint.unpriced")}</Note>
       ) : null}
@@ -261,7 +293,7 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
         wide
         label={saving ? t("endpoint.testing") : t("endpoint.save")}
         loading={saving}
-        disabled={!endpointReady(draft) || saving}
+        disabled={!endpointReady(draft) || listing}
         onPress={() => void save()}
       />
     </View>
@@ -270,5 +302,6 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
 
 const styles = StyleSheet.create({
   gap: { gap: 10 },
+  addRow: { flexDirection: "row", alignItems: "center" },
   input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
 });

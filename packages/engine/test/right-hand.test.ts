@@ -24,6 +24,7 @@ import {
   setAgentAudience,
   setAgentChannels,
   setAgentComputerTarget,
+  setBillingHold,
   updateAgent,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -181,7 +182,10 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).toContain("(1 more agent this person can't see.)");
   expect(member).toContain("Never ask for a key, password or token in the chat");
   // Its own tools only, whichever CLI thinks for it (ADR 0137 §4).
-  expect(member).toContain("You use only your agentes tools. Never run commands, read or list files");
+  expect(member).toContain(
+    "You use only your agentes tools, which read files people give you, the Drive and the wiki.",
+  );
+  expect(member).toContain("Never run commands, touch a computer's files");
   expect(member).toContain("never write out tokens, keys, passwords or sign-in data");
   // Money only for who may see usage (ADR 0063).
   expect(owner).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
@@ -255,6 +259,60 @@ test("in its DM its run reads its own block, not an agent's instructions", async
   expect(text).not.toContain("# Your instructions");
 });
 
+test("what it and the agents advise about computers follows where the server gets them", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const runOf = async (dmId: string) => {
+    const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dmId, {
+      body: "a CPU saturou com 2 tarefas, o que eu faço?",
+    });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const lodiRun = await runOf((await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id)).id);
+  const agentRun = await runOf((await openPersonAgentDm(f.db, f.org.id, f.owner.id, f.agent.id)).id);
+  const text = async (agent: typeof lodi, run: typeof lodiRun, workspaceComputer?: { billing: boolean }) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10, workspaceComputer })).system);
+
+  for (const [agent, run] of [
+    [lodi, lodiRun],
+    [f.agent, agentRun],
+  ] as const) {
+    const cloud = await text(agent, run, { billing: true });
+    expect(cloud).toContain(
+      "No other can join it, nobody SSHes in: never suggest renting or connecting one, nor installing the runner.",
+    );
+    expect(cloud).toContain("a bigger plan may bring a bigger one (Settings › Plan and billing)");
+    expect(cloud).toContain("another workspace, on its own plan, has its own");
+    // A server of the customer's own is work an agent may still reach: only computers for the agents are ruled out.
+    expect(cloud).not.toMatch(/never suggest (it|SSH)|no (pairing|SSH)/);
+    expect(cloud).toContain("Task manager");
+    // Its own provisioner, no plans: no page to send anyone to.
+    const provisioned = await text(agent, run, { billing: false });
+    expect(provisioned).toContain("only whoever runs this server can give it a bigger one");
+    expect(provisioned).not.toContain("Plan and billing");
+    // People connect their own: today's words, none of the block.
+    expect(await text(agent, run)).not.toContain("# The computer");
+  }
+
+  // Paid, a 100% coupon included: no hold, so nobody is sent to pay for the computer they are waiting for.
+  const paid = await text(lodi, lodiRun, { billing: true });
+  expect(paid).toContain("Nobody sets it up: it is on its way, and Settings › Computers shows how far it is.");
+  expect(paid).not.toContain("once the plan is paid");
+  expect(paid).not.toContain("say where it is set up");
+  expect(await text(lodi, lodiRun, { billing: false })).toContain("it is on its way");
+  await setBillingHold({ db: f.db }, f.org.id, "payment");
+  expect(await text(lodi, lodiRun, { billing: true })).toContain(
+    "Nobody sets it up: it comes by itself once the plan is paid (Settings › Plan and billing).",
+  );
+  const own = await text(lodi, lodiRun);
+  expect(own).toContain("No computer is ready for the agents yet");
+  expect(own).toContain("say where it is set up (Settings › Computers)");
+  expect(own).not.toContain("Nobody sets it up");
+});
+
 test("with nobody behind its run (another agent's message), it still keeps to its own tools", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);
@@ -272,7 +330,7 @@ test("with nobody behind its run (another agent's message), it still keeps to it
   const text = systemText(
     (await buildRunContext(f.db, { ...run, triggerMessageId: byAgent.id }, lodi, { maxMessages: 10 })).system,
   );
-  expect(text).toContain("# Your tools\nYou use only your agentes tools.");
+  expect(text).toContain("# Your tools\nYou use only your agentes tools,");
 });
 
 test("in no channel, an @mention in any channel still reaches it, and only that", async () => {

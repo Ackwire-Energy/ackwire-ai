@@ -3,7 +3,19 @@ import { useApprovals, useRoles } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { can } from "@agenteschat/client/lib/permissions";
 import { filterTeam, sortTeam, type TeamFilter, type TeamSort } from "@agenteschat/client/lib/team-views";
-import { Card, FilterToggle, Icon, RoleMark, SearchField, Select, TabPanel, Tabs, Toolbar } from "@agenteschat/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  FilterToggle,
+  Icon,
+  RoleMark,
+  SearchField,
+  Select,
+  TabPanel,
+  Tabs,
+  Toolbar,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -286,7 +298,24 @@ function AgentsTable({ agents, groups }: { agents: TeamAgent[]; groups: AgentGro
           </thead>
           <tbody>{body()}</tbody>
         </table>
-        {rows.length === 0 && <p className="team-empty">{t("team.list.none")}</p>}
+        {rows.length === 0 && (
+          <EmptyState
+            size="inline"
+            actions={
+              <Button
+                size="sm"
+                onClick={() => {
+                  setQ("");
+                  setFilter("all");
+                }}
+              >
+                {t("filters.clearAll")}
+              </Button>
+            }
+          >
+            {t("team.list.none")}
+          </EmptyState>
+        )}
       </Card>
       {dialog && <GroupNameDialog purpose={dialog} onClose={() => setDialog(null)} />}
     </>

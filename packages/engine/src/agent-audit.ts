@@ -1,11 +1,16 @@
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
+import { readableChannelIds } from "./channels";
 import { cutText } from "./format";
-import { requirePermission } from "./organizations";
+import { can, requirePermission } from "./organizations";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL } from "./secrets";
+import { taskSeenSql } from "./task-access";
 import { redactCredentials as masked } from "./tool-detail";
+import type { ToolOutput } from "./tools/types";
+import { visibleWikiPageIds } from "./wiki-links";
 
-const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
+const { auditLog, agents, approvals, channels, issues, secretRequests, users } = schema;
 
 /**
  * The audit of what agents do: every tool call that matters, written by the
@@ -84,6 +89,16 @@ export function callTitle(
   }
 }
 
+/** The task or wiki page a call wrote, so the audit shows its title only to who sees it. */
+export type ToolCallSubject = { type: "issue" | "wiki_page"; id: string };
+
+export function callSubject(output: ToolOutput): ToolCallSubject | null {
+  const issue = (output.data?.issue as { id?: unknown } | undefined)?.id;
+  if (typeof issue === "string") return { type: "issue", id: issue };
+  const page = output.data?.wikiPageId;
+  return typeof page === "string" ? { type: "wiki_page", id: page } : null;
+}
+
 /** One tool call an agent made (see `auditsCall`). Never fails the call. */
 export async function recordToolCall(
   db: Executor,
@@ -108,8 +123,16 @@ export async function recordToolCall(
     secretRequestId?: string | null;
     /** A call that ran without asking under "Aprovar sempre": its rules (`approval_rules`). */
     approvalRules?: string[] | null;
+    about?: ToolCallSubject | null;
   },
 ) {
+  // A secret's variable-style name is the agent's own: people read its label (the call's title), never this.
+  const { name: secretName, ...rest } = call.input;
+  const named = call.tool === REQUEST_SECRET_TOOL || call.tool === MAKE_KEY_TOOL;
+  const asked = named && typeof secretName === "string" && secretName ? secretName : null;
+  const unnamed = (text: string) => (asked ? text.replaceAll(asked, "the secret") : text);
+  const input = asked === null ? call.input : (JSON.parse(unnamed(JSON.stringify(rest))) as Record<string, unknown>);
+  const reason = call.reason && unnamed(call.reason);
   await recordAudit(db, {
     orgId: call.orgId,
     actor: { type: "agent", id: call.agentId },
@@ -123,11 +146,12 @@ export async function recordToolCall(
       ...(call.authority?.kind === "routine" && call.authority.brief
         ? { routine: { id: call.authority.brief.routineId, name: call.authority.brief.name } }
         : {}),
-      input: auditInput(call.input),
-      ...(call.reason ? { reason: cutText(masked(call.reason), MAX_STRING) } : {}),
+      input: auditInput(input),
+      ...(reason ? { reason: cutText(masked(reason), MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
       ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),
+      ...(call.about ? { about: call.about } : {}),
     },
     runId: call.runId,
     channelId: call.channelId,
@@ -193,6 +217,60 @@ export interface AuditRow {
 export const AUDIT_PAGE = 50;
 export const AUDIT_PAGE_MAX = 200;
 
+/** Tools whose input names a task or a wiki page. */
+const CONTENT_TOOLS = /^(create_issue|update_issue|comment_issue|create_wiki_page|update_wiki_page|link_to_wiki)$/;
+
+type AuditLogRow = typeof auditLog.$inferSelect;
+
+/** The task or wiki page a row is about, when it says. */
+function subjectOf(r: AuditLogRow): ToolCallSubject | null {
+  if (r.action === TOOL_CALL) return (r.details.about as ToolCallSubject | undefined) ?? null;
+  return r.targetId && (r.targetType === "issue" || r.targetType === "wiki_page")
+    ? { type: r.targetType, id: r.targetId }
+    : null;
+}
+
+/**
+ * The rows that keep their title from this reader (ADR 0151). Administrators see everything; `view_audit` given to
+ * anyone else shows a task's or a page's title only to who sees it. A tool call that doesn't say what it wrote (from
+ * before it did, or one that failed) goes by its conversation: who doesn't read it doesn't get what was typed there.
+ */
+async function hiddenFrom(db: Database, orgId: string, userId: string, rows: AuditLogRow[]) {
+  const subjects = rows.map((r) => [r, subjectOf(r)] as const);
+  const ids = (type: ToolCallSubject["type"]) => subjects.flatMap(([, s]) => (s?.type === type ? [s.id] : []));
+  const issueIds = ids("issue");
+  const unnamed = rows.filter((r) => r.action === TOOL_CALL && CONTENT_TOOLS.test(r.targetId ?? "") && !subjectOf(r));
+  const places = [...new Set(unnamed.flatMap((r) => (r.channelId ? [r.channelId] : [])))];
+  const [seenIssues, seenPages, read, open] = await Promise.all([
+    issueIds.length
+      ? db
+          .select({ id: issues.id })
+          .from(issues)
+          .where(and(inArray(issues.id, issueIds), taskSeenSql("issues", sql`${userId}::text`)))
+      : Promise.resolve([]),
+    visibleWikiPageIds(db, userId, ids("wiki_page")),
+    readableChannelIds(db, orgId, userId, places),
+    places.length
+      ? db
+          .select({ id: channels.id })
+          .from(channels)
+          .where(and(inArray(channels.id, places), eq(channels.kind, "channel"), eq(channels.visibility, "public")))
+      : Promise.resolve([]),
+  ]);
+  const seen = new Set([...seenIssues.map((i) => i.id), ...seenPages]);
+  const publicPlaces = new Set(open.map((c) => c.id));
+  const hidden = new Set<string>();
+  for (const [r, s] of subjects) {
+    if (
+      s
+        ? !seen.has(s.id)
+        : unnamed.includes(r) && !(r.channelId && (read.has(r.channelId) || publicPlaces.has(r.channelId)))
+    )
+      hidden.add(r.id);
+  }
+  return hidden;
+}
+
 /**
  * The org's audit log, newest first, for admins (`configure`): what people
  * changed and what agents did, with names (an agent or person since removed
@@ -204,7 +282,7 @@ export async function listAudit(
   orgId: string,
   filter: AuditFilter = {},
 ): Promise<{ rows: AuditRow[]; next: string | null }> {
-  await requirePermission(db, actorId, orgId, "view_audit");
+  const membership = await requirePermission(db, actorId, orgId, "view_audit");
   const limit = Math.min(Math.max(filter.limit ?? AUDIT_PAGE, 1), AUDIT_PAGE_MAX);
   const found = await db
     .select()
@@ -241,6 +319,7 @@ export async function listAudit(
     .orderBy(desc(auditLog.id))
     .limit(limit + 1);
   const page = found.slice(0, limit);
+  const hidden = can(membership, "administrator") ? new Set<string>() : await hiddenFrom(db, orgId, actorId, page);
 
   const approvalOf = (r: (typeof page)[number]) =>
     typeof r.details.approvalId === "string" ? r.details.approvalId : null;
@@ -312,7 +391,13 @@ export async function listAudit(
       target: { type: r.targetType, id: r.targetId },
       // A tool call's input was cleaned when it was written; the rest (a server's address, a database's
       // host…) is cleaned here, as it leaves.
-      details: r.action === TOOL_CALL ? r.details : auditInput(r.details),
+      details: hidden.has(r.id)
+        ? r.action === TOOL_CALL
+          ? { kind: r.details.kind, behind: r.details.behind, input: {} }
+          : {}
+        : r.action === TOOL_CALL
+          ? r.details
+          : auditInput(r.details),
       runId: r.runId,
       channelId: r.channelId,
       channel: (r.channelId && (channelById.get(r.channelId) as AuditRow["channel"])) || null,

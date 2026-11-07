@@ -1,4 +1,5 @@
 import { ApiError, keys, useApi, useWikiAction, useWikiPage, useWikiTree, type WikiPage } from "@agenteschat/client";
+import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
 import { prefixLines, wikiQuery, wrapSelection } from "@agenteschat/client/lib/wiki";
 import { diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,8 +24,12 @@ import {
   Button,
   DiffView,
   fieldText,
+  GroupedFooter,
+  GroupedList,
+  GroupedRow,
   Icon,
   type IconName,
+  Locked,
   Segmented,
   SheetScreen,
   Text,
@@ -34,6 +39,7 @@ import {
 import { useFailed } from "../routines/hooks";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, MONO, PushedHeader, successHaptic, Tile, tapHaptic } from "../shared/parts";
+import { useWhoSeesDraft, useWhoSeesLabel, WhoSeesRows } from "../shared/WhoSees";
 import { foldersIn, suggestPages } from "./logic";
 import { WikiDoc } from "./WikiDoc";
 import { cleanFolder, FolderChips, openWikiPage } from "./WikiScreen";
@@ -48,7 +54,7 @@ type Sel = { start: number; end: number };
  * changed meanwhile shows the conflict (the web's): the difference, and which one stays. Leaving with changes
  * asks first. `slug` edits a page; `title` and `folder` write a new one (created on Salvar).
  */
-export function WikiWriteScreen(props: { slug: string } | { title: string; folder: string }) {
+export function WikiWriteScreen(props: { slug: string } | { title: string; folder: string; who?: string }) {
   const orgId = useOrgId();
   const slug = "slug" in props ? props.slug : null;
   const page = useWikiPage(orgId, slug);
@@ -58,11 +64,22 @@ export function WikiWriteScreen(props: { slug: string } | { title: string; folde
       page={page.data ?? null}
       title={"title" in props ? props.title : (page.data?.title ?? "")}
       folder={"folder" in props ? props.folder : (page.data?.folder ?? "")}
+      audience={"who" in props && props.who ? { mode: "people", userIds: props.who.split(",") } : EVERYONE}
     />
   );
 }
 
-function Writer({ page, title, folder }: { page: WikiPage | null; title: string; folder: string }) {
+function Writer({
+  page,
+  title,
+  folder,
+  audience,
+}: {
+  page: WikiPage | null;
+  title: string;
+  folder: string;
+  audience: AudienceChoice;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -179,7 +196,7 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
       if (!page) {
         const created = await action.mutateAsync({
           type: "create",
-          input: { title: title.trim(), folder: cleanFolder(folder), body },
+          input: { title: title.trim(), folder: cleanFolder(folder), body, audience },
         });
         done(created, true);
       } else {
@@ -301,24 +318,26 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
               </View>
             ) : null}
           </View>
-          <TextInput
-            ref={input}
-            value={body}
-            onChangeText={setBody}
-            onSelectionChange={(e: TextInputSelectionChangeEvent) => {
-              setSel(e.nativeEvent.selection);
-              if (pending) setPending(null);
-            }}
-            {...(pending ? { selection: pending } : {})}
-            multiline
-            autoFocus={!page}
-            textAlignVertical="top"
-            autoCapitalize="sentences"
-            placeholder={t("mobile.wiki.placeholder")}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("wiki.editorLabel", { title })}
-            style={[styles.source, { color: c.ink2 }]}
-          />
+          <Locked when={saving} style={styles.fill}>
+            <TextInput
+              ref={input}
+              value={body}
+              onChangeText={setBody}
+              onSelectionChange={(e: TextInputSelectionChangeEvent) => {
+                setSel(e.nativeEvent.selection);
+                if (pending) setPending(null);
+              }}
+              {...(pending ? { selection: pending } : {})}
+              multiline
+              autoFocus={!page}
+              textAlignVertical="top"
+              autoCapitalize="sentences"
+              placeholder={t("mobile.wiki.placeholder")}
+              placeholderTextColor={c.faint}
+              accessibilityLabel={t("wiki.editorLabel", { title })}
+              style={[styles.source, { color: c.ink2 }]}
+            />
+          </Locked>
           {suggestions.length > 0 || token ? (
             // Rises in as the chat's pickers do, as `[[` starts a link.
             <Animated.View
@@ -358,39 +377,41 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
               ) : null}
             </Animated.View>
           ) : null}
-          <View style={[styles.bar, { borderTopColor: c.line2, paddingBottom: 6 }]}>
-            {tools.map((tool) => (
+          <Locked when={saving}>
+            <View style={[styles.bar, { borderTopColor: c.line2, paddingBottom: 6 }]}>
+              {tools.map((tool) => (
+                <Pressable
+                  key={tool.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={tool.label}
+                  onPress={tool.run}
+                  hitSlop={4}
+                  style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
+                >
+                  {tool.icon ? (
+                    <Icon name={tool.icon} size={20} color={c.ink2} />
+                  ) : (
+                    <Text
+                      variant="callout"
+                      style={[styles.toolText, { color: c.ink2 }, tool.key === "italic" && styles.italic]}
+                    >
+                      {tool.text}
+                    </Text>
+                  )}
+                </Pressable>
+              ))}
+              <View style={styles.grow} />
               <Pressable
-                key={tool.key}
                 accessibilityRole="button"
-                accessibilityLabel={tool.label}
-                onPress={tool.run}
+                accessibilityLabel={t("mobile.wiki.hideKeyboard")}
+                onPress={() => Keyboard.dismiss()}
                 hitSlop={4}
                 style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
               >
-                {tool.icon ? (
-                  <Icon name={tool.icon} size={20} color={c.ink2} />
-                ) : (
-                  <Text
-                    variant="callout"
-                    style={[styles.toolText, { color: c.ink2 }, tool.key === "italic" && styles.italic]}
-                  >
-                    {tool.text}
-                  </Text>
-                )}
+                <Icon name="keyboard" size={20} color={c.ink2} />
               </Pressable>
-            ))}
-            <View style={styles.grow} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.wiki.hideKeyboard")}
-              onPress={() => Keyboard.dismiss()}
-              hitSlop={4}
-              style={({ pressed }) => [styles.tool, pressed && { backgroundColor: c.sunken }]}
-            >
-              <Icon name="keyboard" size={20} color={c.ink2} />
-            </Pressable>
-          </View>
+            </View>
+          </Locked>
           <View style={{ height: insets.bottom }} />
         </KeyboardAvoidingView>
       )}
@@ -416,6 +437,9 @@ export function WikiNewSheet({
   const tree = useWikiTree(orgId);
   const [title, setTitle] = useState(initialTitle);
   const [folder, setFolder] = useState(initialFolder);
+  const sees = useWhoSeesDraft(EVERYONE);
+  const seesLabel = useWhoSeesLabel();
+  const [choosing, setChoosing] = useState(false);
   const folders = foldersIn(tree.data ?? []);
   const existing = (tree.data ?? []).find((p) => p.title.toLowerCase() === title.trim().toLowerCase());
   const go = () => {
@@ -426,7 +450,10 @@ export function WikiNewSheet({
     }
     goBack();
     if (existing) openWikiPage(existing.slug);
-    else router.push({ pathname: "/wiki-write", params: { title: name, folder: cleanFolder(folder) } });
+    else {
+      const who = sees.choice.mode === "people" ? { who: sees.choice.userIds.join(",") } : {};
+      router.push({ pathname: "/wiki-write", params: { title: name, folder: cleanFolder(folder), ...who } });
+    }
   };
   const field = [styles.field, fieldText("body"), { backgroundColor: c.sunken, color: c.ink }];
   return (
@@ -460,10 +487,27 @@ export function WikiNewSheet({
         <Text variant="footnote" tone="faint">
           {t("mobile.wiki.exists")}
         </Text>
+      ) : (
+        <GroupedList>
+          <GroupedRow
+            icon={sees.choice.mode === "everyone" ? "globe" : "lock"}
+            label={t("whoSees.label")}
+            value={seesLabel(sees.choice)}
+            chevron
+            onPress={() => setChoosing((v) => !v)}
+          />
+        </GroupedList>
+      )}
+      {choosing && !existing ? (
+        <>
+          <WhoSeesRows draft={sees} />
+          <GroupedFooter>{t("whoSees.admins")}</GroupedFooter>
+        </>
       ) : null}
       <Button
         variant="primary"
         wide
+        disabled={!sees.ready}
         label={existing ? t("mobile.wiki.openExisting") : t("mobile.wiki.createAndWrite")}
         onPress={go}
       />

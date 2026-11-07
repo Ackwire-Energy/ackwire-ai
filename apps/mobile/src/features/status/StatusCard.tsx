@@ -1,4 +1,4 @@
-import { clearsText, type LIMIT_ICON } from "@agenteschat/client/lib/presence";
+import { type LIMIT_ICON, statusEndNote } from "@agenteschat/client/lib/presence";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Icon, Text, useTheme } from "@/ui";
@@ -48,7 +48,7 @@ export function StatusCard({
   );
 }
 
-/** A person's status as a card (the ⋯ of a DM with them): the line, and when it clears; nothing without one. */
+/** Another person's status as a card (the ⋯ of a DM with them): the line, and when it clears; nothing without one. */
 export function PersonStatusCard({ userId }: { userId: string }) {
   const { t, i18n } = useTranslation();
   const status = usePresenceOf().person(userId)?.status;
@@ -57,7 +57,7 @@ export function PersonStatusCard({ userId }: { userId: string }) {
     <StatusCard
       emoji={status.emoji}
       text={status.text}
-      note={status.until ? clearsText(t, i18n.language || "en", status.until) : t("presence.untilChanged")}
+      note={statusEndNote(t, i18n.language || "en", status.until, false) ?? undefined}
     />
   );
 }

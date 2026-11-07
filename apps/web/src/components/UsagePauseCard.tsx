@@ -12,12 +12,13 @@ import {
   usagePauseText,
   usageWaitFix,
 } from "@agenteschat/client/lib/usage-pause";
-import { Button, Icon } from "@agenteschat/ui";
+import { EventPillAction, Locked } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ButtonHTMLAttributes, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
 import { SeeUsageQueue } from "@/components/UsageQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -70,9 +71,21 @@ export function useDontRun(runId: string | null) {
   return { run, pending };
 }
 
-export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
+export function DontRunButton({
+  runId,
+  may,
+  count = 1,
+  state,
+}: {
+  runId: string | null;
+  may: boolean;
+  count?: number;
+  /** A card that locks its other buttons on it keeps the state itself. */
+  state?: ReturnType<typeof useDontRun>;
+}) {
   const { t } = useTranslation();
-  const dontRun = useDontRun(runId);
+  const own = useDontRun(runId);
+  const dontRun = state ?? own;
   if (!runId) return null;
   return (
     <TextAction
@@ -174,9 +187,10 @@ export function UsageWaitClosed({ message, wait }: { message: Message; wait: Usa
 }
 
 /**
- * Long work paused near its plan's or budget's limit (ADR 0118), in place of its text: when it picks up by itself,
- * and Continuar agora or "Don't run it" for the person behind the work, the agent's owner and admins. Anyone else
- * sees the buttons greyed with who may press them.
+ * Long work paused near its plan's or budget's limit (ADR 0118), in place of its text, as a waiting pill: when it
+ * picks up by itself under it, and "Continue now" (primary) or "Don't run it" for the person behind the work, the
+ * agent's owner and admins. Anyone else sees them greyed, with who may press them. Continued, resumed, ended or
+ * canceled, it turns into a decided pill saying so.
  */
 export function UsagePauseCardView({ message, card }: { message: Message; card: UsagePauseCard }) {
   const { t, i18n } = useTranslation();
@@ -185,6 +199,7 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
   const api = useApi();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const dontRun = useDontRun(card.runId);
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const { title, line } = usagePauseText(t, i18n.language, card, name);
@@ -201,42 +216,56 @@ export function UsagePauseCardView({ message, card }: { message: Message; card: 
       setPending(false);
     }
   };
-  const done = card.state !== "paused";
+  if (card.state === "continued" && by)
+    return (
+      <RequestDone done label={title}>
+        {by === me.user.id
+          ? t("stretchCard.continuedByYou", { time })
+          : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
+      </RequestDone>
+    );
+  if (card.state === "resumed" || card.state === "ended" || card.state === "canceled")
+    return (
+      <RequestDone done={card.state === "resumed"} label={title}>
+        {t(`usageCard.${card.state}`, { agent: name })}
+      </RequestDone>
+    );
   return (
-    <div className="waitcard" data-done={done || undefined}>
-      <span className="waitcard__top ac-iconline">
-        <Icon name={done ? "check" : "pause"} size={16} />
-        <span>{title}</span>
-      </span>
-      {card.state === "continued" && by ? (
-        <span className="small muted">
-          {by === me.user.id
-            ? t("stretchCard.continuedByYou", { time })
-            : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
-        </span>
-      ) : card.state === "resumed" || card.state === "ended" || card.state === "canceled" ? (
-        <span className="small muted">{t(`usageCard.${card.state}`, { agent: name })}</span>
-      ) : (
-        <>
-          <span className="small muted">{line}</span>
-          <span className="waitcard__acts">
-            <Button
-              size="sm"
-              variant="primary"
-              loading={pending}
+    <RequestOpen
+      mine={may}
+      icon="pause"
+      label={title}
+      action={
+        <Locked when={pending || dontRun.pending}>
+          <EventPillAction
+            primary={may}
+            disabled={!may}
+            title={
+              may ? t(card.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint") : t("usageCard.forbidden")
+            }
+            onClick={go}
+          >
+            {t("usageCard.continue")}
+          </EventPillAction>
+          {card.runId && (
+            <EventPillAction
               disabled={!may}
-              title={
-                may ? t(card.source === "budget" ? "usageCard.hintBudget" : "usageCard.hint") : t("usageCard.forbidden")
-              }
-              onClick={go}
+              title={t(may ? "usageCard.dontRunHint" : "usageCard.dontRunForbidden")}
+              onClick={dontRun.run}
             >
-              {t("usageCard.continue")}
-            </Button>
-            <DontRunButton runId={card.runId} may={may} />
-            {!may && <span className="small muted">{t("usageCard.forbidden")}</span>}
-          </span>
+              {t("usageCard.dontRun")}
+            </EventPillAction>
+          )}
+        </Locked>
+      }
+      below={
+        <>
+          <span>{line}</span>
+          {!may && <span>{t("usageCard.forbidden")}</span>}
         </>
-      )}
-    </div>
+      }
+    >
+      {title}
+    </RequestOpen>
   );
 }

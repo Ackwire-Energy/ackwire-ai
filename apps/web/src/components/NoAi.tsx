@@ -1,13 +1,15 @@
 import type { Message } from "@agenteschat/client";
-import { useAiStatus, useAuthConfig } from "@agenteschat/client";
+import { useAiStatus, useAuthConfig, useMessages, useThreadMessages } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
-import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import type { BillingHold } from "@agenteschat/client/lib/billing";
 import { failedRunFix } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   aiStateOf,
+  keptCardState,
   mayConnectAi,
   NO_AI,
+  type NoAiCard as NoAiCardMeta,
   noAiCardOf,
   noAiLineKey,
   noAiStatusKey,
@@ -19,14 +21,20 @@ import {
   signInAgainPlan,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { Button, Chip, Dialog, DialogFooter, EventPillAction, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BillingLinkButton } from "@/components/BillingLinkButton";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { useOpenBilling } from "@/components/BillingLinkButton";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
+import { TeamTemplatesDialog } from "@/components/TeamPlan";
 import { useDirectory } from "@/hooks/useDirectory";
+import { usePaidReturn } from "@/lib/paid-return";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useChannelEvents } from "@/realtime/context";
 import "./no-ai.css";
@@ -46,7 +54,9 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
-  if (!status.data || !connect) return null;
+  const held = usePlanHold() !== null;
+  // On a billing hold an AI comes after the plan: the agent's card and the hold's banner say so.
+  if (!status.data || !connect || held) return null;
   if (dmAgentId) {
     if (aiStateOf(status.data, dmAgentId) !== "no_ai") return null;
     const agent = dir.agentById.get(dmAgentId);
@@ -90,8 +100,9 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
 }
 
 /**
- * The agent's card in the conversation (`meta.noAi`): it won't answer, with Connect at the step the message
- * asked for. Once its agent has an AI: "Responder agora" (it answers by itself when connected from here).
+ * The agent's pill in the conversation (`meta.noAi`): it won't answer, waiting for the viewer with "Connect" at the
+ * step the message asked for, or for whoever may connect (a quiet mark and who that is, under it). Once its agent has
+ * an AI, a decided request's pill with "Answer now" (it answers by itself when connected from here).
  */
 export function NoAiCard({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -99,8 +110,11 @@ export function NoAiCard({ message }: { message: Message }) {
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
+  const hold = usePlanHold();
   const card = noAiCardOf(message.meta);
   if (!card) return null;
+  // Any card on a billing hold is the wall: a Connect or a key from before it leads nowhere until the plan.
+  if (card.held || hold) return <KeptCard message={message} card={card} hold={hold} />;
   if (card.planLine)
     return <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} model={card.model} />;
   const agent = dir.agentById.get(card.agentId);
@@ -122,45 +136,174 @@ export function NoAiCard({ message }: { message: Message }) {
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
         : t(noAiLineKey(card), agentGrammar(name));
-  const action =
-    !connect || answering ? null : ready || answer === "pending" ? (
-      mayAnswer && (
-        <Button size="sm" variant="primary" loading={answer === "pending"} onClick={() => connect.answer(message.id)}>
-          {t("noAi.card.answerNow")}
-        </Button>
-      )
-    ) : !mayConnectAi(agent, me.user.id, org) ? (
-      <span className="small muted">{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span>
-    ) : (
-      <Button
-        size="sm"
-        onClick={() =>
-          connect.open({
-            intent: card.intent,
-            provider: card.provider,
-            agentId: card.agentId,
-            from: message.id,
-            ...(plan ? { plan } : {}),
-          })
+  // Its agent has an AI now (or is answering): a decided request, one pill with "Answer now" in it.
+  if (ready || answering || answer === "pending")
+    return (
+      <RequestDone
+        done
+        label={title}
+        action={
+          connect && !answering && mayAnswer ? (
+            <EventPillAction disabled={answer === "pending"} onClick={() => connect.answer(message.id)}>
+              {t("noAi.card.answerNow")}
+            </EventPillAction>
+          ) : undefined
         }
       >
-        {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
-      </Button>
+        {title}
+      </RequestDone>
     );
+  const mine = connect !== null && mayConnectAi(agent, me.user.id, org);
   return (
-    <div className="waitcard" data-done={ready || answering || undefined}>
-      <span className="waitcard__top ac-iconline">
-        <Icon name={ready || answering ? "check" : "plug"} size={16} />
-        <span>{title}</span>
-      </span>
-      {action && <span className="waitcard__acts">{action}</span>}
-    </div>
+    <RequestOpen
+      mine={mine}
+      icon="plug"
+      label={title}
+      action={
+        connect && mine ? (
+          <EventPillAction
+            primary
+            onClick={() =>
+              connect.open({
+                intent: card.intent,
+                provider: card.provider,
+                agentId: card.agentId,
+                from: message.id,
+                ...(plan ? { plan } : {}),
+              })
+            }
+          >
+            {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
+          </EventPillAction>
+        ) : undefined
+      }
+      below={
+        connect && !mine ? <span>{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span> : undefined
+      }
+    >
+      {title}
+    </RequestOpen>
   );
 }
 
 /**
- * The team's right hand on a plan that can't think now (ADR 0137 §7): one plain line saying why, with the way to an API
- * key, and before the workspace's plan is paid, the way to pay. Once it can think again: "Responder agora".
+ * The wall (ADR 0079 §6): an agent kept the person's message for after the plan. It follows the message from there
+ * (`keptCardState`): the way to the plans, then Connect for the whole team, and once an AI is there, from wherever it
+ * was connected, opening the conversation starts the answer with no click.
+ */
+function KeptCard({ message, card, hold }: { message: Message; card: NoAiCardMeta; hold: BillingHold | null }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const status = useAiStatus(org.id);
+  const connect = useConnectAi();
+  // A card in a thread is answered there.
+  const channel = useMessages(org.id, message.channelId, !message.threadId).data;
+  const thread = useThreadMessages(org.id, message.threadId ? message.channelId : undefined, message.threadId ?? "");
+  const messages = message.threadId ? thread.data : channel;
+  const billingUrl = useAuthConfig().data?.billingUrl;
+  const paid = usePaidReturn(org.id, hold !== null);
+  const billing = useOpenBilling(org.id, "hold");
+  const [templates, setTemplates] = useState(false);
+  const agent = dir.agentById.get(card.agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const ai = aiStateOf(status.data, card.agentId);
+  const state = keptCardState({ hold, paid, ready: ai !== undefined && ai !== "no_ai" });
+  const answer = connect?.answered[message.id];
+  const mayAnswer = card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org, "manage_agents");
+  const replied = messages?.some(
+    (m) => m.author.id === card.agentId && m.createdAt > message.createdAt && !noAiCardOf(m.meta),
+  );
+  const asked = `${STORAGE_KEYS.noAiOpened}.answer.${message.id}`;
+  const starts =
+    state === "answer" && mayAnswer && replied === false && !answer && connect !== null && !sessionStore.get(asked);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `connect` changes with each answer; once per card here
+  useEffect(() => {
+    if (!starts) return;
+    sessionStore.set(asked, "1");
+    void connect?.answer(message.id);
+  }, [starts, message.id]);
+  // Not known yet: no moment of "Plano ativo" on a card an AI has long answered.
+  if (state === "connect" && !status.data) return null;
+  if (state === "answer") {
+    const answering = !replied && (starts || answer === "answering" || answer === "pending");
+    const title = t(answering ? "noAi.card.answering" : "noAi.card.connected", { name });
+    return (
+      <RequestDone
+        done
+        label={title}
+        action={
+          // The start refused, or it isn't this person's to start: never a promise with nothing behind it.
+          !answering && !replied && mayAnswer && connect ? (
+            <EventPillAction onClick={() => connect.answer(message.id)}>{t("noAi.card.answerNow")}</EventPillAction>
+          ) : undefined
+        }
+      >
+        {title}
+      </RequestDone>
+    );
+  }
+  if (state === "connect") {
+    const mine = connect !== null && mayConnectAi(agent, me.user.id, org);
+    return (
+      <RequestOpen
+        mine={mine}
+        icon="plug"
+        action={
+          connect && mine ? (
+            <EventPillAction primary onClick={() => connect.open({ from: message.id })}>
+              {t("noAi.action")}
+            </EventPillAction>
+          ) : undefined
+        }
+        below={connect && !mine ? <span>{t("noAi.lockedAdmins")}</span> : undefined}
+      >
+        {t("noAi.kept.active", { name })}
+      </RequestOpen>
+    );
+  }
+  const code = hold ?? "payment";
+  const canPay = can(org, "manage_billing") && Boolean(billingUrl);
+  // With no team yet, the way to one needs no model.
+  const noTeam = state === "held" && isRightHand(agent) && can(org, "create_agents") && dir.agents.every(isRightHand);
+  return (
+    <>
+      <RequestOpen
+        mine={state === "held" && canPay}
+        icon="waiting"
+        action={
+          state === "held" && (canPay || noTeam) ? (
+            <>
+              {canPay && (
+                <EventPillAction primary disabled={billing.isPending} onClick={() => billing.mutate()}>
+                  {t(`standing.billing.cta.${code}`)}
+                </EventPillAction>
+              )}
+              {noTeam && (
+                <EventPillAction onClick={() => setTemplates(true)}>{t("teamPlan.start.templates")}</EventPillAction>
+              )}
+            </>
+          ) : undefined
+        }
+        below={
+          <>
+            <p>{code === "payment" ? t("noAi.kept.line") : t(`standing.billing.${code}`)}</p>
+            {code === "payment" && <p>{t("noAi.kept.plan")}</p>}
+            {state === "held" && !canPay && <p>{t("standing.billing.askAdmin")}</p>}
+          </>
+        }
+      >
+        {t("noAi.kept.title")}
+      </RequestOpen>
+      {noTeam && <TeamTemplatesDialog open={templates} onClose={() => setTemplates(false)} />}
+    </>
+  );
+}
+
+/**
+ * The team's right hand on a plan that can't think now (ADR 0137 §7): one waiting pill saying why, with the way to an
+ * API key (on a billing hold the wall stands in its place, `KeptCard`). Once it can think again, a decided pill with
+ * "Answer now".
  */
 function PlanLineCard({
   message,
@@ -181,46 +324,45 @@ function PlanLineCard({
   const agent = dir.agentById.get(agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const ready = aiStateOf(status.data, agentId) === "ready" && planLinePasses(line);
-  // Before the workspace's plan is paid it has no computer: whoever pays sees the way to.
-  const billingUrl = useAuthConfig().data?.billingUrl;
-  const hold = can(org, "manage_billing") && billingUrl ? billingHoldOf(org.standing) : null;
   const fix = planLineFix(line, agent, me.user.id, org);
+  // It can think again: a decided request, one pill with "Answer now" in it.
+  if (ready)
+    return (
+      <RequestDone
+        done
+        label={t("noAi.card.connected", { name })}
+        action={
+          connect ? (
+            <EventPillAction onClick={() => connect.answer(message.id)}>{t("noAi.card.answerNow")}</EventPillAction>
+          ) : undefined
+        }
+      >
+        {t("noAi.card.connected", { name })}
+      </RequestDone>
+    );
+  const sentence = t(`noAi.rightHand.${line}`, { name, model });
+  const mine = connect !== null && (fix === "connectMine" || fix === "useKey");
   return (
-    <div className="waitcard" data-done={ready || undefined}>
-      <span className="waitcard__top ac-iconline">
-        <Icon name={ready ? "check" : "plug"} size={16} />
-        <span>{ready ? t("noAi.card.connected", { name }) : t(`noAi.rightHand.${line}`, { name, model })}</span>
-      </span>
-      {connect && (
-        <span className="waitcard__acts">
-          {ready ? (
-            <Button size="sm" variant="primary" onClick={() => connect.answer(message.id)}>
-              {t("noAi.card.answerNow")}
-            </Button>
-          ) : (
-            <>
-              {hold && (
-                <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-                  {t(`standing.billing.cta.${hold}`)}
-                </BillingLinkButton>
-              )}
-              {/* The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11). */}
-              {fix === "connectMine" ? (
-                <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
-                  {t("rightHand.settings.connectMine")}
-                </Button>
-              ) : fix === "useKey" ? (
-                <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
-                  {t("noAi.rightHand.useKey")}
-                </Button>
-              ) : (
-                <span className="small muted">{t("noAi.lockedAdmins")}</span>
-              )}
-            </>
-          )}
-        </span>
-      )}
-    </div>
+    <RequestOpen
+      mine={mine}
+      icon="plug"
+      label={sentence}
+      action={
+        // The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11).
+        connect && fix === "connectMine" ? (
+          <EventPillAction primary onClick={() => connect.open({ agentId, from: message.id })}>
+            {t("rightHand.settings.connectMine")}
+          </EventPillAction>
+        ) : connect && fix === "useKey" ? (
+          <EventPillAction primary onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
+            {t("noAi.rightHand.useKey")}
+          </EventPillAction>
+        ) : undefined
+      }
+      below={connect && fix !== "connectMine" && fix !== "useKey" ? <span>{t("noAi.lockedAdmins")}</span> : undefined}
+    >
+      {sentence}
+    </RequestOpen>
   );
 }
 
@@ -233,8 +375,9 @@ export function FailedRunFix({ code, agentId }: { code: string | undefined; agen
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const connect = useConnectAi();
+  const held = usePlanHold() !== null;
   const fix = failedRunFix(code, {
-    keys: can(org, "manage_credentials"),
+    keys: can(org, "manage_credentials") && !held,
     admin: can(org, "manage_agents"),
     owner: dir.agentById.get(agentId)?.ownerUserId === me.user.id,
   });
@@ -263,7 +406,8 @@ export function NoAiChip({ agentId }: { agentId: string }) {
   const { org } = useOrg();
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
-  if (aiStateOf(status.data, agentId) !== "no_ai") return null;
+  const held = usePlanHold() !== null;
+  if (held || aiStateOf(status.data, agentId) !== "no_ai") return null;
   const chip = (
     <Chip icon="plug" tone="waiting">
       {t("noAi.chip")}
@@ -296,7 +440,8 @@ export function KeyGuardDialog({
   const { t } = useTranslation();
   const { org } = useOrg();
   const connect = useConnectAi();
-  const admin = connect !== null && can(org, "manage_credentials");
+  const held = usePlanHold() !== null;
+  const admin = connect !== null && can(org, "manage_credentials") && !held;
   return (
     <Dialog
       open={ask !== null}

@@ -132,7 +132,6 @@
     "refuse": "Odrzuć",
     "approve": "Zatwierdź",
     "hold": "Przytrzymaj, aby zatwierdzić",
-    "holding": "Trzymaj dalej…",
     "holdNote": "Wysokie ryzyko: przytrzymaj przycisk przez sekundę.",
     "tapNote": "Zatwierdzenie wykona to od razu.",
     "tapNoteAhead": "Zatwierdzenie teraz obejmie {{when}}.",
@@ -220,7 +219,6 @@
       "active": "W toku",
       "proposed": "Zaproponowana"
     },
-    "empty": "Nie ma jeszcze czatów.",
     "sayHi": "Przywitaj się: {{name}}.",
     "channelEmpty": "Nie ma jeszcze wiadomości. Rozpocznij rozmowę.",
     "closed": "Zamknięty",
@@ -273,7 +271,6 @@
     "channelFine": "Dla zespołu albo tematu.",
     "chatSearch": "Szukaj osoby albo agenta",
     "people": "Osoby",
-    "nobody": "Nikogo tu jeszcze nie ma.",
     "search": "Osoba lub agent",
     "create": "Utwórz",
     "agentHint": "Nazwa i czym się zajmuje",
@@ -336,7 +333,6 @@
     "switchNone": "Brak rozmowy o tej nazwie.",
     "switchWorking": "pracuje",
     "join": "Dołącz do kanału",
-    "empty": "Nikt jeszcze tu nie pisał.",
     "sending": "Wysyłanie…",
     "failed": "Nie wysłano · Spróbuj ponownie",
     "notSent": "Wiadomość nie została wysłana.",
@@ -362,9 +358,9 @@
       "wellNow": "Przerwa na przeczytanie twojej uwagi"
     },
     "stopped": {
-      "byYou": "Zatrzymane przez ciebie",
-      "by": "Zatrzymane przez: {{name}}",
-      "plain": "Zatrzymano",
+      "byYou": "Zatrzymano tutaj",
+      "by": "{{name}} zatrzymał(a) tutaj",
+      "plain": "Zatrzymano tutaj",
       "limit": "Osiągnięto limit kroków",
       "stuck": "Zatrzymano, bo praca utknęła",
       "continue": "Kontynuuj",
@@ -698,9 +694,7 @@
     "section": {
       "missions": "Misje",
       "threads": "Wątki"
-    },
-    "empty": "Nie ma jeszcze wątków ani misji",
-    "emptyHint": "Przytrzymaj wiadomość, aby odpowiedzieć w wątku albo zamienić ją w misję."
+    }
   },
   "agents": {
     "title": "Agenci",
@@ -716,11 +710,12 @@
     "create": "Utwórz agenta",
     "created": "{{name}} dołącza do zespołu",
     "createFailed": "Nie udało się utworzyć agenta. Może ta nazwa jest już zajęta.",
-    "empty": "Nie ma jeszcze agentów.",
-    "noneForYou": "Żaden agent jeszcze z tobą nie pracuje.",
-    "noneForYouHint": "Poproś administratora o dostęp.",
     "freeSection": "Wolni",
     "noGroupSection": "Bez działu"
+  },
+  "team": {
+    "entry": "Lista, schemat organizacyjny i mapa",
+    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
   },
   "agentEdit": {
     "missing": "Ten agent już nie istnieje.",
@@ -795,6 +790,10 @@
       "older": "Starsze"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} proponuje ulepszenie",
+      "proposal_waiting_few": "{{names}} proponują ulepszenia",
+      "proposal_waiting_many": "{{names}} proponują ulepszenia",
+      "proposal_waiting_other": "{{names}} proponują ulepszenia",
       "mention_one": "{{names}} wspomina o tobie",
       "mention_few": "{{names}} wspominają o tobie",
       "mention_many": "{{names}} wspominają o tobie",
@@ -957,6 +956,14 @@
       "desktop_taken_female_few": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_many": "Ekran komputera {{agent}} przejęty przez {{names}}",
       "desktop_taken_female_other": "Ekran komputera {{agent}} przejęty przez {{names}}",
+      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
       "connector_tool_changed_one": "Podłączony serwer zmienił zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_few": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
       "connector_tool_changed_many": "Podłączone serwery zmieniły zatwierdzone przez ciebie narzędzia",
@@ -972,15 +979,7 @@
       "app_created_one": "Aplikacja AI coś dla ciebie utworzyła",
       "app_created_few": "Aplikacje AI coś dla ciebie utworzyły",
       "app_created_many": "Aplikacje AI coś dla ciebie utworzyły",
-      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły",
-      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
-      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}"
+      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły"
     },
     "markRead": "Oznacz jako przeczytane",
     "markUnread": "Oznacz jako nieprzeczytane",
@@ -1074,6 +1073,10 @@
     "issuesWithMe_few": "{{count}} z tobą",
     "issuesWithMe_many": "{{count}} z tobą",
     "issuesWithMe_other": "{{count}} z tobą",
+    "proposalsWaiting_one": "{{count}} czeka",
+    "proposalsWaiting_few": "{{count}} czekają",
+    "proposalsWaiting_many": "{{count}} czeka",
+    "proposalsWaiting_other": "{{count}} czeka",
     "drive": "Drive",
     "connectors": "Konektory i MCP",
     "usage": "Użycie",
@@ -1129,6 +1132,8 @@
     }
   },
   "delete": {
+    "intro": "Tego nie da się cofnąć.",
+    "introGrace": "Masz 7 dni, żeby zmienić zdanie.",
     "goes": {
       "account": "Twoje konto, dostęp i sesje znikną.",
       "orgs": "Przestrzenie robocze, w których jesteś jedynym członkiem, zostaną usunięte.",
@@ -1139,8 +1144,7 @@
     "addPasswordFirst": "Najpierw dodaj hasło do konta na stronie, a potem wpisz je tutaj.",
     "addPasswordWeb": "Dodaj hasło na stronie",
     "otherAccount": "Zalogowano się na inne konto. Nic nie zostało usunięte.",
-    "hold": "Przytrzymaj, aby usunąć",
-    "holding": "Trzymaj dalej…"
+    "hold": "Przytrzymaj, aby usunąć"
   },
   "files": {
     "type": {
@@ -1207,8 +1211,6 @@
       "canceled": "Anulowane"
     },
     "until": "termin {{date}}",
-    "empty": "Brak zadań",
-    "emptyOpen": "Możesz też poprosić o nie na czacie.",
     "loadFailed": "Nie udało się wczytać zadań.",
     "createdBy": "utworzone przez: {{name}}",
     "fromMessage": "z wiadomości",
@@ -1285,8 +1287,6 @@
       "file": "Plik"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "W Drive nic jeszcze nie ma",
-    "emptySub": "Tutaj pojawi się to, co agenci i osoby tworzą albo wysyłają na czatach.",
     "noResults": "Nic z tymi filtrami.",
     "loadFailed": "Nie udało się wczytać Drive.",
     "more": "Pokaż więcej"
@@ -1303,8 +1303,6 @@
     "recent": "Świeżo nauczone",
     "mostUsed": "Najczęściej używane",
     "noMatch": "Brak wspomnień z tą frazą.",
-    "emptyTitle": "Nic jeszcze się nie nauczyli",
-    "empty": "Pracując z tobą, agenci zachowują tutaj to, czego się nauczą.",
     "gone": "To wspomnienie już nie istnieje.",
     "of": "Pamięć: {{name}}",
     "line_one": "{{name}} · użyte {{count}} raz",
@@ -1335,8 +1333,6 @@
     "readsWeek_few": "{{count}} odczyty w tym tygodniu",
     "readsWeek_many": "{{count}} odczytów w tym tygodniu",
     "readsWeek_other": "{{count}} odczytu w tym tygodniu",
-    "empty": "Stuknij Nowa strona, żeby napisać pierwszą.",
-    "missing": "Ta strona już nie istnieje albo zmieniła nazwę.",
     "blank": "Pusta strona.",
     "folderGone": "W tym folderze nie ma już stron.",
     "reads_one": "{{count}} raz",
@@ -1677,7 +1673,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Usuń",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Strzałka w lewo",
+        "ArrowUp": "Strzałka w górę",
+        "ArrowDown": "Strzałka w dół",
+        "ArrowRight": "Strzałka w prawo"
       },
       "unavailable": {
         "reconnectingF": "Ponowne łączenie…",
@@ -1730,8 +1730,6 @@
     "connected": "Połączone",
     "suggested": "Sugerowane dla {{org}}",
     "all": "Wszystkie",
-    "empty": "Twoi agenci jeszcze z niczego nie korzystają",
-    "emptySub": "Połącz usługę, a zaczną w niej czytać i działać.",
     "noResults": "Brak usługi o tej nazwie. Spróbuj jej adresu.",
     "soon": "Wkrótce",
     "loadFailed": "Nie udało się wczytać konektorów.",
@@ -1865,11 +1863,8 @@
   },
   "ai": {
     "yourPlan": "Twój plan AI",
-    "coding": "Plan do programowania",
-    "codingSub": "GLM, Kimi, MiniMax albo OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM i inne",
     "plansFoot": "Agenci myślą za pomocą twojego planu, bez klucza API. Logowanie odbywa się na komputerze agenta.",
-    "whichPlan": "Który plan",
-    "codingFoot": "Plan do programowania loguje się własnym kluczem, na komputerze agenta.",
     "change": "Zmień",
     "how": "Jak połączyć",
     "whose": "Czyj klucz",
@@ -1959,13 +1954,6 @@
       "login": "Strona internetowa, nazwa użytkownika i hasło. Agenci logują się, nie widząc hasła.",
       "key": "Klucz API lub token. Agenci używają go w poleceniu, nie widząc go.",
       "contact": "Imię i nazwisko, firma, e-mail, telefon i adres, które agenci wpisują w formularzach."
-    },
-    "empty": {
-      "personalTitle": "Jeszcze nic twojego",
-      "personalText": "Zapisz tu login lub klucz, a twoi agenci użyją go, gdy o to poprosisz.",
-      "teamTitle": "Jeszcze nic nie udostępniono",
-      "teamText": "Zapisz loginy i klucze, których twoi agenci używają dla zespołu.",
-      "teamReadText": "Gdy ktoś udostępni ci login lub klucz, pojawi się tutaj."
     },
     "import": {
       "title": "Import z komputera",
@@ -2166,7 +2154,6 @@
       "as": "Loguje się jako {{username}}.",
       "saved": "Zapisano w Vault",
       "notSaved": "Wysłano, ale nie zapisano w Vault",
-      "codeLabel": "Kod dla {{name}}",
       "codeIncomplete": "Wpisz wszystkie cyfry kodu.",
       "codeNote": "Wysyłane w postaci zaszyfrowanej prosto na komputer. Kody nigdy nie są zapisywane."
     }
@@ -2254,8 +2241,126 @@
       }
     }
   },
-  "team": {
-    "entry": "Lista, schemat organizacyjny i mapa",
-    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
+  "empty": {
+    "agents": {
+      "title": "Zbuduj zespół agentów",
+      "text": "Każdy agent przyjmuje rolę i pracuje z tobą na czacie.",
+      "viewerTitle": "Tutaj jest twój zespół agentów",
+      "viewerText": "Osoba tworząca agentów w tym obszarze roboczym doda pierwszego, a on pojawi się tutaj."
+    },
+    "agentsForYou": {
+      "title": "Twoi agenci pojawiają się tutaj",
+      "text": "Osoba zarządzająca agentami wybiera, którzy pracują z tobą."
+    },
+    "drive": {
+      "title": "Wszystko, co tworzy zespół, w jednym miejscu",
+      "text": "Raporty, tabele i pliki agentów i osób zostają tutaj, łatwe do znalezienia.",
+      "viewerTitle": "Znajdź to, co tworzy zespół",
+      "viewerText": "Tutaj pojawia się to, co agenci i osoby tworzą na czatach."
+    },
+    "tasks": {
+      "title": "Przekaż pracę zespołowi",
+      "text": "Utwórz zadanie dla agenta lub osoby i śledź je do końca.",
+      "viewerTitle": "Śledź pracę zespołu",
+      "viewerText": "Zadania pojawią się tutaj, gdy ktoś utworzy pierwsze."
+    },
+    "routines": {
+      "title": "Zostaw powtarzalną pracę agentom",
+      "text": "Rutyna działa sama, o ustalonej porze albo gdy coś się wydarzy.",
+      "viewerTitle": "Zobacz, co działa samo",
+      "viewerText": "Tworzą je osoby zarządzające rutynami lub mające agenta, a wtedy pojawiają się tutaj."
+    },
+    "wiki": {
+      "title": "Zachowaj to, co zespół powinien wiedzieć",
+      "text": "Osoby i agenci czytają te strony, więc wszyscy pracują na tych samych informacjach.",
+      "viewerTitle": "Sprawdź, co wie zespół",
+      "viewerText": "Osoba edytująca wiki napisze pierwszą stronę, a ona pojawi się tutaj."
+    },
+    "memory": {
+      "title": "Twoi agenci uczą się podczas pracy",
+      "text": "To, co wynoszą z rozmów, zostaje tutaj, więc widzisz, co już wiedzą.",
+      "ask": "Opowiem ci, jak tu pracujemy.",
+      "noneForAgent": "Brak wspomnień tego agenta."
+    },
+    "threads": {
+      "title": "Każdy temat we własnej rozmowie",
+      "text": "Przytrzymaj wiadomość, aby odpowiedzieć w wątku albo zamienić ją w misję.",
+      "action": "Przejdź do czatów"
+    },
+    "chats": {
+      "title": "Porozmawiaj ze swoimi agentami",
+      "text": "Poproś o coś na czacie, a agent zabierze się do pracy.",
+      "action": "Nowy czat"
+    },
+    "channels": {
+      "title": "Zbierz osoby i agentów na kanale",
+      "text": "Każdy kanał łączy tych, którzy zajmują się jednym tematem.",
+      "viewerTitle": "Tutaj są kanały zespołu",
+      "viewerText": "Osoba tworząca kanały otworzy pierwszy, a on pojawi się tutaj.",
+      "action": "Utwórz kanał"
+    },
+    "people": {
+      "title": "Pracuj tutaj ze swoim zespołem",
+      "text": "Zaproś osoby, aby rozmawiać z nimi i z agentami w jednym miejscu.",
+      "viewerTitle": "Twój zespół pojawia się tutaj",
+      "viewerText": "Osoba zapraszająca ściągnie resztę zespołu, a oni pojawią się tutaj."
+    },
+    "chat": {
+      "title": "Wszystko zaczyna się od wiadomości",
+      "text": "Napisz poniżej, a wszyscy tutaj to zobaczą.",
+      "viewerTitle": "Tutaj pojawiają się wiadomości",
+      "viewerText": "Gdy ktoś napisze, przeczytasz to tutaj."
+    },
+    "ai": {
+      "title": "Daj agentom AI do myślenia",
+      "text": "Połącz plan, za który już płacisz, a zaczną z nim pracować."
+    },
+    "vaultPersonal": {
+      "title": "Trzymaj swoje loginy bezpiecznie",
+      "text": "Zapisz login lub klucz, a agenci użyją ich, gdy poprosisz."
+    },
+    "vaultTeam": {
+      "title": "Udostępniaj loginy bez przekazywania haseł",
+      "text": "Zapisz loginy i klucze, których twoi agenci używają dla zespołu.",
+      "viewerTitle": "Tutaj pojawiają się loginy zespołu",
+      "viewerText": "Gdy ktoś udostępni ci login lub klucz, pojawi się tutaj."
+    },
+    "skills": {
+      "title": "Naucz agentów, jak pracujecie",
+      "text": "Umiejętność zawiera kroki zadania, a agenci otwierają ją, gdy jest potrzebna."
+    },
+    "apps": {
+      "title": "Proś agentów z innych aplikacji",
+      "text": "Połącz Claude lub inną aplikację i zlecaj zadania bez jej opuszczania."
+    },
+    "access": {
+      "title": "Wybierz, czego może używać każdy agent",
+      "text": "Połącz usługę i ustaw tutaj dostęp każdego agenta.",
+      "viewerTitle": "Tutaj pojawia się dostęp każdego agenta",
+      "viewerText": "Osoba zarządzająca konektorami połączy pierwszą usługę.",
+      "action": "Połącz usługę"
+    },
+    "board": {
+      "title": "Zobacz to, co ważne, na jednym panelu",
+      "text": "Dodaj widżet, poproś o niego agenta albo przypnij blok z czatu.",
+      "viewerTitle": "Ten panel nabiera kształtu",
+      "viewerText": "Osoba edytująca ten panel doda widżety, a one pojawią się tutaj."
+    },
+    "computers": {
+      "title": "Daj agentom kolejny komputer",
+      "text": "Połącz kodem Maca mini w domu albo inny serwer.",
+      "viewerTitle": "Tutaj pojawiają się inne komputery",
+      "viewerText": "Osoba łącząca komputery doda je, a one pojawią się tutaj."
+    },
+    "connectors": {
+      "title": "Daj agentom prawdziwe narzędzia",
+      "text": "Połącz usługę, a zaczną w niej czytać i działać.",
+      "viewerTitle": "Tutaj pojawiają się narzędzia agentów",
+      "viewerText": "Osoba zarządzająca konektorami połączy usługi poniżej."
+    },
+    "audit": {
+      "title": "Nic do sprawdzenia",
+      "text": "Gdy agent zrobi coś poza rozmową, pojawi się to tutaj."
+    }
   }
 }

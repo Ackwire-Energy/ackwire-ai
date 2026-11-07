@@ -1,10 +1,15 @@
+import { ACCOUNT_KINDS, PROVIDER_FAILURE_CAUSES } from "@agenteschat/adapters";
 import {
+  AI_ACCOUNT_STATUSES,
+  AI_ACCOUNTS_RECENT_FAILURES,
   ANALYTICS_LIST_MAX,
   ANALYTICS_MAX_DAYS,
   ANALYTICS_ROWS_MAX,
   CONNECTOR_KEY,
+  operatorAiAccounts,
   operatorAnalytics,
   operatorConnectorAnalytics,
+  operatorListAiAccounts,
   operatorOrgWorkAnalytics,
   operatorWorkAnalytics,
   WORK_ANALYTICS_HOURLY_DAYS,
@@ -12,7 +17,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { errorResponse } from "../http/errors";
-import { json, OrgParams } from "../routes/app/context";
+import { iso, json, OrgParams } from "../routes/app/context";
 import type { OperatorDeps } from "./app";
 
 const tags = ["Operator"];
@@ -306,6 +311,168 @@ const OrgWorkAnalytics = z
   })
   .openapi("OperatorOrgWorkAnalytics");
 
+const AuthMethodOrUnknown = z.enum(["cli_login", "setup_token", "api_key", "unknown"]).openapi("OperatorAiAuthMethod", {
+  description:
+    "`cli_login`: the CLI's own sign-in, kept by the CLI. `setup_token`: `claude setup-token`'s token, kept by the runner. `api_key`: a pasted key. `unknown`: its computer never said.",
+});
+const Cause = z.string().openapi({
+  description: `What the provider or the runner reported: ${PROVIDER_FAILURE_CAUSES.map((c) => `\`${c}\``).join(", ")}. Ignore values you don't know.`,
+});
+const AccountCounts = {
+  connections: Count.openapi({ description: "Signed in or signed out (sign-ins in progress and removals left out)." }),
+  usable: Count.openapi({ description: "Signed in, and its runner's last look was conclusive." }),
+  signedOut: Count,
+  unknown: Count.openapi({ description: "Its runner's last look at its status was inconclusive." }),
+};
+const AiAccounts = z
+  .object({
+    generatedAt: z.string(),
+    from: Day,
+    to: Day,
+    totals: z.object({
+      ...AccountCounts,
+      inProgress: Count.openapi({ description: "Sign-ins started and not finished." }),
+      removing: Count.openapi({ description: "Removed, waiting for their computer to confirm." }),
+      workspaces: Count.openapi({ description: "Workspaces with at least one of `connections`." }),
+      usedLast24h: Count.openapi({ description: "Of `connections`, used by a turn in the last 24 hours." }),
+      usedLast7d: Count,
+      apiCredentials: Count.openapi({ description: "Workspaces' model API keys not revoked." }),
+      apiCredentialWorkspaces: Count,
+      inheritedMachineLogins: Count.openapi({
+        description:
+          "Computers whose own Claude sign-in (no connection of its own) reports signed in. Counted apart: never in `connections`.",
+      }),
+    }),
+    byDimension: z
+      .array(
+        z.object({
+          provider: z.string().openapi({
+            description:
+              "`anthropic`, `openai`, `xai`, `google`, `cursor`, `opencode`, a coding plan's id, or an API key's provider.",
+          }),
+          runtime: z.string().openapi({
+            description: "`claude_code`, `codex`, `grok`, `antigravity`, `cursor`, `opencode`, or `api` (an API key).",
+          }),
+          authMethod: AuthMethodOrUnknown,
+          billing: z.enum(["subscription", "coding_plan", "metered_api", "unknown"]).openapi({
+            description:
+              "`subscription`: a CLI's sign-in to a plan. `coding_plan`: a coding plan's key. `metered_api`: an API key, billed per token.",
+          }),
+          ...AccountCounts,
+          usedLast7d: Count,
+        }),
+      )
+      .openapi({
+        description: "Most connections first. An API key is usable while it isn't revoked; its use isn't counted here.",
+      }),
+    identity: z
+      .object({
+        withProviderIdentity: Count.openapi({
+          description: "Connections whose email and provider organization are known.",
+        }),
+        withoutIdentity: Count,
+        distinctProviderAccounts: Count.openapi({
+          description:
+            "Distinct (kind, email, provider organization) among those: one account signed in on several computers counts once.",
+        }),
+      })
+      .openapi({ description: "Never by a key, a token or a label." }),
+    failures: z.object({
+      from: Day,
+      to: Day,
+      byCause: z
+        .array(
+          z.object({
+            cause: Cause,
+            authMethod: z.string().openapi({ description: "As the failure's event said, `unknown` if it didn't." }),
+            attempts: Count.openapi({
+              description: "`account.failure` events: at most one per account and cause every 10 minutes.",
+            }),
+            accounts: Count,
+            workspaces: Count,
+          }),
+        )
+        .openapi({ description: `Most attempts first, at most ${ANALYTICS_ROWS_MAX}.` }),
+      recent: z
+        .array(
+          z.object({
+            at: z.string(),
+            orgId: z.uuid().nullable(),
+            machineId: z.string().nullable(),
+            accountId: z.string().nullable(),
+            kind: z.string().nullable(),
+            authMethod: z.string().nullable(),
+            cause: Cause.nullable(),
+            code: z.string().nullable().openapi({ description: "The runner's stable code, e.g. `not_logged_in`." }),
+            runnerVersion: z.string().nullable(),
+          }),
+        )
+        .openapi({ description: `Newest first, at most ${AI_ACCOUNTS_RECENT_FAILURES}.` }),
+    }),
+    added: z
+      .array(z.object({ day: Day, authMethod: AuthMethodOrUnknown, count: Count }))
+      .openapi({ description: "Oldest first. A day without any is left out." }),
+    addedSource: z.enum(["events", "retained_rows"]).openapi({
+      description:
+        "`retained_rows`: from the connections still kept, by the day each was made (removed ones are gone).",
+    }),
+    coverage: z.object({
+      eventsSince: z
+        .string()
+        .nullable()
+        .openapi({ description: "The oldest event the feed keeps; failures before it are gone." }),
+      notes: z.array(z.string()).openapi({
+        description:
+          "Fixed codes on what these numbers can't see: `inherited_logins_by_machine`, `api_credentials_no_usage_identity`, `added_from_retained_rows`.",
+      }),
+    }),
+  })
+  .openapi("OperatorAiAccounts");
+
+const AiAccountQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().max(200).optional(),
+  orgId: z.uuid().optional(),
+  kind: z.enum(ACCOUNT_KINDS).optional(),
+  authMethod: AuthMethodOrUnknown.optional(),
+  status: z.enum(AI_ACCOUNT_STATUSES).optional(),
+});
+const AiAccountPage = z
+  .object({
+    accounts: z.array(
+      z.object({
+        id: z.uuid(),
+        orgId: z.uuid(),
+        orgName: z.string().openapi({ description: "The workspace's name." }),
+        machineId: z.uuid(),
+        machineName: z.string(),
+        kind: z.string(),
+        provider: z.string().nullable().openapi({
+          description: "A coding plan's id, `cursor` or `zen` (keys), `enterprise`; null: the CLI's own sign-in.",
+        }),
+        authMethod: z.string().nullable(),
+        label: z.string(),
+        plan: z.string().nullable(),
+        status: z.string().openapi({ description: AI_ACCOUNT_STATUSES.map((v) => `\`${v}\``).join(", ") }),
+        statusUnknown: z.boolean(),
+        shared: z.boolean().openapi({ description: "One sign-in thinks for every agent its owner gives it." }),
+        ownerId: z.string().nullable(),
+        agents: Count.openapi({ description: "Agents set to think with it." }),
+        createdAt: z.string(),
+        lastUsedAt: z.string().nullable(),
+        lastSuccessAt: z.string().nullable(),
+        lastFailureCause: Cause.nullable(),
+        lastFailureAt: z.string().nullable(),
+        usageAt: z.string().nullable().openapi({ description: "When its plan's usage was last read." }),
+        usageSource: z.string().nullable().openapi({ description: "`turn` or `probe`." }),
+        runnerVersion: z.string().nullable(),
+        protocol: z.number().int(),
+      }),
+    ),
+    next: z.string().nullable(),
+  })
+  .openapi("OperatorAiAccountPage");
+
 export function registerOperatorAnalytics(api: OpenAPIHono, { db }: OperatorDeps) {
   api.openapi(
     createRoute({
@@ -361,5 +528,42 @@ export function registerOperatorAnalytics(api: OpenAPIHono, { db }: OperatorDeps
       responses: { 200: json(OrgWorkAnalytics), 400: errors[400], 401: errors[401] },
     }),
     async (c) => c.json(await operatorOrgWorkAnalytics(db, c.req.valid("param").orgId, c.req.valid("query")), 200),
+  );
+
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/analytics/ai-accounts",
+      tags,
+      summary: "The AI accounts people connected: how they sign in, who bills them, how they fail",
+      description:
+        "Connections now, whatever the dates; failures from the events feed in the dates. Counts, ids and codes only: no email, key hint, token or provider organization id.",
+      request: { query: Range },
+      responses: { 200: json(AiAccounts), 400: errors[400], 401: errors[401] },
+    }),
+    async (c) => c.json(await operatorAiAccounts(db, c.req.valid("query")), 200),
+  );
+
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/ai-accounts",
+      tags,
+      summary: "AI accounts on the workspaces' computers, newest first",
+      description: "Keyset pages: an account added while paging never shifts a page. No email, key hint or token.",
+      request: { query: AiAccountQuery },
+      responses: { 200: json(AiAccountPage), 400: errorResponse("Invalid request"), 401: errors[401] },
+    }),
+    async (c) => {
+      const page = await operatorListAiAccounts(db, c.req.valid("query"));
+      const accounts = page.accounts.map((a) => ({
+        ...a,
+        createdAt: a.createdAt.toISOString(),
+        lastUsedAt: iso(a.lastUsedAt),
+        lastSuccessAt: iso(a.lastSuccessAt),
+        lastFailureAt: iso(a.lastFailureAt),
+      }));
+      return c.json({ accounts, next: page.next }, 200);
+    },
   );
 }

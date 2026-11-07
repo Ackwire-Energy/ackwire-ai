@@ -49,3 +49,33 @@ the agent sent a message because of another (`send_dm`'s `meta.agentDm`, `post_m
 `fromMessageId`), that origin message alone may be read, quoted and linked when the person behind the run is in its
 conversation and, unless it is a public channel, so is every person in the conversation the agent speaks in; otherwise
 its later runs learn only who asked, and the channel only when it is public.
+
+## Addendum (2026-11-06): what a person says in a DM stays in that DM
+
+An agent's reply in a channel is read by everyone there, so a DM reaches a conversation only as far as code lets it:
+
+- "Your recent work with X in other conversations" lists a DM's or a private channel's work only when every person in
+  the conversation is in it too, the rule `originNotes` already followed. A public channel's work always shows. Files
+  still come when the person asks (`list_artifacts`, `share_artifact`).
+- The origin note of a message sent from a DM names nobody to someone outside that DM: "Someone asked…".
+- `remember` with `everywhere` in a DM saves a person-scoped item: it reaches that person's runs, in any conversation,
+  and no one else's. Elsewhere it stays agent-wide.
+- Memories from a DM are never proposed for an agent's instructions or the org context (`proposeFromItem`): the
+  proposal would show them to who decides, and once accepted every run reads them. Neither is a person's preference.
+- A person's preferences stay theirs: `consolidateItem` merges them only within one person, and a mission's
+  `get_context` passes `personMayRead`.
+- A consulted agent reads the person's DM with it only when everyone where they asked is in that DM: the asking agent
+  relays the answer there.
+- `meta.agentDm` and `meta.postedFrom` carry no requester: they reach every reader, and nothing read it.
+- `send_dm` no longer tells the agent to say who asked and why when the asking was in a DM, and one line in the prompt
+  states the rule.
+- Migration 0236 gives memories already saved "everywhere" from a DM back to the person who said them.
+- "Everyone" there is everyone who reads the conversation (`channelReaderSql`, the rule of `requireChannelAccess`):
+  its members, administrators in any channel they aren't in (ADR 0151), and a task's readers in its conversation.
+  The recent-work block and `peopleAllIn` (origin notes, `originReadable`, a consulted agent's DM) count them all.
+
+Not enforced by code: what the model itself writes in a `send_dm` or `post_message` from a DM, a person's `rule` (it
+holds for all the agent's work when its giver decides the agent's approvals, so its text reads in others' runs), and
+what a computer brain keeps in its own files. Those rest on the prompt line. A preference kept "everywhere" from a DM
+still reads in that person's own runs in a channel, where everyone reads the reply, and in the memory list of who holds
+`review_memory`.

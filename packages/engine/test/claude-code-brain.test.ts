@@ -517,6 +517,8 @@ test("end to end through the real hub: the runner's brain.event frames reach the
   });
 });
 
+const LONG_ANSWER = "Olá, ".repeat(70);
+
 test("live text end to end: the runner's partial deltas reach the channel as agent.delta while the run thinks", async () => {
   f = await setup({ machines: true });
   const fx = f;
@@ -545,15 +547,15 @@ test("live text end to end: the runner's partial deltas reach the channel as age
       const frame = JSON.parse(text) as ServerFrame;
       if (frame.type !== "request" || frame.op !== "brain.turn") return;
       setTimeout(async () => {
-        // Claude Code's `--include-partial-messages`, batched by the runner: three pieces.
-        for (const piece of ["Olá, ", "tudo ", "certo."]) {
+        // Claude Code's `--include-partial-messages`, batched by the runner: pieces of a long answer.
+        for (const piece of [LONG_ANSWER, "tudo ", "certo."]) {
           await reply({ type: "brain.event", runId: frame.runId, event: { type: "text_delta", text: piece } });
           await new Promise((r) => setTimeout(r, 30));
         }
         seenBeforeDone = events.flatMap((e) =>
           e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : [],
         );
-        const final = { type: "done", text: "Olá, tudo certo.", session: { id: frame.session.id } };
+        const final = { type: "done", text: `${LONG_ANSWER}tudo certo.`, session: { id: frame.session.id } };
         await reply({ type: "brain.event", runId: frame.runId, event: final });
         await reply({ type: "brain.done", runId: frame.runId });
         await reply({ type: "result", id: frame.id, ok: true, data: { runId: frame.runId, final } });
@@ -592,13 +594,13 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   await drainOutbox(fx.db, handlers);
 
   // Streamed live, piece by piece, before the turn ended.
-  expect(seenBeforeDone.join("")).toBe("Olá, tudo certo.");
+  expect(seenBeforeDone.join("")).toBe(`${LONG_ANSWER}tudo certo.`);
   expect(seenBeforeDone.length).toBeGreaterThanOrEqual(2);
   expect(events.findIndex((e) => e.type === "agent.typing")).toBeLessThan(
     events.findIndex((e) => e.type === "agent.delta"),
   );
   const timeline = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
-  expect(timeline.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
+  expect(timeline.map((m) => m.body)).toEqual(["@dev oi", `${LONG_ANSWER}tudo certo.`]);
 });
 
 // A pure check (no fixture): what counts as restating a reaction after `react`.

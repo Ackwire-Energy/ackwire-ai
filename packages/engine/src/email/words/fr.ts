@@ -254,7 +254,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Saisissez ce code pour supprimer tout le compte ",
       { b: email },
-      ", pas seulement un espace de travail. Il disparaît aussitôt, et les espaces de travail dont vous êtes le seul membre se ferment avec lui.",
+      ", pas seulement un espace de travail. Il est déconnecté partout aussitôt et sera supprimé définitivement 7 jours plus tard, et les espaces de travail dont vous êtes le seul membre se ferment avec lui.",
     ],
     support: (address) => [
       "Il est valable 10 minutes, et rien n’est supprimé sans lui. Si ce n’était pas vous, ne le partagez pas et écrivez à ",
@@ -298,6 +298,28 @@ export const words: EmailWords = {
     note: "Ce n’est pas vous ? Déconnectez-la maintenant et changez votre mot de passe.",
     button: "Voir les apps connectées",
     why: (org) => `Vous recevez cet e-mail car une app a été connectée à votre compte dans ${org} sur agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Votre compte agentes.chat sera supprimé le ${day}`,
+    preheader: "Vous avez 7 jours pour changer d’avis.",
+    headline: "Votre compte est en cours de suppression",
+    body: (email, day, time) => [
+      "Nous supprimerons le compte ",
+      { b: email },
+      ` le ${day} à ${time}. Il est déconnecté partout, et personne ne peut vous joindre ici jusqu’à votre retour.`,
+    ],
+    closes: (count, names) => [
+      plural("fr", count, {
+        one: "L’espace de travail dont vous étiez le seul membre vient de fermer et disparaît à la même date : ",
+        other:
+          "Les espaces de travail dont vous étiez le seul membre viennent de fermer et disparaissent à la même date : ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Vous avez changé d’avis ? Connectez-vous avant cette date et appuyez sur Restaurer.",
+    button: "Se connecter pour restaurer",
+    why: "Vous recevez cet e-mail parce que cette adresse a un compte sur agentes.chat.",
   },
   accountDeleted: {
     subject: "Votre compte agentes.chat a été supprimé",
@@ -384,5 +406,21 @@ export const words: EmailWords = {
     note: "Reprenez-le en un clic depuis vos notifications, et l’agent arrête de penser avec votre forfait.",
     button: "Ouvrir les notifications",
     why: (org) => `Vous recevez cet e-mail parce que quelqu’un dans ${org} a connecté votre forfait à un agent.`,
+  },
+  planWaiting: {
+    subject: "Votre équipe attend",
+    preheader: "Votre espace de travail est prêt. Il lui faut un abonnement agentes.chat pour démarrer.",
+    headline: "Votre équipe attend",
+    body: (agents, channels, routines) => {
+      const a = plural("fr", agents, { one: `1 agent`, other: `${agents} agents` });
+      const c = plural("fr", channels, { one: `1 canal`, other: `${channels} canaux` });
+      const r = plural("fr", routines, { one: `1 routine`, other: `${routines} routines` });
+      return routines > 0
+        ? `${a}, ${c} et ${r} sont prêts. Il leur faut un abonnement agentes.chat pour démarrer.`
+        : `${a} et ${c} sont prêts. Il leur faut un abonnement agentes.chat pour démarrer.`;
+    },
+    button: "Voir les abonnements agentes.chat",
+    why: (org) =>
+      `Vous recevez cet e-mail parce que vous gérez ${org} sur agentes.chat. Nous n'envoyons que deux rappels comme celui-ci.`,
   },
 };

@@ -434,7 +434,7 @@ describe("agent questions (ask_user)", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("o login está devolvendo 401")) as HTMLElement;
     expect(root.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
-      "Vista por Ada. Ada está esperando sua resposta",
+      "Vista por Ada. Ada está esperando uma resposta",
     );
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");
@@ -456,6 +456,53 @@ describe("agent questions (ask_user)", () => {
       ORG_ID,
       "q1",
       { choice: "Depois das 18h" },
+    ]);
+  });
+
+  test("the choices are a list, one a line with its number key; with the focus in it, a number answers", async () => {
+    const state = seedState();
+    const question = {
+      id: "q-keys",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-keys",
+      text: "Para qual faixa a versão 8 deve ir?",
+      choices: ["Teste fechado", "Teste aberto", "Produção"],
+      status: "open",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-keys",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-keys",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    await settle();
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    const list = card.querySelector(".rq__choices") as HTMLElement;
+    // Each choice its key and words; "Outra resposta" the list's last line; the footer says the keys.
+    expect([...list.querySelectorAll(".rq__choice")].map((b) => b.textContent)).toEqual([
+      "1Teste fechado",
+      "2Teste aberto",
+      "3Produção",
+      "Outra resposta",
+    ]);
+    expect(card.querySelector(".rq__foot .rq__keys")?.textContent).toBe("Tecle 1–3 para responder");
+    within(list).getByRole("button", { name: "Teste fechado" }).focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "2" });
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
+      ORG_ID,
+      "q-keys",
+      { choice: "Teste aberto" },
     ]);
   });
 
@@ -615,8 +662,10 @@ describe("agent questions (ask_user)", () => {
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);
+    // The card ends where it stands: no choice left to press.
     const after = screen().getByRole("group", { name: "Pergunta de Ada" });
-    expect(within(after).getByRole("alert").textContent).toBe("Esta pergunta já foi respondida ou encerrada.");
+    expect(after.textContent).toContain("Esta pergunta já foi respondida ou encerrada.");
+    expect(within(after).queryByRole("button", { name: "staging" })).toBeNull();
   });
 
   test("a question closed without an answer (its run stopped) says so, not who answered", async () => {

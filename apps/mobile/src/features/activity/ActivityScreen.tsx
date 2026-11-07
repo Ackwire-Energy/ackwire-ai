@@ -24,6 +24,7 @@ import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
   Button,
+  EmptyState,
   Filters,
   HoldButton,
   type IconName,
@@ -33,7 +34,6 @@ import {
   ListRow,
   PersonAvatar,
   SectionHeader,
-  Sky,
   SwipeRow,
   Text,
   useReducedMotion,
@@ -48,8 +48,8 @@ import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
+import { LoadFailed, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
@@ -138,12 +138,12 @@ export function ActivityScreen() {
             </View>
           </LayoutAnimationConfig>
         </>
-      ) : list.isLoading ? null : filter !== "done" ? (
+      ) : list.isLoading ? null : list.isError && !list.data ? (
+        <LoadFailed onRetry={() => void list.refetch()} />
+      ) : filter !== "done" ? (
         <AllClear />
       ) : days.length === 0 ? (
-        <Text variant="body" tone="muted" style={styles.noneDone}>
-          {t("mobile.activity.noneDone")}
-        </Text>
+        <EmptyState size="inline" title={t("mobile.activity.noneDone")} />
       ) : null}
       {days.map(([group, groupItems]) => (
         <View key={group}>
@@ -335,12 +335,7 @@ function ApproveHere({ approval: a }: { approval: Approval }) {
     <AskButtons
       primary={
         high ? (
-          <HoldButton
-            size="card"
-            label={t("mobile.approval.hold")}
-            holdLabel={t("mobile.approval.holding")}
-            onConfirm={() => approve()}
-          />
+          <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
         ) : (
           <Button
             variant="primary"
@@ -378,11 +373,8 @@ function ApprovalSource({ approval: a }: { approval: Approval }) {
   return detail ? <WaitingSource mark={<ApprovalMark approval={a} size={20} />} text={detail} /> : null;
 }
 
-/** Faces of the crew over "Nada esperando você". */
-const CREW = 3;
-
 /**
- * Nothing waits on you, right on the page: a band of sky with the crew, "Nada esperando você" and one calm line, then
+ * Nothing waits on you, right on the page: the agent pleased, "Nada esperando você" and one calm line, then
  * the next real event as one line (a routine's next run: its agent, its name and when), which opens the routine.
  */
 function AllClear() {
@@ -390,7 +382,7 @@ function AllClear() {
   const orgId = useOrgId();
   const dir = useDirectory();
   const routines = useRoutines(orgId);
-  const crew = dir.agents.slice(0, CREW);
+  const look = useEmptyLook();
   const next = useMemo(() => nextRoutine<Routine>(routines.data ?? []), [routines.data]);
   const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
   const when = useWhen();
@@ -399,22 +391,13 @@ function AllClear() {
   // The last card decided: the clear page fades in where the cards were.
   return (
     <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
-      <View style={styles.clear}>
-        <View style={styles.clearSky}>
-          <Sky color={agentLook(crew[0]).color} depth={0.8} style={[StyleSheet.absoluteFill, styles.clearSkyTint]} />
-          <View style={styles.crew}>
-            {crew.map((a) => (
-              <AgentFace key={a.id} agentId={a.id} size={36} live={false} />
-            ))}
-          </View>
-        </View>
-        <Text variant="title2" accessibilityRole="header" style={styles.clearTitle}>
-          {t("mobile.activityNow.clear.title")}
-        </Text>
-        <Text variant="small" tone="muted" style={styles.clearText}>
-          {t("mobile.activityNow.clear.text")}
-        </Text>
-      </View>
+      <EmptyState
+        size="panel"
+        agent={look}
+        mood="deal"
+        title={t("mobile.activityNow.clear.title")}
+        subtitle={t("mobile.activityNow.clear.text")}
+      />
       {/* The next run as a row of the list below it: who, the routine's name on one line, and when. */}
       {next ? (
         <>
@@ -594,18 +577,11 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
 const styles = StyleSheet.create({
   cards: { gap: 10, paddingHorizontal: 16 },
   change: { paddingHorizontal: 16, paddingBottom: 12 },
-  noneDone: { paddingHorizontal: 16, paddingVertical: 24, textAlign: "center" },
   wpressed: { opacity: 0.85 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
   grow: { flex: 1, minWidth: 0 },
   // Nothing waiting, on the page itself: the sky band edge to edge, its crew, the words, the next event's line.
-  clear: { marginTop: 2, paddingBottom: 6 },
-  clearSky: { height: 84, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 },
-  clearSkyTint: { opacity: 0.7 },
-  crew: { flexDirection: "row", alignItems: "flex-end", gap: 14 },
-  clearTitle: { textAlign: "center", marginTop: 10, paddingHorizontal: 16 },
-  clearText: { textAlign: "center", marginTop: 4, paddingHorizontal: 16 },
   // One event line: the 16-point mark on the first line, the words, when at the end.
   stack: { width: LIST_AVATAR, height: LIST_AVATAR },
   back: { position: "absolute", top: 0, left: 0 },

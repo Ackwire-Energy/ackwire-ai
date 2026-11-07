@@ -91,6 +91,10 @@ export interface ComposerProps {
    * empty, and the field focused. Once per request (`at`).
    */
   prefill?: { text: string; at: number } | null;
+  /** A change here brings the keyboard up ("Responder" on a message). */
+  focusAt?: number;
+  /** Right above the field ("Respondendo a Ana"). */
+  banner?: ReactNode;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
   onType?: (text: string) => void;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
@@ -132,6 +136,8 @@ export function Composer({
   mentionAt,
   insertMention,
   prefill,
+  focusAt,
+  banner,
   onType,
   media,
   voice,
@@ -153,6 +159,9 @@ export function Composer({
     setText((current) => (current.trim() ? current : handed));
     input.current?.focus();
   }, [prefillAt]);
+  useEffect(() => {
+    if (focusAt) input.current?.focus();
+  }, [focusAt]);
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has && !voice?.active;
@@ -247,6 +256,7 @@ export function Composer({
           />
         </Animated.View>
       ) : null}
+      {banner}
       <View style={styles.row}>
         {voice?.leading ??
           (onPlus ? (

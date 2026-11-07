@@ -157,7 +157,7 @@ test("send_dm: the agent writes to a person in its DM with them, they're notifie
     authorAgentId: f.agent.id,
     body: "Oi Joao! O Leo pediu para te avisar do e-mail.",
   });
-  expect(sent?.meta.agentDm).toMatchObject({ requesterUserId: f.owner.id });
+  expect(sent?.meta.agentDm).not.toHaveProperty("requesterUserId");
   const notes = await f.db
     .select()
     .from(schema.notifications)

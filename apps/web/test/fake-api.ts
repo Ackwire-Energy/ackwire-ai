@@ -225,6 +225,8 @@ export interface FakeState {
   extraModels?: Model[];
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
+  /** Its `params`: the provider's name and words. */
+  keyRefusalParams?: Record<string, unknown>;
   /** What an endpoint lists (ADR 0146); absent: nothing. */
   endpointList?: { baseURL: string; models: { id: string }[]; error?: string };
   /** Each model's test result when an endpoint is saved; absent: `ok`. */
@@ -241,6 +243,7 @@ export interface FakeState {
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
+  githubAccess?: { orgs: string[] | null; manageUrl: string | null };
   /** The workspace's Composio calls this month (default: none counted, no cap). */
   composioUsage?: ComposioUsage;
   /** What the organization's GitHub reaches (`githubApp.repositories`); unset = not connected. */
@@ -294,6 +297,7 @@ export interface FakeState {
     with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
     unread?: number;
     everRead?: boolean;
+    openedAt?: string;
   }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
@@ -1406,6 +1410,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           staysBehind: [],
           serverOwner: false,
         },
+      restore: async () => {
+        log("account.restore");
+        if (state.me) {
+          const { deletion: _gone, ...user } = state.me.user;
+          state.me = { ...state.me, user };
+        }
+      },
       delete: async (input) => {
         log("account.delete", input);
         if (state.deletionError) throw state.deletionError;
@@ -1805,6 +1816,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         agents: state.agents.length,
         budgetUsedPercent: workspacePercent(),
         approvalsWaitingForMe: state.approvals.filter((a) => a.status === "pending" && a.canDecide).length,
+        proposalsWaitingForMe: state.proposals.filter((p) => p.status === "pending" && !p.stale && p.canDecide).length,
       }),
       people: async () =>
         state.members.map((m) => ({
@@ -2185,8 +2197,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.teamTemplates", orgId, locale);
         return state.teamTemplates ?? [];
       },
-      applyTeamTemplate: async (orgId, templateId, locale) => {
-        log("agents.applyTeamTemplate", orgId, templateId, locale);
+      applyTeamTemplate: async (orgId, templateId, locale, tap) => {
+        log("agents.applyTeamTemplate", orgId, templateId, locale, tap);
         return { channelId: `dm-${LODI_ID}`, messageId: id("message") };
       },
       decideCostly: async (orgId, signalId, decision) => {
@@ -2320,7 +2332,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       credentials: async () => [...state.credentials],
       addCredential: async (orgId, input) => {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
-        if (state.keyRefusal) throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.");
+        if (state.keyRefusal)
+          throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.", state.keyRefusalParams);
         const cred: Credential = {
           id: id("cred"),
           provider: input.provider,
@@ -2351,9 +2364,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         cred.keyHint = input.apiKey.slice(-4);
         return { ...cred };
       },
-      removeCredential: async (orgId, credentialId, purge) => {
-        log("agents.removeCredential", orgId, credentialId, purge);
+      removeCredential: async (orgId, credentialId, purge, release) => {
+        log("agents.removeCredential", orgId, credentialId, purge, release);
         state.credentials = state.credentials.filter((c) => c.id !== credentialId);
+      },
+      checkCredential: async (orgId, credentialId) => {
+        log("agents.checkCredential", orgId, credentialId);
+        if (state.keyRefusal)
+          throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.", state.keyRefusalParams);
+        return { check: "ok" as const };
       },
       platformKeyAvailable: async () => state.platformKey,
       aiStatus: async () =>
@@ -2543,8 +2562,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             (r) => (!filter.agentId || r.agentId === filter.agentId) && (!filter.status || r.status === filter.status),
           )
           .slice(0, filter.limit),
-      cancelRun: async (orgId, runId, reason) => {
-        if (reason === undefined) log("agents.cancelRun", orgId, runId);
+      cancelRun: async (orgId, runId, reason, chain) => {
+        if (chain) log("agents.cancelRun", orgId, runId, reason, "chain");
+        else if (reason === undefined) log("agents.cancelRun", orgId, runId);
         else log("agents.cancelRun", orgId, runId, reason);
         if (state.runs.some((r) => r.id === runId && r.status !== "running" && r.status !== "queued"))
           throw new ApiError(409, "run_finished", "Run already finished");
@@ -2950,12 +2970,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ? state.messages.find((m) => m.clientId === input.clientId && m.author.id === (state.me?.user.id ?? null))
           : undefined;
         if (resent) return resent;
-        // Like the server: the quoted message must be in this channel; the meta is built here.
+        // Like the server: the quoted message must be in this channel and, from a thread, in that thread; the meta is
+        // built here.
         const meta: Record<string, unknown> = {};
         if (input.replyTo) {
           const quoted = state.messages.find((m) => m.id === input.replyTo);
-          if (!quoted || quoted.channelId !== channelId) {
-            throw new ApiError(400, "message.reply_not_found", "replyTo must be a message of this channel");
+          const elsewhere = input.threadId && quoted?.id !== input.threadId && quoted?.threadId !== input.threadId;
+          if (!quoted || quoted.channelId !== channelId || elsewhere) {
+            throw new ApiError(400, "message.reply_not_found", "replyTo must be a message of this conversation");
           }
           const who =
             quoted.author.type === "agent"
@@ -3182,6 +3204,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     githubApp: {
+      access: async () =>
+        structuredClone(
+          state.githubAccess ?? {
+            orgs: [],
+            manageUrl: "https://github.com/settings/connections/applications/client-id",
+          },
+        ),
       info: async () => structuredClone(state.githubApp ?? { installable: false, installations: [] }),
       install: async (orgId, returnTo) => {
         log("githubApp.install", orgId, returnTo);
@@ -3286,6 +3315,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           with: agent
             ? { type: "agent", id: agent.id, name: agent.name, handle: agent.handle }
             : { type: "person", id: person?.userId ?? "", name: person?.name ?? "", handle: null },
+          openedAt: new Date().toISOString(),
         });
         return { channelId };
       },
@@ -3344,6 +3374,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       saveToVault: async (orgId, requestId, input) => {
         log("secrets.saveToVault", orgId, requestId, input);
         return {} as never;
+      },
+      get: async (_orgId, requestId) => {
+        const msg = state.messages.find((m) => (m.meta?.secretRequest as SecretRequest | undefined)?.id === requestId);
+        const r = msg?.meta?.secretRequest as SecretRequest | undefined;
+        if (!r) throw new ApiError(404, "not_found", "Secret request not found");
+        return structuredClone(r);
       },
       // Like the server: only the person asked answers, once; the fake keeps the box to check it was sealed.
       deliver: async (orgId, requestId, box) => {

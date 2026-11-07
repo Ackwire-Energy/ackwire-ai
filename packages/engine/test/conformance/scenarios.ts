@@ -204,7 +204,7 @@ export const SCENARIOS: Scenario[] = [
       expect(run).toMatchObject({ status: "done", trigger: "router" });
       expect(await agentPosts(h)).toEqual([]);
       expect(await stepsOf(h, run.id, "context")).toContainEqual(
-        expect.objectContaining({ passed: { how: "pass", reason: "Nada a acrescentar." } }),
+        expect.objectContaining({ passed: { how: "pass", reason: "Nada a acrescentar.", silent: true } }),
       );
     },
   },
@@ -523,7 +523,7 @@ export const SCENARIOS: Scenario[] = [
       expect(run).toMatchObject({ status: "done", trigger: "mention" });
       expect((await agentPosts(h)).filter((m) => m.authorAgentId === h.f.agent.id)).toEqual([]);
       expect(await stepsOf(h, run.id, "context")).toContainEqual(
-        expect.objectContaining({ passed: { how: "pass", reason: "Só um obrigado." } }),
+        expect.objectContaining({ passed: { how: "pass", reason: "Só um obrigado.", silent: true } }),
       );
     },
   },

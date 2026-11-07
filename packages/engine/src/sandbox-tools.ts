@@ -4,6 +4,8 @@ import {
   type ExecResult,
   isReservedSecretName,
   MAX_INLINE_FILE_BYTES,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
   type PubSub,
   policyRefusal,
   SECRET_NAME,
@@ -17,6 +19,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
+import { fileLanded, SHARED_DRIVE_INPUT } from "./artifact-tools";
 import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
@@ -26,7 +29,7 @@ import {
   createArtifact,
   diffToPatch,
   getArtifact,
-  readFileArtifact,
+  storedFileOfArtifact,
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
@@ -34,11 +37,18 @@ import { recordAudit } from "./audit";
 import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
+import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
 import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
-import { foldersFixedMessage, notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
+import {
+  foldersFixedMessage,
+  notAllowedMessage,
+  requestMadePassword,
+  requestVaultKey,
+  vaultUpdateText,
+} from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -76,9 +86,9 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
-import { requestSecretTool } from "./secret-request-tool";
-import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
-import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
+import { friendlyLabel, requestSecretTool } from "./secret-request-tool";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
+import { agentSkillByName, type SkillDeps, skillFilesOf, skillFilesOver, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
@@ -90,16 +100,36 @@ import {
   toolAllowScope,
   VAULT_LIST_TOOL,
   VAULT_READ_SCOPE,
+  VAULT_SAVE_TOOL,
+  VAULT_WRITE_SCOPE,
 } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { uploadedFile, uploadFromComputer } from "./uploads";
-import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal, vaultRefusalOutput } from "./vault";
+import {
+  recordVaultUse,
+  releaseVaultKeys,
+  restoreMadePassword,
+  saveMadePassword,
+  undoneText,
+  type VaultDeps,
+  VaultRefusal,
+  vaultItemName,
+  vaultRefusalOutput,
+} from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** Tools that change the computer (or start work on it); the rest only read. */
-const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+const WRITE_TOOLS = new Set([
+  "run_code",
+  "write_file",
+  "start_task",
+  "run_skill_script",
+  "import_file",
+  "cancel_task",
+  MAKE_KEY_TOOL,
+]);
 
 const READ_ONLY_COMMANDS = new Set([
   "ls",
@@ -309,7 +339,11 @@ function timeoutOf(input: Record<string, unknown>, fallback: number, max: number
  * per conversation (the thread's id, a UUID), resumed on every follow-up.
  * Sessions live per folder, and each agent has its own folder there.
  */
-export function claudeCodeSentence(sessionId: string, tasks = false) {
+export function claudeCodeSentence(sessionId: string, tasks = false, managed = false) {
+  // Each agent is its own OS user there and a sign-in reaches only what the runner starts, never the agent's shell.
+  if (managed) {
+    return `\`claude\` in run_code has no sign-in on this computer, on purpose: "not logged in" there says nothing about any plan, so never ask anyone to sign in because of it.${tasks ? ' For a job for Claude Code, use start_task with executor "claude".' : ""}`;
+  }
   const run = `If Claude Code (\`claude\`) is installed there and the work suits it, run it non-interactively from your workspace with one session per conversation, so it remembers earlier turns: the first time \`claude -p --session-id ${sessionId} "<task>"\`, afterwards \`claude -p --resume ${sessionId} "<follow-up>"\` (if it says there's no such conversation, start it with --session-id). Add \`--permission-mode acceptEdits\` so it can edit files; never add --dangerously-skip-permissions unless the person asks.`;
   return tasks
     ? `${run} For anything that takes more than a couple of minutes (building a feature, a refactor, a long test run), use start_task with executor "claude" instead: it runs in the background in the same session, survives the connection dropping, and you are woken here when it finishes. Keep run_code for short commands and quick questions.`
@@ -325,7 +359,7 @@ const NO_NETWORK =
 
 /** On a connected machine the network is that machine's own: we don't block anything there. */
 export const MACHINE_NETWORK_NOTE =
-  "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
+  "network failure: this computer is on its own network (we block nothing there), so the problem is the address, the site or that network. Tell the person.";
 
 /**
  * A command killed by SIGKILL (128 + 9) that no person or timeout stopped: on a computer, the kernel stopping the
@@ -607,7 +641,7 @@ export function createSandboxToolSource(
     // An old computer never gets a value: checked before anything is released (`requestVaultKey` checks again).
     const status = await hub.status(computer.machineId);
     if (!status || status.protocol < VAULT_PROTOCOL) {
-      throw new Error(vaultUpdateText(status?.name ?? "computer", "use Vault keys"));
+      throw new Error(vaultUpdateText(status ?? { name: "computer" }, "use Vault keys"));
     }
     const run = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
     const released = await releaseVaultKeys(vault, run, names);
@@ -643,6 +677,69 @@ export function createSandboxToolSource(
         ),
     };
   };
+
+  /**
+   * The computer's side of a made password (ADR 0144 §8): the same box from the agent's own process to the Vault, kept
+   * as a key, since a command takes it by name. For what the agent sets up itself, as a database's user.
+   */
+  const makeKeyTool = (vault: VaultDeps): ToolDefinition => ({
+    name: MAKE_KEY_TOOL,
+    description:
+      "For something you are setting up yourself on your computer (a database user, a service's admin): makes a strong password there and keeps it in the Vault as a key. You never see it: commands get it as $NAME through run_code's `keys`. Never ask a person to invent one.",
+    scope: SANDBOX_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        label: { type: "string", maxLength: 80, description: "What people read in the Vault (`Postgres admin`)." },
+        length: { type: "integer", minimum: PASSWORD_LENGTH.min, maximum: PASSWORD_LENGTH.max },
+        classes: { type: "array", items: { enum: [...PASSWORD_CLASSES] } },
+        undo: { type: "string", maxLength: 64, description: "A key's id: back to the value it had before." },
+      },
+      additionalProperties: false,
+    },
+    describe: () => ({ title: "Make a password" }),
+    async execute(input, ctx) {
+      const hub = deps.machines?.hub;
+      if (!hub) return { content: "Connected computers are not available on this server.", isError: true };
+      const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+      if (!isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }))) {
+        return {
+          content:
+            'You may not keep passwords in the Vault ("Edit Vault contacts" is off for you). Ask for it with request_permission.',
+          isError: true,
+        };
+      }
+      const runIds = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
+      try {
+        const undo = str(input.undo).trim();
+        if (undo) {
+          const { item, kept } = await restoreMadePassword(vault, runIds, undo);
+          return { content: undoneText(vaultItemName(item), kept) };
+        }
+        const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+        const scope = {
+          id: ctx.agentId,
+          handle: agent?.handle ?? "agent",
+          ...(agent?.name ? { name: agent.name } : {}),
+        };
+        const value = await run(ctx, (computer) =>
+          requestMadePassword(hub, computer.machineId, scope, input, ctx.signal),
+        );
+        const saved = await saveMadePassword(
+          vault,
+          runIds,
+          { keyName: str(input.name), title: friendlyLabel(input.label) ?? "" },
+          value,
+        );
+        return {
+          content: `Made it: ${vaultItemName(saved.item)} is in the Vault${saved.outcome === "updated" ? ", in place of the value it had (`undo` with its id brings that back)" : ""}. Give its name to run_code's \`keys\`.`,
+        };
+      } catch (error) {
+        return vaultRefusalOutput(error) ?? failed(error);
+      }
+    },
+  });
 
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
   const auditMachineExec = async (
@@ -681,7 +778,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo), computerInfo.managed)}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
       scope: SANDBOX_SCOPE,
       readsOutside: true,
       sensitive: requireApproval,
@@ -755,10 +852,12 @@ export function createSandboxToolSource(
         }
       },
     },
+    ...(deps.vault ? [makeKeyTool(deps.vault)] : []),
     requestSecretTool({
       scope: SANDBOX_SCOPE,
       browserOnly: false,
       toolPath: (raw) => toolPath(raw, computerInfo),
+      ...(deps.pubsub ? { pubsub: deps.pubsub } : {}),
       onComputer: (ctx, fn) => run(ctx, fn),
     }),
     {
@@ -891,6 +990,7 @@ export function createSandboxToolSource(
           title: { type: "string", maxLength: 200 },
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
+          shared_drive: SHARED_DRIVE_INPUT,
         },
         required: ["path"],
         additionalProperties: false,
@@ -926,7 +1026,7 @@ export function createSandboxToolSource(
                 content,
               });
           return {
-            content: `Saved ${path} to the Drive as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}.`,
+            content: `Saved ${path} as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}. ${await fileLanded(deps.artifacts, ctx, a.id, input.shared_drive)}`,
             data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
@@ -945,6 +1045,7 @@ export function createSandboxToolSource(
           title: { type: "string", maxLength: 200 },
           artifact_id: { type: "string", minLength: 36, maxLength: 36 },
           note: { type: "string", maxLength: 500 },
+          shared_drive: SHARED_DRIVE_INPUT,
         },
         required: ["path"],
         additionalProperties: false,
@@ -981,7 +1082,7 @@ export function createSandboxToolSource(
           const done = await uploadedFile(deps.db, row);
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
-            content: `Uploaded ${path} to the Drive as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}.`,
+            content: `Uploaded ${path} as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}. ${await fileLanded(deps.artifacts, ctx, done.id, input.shared_drive)}`,
             data: { artifact: { id: done.id, version: done.version, title: done.title } },
           };
         } catch (error) {
@@ -994,6 +1095,7 @@ export function createSandboxToolSource(
       description:
         "Copy a Drive file you can see into your computer's workspace (documents as .md, tables as .csv, diffs as .patch, diagrams as .mmd, pages as .html; uploaded files as they are, under their original name).",
       scope: SANDBOX_SCOPE,
+      needs: { name: "read_artifact", scope: "drive:read" },
       inputSchema: {
         type: "object",
         properties: {
@@ -1009,11 +1111,11 @@ export function createSandboxToolSource(
           const file = fileOfArtifact(a);
           if (!file) {
             // An uploaded file: its bytes as they are, under its original name.
-            const raw = await readFileArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
+            const raw = await storedFileOfArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
             const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
-            await run(ctx, (c) => c.provider.writeFile(c.id, path, raw.bytes));
+            await run(ctx, (c) => copyToComputer({ ...deps.artifacts, publicUrl: deps.publicUrl }, ctx, c, path, raw));
             return {
-              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.bytes.byteLength)}).`,
+              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.size)}).`,
             };
           }
           const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
@@ -1064,23 +1166,38 @@ export function createSandboxToolSource(
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
-          // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
-          const left = listed
-            .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
-            .map((f) => f.path);
+          // What an older runner can't receive (a big PDF) stays behind instead of failing every run.
+          let left = "";
           // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
           // what a person approved) is the skill's, whatever was written over them on the computer since.
           const copiedMark = `${base}/.copied-v${skill.version}`;
+          // Files past a `write` have their own mark: a runner brought up to date gets them without the rest again.
+          const largeMark = `${base}/.copied-large-v${skill.version}`;
           const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
+          const mark = (path: string, c: ComputerHandle) =>
+            c.provider.writeFile(c.id, path, new TextEncoder().encode(skill.name));
           const result = await run(ctx, async (computer) => {
             const copied = await computer.provider.readFile(computer.id, copiedMark);
-            for (const f of await skillFolderFiles(skillDeps(ctx), skill, copied ? scripts : undefined)) {
-              if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+            const wanted = copied ? scripts : undefined;
+            for (const f of await skillFolderFiles(skillDeps(ctx), skill, wanted, MAX_INLINE_FILE_BYTES)) {
               await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             }
-            if (!copied)
-              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
+            if (!copied) await mark(copiedMark, computer);
+            const large = await skillFilesOver(ctx.db, skill, MAX_INLINE_FILE_BYTES);
+            const refusal = large.length > 0 ? await computer.provider.pullRefusal(computer.id) : null;
+            if (refusal) {
+              left = `Not copied to ${base}/: ${large.map((f) => f.path).join(", ")}. ${refusal}`;
+            } else if (large.length > 0) {
+              const pull = { ...skillDeps(ctx), publicUrl: deps.publicUrl };
+              const whole = await computer.provider.readFile(computer.id, largeMark);
+              for (const f of large) {
+                if (!whole || scripts.includes(f.path)) {
+                  await copyToComputer(pull, ctx, computer, `${base}/${f.path}`, f);
+                }
+              }
+              if (!whole) await mark(largeMark, computer);
+            }
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
@@ -1091,9 +1208,8 @@ export function createSandboxToolSource(
           });
           const seconds = Math.round((Date.now() - started) / 1000);
           const output = execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
-          if (left.length === 0) return output;
-          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each): ${left.join(", ")}.`;
-          return { ...output, content: `${output.content}\n${note}` };
+          if (!left) return output;
+          return { ...output, content: `${output.content}\n${left}` };
         } catch (error) {
           return heldForApproval(error, "Not run") ?? failed(error);
         }
@@ -1115,7 +1231,7 @@ export function createSandboxToolSource(
   const taskTools = (requireApproval: boolean, info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition[] => [
     {
       name: "start_task",
-      description: `Start a detached command or a parallel CLI job on the connected computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
+      description: `Start a detached command or a parallel CLI job on the computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       whyAsks: true,
@@ -1453,6 +1569,7 @@ export function createSandboxToolSource(
           "upload_file",
           "import_file",
           "computer_status",
+          MAKE_KEY_TOOL,
           REQUEST_SECRET_TOOL,
           "start_task",
           "list_tasks",

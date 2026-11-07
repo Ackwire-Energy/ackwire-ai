@@ -64,6 +64,7 @@ import {
   InfoHint,
   Input,
   Kbd,
+  Locked,
   Logo,
   modKey,
   ProviderLogo,
@@ -96,6 +97,7 @@ import {
   type PlanChoice,
   usd,
 } from "@/components/AgentFields";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ImportFlow, useImportFlow } from "@/components/ImportFlow";
@@ -364,6 +366,7 @@ function NewAgentFlow({
     [models.data, credentials.data, platform.data],
   );
   const usable = useMemo(() => usableModels(choices), [choices]);
+  const held = usePlanHold() !== null;
   // "Quem pensa": what the agent's page offers, every plan on every computer that runs it, in one list.
   const brainOptions = useMemo(
     () =>
@@ -372,8 +375,9 @@ function NewAgentFlow({
         machines: brainMachines.data ?? [],
         accounts: aiAccounts.data?.accounts ?? [],
         ownerIsMe: owner === me.user.id,
+        held,
       }),
-    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id],
+    [t, locale, choices, brainMachines.data, aiAccounts.data, owner, me.user.id, held],
   );
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
@@ -444,7 +448,7 @@ function NewAgentFlow({
   // it is mine (a plan signs in for the agents I create), else the workspace's key (admins). A plan account that
   // wasn't in "Quem pensa" when it opened is what the agent thinks with; closing it with nothing new keeps the pick.
   const [optionsBefore, setOptionsBefore] = useState<ReadonlySet<string> | null>(null);
-  const connectsHere = connect && (ownerId === me.user.id || can(org, "manage_credentials"));
+  const connectsHere = connect && !held && (ownerId === me.user.id || can(org, "manage_credentials"));
   const connectHere = () => {
     if (!connect) return;
     setOptionsBefore(ownerId === me.user.id ? new Set(brainOptions.map((o) => o.value)) : null);
@@ -686,6 +690,8 @@ function NewAgentFlow({
     }
     // Reviewed over the conversation: it closes on it, as it was.
     onClose?.();
+    // On a billing hold nothing connects before the plan.
+    if (held) return;
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
     if (connectPlan) connect?.open({ agentId: agent.id, plan: connectPlan });
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
@@ -1229,7 +1235,7 @@ function NewAgentFlow({
               </ul>
             </>
           ) : (
-            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+            <p className="small muted">{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</p>
           )}
           {managesAgents && (
             <Link
@@ -1401,7 +1407,7 @@ function NewAgentFlow({
               })}
             </span>
           )}
-          {connectAfter && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
+          {connectAfter && !held && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
           {connectsHere && (
             <span className="newag__connect">
               <Button size="sm" variant={connectAfter ? "primary" : "default"} icon="plus" onClick={connectHere}>
@@ -1646,9 +1652,11 @@ function NewAgentFlow({
       <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} onLeave={onClose} />
       <div className="newag__work">
         <main className="newag__main">
-          <div className="newag__content" key={step}>
-            {views[step]()}
-          </div>
+          <Locked when={create.isPending || deny.isPending}>
+            <div className="newag__content" key={step}>
+              {views[step]()}
+            </div>
+          </Locked>
           <div className="newag__foot">
             <span className="newag__hint" data-bad={footErrors.length > 0 || undefined}>
               {importing ? null : footErrors.length > 0 ? (
@@ -1661,7 +1669,13 @@ function NewAgentFlow({
               )}
             </span>
             {index > 0 || importing ? (
-              <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
+              <Button
+                variant="ghost"
+                size="lg"
+                icon="chevronLeft"
+                disabled={create.isPending || deny.isPending}
+                onClick={back}
+              >
                 {t("common.back")}
               </Button>
             ) : onClose ? (

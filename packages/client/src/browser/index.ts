@@ -10,6 +10,7 @@ import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
+export * from "./frame-bytes";
 export * from "./held";
 export * from "./input";
 export * from "./live";
@@ -322,6 +323,9 @@ export interface OpenPageInput {
   url: PageTarget;
 }
 
+/** The code a request that already ended answers with. */
+export const HANDOFF_OVER = "browser.handoff_over";
+
 /**
  * "Abrir" (take control), "Pronto"/"Devolver", "Não consegui", cancel, "Assumir" while
  * watching, opening a site while in control, "Parar" (close the agent's browser) and "Tentar de
@@ -332,17 +336,24 @@ export function useBrowserHandoffMutations(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const apply = (h: BrowserHandoff) => applyBrowserHandoff(qc, orgId, h);
+  // It ended meanwhile: the card settles now, even if the event that said so never came.
+  const settle = (error: unknown, handoffId: string) => {
+    if ((error as { code?: string }).code !== HANDOFF_OVER) return;
+    void api.browser.handoff(orgId, handoffId).then(apply, () => undefined);
+  };
   return {
     takeControl: useMutation({
       mutationFn: (handoffId: string) => api.browser.takeControl(orgId, handoffId),
       meta: { silent: true },
       onSuccess: apply,
+      onError: settle,
     }),
     done: useMutation({
       mutationFn: (v: string | DoneInput) =>
         typeof v === "string" ? api.browser.done(orgId, v) : api.browser.done(orgId, v.handoffId, v.note),
       meta: { silent: true },
       onSuccess: apply,
+      onError: (error, v) => settle(error, typeof v === "string" ? v : v.handoffId),
     }),
     /** 403 `browser.not_allowed` (outside the agent's sites), 409 `browser.not_in_control`, 400 `browser.bad_address` / `browser.open_failed`. */
     open: useMutation({
@@ -354,11 +365,13 @@ export function useBrowserHandoffMutations(orgId: string) {
         api.browser.failed(orgId, handoffId, note),
       meta: { silent: true },
       onSuccess: apply,
+      onError: (error, v) => settle(error, v.handoffId),
     }),
     cancel: useMutation({
       mutationFn: (handoffId: string) => api.browser.cancel(orgId, handoffId),
       meta: { silent: true },
       onSuccess: apply,
+      onError: settle,
     }),
     takeover: useMutation({
       mutationFn: (v: string | TakeoverInput) =>

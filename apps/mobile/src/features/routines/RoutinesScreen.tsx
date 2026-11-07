@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   EmptyState,
@@ -16,8 +17,9 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
-import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
+import { mayCreate } from "../new/logic";
+import { FirstUse } from "../shared/FirstUse";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useWhenText } from "./hooks";
@@ -50,6 +52,7 @@ function RoutineList() {
   const c = useColors();
   const orgId = useOrgId();
   const dir = useDirectory();
+  const meId = useMeId();
   const routines = useRoutines(orgId);
   const pull = usePullRefresh(routines.refetch);
   const now = useNow(60_000);
@@ -75,6 +78,13 @@ function RoutineList() {
     return () => clearInterval(timer);
   }, [working, refetch]);
   const openNew = () => router.push("/routines/new");
+  const clear = () => {
+    setQ("");
+    setStatus("all");
+    setAgentId(null);
+  };
+  const ownsAgent = Boolean(meId) && dir.agents.some((a) => a.ownerUserId === meId);
+  const mayNew = mayCreate(useOrg().org, "routine", { ownsAgent });
   // A routine paused, resumed, deleted or filtered out while the person watches fades, and the rest slide into place.
   const reduced = useReducedMotion();
   const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
@@ -92,7 +102,7 @@ function RoutineList() {
   return (
     <PushedLargeTitle
       title={t("routines.title")}
-      right={<IconButton icon="plus" label={t("routines.new")} onPress={openNew} />}
+      {...(mayNew ? { right: <IconButton icon="plus" label={t("routines.new")} onPress={openNew} /> } : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       <View style={styles.head}>
@@ -112,12 +122,7 @@ function RoutineList() {
           <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void refetch()} />
         </View>
       ) : list.length === 0 ? (
-        <EmptyState
-          sky
-          crew={dir.agents.slice(0, 3).map((a) => ({ ...agentLook(a), id: a.id }))}
-          title={t("routines.emptyTitle")}
-          action={<Button variant="primary" size="sm" icon="plus" label={t("routines.new")} onPress={openNew} />}
-        />
+        <FirstUse place="routines" acts={mayNew} label={t("routines.new")} onPress={openNew} />
       ) : (
         // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
         <Animated.View {...fade}>
@@ -174,7 +179,11 @@ function RoutineList() {
             ) : null}
             {sections.live.length === 0 && sections.paused.length === 0 && sections.filtered ? (
               <Animated.View {...fade} layout={layout}>
-                <EmptyState icon="search" title={t("routines.noResults")} />
+                <EmptyState
+                  size="inline"
+                  title={t("routines.noResults")}
+                  action={<Button variant="secondary" size="sm" label={t("filters.clearAll")} onPress={clear} />}
+                />
               </Animated.View>
             ) : null}
             {sections.done.length > 0 && status === "all" ? (

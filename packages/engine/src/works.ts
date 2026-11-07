@@ -9,6 +9,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { cutText } from "./format";
 import { linkIssueToWork, setWorkIssueState } from "./issues";
 import { deliverLive } from "./live-steer";
+import { messageLink } from "./message-links";
 import { insertMessage, type Message, messageView, replyExcerpt } from "./messages";
 import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
@@ -16,7 +17,7 @@ import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
 import { maskCredentials } from "./tool-detail";
 
-const { agentWorks, agentRuns, messages, threadFollows, users } = schema;
+const { agentQuestions, agentWorks, agentRuns, messages, threadFollows, users } = schema;
 
 export type WorkRow = typeof agentWorks.$inferSelect;
 export type WorkPlanItem = schema.WorkPlanItem;
@@ -130,6 +131,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
+  /** Waiting on an answer: what its run asked (the first if it asked several), and the message that holds the card. */
+  question: { text: string; messageId: string | null; requestedForUserId: string | null } | null;
   plan: WorkPlanItem[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -176,6 +179,26 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
       ),
     )
     .orderBy(desc(agentRuns.createdAt));
+  const asking = runs.filter((r) => r.status === "waiting_input" && !r.code && !r.waitingMachineId).map((r) => r.id);
+  const questions = asking.length
+    ? await db
+        .select({
+          runId: agentQuestions.runId,
+          channelId: agentQuestions.channelId,
+          text: agentQuestions.text,
+          messageId: agentQuestions.messageId,
+          requestedForUserId: agentQuestions.requestedForUserId,
+        })
+        .from(agentQuestions)
+        .where(
+          and(
+            eq(agentQuestions.orgId, orgId),
+            inArray(agentQuestions.runId, asking),
+            eq(agentQuestions.status, "open"),
+          ),
+        )
+        .orderBy(asc(agentQuestions.createdAt))
+    : [];
   const queued = rows.filter((r) => r.status === "queued");
   const lines = queued.length
     ? await db
@@ -232,6 +255,9 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
       } else state = "working";
     }
     const mine = lines.filter((l) => l.agentId === w.agentId);
+    // Only one asked in the work's own conversation: a view reaches whoever reads that one.
+    const asked =
+      state === "waiting_input" ? questions.find((q) => q.runId === run?.id && q.channelId === w.channelId) : undefined;
     const detail = status === "failed" ? runErrorDetail(run?.error) : null;
     out.set(w.id, {
       id: w.id,
@@ -253,6 +279,13 @@ export async function workViews(db: Executor, orgId: string, ids: string[]): Pro
         w.lastUpdateText && w.updateSeq > 0
           ? { text: w.lastUpdateText, at: w.lastUpdateAt.toISOString(), seq: w.updateSeq }
           : null,
+      question: asked
+        ? {
+            text: plainText(asked.text, WORK_LIMITS.updateMax),
+            messageId: asked.messageId,
+            requestedForUserId: asked.requestedForUserId,
+          }
+        : null,
       plan: w.plan,
       issue: w.issueId && numbers.has(w.issueId) ? { id: w.issueId, number: numbers.get(w.issueId) as number } : null,
       resultMessageId: w.resultMessageId,
@@ -305,7 +338,12 @@ type RunLike = Pick<
  * not a mission's thread, not a routine's run and not one that already is.
  */
 export async function workEligible(db: Executor, run: RunLike): Promise<boolean> {
-  if (run.background || run.workId || isTerminal(run.status)) return false;
+  return !run.workId && !isTerminal(run.status) && movableRun(db, run);
+}
+
+/** Whether a run's work may leave where it answers now (`moveRun`, `moveToBackground`). */
+export async function movableRun(db: Executor, run: RunLike): Promise<boolean> {
+  if (run.background) return false;
   const channel = await getChannelCached(db as Database, run.orgId, run.channelId);
   if (!channel || (channel.kind !== "channel" && channel.kind !== "dm") || isAgentOnlyDm(channel)) return false;
   const thread = replyThreadOf(run);
@@ -453,6 +491,57 @@ export async function moveToBackground(
   }
   const [fresh] = await db.select().from(agentWorks).where(eq(agentWorks.id, work.id));
   return { work: fresh ?? work, anchor, queued: moved.queued };
+}
+
+/**
+ * A person asked it to go on elsewhere (`post_message` with `move_here`): from now on the run answers at `to`'s
+ * channel's top level (`replyThreadOf`: its root is its trigger), its long work's updates and report too, and every
+ * later wake of it, which reads this row. A line where it was links to `to`.
+ */
+export async function moveRun(
+  deps: { db: Database; pubsub?: PubSub },
+  run: Pick<
+    AgentRun,
+    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "workId"
+  >,
+  to: Message,
+) {
+  const from = { channelId: run.channelId, threadId: replyThreadOf(run), agentId: run.agentId, runId: run.id };
+  const link = messageLink(run.orgId, to);
+  const now = new Date();
+  const line = await deps.db.transaction(async (tx) => {
+    await tx
+      .update(agentRuns)
+      .set({ channelId: to.channelId, threadRootId: run.triggerMessageId, updatedAt: now })
+      .where(eq(agentRuns.id, run.id));
+    if (run.workId)
+      await tx
+        .update(agentWorks)
+        .set({ channelId: to.channelId, homeThreadId: null, ownThread: false, updatedAt: now })
+        .where(eq(agentWorks.id, run.workId));
+    return insertMessage(tx, {
+      orgId: run.orgId,
+      channelId: from.channelId,
+      threadId: from.threadId,
+      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+      body: `Continues in ${link}`,
+      meta: { movedOn: true, bodyCode: "moved_on", bodyParams: { link } },
+    });
+  });
+  localMoves.add(run.id);
+  if (!deps.pubsub) return;
+  await publishMessageCreated(deps.pubsub, messageView(line));
+  // Live rows keep the place they started in: this one ends where it was and, unless it is long work, starts over.
+  const background = run.workId ? { background: true as const } : {};
+  await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...from, ...background });
+  if (!run.workId)
+    await publishChannelEvent(deps.pubsub, {
+      type: "agent.thinking",
+      ...from,
+      channelId: to.channelId,
+      threadId: null,
+    });
+  await deps.pubsub.publish(workTopic(run.id), { type: "run.moved", runId: run.id }).catch(() => {});
 }
 
 /** A work with no title of its own: its thread's title, else the start of the ask. */

@@ -1,9 +1,11 @@
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
+import { channelTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   type AgentRun,
   addChannelMember,
+  answerQuestion,
   cancelRun,
   checkInWork,
   continueRun,
@@ -433,6 +435,43 @@ test("waiting: no timer while it waits, the line says on what, and it starts ove
   expect(Date.parse(view?.nextUpdateAt ?? "")).toBe(now.getTime() + 10 * 60_000);
 });
 
+test("waiting on an answer, the view says what it asked, in one line and only while the question is open", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run);
+  const question = (over: Partial<typeof schema.agentQuestions.$inferInsert> = {}) => ({
+    orgId: f.org.id,
+    runId: run.id,
+    agentId: run.agentId,
+    channelId: f.general.id,
+    toolUseId: "tu-1",
+    text: "Envio agora\n\npara @ana ou espero?",
+    expiresAt: new Date(Date.now() + 3600_000),
+    ...over,
+  });
+  const [first] = await f.db.insert(schema.agentQuestions).values(question()).returning();
+  await f.db.insert(schema.agentQuestions).values(question({ toolUseId: "tu-2", text: "E a outra?" }));
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, run.id));
+  expect(await workView(f.db, f.org.id, work.id)).toMatchObject({
+    state: "waiting_input",
+    question: { text: "Envio agora para ana ou espero?", messageId: null },
+  });
+  // A question another conversation holds stays out of a view this one's readers get.
+  await f.db.update(schema.agentQuestions).set({ channelId: f.org.id }).where(eq(schema.agentQuestions.runId, run.id));
+  expect((await workView(f.db, f.org.id, work.id))?.question).toBeNull();
+  await f.db
+    .update(schema.agentQuestions)
+    .set({ channelId: f.general.id })
+    .where(eq(schema.agentQuestions.runId, run.id));
+  await f.db
+    .update(schema.agentQuestions)
+    .set({ status: "answered" })
+    .where(eq(schema.agentQuestions.id, first?.id as string));
+  expect((await workView(f.db, f.org.id, work.id))?.question?.text).toBe("E a outra?");
+  await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, run.id));
+  expect((await workView(f.db, f.org.id, work.id))?.question).toBeNull();
+});
+
 test("cards: none for a quick run nor a short auto work; card: true makes one; a named issue is reused untouched", async () => {
   f = await setup();
   const quick = await working("@dev oi");
@@ -565,26 +604,6 @@ test("card_issue: only a card the asker reads, here or workspace-wide; elsewhere
     .from(schema.issues)
     .where(eq(schema.issues.id, w?.issueId ?? ""));
   expect(card).toMatchObject({ title: "Migrar a cobrança", channelId: dm.id });
-});
-
-test("Mostrar para todos: only a work's card, by who asked for it, its creator or an admin", async () => {
-  f = await setup();
-  const owner = { type: "person" as const, userId: f.owner.id };
-  const { shareIssueWithEveryone } = await import("../src");
-  const plain = await createIssue(deps(), owner, f.org.id, { title: "Confidencial", channelId: f.general.id });
-  await expect(shareIssueWithEveryone(deps(), owner, f.org.id, plain.id)).rejects.toThrow();
-  const run = await working("@dev monta o relatório");
-  const made = await moved(run, { card: true, title: "Relatório" });
-  const [w] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, made.work.id));
-  const bia = await addMember(f.db, f.org.id, "member", "bia");
-  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
-  await expect(
-    shareIssueWithEveryone(deps(), { type: "person", userId: bia.id }, f.org.id, w?.issueId ?? ""),
-  ).rejects.toThrow();
-  const shared = await shareIssueWithEveryone(deps(), owner, f.org.id, w?.issueId ?? "");
-  expect(shared.channelId).toBeNull();
-  const activity = await f.db.select().from(schema.issueActivity);
-  expect(activity.some((a) => a.event === "shared_everyone")).toBe(true);
 });
 
 test("caps: an agent's 4th work waits in line, with its place, and starts when one ends", async () => {
@@ -766,7 +785,52 @@ test("a work's card from a DM stays with who reads the DM until someone shows it
     (await listIssues(f.db, { type: "person", userId }, f.org.id)).some((i) => i.id === w?.issueId);
   expect(await seen(f.owner.id)).toBe(true);
   expect(await seen(bia.id)).toBe(false);
-  const { shareIssueWithEveryone } = await import("../src");
-  await shareIssueWithEveryone(deps(), { type: "person", userId: f.owner.id }, f.org.id, w?.issueId ?? "");
+  const { setIssueAudience } = await import("../src");
+  const runId = (await runs()).find((r) => r.workId === made.work.id)?.id as string;
+  await f.db.insert(schema.agentQuestions).values({
+    orgId: f.org.id,
+    runId,
+    agentId: f.agent.id,
+    channelId: dm.id,
+    toolUseId: "tu-1",
+    text: "Mando o salário de quem no relatório?",
+    expiresAt: new Date(Date.now() + 3600_000),
+  });
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, runId));
+  const card = async (userId: string) =>
+    (await listIssues(f.db, { type: "person", userId }, f.org.id)).find((i) => i.id === w?.issueId);
+  expect((await card(f.owner.id))?.backgroundWork?.question?.text).toContain("salário");
+  const owner = { type: "person" as const, userId: f.owner.id };
+  const shared = await setIssueAudience(deps(), owner, f.org.id, w?.issueId ?? "", { mode: "everyone" });
+  expect(shared).toMatchObject({ channelId: null, audience: { mode: "everyone" } });
   expect(await seen(bia.id)).toBe(true);
+  expect((await f.db.select().from(schema.issueActivity)).some((a) => a.event === "audience_changed")).toBe(true);
+  // The card shows to everyone; what its work asks in the DM stays with who reads the DM.
+  expect((await card(bia.id))?.backgroundWork).toMatchObject({ state: "waiting_input", question: null });
+});
+
+test("one answer of several: the run stays parked and the work's line goes on to what it still asks", async () => {
+  f = await setup();
+  const run = await working("@dev roda a migração");
+  const { work } = await moved(run);
+  const question = (toolUseId: string, text: string) => ({
+    orgId: f.org.id,
+    runId: run.id,
+    agentId: run.agentId,
+    channelId: f.general.id,
+    toolUseId,
+    text,
+    expiresAt: new Date(Date.now() + 3600_000),
+  });
+  const [first] = await f.db.insert(schema.agentQuestions).values(question("tu-1", "Qual ambiente?")).returning();
+  await f.db.insert(schema.agentQuestions).values(question("tu-2", "E a janela?"));
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, run.id));
+  await answerQuestion(deps(), f.owner.id, f.org.id, first?.id as string, { text: "Produção" });
+  const seen: { type: string; work?: { question: { text: string } | null } }[] = [];
+  const off = f.pubsub.subscribe(channelTopic(f.general.id), (e) => void seen.push(e as (typeof seen)[number]));
+  await drainOutbox(f.db, f.handlers);
+  off();
+  expect((await runs()).find((r) => r.id === run.id)?.status).toBe("waiting_input");
+  expect(seen.find((e) => e.type === "agent.work")?.work?.question?.text).toBe("E a janela?");
+  expect((await workView(f.db, f.org.id, work.id))?.question?.text).toBe("E a janela?");
 });

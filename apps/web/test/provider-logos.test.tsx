@@ -4,7 +4,6 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { AiPicker } from "@/components/ai/ConnectAiSteps";
 import { ExecutorMark } from "@/components/missions/MissionBits";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs, title } from "./new-agent-flow";
@@ -47,7 +46,7 @@ describe("provider marks where a provider is named", () => {
     trigger.focus();
     await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
     expect(marks(screen().getByRole("option", { name: "OpenAI" }))).toEqual(["openai"]);
-    // Gemini third, by Google's own sparkle.
+    // The most used first, Gemini by Google's own sparkle.
     expect(
       screen()
         .getAllByRole("option")
@@ -56,11 +55,11 @@ describe("provider marks where a provider is named", () => {
       "Claude",
       "OpenAI",
       "Gemini",
+      "OpenRouter",
       "DeepSeek",
       "Kimi",
       "Z.ai",
       "MiniMax",
-      "OpenRouter",
       // A workspace's own endpoint (ADR 0146), its line under its name.
       expect.stringContaining("Outro provedor"),
     ]);
@@ -117,14 +116,6 @@ describe("provider marks where a provider is named", () => {
     await open(`dm/agent/${ADA_ID}`, withBrain(undefined));
     expect(brainLine().textContent).toBe("Claude Sonnet 5.5");
     expect(marks(brainLine())).toEqual(["claude"]);
-  });
-
-  test("several makers in one line: the API key row, by four marks, overlapped", () => {
-    const { container } = render(<AiPicker choice="claude" onPick={() => {}} panel={null} />);
-    const key = container.querySelector(".ac-brand-stack");
-    expect(key && marks(key)).toEqual(["claude", "openai", "gemini", "openrouter"]);
-    // The row says the makers in words: its marks are decorative.
-    expect(key?.getAttribute("aria-hidden")).toBe("true");
   });
 
   test("missions: Claude Code and Codex by their makers' marks", () => {

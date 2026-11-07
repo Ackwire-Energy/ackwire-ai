@@ -278,6 +278,8 @@ describe("offer_open_page", () => {
     const bad = await call(f, ctx, OFFER_OPEN_PAGE_TOOL, { page: "nowhere", why: "x" });
     expect(bad.isError).toBe(true);
     expect(Object.keys(APP_PAGES)).toContain("ai_accounts");
+    const tasks = await call(f, ctx, OFFER_OPEN_PAGE_TOOL, { page: "task_manager", why: "O que está rodando." });
+    expect(tasks.content).toContain("Task manager");
   });
 
   test("the right hand's card cap holds across every kind", async () => {

@@ -4,6 +4,7 @@ import { capitalize } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import {
   type AgentTasks,
+  delegationText,
   endedState,
   type TaskProgram,
   taskState,
@@ -97,14 +98,27 @@ export function groupLine(t: TFunction, group: Pick<AgentTasks, "working" | "wai
 }
 
 /**
- * Under a task's title: where it is, who asked and how far its plan got ("#produto · Ana pediu · 9 de 14 feitos").
- * Where is left out when it already is the title (a task with no label of its own).
+ * Under a task's title: where it is, who asked and how far its plan got ("#produto · Ana pediu · 9 de 14 feitos"); a
+ * task agents asked of each other says who asked and what started it, and one with helpers how many. Where is left out
+ * when it already is the title (a task with no label of its own).
  */
 export function taskSubline(
   t: TFunction,
-  task: Pick<ManagedTask, "routine" | "channelKind" | "channelName" | "background" | "requester" | "plan">,
+  task: Pick<
+    ManagedTask,
+    | "routine"
+    | "channelKind"
+    | "channelName"
+    | "betweenAgents"
+    | "background"
+    | "requester"
+    | "plan"
+    | "delegation"
+    | "helpers"
+  >,
   meId: string | null,
   title: string,
+  agentName: (id: string) => string | undefined = () => undefined,
 ): string {
   const where = taskWhere(t, task);
   const asked = task.requester
@@ -113,7 +127,9 @@ export function taskSubline(
       : t("taskManager.askedBy", { name: task.requester.name })
     : null;
   const plan = task.plan && task.plan.total > 0 ? t("taskManager.plan", task.plan) : null;
-  return [where === title ? null : where, asked, plan].filter(Boolean).join(" · ");
+  const chain = delegationText(t, task, agentName, meId);
+  const helpers = task.helpers ? t("taskManager.helpers", { count: task.helpers }) : null;
+  return [where === title ? null : where, chain ?? asked, plan, helpers].filter(Boolean).join(" · ");
 }
 
 /** How a task ended, for "Terminadas hoje": done, stopped (by you, by someone), or couldn't finish. */

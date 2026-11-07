@@ -61,6 +61,7 @@ import {
   GroupedList,
   GroupedRow,
   type IconName,
+  Locked,
   ProviderLogo,
   Sky,
   Text,
@@ -68,6 +69,7 @@ import {
 } from "@/ui";
 import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
@@ -217,11 +219,13 @@ function NewAgentForm({
   const [useLast, setUseLast] = useState(true);
   // Or anything else the agent's page offers ("Quem pensa", the web's model step), from its sheet.
   const aiAccounts = useAiAccounts(orgId, !proposed);
+  const held = usePlanHold(orgId, org) !== null;
   const brainOptions = brainPickOptions(t, i18n.language, {
     api: choices,
     machines: brainMachines.data ?? [],
     accounts: aiAccounts.data?.accounts ?? [],
     ownerIsMe: true,
+    held,
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
@@ -428,12 +432,14 @@ function NewAgentForm({
       if (from) {
         // From its card: back to that conversation as it was, Connect over it when it has nothing to think with.
         router.back();
-        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+        if (ai?.kind === "none" && !held) openConnectAi({ agentId: agent.id });
         return;
       }
       // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
       // when it has nothing to think with yet (ADR 0061 §6).
       void openDm({ agentId: agent.id }).then(() => {
+        // On a billing hold nothing connects before the plan.
+        if (held) return;
         if (thinks.connect) openConnectAi({ agentId: agent.id, plan: thinks.connect });
         else if (ai?.kind === "none" || (!thinks.plan && usable.size === 0)) openConnectAi({ agentId: agent.id });
       });
@@ -735,14 +741,16 @@ function NewAgentForm({
                     : setPicking(true)
                 }
               />
-              <GroupedRow
-                icon="plus"
-                label={t("aiAccounts.page.connect")}
-                onPress={() => {
-                  setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
-                  openConnectAi({ forNew: "1" });
-                }}
-              />
+              {held ? null : (
+                <GroupedRow
+                  icon="plus"
+                  label={t("aiAccounts.page.connect")}
+                  onPress={() => {
+                    setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
+                    openConnectAi({ forNew: "1" });
+                  }}
+                />
+              )}
             </GroupedList>
             {picked?.pick.kind === "connect" && picked.description ? (
               <GroupedFooter>{picked.description}</GroupedFooter>
@@ -889,7 +897,7 @@ function NewAgentForm({
           ) : (
             <>
               <StepBar index={index} total={total} name={stepNames[step]} />
-              {views[step]()}
+              <Locked when={busy}>{views[step]()}</Locked>
             </>
           )}
         </ScrollView>
@@ -912,7 +920,9 @@ function NewAgentForm({
                 ) : null}
               </>
             ) : null}
-            {backs ? <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} /> : null}
+            {backs ? (
+              <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={() => goTo(index - 1)} />
+            ) : null}
             {goes ? (
               <View style={styles.fill}>
                 <Button
@@ -923,7 +933,7 @@ function NewAgentForm({
                       ? t("newAgent.create", { name: name.trim() || shownName })
                       : t("common.continue")
                   }
-                  disabled={busy}
+                  loading={busy}
                   onPress={next}
                 />
               </View>

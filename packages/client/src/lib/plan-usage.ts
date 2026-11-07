@@ -117,6 +117,8 @@ export function planMeterText(
   almost: string;
   limited(until: string | null): string;
   updated(iso: string): string;
+  ago(iso: string): string;
+  stale(iso: string): string;
 } {
   const named = (w: Pick<MeterWindow, "kind" | "label">, words: "window" | "short") => {
     const kind = WINDOW_NAMES.find((k) => k === w.kind);
@@ -136,6 +138,8 @@ export function planMeterText(
       return t("aiAccounts.usage.limitedUntil", { when: day ? `${day} ${time}` : time });
     },
     updated: (iso) => t("aiAccounts.usage.updated", { ago: relativeTime(t, locale, iso, now) }),
+    ago: (iso) => t("aiAccounts.usage.ago", { ago: relativeTime(t, locale, iso, now) }),
+    stale: (iso) => t("aiAccounts.usage.stale", { ago: relativeTime(t, locale, iso, now) }),
   };
 }
 
@@ -323,8 +327,8 @@ export function accountShares(account: Pick<PlanAccountUsage, "usage" | "agents"
 }
 
 /** What people call a plan account: its label, or the computer's own sign-in's name (`ownSignInName`). */
-export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName" | "mine">) =>
-  a.label ?? ownSignInName(t, a.mine, a.machineName);
+export const accountName = (t: TFunction, a: Pick<PlanAccountInfo, "label" | "machineName" | "mine" | "kind">) =>
+  a.label ?? ownSignInName(t, a.mine, a.machineName, a.kind);
 
 /** Who makes what an account thinks with: a coding plan's maker, else Claude Code or Codex. */
 export const brandOf = (a: Pick<PlanAccountInfo, "kind" | "provider">) =>
@@ -349,7 +353,7 @@ export function usageSourceName(t: TFunction, s: AgentUsageSource) {
 export function usageSourcePart(t: TFunction, locale: string, s: AgentUsageSource) {
   const percent = formatPercent(locale, s.share);
   if (s.type === "api") return t("usageViews.agent.apiPart", { percent });
-  if (s.account?.accountId === null) {
+  if (s.account?.accountId === null && s.account.kind !== "opencode") {
     return s.account.mine
       ? t("usageViews.agent.sharedPart", { percent })
       : t("usageViews.agent.computerPart", { percent, computer: s.account.machineName });

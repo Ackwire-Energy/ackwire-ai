@@ -25,6 +25,8 @@ export interface SearchQuery {
   embedding?: number[] | null;
   /** Channels the reader can see. Enforced by every implementation. */
   visibleChannelIds: string[];
+  /** Scopes the reader sees on tasks' documents only: a DM's id here reaches its tasks, never its messages. */
+  visibleIssueScopes?: string[];
   kinds?: SearchKind[];
   limit?: number;
   /** `all` (default): every word must match (websearch syntax). `any`: at least one word (retrieval). */
@@ -200,7 +202,10 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
           const text = q.text.trim();
           const filtered = Boolean(q.messages || q.after || q.before);
           if (!text && !q.embedding && !filtered) return [];
-          const visible = sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`;
+          const visible = q.visibleIssueScopes?.length
+            ? sql`(${t.channelIds} <@ ${uuids(q.visibleChannelIds)}
+                or (${t.kind} = 'issue' and ${t.channelIds} <@ ${uuids(q.visibleIssueScopes)}))`
+            : sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`;
           const kinds = q.messages
             ? eq(t.kind, "message")
             : q.kinds && q.kinds.length > 0

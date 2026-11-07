@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), how new Claude sign-ins for all agents are made (ADR 0150), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -562,7 +562,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `run.hop_limit`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deletion_requested`, `user.deletion_canceled`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `run.hop_limit`, `task.finished`, `desktop_control.ended`, `content.viewed`, `platform_ai.threshold` or `account.failure` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -2124,6 +2124,610 @@
           }
         },
         "required": ["from", "to", "bucket", "totals", "series", "more", "orgId", "agents"]
+      },
+      "OperatorAiAccounts": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "to": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "connections": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Signed in or signed out (sign-ins in progress and removals left out)."
+              },
+              "usable": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Signed in, and its runner's last look was conclusive."
+              },
+              "signedOut": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Its runner's last look at its status was inconclusive."
+              },
+              "inProgress": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Sign-ins started and not finished."
+              },
+              "removing": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Removed, waiting for their computer to confirm."
+              },
+              "workspaces": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Workspaces with at least one of `connections`."
+              },
+              "usedLast24h": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Of `connections`, used by a turn in the last 24 hours."
+              },
+              "usedLast7d": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "apiCredentials": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Workspaces' model API keys not revoked."
+              },
+              "apiCredentialWorkspaces": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inheritedMachineLogins": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Computers whose own Claude sign-in (no connection of its own) reports signed in. Counted apart: never in `connections`."
+              }
+            },
+            "required": [
+              "connections",
+              "usable",
+              "signedOut",
+              "unknown",
+              "inProgress",
+              "removing",
+              "workspaces",
+              "usedLast24h",
+              "usedLast7d",
+              "apiCredentials",
+              "apiCredentialWorkspaces",
+              "inheritedMachineLogins"
+            ]
+          },
+          "byDimension": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "description": "`anthropic`, `openai`, `xai`, `google`, `cursor`, `opencode`, a coding plan's id, or an API key's provider."
+                },
+                "runtime": {
+                  "type": "string",
+                  "description": "`claude_code`, `codex`, `grok`, `antigravity`, `cursor`, `opencode`, or `api` (an API key)."
+                },
+                "authMethod": {
+                  "$ref": "#/components/schemas/OperatorAiAuthMethod"
+                },
+                "billing": {
+                  "type": "string",
+                  "enum": ["subscription", "coding_plan", "metered_api", "unknown"],
+                  "description": "`subscription`: a CLI's sign-in to a plan. `coding_plan`: a coding plan's key. `metered_api`: an API key, billed per token."
+                },
+                "connections": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Signed in or signed out (sign-ins in progress and removals left out)."
+                },
+                "usable": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Signed in, and its runner's last look was conclusive."
+                },
+                "signedOut": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unknown": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Its runner's last look at its status was inconclusive."
+                },
+                "usedLast7d": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "provider",
+                "runtime",
+                "authMethod",
+                "billing",
+                "connections",
+                "usable",
+                "signedOut",
+                "unknown",
+                "usedLast7d"
+              ]
+            },
+            "description": "Most connections first. An API key is usable while it isn't revoked; its use isn't counted here."
+          },
+          "identity": {
+            "type": "object",
+            "properties": {
+              "withProviderIdentity": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Connections whose email and provider organization are known."
+              },
+              "withoutIdentity": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "distinctProviderAccounts": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Distinct (kind, email, provider organization) among those: one account signed in on several computers counts once."
+              }
+            },
+            "required": ["withProviderIdentity", "withoutIdentity", "distinctProviderAccounts"],
+            "description": "Never by a key, a token or a label."
+          },
+          "failures": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "A UTC day, YYYY-MM-DD.",
+                "example": "2026-10-31"
+              },
+              "to": {
+                "type": "string",
+                "description": "A UTC day, YYYY-MM-DD.",
+                "example": "2026-10-31"
+              },
+              "byCause": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cause": {
+                      "type": "string",
+                      "description": "What the provider or the runner reported: `auth_rejected`, `account_disabled`, `quota`, `billing`, `provider_transient`, `network`, `unknown`. Ignore values you don't know."
+                    },
+                    "authMethod": {
+                      "type": "string",
+                      "description": "As the failure's event said, `unknown` if it didn't."
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "`account.failure` events: at most one per account and cause every 10 minutes."
+                    },
+                    "accounts": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "workspaces": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["cause", "authMethod", "attempts", "accounts", "workspaces"]
+                },
+                "description": "Most attempts first, at most 500."
+              },
+              "recent": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "string"
+                    },
+                    "orgId": {
+                      "type": ["string", "null"],
+                      "format": "uuid"
+                    },
+                    "machineId": {
+                      "type": ["string", "null"]
+                    },
+                    "accountId": {
+                      "type": ["string", "null"]
+                    },
+                    "kind": {
+                      "type": ["string", "null"]
+                    },
+                    "authMethod": {
+                      "type": ["string", "null"]
+                    },
+                    "cause": {
+                      "type": ["string", "null"],
+                      "description": "What the provider or the runner reported: `auth_rejected`, `account_disabled`, `quota`, `billing`, `provider_transient`, `network`, `unknown`. Ignore values you don't know."
+                    },
+                    "code": {
+                      "type": ["string", "null"],
+                      "description": "The runner's stable code, e.g. `not_logged_in`."
+                    },
+                    "runnerVersion": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "orgId",
+                    "machineId",
+                    "accountId",
+                    "kind",
+                    "authMethod",
+                    "cause",
+                    "code",
+                    "runnerVersion"
+                  ]
+                },
+                "description": "Newest first, at most 50."
+              }
+            },
+            "required": ["from", "to", "byCause", "recent"]
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "A UTC day, YYYY-MM-DD.",
+                  "example": "2026-10-31"
+                },
+                "authMethod": {
+                  "$ref": "#/components/schemas/OperatorAiAuthMethod"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["day", "authMethod", "count"]
+            },
+            "description": "Oldest first. A day without any is left out."
+          },
+          "addedSource": {
+            "type": "string",
+            "enum": ["events", "retained_rows"],
+            "description": "`retained_rows`: from the connections still kept, by the day each was made (removed ones are gone)."
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "eventsSince": {
+                "type": ["string", "null"],
+                "description": "The oldest event the feed keeps; failures before it are gone."
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Fixed codes on what these numbers can't see: `inherited_logins_by_machine`, `api_credentials_no_usage_identity`, `added_from_retained_rows`."
+              }
+            },
+            "required": ["eventsSince", "notes"]
+          }
+        },
+        "required": [
+          "generatedAt",
+          "from",
+          "to",
+          "totals",
+          "byDimension",
+          "identity",
+          "failures",
+          "added",
+          "addedSource",
+          "coverage"
+        ]
+      },
+      "OperatorAiAuthMethod": {
+        "type": "string",
+        "enum": ["cli_login", "setup_token", "api_key", "unknown"],
+        "description": "`cli_login`: the CLI's own sign-in, kept by the CLI. `setup_token`: `claude setup-token`'s token, kept by the runner. `api_key`: a pasted key. `unknown`: its computer never said."
+      },
+      "OperatorAiAccountPage": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "orgId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "orgName": {
+                  "type": "string",
+                  "description": "The workspace's name."
+                },
+                "machineId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "machineName": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": ["string", "null"],
+                  "description": "A coding plan's id, `cursor` or `zen` (keys), `enterprise`; null: the CLI's own sign-in."
+                },
+                "authMethod": {
+                  "type": ["string", "null"]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": ["string", "null"]
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`active`, `signed_out`, `signing_in`, `removing`"
+                },
+                "statusUnknown": {
+                  "type": "boolean"
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "One sign-in thinks for every agent its owner gives it."
+                },
+                "ownerId": {
+                  "type": ["string", "null"]
+                },
+                "agents": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Agents set to think with it."
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "lastUsedAt": {
+                  "type": ["string", "null"]
+                },
+                "lastSuccessAt": {
+                  "type": ["string", "null"]
+                },
+                "lastFailureCause": {
+                  "type": ["string", "null"],
+                  "description": "What the provider or the runner reported: `auth_rejected`, `account_disabled`, `quota`, `billing`, `provider_transient`, `network`, `unknown`. Ignore values you don't know."
+                },
+                "lastFailureAt": {
+                  "type": ["string", "null"]
+                },
+                "usageAt": {
+                  "type": ["string", "null"],
+                  "description": "When its plan's usage was last read."
+                },
+                "usageSource": {
+                  "type": ["string", "null"],
+                  "description": "`turn` or `probe`."
+                },
+                "runnerVersion": {
+                  "type": ["string", "null"]
+                },
+                "protocol": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "orgId",
+                "orgName",
+                "machineId",
+                "machineName",
+                "kind",
+                "provider",
+                "authMethod",
+                "label",
+                "plan",
+                "status",
+                "statusUnknown",
+                "shared",
+                "ownerId",
+                "agents",
+                "createdAt",
+                "lastUsedAt",
+                "lastSuccessAt",
+                "lastFailureCause",
+                "lastFailureAt",
+                "usageAt",
+                "usageSource",
+                "runnerVersion",
+                "protocol"
+              ]
+            }
+          },
+          "next": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["accounts", "next"]
+      },
+      "OperatorClaudeAuth": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OperatorClaudeAuthPolicy"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connections": {
+                "type": "object",
+                "properties": {
+                  "cli_login": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "setup_token": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "api_key": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unknown": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["cli_login", "setup_token", "api_key", "unknown"],
+                "description": "Claude subscription connections people have now (signed in or signed out), by how they sign in; `unknown`: their computer never said."
+              }
+            },
+            "required": ["connections"]
+          }
+        ]
+      },
+      "OperatorClaudeLoginMethod": {
+        "type": "string",
+        "enum": ["cli_login", "setup_token"],
+        "description": "What NEW Claude sign-ins for all agents use on computers where each agent is its own OS user, in the workspaces `rollout` covers (`setup_token` in the others). Elsewhere they always use Claude's own login."
+      },
+      "OperatorClaudeAuthPolicy": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OperatorClaudeAuthInput"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "changedAt": {
+                "type": ["string", "null"],
+                "description": "When it last changed; null: never."
+              }
+            },
+            "required": ["changedAt"]
+          }
+        ]
+      },
+      "OperatorClaudeAuthInput": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/OperatorClaudeLoginMethod"
+          },
+          "rollout": {
+            "type": "string",
+            "enum": ["selected", "all"],
+            "description": "`selected`: only the workspaces in `orgIds`. `all`: every workspace."
+          },
+          "orgIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500,
+            "description": "Deduplicated; each must exist."
+          }
+        },
+        "required": ["method", "rollout", "orgIds"]
+      },
+      "OperatorOrgClaudeAuth": {
+        "type": "object",
+        "properties": {
+          "effective": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OperatorClaudeLoginMethod"
+                  },
+                  {
+                    "description": "`setup_token`: `claude setup-token`'s long-lived token, kept by the computer's runner. `cli_login`: Claude's own login, kept and refreshed by Claude Code in the connection's folder."
+                  }
+                ]
+              }
+            },
+            "required": ["method"],
+            "description": "What a new Claude sign-in for all agents uses on the workspace's computers where each agent is its own OS user."
+          },
+          "policy": {
+            "$ref": "#/components/schemas/OperatorClaudeAuthPolicy"
+          },
+          "machines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "system": {
+                  "type": "boolean",
+                  "description": "Each agent is its own OS user there."
+                },
+                "protocol": {
+                  "type": "integer"
+                },
+                "claudeLoginMethods": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperatorAuthMethod"
+                  },
+                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 50), else what older runners do."
+                },
+                "supportsSelected": {
+                  "type": "boolean",
+                  "description": "It can use the method the policy gives it now; else such a sign-in there is refused."
+                }
+              },
+              "required": ["id", "name", "system", "protocol", "claudeLoginMethods", "supportsSelected"]
+            }
+          }
+        },
+        "required": ["effective", "policy", "machines"]
+      },
+      "OperatorAuthMethod": {
+        "type": "string",
+        "enum": ["cli_login", "setup_token", "api_key"]
       }
     },
     "parameters": {}
@@ -4218,6 +4822,300 @@
           },
           "401": {
             "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/ai-accounts": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The AI accounts people connected: how they sign in, who bills them, how they fail",
+        "description": "Connections now, whatever the dates; failures from the events feed in the dates. Counts, ids and codes only: no email, key hint, token or provider organization id.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The first UTC day, YYYY-MM-DD.",
+              "example": "2026-10-01"
+            },
+            "required": true,
+            "description": "The first UTC day, YYYY-MM-DD.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+              "example": "2026-10-31"
+            },
+            "required": true,
+            "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAiAccounts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (`analytics.range`: the dates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-accounts": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "AI accounts on the workspaces' computers, newest first",
+        "description": "Keyset pages: an account added while paging never shifts a page. No email, key hint or token.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "orgId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/OperatorAiAuthMethod"
+            },
+            "required": false,
+            "description": "`cli_login`: the CLI's own sign-in, kept by the CLI. `setup_token`: `claude setup-token`'s token, kept by the runner. `api_key`: a pasted key. `unknown`: its computer never said.",
+            "name": "authMethod",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["active", "signed_out", "signing_in", "removing"]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAiAccountPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claude-auth": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "How new Claude sign-ins for all agents are made",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorClaudeAuth"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Choose how new Claude sign-ins for all agents are made",
+        "description": "Takes effect for sign-ins started after it, with no restart; every connection keeps the method it was made with. Setting the current policy changes nothing. A workspace that doesn't exist is refused (400 `claude_auth.unknown_org`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorClaudeAuthInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorClaudeAuth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/claude-auth": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "How new Claude sign-ins for all agents are made in the workspace, and on each of its computers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrgClaudeAuth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No workspace with this id",
             "content": {
               "application/json": {
                 "schema": {

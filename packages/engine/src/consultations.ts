@@ -12,6 +12,7 @@ import {
   ne,
   or,
   rowsOf,
+  type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -20,8 +21,8 @@ import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, speakerFor, viaAgent } from "./audience";
 import { runAuthorityById } from "./authority";
 import { routineBriefOfRun } from "./background";
-import { type BrakeOutcome, brakeWakes, callableAgents, notCallableText } from "./brakes";
-import { stopRun } from "./cancel";
+import { type BrakeOutcome, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
+import { canceledBy, stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { INBOX_JOB, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm, openAgentDm } from "./dms";
@@ -35,13 +36,15 @@ import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall, routineCreatorOf } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
+import { tellAgentStopped } from "./run-stopped";
 import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
+import { USAGE_WAIT_CODES } from "./usage-pause";
 
-const { agentConsultations, agentRuns, agents, channels, messages } = schema;
+const { agentConsultations, agentRuns, agents, channels, messages, outbox, users } = schema;
 
 export const ASK_AGENT_TOOL = "ask_agent";
 export const TELL_AGENT_TOOL = "tell_agent";
@@ -51,6 +54,12 @@ export const TELL_AGENT_TOOL = "tell_agent";
  * again, every time (`expireConsultations`).
  */
 export const CONSULTATION_TTL_MS = 15 * 60_000;
+/**
+ * How long a question or a hand-off may go without moving before it ends with why: its colleague never started, or
+ * sits in its computer's line, on a computer that's away, on its plan or budget, or on its AI provider. A colleague
+ * at work has no such limit, and neither has one waiting on a person: its card has its own deadline.
+ */
+export const CONSULTATION_HUNG_MS = 2 * 3600_000;
 /**
  * Agents already in a chain before one more may be asked (a lead → a dev → a reviewer → a specialist → one more).
  * Real teams delegate three and four deep; cycles are refused anyway, and the stretch limits (`stretch.ts`: runs
@@ -322,6 +331,7 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judg
       if (same) return same;
       const atLimit = await refusedAtLimit(db, reached.run, target.id);
       if (atLimit) return atLimit;
+      let waitsForRoom = false;
       // Nobody asked for it directly: the note meets the brakes on unrequested work before it wakes anyone (ADR 0131).
       const braked = (await runAuthorityById(db, ctx.orgId, ctx.runId)).kind !== "person";
       const sent = await sendNote(db, {
@@ -348,6 +358,7 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judg
           { reportIn: await peopleSee(db, reached.run, here) },
         );
         const outcome = held.get(target.id);
+        waitsForRoom = outcome === "later";
         if (!outcome) await startNoteRun(db, sent.message, target.id);
         else if (outcome !== "later") {
           await db
@@ -369,12 +380,15 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judg
         consultedAgentId: target.id,
         kind: "note",
       });
+      const handed = ctx.background
+        ? `Handed to @${handle}. What comes of it reaches the people where this routine reports, by itself, and wakes you there: don't wait for it. Do your own part now, and say in hand_off who has what.`
+        : here && isAgentOnlyDm(here)
+          ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
+          : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`;
       return {
-        content: ctx.background
-          ? `Handed to @${handle}. What comes of it reaches the people where this routine reports, by itself, and wakes you there: don't wait for it. Do your own part now, and say in hand_off who has what.`
-          : here && isAgentOnlyDm(here)
-            ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
-            : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
+        content: waitsForRoom
+          ? `${handed} @${handle} hasn't started yet: its computer is full, so your note waits and starts once there's room. It isn't lost: don't send it again.`
+          : handed,
         data: {
           agentNote: { messageId: sent.message.id, agentId: target.id },
           consultation: { id: sent.consultationId, agentId: target.id },
@@ -385,10 +399,10 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judg
 }
 
 /**
- * Where people read about a run's held note (ADR 0131): where its routine reports, the conversation a consultation
- * chain started in, else the run's own conversation.
+ * Where people follow a run (a held note, ADR 0131, a saved file, ADR 0111): where its routine reports, the
+ * conversation a consultation chain started in, else the run's own conversation.
  */
-async function peopleSee(db: Executor, run: AgentRun, here: { kind: string; dmKey: string | null } | undefined) {
+export async function peopleSee(db: Executor, run: AgentRun, here: { kind: string; dmKey: string | null } | undefined) {
   const report = run.background ? (await routineBriefOfRun(db, run))?.deliverTo : undefined;
   if (report) return { channelId: report.channelId, threadId: report.threadId ?? null };
   const origin = here && isAgentOnlyDm(here) ? await consultationOrigin(db, run.orgId, run.id) : null;
@@ -429,8 +443,8 @@ export async function startNoteRun(db: Database, message: Message, targetAgentId
 }
 
 /**
- * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
- * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
+ * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of a member that takes consultations
+ * for people outside its audience, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
  * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
  * (`reportHandOffs`). The caller checked who may be reached. Null: the same note went out within the hour.
  */
@@ -444,7 +458,7 @@ export async function sendNote(
     targetAgentId: string;
     body: string;
     chain: string[];
-    /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
+    /** An @mention (`settleReach`), not a tell_agent call. */
     fromMention?: boolean;
     /** Wakes nobody yet: the caller starts it (`startNoteRun`) once the brakes let it through. */
     deferStart?: boolean;
@@ -592,6 +606,32 @@ async function sameNoteSent(
 }
 
 const ACTIVE_RUN = ["queued", "running", "waiting_approval", "waiting_input"] as const;
+
+/** The jobs that start a question or a note no run took yet: its wake waits for room, or for its agent's line. */
+const wakeJobs = () => [INBOX_JOB, LATER_JOB];
+
+/** For a select naming a consultation: its wake still waits to start a run. */
+const wakeWaitsSql = (row: SQL) => sql<boolean>`exists (select 1 from ${outbox} wake where wake.org_id = ${row}.org_id
+  and wake.kind in (${sql.join(
+    wakeJobs().map((k) => sql`${k}`),
+    sql`, `,
+  )}) and wake.status in ('pending', 'processing')
+  and wake.payload ->> 'messageId' = ${row}.message_id::text and wake.payload ->> 'agentId' = ${row}.target_agent_id::text)`;
+
+/** Nobody waits on this ask anymore: its wake never starts a run whose result would go nowhere. */
+async function dropWake(db: Executor, row: Pick<AgentConsultationRow, "orgId" | "messageId" | "targetAgentId">) {
+  await db
+    .delete(outbox)
+    .where(
+      and(
+        eq(outbox.orgId, row.orgId),
+        inArray(outbox.kind, wakeJobs()),
+        eq(outbox.status, "pending"),
+        sql`${outbox.payload} ->> 'messageId' = ${row.messageId}`,
+        sql`${outbox.payload} ->> 'agentId' = ${row.targetAgentId}`,
+      ),
+    );
+}
 
 /**
  * The consulted agent's own run on the same person request: started by the
@@ -821,9 +861,9 @@ export interface HandOff {
   answeredAt: Date | null;
   /** The sender heard what came of it. */
   reportedAt: Date | null;
-  /** Null: nobody started it (the stretch held it, or it waits for its agent in its computer's line: `parked`). */
+  /** Null: nobody started it (the stretch held it, or its wake waits for room or for its agent's line: `parked`). */
   target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
-  /** No run yet: it waits outside any run for its agent to leave its computer's line (`StartRunOptions.park`). */
+  /** No run yet: its wake waits outside any run, for its agent to leave the line or for room (`INBOX_JOB`, `LATER_JOB`). */
   parked?: boolean;
 }
 
@@ -864,10 +904,7 @@ export async function handOffsFrom(
         c.reported_at, t.status as target_status, t.waiting_machine_id,
         exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
         (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage,
-        (c.target_run_id is null and exists (select 1 from outbox o where o.org_id = c.org_id
-          and o.kind = ${INBOX_JOB} and o.status in ('pending', 'processing')
-          and o.payload ->> 'messageId' = c.message_id::text
-          and o.payload ->> 'agentId' = c.target_agent_id::text)) as parked
+        (c.target_run_id is null and ${wakeWaitsSql(sql`c`)}) as parked
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
@@ -969,7 +1006,7 @@ async function closeConsultation(
   } else if (closed.kind === "note") {
     // Its own close committed: this claim sees it, and every sibling that closed before.
     await reportHandOffs(deps, asker);
-  } else {
+  } else if (!options.told) {
     const delivered = await deps.db.transaction(async (tx) => {
       const readOutside = await answerReadOutside(tx, closed);
       const sent = await deliverNoticeToRun(tx, asker, consultationNotice(closed, handle, { hidden, readOutside }));
@@ -1047,6 +1084,14 @@ async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultation
   return null;
 }
 
+/** Why a run that owed an answer ended, as the agent that asked reads it: a person's stop by name, and what it means. */
+async function endedWhy(db: Executor, status: string, error: string | undefined) {
+  const by = canceledBy(error);
+  if (!by) return error?.slice(0, 500) ?? status;
+  const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, by));
+  return `${person?.name || "A person"} stopped it on purpose, so don't ask it again or hand it to anyone else unless a person asks you to`;
+}
+
 /**
  * Closes what a run in an agents' DM owes now that it ended (ADR 0095), only what it read: a question or note still
  * unread in its inbox goes to the run that answers it (`handOn`). Done: once nothing it asked or handed on is out,
@@ -1081,8 +1126,9 @@ async function settleOwed(
   if (first.rows.length === 0) return null;
   const closed: AgentConsultationRow[] = [];
   if (status !== "done") {
+    const why = await endedWhy(deps.db, status, error);
     for (const row of first.rows) {
-      const c = await closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status);
+      const c = await closeConsultation(deps, row, "failed", why);
       if (c) closed.push(c);
     }
     return closed;
@@ -1120,8 +1166,8 @@ async function settleOwed(
 /**
  * Report once (ADR 0095): the results of the notes run `asker` sent come back together, once none of them is still
  * being worked on (queued or running, not started yet, its run ended but the row not closed yet, or waiting on what
- * its colleague handed on). One waiting on a person or its computer holds up no one: the wake names it
- * (`refs.pending`). One claim after each close commits, so the last closer sees every row closed, and row locks with
+ * its colleague handed on). One waiting on a person or its computer, or whose wake waits for room, holds up no one: the
+ * wake names it (`refs.pending`). One claim after each close commits, so the last closer sees every row closed, and row locks with
  * `reported_at` keep a second claim from taking them again: exactly one wake. Oldest first, every notice but the last
  * is only written; the last wakes the agent, and a run of its already at work there that takes it reads the earlier
  * ones with it. Only for a run in a person's conversation (an agents' DM hands back instead).
@@ -1141,7 +1187,7 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
           sql`not exists (select 1 from ${agentConsultations} o left join ${agentRuns} t on t.id = o.target_run_id
             where o.org_id = ${asker.orgId}::uuid and o.asker_run_id = ${asker.id}::uuid
               and o.kind = 'note' and o.status = 'open'
-              and (t.id is null or t.status not in ('waiting_approval', 'waiting_input')
+              and ((t.id is null and not ${wakeWaitsSql(sql`o`)}) or t.status not in ('waiting_approval', 'waiting_input')
                 or exists (select 1 from ${agentConsultations} s where s.asker_run_id = t.id and s.status = 'open')))`,
         ),
       )
@@ -1799,16 +1845,51 @@ export async function announceConsultationChange(
 /** A row this close to its deadline whose colleague is still at it gets `CONSULTATION_TTL_MS` more. */
 const EXTEND_BEFORE_MS = 2 * 60_000;
 
+/** What holds a colleague that isn't moving, as the asking agent reads it; null while it works or waits on a person. */
+function stuckOn(target: {
+  status: string | null;
+  code: string | null;
+  outage: boolean;
+  waitingMachineId: string | null;
+}) {
+  if (target.status === null) return "it never got to start";
+  // Asking its computer from the line it still waits (`computerWaitOf`).
+  const asking = target.status === "running" && target.waitingMachineId !== null;
+  if (target.status !== "waiting_input" && !asking) return null;
+  if (target.outage) return "its AI provider stayed down";
+  if (asking || target.code === "busy") return "it stayed in line for room on its computer";
+  if (target.code === null) return null;
+  if (target.code === "work_queue") return "it stayed behind its own long work";
+  if (USAGE_WAIT_CODES.has(target.code)) return "it stayed at its plan's or budget's limit";
+  return "its computer stayed away";
+}
+
+/** Since when a run waits for its computer, plan or provider, in ms: the wait's own clock, else the run's last change. */
+const waitSinceSql = sql<string>`coalesce((${agentRuns.transcript}->>'roomWaitSince')::bigint,
+  (${agentRuns.transcript}->'waitingForBrain'->>'since')::bigint,
+  (${agentRuns.transcript}->'outage'->>'since')::bigint,
+  (extract(epoch from ${agentRuns.updatedAt}) * 1000)::bigint)`;
+
 /**
- * The worker's sweep, every minute (ADR 0095). Nothing expires while a colleague is at it: a row whose run is
- * queued, running, waiting on a person or its computer, or done but waiting on what it handed on, gets more time
- * near its deadline (its line and clock stay where it was asked), and that run is never stopped. Past its deadline,
- * a row nobody started (the stretch held it) or whose run is gone closes: with what it gathered, else expired, and
- * its run stops. Returns how many closed.
+ * The worker's sweep, every minute (ADR 0095). A colleague at it (queued, running, waiting on a person, or done but
+ * waiting on what it handed on) keeps a row open, and so does a wake still waiting to start a run: near its deadline
+ * it gets more time (its line and clock stay where it was asked), and that run is never stopped. Past
+ * `CONSULTATION_HUNG_MS` without moving (`stuckOn`) a row ends with why, and its run or wake with it. Past its
+ * deadline, a row nobody started (the stretch held it) or whose run is gone closes: with what it gathered, else
+ * expired, and its run stops. Returns how many closed.
  */
 export async function expireConsultations(deps: { db: Database; pubsub?: PubSub }, now = new Date()) {
   const rows = await deps.db
-    .select({ row: agentConsultations, target: agentRuns.status, handedOn: handedOnSql })
+    .select({
+      row: agentConsultations,
+      target: agentRuns.status,
+      handedOn: handedOnSql,
+      code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+      outage: outageParkedSql,
+      waitingMachineId: agentRuns.waitingMachineId,
+      since: waitSinceSql,
+      wake: sql<boolean>`(${agentConsultations.targetRunId} is null and ${wakeWaitsSql(sql`${agentConsultations}`)})`,
+    })
     .from(agentConsultations)
     .leftJoin(agentRuns, eq(agentRuns.id, agentConsultations.targetRunId))
     .where(
@@ -1820,8 +1901,20 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
     .limit(200);
   let closed = 0;
   const announced = new Set<string>();
-  for (const { row, target, handedOn } of rows) {
-    if (target && (ACTIVE_RUN.some((s) => s === target) || handedOn)) {
+  for (const { row, target, handedOn, code, outage, waitingMachineId, since, wake } of rows) {
+    const started = target ? Number(since) : row.createdAt.getTime();
+    const stuck = target || wake ? stuckOn({ status: target, code, outage: Boolean(outage), waitingMachineId }) : null;
+    if (stuck && now.getTime() - started >= CONSULTATION_HUNG_MS) {
+      const hours = CONSULTATION_HUNG_MS / 3600_000;
+      const why = `${stuck} for over ${hours} hours, so it was stopped and nothing more will come of it. Ask again later, or tell the person what is missing`;
+      const c = await closeConsultation(deps, row, "failed", why);
+      if (!c) continue;
+      closed++;
+      await dropWake(deps.db, row);
+      if (row.targetRunId) await stopUnwantedRun(deps, row.orgId, row.targetRunId);
+      continue;
+    }
+    if ((target && (ACTIVE_RUN.some((s) => s === target) || handedOn)) || wake) {
       const [kept] = await deps.db
         .update(agentConsultations)
         .set({ expiresAt: new Date(now.getTime() + CONSULTATION_TTL_MS) })
@@ -1844,9 +1937,75 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
   return closed;
 }
 
-/** Nobody waits for this consulted run anymore (every consultation on it closed): it stops, approvals and all. */
-async function stopUnwantedRun(deps: { db: Database; pubsub?: PubSub }, orgId: string, runId: string) {
-  const [stillWaited] = await deps.db
+/**
+ * A person stopped a run and what it delegated (`cancelRun` with `chain`, ADR 0128): every ask it has open, all the
+ * way down, closes top first, each as told so nobody it asked for wakes (a close from below would settle the run above
+ * it and wake the top), then the runs nobody else waits on stop, each told by name. A wake that never started goes too,
+ * and so does an ask still unread in its colleague's inbox, or the stop would hand it on to a new run. Returns the
+ * handles of the agents stopped.
+ */
+export async function stopHelpers(
+  deps: { db: Database; pubsub?: PubSub },
+  userId: string,
+  orgId: string,
+  runId: string,
+  reason?: string,
+) {
+  const { db } = deps;
+  const below = new Set<string>();
+  const handles = new Set<string>();
+  let level = [runId];
+  while (level.length > 0) {
+    // What came back of these and wasn't reported yet stays unsaid: a report would wake the agent just stopped.
+    await db
+      .update(agentConsultations)
+      .set({ reportedAt: new Date() })
+      .where(
+        and(
+          eq(agentConsultations.orgId, orgId),
+          inArray(agentConsultations.askerRunId, level),
+          ne(agentConsultations.status, "open"),
+          isNull(agentConsultations.reportedAt),
+        ),
+      );
+    const open = await db
+      .select()
+      .from(agentConsultations)
+      .where(
+        and(
+          eq(agentConsultations.orgId, orgId),
+          inArray(agentConsultations.askerRunId, level),
+          eq(agentConsultations.status, "open"),
+        ),
+      );
+    level = [];
+    for (const row of open) {
+      if (!(await closeConsultation(deps, row, "failed", "stopped with the run that asked", { told: true }))) continue;
+      await dropWake(db, row);
+      const id = row.targetRunId;
+      if (!id) continue;
+      await db
+        .update(agentRuns)
+        .set({ pendingMessageIds: sql`array_remove(${agentRuns.pendingMessageIds}, ${row.messageId}::uuid)` })
+        .where(eq(agentRuns.id, id));
+      // A run another ask still waits on goes on, and so does what it asked.
+      if (id === runId || below.has(id) || (await stillWaitedOn(db, orgId, id))) continue;
+      below.add(id);
+      level.push(id);
+    }
+  }
+  for (const id of below) {
+    const stopped = await stopUnwantedRun(deps, orgId, id, { type: "person", id: userId });
+    if (!stopped) continue;
+    handles.add(`@${await handleOf(db, orgId, stopped.run.agentId)}`);
+    await tellAgentStopped(deps, stopped.run, stopped.previous, userId, reason).catch(() => null);
+  }
+  return [...handles];
+}
+
+/** An ask is still open on this run. */
+async function stillWaitedOn(db: Executor, orgId: string, runId: string) {
+  const [open] = await db
     .select({ id: agentConsultations.id })
     .from(agentConsultations)
     .where(
@@ -1857,13 +2016,24 @@ async function stopUnwantedRun(deps: { db: Database; pubsub?: PubSub }, orgId: s
       ),
     )
     .limit(1);
-  if (stillWaited) return;
+  return Boolean(open);
+}
+
+/** Nobody waits for this consulted run anymore (every consultation on it closed): it stops, approvals and all. */
+async function stopUnwantedRun(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  runId: string,
+  actor: Parameters<typeof stopRun>[4] = { type: "system", reason: "consultation_expired" },
+) {
+  if (await stillWaitedOn(deps.db, orgId, runId)) return null;
   const [run] = await deps.db
     .select()
     .from(agentRuns)
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
-  if (!run || isTerminal(run.status)) return;
-  await stopRun(deps, orgId, run, "dm", { type: "system", reason: "consultation_expired" }).catch(() => null);
+  if (!run || isTerminal(run.status)) return null;
+  const stopped = await stopRun(deps, orgId, run, "dm", actor).catch(() => null);
+  return stopped && { run, previous: stopped.previousStatus };
 }
 
 /**

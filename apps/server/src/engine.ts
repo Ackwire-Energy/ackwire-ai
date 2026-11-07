@@ -119,6 +119,7 @@ import {
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
@@ -132,6 +133,8 @@ export interface EngineOptions {
   /** Tests: extra tool sources, in-process MCP, fake HTTP, fake embeddings. */
   toolSources?: ToolSource[];
   mcpConnect?: McpConnect;
+  /** Revokes Apple tokens at an account's deletion (ADR 0035); absent: from `config`. */
+  appleRevoke?: AppleTokenRevoker;
   http?: typeof fetch;
   embeddings?: { provider: EmbeddingProvider; apiKey: string };
   deltaFlushMs?: number;
@@ -287,9 +290,12 @@ export function buildEngine(o: EngineOptions) {
     readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
     errors: o.errors,
   });
+  const workspaceComputer =
+    config.MACHINE_PROVISIONING === "external" ? { billing: Boolean(config.BILLING_URL) } : undefined;
   const sandbox: SandboxDeps = {
     db,
     machines: { hub: machineHub },
+    workspaceComputer,
     // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
@@ -471,8 +477,15 @@ export function buildEngine(o: EngineOptions) {
   // The agent's Chrome started ahead of its first command (ADR 0040 §11): a head start, so a refusal costs nothing.
   const warmBrowser = (at: Parameters<typeof warmAgentBrowser>[2]) =>
     void warmAgentBrowser(db, machineHub, at).catch(() => {});
-  // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
-  const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub, warm: warmBrowser });
+  // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory. Its log says how each
+  // view's own socket went (§7.1).
+  const browserLive = createBrowserLive({
+    db,
+    pubsub: adapters.pubsub,
+    hub: machineHub,
+    warm: warmBrowser,
+    log: o.log,
+  });
   machineHub.setBrowserHooks(browserLive.hubHooks);
   // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
   const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
@@ -488,14 +501,17 @@ export function buildEngine(o: EngineOptions) {
         { db, hub: machineHub, rateLimiter: adapters.rateLimiter, pubsub: adapters.pubsub },
         input,
       );
-      // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile.
-      if (input.request.kind === "desktop" && "machineId" in target && !target.held) {
+      // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile. Not for
+      // a browser card's view (ADR 0058 §7): a card that only looks doesn't start Chrome again after Stop.
+      if (input.request.kind === "desktop" && "machineId" in target && !target.held && !input.preview) {
         warmBrowser({ orgId: input.orgId, agentId: input.agentId, machineId: target.machineId });
       }
       return target;
     },
     recheck: (stream) => recheckStream(db, stream),
     reauthorize: (stream, mode) => reauthorizeStream(db, stream, mode),
+    // An agent browser's live view has a data socket of its own too (ADR 0040 §7.1).
+    claim: (streamId, machineId, socket) => browserLive.claimView(streamId, machineId, socket),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
     log: o.log,
@@ -634,6 +650,8 @@ export function buildEngine(o: EngineOptions) {
       : null,
   };
   const jobDeps: JobDeps = {
+    accountEmails: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
+    appleRevoke: o.appleRevoke ?? appleTokenRevoker(config),
     voice,
     db,
     gateway,
@@ -672,6 +690,7 @@ export function buildEngine(o: EngineOptions) {
     brains,
     prepareCode,
     machines: machineHub,
+    workspaceComputer,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     blockSpec: (orgId, artifactId, version) => blockSpecAt(artifacts, orgId, artifactId, version),

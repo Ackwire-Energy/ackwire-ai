@@ -16,6 +16,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { enqueueAccountContact } from "./account-contacts";
 import { recordAudit } from "./audit";
 import { orgMessageCount } from "./billing-link";
 import { caches } from "./cache";
@@ -45,7 +46,10 @@ import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
 import { retireMillionSendMailboxes } from "./mail/retire-millionsend";
 import { recordOperatorEvent } from "./operator-events";
 import {
+  announceMembers,
+  appleSignInTokens,
   can,
+  deleteAccount,
   getMembership,
   getOrganization,
   lockOrgMembers,
@@ -55,7 +59,9 @@ import {
   queueOrgFilesPurge,
 } from "./organizations";
 import { enqueue } from "./outbox";
+import { followOwner } from "./right-hand";
 import {
+  accountInUse,
   closedRefusal,
   heldOrg,
   OrgDeletingError,
@@ -72,6 +78,8 @@ const {
   organizationMembers,
   organizationSettings,
   users,
+  sessions,
+  pushDevices,
   machineProvisioning,
   machines,
   machineAccounts,
@@ -152,6 +160,11 @@ export interface DeletionDeps {
    */
   emails?: { publicUrl: string; support?: string | null } | null;
 }
+
+/** Days a deleted account waits, and can be restored by signing in, before it goes for good. */
+export const ACCOUNT_DELETION_DAYS = WORKSPACE_DELETION_DAYS;
+/** The job that deletes an account at its date (`purgeAccount`). */
+export const ACCOUNT_DELETE_JOB = "account.delete";
 
 /** A deletion written in a transaction, for what follows its commit (`afterClosing`). */
 export interface Closed {
@@ -470,9 +483,16 @@ export async function afterClosing(deps: DeletionDeps, closed: Closed) {
  * Restores a workspace being deleted: an owner, with no proof, since it destroys nothing. Only before its date
  * (`org.not_restorable` after), never while suspended. One waiting for its first plan comes back only while its owner
  * waits on no other (`org.create_unpaid`). The operator's deletion hold stays as it is. Its members are told. What
- * stopped while it was closed stays stopped, and its routines fire again at their next time.
+ * stopped while it was closed stays stopped, and its routines fire again at their next time. `account`: it closed with
+ * its member's account and comes back with it, whatever their role, nobody else to tell, and its feed event says so:
+ * a plan that stopped renewing stays that way until the person turns it on (a billing service reads `via`).
  */
-export async function restoreWorkspace(deps: DeletionDeps, actorId: string, orgId: string) {
+export async function restoreWorkspace(
+  deps: DeletionDeps,
+  actorId: string,
+  orgId: string,
+  options: { account?: boolean } = {},
+) {
   await deps.db.transaction(async (tx) => {
     // The plan rule below can't race a new workspace of theirs.
     await lockWorkspacesOf(tx, actorId);
@@ -491,7 +511,8 @@ export async function restoreWorkspace(deps: DeletionDeps, actorId: string, orgI
       )
       .where(eq(organizations.id, orgId));
     if (!org) throw new NotFoundError("This workspace no longer exists");
-    if (org.role !== "owner") throw new ForbiddenError("Only an owner can restore the workspace");
+    if (org.role !== "owner" && !(options.account && org.role))
+      throw new ForbiddenError("Only an owner can restore the workspace");
     const refusal = closedRefusal(org.standing);
     if (refusal instanceof OrgPausedError) throw refusal;
     const dueAt = org.standing.deletionDueAt;
@@ -528,8 +549,13 @@ export async function restoreWorkspace(deps: DeletionDeps, actorId: string, orgI
       target: { type: "organization", id: orgId },
       details: { dueAt: dueAt.toISOString() },
     });
-    await recordOperatorEvent(tx, { type: "organization.deletion_canceled", orgId, userId: actorId });
-    if (!deps.emails) return;
+    await recordOperatorEvent(tx, {
+      type: "organization.deletion_canceled",
+      orgId,
+      userId: actorId,
+      ...(options.account ? { data: { via: "account" } } : {}),
+    });
+    if (!deps.emails || options.account) return;
     const url = workspaceUrl(deps.emails.publicUrl, orgId);
     const byName = await nameOf(tx, actorId);
     for (const member of await membersToTell(tx, orgId)) {
@@ -566,7 +592,7 @@ function membersToTell(tx: Executor, orgId: string) {
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .leftJoin(organizationSettings, eq(organizationSettings.orgId, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)));
+    .where(and(eq(organizationMembers.orgId, orgId), accountInUse));
 }
 
 export interface PurgeDeps {
@@ -929,8 +955,8 @@ export async function workspaceContents(db: Executor, orgIds: string[]) {
 /** What deleting an account does, workspace by workspace (`accountDeletionPlan`). */
 export interface AccountDeletionPlan {
   /**
-   * Only they are in it: it closes with the account and goes later. One already being deleted keeps its date
-   * (`dueAt`; null for the others, which go `WORKSPACE_DELETION_DAYS` after the account).
+   * Nobody else in use is in it: it closes with the account and goes on the account's date. One already being deleted
+   * keeps its date (`dueAt`; null for the others).
    */
   closes: { id: string; name: string; dueAt: Date | null }[];
   /** Others are in it: they leave it. */
@@ -964,25 +990,31 @@ export async function accountDeletionPlan(db: Executor, userId: string): Promise
   const counts = await db
     .select({
       orgId: organizationMembers.orgId,
-      members: sql<number>`count(*)::int`,
+      others: sql<number>`count(*)::int`,
       owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
     })
     .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(
-      inArray(
-        organizationMembers.orgId,
-        mine.map((o) => o.id),
+      and(
+        inArray(
+          organizationMembers.orgId,
+          mine.map((o) => o.id),
+        ),
+        ne(organizationMembers.userId, userId),
+        // An account waiting for its own date is leaving too: it keeps nothing open, and owns nothing for anyone.
+        isNull(users.deletionDueAt),
       ),
     )
     .groupBy(organizationMembers.orgId);
   for (const org of mine) {
     const count = counts.find((c) => c.orgId === org.id);
-    if (Number(count?.members ?? 0) <= 1) {
+    if (Number(count?.others ?? 0) === 0) {
       plan.closes.push({ id: org.id, name: org.name, dueAt: org.dueAt });
       continue;
     }
     plan.leaves.push({ id: org.id, name: org.name, role: org.role });
-    if (org.role === "owner" && Number(count?.owners ?? 0) <= 1 && org.dueAt === null) {
+    if (org.role === "owner" && Number(count?.owners ?? 0) === 0 && org.dueAt === null) {
       plan.soleOwner.push({ id: org.id, name: org.name });
     }
   }
@@ -1044,6 +1076,192 @@ export function soleOwnerRefusal(plan: Pick<AccountDeletionPlan, "soleOwner">) {
     "sole_owner",
     { organizations: plan.soleOwner.map((o) => o.name), orgIds: plan.soleOwner.map((o) => o.id) },
   );
+}
+
+/**
+ * Deletes an account in `ACCOUNT_DELETION_DAYS`, as a workspace's deletion does (ADR 0088 §10): the caller checked it's
+ * them. Refused for a blocked account and with `sole_owner`, under the same locks as `deleteAccount`. Its sessions and
+ * phones go now and every membership reads it as no member (`accountInUse`), but nothing else leaves: its memberships,
+ * sign-in methods and computers wait for `account.delete` at the date, so restoring is whole. Workspaces only they are
+ * in close now, on the same date (the transaction's clock), and one already being deleted keeps its own. Already
+ * waiting, it keeps its date. The feed's `user.deletion_requested` stops the plans it pays for, which a restore leaves
+ * off (`restoreAccount`). Their email says when it goes and how to come back.
+ */
+export async function scheduleAccountDeletion(deps: DeletionDeps, userId: string) {
+  const { dueAt, closed, orgs } = await deps.db.transaction(async (tx) => {
+    await lockWorkspacesOf(tx, userId);
+    const mine = await tx
+      .select({ orgId: organizationMembers.orgId })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, userId))
+      .orderBy(asc(organizationMembers.orgId));
+    // Every workspace row before the user row, as `deleteAccount` writes them.
+    for (const m of mine) await lockOrgMembers(tx, m.orgId);
+    const [account] = await tx
+      .select({ dueAt: users.deletionDueAt, blockedAt: users.blockedAt, email: users.email, locale: users.locale })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (!account || account.blockedAt) throw new ForbiddenError();
+    if (account.dueAt) return { dueAt: account.dueAt, closed: [], orgs: [] };
+    const plan = await accountDeletionPlan(tx, userId);
+    const refusal = soleOwnerRefusal(plan);
+    if (refusal) throw refusal;
+    const closed: Closed[] = [];
+    for (const org of plan.closes) {
+      const scheduled = await closeForDeletion(tx, { actorId: userId, orgId: org.id, via: "account" });
+      if (scheduled.closed) closed.push(scheduled.closed);
+    }
+    const [row] = await tx
+      .update(users)
+      .set({
+        deletionDueAt: sql`now() + make_interval(days => ${ACCOUNT_DELETION_DAYS})`,
+        deletionRequestedAt: sql`now()`,
+      })
+      .where(eq(users.id, userId))
+      .returning({ dueAt: users.deletionDueAt });
+    const dueAt = row?.dueAt;
+    if (!dueAt) throw new NotFoundError("This account no longer exists");
+    await tx.delete(sessions).where(eq(sessions.userId, userId));
+    await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));
+    for (const m of mine) await followOwner(tx, m.orgId);
+    await recordOperatorEvent(tx, { type: "user.deletion_requested", userId, data: { dueAt: dueAt.toISOString() } });
+    await enqueueAccountContact(tx, userId);
+    if (deps.emails) {
+      const names = closed.length
+        ? await tx
+            .select({ name: organizations.name })
+            .from(organizations)
+            .where(
+              inArray(
+                organizations.id,
+                closed.map((c) => c.orgId),
+              ),
+            )
+            .orderBy(asc(organizations.createdAt))
+        : [];
+      const [zone] = await tx
+        .select({
+          timeZone: sql<string>`coalesce(${organizationMembers.timezone}, ${organizationSettings.timezone}, 'UTC')`,
+        })
+        .from(organizationMembers)
+        .leftJoin(organizationSettings, eq(organizationSettings.orgId, organizationMembers.orgId))
+        .where(eq(organizationMembers.userId, userId))
+        .orderBy(asc(organizationMembers.createdAt))
+        .limit(1);
+      await queueEmail(tx, {
+        orgId: null,
+        key: `account-deleting:${userId}:${dueAt.getTime()}`,
+        to: [account.email],
+        template: {
+          kind: "account_deleting",
+          locale: emailLocale(account.locale),
+          email: account.email,
+          orgNames: names.map((o) => o.name),
+          dueAt: dueAt.toISOString(),
+          timeZone: zone?.timeZone || "UTC",
+          support: deps.emails.support ?? null,
+          url: deps.emails.publicUrl.replace(/\/$/, ""),
+        },
+      });
+    }
+    await enqueue(tx, {
+      orgId: null,
+      kind: ACCOUNT_DELETE_JOB,
+      payload: { userId },
+      runAt: dueAt,
+      dedupeKey: `${ACCOUNT_DELETE_JOB}:${userId}:${dueAt.getTime()}`,
+    });
+    return { dueAt, closed, orgs: mine };
+  });
+  // Their open sockets lose every subscription now.
+  for (const m of orgs) {
+    await publishOrgEvent(deps.pubsub, { type: "membership.revoked", orgId: m.orgId, userId, quiet: true });
+    await announceMembers(deps.pubsub, m.orgId);
+  }
+  for (const one of closed) await afterClosing(deps, one);
+  return { dueAt };
+}
+
+/**
+ * Brings back an account waiting for its deletion: only before its date (`account.not_restorable` after), by the same
+ * clock and under the same lock as `deleteAccount`, so neither can undo the other. No proof: it destroys nothing, and
+ * only its own session gets here. Workspaces that closed with it (same date, asked by them) come back; one that can't
+ * yet (suspended, or waiting for a plan another of theirs waits for) stays on its closing screen, where its Restaurar
+ * says why. Plans that stopped renewing stay stopped: nothing charges until the person turns one on.
+ */
+export async function restoreAccount(deps: DeletionDeps, userId: string) {
+  const { closed, mine } = await deps.db.transaction(async (tx) => {
+    await lockWorkspacesOf(tx, userId);
+    const [account] = await tx
+      .select({ dueAt: users.deletionDueAt, inTime: sql<boolean>`${users.deletionDueAt} > statement_timestamp()` })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (!account?.dueAt || !account.inTime) {
+      throw new ConflictError("This account can't be restored anymore", "account.not_restorable");
+    }
+    const closed = await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(and(eq(organizations.deletionRequestedBy, userId), eq(organizations.deletionDueAt, account.dueAt)));
+    await tx.update(users).set({ deletionDueAt: null, deletionRequestedAt: null }).where(eq(users.id, userId));
+    await recordOperatorEvent(tx, { type: "user.deletion_canceled", userId });
+    await enqueueAccountContact(tx, userId);
+    const mine = await tx
+      .select({ orgId: organizationMembers.orgId })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, userId));
+    return { closed, mine };
+  });
+  for (const m of mine) await announceMembers(deps.pubsub, m.orgId);
+  for (const org of closed) {
+    await restoreWorkspace(deps, userId, org.id, { account: true }).catch((error) => {
+      if (!(error instanceof ForbiddenError || error instanceof ConflictError || error instanceof OrgPausedError))
+        throw error;
+    });
+  }
+}
+
+/**
+ * The `account.delete` job: deletes an account past its date, exactly as `deleteAccount` does, its Apple sign-in revoked
+ * after (`appleRevoke`, best effort: the account is gone). Does nothing when it was restored or is gone, and waits while
+ * it is blocked, as a blocked account can't delete itself: the hourly `enqueueOverdueAccountDeletions` comes back.
+ * Returns whether it was deleted.
+ */
+export async function purgeAccount(
+  deps: DeletionDeps & {
+    appleRevoke?: ((token: { value: string; hint: "refresh_token" | "access_token" }) => Promise<void>) | null;
+  },
+  userId: string,
+) {
+  const { appleRevoke, db, ...options } = deps;
+  const [row] = await db
+    .select({ blockedAt: users.blockedAt })
+    .from(users)
+    .where(and(eq(users.id, userId), sql`${users.deletionDueAt} <= statement_timestamp()`));
+  if (!row || row.blockedAt) return false;
+  // Read before the account goes: its sign-in rows go with it.
+  const tokens = appleRevoke ? await appleSignInTokens(db, userId) : [];
+  if (!(await deleteAccount(db, userId, { ...options, whenDue: true }))) return false;
+  if (appleRevoke) await Promise.all(tokens.map((token) => appleRevoke(token).catch(() => undefined)));
+  return true;
+}
+
+/** Queues `account.delete` for every account past its date, at most once an hour each, as for workspaces. */
+export async function enqueueOverdueAccountDeletions(db: Database, now = new Date()) {
+  const due = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(lte(users.deletionDueAt, now), isNull(users.blockedAt)));
+  const hour = now.toISOString().slice(0, 13);
+  for (const { id } of due) {
+    await enqueue(db, {
+      orgId: null,
+      kind: ACCOUNT_DELETE_JOB,
+      payload: { userId: id },
+      dedupeKey: `${ACCOUNT_DELETE_JOB}:${id}:${hour}`,
+    });
+  }
+  return due.length;
 }
 
 /**

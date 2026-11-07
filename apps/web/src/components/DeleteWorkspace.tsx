@@ -17,6 +17,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  Locked,
 } from "@agenteschat/ui";
 import { useMutation } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
@@ -78,43 +79,45 @@ export function DeleteWorkspaceDialog({
           if (named && proof.ready && !del.isPending) submit();
         }}
       >
-        <DialogBody>
-          <ul className="deletion-lines">
-            <DeletionLine icon="message">{t("deleteOrg.goes.content")}</DeletionLine>
-            <DeletionLine icon="members">
-              {t(sendsEmail(config) ? "deleteOrg.goes.people" : "deleteOrg.goes.peopleQuiet")}
-            </DeletionLine>
-            {edition && (
-              <DeletionLine icon="computer">
-                {t(edition === "cloud" ? "deleteOrg.goes.computer" : "deleteOrg.goes.computers")}
+        <Locked when={del.isPending}>
+          <DialogBody>
+            <ul className="deletion-lines">
+              <DeletionLine icon="message">{t("deleteOrg.goes.content")}</DeletionLine>
+              <DeletionLine icon="members">
+                {t(sendsEmail(config) ? "deleteOrg.goes.people" : "deleteOrg.goes.peopleQuiet")}
               </DeletionLine>
-            )}
-            <DeletionLine icon="plug">
-              <span className="ac-hintline">
-                {t("deleteOrg.goes.connectors")}
-                <InfoHint name={t("common.about", { label: t("deleteOrg.goes.connectors") })}>
-                  {t("common.joinSentences", { a: t("deleteOrg.bucket"), b: t("deleteOrg.github") })}
-                </InfoHint>
-              </span>
-            </DeletionLine>
-            {config?.billingUrl && <DeletionLine icon="coin">{t("deleteOrg.plan")}</DeletionLine>}
-          </ul>
-          <p className="small muted deletion-export">
-            <Trans
-              i18nKey="deleteOrg.export"
-              components={{
-                export: (
-                  <button type="button" className="ac-link ac-link--muted" onClick={() => saveExport(api, org.id)} />
-                ),
-              }}
-            />
-          </p>
-          <Field label={t("deleteOrg.type", { name: org.name })}>
-            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" spellCheck={false} />
-          </Field>
-          <DeletionProofField proof={proof} />
-          {proof.alert && <Alert>{errorText(t, del.error)}</Alert>}
-        </DialogBody>
+              {edition && (
+                <DeletionLine icon="computer">
+                  {t(edition === "cloud" ? "deleteOrg.goes.computer" : "deleteOrg.goes.computers")}
+                </DeletionLine>
+              )}
+              <DeletionLine icon="plug">
+                <span className="ac-hintline">
+                  {t("deleteOrg.goes.connectors")}
+                  <InfoHint name={t("common.about", { label: t("deleteOrg.goes.connectors") })}>
+                    {t("common.joinSentences", { a: t("deleteOrg.bucket"), b: t("deleteOrg.github") })}
+                  </InfoHint>
+                </span>
+              </DeletionLine>
+              {config?.billingUrl && <DeletionLine icon="coin">{t("deleteOrg.plan")}</DeletionLine>}
+            </ul>
+            <p className="small muted deletion-export">
+              <Trans
+                i18nKey="deleteOrg.export"
+                components={{
+                  export: (
+                    <button type="button" className="ac-link ac-link--muted" onClick={() => saveExport(api, org.id)} />
+                  ),
+                }}
+              />
+            </p>
+            <Field label={t("deleteOrg.type", { name: org.name })}>
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" spellCheck={false} />
+            </Field>
+            <DeletionProofField proof={proof} />
+            {proof.alert && <Alert>{errorText(t, del.error)}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}

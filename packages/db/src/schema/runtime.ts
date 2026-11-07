@@ -857,6 +857,8 @@ export const agentQuestions = pgTable(
     toolUseId: text().notNull(),
     text: text().notNull(),
     choices: text().array(),
+    /** The one person it is for: only they answer it, and it waits on nobody else. Null: anyone in the conversation. */
+    requestedForUserId: text(),
     status: agentQuestionStatusEnum().notNull().default("open"),
     answer: text(),
     answeredByUserId: text(),
@@ -963,8 +965,10 @@ export const secretRequests = pgTable(
     toolUseId: text().notNull(),
     /** The only person who may answer: whoever started the run. */
     requestedForUserId: text().notNull(),
-    /** `GITHUB_TOKEN`… */
+    /** `GITHUB_TOKEN`…: the agent's own name for it. People read `label`. */
     name: text().notNull(),
+    /** What people read instead of `name` ("Senha da Conta Google"), in the agent's words; null: the apps derive one. */
+    label: text(),
     purpose: text().notNull(),
     /**
      * `site`: only the agent browser types it, on `site`, never its commands (a runner that says it can, ADR 0027);
@@ -992,6 +996,10 @@ export const secretRequests = pgTable(
     removedAt: timestamp({ withTimezone: true }),
     /** When asked, the agent already held this name on this computer: a delivery replaces that value. */
     replaces: boolean().notNull().default(false),
+    /** Why a `canceled` request closed; null on what closed before this was kept. */
+    endReason: text().$type<"run_stopped" | "withdrawn" | "person_left" | "superseded" | "computer_changed">(),
+    /** The newer request that took this one's place (`endReason: superseded`). */
+    supersededBy: uuid(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

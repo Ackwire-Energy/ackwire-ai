@@ -1,6 +1,7 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   beginLogin,
   freeDuplicate,
@@ -12,12 +13,13 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import { openPopup, sendPopup } from "@/lib/popup";
+import { inDesktopApp } from "@/lib/desktop";
+import { openPopup, openWaitingPopup, sendPopup } from "@/lib/popup";
 
 /*
  * "Add account" (ADR 0041 §2, ADR 0059): the computer starts the
@@ -119,7 +121,7 @@ export function AddAccount(props: AddAccountProps) {
     setReuse(found ?? null);
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
   if (reuse === undefined) return <Icon name="spinner" size={14} />;
-  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
   const label = reuse ? accountTitle(reuse) : "";
   const another = (
     <Button size="sm" onClick={() => setPick("new")}>
@@ -269,7 +271,8 @@ function AddAccountFlow({
   const signInProvider = keyProvider ?? (kind === "antigravity" && enterprise ? GEMINI_ENTERPRISE_PROVIDER : undefined);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
-  const [startFailed, setStartFailed] = useState(false);
+  // Why the sign-in didn't start, in the person's language.
+  const [startFailed, setStartFailed] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
@@ -308,7 +311,7 @@ function AddAccountFlow({
 
   const begin = async (popup?: Window | null): Promise<AccountLoginStart | null> => {
     setStarting(true);
-    setStartFailed(false);
+    setStartFailed(null);
     try {
       const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
         again,
@@ -316,6 +319,7 @@ function AddAccountFlow({
         hint,
       });
       if (gone.current) {
+        popup?.close();
         void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);
         return null;
       }
@@ -323,9 +327,10 @@ function AddAccountFlow({
       setLogin(l);
       if (popup) sendPopup(popup, l.url);
       return l;
-    } catch {
+    } catch (error) {
       popup?.close();
-      if (!gone.current) setStartFailed(true);
+      if (!gone.current)
+        setStartFailed(knownErrorText(t, error) ?? t("agentPage.work.brain.add.startFailed", { computer }));
       return null;
     } finally {
       if (!gone.current) setStarting(false);
@@ -382,7 +387,7 @@ function AddAccountFlow({
 
   const reads = [read, ...Object.values(fanReads)];
   const shown = fanFailed ?? result;
-  const noAnswer = startFailed || reads.includes("noAnswer");
+  const noAnswer = startFailed !== null || reads.includes("noAnswer");
   const ended = noAnswer || reads.includes("failed") || shown?.state === "failed" || shown?.state === "expired";
   // The code or the key on its way to the computer, then the computer signing in with it: a line stands in for the
   // field and its buttons until the sign-in ends.
@@ -533,36 +538,42 @@ function AddAccountFlow({
       </span>
     </p>
   );
-  // The field's buttons are its height (the ruler's default step), so the row reads as one line.
+  // Empty, the field offers Colar inside its end. Filled, Send comes up under it: no greyed button before there's a key.
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
-        <Input
-          ref={field}
-          id={codeId}
-          type={secret ? "password" : "text"}
-          value={code}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={placeholder}
-          aria-label={label}
-          aria-describedby={plan ? keyHintId : undefined}
-          onChange={(e) => take(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              if (valid && ready && !loading) void send();
+        <Locked when={loading}>
+          <AffixInput
+            ref={field}
+            id={codeId}
+            type={secret ? "password" : "text"}
+            value={code}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={placeholder}
+            aria-label={label}
+            aria-describedby={plan ? keyHintId : undefined}
+            onChange={(e) => take(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (valid && ready && !loading) void send();
+              }
+            }}
+            action={
+              !code.trim() && (
+                <Button variant="ghost" size="sm" icon="copy" onClick={() => void paste()}>
+                  {t("aiAccounts.add.paste")}
+                </Button>
+              )
             }
-          }}
-        />
-        {!code.trim() && (
-          <Button icon="copy" onClick={() => void paste()}>
-            {t("aiAccounts.add.paste")}
+          />
+        </Locked>
+        {(code.trim() || !ready) && (
+          <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
+            {t("agentPage.work.brain.add.send", { computer })}
           </Button>
         )}
-        <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
-          {t("agentPage.work.brain.add.send", { computer })}
-        </Button>
       </span>
       {pasteFailed && <SettingNote icon="alert">{t("aiAccounts.add.pasteFailed")}</SettingNote>}
       {sendFailed && (
@@ -582,7 +593,7 @@ function AddAccountFlow({
   const why = otherEmail
     ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
     : noAnswer
-      ? t("agentPage.work.brain.add.startFailed", { computer })
+      ? (startFailed ?? t("agentPage.work.brain.add.startFailed", { computer }))
       : shown?.state === "expired"
         ? t("agentPage.work.brain.add.expired")
         : shown?.duplicate
@@ -621,9 +632,12 @@ function AddAccountFlow({
 
   // Opened on the click itself, then sent to the provider's page once the computer has it.
   const start = () => {
-    const popup = openPopup();
+    const popup = openWaitingPopup(kind);
     setOpened(true);
-    void begin(popup);
+    // The desktop app has no popup: its page goes to the browser (main_window.rs).
+    void begin(popup).then((l) => {
+      if (l && inDesktopApp()) openPopup(l.url);
+    });
   };
   const openAgain = (url: string) => (
     <OpenPage href={url} onOpened={() => setOpened(true)}>
@@ -681,7 +695,7 @@ function AddAccountFlow({
         <Step
           n={1}
           side={
-            <OpenPage href={plan.site} primary={!opened} onOpened={() => setOpened(true)}>
+            <OpenPage href={plan.site} primary={!opened && !code.trim()} onOpened={() => setOpened(true)}>
               {t("aiAccounts.add.openKeys", { site: site.host })}
             </OpenPage>
           }

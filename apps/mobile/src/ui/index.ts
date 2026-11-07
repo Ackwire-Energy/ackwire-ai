@@ -30,6 +30,13 @@ export {
 export { Count, type CountProps } from "./Count";
 export { DiffView } from "./DiffView";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
+export {
+  EventPill,
+  EventPillAction,
+  type EventPillActionProps,
+  type EventPillProps,
+  EventPillText,
+} from "./EventPill";
 export { type FilterItem, Filters, type FiltersProps } from "./Filters";
 export { Glass, type GlassProps } from "./Glass";
 export {
@@ -56,6 +63,7 @@ export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";
 export { LineIcon, type LineIconProps } from "./LineIcon";
 export { LIST_AVATAR, LIST_INSET, LIST_PREVIEW, LIST_TIME, ListRow, type ListRowProps } from "./ListRow";
+export { Locked } from "./Locked";
 export { LogoMark } from "./LogoMark";
 export {
   CoverTabStack,

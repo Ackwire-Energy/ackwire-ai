@@ -62,6 +62,8 @@ export interface SetupView {
   specs: ComputerSetup["specs"];
   /** The computer itself, once made (its page). */
   machineId: string | null;
+  /** Since when (ms) it is in this phase, when the server says. */
+  since?: number | null;
   /** The server's seconds left when its answer came (`receivedAt`, this device's clock); null: no time said. */
   secondsLeft: number | null;
   receivedAt: number;
@@ -98,6 +100,7 @@ export function setupView(setup: ComputerSetup | null | undefined, receivedAt = 
     chipKey: `computerSetup.chip.${status}`,
     specs: setup.specs,
     machineId: setup.machineId,
+    since: setup.since ? Date.parse(setup.since) : null,
     secondsLeft,
     receivedAt,
     waited: typeof setup.secondsWaited === "number" ? Math.max(0, setup.secondsWaited) : null,
@@ -285,6 +288,14 @@ export function computerName(
   if (machine.kind !== "managed") return machineTitle(machine, t("machines.host.label"));
   return [`${orgName}'s computer`, `Computador da ${orgName}`].includes(machine.name) ? ours : machine.name;
 }
+
+/** A computer known only by its name, for `computerName`: the workspace's own reads in the reader's words. */
+export const managedNamed = (c: { name: string } | null | undefined) =>
+  c ? { kind: "managed" as const, name: c.name } : null;
+
+/** `computerName` where a list carries only a computer's name. */
+export const computerNameOf = (t: TFunction, orgName: string, name: string) =>
+  computerName(t, orgName, managedNamed({ name }));
 
 export type NoComputer = "workspace" | "none";
 

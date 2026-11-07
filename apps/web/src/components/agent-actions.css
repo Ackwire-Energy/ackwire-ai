@@ -182,28 +182,22 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   display: flex;
   margin: 4px 0 -2px;
 }
-/* A hand-off by direct message: the two agents' pair row with the reach rows, no reply face to line up with. */
+/* A hand-off by direct message: the two agents' pair row, across the conversation as any pair row is, from past the
+   row's face. An action goes on its own line under it, so the two stay on the middle. */
 .ag-rc--talk {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 6px;
+  margin-left: calc(-1 * var(--msg-lead));
 }
-/* With an action beside it: the pair row's height and type, right after its words (no room kept for the chevron). */
 .ag-rc--talk > .ag-rc__btn {
   min-height: 26px;
   font-size: 13px;
 }
-.ag-rc--talk:has(> .ag-rc__btn) {
-  gap: 2px;
-}
-.ag-rc--talk:has(> .ag-rc__btn) .consult-pair__chev {
-  display: none;
-}
+/* The row's own edge is short of the line's (`.consult-pair`) by a look's side padding: the rest is the same 16px. */
 .ag-rcs .ag-rc--talk > .consult-pair {
-  margin: 0;
-  padding: 0;
-}
-.ag-rc--talk .consult-pair__detail {
-  padding-left: 0;
+  flex: 1 1 100%;
+  padding-inline: calc(16px - var(--msg-inline));
 }

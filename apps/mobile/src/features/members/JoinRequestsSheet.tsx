@@ -17,7 +17,19 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useReducedMotion, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  EmptyState,
+  GroupedRow,
+  InfoHint,
+  Locked,
+  PersonAvatar,
+  SheetScreen,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { errorHaptic, successHaptic, useSurface } from "../shared/parts";
@@ -55,7 +67,7 @@ export function JoinRequestsSheet({ focus, onClose }: { focus?: string | undefin
   else if (list.data.length === 0)
     body = (
       <>
-        <Text tone="muted">{t("members.requests.empty")}</Text>
+        <EmptyState size="inline" title={t("members.requests.empty")} />
         <Button variant="secondary" wide label={t("mobile.common.close")} onPress={onClose} />
       </>
     );
@@ -201,7 +213,7 @@ function RequestCard({
       {/* Denying swaps the answer for the reason, faded in place. */}
       {denying ? (
         <Animated.View key="deny" entering={reduced ? undefined : CARD_IN} style={styles.swap}>
-          <View style={styles.field}>
+          <Locked when={busy} style={styles.field}>
             <TextArea
               value={reason}
               onChangeText={setReason}
@@ -213,19 +225,26 @@ function RequestCard({
             <Text variant="caption" tone="faint">
               {t("members.requests.reasonHelp")}
             </Text>
-          </View>
+          </Locked>
           <View style={styles.acts}>
             <View style={styles.grow}>
               <Button
                 variant="primary"
                 wide
                 label={t("members.requests.deny")}
+                loading={deny.isPending}
                 disabled={busy}
                 onPress={() => void denyIt()}
               />
             </View>
             <View style={styles.grow}>
-              <Button variant="ghost" wide label={t("mobile.common.back")} onPress={() => setDenying(false)} />
+              <Button
+                variant="ghost"
+                wide
+                label={t("mobile.common.back")}
+                disabled={busy}
+                onPress={() => setDenying(false)}
+              />
             </View>
           </View>
         </Animated.View>
@@ -265,6 +284,7 @@ function RequestCard({
                 wide
                 icon="check"
                 label={t("members.requests.approve")}
+                loading={approve.isPending}
                 disabled={busy || full}
                 onPress={() => void approveIt()}
               />

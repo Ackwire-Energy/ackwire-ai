@@ -16,6 +16,7 @@ import type {
   StickerMood,
 } from "../api/types";
 import { agentGrammar } from "./grammar";
+import { plainLine } from "./markdown";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /**
@@ -211,14 +212,18 @@ export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
  * 0100), and a search by filters alone also lists GIFs and stickers sent with no words.
  */
 export const hitText = (t: TFunction, hit: { snippet: string; mediaKind?: MediaKind }) =>
-  hit.snippet || (hit.mediaKind ? mediaWord(t, hit.mediaKind) : "");
+  plainLine(hit.snippet) || (hit.mediaKind ? mediaWord(t, hit.mediaKind) : "");
 
-/** A quote's line: its excerpt, or the word for what it quotes when that was a GIF or a sticker. */
+/**
+ * A quote's line: its excerpt in plain words (one saved before excerpts lost their marks may still have them), else
+ * the word for what it quotes.
+ */
 export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media">): string {
   const kind = mediaKindOf(reply.media);
   if (kind === "voice") return mediaWord(t, kind);
-  if (reply.excerpt.trim()) return reply.excerpt;
-  return kind ? mediaWord(t, kind) : reply.excerpt;
+  const words = plainLine(reply.excerpt);
+  if (words) return words;
+  return kind ? mediaWord(t, kind) : t("channel.quoteNoWords");
 }
 
 /** A mood's name, as the picker and a sticker's name say it ("comemorando"). */

@@ -17,8 +17,10 @@ import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { ArtifactLink } from "./run-tools";
+import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
+import { movableRun, moveRun } from "./works";
 
 export const POST_MESSAGE_TOOL = "post_message";
 export const SEND_DM_TOOL = "send_dm";
@@ -38,11 +40,11 @@ const AGENTS_ONLY =
   "You were consulted by another agent for someone who doesn't talk to you directly: answer that agent with what you found (it passes it on), never them or anyone else from here.";
 
 /**
- * Why a message the agent sends elsewhere was sent: who asked, and the message that asked (`fromMessageId`, in its
- * thread `fromThreadId`), so the agent's later runs there can quote it and link to it (`originNotes` in context.ts).
+ * Why a message the agent sends elsewhere was sent: the message that asked (`fromMessageId`, in its thread
+ * `fromThreadId`), so the agent's later runs there can quote it and link to it (`originNotes` in context.ts). Who
+ * asked isn't on it: everyone there gets the message, and a request from a DM stays in that DM.
  */
-const origin = (ctx: ToolContext, requester: string | null) => ({
-  requesterUserId: requester,
+const origin = (ctx: ToolContext) => ({
   fromChannelId: ctx.channelId,
   fromMessageId: ctx.triggerMessageId,
   fromThreadId: ctx.threadRootId,
@@ -141,13 +143,14 @@ export function createChatToolSource(deps: {
     {
       name: POST_MESSAGE_TOOL,
       description:
-        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, channels you are in). Then reply here saying where you posted. For this conversation, just reply.',
+        'Post a new message in another channel, e.g. "manda no #geral". `channel`: its name. `move_here`: asked to continue in a channel or out of a thread (its own channel too): your replies and background work go on at its top level, and a line here links there. Files: `artifact_ids`; one from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, yours). Then say where you posted. For this conversation, just reply.',
       scope: "",
       inputSchema: {
         type: "object",
         properties: {
           channel: { type: "string", minLength: 1, maxLength: 100 },
           text: { type: "string", maxLength: MAX_MESSAGE_LENGTH },
+          move_here: { type: "boolean" },
           artifact_ids: {
             type: "array",
             items: { type: "string", minLength: 36, maxLength: 36 },
@@ -205,7 +208,18 @@ export function createChatToolSource(deps: {
                 : "you are";
             return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
-          if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
+          const moving = input.move_here === true;
+          const [run] = await ctx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId));
+          const here = channel.id === ctx.channelId;
+          const inThread = replyThreadOf(ctx) !== null;
+          const movable = (moving || (here && inThread)) && !!run && (await movableRun(ctx.db, run));
+          if (here && !(moving && inThread && movable)) {
+            const out = inThread && movable ? " To continue at this channel's top level instead, set `move_here`." : "";
+            return { content: `${SAME_CONVERSATION}${out}`, isError: true };
+          }
+          if (moving && !movable) {
+            return { content: "This work stays where it is: post without `move_here`.", isError: true };
+          }
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {
             return {
               content: `You are not in #${channel.name} (private). Ask someone to add you to it, then try again.`,
@@ -242,10 +256,6 @@ export function createChatToolSource(deps: {
             });
             files.push({ id: shared.artifact.id, version: shared.artifact.version, title: shared.artifact.title });
           }
-          const [run] = await ctx.db
-            .select({ hop: schema.agentRuns.hop })
-            .from(schema.agentRuns)
-            .where(eq(schema.agentRuns.id, ctx.runId));
           // A mention reaches only that channel's members: the result names the agents it missed.
           const unreached = await unreachedAgents(ctx.db, {
             orgId: ctx.orgId,
@@ -263,7 +273,7 @@ export function createChatToolSource(deps: {
               ...(files.length > 0 ? { artifacts: files } : {}),
               // Kept as `send_gif` keeps it: no URL, and its title never reaches the model (ADR 0091 §6).
               ...(gif ? { media: gif } : {}),
-              postedFrom: origin(ctx, requester),
+              postedFrom: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
@@ -286,9 +296,13 @@ export function createChatToolSource(deps: {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          if (moving && run) await moveRun({ db: ctx.db, pubsub: deps.pubsub }, run, message);
           const note = unreachedNote(unreached, `#${channel.name}`, true);
+          const next = moving
+            ? `Your replies land there from now on, at its top level, your background work's updates and report too; the people where you were see a line linking to it. Go on with the work.`
+            : "Tell the person it's there.";
           return {
-            content: `Posted in #${channel.name}${gif ? " with a GIF" : ""}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. Tell the person it's there.${note ? ` ${note}` : ""}`,
+            content: `Posted in #${channel.name}${gif ? " with a GIF" : ""}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. ${next}${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {
@@ -299,7 +313,7 @@ export function createChatToolSource(deps: {
     {
       name: SEND_DM_TOOL,
       description:
-        'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
+        'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language, unless they asked in a DM: then only what they told you to say. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
       scope: "",
       inputSchema: {
         type: "object",
@@ -395,7 +409,7 @@ export function createChatToolSource(deps: {
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
-              agentDm: origin(ctx, requester),
+              agentDm: origin(ctx),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },

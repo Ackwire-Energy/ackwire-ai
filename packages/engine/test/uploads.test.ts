@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { FILE_PULL_PROTOCOL, MAX_INLINE_FILE_BYTES } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
@@ -21,6 +22,8 @@ import {
   grantScopes,
   listArtifacts,
   listDeletedArtifacts,
+  NotFoundError,
+  openFilePull,
   postPersonMessage,
   rankTools,
   receiveMachineUpload,
@@ -394,7 +397,7 @@ describe("upload_file", () => {
     const [a] = await f.db.select().from(schema.artifacts);
     expect(a).toMatchObject({ kind: "file", title: "Gráfico", channelId: f.general.id, untrusted: true });
     expect(out.content).toBe(
-      `Uploaded out/chart.png to the Drive as "Gráfico" (file, ${PNG.byteLength} bytes), artifact ${a?.id}, version 1.`,
+      `Uploaded out/chart.png as "Gráfico" (file, ${PNG.byteLength} bytes), artifact ${a?.id}, version 1. It is in the shared Drive, from #general: everyone in the workspace sees it.`,
     );
     expect(out.data).toEqual({ artifact: { id: a?.id, version: 1, title: "Gráfico" } });
     const [up] = await f.db.select().from(schema.artifactUploads);
@@ -497,6 +500,106 @@ describe("upload_file", () => {
     for (const query of ["share file in channel", "send screenshot", "attach image"]) {
       expect(rankTools(computer, "", query)[0]?.name).toBe("upload_file");
     }
+  });
+
+  const bigFile = () =>
+    createFileArtifact(f.artifactDeps, person(), f.org.id, {
+      title: "Base",
+      name: "base.zip",
+      bytes: new Uint8Array(MAX_INLINE_FILE_BYTES + 1).fill(7),
+    });
+  const pulls = () => f.db.select().from(schema.machineFilePulls);
+  const requests = (runner: { sent: { type: string; op?: string }[] }) =>
+    runner.sent.filter((s) => s.type === "request" && (s.op === "write" || s.op === "pull"));
+
+  test("import_file past what a write carries: the computer fetches it, at the hash of that version", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner } = await connectedComputer(f);
+    const a = await bigFile();
+    const out = await call(await runCtx(), "import_file", { artifact_id: a.id });
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain("to imports/base.zip (5.0 MB)");
+    expect(runner.files.get("imports/base.zip")?.byteLength).toBe(MAX_INLINE_FILE_BYTES + 1);
+    expect(requests(runner)).toMatchObject([
+      {
+        op: "pull",
+        path: "imports/base.zip",
+        size: MAX_INLINE_FILE_BYTES + 1,
+        sha256: a.content.kind === "file" ? a.content.sha256 : "",
+      },
+    ]);
+    expect(await pulls()).toEqual([]);
+  });
+
+  test("a pull is one fetch by its machine, before it expires, and names no other file", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    let held: { pullId: string; url: string } | undefined;
+    const { paired } = await connectedComputer(f, {
+      pull: async (req) => {
+        held = req;
+        const other = await openFilePull(f.artifactDeps, req.pullId, crypto.randomUUID()).catch((e: unknown) => e);
+        expect(other).toBeInstanceOf(NotFoundError);
+        const { body } = await openFilePull(f.artifactDeps, req.pullId, paired.machineId);
+        expect(
+          await openFilePull(f.artifactDeps, req.pullId, paired.machineId).catch((e: unknown) => e),
+        ).toBeInstanceOf(NotFoundError);
+        return new Uint8Array(await new Response(body).arrayBuffer());
+      },
+    });
+    const a = await bigFile();
+    expect((await call(await runCtx(), "import_file", { artifact_id: a.id })).isError).toBeFalsy();
+    expect(held?.url).toEndWith(`/api/machines/pulls/${held?.pullId}`);
+    const expired = {
+      orgId: f.org.id,
+      machineId: paired.machineId,
+      blobKey: "orgs/x/y",
+      size: 1,
+      expiresAt: new Date(Date.now() - 1000),
+    };
+    const [row] = await f.db.insert(schema.machineFilePulls).values(expired).returning();
+    expect(await openFilePull(f.artifactDeps, row?.id ?? "", paired.machineId).catch((e: unknown) => e)).toBeInstanceOf(
+      NotFoundError,
+    );
+    // The next copy on that machine clears what never got fetched.
+    await call(await runCtx(), "import_file", { artifact_id: a.id });
+    expect(await pulls()).toEqual([]);
+  });
+
+  test("a copy that doesn't land says why and leaves no pull behind", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await connectedComputer(f, {
+      pull: async () => {
+        throw new Error("the computer's disk is full. Free some space there, then try again.");
+      },
+    });
+    const a = await bigFile();
+    const out = await call(await runCtx(), "import_file", { artifact_id: a.id });
+    expect(out).toMatchObject({
+      isError: true,
+      content:
+        "Failed: imports/base.zip didn't reach Build box: the computer's disk is full. Free some space there, then try again.",
+    });
+    expect(await pulls()).toEqual([]);
+  });
+
+  test("an older runner still takes what a write carries; past that it says the cause and the way out", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner } = await connectedComputer(f, { protocol: FILE_PULL_PROTOCOL - 1 });
+    const small = await createFileArtifact(f.artifactDeps, person(), f.org.id, {
+      title: "Logo",
+      name: "logo.png",
+      bytes: PNG,
+    });
+    const ctx = await runCtx();
+    expect((await call(ctx, "import_file", { artifact_id: small.id })).isError).toBeFalsy();
+    expect(runner.files.get("imports/logo.png")).toEqual(PNG);
+    const out = await call(ctx, "import_file", { artifact_id: (await bigFile()).id });
+    expect(out).toMatchObject({
+      isError: true,
+      content:
+        "Failed: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
+    });
+    expect(await pulls()).toEqual([]);
   });
 
   test("import_file copies an uploaded file's bytes under its original name", async () => {

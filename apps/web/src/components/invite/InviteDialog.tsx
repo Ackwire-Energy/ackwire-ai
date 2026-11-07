@@ -26,6 +26,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  Locked,
   LogoMark,
   OptionCard,
   pixelConfetti,
@@ -49,6 +50,8 @@ import {
 import { Trans, useTranslation } from "react-i18next";
 import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { MembersFull } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -142,6 +145,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   const toast = useToast();
   const api = useApi();
   const dir = useDirectory(org.id);
+  const held = usePlanHold() !== null;
   // A server that sends no email invites through the link only.
   const byLink = !sendsEmail(useAuthConfig().data);
   const invitations = useAllInvitations(org.id);
@@ -675,6 +679,29 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
       </>
     );
 
+  if (held) {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={(o) => !o && onClose()}
+        title={t("members.dialog.title", { org: org.name })}
+        closeLabel={t("common.close")}
+        width={480}
+      >
+        <DialogBody>
+          <p>{t("standing.billing.invites")}</p>
+        </DialogBody>
+        <DialogFooter>
+          <Button onClick={onClose}>{t("common.close")}</Button>
+          {can(org, "manage_billing") && (
+            <BillingLinkButton orgId={org.id} from="hold" variant="primary">
+              {t("standing.billing.cta.payment")}
+            </BillingLinkButton>
+          )}
+        </DialogFooter>
+      </Dialog>
+    );
+  }
   return (
     <Dialog
       open={open}
@@ -700,18 +727,20 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           ))}
         </div>
       )}
-      <DialogBody className="invite-dialog">
-        <div
-          className="invite-screen"
-          key={screen}
-          data-sent={screen === "sent" || undefined}
-          data-party={party || undefined}
-        >
-          <HostAsk host={host} title={ask.title} lead={ask.lead} happy={party} face={hostFace} />
-          <div className="auth__step invite-answer">{answer}</div>
-        </div>
-      </DialogBody>
-      <DialogFooter>{footer}</DialogFooter>
+      <Locked when={inviteMany.isPending}>
+        <DialogBody className="invite-dialog">
+          <div
+            className="invite-screen"
+            key={screen}
+            data-sent={screen === "sent" || undefined}
+            data-party={party || undefined}
+          >
+            <HostAsk host={host} title={ask.title} lead={ask.lead} happy={party} face={hostFace} />
+            <div className="auth__step invite-answer">{answer}</div>
+          </div>
+        </DialogBody>
+        <DialogFooter>{footer}</DialogFooter>
+      </Locked>
     </Dialog>
   );
 }

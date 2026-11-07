@@ -72,6 +72,7 @@ import { notifyMissionEnded } from "./notification-producers";
 import { recordTaskFinished } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { maySql } from "./permissions";
 import type { SearchDeps } from "./search";
 import { autoThreadTitle, createThreadFromRange } from "./threads";
 import { createWikiPage } from "./wiki";
@@ -872,8 +873,10 @@ function missionScope(userId: string, orgId: string, input: ListMissionsInput) {
   const agentId = uuid(input.agentId);
   if ((input.channelId && !channelId) || (input.agentId && !agentId)) return sql`false`;
   return sql`m.org_id = ${orgId}::uuid
-    and m.channel_id in (select cm.channel_id from ${schema.channelMembers} cm
-      where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId})
+    and (m.channel_id in (select cm.channel_id from ${schema.channelMembers} cm
+        where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId})
+      or exists (select 1 from ${schema.channels} mc where mc.id = m.channel_id and mc.kind = 'channel'
+        and ${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "administrator")}))
     ${channelId ? sql`and m.channel_id = ${channelId}::uuid` : sql``}
     ${agentId ? sql`and m.agent_id = ${agentId}::uuid` : sql``}
     ${like ? sql`and (m.title ilike ${like} or m.goal ilike ${like})` : sql``}`;

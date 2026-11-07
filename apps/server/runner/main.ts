@@ -68,7 +68,7 @@ import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
-import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
+import { MCP_TOKEN_FILE, mcpSocketPath, runMcpRelay, runMcpServer } from "./mcp";
 import {
   type DeviceGrant,
   devicePair,
@@ -1284,6 +1284,11 @@ async function main(argv: string[]): Promise<number> {
       if (!taskId || !/^[a-zA-Z0-9-]{8,64}$/.test(taskId)) {
         console.error("Usage: agentes-runner mcp --task <taskId> | --run <runId>");
         return 1;
+      }
+      if (p.flags.has("relay")) {
+        const { AGENTES_MCP_SOCKET: socketPath, AGENTES_MCP_TOKEN: token } = process.env;
+        if (!socketPath || !token) return 1;
+        return runMcpRelay({ taskId, socketPath, token });
       }
       return runMcpServer({
         taskId,

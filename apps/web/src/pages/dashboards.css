@@ -235,35 +235,6 @@ html:not([data-pointer]) .db-card:focus-visible {
   }
 }
 
-.db-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 56px 16px;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
-  box-shadow: inset 0 0 0 1.5px var(--line);
-  text-align: center;
-  font-size: 14px;
-  color: var(--muted);
-}
-.db-empty b {
-  font-size: 16px;
-  color: var(--ink);
-}
-.db-empty .ac-btn {
-  margin-top: 8px;
-}
-.db-empty__art {
-  width: 96px;
-  height: 48px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  background: var(--wg-tile) 0 0 / 8px 8px;
-  image-rendering: pixelated;
-  opacity: 0.6;
-}
-
 /* ── Dialogs: shared fields ─────────────────────────────────────────────── */
 .db-form {
   display: contents;
@@ -271,7 +242,7 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--form-gap);
   overflow: auto;
 }
 .db-f {
@@ -726,6 +697,7 @@ html:not([data-pointer]) .nwc-pk .ac-select__trigger:focus-visible {
 /* Format and size side by side. */
 .nwc-pks {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;

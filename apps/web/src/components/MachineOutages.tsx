@@ -24,7 +24,9 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  EventPillAction,
   Icon,
+  Locked,
   OptionList,
   type OptionListItem,
   ProviderLogo,
@@ -36,6 +38,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
@@ -278,47 +281,49 @@ export function SwitchComputerDialog({
       width={520}
       className="outage-dialog"
     >
-      <DialogBody>
-        <p className="outage-dialog__h">{t("outage.dialog.where")}</p>
-        {options.length > 0 && (
-          <OptionList
-            aria-label={t("outage.dialog.whereLabel")}
-            value={value}
-            onValueChange={setTarget}
-            options={options}
-          />
-        )}
-        {!firstOpen && <p className="small muted outage-dialog__none">{t("outage.dialog.none")}</p>}
-        <p className="outage-dialog__h outage-dialog__h--gap">{t("outage.dialog.who")}</p>
-        <div className="outage-dialog__who">
-          {o.agents.map((a) => {
-            const check = `${id}-${a.agentId}`;
-            const waiting = waitingText(t, a.waiting);
-            return (
-              <label key={a.agentId} htmlFor={check} className="outage-dialog__agent">
-                <Checkbox
-                  id={check}
-                  aria-label={a.name}
-                  checked={picked.includes(a.agentId)}
-                  onCheckedChange={(on) =>
-                    setPicked((p) => (on ? [...p, a.agentId] : p.filter((x) => x !== a.agentId)))
-                  }
-                />
-                <AgentAvatar agentId={a.agentId} name={a.name} size="sm" state="idle" expression="closed" />
-                <span className="outage-dialog__name">{a.name}</span>
-                {waiting && <small>{waiting}</small>}
-              </label>
-            );
-          })}
-        </div>
-        <p className="outage-dialog__hint ac-iconline">
-          <Icon name="info" size={16} />
-          <span>{t("outage.dialog.hint", { name: o.name })}</span>
-        </p>
-      </DialogBody>
+      <Locked when={move.isPending}>
+        <DialogBody>
+          <p className="outage-dialog__h">{t("outage.dialog.where")}</p>
+          {options.length > 0 && (
+            <OptionList
+              aria-label={t("outage.dialog.whereLabel")}
+              value={value}
+              onValueChange={setTarget}
+              options={options}
+            />
+          )}
+          {!firstOpen && <p className="small muted outage-dialog__none">{t("outage.dialog.none")}</p>}
+          <p className="outage-dialog__h outage-dialog__h--gap">{t("outage.dialog.who")}</p>
+          <div className="outage-dialog__who">
+            {o.agents.map((a) => {
+              const check = `${id}-${a.agentId}`;
+              const waiting = waitingText(t, a.waiting);
+              return (
+                <label key={a.agentId} htmlFor={check} className="outage-dialog__agent">
+                  <Checkbox
+                    id={check}
+                    aria-label={a.name}
+                    checked={picked.includes(a.agentId)}
+                    onCheckedChange={(on) =>
+                      setPicked((p) => (on ? [...p, a.agentId] : p.filter((x) => x !== a.agentId)))
+                    }
+                  />
+                  <AgentAvatar agentId={a.agentId} name={a.name} size="sm" state="idle" expression="closed" />
+                  <span className="outage-dialog__name">{a.name}</span>
+                  {waiting && <small>{waiting}</small>}
+                </label>
+              );
+            })}
+          </div>
+          <p className="outage-dialog__hint ac-iconline">
+            <Icon name="info" size={16} />
+            <span>{t("outage.dialog.hint", { name: o.name })}</span>
+          </p>
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={t("outage.dialog.note", { name: o.name })}>
         <Button onClick={() => onOpenChange(false)}>{t("outage.dialog.cancel")}</Button>
-        <Button variant="primary" disabled={picked.length === 0 || !value || move.isPending} onClick={submit}>
+        <Button variant="primary" disabled={picked.length === 0 || !value} loading={move.isPending} onClick={submit}>
           {t("outage.dialog.submit", { count: picked.length })}
         </Button>
       </DialogFooter>
@@ -327,9 +332,9 @@ export function SwitchComputerDialog({
 }
 
 /**
- * The agent's note "the computer brain can't answer" as one card: waiting for the computer (with what
- * waits and, on a self-host, "Trocar computador"), then "voltou" once it is back, or "troquei" once the
- * agent moved.
+ * The agent's note "the computer brain can't answer" as one waiting pill: it waits for the computer, not for the
+ * viewer (a quiet clock, what waits under it and, on a self-host, "Switch computer"), then a decided pill saying it is
+ * back, or that the agent moved.
  */
 export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; agentId: string | null }) {
   const { t } = useTranslation();
@@ -341,36 +346,38 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
   const { outages, outage, mine, state, name } = useWaitState(notice, agentId);
   const waiting = mine ? waitingText(t, mine.waiting) : null;
   if (state !== "waiting") {
+    const text = state === "back" ? t("outage.card.back", { name }) : t("outage.card.moved");
     return (
-      <div className="waitcard" data-done="">
-        <span className="waitcard__top ac-iconline">
-          <Icon name="check" size={16} />
-          <span>{state === "back" ? t("outage.card.back", { name }) : t("outage.card.moved")}</span>
-        </span>
-      </div>
+      <RequestDone done label={text}>
+        {text}
+      </RequestDone>
     );
   }
+  const title = t("outage.card.waiting", { name });
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="waiting" size={16} />
-        <span>{t("outage.card.waiting", { name })}</span>
-      </span>
-      <p className="ac-iconline">
-        <ProviderLogo id={notice.brain} size="xs" />
-        {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
-      </p>
-      {switches && outage && outages.data && (
-        <span className="waitcard__acts">
-          <Button size="sm" onClick={() => setOpen(true)}>
-            {t("outage.switch")}
-          </Button>
-        </span>
-      )}
+    <>
+      <RequestOpen
+        mine={false}
+        icon="waiting"
+        label={title}
+        action={
+          switches && outage && outages.data ? (
+            <EventPillAction onClick={() => setOpen(true)}>{t("outage.switch")}</EventPillAction>
+          ) : undefined
+        }
+        below={
+          <p className="ac-iconline">
+            <ProviderLogo id={notice.brain} size="xs" />
+            {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
+          </p>
+        }
+      >
+        {title}
+      </RequestOpen>
       {open && outage && outages.data && (
         <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={outage} data={outages.data} />
       )}
-    </div>
+    </>
   );
 }
 

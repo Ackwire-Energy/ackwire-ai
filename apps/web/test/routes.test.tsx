@@ -107,10 +107,10 @@ describe("route guards", () => {
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
-    expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    expect(screen().getByText("Cada assunto na sua própria conversa")).toBeTruthy();
     // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
-      "Responda a uma mensagem para abrir uma thread.",
+      "Responda a uma mensagem para abrir uma thread, e o canal continua limpo.",
     );
     cleanup();
     for (const [tab, title] of [
@@ -137,7 +137,7 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Página não encontrada" })).toBeTruthy();
   });
 
-  test("the sidebar lists channels, DMs (people and agents) and the pending approvals count", async () => {
+  test("the sidebar lists channels, DMs (people and agents) and the pending approvals count, proposals in it", async () => {
     const state = seedState();
     for (const id of [ADA_ID, ATLAS_ID]) seedDm(state, { type: "agent", id });
     seedDm(state, { type: "person", id: "u-joao" });
@@ -146,7 +146,8 @@ describe("route guards", () => {
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.textContent).toContain("Acme");
     expect(nav.textContent).toContain("2 membros · 2 agentes");
-    expect(screen().getByLabelText("2 aprovações pendentes").textContent).toBe("2");
+    // Two approvals and the two proposals waiting: proposals count in Aprovações unless they have a row of their own.
+    expect(screen().getByLabelText("4 aprovações pendentes").textContent).toBe("4");
     for (const name of ["Canais", "eng", "general", "Mensagens diretas", "Ada", "Atlas", "João"]) {
       expect(nav.textContent).toContain(name);
     }

@@ -8,7 +8,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
       "Umowa dotycząca korzystania z agentes.chat: Twój obszar roboczy, Twoi agenci oraz zakres odpowiedzialności każdej ze stron.",
     courtesy:
       "Niniejszy dokument jest tłumaczeniem grzecznościowym. W przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "agreement",
@@ -122,7 +122,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "termination",
         heading: "12. Okres obowiązywania i rozwiązanie",
         blocks: [
-          "Możesz w każdej chwili zaprzestać korzystania z Usługi i usunąć swoje konto w aplikacji. Możemy zawiesić lub zakończyć Twój dostęp w przypadku istotnego naruszenia niniejszych Warunków, gdy wymagają tego przepisy prawa, lub z 30-dniowym wypowiedzeniem, jeżeli zaprzestaniemy świadczenia Usługi. Jeżeli zakończymy świadczenie Usługi z przyczyn innych niż Twoje naruszenie, udostępnimy Twoje Treści Obszaru Roboczego do eksportu przez 30 dni, a następnie usuniemy je zgodnie z opisem w Polityce prywatności. Postanowienia, które ze swej natury obowiązują po rozwiązaniu (w tym sekcje 6, 9, 11, 13, 14 i 15), pozostają w mocy.",
+          "Możesz w każdej chwili zaprzestać korzystania z Usługi i usunąć swoje konto w aplikacji. Zostaje ono usunięte 7 dni później i do tego czasu możesz je przywrócić. Możemy zawiesić lub zakończyć Twój dostęp w przypadku istotnego naruszenia niniejszych Warunków, gdy wymagają tego przepisy prawa, lub z 30-dniowym wypowiedzeniem, jeżeli zaprzestaniemy świadczenia Usługi. Jeżeli zakończymy świadczenie Usługi z przyczyn innych niż Twoje naruszenie, udostępnimy Twoje Treści Obszaru Roboczego do eksportu przez 30 dni, a następnie usuniemy je zgodnie z opisem w Polityce prywatności. Postanowienia, które ze swej natury obowiązują po rozwiązaniu (w tym sekcje 6, 9, 11, 13, 14 i 15), pozostają w mocy.",
         ],
       },
       {
@@ -175,7 +175,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
       "Jakie dane zbieramy, co i dokąd wysyłają agenci, kto może widzieć Twój obszar roboczy oraz jakie przysługują Ci prawa.",
     courtesy:
       "Niniejszy dokument jest tłumaczeniem grzecznościowym. W przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
-    updated: "2026-11-04",
+    updated: "2026-11-06",
     sections: [
       {
         id: "overview",
@@ -220,7 +220,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Treści Obszaru Roboczego przetwarzane w imieniu obszarów roboczych",
         blocks: [
           "Treści Obszaru Roboczego obejmują wiadomości w kanałach, wątkach i wiadomościach bezpośrednich, pliki w Drive oraz strony wiki. Obejmują też zadania, rutyny, wydarzenia w kalendarzu i zatwierdzenia, instrukcje, ustawienia i pamięć agentów, to, co agenci piszą i robią, oraz dane, które agenci odczytują za pośrednictwem konektorów, baz danych i komputerów podłączonych przez obszar roboczy. Przetwarzamy je wyłącznie w celu obsługi obszaru roboczego i jego agentów zgodnie z konfiguracją ustaloną przez obszar roboczy, wyświetlania ich członkom obszaru roboczego, wysyłania powiadomień, o które proszą, oraz zapewniania wsparcia.",
-          "Treści Obszaru Roboczego należą do obszaru roboczego: członkowie widzą to, na co pozwalają jego kanały i uprawnienia, a zarządzają nimi jego właściciele i administratorzy. Opublikowane przez Ciebie wiadomości pozostają w obszarze roboczym po Twoim odejściu z niego lub usunięciu Twojego konta, chyba że obszar roboczy je usunie.",
+          "Treści Obszaru Roboczego należą do obszaru roboczego: członkowie widzą to, na co pozwalają jego kanały i uprawnienia, a zarządzają nimi jego właściciele i administratorzy. Właściciele i administratorzy obszaru roboczego widzą wszystkie kanały, zadania i strony wiki, także prywatne. Nie mogą czytać wiadomości bezpośrednich między innymi osobami. Opublikowane przez Ciebie wiadomości pozostają w obszarze roboczym po Twoim odejściu z niego lub usunięciu Twojego konta, chyba że obszar roboczy je usunie.",
         ],
       },
       {
@@ -265,7 +265,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         blocks: [
           {
             list: [
-              "**Dane konta:** przez cały okres istnienia konta. Gdy usuniesz konto w aplikacji, zostaje ono usunięte natychmiast i znika z naszych kopii zapasowych w ciągu 30 dni, z wyjątkiem zapisów, które musimy przechowywać na podstawie przepisów prawa. Każdy obszar roboczy, którego byłeś jedynym członkiem, zostaje jednocześnie zamknięty, a jego treści są usuwane 7 dni później, zgodnie z opisem poniżej. Obszary robocze, do których należałeś, zachowują Twoje imię i nazwisko oraz adres e-mail w swoich dziennikach audytu przez cały okres istnienia każdego z nich.",
+              "**Dane konta:** przez cały okres istnienia konta. Gdy usuniesz konto w aplikacji, zostaje ono natychmiast wylogowane wszędzie i usunięte 7 dni później, chyba że wcześniej je przywrócisz, a następnie znika z naszych kopii zapasowych w ciągu 30 dni, z wyjątkiem zapisów, które musimy przechowywać na podstawie przepisów prawa. Każdy obszar roboczy, którego byłeś jedynym członkiem, zostaje jednocześnie zamknięty, a jego treści są usuwane 7 dni później, zgodnie z opisem poniżej. Obszary robocze, do których należałeś, zachowują Twoje imię i nazwisko oraz adres e-mail w swoich dziennikach audytu przez cały okres istnienia każdego z nich.",
               "**Treści Obszaru Roboczego:** przez cały okres istnienia obszaru roboczego, a wcześniej, gdy obszar roboczy usuwa określone treści. Gdy plan agentes.chat obszaru roboczego się kończy, jego treści pozostają dostępne przez 90 dni, a następnie są usuwane. Gdy właściciel usuwa obszar roboczy, zostaje on natychmiast zamknięty dla wszystkich, a jego treści są usuwane 7 dni później, chyba że właściciel przywróci go wcześniej, i znikają z naszych kopii zapasowych w ciągu kolejnych 30 dni, z wyjątkiem treści, które musimy przechowywać na podstawie przepisów prawa lub jako zapis nadużycia (poniżej).",
               "**Dzienniki:** dzienniki żądań i bezpieczeństwa do 90 dni. Zapisy dotyczące wykorzystania modeli (tokeny i koszt) przez cały okres istnienia obszaru roboczego, ponieważ zależą od nich budżety i raporty wykorzystania.",
               "**Dane rozliczeniowe:** przez okres, w którym płacisz za obszar roboczy, a następnie tak długo, jak wymagają tego przepisy podatkowe i rachunkowe.",

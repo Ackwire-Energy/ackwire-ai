@@ -21,7 +21,17 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-import { GroupedFooter, haptics, IconButton, Segmented, Text, useReducedMotion, useTheme, useToast } from "@/ui";
+import {
+  GroupedFooter,
+  haptics,
+  IconButton,
+  Locked,
+  Segmented,
+  Text,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
@@ -194,26 +204,28 @@ function Arrange({ board }: { board: Dashboard }) {
         <GroupedFooter>{t("mobile.dashboards.organize.hint")}</GroupedFooter>
         {widgets.length === 0 ? (
           <Text variant="subhead" tone="muted" style={styles.empty}>
-            {t("dashboards.empty.title")}
+            {t("dashboards.empty.text")}
           </Text>
         ) : null}
-        <View style={{ height: widgets.length ? widgets.length * (rowH + GAP) - GAP : 0 }}>
-          {widgets.map((item) => (
-            <OrganizeRow
-              key={item.id}
-              item={item}
-              place={widgetPlace(items, item.id)}
-              lifted={lifted === item.id}
-              motion={motion}
-              onLayoutHeight={(h) => measure(item.id, h)}
-              onLift={lift}
-              onDrop={drop}
-              onMove={(by) => move(item.id, by)}
-              onSize={(size) => resize(item.id, size)}
-              onRemove={() => confirmRemove(item)}
-            />
-          ))}
-        </View>
+        <Locked when={save.isPending}>
+          <View style={{ height: widgets.length ? widgets.length * (rowH + GAP) - GAP : 0 }}>
+            {widgets.map((item) => (
+              <OrganizeRow
+                key={item.id}
+                item={item}
+                place={widgetPlace(items, item.id)}
+                lifted={lifted === item.id}
+                motion={motion}
+                onLayoutHeight={(h) => measure(item.id, h)}
+                onLift={lift}
+                onDrop={drop}
+                onMove={(by) => move(item.id, by)}
+                onSize={(size) => resize(item.id, size)}
+                onRemove={() => confirmRemove(item)}
+              />
+            ))}
+          </View>
+        </Locked>
       </ScrollView>
     </View>
   );

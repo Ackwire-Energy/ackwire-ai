@@ -19,6 +19,8 @@ interface FieldContextValue {
   id: string;
   describedBy?: string;
   invalid: boolean;
+  /** A `group` field's label, for a control a `<label>` can't name. */
+  labelledBy?: string;
 }
 
 const FieldContext = createContext<FieldContextValue | null>(null);
@@ -28,7 +30,12 @@ export function useFieldControl(props: { id?: string; "aria-describedby"?: strin
   const field = useContext(FieldContext);
   const describedBy = [props["aria-describedby"], field?.describedBy].filter(Boolean).join(" ") || undefined;
   const invalid = props["aria-invalid"] === true || props["aria-invalid"] === "true" || field?.invalid === true;
-  return { id: props.id ?? field?.id, "aria-describedby": describedBy, "aria-invalid": invalid || undefined };
+  return {
+    id: props.id ?? field?.id,
+    "aria-describedby": describedBy,
+    "aria-invalid": invalid || undefined,
+    labelledBy: field?.labelledBy,
+  };
 }
 
 export interface FieldProps {
@@ -42,13 +49,15 @@ export interface FieldProps {
   labelAside?: ReactNode;
   /** An ⓘ right after the label with what the field is for (plain sentences); it also describes the control. */
   hint?: { name: string; text: ReactNode };
+  /** The control is a group of its own (`Segmented`): the label names it by `aria-labelledby`. */
+  group?: boolean;
   className?: string;
   style?: React.CSSProperties;
   children: ReactNode;
 }
 
 /** A form field: always-visible label, optional ⓘ hint, help or error, wired to its control. */
-export function Field({ label, id, help, error, labelAside, hint, className, style, children }: FieldProps) {
+export function Field({ label, id, help, error, labelAside, hint, group, className, style, children }: FieldProps) {
   const generated = useId();
   const controlId = id ?? `f${generated.replace(/:/g, "")}`;
   const helpId = `${controlId}-help`;
@@ -56,7 +65,12 @@ export function Field({ label, id, help, error, labelAside, hint, className, sty
   const showError = error !== undefined && error !== null && error !== false;
   const showHelp = !showError && help !== undefined && help !== null && help !== false;
   const describedBy = [showError || showHelp ? helpId : "", hint ? hintId : ""].filter(Boolean).join(" ");
-  const labelOnly = (
+  const labelId = `${controlId}-label`;
+  const labelOnly = group ? (
+    <span className="ac-field__label" id={labelId}>
+      {label}
+    </span>
+  ) : (
     <label className="ac-field__label" htmlFor={controlId}>
       {label}
     </label>
@@ -73,7 +87,14 @@ export function Field({ label, id, help, error, labelAside, hint, className, sty
     labelOnly
   );
   return (
-    <FieldContext.Provider value={{ id: controlId, describedBy: describedBy || undefined, invalid: showError }}>
+    <FieldContext.Provider
+      value={{
+        id: controlId,
+        describedBy: describedBy || undefined,
+        invalid: showError,
+        labelledBy: group ? labelId : undefined,
+      }}
+    >
       <div className={cx("ac-field", className)} style={style}>
         {labelAside ? (
           <div className="ac-field__label-row">
@@ -104,9 +125,70 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ className, invalid, ...rest }, ref) {
-  const wiring = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
+  const { labelledBy: _, ...wiring } = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
   return <input ref={ref} className={cx("ac-input", className)} {...rest} {...wiring} />;
 });
+
+/**
+ * Fields under each other: every field, note and group the same `--form-gap` apart, more than a field's label and
+ * help sit from its control (`--field-gap`). A dialog's `DialogBody` keeps the same rhythm.
+ */
+export function FormStack({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx("ac-form", className)} {...rest} />;
+}
+
+/** A form's buttons outside a dialog, the primary last, as `DialogFooter` lays them out in one. */
+export function FormActions({
+  note,
+  className,
+  children,
+}: {
+  note?: ReactNode;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={cx("ac-form__actions", className)}>
+      {note !== undefined && <span className="ac-dialog__foot-note">{note}</span>}
+      {children}
+    </div>
+  );
+}
+
+const LockedContext = createContext(false);
+
+/** True inside a `Locked` that's on: for what a fieldset can't reach, such as a contenteditable or a drop zone. */
+export function useLocked() {
+  return useContext(LockedContext);
+}
+
+/**
+ * `<Locked when={sending}>` turns off every control inside, keeping its text, while its action runs or once its result
+ * is final. A Cancel that really cancels stays outside. CSS says `:disabled`, never `[disabled]`, to see a fieldset's.
+ */
+export function Locked({ when, children }: { when: boolean; children: ReactNode }) {
+  const outer = useLocked();
+  const box = useRef<HTMLFieldSetElement>(null);
+  const focused = useRef<HTMLElement | null>(null);
+  // Read while rendering: by a layout effect Chromium has already taken the focus off a disabled control.
+  if (when && !focused.current) {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && box.current?.contains(active)) focused.current = active;
+  }
+  useLayoutEffect(() => {
+    if (when) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) focused.current?.focus({ preventScroll: true });
+    focused.current = null;
+  }, [when]);
+  return (
+    <LockedContext.Provider value={when || outer}>
+      <fieldset ref={box} className="ac-locked" disabled={when}>
+        {children}
+      </fieldset>
+    </LockedContext.Provider>
+  );
+}
 
 /** A border-box height that fits the text: `scrollHeight` leaves the border out. */
 function fitText(el: HTMLTextAreaElement) {
@@ -160,26 +242,29 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   { className, invalid, rows = 4, autoGrow = false, ...rest },
   ref,
 ) {
-  const wiring = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
+  const { labelledBy: _, ...wiring } = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
   const box = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => box.current as HTMLTextAreaElement, []);
   useAutoGrow(box, String(rest.value ?? ""), autoGrow);
   return <textarea ref={box} rows={rows} className={cx("ac-input", className)} {...rest} {...wiring} />;
 });
 
-/** Input with a fixed prefix, e.g. "agentes.chat/" + address. */
-export const AffixInput = forwardRef<HTMLInputElement, InputProps & { prefix: ReactNode }>(function AffixInput(
-  { prefix, className, invalid, ...rest },
-  ref,
-) {
-  const wiring = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
-  return (
-    <div className={cx("ac-input-affix", className)}>
-      <span className="ac-input-affix__prefix">{prefix}</span>
-      <input ref={ref} {...rest} {...wiring} />
-    </div>
-  );
-});
+/**
+ * Input with a fixed prefix, e.g. "agentes.chat/" + address, or a small action inside its end (a ghost `sm` icon
+ * button: the + that adds what's typed).
+ */
+export const AffixInput = forwardRef<HTMLInputElement, InputProps & { prefix?: ReactNode; action?: ReactNode }>(
+  function AffixInput({ prefix, action, className, invalid, ...rest }, ref) {
+    const { labelledBy: _, ...wiring } = useFieldControl({ ...rest, "aria-invalid": invalid ?? rest["aria-invalid"] });
+    return (
+      <div className={cx("ac-input-affix", className)}>
+        {prefix && <span className="ac-input-affix__prefix">{prefix}</span>}
+        <input ref={ref} {...rest} {...wiring} />
+        {action && <span className="ac-input-affix__action">{action}</span>}
+      </div>
+    );
+  },
+);
 
 /**
  * Search box above a list: the shared SearchField (a field of the ruler; `size="sm"` in

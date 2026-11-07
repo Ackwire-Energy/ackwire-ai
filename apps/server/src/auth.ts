@@ -13,6 +13,7 @@ import {
   EARLY_ACCESS_TOKEN,
   earlyAccessLink,
   emailLocale,
+  enqueueAccountContact,
   ForbiddenError,
   holdsInvitation,
   INVITATION_MAIL_HEADER,
@@ -341,6 +342,9 @@ export function createAuth(deps: {
             } catch (error) {
               log.error("post-signup setup failed", { userId: user.id, error });
             }
+            await enqueueAccountContact(db, user.id).catch((error) =>
+              log.error("account contact not queued", { userId: user.id, error }),
+            );
             const access = await accessOf(context);
             if (access && (!isSocial(context) || user.emailVerified === true)) {
               await useEarlyAccess(db, { access, email: user.email, userId: user.id }).catch((error) =>

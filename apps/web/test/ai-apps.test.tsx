@@ -248,7 +248,9 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
     await click(within(server).getByRole("button", { name: "Copiar" }));
     expect(copied).toEqual([SERVER_URL]);
     expect(document.body.textContent).toContain("Endereço copiado");
-    expect(section().getByText(/Nenhum app conectado/)).toBeTruthy();
+    expect(section().getByText("Chame seus agentes de onde você já trabalha")).toBeTruthy();
+    expect(within(server).queryByRole("button", { name: "Conectar um app" })).toBeNull();
+    expect(section().getByRole("button", { name: "Conectar um app" })).toBeTruthy();
     expect(section().queryByRole("region", { name: "Conectados" })).toBeNull();
     const tokens = section().getByRole("region", { name: "Tokens pessoais" });
     expect(tokens.textContent).toContain("Para scripts e apps sem login OAuth. Valem só neste workspace.");

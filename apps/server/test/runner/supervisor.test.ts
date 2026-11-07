@@ -5,8 +5,10 @@ import {
   existsSync,
   linkSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -15,16 +17,19 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
-import type { AccountManager } from "../../runner/accounts";
+import { AccountBrains, type AccountBrainsOptions, SHARED_LOGIN_OFF } from "../../runner/account-brains";
+import { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
+import { BrainManager, PERSONAL_MCP_REFUSED } from "../../runner/brain";
 import { BrowserManager } from "../../runner/browser";
-import { writeConfig } from "../../runner/config";
+import { type StoredConfig, writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { RunnerDaemon } from "../../runner/daemon";
 import { DesktopSessions } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
+import { runMcpRelay } from "../../runner/mcp";
 import { AgentNetworks } from "../../runner/network-state";
 import type { FetchLike } from "../../runner/push";
 import { agentSecrets, secretValue } from "../../runner/secrets";
@@ -1065,6 +1070,90 @@ test("root counts the live view of its agents' browsers it relays: frames up, pe
   await Promise.all([run, input]);
 });
 
+test("a worker's browser frames go to its agent's live view when it takes them, else up as before", async () => {
+  const pushed: number[] = [];
+  const ended: string[] = [];
+  let take = true;
+  let room = true;
+  let open = true;
+  const t = setup({
+    views: {
+      push: (f) => {
+        pushed.push(f.seq);
+        return take;
+      },
+      end: (agentId) => {
+        ended.push(agentId);
+      },
+      room: () => room,
+      has: () => open,
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const frame = {
+    type: "browser.frame",
+    agentId: ANA.id,
+    seq: 1,
+    data: "/9j/A",
+    metadata: { deviceWidth: 1280, deviceHeight: 800 },
+  };
+  const rooms = () => ana.of("browser.room");
+  const upFrames = () => t.up.filter((f) => f.type === "browser.frame").map((f) => f.seq);
+  // The view takes it and has room for the next: nothing goes up, and the worker's stream may send the next.
+  ana.send(frame);
+  await waitFor(() => rooms().length === 1);
+  expect(rooms()).toEqual([{ type: "browser.room", agentId: ANA.id, view: true }]);
+  // Its window is full: no word until the view frees room (ADR 0040 §7.1).
+  room = false;
+  ana.send({ ...frame, seq: 2 });
+  await waitFor(() => pushed.length === 2);
+  expect(rooms()).toHaveLength(1);
+  t.sup.browserRoom(ANA.id);
+  await waitFor(() => rooms().length === 2);
+  // Another agent's frame goes neither to the view nor up.
+  ana.send({ ...frame, agentId: BIA.id, seq: 3 });
+  // No view: up on the machine socket, and the worker hears once that its frames needn't wait.
+  take = false;
+  open = false;
+  ana.send({ ...frame, seq: 4 });
+  ana.send({ ...frame, seq: 5 });
+  await waitFor(() => upFrames().length === 2);
+  expect(pushed).toEqual([1, 2, 4, 5]);
+  expect(upFrames()).toEqual([4, 5]);
+  expect(rooms()).toHaveLength(3);
+  expect(rooms()[2]).toEqual({ type: "browser.room", agentId: ANA.id, view: false });
+  // The stream ended: its view closes with it, and the server hears.
+  const streamEnded = { type: "browser.stream.ended", agentId: ANA.id, reason: "stopped" };
+  ana.send(streamEnded);
+  await waitFor(() => ended.length === 1);
+  expect(ended).toEqual([ANA.id]);
+  expect(t.up.at(-1)).toEqual(streamEnded);
+  const req = await requestOn(ana, 1);
+  ana.send({ type: "result", id: req.id, ok: true, data: execDone });
+  await run;
+});
+
+test("a worker hears root's word on its live view's room; nothing else does", async () => {
+  const fromRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, new PassThrough());
+  const heard: [string, boolean][] = [];
+  link.onBrowserRoom = (agentId, view) => heard.push([agentId, view]);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: ANA.id, view: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: 7, view: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "browser.room", agentId: ANA.id, view: false })}\n`);
+  await waitFor(() => heard.length === 2);
+  await sleep(10);
+  expect(heard).toEqual([
+    [ANA.id, true],
+    [ANA.id, false],
+  ]);
+});
+
 test("hello lists every worker's tasks until the server acknowledges them, across a restart of the supervisor", async () => {
   const home = newHome();
   const t = setup({}, home);
@@ -1225,6 +1314,126 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   await sleep(20);
   expect(ana.of("worker.state")).toHaveLength(3);
   expect(ana.of("worker.state")[2]).toMatchObject({ paused: { paused: true, until: null } });
+});
+
+test("pull: root fetches its own request's URL with the machine token, once, and paces the bytes to the worker", async () => {
+  const gets: { url: string; init: RequestInit }[] = [];
+  const bytes = Buffer.alloc(2_500_000, 7);
+  const fetch: FetchLike = async (url, init) => {
+    gets.push({ url, init });
+    return new Response(bytes, { status: 200 });
+  };
+  const t = setup({ fetch, server: "http://127.0.0.1:3000" });
+  t.sup.boot();
+  t.sup.attach();
+  const pullId = "11111111-1111-4111-8111-111111111111";
+  const url = "https://agentes.test/api/machines/pulls/1";
+  const req: MachineRequest = { op: "pull", path: "base.zip", url, pullId, size: bytes.length, agent: ANA };
+  const pull = handleRequest(t.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  expect(q).toMatchObject({ op: "pull", pullId });
+
+  // Only for a request it holds, and the address is the request's: the frame has no say in it.
+  ana.send({ type: "pull.start", pullId: "nobody" });
+  await waitFor(() => ana.of("pull.end").length === 1);
+  expect(ana.of("pull.end")[0]).toEqual({
+    type: "pull.end",
+    pullId: "nobody",
+    error: "No pull is waiting for this file",
+  });
+  ana.send({ type: "pull.start", pullId, url: "https://evil.test/steal" });
+  await waitFor(() => ana.of("pull.end").length === 2);
+  expect(gets.map((g) => g.url)).toEqual(["http://127.0.0.1:3000/api/machines/pulls/1"]);
+  expect(gets[0]?.init.headers).toEqual({ authorization: "Bearer agm_machine" });
+  expect(ana.of("pull.head")).toEqual([{ type: "pull.head", pullId, status: 200 }]);
+  const pieces = ana.of("pull.chunk") as unknown as { data: string }[];
+  expect(pieces.length).toBeGreaterThanOrEqual(3);
+  expect(Buffer.concat(pieces.map((p) => Buffer.from(p.data, "base64"))).equals(bytes)).toBe(true);
+  expect(ana.of("pull.end")[1]).toEqual({ type: "pull.end", pullId });
+
+  // Once per request.
+  ana.send({ type: "pull.start", pullId });
+  await waitFor(() => ana.of("pull.end").length === 3);
+  expect(gets).toHaveLength(1);
+  ana.send({ type: "result", id: q.id, ok: true, data: { size: bytes.length, sha256: "x" } });
+  await pull;
+});
+
+test("pull: a piece waits for the one before it to leave for the worker's pipe", async () => {
+  const bytes = Buffer.alloc(2_500_000, 7);
+  const t = setup({ fetch: async () => new Response(bytes), server: "http://127.0.0.1:3000" });
+  t.sup.boot();
+  t.sup.attach();
+  const pullId = "11111111-1111-4111-8111-111111111111";
+  const url = "https://agentes.test/api/machines/pulls/1";
+  const req: MachineRequest = { op: "pull", path: "base.zip", url, pullId, size: bytes.length, agent: ANA };
+  const pull = handleRequest(t.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  // As a real pipe does it: `writableLength` says nothing, and a write's callback comes when the bytes left.
+  const flushes: (() => void)[] = [];
+  let holding = true;
+  const write = ana.stdin.write.bind(ana.stdin);
+  ana.stdin.write = ((line: string, flushed?: () => void) => {
+    if (flushed) holding ? flushes.push(flushed) : queueMicrotask(flushed);
+    return write(line);
+  }) as typeof ana.stdin.write;
+  ana.send({ type: "pull.start", pullId });
+  await waitFor(() => ana.of("pull.chunk").length === 1);
+  await Bun.sleep(40);
+  expect(ana.of("pull.chunk")).toHaveLength(1);
+  flushes.shift()?.();
+  await waitFor(() => ana.of("pull.chunk").length === 2);
+  await Bun.sleep(40);
+  expect(ana.of("pull.chunk")).toHaveLength(2);
+  holding = false;
+  flushes.shift()?.();
+  await waitFor(() => ana.of("pull.end").length === 1);
+  ana.send({ type: "result", id: q.id, ok: true, data: { size: bytes.length, sha256: "x" } });
+  await pull;
+});
+
+test("pull: the worker's end reads root's frames as a fetch, and a cut stream as a failure", async () => {
+  const fromRoot = new PassThrough();
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, toRoot);
+  const said: Record<string, unknown>[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => said.push(JSON.parse(line)),
+    () => {},
+  );
+  const frame = (f: Record<string, unknown>) => fromRoot.write(`${JSON.stringify(f)}\n`);
+  const headers = (pullId: string) => ({ "x-agentes-pull-id": pullId });
+
+  const whole = link.fetch("ignored", { method: "GET", headers: headers("p1") });
+  await waitFor(() => said.length === 1);
+  expect(said[0]).toEqual({ type: "pull.start", pullId: "p1" });
+  frame({ type: "pull.head", pullId: "p1", status: 200 });
+  frame({ type: "pull.chunk", pullId: "p1", data: Buffer.from("olá ").toString("base64") });
+  frame({ type: "pull.chunk", pullId: "p1", data: Buffer.from("mundo").toString("base64") });
+  frame({ type: "pull.end", pullId: "p1" });
+  expect(await (await whole).text()).toBe("olá mundo");
+
+  const cut = link.fetch("ignored", { method: "GET", headers: headers("p2") });
+  frame({ type: "pull.head", pullId: "p2", status: 200 });
+  frame({ type: "pull.end", pullId: "p2", error: "socket closed" });
+  expect((await cut).text()).rejects.toThrow("socket closed");
+
+  const refused = link.fetch("ignored", { method: "GET", headers: headers("p3") });
+  frame({ type: "pull.end", pullId: "p3", error: "No pull is waiting for this file" });
+  expect(refused).rejects.toThrow("No pull is waiting");
+
+  const stop = new AbortController();
+  const stopped = link.fetch("ignored", { method: "GET", headers: headers("p4"), signal: stop.signal });
+  stop.abort(new Error("Canceled"));
+  expect(stopped).rejects.toThrow("Canceled");
 });
 
 test("push: the worker's bytes go out from here with the machine token, only to the server it is paired with", async () => {
@@ -1577,8 +1786,10 @@ test.if(posix)(
   "a real worker: its agent's folder, what the computer allows, uploads through the supervisor, new sessions",
   async () => {
     const puts: { url: string; init: RequestInit }[] = [];
+    const big = Buffer.from(Array.from({ length: 3_000_000 }, (_, i) => i % 251));
     const t = realWorkers({
       fetch: async (url, init) => {
+        if (init.method === "GET") return new Response(big, { status: 200 });
         puts.push({ url, init });
         return new Response("{}", { status: 200 });
       },
@@ -1604,6 +1815,18 @@ test.if(posix)(
       [url, "Bearer agm_machine"],
     ]);
     expect(Buffer.from(puts[0]?.init.body as Uint8Array).toString()).toBe("olá");
+
+    const pull = {
+      op: "pull",
+      path: "in/base.zip",
+      url: "https://agentes.test/api/machines/pulls/4",
+      pullId: "44444444-4444-4444-8444-444444444444",
+      size: big.length,
+      sha256: createHash("sha256").update(big).digest("hex"),
+      agent: ANA,
+    } as MachineRequest;
+    expect(await handleRequest(t.ctx, pull, scope().scope)).toMatchObject({ size: big.length });
+    expect(readFileSync(path.join(realpathSync(t.agentHome), "ana-a1b2c3d4", "in/base.zip")).equals(big)).toBe(true);
 
     // Commands turned off on the computer: the worker refuses them (its state comes before the next request).
     const off = { ...STATE.access.tools, commands: false };
@@ -2436,6 +2659,430 @@ test.if(posix)(
     }
   },
 );
+
+test.if(posix)(
+  "a system-mode runner lists Claude's own login only once its switch is on and its self-check passed",
+  async () => {
+    const run = async (claudeSharedLogin: unknown, verdict: string | null, retried?: string | null) => {
+      const home = newHome();
+      const ws = tempDir("root-ws-");
+      dirs.push(ws);
+      writeConfig(
+        {
+          server: "https://agentes.test",
+          machineId: "m1",
+          name: "box",
+          token: "agm_machine_token_never_shown_123456",
+          workspace: ws,
+          mode: "system",
+          agentUidRange: [21000, 21099],
+          ...(claudeSharedLogin ? { claudeSharedLogin } : {}),
+        } as StoredConfig,
+        home,
+      );
+      const sockets: FakeSocket[] = [];
+      let swept = 0;
+      let checks = 0;
+      const daemon = new RunnerDaemon({
+        probeEgress: async () => null,
+        home,
+        mode: "start",
+        log: () => {},
+        watch: false,
+        executors: () => ({}),
+        self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+        caffeinate: false,
+        dial: (_url, handlers) => {
+          const s = new FakeSocket(handlers);
+          sockets.push(s);
+          queueMicrotask(() => handlers.onOpen());
+          return s;
+        },
+        workers: { user: userOf, start: (user) => new FakeWorker(user) },
+        accountUsers: {
+          sweep: () => void swept++,
+          stopScopes: () => {},
+          sweepAgent: () => {},
+          launcher: () => ({ prefix: [], env: {}, home }),
+          remove: () => {},
+          ensure: () => {
+            throw new Error("no user here");
+          },
+          room: () => {},
+          bridge: () => "",
+          carry: () => {},
+        },
+        selfCheck: async () => {
+          checks++;
+          return checks > 1 && retried !== undefined ? retried : verdict;
+        },
+        ...(retried !== undefined ? { selfCheckRetryMs: 50 } : {}),
+      });
+      daemon.start();
+      return { daemon, sockets, swept: () => swept, checks: () => checks };
+    };
+    const hellos = (sockets: FakeSocket[]) =>
+      sockets.flatMap((s) => s.of("hello")) as { claudeLoginMethods?: string[]; claudeLoginBlocked?: string }[];
+
+    const off = await run(undefined, null);
+    await waitFor(() => hellos(off.sockets).length === 1);
+    expect(off.swept()).toBe(1);
+    expect(off.checks()).toBe(0);
+    expect(hellos(off.sockets)[0]).toMatchObject({ claudeLoginMethods: ["setup_token"] });
+    expect(hellos(off.sockets)[0]).not.toHaveProperty("claudeLoginBlocked");
+    await off.daemon.stop();
+
+    const on = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" };
+    const passed = await run(on, null);
+    await waitFor(
+      () => hellos(passed.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
+      8000,
+    );
+    expect(passed.daemon.accounts.claudeLoginMethods()).toEqual(["setup_token", "cli_login"]);
+    await passed.daemon.stop();
+
+    const failed = await run(on, "The Claude CLI kept a tool of its own (Bash)");
+    await waitFor(() => failed.checks() === 1 && hellos(failed.sockets).length >= 1);
+    expect(failed.daemon.accounts.claudeLoginMethods()).toEqual(["setup_token"]);
+    failed.daemon.reconnect();
+    await waitFor(() => hellos(failed.sockets).at(-1)?.claudeLoginBlocked !== undefined, 8000);
+    expect(hellos(failed.sockets).at(-1)?.claudeLoginBlocked).toContain("Bash");
+    await failed.daemon.stop();
+
+    // A failure at a busy moment (boot, a relay starting) is tried again soon, not only at the next 6-hourly run.
+    const recovered = await run(on, "The Claude CLI didn't start as the sign-in's user", null);
+    await waitFor(
+      () => hellos(recovered.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
+      8000,
+    );
+    expect(recovered.checks()).toBe(2);
+    await recovered.daemon.stop();
+  },
+  20_000,
+);
+
+/** A system-mode daemon of Ana's with the login's switch on, its self-check answered by the test. */
+function sharedLoginDaemon() {
+  const home = newHome();
+  const ws = tempDir("root-ws-");
+  dirs.push(ws);
+  const ana = userOf(ANA);
+  writeFileSync(path.join(home, AGENT_USERS_FILE), JSON.stringify([ana]));
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_machine_token_never_shown_123456",
+    workspace: ws,
+    mode: "system",
+    agentUidRange: [21000, 21099],
+    access: STATE.access,
+  } as StoredConfig;
+  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  writeConfig({ ...config, claudeSharedLogin }, home);
+  const sockets: FakeSocket[] = [];
+  const events: string[] = [];
+  const checks: ((verdict: string | null) => void)[] = [];
+  const daemon = new RunnerDaemon({
+    probeEgress: async () => null,
+    home,
+    mode: "start",
+    log: () => {},
+    executors: () => ({}),
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    caffeinate: false,
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      queueMicrotask(() => handlers.onOpen());
+      return s;
+    },
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    accountUsers: {
+      sweep: () => {},
+      stopScopes: () => void events.push("stop"),
+      sweepAgent: () => void events.push("sweep"),
+      launcher: () => ({ prefix: [], env: {}, home }),
+      remove: () => {},
+      ensure: () => {
+        throw new Error("no user here");
+      },
+      room: () => {},
+      bridge: () => "",
+      carry: () => {},
+    },
+    selfCheck: () => new Promise((resolve) => checks.push(resolve)),
+  });
+  const hellos = () => sockets.flatMap((s) => s.of("hello")) as { claudeLoginMethods?: string[] }[];
+  const lists = (method: boolean) =>
+    waitFor(() => hellos().at(-1)?.claudeLoginMethods?.includes("cli_login") === method, 8000);
+  /** The connection that has the daemon's session, welcomed. */
+  const online = () => {
+    const s = sockets.at(-1) as FakeSocket;
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+    return s;
+  };
+  return { home, config, claudeSharedLogin, daemon, sockets, events, checks, lists, online };
+}
+
+test.if(posix)(
+  "a change to the login's switch asks the self-check again, and the server hears of it",
+  async () => {
+    const d = sharedLoginDaemon();
+    const keep = spyOn(BrainManager.prototype, "keepAccount");
+    const invalidate = spyOn(AccountManager.prototype, "invalidate");
+    const { config, claudeSharedLogin, home, daemon, checks } = d;
+    const methods = () => daemon.accounts.claudeLoginMethods();
+    daemon.start();
+    try {
+      await waitFor(() => checks.length === 1);
+      expect(invalidate).not.toHaveBeenCalled();
+      checks[0]?.(null);
+      await d.lists(true);
+      // The looks before the pass said "status unknown" for every Claude login: the next list asks again.
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      d.online().frame({ type: "agents", agents: [{ ...ANA, account: SHARED_LOGIN }] });
+      expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
+
+      // A narrower range: the pass was for the last one, and nothing runs on it until this one's answer.
+      const narrow = { ...claudeSharedLogin, maxVersion: "2.1.305" };
+      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      await waitFor(() => checks.length === 2, 5000);
+      expect(methods()).toEqual(["setup_token"]);
+      expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
+      await d.lists(false);
+      checks[1]?.(null);
+      await d.lists(true);
+      expect(methods()).toEqual(["setup_token", "cli_login"]);
+      expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
+
+      // Off, the method leaves at once; the next on starts from nothing, and no answer from before counts.
+      writeConfig(config, home);
+      await d.lists(false);
+      expect(checks).toHaveLength(2);
+      writeConfig({ ...config, claudeSharedLogin }, home);
+      await waitFor(() => checks.length === 3, 5000);
+      expect(methods()).toEqual(["setup_token"]);
+      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      await waitFor(() => checks.length === 4, 5000);
+      checks[2]?.(null);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(methods()).toEqual(["setup_token"]);
+
+      // A failed check closes what is idle on the store too.
+      checks[3]?.("An agent's user reached the sign-in's folders");
+      await new Promise((r) => setTimeout(r, 20));
+      expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
+    } finally {
+      keep.mockRestore();
+      invalidate.mockRestore();
+      await daemon.stop();
+    }
+  },
+  30_000,
+);
+
+test.if(posix)(
+  "an agent leaving its computer keeps what its sign-ins hold; only a deleted one is cleared",
+  async () => {
+    const d = sharedLoginDaemon();
+    const { daemon, events, checks } = d;
+    const drop = spyOn(AccountBrains.prototype, "dropTurns").mockImplementation((err, agentId) => {
+      events.push(`drop ${err.code} ${agentId ?? "all"}`);
+    });
+    daemon.start();
+    try {
+      await waitFor(() => checks.length === 1);
+      checks[0]?.(null);
+      await d.lists(true);
+      const s = d.online();
+      s.frame({ type: "agents", agents: [ANA] });
+      expect(events).toEqual([]);
+      // Archived or moved: its CLIs stop, turn first; its transcripts wait for it.
+      s.frame({ type: "agents", agents: [] });
+      expect(events).toEqual([`drop dropped ${ANA.id}`, "stop"]);
+      events.length = 0;
+      s.frame({ type: "agents", agents: [ANA] });
+      s.frame({ type: "agents", agents: [ANA], deleted: [ANA.id] });
+      expect(events).toEqual([]);
+      s.frame({ type: "agents", agents: [], deleted: [ANA.id] });
+      expect(events).toEqual([`drop dropped ${ANA.id}`, "sweep"]);
+      events.length = 0;
+      s.frame({ type: "agents", agents: [], deleted: [ANA.id] });
+      expect(events).toEqual([]);
+
+      daemon.pause(null);
+      expect(events).toEqual(["drop dropped all", "stop"]);
+    } finally {
+      drop.mockRestore();
+      await daemon.stop();
+    }
+  },
+  20_000,
+);
+
+test.if(posix)("the login switch going away stops that login's running CLIs, and only then", async () => {
+  const home = newHome();
+  const ws = tempDir("root-ws-");
+  dirs.push(ws);
+  const ana = userOf(ANA);
+  writeFileSync(path.join(home, AGENT_USERS_FILE), JSON.stringify([ana]));
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_machine_token_never_shown_123456",
+    workspace: ws,
+    mode: "system",
+    agentUidRange: [21000, 21099],
+  } as StoredConfig;
+  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  writeConfig({ ...config, claudeSharedLogin }, home);
+  const stopped: number[] = [];
+  const daemon = new RunnerDaemon({
+    probeEgress: async () => null,
+    home,
+    mode: "start",
+    log: () => {},
+    executors: () => ({}),
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    caffeinate: false,
+    dial: (_url, handlers) => new FakeSocket(handlers),
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    accountUsers: {
+      sweep: () => {},
+      stopScopes: (uid) => void stopped.push(uid),
+      sweepAgent: () => {},
+      launcher: () => ({ prefix: [], env: {}, home }),
+      remove: () => {},
+      ensure: () => {
+        throw new Error("no user here");
+      },
+      room: () => {},
+      bridge: () => "",
+      carry: () => {},
+    },
+    selfCheck: async () => null,
+  });
+  daemon.start();
+  try {
+    writeConfig({ ...config, claudeSharedLogin, name: "desk" }, home);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(stopped).toEqual([]);
+    writeConfig(config, home);
+    await waitFor(() => stopped.length > 0, 5000);
+    expect(stopped).toEqual([ana.uid]);
+  } finally {
+    await daemon.stop();
+  }
+});
+
+test.if(posix)(
+  "a system-mode runner hosts a shared CLI login's turns in root, and tells them apart by its marker",
+  async () => {
+    const home = newHome();
+    const ws = tempDir("root-ws-");
+    const accounts = tempDir("accounts-");
+    dirs.push(ws, accounts);
+    mkdirSync(path.join(accounts, "claude_code"));
+    writeFileSync(path.join(accounts, "claude_code", `${SHARED_LOGIN}.method`), "cli_shared");
+    writeConfig(
+      {
+        server: "https://agentes.test",
+        machineId: "m1",
+        name: "box",
+        token: "agm_machine_token_never_shown_123456",
+        workspace: ws,
+        mode: "system",
+        agentUidRange: [21000, 21099],
+        access: STATE.access,
+        claudeSharedLogin: { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" },
+      } as StoredConfig,
+      home,
+    );
+    const sockets: FakeSocket[] = [];
+    const started: FakeWorker[] = [];
+    const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
+      home,
+      mode: "start",
+      log: () => {},
+      watch: false,
+      executors: () => ({}),
+      self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+      caffeinate: false,
+      dial: (_url, handlers) => {
+        const s = new FakeSocket(handlers);
+        sockets.push(s);
+        queueMicrotask(() => handlers.onOpen());
+        return s;
+      },
+      workers: {
+        user: userOf,
+        start: (user) => {
+          const w = new FakeWorker(user);
+          started.push(w);
+          return w;
+        },
+      },
+      systemAccounts: { root: accounts, chown: async () => {} },
+      accountUsers: {
+        sweep: () => {},
+        stopScopes: () => {},
+        sweepAgent: () => {},
+        launcher: () => ({ prefix: [], env: {}, home }),
+        remove: () => {},
+        ensure: (id) => ({ id, user: "agc-0193ffff", uid: 30000, gid: 998 }),
+        room: () => {},
+        bridge: () => "/run/agentes-bridge/21000/mcp.sock",
+        carry: () => {},
+      },
+      selfCheck: async () => null,
+    });
+    daemon.start();
+    try {
+      const listed = (s: FakeSocket) =>
+        (s.of("hello").at(-1) as { claudeLoginMethods?: string[] } | undefined)?.claudeLoginMethods?.includes(
+          "cli_login",
+        );
+      await waitFor(() => sockets.some(listed), 8000);
+      const s = sockets.find(listed) as FakeSocket;
+      s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+      s.frame({ type: "request", id: "t1", ...hostedTurn() } as ServerFrame);
+      await waitFor(() => started.length === 1);
+      const ana = started[0] as FakeWorker;
+      ana.hello();
+      await waitFor(() => ana.of("turn.prepare").length === 1);
+      expect(ana.of("request")).toHaveLength(0);
+      ana.send({
+        type: "turn.context",
+        prepareId: ana.of("turn.prepare")[0]?.prepareId,
+        error: { code: "bad_request", message: "Not this folder" },
+      });
+      await waitFor(() => s.of("result").length === 1);
+      expect(s.of("result")[0]).toMatchObject({
+        id: "t1",
+        ok: true,
+        data: { final: { type: "error", code: "bad_request", message: "Not this folder" } },
+      });
+    } finally {
+      await daemon.stop();
+    }
+  },
+  20_000,
+);
+
+test("a worker that stops or retires takes what root launched for its agent on a sign-in with it", async () => {
+  const stopped: number[] = [];
+  const { sup, workers } = setup({ stopAccountScopes: (uid) => void stopped.push(uid) });
+  const pending = sup.run({ op: "exec", command: "x", agent: ANA } as never, scope().scope);
+  await waitFor(() => workers.length === 1);
+  const ana = workers[0] as FakeWorker;
+  ana.hello();
+  sup.retireNetworkAgent(ANA.id, "network changed");
+  await pending.catch(() => undefined);
+  expect(stopped).toEqual([ana.user.uid]);
+});
 
 test.if(posix)(
   "a single-user runner: Browser clicked on an agent's desktop opens that agent's own browser here, unless paused",
@@ -3357,3 +4004,705 @@ test("clone slots are the computer's: two at once across every agent's worker; a
   expect(filled).toEqual([{ repo: "acme/app", uid: 21001 }]);
   expect(bia.of("cache.filled")[0]?.dir).toBe("/var/cache/agentes-git/conn/acme/app.git");
 });
+
+// ── A Claude sign-in several agents share: its turns run in root, as its own user ────────────────────────────────────
+
+const SHARED_LOGIN = "0193ffff-0000-7000-8000-000000000002";
+const FAKE_CLI = path.join(import.meta.dir, "fake-claude.mjs");
+const HOSTED_SESSION = "0193aaaa-0000-7000-8000-000000000001";
+
+const hostedTurn = (over: Record<string, unknown> = {}) =>
+  ({
+    op: "brain.turn",
+    kind: "claude_code",
+    runId: "run-00000001",
+    session: { id: HOSTED_SESSION, resume: false },
+    prompt: "hi",
+    account: SHARED_LOGIN,
+    mcp: { token: `agr_${"t".repeat(26)}` },
+    agent: ANA,
+    ...over,
+  }) as unknown as Extract<MachineRequest, { op: "brain.turn" }>;
+
+/** What a worker of `t` says to root's asks about a turn, until `stop`. */
+function answersAsWorker(w: FakeWorker, folder: string) {
+  let told = 0;
+  let bridged = 0;
+  const timer = setInterval(() => {
+    for (const f of w.of("turn.prepare").slice(told)) {
+      told++;
+      w.send({
+        type: "turn.context",
+        prepareId: f.prepareId,
+        folder,
+        cwd: f.cwd ?? folder,
+        text: "\n\nfrom the worker",
+      });
+    }
+    for (const f of w.of("bridge.token").slice(bridged)) {
+      bridged++;
+      if (f.token !== null) w.send({ type: "bridge.ready", process: f.process });
+    }
+  }, 2);
+  return () => clearInterval(timer);
+}
+
+function hosted(t: ReturnType<typeof setup>, over: Partial<AccountBrainsOptions> = {}) {
+  const stores = tempDir("stores-");
+  dirs.push(stores);
+  const log = path.join(stores, "spawns.log");
+  const state: { now: "ready" | "off" | "signed_out" } = { now: "ready" };
+  const usage: unknown[][] = [];
+  const refused: string[] = [];
+  const store = path.join(stores, SHARED_LOGIN);
+  const brains = new AccountBrains({
+    root: path.join(stores, "account-brains"),
+    stores,
+    accounts: {
+      isCliShared: (_kind, id) => id === SHARED_LOGIN,
+      cliSharedState: () => state.now,
+      sharedCommand: (prefix) => [...prefix, process.execPath, FAKE_CLI],
+      noteRateLimit: (key, info) => void usage.push([key, info]),
+    },
+    users: {
+      ensure: (id) => ({ id, user: "agc-0193ffff", uid: 30000, gid: 998 }),
+      room: (_user, room) => void mkdirSync(path.join(store, "run", String(room)), { recursive: true }),
+      bridge: () => "/run/agentes-bridge/21000/mcp.sock",
+      carry: () => {},
+    },
+    workers: t.sup,
+    grants: async () => [],
+    relay: ["/usr/local/bin/agentes-runner"],
+    shared: () => undefined,
+    launcher: (_login, agent, cwd) => ({
+      prefix: [],
+      env: { PATH: process.env.PATH ?? "", HOME: stores, FAKE_CLAUDE_LOG: log, FAKE_CWD: String(cwd) },
+      home: path.join(store, "run", String(agent?.uid)),
+    }),
+    deltaMs: 5,
+    ...over,
+  });
+  const ctx: HandlerContext = {
+    ...t.ctx,
+    accountBrains: brains,
+    access: () => STATE.access,
+    accounts: {
+      list: async () => [],
+      refused: async (_kind: string, id: string) => void refused.push(id),
+      invalidate: () => {},
+      refresh: async () => [],
+    } as unknown as AccountManager,
+  };
+  return { brains, ctx, state, usage, refused, store, log };
+}
+
+test.if(posix)("a turn on a shared CLI login runs in root: its worker serves it, and gets no request", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const s = scope();
+  const run = handleRequest(h.ctx, hostedTurn(), s.scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  const out = (await run) as { runId: string; final: { type: string; text?: string } };
+  stop();
+  expect(out.final).toMatchObject({ type: "done", text: "echo 1: hi" });
+  expect(s.emitted.map((f) => f.type)).toContain("brain.done");
+  expect(s.emitted.some((f) => f.type === "brain.event")).toBe(true);
+  expect(ana.of("request")).toHaveLength(0);
+  const bridges = ana.of("bridge.token");
+  expect(bridges[0]).toMatchObject({
+    session: HOSTED_SESSION,
+    cwd: "/home/ag-a1b2c3d4/ana-a1b2c3d4",
+    profile: "work",
+    agent: ANA,
+    socketPath: "/run/agentes-bridge/21000/mcp.sock",
+  });
+  expect(bridges[1]).toMatchObject({ runId: "run-00000001", serverToken: `agr_${"t".repeat(26)}` });
+  // The folder's text comes with its own ask, from the agent's side.
+  expect(ana.of("turn.prepare").map((f) => f.text ?? false)).toEqual([false, true]);
+  const log = JSON.parse(readFileSync(h.log, "utf8").trim().split("\n")[0] as string);
+  expect(log.system).toContain("from the worker");
+  h.brains.brains.close();
+});
+
+test.if(posix)("a sign-in that isn't a shared CLI login goes to the worker, as it always did", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const other = "0193ffff-0000-7000-8000-000000000009";
+  const run = handleRequest(h.ctx, hostedTurn({ account: other }), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  expect(q).toMatchObject({ op: "brain.turn", account: other });
+  ana.send({
+    type: "result",
+    id: q.id,
+    ok: true,
+    data: { runId: "run-00000001", final: { type: "done", text: "ok" } },
+  });
+  await run;
+  expect(ana.of("turn.prepare")).toHaveLength(0);
+  expect(ana.of("bridge.token")).toHaveLength(0);
+});
+
+test.if(posix)("steering and cancel follow the turn to root, and reach the worker's tools", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const s = scope();
+  const run = handleRequest(h.ctx, hostedTurn({ prompt: "SLOW wait" }), s.scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => h.brains.brains.hosts("run-00000001"));
+  const steer = {
+    op: "brain.steer",
+    runId: "run-00000001",
+    session: HOSTED_SESSION,
+    messages: [{ uuid: "0193cccc-0000-7000-8000-000000000001", text: "more" }],
+    agent: ANA,
+  } as unknown as MachineRequest;
+  // The fake here is an old CLI: what counts is that root answered, and the worker never saw it.
+  await waitFor(() => (h.brains.brains.process(ANA.id, HOSTED_SESSION)?.initSeen ?? false) === true);
+  expect(await handleRequest(h.ctx, steer, scope().scope)).toMatchObject({ status: "unsupported" });
+  expect(ana.of("request")).toHaveLength(0);
+  s.ac.abort();
+  const out = (await run) as { final: { code?: string } };
+  stop();
+  expect(out.final.code).toBe("canceled");
+  await waitFor(() => ana.of("turn.cancel").length === 1);
+  expect(ana.of("turn.cancel")[0]).toEqual({ type: "turn.cancel", session: HOSTED_SESSION });
+});
+
+test.if(posix)("a steer for a run root doesn't host still goes to the worker", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const steer = {
+    op: "brain.steer",
+    runId: "run-00000009",
+    session: HOSTED_SESSION,
+    messages: [{ uuid: "0193cccc-0000-7000-8000-000000000001", text: "more" }],
+    agent: ANA,
+  } as unknown as MachineRequest;
+  const run = handleRequest(h.ctx, steer, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "result", id: q.id, ok: true, data: { status: "no_turn" } });
+  expect(await run).toEqual({ status: "no_turn" });
+});
+
+test.if(posix)("a worker that goes away under a hosted turn drops it, so the server resumes it", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const s = scope();
+  const run = handleRequest(h.ctx, hostedTurn({ prompt: "SLOW wait" }), s.scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => h.brains.brains.hosts("run-00000001"));
+  ana.crash();
+  expect(await errorCode(() => run)).toBe("dropped");
+  stop();
+  expect(s.emitted.flatMap((f) => (f.type === "brain.event" ? [f.event.type] : []))).not.toContain("error");
+  expect(s.emitted.some((f) => f.type === "brain.done")).toBe(false);
+});
+
+test.if(posix)("a turn dropped on purpose ends now: its CLI isn't taken for crashed and started again", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const s = scope();
+  const run = handleRequest(h.ctx, hostedTurn({ prompt: "SLOW wait" }), s.scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => h.brains.brains.hosts("run-00000001"));
+  await waitFor(() => existsSync(h.log));
+  h.brains.dropTurns(new RunnerError("dropped", "Not this agent."), BIA.id);
+  expect(h.brains.brains.hosts("run-00000001")).toBe(true);
+  h.brains.dropTurns(new RunnerError("dropped", "This computer was paused."));
+  expect(await errorCode(() => run)).toBe("dropped");
+  await sleep(100);
+  stop();
+  const started = readFileSync(h.log, "utf8")
+    .trim()
+    .split("\n")
+    .filter((l) => JSON.parse(l).args);
+  expect(started).toHaveLength(1);
+  expect(s.emitted.some((f) => f.type === "brain.done")).toBe(false);
+});
+
+test.if(posix)("the network waits for a hosted turn, and goes on once it ended", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, hostedTurn({ prompt: "SLOW wait" }), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => h.brains.brains.hosts("run-00000001"));
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(ana.of("worker.close")).toHaveLength(0);
+  expect(ana.stdin.writableEnded).toBe(false);
+  await run;
+  stop();
+  t.sup.drainNetwork();
+  expect(ana.stdin.writableEnded).toBe(true);
+  h.brains.brains.close();
+});
+
+test.if(posix)("a hosted turn that can't run says why, with no CLI and no worker", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  h.state.now = "off";
+  const off = (await handleRequest(h.ctx, hostedTurn(), scope().scope)) as { final: unknown };
+  expect(off.final).toEqual({ type: "error", code: "unsupported", message: SHARED_LOGIN_OFF, retryable: true });
+  expect(h.refused).toEqual([]);
+  h.state.now = "signed_out";
+  const out = (await handleRequest(h.ctx, hostedTurn(), scope().scope)) as { final: unknown };
+  expect(out.final).toMatchObject({ type: "error", code: "not_logged_in", retryable: true });
+  await waitFor(() => h.refused.length === 1);
+  expect(t.workers).toHaveLength(0);
+  const closed = { ...h.ctx, access: () => ({ ...STATE.access, tools: { ...STATE.access.tools, claude: false } }) };
+  expect(await errorCode(() => handleRequest(closed, hostedTurn(), scope().scope))).toBe("not_allowed");
+});
+
+test.if(posix)(
+  "short of memory: a hosted idle CLI closes first, the waiting session's own only after the workers'",
+  async () => {
+    const t = setup();
+    const h = hosted(t);
+    const reclaimed: string[] = [];
+    const reclaimBrains = spyOn(t.sup, "reclaimBrains").mockImplementation(async (spare) => {
+      reclaimed.push(String(spare));
+      return false;
+    });
+    t.sup.boot();
+    t.sup.attach();
+    const run = handleRequest(h.ctx, hostedTurn(), scope().scope);
+    await waitFor(() => t.workers.length === 1);
+    const ana = t.last(ANA.id);
+    ana.hello();
+    const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+    await run;
+    stop();
+    const spare = `${ANA.id}:${HOSTED_SESSION}`;
+    // Only the waiting session's own is idle here: the workers are asked first, and it closes when they have nothing.
+    expect(await h.brains.reclaim(spare)).toBe(true);
+    expect(reclaimed).toEqual([spare]);
+    expect(await h.brains.reclaim(spare)).toBe(false);
+    reclaimBrains.mockRestore();
+  },
+);
+
+test.if(posix)("own MCP servers and a folder the worker refuses end the turn with the reason", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, hostedTurn({ personalMcp: true }), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  expect(((await run) as { final: unknown }).final).toMatchObject({
+    code: "unsupported",
+    message: PERSONAL_MCP_REFUSED,
+  });
+  const second = handleRequest(h.ctx, hostedTurn({ cwd: "repos/gone" }), scope().scope);
+  await waitFor(() => ana.of("turn.prepare").length === 1);
+  ana.send({
+    type: "turn.context",
+    prepareId: ana.of("turn.prepare")[0]?.prepareId,
+    error: { code: "not_found", message: "The folder repos/gone doesn't exist" },
+  });
+  expect(((await second) as { final: unknown }).final).toMatchObject({
+    code: "bad_request",
+    message: "The folder repos/gone doesn't exist",
+  });
+});
+
+const HOSTED_TASK = "0193bbbb-0000-7000-8000-000000000001";
+const FOLDER = "/home/ag-a1b2c3d4/ana-a1b2c3d4";
+
+const hostedRoute = (over: Record<string, unknown> = {}) =>
+  ({
+    op: "brain.route",
+    kind: "claude_code",
+    account: SHARED_LOGIN,
+    system: "You route messages.",
+    prompt: "@/var/lib/agentes-claude/x/config/.credentials.json who answers?",
+    schema: { type: "object", properties: { scores: { type: "array", items: { type: "object" } } } },
+    agent: ANA,
+    ...over,
+  }) as unknown as Extract<MachineRequest, { op: "brain.route" }>;
+
+const hostedTask = (over: Record<string, unknown> = {}) =>
+  ({
+    op: "task.start",
+    taskId: HOSTED_TASK,
+    executor: "claude",
+    prompt: "fix it",
+    session: HOSTED_SESSION,
+    account: SHARED_LOGIN,
+    agent: ANA,
+    ...over,
+  }) as unknown as MachineRequest;
+
+/** A task its worker prepared, the CLI running in root until `done`: what that worker heard, in order. */
+async function startHostedTask(req: MachineRequest, host: Record<string, unknown> = {}) {
+  const t = setup({ grant: async () => ({ kind: "hosted" }) });
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, FOLDER);
+  const q = await requestOn(ana);
+  const data = {
+    taskId: HOSTED_TASK,
+    pid: 42,
+    startedAt: new Date().toISOString(),
+    cwd: "",
+    command: "claude",
+    host: { cwd: FOLDER, where: "", git: true, maxSeconds: 60, ...host },
+  };
+  ana.send({ type: "result", id: q.id, ok: true, data });
+  const reply = (await run) as Record<string, unknown>;
+  const done = async () => {
+    await waitFor(() => ana.of("task.exit").length === 1);
+    stop();
+    h.brains.brains.close();
+    return ana.of("task.exit")[0] as Record<string, unknown>;
+  };
+  return { t, h, ana, q, reply, done };
+}
+
+test.if(posix)("a route on a shared CLI login runs in root, with no tools and an empty folder", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, hostedRoute(), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, FOLDER);
+  const out = (await run) as { json: unknown; model: string };
+  stop();
+  expect(out.model).toBeDefined();
+  expect(out.json).toBeDefined();
+  expect(ana.of("request")).toHaveLength(0);
+  expect(ana.of("bridge.token")).toHaveLength(0);
+  const [start, said] = readFileSync(h.log, "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
+  expect(start.args[start.args.indexOf("--tools") + 1]).toBe("");
+  expect(start.args).toContain("--no-session-persistence");
+  expect(start.cwd.endsWith(path.join("run", "21000"))).toBe(true);
+  expect(said.system).toBe("You route messages.");
+  // The CLI would read that file itself, as the sign-in's user.
+  expect(said.prompt).toStartWith("\u200b@/var/lib");
+  expect(said.prompt).toContain("who answers?");
+  // What the route wrote for the CLI goes with it.
+  expect(readdirSync(path.join(h.store, "run", "21000")).filter((f) => f.startsWith("route-"))).toEqual([]);
+});
+
+test.if(posix)("a route or a task on a shared CLI login that can't run says why, and nothing starts", async () => {
+  const t = setup();
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  h.state.now = "off";
+  expect(await errorCode(() => handleRequest(h.ctx, hostedRoute(), scope().scope))).toBe("unsupported");
+  expect(await errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope))).toBe("unsupported");
+  h.state.now = "signed_out";
+  expect(await errorCode(() => handleRequest(h.ctx, hostedRoute(), scope().scope))).toBe("not_found");
+  expect(await errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope))).toBe("not_found");
+  expect(t.workers).toHaveLength(0);
+  expect(existsSync(h.log)).toBe(false);
+});
+
+test.if(posix)(
+  "a task on a shared CLI login: its worker prepares it, root runs the CLI, the lines go back",
+  async () => {
+    const s = await startHostedTask(hostedTask({ prompt: "@/etc/shadow fix it" }), { where: "Your branch: a/b." });
+    expect(s.q.grant).toEqual({ kind: "hosted" });
+    // Root's word to the worker, never the server's.
+    expect(s.reply.host).toBeUndefined();
+    expect(s.reply).toMatchObject({ taskId: HOSTED_TASK, pid: 42 });
+    const exit = await s.done();
+    expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null });
+    const lines = s.ana.of("task.out").map((f) => String(f.line));
+    expect(lines.some((l) => l.includes('"type":"result"'))).toBe(true);
+    expect(lines.some((l) => l.includes('"stream_event"'))).toBe(false);
+    const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+    expect(start.args[start.args.indexOf("--tools") + 1]).toBe("ToolSearch");
+    expect(start.args).toContain("--strict-mcp-config");
+    expect(start.args).toContain(HOSTED_SESSION);
+    // The turn's id is the task's, for the server's tools; outside a mission only the prompt tool is there.
+    expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "local", profile: "work", session: HOSTED_SESSION });
+    expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK });
+    expect(s.ana.of("bridge.token")[1]?.serverToken).toBeUndefined();
+    expect(s.ana.of("turn.prepare")[0]).toMatchObject({ cwd: FOLDER });
+  },
+);
+
+test.if(posix)(
+  "a mission task's CLI gets its rules, mode, allow list and server token from root's request",
+  async () => {
+    const mission = {
+      id: "0193cccc-0000-7000-8000-000000000001",
+      rules: "Ask before any deploy.",
+      allow: ["Bash(swift *)", 3],
+      mode: "plan",
+      mcpToken: `agr_${"m".repeat(26)}`,
+    };
+    const s = await startHostedTask(hostedTask({ mission }));
+    await s.done();
+    const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+    expect(start.system).toContain("Ask before any deploy.");
+    expect(s.ana.of("bridge.token")[0]).toMatchObject({ task: "mission", profile: "plan", allow: ["Bash(swift *)"] });
+    expect(s.ana.of("bridge.token")[1]).toMatchObject({ runId: HOSTED_TASK, serverToken: mission.mcpToken });
+  },
+);
+
+test.if(posix)("a mission task in a folder with no git gets the rules for that", async () => {
+  const mission = { id: "0193cccc-0000-7000-8000-000000000001", rules: "Ask before any deploy." };
+  const s = await startHostedTask(hostedTask({ mission }), { git: false });
+  await s.done();
+  const start = JSON.parse(readFileSync(s.h.log, "utf8").trim().split("\n")[0] as string);
+  expect(start.system).not.toContain("Ask before any deploy.");
+  expect(start.system).toContain("not a git repository");
+});
+
+test.if(posix)("a worker stops its task's CLI, and no other agent's", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.h.brains.stopTask(BIA.id, HOSTED_TASK);
+  await sleep(20);
+  expect(s.ana.of("task.exit")).toHaveLength(0);
+  s.h.brains.stopTask(ANA.id, HOSTED_TASK);
+  expect(await s.done()).toMatchObject({ exitCode: null, signal: "SIGTERM", reason: "canceled" });
+});
+
+test.if(posix)("a task's time limit ends its CLI as timed out", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }), { maxSeconds: 0.05 });
+  expect(await s.done()).toMatchObject({ reason: "timeout" });
+});
+
+test.if(posix)("a task's refused CLI marks the sign-in and tells the worker why", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "AUTH" }));
+  expect(await s.done()).toMatchObject({ exitCode: 1, reason: null });
+  expect(s.h.refused).toEqual([SHARED_LOGIN]);
+  expect(s.ana.of("task.out").some((f) => f.stream === "stderr")).toBe(true);
+});
+
+test.if(posix)("a worker that goes away ends its task's CLI, which reads as interrupted", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.ana.crash();
+  await waitFor(() => (s.h.brains as unknown as { tasks: Map<string, unknown> }).tasks.size === 0);
+  s.h.brains.brains.close();
+});
+
+test("a worker that answers no host for a task on a shared CLI login fails the start", async () => {
+  const t = setup({ grant: async () => ({ kind: "hosted" }) });
+  const h = hosted(t);
+  t.sup.boot();
+  t.sup.attach();
+  const run = errorCode(() => handleRequest(h.ctx, hostedTask(), scope().scope));
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "result", id: q.id, ok: true, data: { taskId: HOSTED_TASK, pid: 42 } });
+  expect(await run).toBe("internal");
+});
+
+test.if(posix)("refresh mode B: a CLI starts only once the lock's name is gone", async () => {
+  const t = setup();
+  const h = hosted(t, {
+    shared: () => ({ minVersion: "2.1.0", maxVersion: "2.2.0", refresh: "B", refreshLock: ".lock" }),
+  });
+  mkdirSync(path.join(h.store, "config"), { recursive: true });
+  const lock = path.join(h.store, "config", ".lock");
+  writeFileSync(lock, "");
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(h.ctx, hostedTurn(), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const stop = answersAsWorker(ana, "/home/ag-a1b2c3d4/ana-a1b2c3d4");
+  await waitFor(() => ana.of("turn.prepare").length === 2);
+  await sleep(50);
+  expect(existsSync(h.log)).toBe(false);
+  rmSync(lock);
+  expect(((await run) as { final: { type: string } }).final.type).toBe("done");
+  stop();
+  expect(existsSync(h.log)).toBe(true);
+  h.brains.brains.close();
+});
+
+test.if(posix)(
+  "a task on a shared CLI login outlives a dropped connection, and its end reaches its worker",
+  async () => {
+    const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+    await waitFor(() => existsSync(s.h.log));
+    s.t.sup.detach();
+    expect(s.ana.of("worker.close")).toHaveLength(1);
+    const exit = await s.done();
+    expect(exit).toMatchObject({ exitCode: 0, signal: null, reason: null, session: HOSTED_SESSION });
+  },
+);
+
+test.if(posix)("a task on a shared CLI login outlives its worker's new session, not the worker", async () => {
+  const s = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(s.h.log));
+  s.t.sup.detach();
+  s.t.sup.attach();
+  s.ana.hello();
+  expect(await s.done()).toMatchObject({ exitCode: 0, reason: null });
+
+  const gone = await startHostedTask(hostedTask({ prompt: "SLOW wait" }));
+  await waitFor(() => existsSync(gone.h.log));
+  gone.t.sup.retireNetworkAgent(ANA.id, "network changed");
+  await sleep(50);
+  // Nothing hears it there: the worker's next one finds no CLI, and the server resumes the task.
+  expect(gone.h.brains.brains.hosts(HOSTED_TASK)).toBe(false);
+  gone.h.brains.brains.close();
+});
+
+test("a worker's word to stop a task reaches root as that agent's", async () => {
+  const stops: string[][] = [];
+  const t = setup({ taskStop: (id, taskId) => stops.push([id, taskId]) });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "task.stop", taskId: 3 });
+  ana.send({ type: "task.stop", taskId: HOSTED_TASK });
+  await waitFor(() => stops.length === 1);
+  expect(stops).toEqual([[ANA.id, HOSTED_TASK]]);
+  ana.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await run;
+});
+
+test("a worker's notice reaches root only well formed, as that agent's", async () => {
+  const notices: unknown[][] = [];
+  const t = setup({ toolNotice: (id, n) => notices.push([id, n]) });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  const notice = {
+    session: HOSTED_SESSION,
+    shellId: "b12345678",
+    status: "running",
+    summary: "dev",
+    outputFile: "/tmp/x",
+  };
+  ana.send({ type: "tool.notice", ...notice, status: "exploded" });
+  ana.send({ type: "tool.notice", ...notice, outputFile: "relative" });
+  ana.send({ type: "tool.notice", ...notice, shellId: "../x" });
+  ana.send({ type: "tool.notice", ...notice, agent: BIA.id, summary: "x".repeat(500), moved: true });
+  await waitFor(() => notices.length === 1);
+  expect(notices[0]).toEqual([ANA.id, { ...notice, summary: "x".repeat(200), moved: true }]);
+  ana.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await run;
+});
+
+test.if(posix)(
+  "a real worker: the context, the relay's socket, and a tool served to the relay as the agent",
+  async () => {
+    const t = realWorkers();
+    const h = hosted(t);
+    const socketFolder = tempDir("bridge-");
+    dirs.push(socketFolder);
+    const socketPath = path.join(socketFolder, "mcp.sock");
+    const brains = new AccountBrains({
+      ...(h.brains as unknown as { o: AccountBrainsOptions }).o,
+      users: {
+        ...(h.brains as unknown as { o: AccountBrainsOptions }).o.users,
+        bridge: () => socketPath,
+      },
+    });
+    t.sup.boot();
+    t.sup.attach();
+    const folder = path.join(realpathSync(t.agentHome), "ana-a1b2c3d4");
+    const out = await handleRequest({ ...h.ctx, accountBrains: brains }, hostedTurn(), scope().scope);
+    expect((out as { final: unknown }).final).toMatchObject({ type: "done" });
+    expect(statSync(socketPath).mode & 0o777).toBe(0o666);
+    writeFileSync(path.join(folder, "note.txt"), "from the agent's folder\n");
+    const config = readFileSync(
+      path.join(
+        h.store,
+        "run",
+        "21000",
+        readdirSync(path.join(h.store, "run", "21000")).find((n) => n !== "sessions.json") as string,
+        "mcp.json",
+      ),
+      "utf8",
+    );
+    const { args, env } = JSON.parse(config).mcpServers.agentes as {
+      args: string[];
+      env: { AGENTES_MCP_TOKEN: string; AGENTES_MCP_SOCKET: string };
+    };
+    expect(env.AGENTES_MCP_SOCKET).toBe(socketPath);
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const seen: { id?: number; result?: { content: { text: string }[] } }[] = [];
+    readLines(
+      output,
+      1 << 20,
+      (line) => seen.push(JSON.parse(line)),
+      () => {},
+    );
+    const relay = runMcpRelay({
+      socketPath,
+      taskId: args.at(-1) as string,
+      token: env.AGENTES_MCP_TOKEN,
+      input,
+      output,
+    });
+    const read = { name: "Read", arguments: { file_path: path.join(folder, "note.txt") } };
+    input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/call", params: read })}\n`);
+    await waitFor(() => seen.some((m) => m.id === 7));
+    expect(seen.find((m) => m.id === 7)?.result?.content[0]?.text).toContain("from the agent's folder");
+    input.end();
+    await relay;
+    brains.brains.close();
+  },
+);

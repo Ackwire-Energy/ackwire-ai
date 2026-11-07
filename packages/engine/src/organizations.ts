@@ -18,6 +18,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AppLocale, appLocale, isAppLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { enqueueAccountContact } from "./account-contacts";
 import { type AgentStyle, isAgentStyle, saveAgentStyle } from "./agent-style";
 import { dropAgentRules } from "./approval-rules";
 import { revokeMemberApps } from "./apps/revoke";
@@ -41,6 +42,8 @@ import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } fro
 import { ensureRightHand, followOwner } from "./right-hand";
 import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
+  accountClosed,
+  accountInUse,
   assertCanWork,
   type BillingHold,
   closedOrg,
@@ -164,7 +167,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .innerJoin(users, eq(users.id, organizationMembers.userId))
-    .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
+    .where(and(eq(organizationMembers.userId, userId), accountInUse))
     .orderBy(asc(organizations.createdAt));
   return rows.map(({ startPage, startChannelId, chatPrefs, ...row }) => ({
     ...withPermissions(row),
@@ -198,7 +201,7 @@ export async function getMembership(
       and(
         eq(organizationMembers.userId, userId),
         eq(organizationMembers.orgId, orgId),
-        options.includeBlocked ? undefined : isNull(users.blockedAt),
+        options.includeBlocked ? undefined : accountInUse,
       ),
     );
   return row ? withPermissions(row) : null;
@@ -267,7 +270,7 @@ export async function createOrganization(
       .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
       .where(eq(organizationMembers.userId, userId))
       .orderBy(asc(organizations.createdAt));
-    if (theirs.some((o) => refusesNewWorkspace(o.standing)) || (await isUserBlocked(tx, userId)))
+    if (theirs.some((o) => refusesNewWorkspace(o.standing)) || (await accountClosed(tx, userId)))
       throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
     if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
       throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
@@ -631,7 +634,7 @@ export async function listMembers(db: Database, orgId: string) {
       .from(organizationMembers)
       .innerJoin(users, eq(users.id, organizationMembers.userId))
       .leftJoin(schema.organizationSettings, eq(schema.organizationSettings.orgId, organizationMembers.orgId))
-      .where(eq(organizationMembers.orgId, orgId))
+      .where(and(eq(organizationMembers.orgId, orgId), isNull(users.deletionDueAt)))
       .orderBy(asc(organizationMembers.createdAt));
   let rows = await query();
   if (rows.some((r) => !r.handle)) {
@@ -821,7 +824,10 @@ export type UserLocale = AppLocale;
  */
 export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false, pubsub?: PubSub) {
   if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
-  await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+    await enqueueAccountContact(tx, userId);
+  });
   // Runners render each agent's browser start page in its responsible person's language.
   if (pubsub) {
     const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
@@ -836,10 +842,19 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
  */
 export async function myAccount(db: Database, userId: string) {
   const [row] = await db
-    .select({ name: users.name, image: users.image, locale: users.locale, localeAuto: users.localeAuto })
+    .select({
+      name: users.name,
+      image: users.image,
+      locale: users.locale,
+      localeAuto: users.localeAuto,
+      deletionDueAt: users.deletionDueAt,
+      deletionRequestedAt: users.deletionRequestedAt,
+    })
     .from(users)
     .where(eq(users.id, userId));
   return {
+    deletionDueAt: row?.deletionDueAt ?? null,
+    deletionRequestedAt: row?.deletionRequestedAt ?? null,
     name: row?.name ?? null,
     image: row?.image ?? null,
     locale: row?.locale ?? null,
@@ -877,7 +892,10 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")));
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(
+      and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner"), isNull(users.deletionDueAt)),
+    );
   return row?.n ?? 0;
 }
 
@@ -1013,7 +1031,7 @@ async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId
         ne(organizationMembers.userId, targetUserId),
       ),
     )
-    .orderBy(sql`${users.blockedAt} is not null`, asc(organizationMembers.createdAt))
+    .orderBy(sql`not ${accountInUse}`, asc(organizationMembers.createdAt))
     .limit(1);
   return owner?.userId ?? null;
 }
@@ -1266,6 +1284,8 @@ export async function removeMember(
   const quiet = actorId === targetUserId ? { quiet: true as const } : {};
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId, ...quiet });
   await announceMembers(options.pubsub, orgId, changed);
+  const { releaseQuestionsOf } = await import("./questions");
+  await releaseQuestionsOf({ db, pubsub: options.pubsub }, orgId, targetUserId);
   // Their routines pause at once and their work stops; the agents' owners hear it (ADR 0053 §6.2).
   // Loaded here: the routine engine builds on this module.
   const { pauseRoutinesOfCreator } = await import("./routine-firing");
@@ -1292,8 +1312,9 @@ export async function queueOrgFilesPurge(tx: Executor, orgId: string) {
 }
 
 /**
- * Deletes a person's account at once (App Store 5.1.1(v), ADR 0035), as `accountDeletionPlan` reads it under the
- * `org-members` locks. Refused for a blocked account (it can't act) and with `sole_owner` (`soleOwnerRefusal`).
+ * Deletes a person's account for good, as `accountDeletionPlan` reads it under the `org-members` locks: the account
+ * deletion job does this at its date (`purgeAccount`, with `whenDue`, which then does nothing unless the date passed,
+ * by the clock restoring reads, and returns false). Refused for a blocked account (it can't act) and with `sole_owner` (`soleOwnerRefusal`).
  * Workspaces only they are in close and go later, as any deletion, whatever their standing (`closeForDeletion`,
  * `via: "account"`): a hold makes their purge wait, never the account. They leave the others, and the computers they
  * connected there go (`personalMachines`); what they added there stays. Their AI accounts on computers are signed out
@@ -1302,7 +1323,11 @@ export async function queueOrgFilesPurge(tx: Executor, orgId: string) {
  * without an author. With `emails` they are told (`account_deleted`). Their photos leave platform storage
  * (`user.files.purge`). The caller checks that it's them.
  */
-export async function deleteAccount(db: Database, userId: string, options: Omit<DeletionDeps, "db"> = {}) {
+export async function deleteAccount(
+  db: Database,
+  userId: string,
+  options: Omit<DeletionDeps, "db"> & { whenDue?: boolean } = {},
+) {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
   // Before any account goes: the first one stays the owner even once it is gone.
   const owner = await pinnedOwner(db);
@@ -1313,9 +1338,16 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     await import("./workspace-deletion");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
-  const { plan, closed, released, removed, mailActions, ownerless } = await db.transaction(async (tx) => {
+  const done = await db.transaction(async (tx) => {
     // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
     await lockWorkspacesOf(tx, userId);
+    if (options.whenDue) {
+      const [due] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.id, userId), sql`${users.deletionDueAt} <= statement_timestamp()`));
+      if (!due) return null;
+    }
     const mine = await tx
       .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)
@@ -1370,6 +1402,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
           .returning({ id: agents.id, orgId: agents.orgId })
       : [];
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
+    await enqueueAccountContact(tx, userId);
     await tx.delete(users).where(eq(users.id, userId));
     for (const org of plan.leaves) await followOwner(tx, org.id);
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
@@ -1392,6 +1425,8 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     });
     return { plan, closed, released, removed, mailActions, ownerless };
   });
+  if (!done) return false;
+  const { plan, closed, released, removed, mailActions, ownerless } = done;
   for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
@@ -1401,7 +1436,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   for (const org of [...plan.closes, ...plan.leaves]) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId, quiet: true });
   }
+  const { releaseQuestionsOf } = await import("./questions");
   for (const org of plan.leaves) {
+    await releaseQuestionsOf({ db, pubsub: options.pubsub }, org.id, userId);
     const changed = [
       ...released.agents.filter((a) => a.orgId === org.id).flatMap((a) => a.agentIds),
       ...removed.filter((r) => r.computer.orgId === org.id).flatMap((r) => r.freed),
@@ -1411,6 +1448,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     await announceMembers(options.pubsub, org.id, [...new Set(changed)]);
   }
   for (const one of closed) await afterClosing({ ...options, db }, one);
+  return true;
 }
 
 /**
@@ -2033,7 +2071,7 @@ export async function acceptInvitation(
   now = new Date(),
   mail?: InvitationMail,
 ) {
-  if (await isUserBlocked(db, user.id)) throw new ForbiddenError();
+  if (await accountClosed(db, user.id)) throw new ForbiddenError();
   return db.transaction(async (tx) => {
     const [invitation] = await tx
       .select()

@@ -11,6 +11,7 @@ import {
   SPEEDS,
   viewSpeedFits,
 } from "@agenteschat/client/lib/brain-advanced";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { planOf } from "@agenteschat/client/lib/plans";
@@ -57,7 +58,7 @@ export const advancedOf = (view: AgentBrain, options?: readonly ContextLimit[]):
 
 export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -240,7 +241,9 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                   <View style={styles.gap}>
                     <GroupedList>
                       <GroupedRow
-                        label={t("agentPage.work.brain.fallbackTitle", { computer: view.computer?.name ?? "" })}
+                        label={t("agentPage.work.brain.fallbackTitle", {
+                          computer: computerNameOf(t, org?.name ?? "", view.computer?.name ?? ""),
+                        })}
                         labelLines={2}
                         toggle={view.fallback}
                         disabled={!may}

@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 46;
+export const MACHINE_PROTOCOL_VERSION = 51;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -520,11 +520,82 @@ export const VAULT_PROTOCOL = 45;
  */
 export const SPEED_PROTOCOL = 46;
 /**
+ * From this protocol on: `pull`. A file too big for a `write` is fetched by the computer itself from a one-use URL of
+ * ours and lands whole or not at all. An older runner takes files up to `MAX_INLINE_FILE_BYTES` only.
+ */
+export const FILE_PULL_PROTOCOL = 47;
+/**
+ * From this protocol on (ADR 0144 §8): `vault.password` makes a password in the agent's process (its worker in system
+ * mode) and answers it sealed to the one-use public key the request carries, so it reaches the Vault as a box: no
+ * command line, log or relay on the way reads it. The server sends it to no older runner.
+ */
+export const VAULT_PASSWORD_PROTOCOL = 48;
+/** What a password is made of. */
+export const PASSWORD_CLASSES = ["lower", "upper", "digits", "symbols"] as const;
+export type PasswordClass = (typeof PASSWORD_CLASSES)[number];
+/** The shape of a password `vault.password` makes: a site's own rules, as the agent read them. */
+export interface PasswordRules {
+  length: number;
+  classes: PasswordClass[];
+}
+export const PASSWORD_LENGTH = { min: 8, max: 128, default: 20 } as const;
+/**
+ * From this protocol on: how each account signs in. Accounts carry `authMethod` (from what the runner keeps beside
+ * and in the folder, never guessed), `statusUnknown` when the last look at their status said nothing for sure, and
+ * Claude's `providerOrgId` / `orgName`; `hello` says which methods a new Claude sign-in for all agents can use here
+ * (`claudeLoginMethods`); `begin` may name the `method` of a Claude subscription sign-in; a turn's `error` may say
+ * its `cause` and the provider's `httpStatus`. The server sends `method` to no older runner, and reads an older
+ * runner's missing `claudeLoginMethods` as `claudeLoginMethodsOf` says.
+ */
+export const CLAUDE_AUTH_PROTOCOL = 50;
+/**
+ * From this protocol on: a system-mode runner may list `cli_login` in `claudeLoginMethods`. Its turns on such a sign-in
+ * run in root, as the sign-in's own OS user, with no tool of the CLI's that touches files or runs code; each agent's
+ * worker serves those tools over its bridge. Root and worker speak of them on their link: `bridge.token`, `turn.cancel`
+ * and `turn.detach` from root, `turn.context` (`TurnContext`) and `tool.notice` (`ToolNotice`) from the worker; a
+ * background task's CLI is root's too, its worker hearing `task.out` and `task.exit` and asking `task.stop`. On the
+ * server's side of the wire only the `agents` frame changes: its `deleted` says which agents are gone for good, what an
+ * archived or moved agent, which also leaves the list, isn't. An older runner just never lists the method.
+ */
+export const CLAUDE_SHARED_PROTOCOL = 51;
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
  */
 export const SITE_SECRET_TTL_MS = 15 * 60_000;
+/**
+ * From this protocol on (ADR 0040 §7.1): an agent's browser has a live view socket of its own. Before
+ * `browser.stream.start`, the server sends `browser.view.open` with a fresh `streamId`; the runner's own process (root
+ * in system mode) dials a data socket for it (`/api/machines/stream`, `stream.hello` as a desktop's), and that
+ * agent's frames go there as bytes (`encodeBrowserFrame`) instead of `browser.frame` on this socket: at most
+ * `BROWSER_VIEW.window` unacknowledged (the server answers each with `{"type":"ack"}`), only the newest one waiting.
+ * A slow link then shows the page as it is now instead of replaying the seconds it fell behind, and a picture never
+ * delays a command. Without the view (it closed, or an older server) frames go as `browser.frame` as before. The
+ * server sends `browser.view.open` to no older runner.
+ */
+export const BROWSER_VIEW_PROTOCOL = 49;
+/** Live view frames (ADR 0040 §7.1), on each hop: computer → server, and server → each person watching. */
+export const BROWSER_VIEW = {
+  /**
+   * Frames on their way unacknowledged, per hop: enough to keep a link with a long round trip busy at the control
+   * rate (15 fps over ~200 ms), few enough that a slow link holds at most a fifth of a second of pictures.
+   */
+  window: 3,
+  /**
+   * Computer → server: a full window with no acknowledgement for this long means the view's socket is dead (the
+   * server answers on arrival, or within `ackOwedMs` when nobody watching has room): the runner closes it and its
+   * frames go on the machine socket until the server opens a new one.
+   */
+  stallMs: 5000,
+  /** The longest the server holds a frame's acknowledgement back while no viewer has room for more. */
+  ackOwedMs: 2000,
+  /** Server → a viewer that draws nothing for this long (a hidden tab): it gets the newest frame anyway. */
+  viewerStallMs: 5000,
+  /** Frames a second a viewer may ask for (`browser.watch`'s `maxFps`), and what an app that sends no acks gets. */
+  maxFps: 15,
+  legacyFps: 1,
+} as const;
 /** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
 export const VAULT_TYPE_REFUSALS = [
   /** The frame that owns the field (or one around it, or the page) is on no site the login's rule allows. */
@@ -598,6 +669,59 @@ export const isBrainSpeed = (v: unknown): v is BrainSpeed =>
 export const isContextTokens = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
 
+/**
+ * How an account signs in (protocol 50). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
+ * folder. `setup_token`: `claude setup-token`'s long-lived token, kept by root and handed to each turn. `api_key`: a
+ * pasted key (a coding plan's, Cursor's, OpenCode's).
+ */
+export type AuthMethod = "cli_login" | "setup_token" | "api_key";
+export const AUTH_METHODS: readonly AuthMethod[] = ["cli_login", "setup_token", "api_key"];
+export const isAuthMethod = (v: unknown): v is AuthMethod => AUTH_METHODS.some((m) => m === v);
+/** The methods a `begin` may name (a key account names its `provider` instead). */
+export type ClaudeLoginMethod = Exclude<AuthMethod, "api_key">;
+export const isClaudeLoginMethod = (v: unknown): v is ClaudeLoginMethod => v === "cli_login" || v === "setup_token";
+/**
+ * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 50), else what
+ * runners did before saying it (`claude setup-token` in system mode, the CLI's own sign-in elsewhere).
+ */
+export const claudeLoginMethodsOf = (said: readonly AuthMethod[] | undefined, system: boolean): AuthMethod[] =>
+  said ? [...said] : [system ? "setup_token" : "cli_login"];
+
+/** Why a provider refused or failed a turn (protocol 50), as far as the runner could tell from the CLI. */
+export type ProviderFailureCause =
+  | "auth_rejected"
+  | "account_disabled"
+  | "quota"
+  | "billing"
+  | "provider_transient"
+  | "network"
+  | "unknown";
+export const PROVIDER_FAILURE_CAUSES: readonly ProviderFailureCause[] = [
+  "auth_rejected",
+  "account_disabled",
+  "quota",
+  "billing",
+  "provider_transient",
+  "network",
+  "unknown",
+];
+export const isProviderFailureCause = (v: unknown): v is ProviderFailureCause =>
+  PROVIDER_FAILURE_CAUSES.some((c) => c === v);
+
+/** Claude's organization id (`claude auth status --json` `orgId`), when it is a short word. */
+export const providerOrgIdOf = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[\w-]{1,64}$/.test(v) ? v : undefined;
+/** Claude's organization name, control characters out and cut to 120. */
+export const providerOrgNameOf = (v: unknown): string | undefined => {
+  if (typeof v !== "string") return undefined;
+  const name = v
+    .replace(/\p{Cc}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return name || undefined;
+};
+
 /** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
 export interface RunnerAccountInfo {
   id: string;
@@ -615,6 +739,16 @@ export interface RunnerAccountInfo {
   keyHint?: string;
   /** Protocol 29: it thinks for several of its owner's agents at once. */
   shared?: boolean;
+  /** Protocol 50: how it signs in, when the runner knows for sure. */
+  authMethod?: AuthMethod;
+  /**
+   * Protocol 50: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
+   * readable); `loggedIn` is then the last conclusive answer the runner knew.
+   */
+  statusUnknown?: true;
+  /** Protocol 50: the Claude organization it signed in to (no secret). */
+  providerOrgId?: string;
+  orgName?: string;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -688,6 +822,9 @@ export type AccountRequest =
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
    * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
+   * Protocol 50, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
+   * `cli_login`; a runner that can't do it refuses (`unsupported`) and never signs in another way, and `again` on an
+   * account that signs in another way is refused too. Absent: as before.
    */
   | {
       action: "begin";
@@ -697,6 +834,7 @@ export type AccountRequest =
       email?: string;
       provider?: string;
       shared?: boolean;
+      method?: ClaudeLoginMethod;
     }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
@@ -877,6 +1015,11 @@ export const STREAM_CLOSE = {
   internal: 1011,
   /** A side doesn't keep up: its backlog passed the limit. */
   tooSlow: 1013,
+  /**
+   * Protocol 49: the runner closed a browser's live view that got no acknowledgement in `BROWSER_VIEW.stallMs` (its
+   * link too slow, or dead). In 3000-4999 because the standard WebSocket client (Node's) refuses to send 1013.
+   */
+  viewTooSlow: 4413,
   badRequest: 4400,
   /** Data socket: a bad token, or another machine's stream. */
   badToken: 4401,
@@ -937,7 +1080,9 @@ export interface StreamHello {
 export type StreamControl =
   | { type: "resize"; cols: number; rows: number }
   | { type: "exit"; code: number | null }
-  | { type: "mode"; mode: DesktopMode };
+  | { type: "mode"; mode: DesktopMode }
+  /** Protocol 49: a browser view's frame arrived (server → runner): one more may go (`BROWSER_VIEW`). */
+  | { type: "ack" };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -955,7 +1100,7 @@ export interface BrowserHandoffInfo {
   link?: string;
 }
 
-/** `watch`: about 1 frame a second for viewers; `control`: 10–15 while a person drives. */
+/** `watch`: a few frames a second for viewers; `control`: 10–15 while a person drives. */
 export type BrowserStreamMode = "watch" | "control";
 
 /** Bits of CDP's modifier mask: Alt 1, Control 2, Meta 4, Shift 8. */
@@ -998,6 +1143,8 @@ export interface BrowserFrameMetadata {
   deviceWidth: number;
   deviceHeight: number;
   pageScaleFactor?: number;
+  /** Protocol 49: when the computer captured it (epoch ms, its own clock), to measure how late pictures arrive. */
+  capturedAt?: number;
   /** The active tab's URL when the frame was taken. */
   url?: string;
   /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
@@ -1119,7 +1266,7 @@ export const HELLO_TIMEOUT_MS = 10_000;
 export const HEARTBEAT_MS = 25_000;
 /** Largest text frame either side accepts (a `write` of 5 MB is about 6.7 MB in base64). */
 export const MAX_FRAME_BYTES = 8 * 1024 * 1024;
-/** `read`/`write` bodies (base64 in JSON); larger files go through `push`. */
+/** `read`/`write` bodies (base64 in JSON); larger files go through `push` and `pull`. */
 export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MACHINE_TOKEN_PREFIX = "agm_";
@@ -1306,7 +1453,16 @@ export type WireBrainEvent =
    * `worked`: on a `plan_limit`, whether the turn used any tool before it was cut (an older runner leaves it out:
    * the engine counts that as worked).
    */
-  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
+  | {
+      type: "error";
+      code: string;
+      message: string;
+      retryable?: boolean;
+      worked?: boolean;
+      /** Protocol 50: why the provider refused or failed it, and its HTTP status when the CLI said one. */
+      cause?: ProviderFailureCause;
+      httpStatus?: number;
+    }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] }
   /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
@@ -1393,6 +1549,11 @@ export interface BrainTurnRequest {
   freeTier?: boolean;
   /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
   contextTokens?: number;
+  /**
+   * A person waits on this turn (first rank of the computer's line): it may take the runner's reserved slot
+   * (`PERSON_TURN_MIN_FREE_BYTES`). No protocol step: a runner that doesn't read it admits the turn like any other.
+   */
+  personWaiting?: boolean;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -1647,6 +1808,15 @@ export interface RunnerInfo {
   ownUsage?: OwnPlanUsage;
   /** Protocol 22: how big the computer is. */
   size?: MachineSize;
+  /** Protocol 50: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
+  claudeLoginMethods?: AuthMethod[];
+  /** Why this computer doesn't list `cli_login` for all agents though it was switched on (its self-check's answer). */
+  claudeLoginBlocked?: string;
+  /**
+   * Protocol 50 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
+   * group, which the computer's egress rules may route apart from the rest of root.
+   */
+  authEgressGroup?: true;
 }
 
 export interface FileEntry {
@@ -1728,6 +1898,17 @@ export type MachineRequest = (
       uploadId: string;
       maxBytes: number;
     }
+  /** Protocol 47 (`FILE_PULL_PROTOCOL`): `write`'s path rules, the bytes fetched from `url` instead of sent here. */
+  | {
+      op: "pull";
+      path: string;
+      /** Absolute URL of our file endpoint (`GET`, machine token as bearer), good for one fetch. */
+      url: string;
+      pullId: string;
+      size: number;
+      /** Hex; absent for a stored file with no recorded hash (a skill's), which is then checked by size alone. */
+      sha256?: string;
+    }
   /**
    * Protocol 12: one `agent-browser` command in the request's agent's session
    * (`open`, `snapshot`, `click`…; `args` as on its command line, without
@@ -1753,6 +1934,11 @@ export type MachineRequest = (
   | { op: "browser.stop" }
   /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
   | { op: "browser.stream.start"; mode: BrowserStreamMode }
+  /**
+   * Protocol 49: the live view's own socket for the agent's (or the profile's) browser: the runner dials the data
+   * socket `streamId` names and answers once the server took it (`BROWSER_VIEW_PROTOCOL`).
+   */
+  | { op: "browser.view.open"; streamId: string }
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
@@ -1794,6 +1980,8 @@ export type MachineRequest = (
   | { op: "desktop.text" }
   /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
   | { op: "vault.key" }
+  /** `requestId` and `publicKey`: what the answer is sealed to (`madePasswordAad`). */
+  | { op: "vault.password"; requestId: string; publicKey: string; rules: PasswordRules }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -1817,6 +2005,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "write",
   "list",
   "push",
+  "pull",
   "secret",
   "account",
   "task.start",
@@ -1843,12 +2032,14 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.session.stop",
   "desktop.session.status",
   "stream.open",
+  "browser.view.open",
   "desktop.look",
   "desktop.act",
   "desktop.capture",
   "desktop.apps",
   "desktop.text",
   "vault.key",
+  "vault.password",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1868,6 +2059,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
+  /** What landed at the path: its bytes and SHA-256 (hex). */
+  pull: { size: number; sha256: string };
   /**
    * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
    * `activate`: size; an older activation may be superseded.
@@ -1954,6 +2147,7 @@ export interface MachineReplies {
   /** `streams`: the agent's open desktop and terminal streams. */
   "desktop.session.status": { running: boolean; startedAt?: string; lastUsedAt?: string; streams: number };
   "stream.open": { opened: true };
+  "browser.view.open": { opened: true };
   "desktop.look": DesktopLookReply;
   /** `look` with `settle`; `settled: false`: the screen kept changing until the wait's cap. */
   "desktop.act": { look?: DesktopLookReply; settled?: boolean };
@@ -1975,6 +2169,7 @@ export interface MachineReplies {
   "desktop.text": { text: string } | { same: true };
   /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
+  "vault.password": { box: WireSecretBox };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -1993,6 +2188,8 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
+  /** Protocol 47: a `pull` didn't land; its message says why, for people. */
+  | "pull_failed"
   /**
    * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
    * has no room for one more turn (ADR 0025 §5, admission). Try again later.
@@ -2044,6 +2241,11 @@ export type MachineErrorCode =
    * push to the default branch, a deploy); the message says why and what the agent can do. Nothing ran.
    */
   | "approval_needed"
+  /**
+   * Protocol 50: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
+   * message says why. Older servers read it like `internal`.
+   */
+  | "unsupported"
   | "bad_request"
   | "internal";
 
@@ -2078,7 +2280,7 @@ export type ServerFrame =
    * at it), sent after `welcome` and again whenever the list or a name/look
    * changes. The runner shows them in the desktop app.
    */
-  | { type: "agents"; agents: MachineAgent[] }
+  | { type: "agents"; agents: MachineAgent[]; deleted?: string[] }
   /**
    * Protocol 12: a request for help or a person in control in an agent's
    * browser started, changed or ended (`handoff: null`); sent again on
@@ -2286,6 +2488,8 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     const usage = parsePlanUsage(a.usage);
     const provider = isPlanProviderWord(a.provider) ? a.provider : undefined;
     const keyHint = isString(a.keyHint) && /^[\x21-\x7e]{1,4}$/.test(a.keyHint) ? a.keyHint : undefined;
+    const providerOrgId = providerOrgIdOf(a.providerOrgId);
+    const orgName = providerOrgNameOf(a.orgName);
     out.push({
       id: a.id,
       kind: a.kind,
@@ -2296,6 +2500,10 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
       ...(provider ? { provider } : {}),
       ...(keyHint ? { keyHint } : {}),
       ...(a.shared === true ? { shared: true } : {}),
+      ...(isAuthMethod(a.authMethod) ? { authMethod: a.authMethod } : {}),
+      ...(a.statusUnknown === true ? { statusUnknown: true as const } : {}),
+      ...(providerOrgId ? { providerOrgId } : {}),
+      ...(orgName ? { orgName } : {}),
     });
   }
   return out;
@@ -2409,6 +2617,10 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
         ...(typeof v.worked === "boolean" ? { worked: v.worked } : {}),
+        ...(isProviderFailureCause(v.cause) ? { cause: v.cause } : {}),
+        ...(Number.isInteger(v.httpStatus) && (v.httpStatus as number) >= 100 && (v.httpStatus as number) <= 599
+          ? { httpStatus: v.httpStatus as number }
+          : {}),
       };
     case "steer_read": {
       if (!Array.isArray(v.uuids)) return null;
@@ -2491,6 +2703,11 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.mode === "system" ? { mode: "system" as const } : {}),
         ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
         ...(size ? { size } : {}),
+        ...(Array.isArray(f.claudeLoginMethods)
+          ? { claudeLoginMethods: AUTH_METHODS.filter((m) => (f.claudeLoginMethods as unknown[]).includes(m)) }
+          : {}),
+        ...(isString(f.claudeLoginBlocked) ? { claudeLoginBlocked: f.claudeLoginBlocked.slice(0, 300) } : {}),
+        ...(f.authEgressGroup === true ? { authEgressGroup: true as const } : {}),
       };
     }
     case "browser.frame": {
@@ -2501,6 +2718,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const height = finite(m?.deviceHeight);
       if (seq === undefined || !m || width === undefined || height === undefined) return null;
       const scale = finite(m.pageScaleFactor);
+      const capturedAt = finite(m.capturedAt);
       const url = cut(m.url, BROWSER_LIMITS.url);
       const title = cut(m.title, BROWSER_LIMITS.title);
       return {
@@ -2512,6 +2730,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           deviceWidth: width,
           deviceHeight: height,
           ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+          ...(capturedAt !== undefined ? { capturedAt } : {}),
           ...(url !== undefined ? { url } : {}),
           ...(title ? { title } : {}),
         },
@@ -3243,7 +3462,72 @@ export function parseStreamControl(raw: string): StreamControl | null {
     return { type: "exit", code: f.code as number | null };
   }
   if (f.type === "mode" && (f.mode === "watch" || f.mode === "control")) return { type: "mode", mode: f.mode };
+  if (f.type === "ack") return { type: "ack" };
   return null;
+}
+
+/** A live view frame's header as bytes carry it: what `browser.frame` says besides the picture. */
+export interface BrowserFrameHeader {
+  seq: number;
+  metadata: BrowserFrameMetadata;
+}
+
+const BROWSER_FRAME_VERSION = 1;
+/** A frame's header is a few hundred bytes (an address and a title at most). */
+const BROWSER_FRAME_HEADER_MAX = 16 * 1024;
+
+/**
+ * A live view frame as bytes (protocol 49, ADR 0040 §7.1): a version byte (1), the header's length (4 bytes, big
+ * endian), the header as UTF-8 JSON, then the JPEG. The runner sends it on its view's data socket and the server
+ * passes the same bytes on to each person's frame socket; the apps read it with their own copy of this layout
+ * (`packages/client/src/browser/frame-bytes.ts`).
+ */
+export function encodeBrowserFrame(header: BrowserFrameHeader, jpeg: Uint8Array): Uint8Array {
+  const head = new TextEncoder().encode(JSON.stringify({ seq: header.seq, metadata: header.metadata }));
+  const out = new Uint8Array(5 + head.byteLength + jpeg.byteLength);
+  out[0] = BROWSER_FRAME_VERSION;
+  new DataView(out.buffer).setUint32(1, head.byteLength);
+  out.set(head, 5);
+  out.set(jpeg, 5 + head.byteLength);
+  return out;
+}
+
+/** A frame's bytes (`encodeBrowserFrame`), checked like a `browser.frame`; null when they aren't one. */
+export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { jpeg: Uint8Array }) | null {
+  if (bytes.byteLength < 6 || bytes[0] !== BROWSER_FRAME_VERSION) return null;
+  const length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(1);
+  if (length > BROWSER_FRAME_HEADER_MAX || 5 + length >= bytes.byteLength) return null;
+  const jpeg = bytes.subarray(5 + length);
+  // The same picture as a `browser.frame` may carry (its limit counts base64, a third larger).
+  if (jpeg.byteLength > (BROWSER_LIMITS.frameBytes / 4) * 3) return null;
+  let f: unknown;
+  try {
+    f = JSON.parse(new TextDecoder().decode(bytes.subarray(5, 5 + length)));
+  } catch {
+    return null;
+  }
+  if (!isObject(f)) return null;
+  const seq = finite(f.seq);
+  const m = isObject(f.metadata) ? f.metadata : null;
+  const width = finite(m?.deviceWidth);
+  const height = finite(m?.deviceHeight);
+  if (seq === undefined || !m || width === undefined || height === undefined) return null;
+  const scale = finite(m.pageScaleFactor);
+  const capturedAt = finite(m.capturedAt);
+  const url = cut(m.url, BROWSER_LIMITS.url);
+  const title = cut(m.title, BROWSER_LIMITS.title);
+  return {
+    seq,
+    metadata: {
+      deviceWidth: width,
+      deviceHeight: height,
+      ...(scale !== undefined ? { pageScaleFactor: scale } : {}),
+      ...(capturedAt !== undefined ? { capturedAt } : {}),
+      ...(url !== undefined ? { url } : {}),
+      ...(title ? { title } : {}),
+    },
+    jpeg,
+  };
 }
 
 const BROWSER_MODIFIERS_MAX = 15;
@@ -3313,4 +3597,58 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
     default:
       return null;
   }
+}
+
+/** What a worker answers about a turn its root hosts: where it runs, as the agent's own user resolved it. */
+export interface TurnContext {
+  /** The agent's folder. */
+  folder: string;
+  cwd: string;
+  /** The folder's CLAUDE.md and AGENTS.md, and its git state: root reads nothing of the agent's. */
+  text?: string;
+}
+
+const TURN_TEXT_MAX = 64_000;
+const absolutePath = (v: unknown): v is string =>
+  typeof v === "string" && v.startsWith("/") && v.length <= 4096 && !v.includes("\0");
+
+/** A worker's `turn.context`. It runs as the uid the agent's code runs as: only what fits goes on. */
+export function parseTurnContext(f: Record<string, unknown>): TurnContext | null {
+  if (!absolutePath(f.folder) || !absolutePath(f.cwd)) return null;
+  return {
+    folder: f.folder,
+    cwd: f.cwd,
+    ...(typeof f.text === "string" ? { text: f.text.slice(0, TURN_TEXT_MAX) } : {}),
+  };
+}
+
+/** A delegated session's background shell started or ended (`tool.notice`), for the CLI on that session. */
+export interface ToolNotice {
+  session: string;
+  shellId: string;
+  status: "running" | "completed" | "failed" | "killed";
+  exitCode?: number;
+  /** The call's description, or its command. */
+  summary: string;
+  outputFile: string;
+  /** Running since a call was moved to the background: its turn waits for it, as for Claude Code's own. */
+  moved?: true;
+}
+
+/** A worker's `tool.notice`, clipped. Its text reaches the model as the session's own tool did. */
+export function parseToolNotice(f: Record<string, unknown>): ToolNotice | null {
+  const { session, shellId, status, exitCode, summary, outputFile, moved } = f;
+  if (typeof session !== "string" || !session || session.length > 64) return null;
+  if (typeof shellId !== "string" || !/^[\w-]{1,64}$/.test(shellId)) return null;
+  if (status !== "running" && status !== "completed" && status !== "failed" && status !== "killed") return null;
+  if (typeof summary !== "string" || !absolutePath(outputFile)) return null;
+  return {
+    session,
+    shellId,
+    status,
+    ...(Number.isInteger(exitCode) ? { exitCode: exitCode as number } : {}),
+    summary: summary.slice(0, 200),
+    outputFile,
+    ...(moved === true ? { moved } : {}),
+  };
 }

@@ -24,8 +24,25 @@ export interface PlanAccount<A extends MachineAccount> {
   usedBy: string[];
   /** The newest usage any of them reported: they share the plan's limits. */
   usage: PlanUsage | null;
+  /** Signed out for sure (`signInOf`). */
   signedOut: A[];
+  /** The computer's last look at them said nothing for sure, and the last it knew was signed out (`signInOf`). */
+  unknown: A[];
 }
+
+/**
+ * Where a login's sign-in stands: signed out only when the computer said so for sure. `unknown`: its last look
+ * said nothing for sure (`statusKnown` false) and the last it knew was signed out, which never reads as signed out
+ * nor asks for a new sign-in: the computer looks again by itself.
+ */
+export const signInOf = (a: Pick<MachineAccount, "status" | "statusKnown">): "active" | "signed_out" | "unknown" =>
+  a.status === "active" ? "active" : a.statusKnown === false ? "unknown" : "signed_out";
+
+/**
+ * Whether a login offers signing in to it again: whenever the server keeps it signed out, also while its last look
+ * was unclear (`signInOf` unknown only changes the words), since its turns are refused until then.
+ */
+export const offersSignInAgain = (a: Pick<MachineAccount, "status">) => a.status === "signed_out";
 
 const newest = (usages: (PlanUsage | null)[]) =>
   usages.reduce<PlanUsage | null>(
@@ -35,24 +52,33 @@ const newest = (usages: (PlanUsage | null)[]) =>
 
 /**
  * The logins of one account together, as the server tells them apart: the same computer, owner, CLI and plan, and
- * the same email (any case) or key's last 4. Never the label, which any rename can repeat. A login whose email or
- * key the viewer can't see (another person's) is a row of its own.
+ * the same email (any case) and Claude organization (one not said is any), or key's last 4. Never the label, which any rename can repeat.
+ * A login whose email or key the viewer can't see (another person's) is a row of its own.
  */
 export function groupPlans<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
 ): PlanAccount<A>[] {
-  const groups = new Map<string, A[]>();
+  const groups: { key: string; org: string | null; logins: A[] }[] = [];
   for (const a of accounts) {
     const identity = a.provider ? a.keyHint : a.email?.toLowerCase();
     const key = identity ? JSON.stringify([a.machineId ?? null, a.ownerId, a.kind, a.provider, identity]) : a.id;
-    groups.set(key, [...(groups.get(key) ?? []), a]);
+    const org = a.providerOrgId ?? null;
+    // Like the server's, an organization not said matches any: only two known ones tell logins apart.
+    const same = groups.filter((g) => g.key === key);
+    const group = org === null ? same[0] : (same.find((g) => g.org === org) ?? same.find((g) => g.org === null));
+    if (!group) groups.push({ key, org, logins: [a] });
+    else {
+      group.logins.push(a);
+      group.org ??= org;
+    }
   }
-  return [...groups.values()].map((logins) => ({
+  return groups.map(({ logins }) => ({
     key: logins[0]?.id ?? "",
     logins,
     usedBy: logins.flatMap((l) => l.usedBy),
     usage: newest(logins.map((l) => l.usage)),
-    signedOut: logins.filter((l) => l.status === "signed_out"),
+    signedOut: logins.filter((l) => signInOf(l) === "signed_out"),
+    unknown: logins.filter((l) => signInOf(l) === "unknown"),
   }));
 }
 
@@ -161,6 +187,15 @@ export const endsOnClaude = (
 ) => account.shared === true && account.kind === "claude_code" && !account.provider && machine?.mode === "system";
 
 /**
+ * The viewer's own account that can't say which Claude account it is: a token made for all agents (`endsOnClaude`)
+ * comes with no email, so where its email would show, the apps say it isn't known.
+ */
+export const identityUnknown = (
+  account: Pick<MachineAccount, "shared" | "kind" | "provider" | "mine" | "email">,
+  machine: Pick<Machine, "mode"> | undefined,
+) => account.mine && !account.email && endsOnClaude(account, machine);
+
+/**
  * An account by its name with its plan once ("Claude · Max", "Trabalho · Ultra"); a key account by its name. A name
  * that already says the plan stays as it is: servers before ADR 0059's 2026-10-30 amendment name accounts after it
  * ("Claude Max 2"), and the phone talks to those too.
@@ -178,7 +213,7 @@ export const onSeveralComputers = (accounts: readonly { machineId: string }[]) =
  * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
  * when it isn't the viewer's, the agents on it where choosing it signs this agent in to it too, signed out, the
  * agents it would be taken from (or those it thinks for too, made for all of its owner's agents), else its key's end
- * or its email.
+ * or its email. One the computer couldn't check says so, never signed out.
  */
 export function accountAbout(
   t: TFunction,
@@ -187,6 +222,7 @@ export function accountAbout(
 ): string | undefined {
   if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
   if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t) });
+  if (signInOf(a) === "unknown") return t("agentPage.work.brain.accountUnknown");
   // A coding plan's key never signs out: it reads signed out once its endpoint refused it.
   if (a.status === "signed_out") {
     return t(isPlanId(a.provider) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut");
@@ -263,6 +299,8 @@ export function existingAi<A extends MachineAccount>(
  */
 export const listsExisting = (agent: Pick<Agent, "builtin"> | undefined, noAi: boolean) => noAi || isRightHand(agent);
 
+export const ACCOUNT_KINDS = ["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"] as const;
+
 /** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */
 export interface OwnSignInRow {
   key: string;
@@ -278,7 +316,7 @@ export interface OwnSignInRow {
 export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
   const out: OwnSignInRow[] = [];
   for (const c of view?.computers ?? []) {
-    for (const kind of ["claude_code", "codex", "cursor", "opencode"] as const) {
+    for (const kind of ["claude_code", "codex", "cursor"] as const) {
       const own = c.own?.[kind];
       if (!own) continue;
       out.push({
@@ -304,25 +342,36 @@ export const ownSignInTitle = (t: TFunction, o: Pick<OwnSignInRow, "kind" | "pla
 
 /**
  * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on
- * someone else's, that computer's ("MacBook's account").
+ * someone else's, that computer's ("MacBook's account"). OpenCode with no account is nobody's: its free models.
  */
-export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
-  mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });
+export const ownSignInName = (t: TFunction, mine: boolean, computer: string, kind?: MachineAccountKind) =>
+  kind === "opencode"
+    ? t("connectAi.own.free")
+    : mine
+      ? t("connectAi.own.shared")
+      : t("agentPage.work.brain.thisComputer", { computer });
+
+/** `ownSignInName` inside a sentence ("Ada pensa com a conta que os seus agentes dividem"). */
+export const ownSignInLower = (t: TFunction, kind: string | null) =>
+  t(kind === "opencode" ? "connectAi.own.freeLower" : "connectAi.own.sharedLower");
 
 /**
  * The computer's own sign-in of `kind` can think for the agent (ADR 0041, ADR 0059 §3): whoever connected that
  * computer owns the agent, and its runner reported that CLI signed in there (`own`, the computer's `/ai-accounts`
- * row). On a computer nobody connected (the workspace's own) it never can.
+ * row). On a computer nobody connected (the workspace's own) it never can. OpenCode signs in nowhere: its free tier
+ * is a choice wherever its CLI runs, for the agents of whoever connected that computer and, on a computer nobody
+ * connected (`canAdd` without `mine`), for anyone's (ADR 0132 §6). It is never listed as the person's AI.
  */
 export const ownSignInReady = (
   brain: Pick<AgentBrain, "ownSignIn"> | undefined,
-  row: (Pick<AiComputer, "own"> & Partial<Pick<AiComputer, "mine">>) | undefined,
+  row: (Pick<AiComputer, "own"> & Partial<Pick<AiComputer, "mine" | "brains" | "canAdd">>) | undefined,
   kind: MachineAccountKind,
 ) =>
-  // OpenCode's free tier on a computer nobody connected thinks for anyone's agent (ADR 0132): the server lists it
-  // there, on a computer that isn't the viewer's.
-  (brain?.ownSignIn === true || (kind === "opencode" && brain !== undefined && row?.mine === false)) &&
-  row?.own?.[kind] !== undefined;
+  kind === "opencode"
+    ? row?.brains?.opencode === true &&
+      row.canAdd === true &&
+      (brain?.ownSignIn === true || (brain !== undefined && row.mine === false))
+    : brain?.ownSignIn === true && row?.own?.[kind] !== undefined;
 
 /**
  * An agent's account choice lists the computer's own sign-in where it is ready (`ownSignInReady`), and while the
@@ -332,7 +381,7 @@ export const ownSignInReady = (
  */
 export const ownSignInListed = (
   brain: Pick<AgentBrain, "ownSignIn" | "brain" | "account" | "canUsePlans">,
-  row: Pick<AiComputer, "own"> | undefined,
+  row: Parameters<typeof ownSignInReady>[1],
   kind: MachineAccountKind,
 ) =>
   ownSignInReady(brain, row, kind) ||
@@ -351,4 +400,26 @@ export function signInPlan(
 ): string | null {
   if (view.account === null) return row?.own?.[kind]?.plan ?? null;
   return view.accounts.find((a) => a.id === view.account)?.plan ?? null;
+}
+
+/**
+ * What removing a key changes, said before the person goes on (web and phone): the agents that think with it move to
+ * another key, or stop answering where nothing else is left.
+ */
+export function keyRemovalText(
+  t: TFunction,
+  key: Pick<Credential, "id" | "usedBy">,
+  live: readonly Pick<Credential, "id">[],
+  platform: boolean,
+) {
+  const used = key.usedBy ?? [];
+  if (used.length === 0) return t("settings.removeUnused");
+  const others = platform || live.some((k) => k.id !== key.id);
+  return t(others ? "settings.removeUsedOther" : "settings.removeUsedNone", {
+    count: used.length,
+    agents: joinNames(
+      used.map((a) => a.name),
+      t,
+    ),
+  });
 }

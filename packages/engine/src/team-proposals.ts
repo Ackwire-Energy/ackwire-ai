@@ -1,5 +1,5 @@
-import type { PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import { checkRoutine, type DraftPlace, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
@@ -16,6 +16,7 @@ import type { AiStatusDeps } from "./ai-status";
 import { AGENT_LOOK, type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { setAgentBrain } from "./brain-settings";
+import { invalidateOrg } from "./cache";
 import {
   addChannelMember,
   archiveChannel,
@@ -28,8 +29,9 @@ import {
 import type { ContextDeps } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
+import { queuePlanWaiting } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated } from "./events";
+import { publishAgentsChanged, publishChannelEvent, publishMessageCreated } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
@@ -41,6 +43,7 @@ import { deliverNoticeToRun } from "./run-resume";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { SKILL_NAME } from "./skills";
+import { billingHold } from "./standing";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
@@ -108,6 +111,8 @@ export interface TeamParams {
   invite: string[];
   /** From "Usar este modelo": the template's id. */
   template?: string;
+  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
+  example?: string;
 }
 
 /** `failed` is never stored: a failure leaves it `pending` with `error`. */
@@ -329,6 +334,7 @@ export async function checkTeam(
     approvals: str(input.approvals).slice(0, 300),
     invite: [...new Set(list(input.invite).map(str).filter(Boolean))].slice(0, 10),
     ...(str(input.template) ? { template: str(input.template) } : {}),
+    ...(str(input.example) ? { example: str(input.example) } : {}),
   };
 }
 
@@ -351,6 +357,7 @@ export async function postTeamCard(
   },
   params: TeamParams,
   forUserId: string | null,
+  ttlMs = APPROVAL_TTL_MS,
 ): Promise<Message> {
   const card: TeamProposalCard = {
     kind: "team_proposal",
@@ -359,7 +366,7 @@ export async function postTeamCard(
     state: "pending",
     decidedByUserId: null,
     decidedAt: null,
-    expiresAt: new Date(Date.now() + APPROVAL_TTL_MS).toISOString(),
+    expiresAt: new Date(Date.now() + ttlMs).toISOString(),
   };
   const message = await insertMessage(deps.db, {
     orgId: place.orgId,
@@ -524,6 +531,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
   const admin = can(membership, "manage_agents");
   const skipped: TeamCreated["skipped"] = [];
   let made: Omit<TeamCreated, "noAi" | "skipped"> & { agents: Agent[] };
+  const events = holdEvents(deps.pubsub);
   try {
     made = await deps.db.transaction(async (raw) => {
       const tx = raw as unknown as Database;
@@ -540,15 +548,15 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         channelPlaces(tx, orgId, userId, names),
       );
       if (blocked.length > 0) throw new StepError(channelStep, blockedError(blocked));
-      for (const id of outside) await stepped(channelStep, () => joinChannel(tx, userId, orgId, id, deps));
+      for (const id of outside) await stepped(channelStep, () => joinChannel(tx, userId, orgId, id, events));
       const channelOf = new Map(existing);
       const taken = await takenHandles(tx, orgId);
       for (const name of names) {
         if (channelOf.has(name)) continue;
         const back = archived.get(name);
         const id = await stepped(`#${name}`, async () => {
-          if (!back) return (await createChannel(tx, userId, orgId, { name })).id;
-          await unarchiveChannel(tx, userId, orgId, back);
+          if (!back) return (await createChannel(tx, userId, orgId, { name }, events)).id;
+          await unarchiveChannel(tx, userId, orgId, back, events);
           return back;
         });
         channelOf.set(name, id);
@@ -570,13 +578,13 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
             orgId,
             { name: a.name, handle: a.handle, role: a.role, instructions: a.instructions },
             NEW_AGENT_DEFAULTS,
-            { via: found.proposedBy },
+            { via: found.proposedBy, pubsub: events.pubsub },
           );
-          if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance);
+          if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance, events);
           const channelId = channelOf.get(a.channel) as string;
-          await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, { pubsub: deps.pubsub });
+          await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
           for (const r of a.routines) {
-            const routine = await createRoutine({ db: tx, pubsub: deps.pubsub }, userId, orgId, {
+            const routine = await createRoutine({ db: tx, pubsub: events.pubsub }, userId, orgId, {
               name: r.name,
               agentId: row.id,
               prompt: r.prompt,
@@ -612,7 +620,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         // savepoint keeps a refusal from aborting the rest.
         const weekly = await raw
           .transaction(async (sp) =>
-            createRoutine({ db: sp as unknown as Database, pubsub: deps.pubsub }, userId, orgId, {
+            createRoutine({ db: sp as unknown as Database, pubsub: events.pubsub }, userId, orgId, {
               name: w.name,
               agentId: found.proposedBy,
               prompt: w.prompt,
@@ -639,8 +647,12 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     await writeCard(deps, message, back, "creating");
     return { card: back, noAi: [] as string[] };
   }
+  // Cleared inside the transaction too: a run reading in between may have cached the team as it was.
+  invalidateOrg(orgId);
+  await events.flush();
   // Its AI, one agent after the other: an account of the clicker's thinks for one agent at most.
   const noAi: string[] = [];
+  let thinking = false;
   for (const agent of made.agents) {
     const ai = await suggestAgentAi(deps, orgId, userId);
     if (ai.kind === "none") noAi.push(agent.id);
@@ -651,10 +663,12 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         brain: ai.brain,
         account: ai.accountId,
       });
+      thinking = true;
     } catch {
       noAi.push(agent.id);
     }
   }
+  if (thinking) await publishAgentsChanged(deps.pubsub, orgId);
   const { agents: _agents, ...ids } = made;
   const done: TeamProposalCard = {
     ...card,
@@ -665,6 +679,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     created: { ...ids, skipped, noAi },
   };
   await writeCard(deps, message, done, "creating");
+  if ((await billingHold(deps.db, orgId)) === "payment") await queuePlanWaiting(deps.db, orgId);
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const who = made.agents.map((a, i) => `@${a.handle} (${a.name}) in #${p.agents[i]?.channel}`).join(", ");
   await tellProposer(
@@ -743,10 +758,11 @@ export async function undoTeam(deps: TeamDeps, userId: string, orgId: string, me
   if (!card.decidedAt || Date.parse(card.decidedAt) + TEAM_UNDO_MS <= Date.now()) {
     throw new ConflictError("It is too late to undo this team", "team_proposal.undo_expired");
   }
+  const events = holdEvents(deps.pubsub);
   await deps.db.transaction(async (raw) => {
     const tx = raw as unknown as Database;
     for (const id of made.routineIds) {
-      await deleteRoutine({ db: tx, pubsub: deps.pubsub }, userId, orgId, id).catch((e) => {
+      await deleteRoutine({ db: tx, pubsub: events.pubsub }, userId, orgId, id).catch((e) => {
         if (!(e instanceof NotFoundError)) throw e;
       });
     }
@@ -760,13 +776,15 @@ export async function undoTeam(deps: TeamDeps, userId: string, orgId: string, me
       .select({ id: agents.id })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, made.agentIds), isNull(agents.archivedAt)));
-    for (const a of live) await archiveAgent(tx, userId, orgId, a.id, deps.pubsub, mine);
+    for (const a of live) await archiveAgent(tx, userId, orgId, a.id, events.pubsub, mine);
     for (const id of made.channelIds) {
-      await archiveChannel(tx, userId, orgId, id, { pubsub: deps.pubsub }).catch((e) => {
+      await archiveChannel(tx, userId, orgId, id, events).catch((e) => {
         if (!(e instanceof NotFoundError)) throw e;
       });
     }
   });
+  invalidateOrg(orgId);
+  await events.flush();
   const next: TeamProposalCard = { ...card, state: "undone", undoneAt: new Date().toISOString() };
   await writeCard(deps, message, next, "created");
   return { card: next };
@@ -835,7 +853,7 @@ export function teamTools(deps: {
   pubsub?: PubSub;
   context?: ContextDeps;
   /** The run's card share (`cardsLeft` in setup-tools). */
-  cardsLeft: (ctx: ToolContext) => Promise<ToolOutput | null>;
+  cardsLeft: (ctx: ToolContext, asks?: boolean) => Promise<ToolOutput | null>;
   hopOf: (ctx: ToolContext) => Promise<number>;
 }): ToolDefinition[] {
   return [
@@ -870,17 +888,8 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
-          const [asked] = await ctx.db
-            .select({ n: count() })
-            .from(messages)
-            .where(
-              and(
-                eq(messages.orgId, ctx.orgId),
-                eq(messages.agentRunId, ctx.runId),
-                sql`${messages.meta} ? 'replyChips'`,
-              ),
-            );
-          if ((asked?.n ?? 0) > 0) return { content: "You already asked a question in this turn.", isError: true };
+          const full = await deps.cardsLeft(ctx, true);
+          if (full) return full;
           const of = Math.max(1, Number(input.of) || 1);
           const chips: ReplyChips = {
             choices: [...new Set(list(input.choices).map(str).filter(Boolean))].slice(0, MAX_ANSWER_CHOICES),
@@ -955,7 +964,7 @@ export function teamTools(deps: {
                         type: "string",
                         minLength: 1,
                         maxLength: 300,
-                        description: "As the person would say it ('todo dia às 9h') or cron.",
+                        description: "5-field cron in the person's time zone: '0 9 * * 1-5' is weekdays at 9.",
                       },
                       prompt: { type: "string", minLength: 1, maxLength: 10_000 },
                       title: { type: "string", maxLength: 120, description: "What it does, short, in their language." },
@@ -1011,7 +1020,7 @@ export function teamTools(deps: {
       },
       async execute(input, ctx) {
         try {
-          const full = await deps.cardsLeft(ctx);
+          const full = await deps.cardsLeft(ctx, true);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
           const locale = await personLocale(ctx.db, forUserId);

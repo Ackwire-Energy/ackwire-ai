@@ -3,7 +3,7 @@ import { recordAudit } from "../audit";
 import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { can, getMembership, requireActiveMembership } from "../organizations";
-import { workRefusal } from "../standing";
+import { accountInUse, workRefusal } from "../standing";
 import { queueReceipt } from "./oauth";
 import { revokeAppGrants, revokeMemberApps } from "./revoke";
 import {
@@ -48,7 +48,7 @@ export async function authenticateAppBearer(db: Database, header: string | undef
       tokenKind: appTokens.kind,
       tokenScopes: appTokens.scopes,
       personName: users.name,
-      blockedAt: users.blockedAt,
+      open: accountInUse,
     })
     .from(appTokens)
     .innerJoin(appGrants, eq(appGrants.id, appTokens.grantId))
@@ -72,7 +72,7 @@ export async function appPrincipal(
 ): Promise<AppPrincipal | null> {
   const { grant } = row;
   let refusal: string | null = null;
-  if (row.blockedAt) {
+  if (!row.open) {
     refusal = "This agentes.chat account can't be used right now.";
   } else {
     const membership = await getMembership(db, grant.userId, grant.orgId);

@@ -221,6 +221,46 @@ test("someone opening the agent's desktop gets its browser ready for the agent's
   viewer.socket.close();
 });
 
+test("a browser card's view of the screen (ADR 0058 §7): watch only, never started or switched, no browser warmed, audited as the card's", async () => {
+  const { owner, org, machine, desktop } = await seeded();
+  const cookie = owner.cookie();
+  const card = desktop.replace("mode=watch", "preview=1&mode=watch");
+  const control = desktop.replace("mode=watch", "preview=1&mode=control");
+  expect(await upgradeStatus(control, { origin: ORIGIN, cookie })).toBe(400);
+  await grantScopes(t.db, org.orgId, org.agentId, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  const runner = await connectRunner(machine.token, {
+    refuseOpens: 1,
+    hello: {
+      protocol: DESKTOP_SWITCH_PROTOCOL,
+      browser: { available: true },
+      access: { ...ACCESS, tools: { ...ACCESS.tools, browser: true } },
+    },
+  });
+  // A desktop that isn't running: the card's view is refused, and nothing starts it.
+  const stopped = openViewer(card, owner);
+  await until(() => stopped.closed !== null, "the refusal");
+  expect(stopped.closed).toEqual({ code: STREAM_CLOSE.refused, reason: "desktop_off" });
+  expect(runner.requests).not.toContain("desktop.session.start");
+
+  // `switch` is ignored with it: no mode frame, and no `start` asked of the computer.
+  const viewer = openViewer(`${card}&switch=1`, owner);
+  await until(() => runner.data[0]?.ready === true, "the data socket");
+  expect(runner.opened[0]).toMatchObject({ op: "stream.open", kind: "desktop", mode: "watch" });
+  expect(runner.opened[0]).not.toHaveProperty("start");
+  await Bun.sleep(50);
+  expect(viewer.got).toEqual([]);
+  // A card that only looks never starts the agent's browser.
+  expect(runner.requests).not.toContain("browser.warm");
+  expect(runner.requests).not.toContain("desktop.session.start");
+
+  viewer.socket.close();
+  await until(() => runner.data[0]?.closed !== null, "the data socket's close");
+  const audit = () => t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "desktop.watched"));
+  await until(async () => (await audit()).length === 1, "the audit");
+  expect((await audit())[0]?.details).toMatchObject({ machineId: machine.machineId, preview: true });
+  runner.ws.close();
+});
+
 test("bytes go both ways through the computer's data socket; the audit keeps who, how long and how many bytes", async () => {
   const { owner, org, machine, desktop } = await seeded();
   const runner = await connectRunner(machine.token);
@@ -605,6 +645,7 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
     canControl: true,
     controlRefusal: null,
     held: false,
+    browserOnDesktop: true,
   });
   // Its picture is for the same people; asking for one never starts anything.
   expect((await api("/desktop/picture")).status).toBe(200);

@@ -4,22 +4,101 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   Checkbox,
   CheckboxPill,
   Chip,
   Field,
   Input,
+  Locked,
   PickerHeading,
   Radio,
   RadioCard,
   RadioGroup,
+  Switch,
   TabPanel,
   Tabs,
+  useLocked,
 } from "../src";
 
 const body = () => within(document.body);
+
+describe("Locked", () => {
+  const Reads = () => <output>{useLocked() ? "off" : "on"}</output>;
+  const form = (when: boolean) => (
+    <Locked when={when}>
+      <Input aria-label="Recado" defaultValue="Deixei aberto" />
+      <Switch aria-label="Avisar" checked={false} onCheckedChange={() => {}} />
+      <Reads />
+    </Locked>
+  );
+
+  test("turns off native and Radix controls alike, keeps the text and tells what a fieldset can't reach", () => {
+    const { container, rerender } = render(form(false));
+    const box = container.querySelector("fieldset") as HTMLFieldSetElement;
+    expect(box.disabled).toBe(false);
+    expect(container.querySelector("output")?.textContent).toBe("on");
+    rerender(form(true));
+    expect(box.disabled).toBe(true);
+    expect(box.querySelector("input")?.value).toBe("Deixei aberto");
+    // Radix draws its controls as buttons, which the fieldset reaches with no prop of its own.
+    expect(box.querySelector("button.ac-switch")).not.toBeNull();
+    expect(container.querySelector("output")?.textContent).toBe("off");
+  });
+
+  test("focus goes back to the field it left, so a failed send can be retried from the keyboard", () => {
+    const { container, rerender } = render(form(false));
+    const input = container.querySelector("input") as HTMLInputElement;
+    input.focus();
+    rerender(form(true));
+    input.blur();
+    rerender(form(false));
+    expect(document.activeElement === input).toBe(true);
+  });
+
+  test("focus comes back from a browser that drops it as the lock commits, before any layout effect, as Chromium does", () => {
+    const Drops = ({ when }: { when: boolean }) => {
+      useLayoutEffect(() => {
+        if (when && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }, [when]);
+      return <Input aria-label="Recado" />;
+    };
+    const dropping = (when: boolean) => (
+      <Locked when={when}>
+        <Drops when={when} />
+      </Locked>
+    );
+    const { container, rerender } = render(dropping(false));
+    const input = container.querySelector("input") as HTMLInputElement;
+    input.focus();
+    rerender(dropping(true));
+    expect(document.activeElement === input).toBe(false);
+    rerender(dropping(false));
+    expect(document.activeElement === input).toBe(true);
+  });
+
+  test("focus the person moved elsewhere stays there", () => {
+    const other = document.createElement("button");
+    document.body.append(other);
+    const { container, rerender } = render(form(false));
+    (container.querySelector("input") as HTMLInputElement).focus();
+    rerender(form(true));
+    other.focus();
+    rerender(form(false));
+    expect(document.activeElement === other).toBe(true);
+    other.remove();
+  });
+
+  test("has no box of its own, and CSS can't miss a control it turned off", async () => {
+    const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
+    const kit = await read("../src/styles/components.css");
+    expect(kit).toMatch(/\.ac-locked \{\s*display: contents;/);
+    // `[disabled]` only sees the control's own attribute, never a fieldset's.
+    expect(kit).not.toContain("[disabled]");
+    expect(await read("../../../apps/web/src/layout.css")).not.toContain("[disabled]");
+  });
+});
 
 describe("Checkbox", () => {
   function Harness({ disabled }: { disabled?: boolean }) {
@@ -138,7 +217,11 @@ describe("RadioCard", () => {
     expect(rule(".ac-option__aside")).not.toContain("margin-left");
     expect(rule(".ac-option__desc")).toContain("text-wrap: pretty;");
     // An option that can't be picked dims; its "Em breve" stays clear.
-    expect(rule(".ac-option[data-disabled] :is(.ac-option__title, .ac-option__desc)")).toContain("opacity: 0.55;");
+    expect(
+      rule(
+        ".ac-option:is([data-disabled], :disabled, :has(> .ac-radio:disabled)) :is(.ac-option__title, .ac-option__desc)",
+      ),
+    ).toContain("opacity: 0.55;");
   });
 
   test("a detail is a line of its own under the description, in the same words' style", () => {

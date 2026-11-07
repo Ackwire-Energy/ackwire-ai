@@ -8,7 +8,19 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Card, Chip, Icon, Input, ProviderLogo, Radio, RadioGroup, SettingNote, Switch } from "@agenteschat/ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Icon,
+  Input,
+  Locked,
+  ProviderLogo,
+  Radio,
+  RadioGroup,
+  SettingNote,
+  Switch,
+} from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -124,57 +136,59 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
     <div className="voice-engine">
       <div className="voice-engine__body">
         <h3 className="voice-engine__title">{t("voice.settings.engineTitle")}</h3>
-        <RadioGroup
-          className="voice-engine__tiles"
-          value={provider}
-          onValueChange={pick}
-          aria-label={t("voice.settings.engineTitle")}
-        >
-          {PROVIDERS.map((p) => (
-            // biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control
-            <label key={p.id} className="voice-tile">
-              <Radio className="voice-tile__radio" value={p.id} aria-label={p.name} />
-              <ProviderLogo id={p.id} size="sm" />
-              <span className="voice-tile__name">{p.name}</span>
+        <Locked when={save.isPending || remove.isPending}>
+          <RadioGroup
+            className="voice-engine__tiles"
+            value={provider}
+            onValueChange={pick}
+            aria-label={t("voice.settings.engineTitle")}
+          >
+            {PROVIDERS.map((p) => (
+              // biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control
+              <label key={p.id} className="voice-tile">
+                <Radio className="voice-tile__radio" value={p.id} aria-label={p.name} />
+                <ProviderLogo id={p.id} size="sm" />
+                <span className="voice-tile__name">{p.name}</span>
+                <span className="voice-tile__check" aria-hidden="true">
+                  <Icon name="check" size={14} />
+                </span>
+              </label>
+            ))}
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control */}
+            <label className="voice-tile">
+              <Radio className="voice-tile__radio" value="local" aria-label={t("voice.settings.own")} />
+              <span className="voice-tile__own" aria-hidden="true">
+                <Icon name="computer" size={16} />
+              </span>
+              <span className="voice-tile__name">{t("voice.settings.own")}</span>
               <span className="voice-tile__check" aria-hidden="true">
                 <Icon name="check" size={14} />
               </span>
             </label>
-          ))}
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control */}
-          <label className="voice-tile">
-            <Radio className="voice-tile__radio" value="local" aria-label={t("voice.settings.own")} />
-            <span className="voice-tile__own" aria-hidden="true">
-              <Icon name="computer" size={16} />
-            </span>
-            <span className="voice-tile__name">{t("voice.settings.own")}</span>
-            <span className="voice-tile__check" aria-hidden="true">
-              <Icon name="check" size={14} />
-            </span>
+          </RadioGroup>
+          <label className="voice-engine__label" htmlFor={field}>
+            {local ? t("voice.settings.address") : t("voice.settings.key", { name })}
           </label>
-        </RadioGroup>
-        <label className="voice-engine__label" htmlFor={field}>
-          {local ? t("voice.settings.address") : t("voice.settings.key", { name })}
-        </label>
-        <span className="voice-engine__field">
-          <Input
-            id={field}
-            type={local ? "text" : "password"}
-            value={value}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={local ? "http://whisper:8000/v1" : t("voice.settings.keyPlaceholder")}
-            invalid={Boolean(error)}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setError(null);
-              setTested(false);
-            }}
-          />
-          <Button disabled={!value.trim()} loading={save.isPending} onClick={test}>
-            {t("voice.settings.test")}
-          </Button>
-        </span>
+          <span className="voice-engine__field">
+            <Input
+              id={field}
+              type={local ? "text" : "password"}
+              value={value}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={local ? "http://whisper:8000/v1" : t("voice.settings.keyPlaceholder")}
+              invalid={Boolean(error)}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setError(null);
+                setTested(false);
+              }}
+            />
+            <Button disabled={!value.trim()} loading={save.isPending} onClick={test}>
+              {t("voice.settings.test")}
+            </Button>
+          </span>
+        </Locked>
         {error ? (
           <p className="ac-field__error">{error}</p>
         ) : tested ? (

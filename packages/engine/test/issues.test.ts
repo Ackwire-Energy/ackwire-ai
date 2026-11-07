@@ -32,6 +32,7 @@ import {
   type WorkActor,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -669,6 +670,122 @@ describe("issues", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  test("a GitHub link: an agent sets and removes it, and only a GitHub issue or PR address goes in", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tool = (name: string) => {
+      const found = tools.find((t) => t.name === name);
+      if (!found) throw new Error(name);
+      return found;
+    };
+    const url = "https://github.com/acme/app/issues/12";
+    const made = await tool("create_issue").execute({ title: "Sync", github_url: url }, ctx);
+    expect(made.isError).toBeUndefined();
+    const read = async () => getIssue(f.db, person(f.owner.id), f.org.id, { number: 1 });
+    expect((await read()).githubUrl).toBe(url);
+
+    const refused = await tool("update_issue").execute({ issue: "#1", github_url: "javascript:alert(1)" }, ctx);
+    expect(refused.isError).toBe(true);
+    for (const bad of [
+      "https://evil.example/acme/app/issues/1",
+      "https://github.com/acme/app",
+      "http://github.com/a/b/pull/1",
+    ]) {
+      await expect(
+        updateIssue(deps, person(f.owner.id), f.org.id, (await read()).id, { githubUrl: bad }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+
+    const pr = "https://github.com/acme/app/pull/40/files";
+    await tool("update_issue").execute({ issue: "#1", github_url: pr }, ctx);
+    expect((await read()).githubUrl).toBe(pr);
+    await tool("update_issue").execute({ issue: "#1", github_url: "" }, ctx);
+    expect((await read()).githubUrl).toBeNull();
+    // Setting what is already there says nothing in the activity.
+    const issue = await read();
+    await updateIssue(deps, person(f.owner.id), f.org.id, issue.id, { githubUrl: null });
+    const said = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).filter(
+      (a) => a.event === "github_link",
+    );
+    expect(said.map((a) => a.textCode).sort()).toEqual(["github_linked", "github_unlinked"]);
+  });
+
+  test("a new agent creates tasks with no card, updates what it can see of others' and never what it can't", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { id: agentId } = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Lia", handle: "lia" },
+      NEW_AGENT_DEFAULTS,
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    const hidden = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Segredo", channelId: secret.id });
+    const theirs = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Da Ana",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    const ctx = { ...(await runContext(f)), agentId };
+    await f.db.update(schema.agentRuns).set({ agentId }).where(eq(schema.agentRuns.id, ctx.runId));
+    // Someone who is no administrator asked: an administrator's run reaches what they reach.
+    const plain = await addMember(f.db, f.org.id, "member", "plain");
+    await f.db
+      .update(schema.messages)
+      .set({ authorUserId: plain.id })
+      .where(eq(schema.messages.id, ctx.triggerMessageId ?? ""));
+    const call = (name: string, input: Record<string, unknown>) =>
+      f.tools?.invoke(ctx, { toolUseId: crypto.randomUUID(), name, input });
+
+    expect(await call("create_issue", { title: "Revisar o onboarding" })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Created #") },
+    });
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+    expect(await call("update_issue", { issue: theirs.id, status: "in_progress" })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Updated #") },
+    });
+    expect(await call("comment_issue", { issue: theirs.id, text: "Comecei." })).toMatchObject({
+      output: { content: `Commented on #${theirs.number}.` },
+    });
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: theirs.id })).assignee).toMatchObject({
+      id: f.owner.id,
+    });
+    expect(await call("update_issue", { issue: hidden.id, status: "done" })).toMatchObject({
+      output: { isError: true },
+    });
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: hidden.id })).status).toBe("todo");
+  });
+
+  test("closing someone's task while unassigning it reads as a change on the receipt, never as an assignment", async () => {
+    f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const theirs = await createIssue({ db: f.db, pubsub: f.pubsub }, person(f.owner.id), f.org.id, {
+      title: "Da Ana",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    await f.tools?.invoke(await runContext(f), {
+      toolUseId: crypto.randomUUID(),
+      name: "update_issue",
+      input: { issue: theirs.id, status: "canceled", assignee: "none" },
+    });
+    expect(await f.db.select().from(schema.agentActions)).toMatchObject([
+      { kind: "issue.updated", after: { status: "canceled", assignee: null } },
+    ]);
+  });
+
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {
     f = await setup({
       issueTools: true,
@@ -689,5 +806,10 @@ describe("issues", () => {
     const inSecret = { type: "agent" as const, agentId: f.agent.id, channelId: secret.id };
     await expect(getIssue(f.db, inGeneral, f.org.id, { id: hidden.id })).rejects.toBeInstanceOf(NotFoundError);
     expect((await getIssue(f.db, inSecret, f.org.id, { id: hidden.id })).title).toBe("Segredo");
+    const githubUrl = "https://github.com/acme/app/issues/1";
+    await expect(updateIssue(deps, inGeneral, f.org.id, hidden.id, { githubUrl })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    expect((await getIssue(f.db, inSecret, f.org.id, { id: hidden.id })).githubUrl).toBeNull();
   });
 });

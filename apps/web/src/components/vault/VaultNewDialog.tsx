@@ -6,6 +6,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Segmented,
   Select,
   SettingNote,
@@ -118,83 +119,89 @@ export function VaultNewDialog({
       }
     >
       <div className="issue-layout">
-        <form
-          id={formId}
-          className="issue-layout__main vlt-details__main"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          {/* One line to choose what to save: the list says what each kind is (ADR 0144). */}
-          <Field label={t("vault.new.what")}>
-            <Select<VaultItemKind>
-              value={kind}
-              onValueChange={(k) => {
-                setKind(k);
-                setTried(false);
-              }}
-              options={(["login", "key", "contact"] as const).map((k) => ({
-                value: k,
-                label: t(`vault.kind.${k}`),
-                description: t(`vault.kind.${k}Text`),
-                leading: <Icon name={KIND_ICON[k]} size={16} />,
-              }))}
-              renderValue={(o) => (
-                <span className="ac-iconline">
-                  <Icon name={KIND_ICON[o.value]} size={16} />
-                  <span>{o.label}</span>
-                </span>
-              )}
+        <Locked when={actions.creating}>
+          <form
+            id={formId}
+            className="issue-layout__main vlt-details__main"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            {/* One line to choose what to save: the list says what each kind is (ADR 0144). */}
+            <Field label={t("vault.new.what")}>
+              <Select<VaultItemKind>
+                value={kind}
+                onValueChange={(k) => {
+                  setKind(k);
+                  setTried(false);
+                }}
+                options={(["login", "key", "contact"] as const).map((k) => ({
+                  value: k,
+                  label: t(`vault.kind.${k}`),
+                  description: t(`vault.kind.${k}Text`),
+                  leading: <Icon name={KIND_ICON[k]} size={16} />,
+                }))}
+                renderValue={(o) => (
+                  <span className="ac-iconline">
+                    <Icon name={KIND_ICON[o.value]} size={16} />
+                    <span>{o.label}</span>
+                  </span>
+                )}
+              />
+            </Field>
+            <ItemFields
+              kind={kind}
+              draft={draft}
+              onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
+              readOnly={false}
+              errors={errors}
+              secret={
+                kind === "contact" ? null : (
+                  <Field
+                    label={t(kind === "login" ? "vault.field.password" : "vault.field.value")}
+                    error={errors.secret}
+                  >
+                    <Input
+                      type="password"
+                      value={secret}
+                      autoComplete="new-password"
+                      spellCheck={false}
+                      onChange={(e) => setSecret(e.target.value)}
+                      data-1p-ignore
+                    />
+                  </Field>
+                )
+              }
             />
-          </Field>
-          <ItemFields
-            kind={kind}
-            draft={draft}
-            onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
-            readOnly={false}
-            errors={errors}
-            secret={
-              kind === "contact" ? null : (
-                <Field label={t(kind === "login" ? "vault.field.password" : "vault.field.value")} error={errors.secret}>
-                  <Input
-                    type="password"
-                    value={secret}
-                    autoComplete="new-password"
-                    spellCheck={false}
-                    onChange={(e) => setSecret(e.target.value)}
-                    data-1p-ignore
-                  />
-                </Field>
-              )
-            }
-          />
-        </form>
-        {/* Who may use it, where an item's page shows who has access (ADR 0144 §7): Personal or Team first. */}
-        <aside className="issue-aside vlt-aside">
-          <DetailsSection title={t("vault.access.title")}>
-            <Segmented<VaultScope>
-              label={t("vault.new.who")}
-              value={scope}
-              disabled={!canManageTeam}
-              onValueChange={pickScope}
-              options={[
-                { value: "personal", label: t("vault.scope.personal") },
-                { value: "team", label: t("vault.scope.team") },
-              ]}
-            />
-            {!canManageTeam && <SettingNote icon="lock">{t("vault.new.teamLocked")}</SettingNote>}
-            <AccessBlock
-              scope={scope}
-              access={access}
-              editable
-              onChange={(next) => {
-                setAccess(next);
-                return true;
-              }}
-            />
-          </DetailsSection>
-        </aside>
+          </form>
+          {/* Who may use it, where an item's page shows who has access (ADR 0144 §7): Personal or Team first. */}
+          <aside className="issue-aside vlt-aside">
+            <DetailsSection title={t("vault.access.title")}>
+              <Segmented<VaultScope>
+                block
+                label={t("vault.new.who")}
+                value={scope}
+                disabled={!canManageTeam}
+                onValueChange={pickScope}
+                options={[
+                  { value: "personal", label: t("vault.scope.personal") },
+                  { value: "team", label: t("vault.scope.team") },
+                ]}
+              />
+              {!canManageTeam && <SettingNote icon="lock">{t("vault.new.teamLocked")}</SettingNote>}
+              <AccessBlock
+                scope={scope}
+                access={access}
+                editable
+                onChange={(next) => {
+                  setAccess(next);
+                  return true;
+                }}
+              />
+            </DetailsSection>
+          </aside>
+        </Locked>
       </div>
     </DetailsDialog>
   );

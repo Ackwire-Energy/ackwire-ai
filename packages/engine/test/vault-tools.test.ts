@@ -2,14 +2,18 @@ import { afterEach, expect, test } from "bun:test";
 import {
   generateSecretKeyPair,
   type MachineRequest,
+  madePasswordAad,
   openSecret,
   type SecretBox,
+  sealSecret,
+  VAULT_PASSWORD_PROTOCOL,
   VAULT_PROTOCOL,
   vaultAad,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   ASK_PERSON_TOOL,
+  cancelSecretRequests,
   createAgent,
   createAgentRuns,
   createBrowserProfile,
@@ -17,9 +21,11 @@ import {
   createSandboxToolSource,
   createVaultItem,
   createVaultToolSource,
+  deliverSecret,
   grantScopes,
   heldSecretsOf,
   heldSecretsText,
+  importVaultCsv,
   insertMessage,
   keysMayHaveRun,
   listAgentSecrets,
@@ -29,15 +35,22 @@ import {
   MachineRequestError,
   type MachineStatus,
   ROUTINE_KEYS_REFUSAL,
+  releaseVaultKeys,
   runnerFailureText,
+  secretLabelOf,
   secretRequestView,
+  secretResult,
+  TOOL_CALL,
   type ToolContext,
   toolKind,
+  updateVaultItem,
   VAULT_KEY_EXPIRED,
   type VaultDeps,
   vaultListText,
   vaultTypingRefusal,
 } from "../src";
+import { friendlyLabel } from "../src/secret-request-tool";
+import { openItemValue } from "../src/vault/seal";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
@@ -72,8 +85,11 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
   const keys = new Map<string, string>();
   const opened: { use: string; value: string }[] = [];
   const s = {
-    protocol: VAULT_PROTOCOL,
+    protocol: VAULT_PASSWORD_PROTOCOL as number,
+    kind: undefined as string | undefined,
     url: "https://acme.example/login",
+    /** The next password `vault.password` makes (each call takes a new one). */
+    made: [] as string[],
     /** What the runner answers an `agentes:type_vault` once the box opened (default: typed). */
     typeVault: (): Reply => ok({ typed: true }),
     /** Set: `exec` opens its keys, then the connection drops before any answer. */
@@ -102,6 +118,7 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
       return s.typeVault();
     }
     if (command === "snapshot") return page('- textbox "Password" [ref=e2]\n- button "Sign in" [ref=e3]', s.url);
+    if (command === "get") return ok({ url: s.url });
     return ok();
   };
   const hub: MachineCaller = {
@@ -115,6 +132,7 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
         execAllowed: true,
         os: "linux",
         protocol: s.protocol,
+        kind: s.kind,
         executors: { browser: { available: true, version: "0.39.1" } },
         paused: null,
         access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
@@ -131,6 +149,12 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
           keys.set(keyId, pair.privateKey);
           const expiresAt = new Date(Date.now() + 120_000).toISOString();
           return { vaultKey: { keyId, publicKey: pair.publicKey, expiresAt } } as never;
+        }
+        case "vault.password": {
+          const value = s.made.shift() ?? `made-${crypto.randomUUID()}`;
+          return {
+            box: await sealSecret(r.publicKey, value, madePasswordAad({ requestId: r.requestId, agentId })),
+          } as never;
         }
         case "browser.act":
           return (await answer(agentId, r.command, r.args)) as never;
@@ -804,6 +828,14 @@ test("in a shared browser profile, a login is typed only when every agent grante
     (c) => (c.op === "browser.batch" || c.op === "browser.act") && c.profile?.id === profile.id,
   );
   expect(inProfile).toBeDefined();
+  // Too old for the Vault, in a profile as in its own browser: the workspace's own computer updates by itself.
+  v.computer.s.protocol = VAULT_PROTOCOL - 1;
+  v.computer.s.kind = "managed";
+  const waits = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(waits.content).toContain("It updates by itself");
+  expect(waits.content).not.toContain("agentes-runner update");
+  v.computer.s.protocol = VAULT_PROTOCOL;
+  v.computer.s.kind = undefined;
   // Back in its own browser, the personal login is typed.
   await f.db.update(schema.agents).set({ browserProfileId: null }).where(eq(schema.agents.id, f.agent.id));
   const own = await v.runFor(f.owner.id);
@@ -888,4 +920,410 @@ test("a one-use key gone before the command ran reads as an expired key, not a m
   expect(r.isError).toBe(true);
   expect(r.content).toContain(VAULT_KEY_EXPIRED);
   expect(r.content).not.toContain("No file or folder");
+});
+
+// ── Passwords the agent makes (ADR 0144 §8) ──────────────────────────────────
+
+const MADE = "Mqz7!made-by-the-computer-41";
+const makerSetup = async () => {
+  const v = await vaultSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "vault:write" }]);
+  v.computer.s.url = "https://accounts.acme.example/signup";
+  return v;
+};
+const vaultRow = async (id: string) => {
+  const [row] = await f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, id));
+  if (!row) throw new Error("no item");
+  return row;
+};
+const madeLogins = () =>
+  f.db
+    .select()
+    .from(schema.vaultItems)
+    .where(and(eq(schema.vaultItems.kind, "login"), eq(schema.vaultItems.username, "lia@acme.example")));
+const savedValue = async (v: { vault: VaultDeps }, id: string) => openItemValue(v.vault, await vaultRow(id));
+
+test("an agent makes a password: kept in the Vault first, typed into both fields, and the value never in the open", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.made = [MADE];
+  const out = await v.call(ana, "browser_make_password", {
+    target: "e2",
+    confirm: "e3",
+    username: "lia@acme.example",
+    length: 24,
+    classes: ["lower", "digits"],
+  });
+  expect(out.isError).toBeFalsy();
+  // The agent's rules reached the computer, with a key made for this one call.
+  const made = v.computer.calls.find((c) => c.op === "vault.password");
+  expect(made).toMatchObject({ rules: { length: 24, classes: ["lower", "digits"] } });
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  // Its own row: the team's, for this agent, for the site whatever the host.
+  expect(login).toMatchObject({
+    website: "https://accounts.acme.example",
+    match: "site",
+    ownerUserId: null,
+    audienceEveryone: true,
+    agentIds: [f.agent.id],
+    createdByAgentId: f.agent.id,
+  });
+  expect(await savedValue(v, login.id)).toBe(MADE);
+  // Typed twice as any Vault login: its one rule, one use each, both fields.
+  expect(v.computer.opened).toEqual([
+    { use: "fill:site:acme.example", value: MADE },
+    { use: "fill:site:acme.example", value: MADE },
+  ]);
+  expect((await usesOf(login.id)).map((u) => u.action).sort()).toEqual(["create", "fill", "fill"]);
+  // Nowhere else: no request, no answer, no step, no audit row.
+  const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, ana.runId));
+  const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, f.org.id));
+  expect(audit.some((a) => a.action === "vault.item_created" && a.targetId === login.id)).toBe(true);
+  for (const text of [v.computer.calls, out, steps, audit]) expect(JSON.stringify(text)).not.toContain(MADE);
+});
+
+test("a retry can't lock the agent out: each replaced value stays behind it, and undo brings it back", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  const make = (input: Record<string, unknown> = {}) =>
+    v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example", ...input });
+  v.computer.s.made = ["first-value-accepted", "second-value-refused", "third-value-refused"];
+  await make();
+  await make({ classes: ["lower", "digits"] });
+  const out = await make({ length: 12 });
+  expect(out.content).toContain("undo");
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  expect(await madeLogins()).toHaveLength(1);
+  expect(await savedValue(v, login.id)).toBe("third-value-refused");
+  expect(login.previousSecrets).toHaveLength(2);
+  expect(JSON.stringify(login.previousSecrets)).not.toContain("first-value");
+  // Undo steps back, says what is left, and loses nothing: an undo the site didn't need comes back round.
+  const back = await make({ undo: login.id });
+  expect(back.content).toContain("keeps 2 more");
+  await make({ undo: login.id });
+  expect(await savedValue(v, login.id)).toBe("first-value-accepted");
+  expect((await vaultRow(login.id)).previousSecrets).toHaveLength(2);
+  await make({ undo: login.id });
+  expect(await savedValue(v, login.id)).toBe("third-value-refused");
+  // A person's new value is the last word: nothing older is kept.
+  await updateVaultItem(v.vault, f.owner.id, f.org.id, login.id, { secret: "typed-by-a-person" });
+  expect((await vaultRow(login.id)).previousSecrets).toHaveLength(0);
+  const none = await make({ undo: login.id });
+  expect(none.isError).toBe(true);
+  expect(none.content).toContain("no earlier password");
+});
+
+test("however many it makes, a person's password stays behind them, and vault_list says so", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.url = "https://acme.example/settings";
+  const make = (input: Record<string, unknown> = {}) =>
+    v.call(ana, "browser_make_password", { target: "e2", username: "dev@acme.example", ...input });
+  const tries = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"].map((n) => `refused-try-${n}`);
+  v.computer.s.made = [...tries];
+  for (const _ of tries) expect((await make()).isError).toBeFalsy();
+  const row = await vaultRow(v.items.login.id);
+  expect(row.previousSecrets).toHaveLength(5);
+  // A later run sees the way back without having made any of them.
+  const listed = await v.call(await v.runFor(f.owner.id), "vault_list", {});
+  expect(listed.content).toContain("earlier values kept: 5");
+  for (let i = 0; i < 5; i++) await make({ undo: row.id });
+  expect(await savedValue(v, row.id)).toBe(PASSWORD);
+});
+
+test("a person's new values from a CSV leave nothing older to come back", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.made = ["made-before-the-import"];
+  await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  v.computer.s.made = ["made-again"];
+  await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  expect(login.previousSecrets).toHaveLength(1);
+  const csv = `name,url,username,password\nAcme,https://accounts.acme.example,lia@acme.example,typed-in-a-csv-1\n`;
+  await importVaultCsv(v.vault, f.owner.id, f.org.id, { csv, scope: "team", dryRun: false });
+  const after = await vaultRow(login.id);
+  expect(await openItemValue(v.vault, after)).toBe("typed-in-a-csv-1");
+  expect(after.previousSecrets).toHaveLength(0);
+});
+
+test("one field filled isn't a form to send: the Vault goes back and the agent is told", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  const made = () =>
+    v.call(ana, "browser_make_password", { target: "e2", confirm: "e3", username: "lia@acme.example" });
+  let fields = 0;
+  v.computer.s.typeVault = () =>
+    ++fields % 2 === 0
+      ? { success: false, data: null, error: "gone", code: "not_password_field" }
+      : ok({ typed: true });
+  const half = await made();
+  expect(half.content).toContain("Don't send the form");
+  expect(half.content).not.toContain("Now send the form");
+  expect(await madeLogins()).toHaveLength(0);
+
+  v.computer.s.typeVault = () => ok({ typed: true });
+  v.computer.s.made = ["good-password-kept"];
+  await made();
+  fields = 0;
+  v.computer.s.typeVault = () =>
+    ++fields % 2 === 0
+      ? { success: false, data: null, error: "gone", code: "not_password_field" }
+      : ok({ typed: true });
+  v.computer.s.made = ["only-in-one-field"];
+  await made();
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  expect(await savedValue(v, login.id)).toBe("good-password-kept");
+  expect(login.previousSecrets).toHaveLength(0);
+});
+
+test("a made password is for a named account", async () => {
+  const v = await makerSetup();
+  const out = await v.call(await v.runFor(f.owner.id), "browser_make_password", { target: "e2" });
+  expect(out.isError).toBe(true);
+  expect(out.content).toContain("username");
+  expect(v.computer.calls.filter((c) => c.op === "vault.password")).toHaveLength(0);
+});
+
+test("typed nowhere, the Vault stays as it was: a new login goes, a replaced one comes back", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.typeVault = () => ({
+    success: false,
+    data: null,
+    error: "not a password field",
+    code: "not_password_field",
+  });
+  const refused = await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  expect(refused.isError).toBe(true);
+  expect(refused.content).toContain("Vault is as it was");
+  expect(await madeLogins()).toHaveLength(0);
+
+  v.computer.s.typeVault = () => ok({ typed: true });
+  v.computer.s.made = ["good-password-kept"];
+  await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  v.computer.s.typeVault = () => ({ success: false, data: null, error: "gone", code: "in_frame" });
+  v.computer.s.made = ["never-typed-anywhere"];
+  await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  expect(await savedValue(v, login.id)).toBe("good-password-kept");
+});
+
+test("nothing is saved or typed when the agent may not replace it, on an old computer, or without the scope", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  const make = (ctx: ToolContext) =>
+    v.call(ctx, "browser_make_password", { target: "e2", username: "dev@acme.example" });
+  // A team login a person saved, asked by someone who doesn't manage credentials.
+  v.computer.s.url = "https://acme.example/settings";
+  const bruno = await make(await v.runFor(v.bruno.id));
+  expect(bruno.isError).toBe(true);
+  expect(bruno.content).toContain("only someone who manages credentials");
+  expect(await savedValue(v, v.items.login.id)).toBe(PASSWORD);
+  expect(v.computer.opened).toHaveLength(0);
+
+  v.computer.s.protocol = VAULT_PASSWORD_PROTOCOL - 1;
+  const old = await make(ana);
+  expect(old.content).toContain("needs an update to make passwords");
+  expect(v.computer.calls.filter((c) => c.op === "vault.password")).toHaveLength(1);
+  v.computer.s.protocol = VAULT_PASSWORD_PROTOCOL;
+
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, "vault:write")));
+  const off = await make(ana);
+  expect(off.isError).toBe(true);
+  // The tool stays in sight: the guidance names it, and this says the way on.
+  expect(off.content).toContain("request_permission");
+  expect(await savedValue(v, v.items.login.id)).toBe(PASSWORD);
+});
+
+test("the computer's side: a key made there, for commands, by its name", async () => {
+  const v = await makerSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.made = ["db-admin-value", "db-admin-second"];
+  const out = await v.call(ana, "vault_make_password", { name: "POSTGRES_ADMIN", label: "Postgres admin" });
+  expect(out.isError).toBeFalsy();
+  expect(out.content).toContain("POSTGRES_ADMIN");
+  expect(out.content).not.toContain("db-admin-value");
+  const released = await releaseVaultKeys(v.vault, { orgId: f.org.id, agentId: f.agent.id, runId: ana.runId }, [
+    "POSTGRES_ADMIN",
+  ]);
+  expect(released[0]?.value).toBe("db-admin-value");
+  const [row] = await f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.keyName, "POSTGRES_ADMIN"));
+  expect(row?.title).toBe("Postgres admin");
+
+  // No label of its own: people still read plain words, in the Vault and the audit.
+  v.computer.s.made = ["worker-value-here"];
+  await v.call(ana, "vault_make_password", { name: "QUEUE_WORKER_PASSWORD", label: "QUEUE_WORKER_PASSWORD" });
+  const [plain] = await f.db
+    .select()
+    .from(schema.vaultItems)
+    .where(eq(schema.vaultItems.keyName, "QUEUE_WORKER_PASSWORD"));
+  expect(plain?.title).toBe("Queue worker password");
+  const calls = await f.db
+    .select()
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, TOOL_CALL)));
+  expect(calls.length).toBeGreaterThan(0);
+  expect(JSON.stringify(calls)).not.toContain("QUEUE_WORKER_PASSWORD");
+
+  // A value it replaced had its own hint: the new one has none.
+  expect((await vaultRow(v.items.key.id)).keyHint).not.toBeNull();
+  v.computer.s.made = ["replacing-the-saved-key"];
+  await v.call(ana, "vault_make_password", { name: "ACME_API_KEY" });
+  expect((await vaultRow(v.items.key.id)).keyHint).toBeNull();
+});
+
+// ── What a request is called, and how it ends ────────────────────────────────
+
+/** `request_secret` for a site, as a run calls it: the id of the card it waits on. */
+const askFor = async (ctx: ToolContext, input: Record<string, unknown> = {}) => {
+  const r = await f.tools?.invoke(ctx, {
+    toolUseId: `tu_${crypto.randomUUID()}`,
+    name: "request_secret",
+    input: {
+      name: "LIA_GOOGLE_PASSWORD",
+      purpose: "Preciso entrar na conta.",
+      target: "env",
+      site: "https://accounts.google.com",
+      ...input,
+    },
+  });
+  if (r?.type !== "secret") throw new Error(`not waiting: ${JSON.stringify(r)}`);
+  return r.requestId;
+};
+const requestRow = async (id: string) => {
+  const [row] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, id));
+  if (!row) throw new Error("no request");
+  return row;
+};
+
+test("people read a request's label: its internal name stays out of the view's words, the audit and the notification", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const id = await askFor(ana, { label: "Senha da Conta Google", username: "lia@acme.example" });
+  const row = await requestRow(id);
+  expect(secretRequestView(row)).toMatchObject({ label: "Senha da Conta Google", username: "lia@acme.example" });
+  const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, f.org.id));
+  expect(JSON.stringify(audit)).not.toContain("LIA_GOOGLE_PASSWORD");
+  const notices = await f.db.select().from(schema.notifications).where(eq(schema.notifications.orgId, f.org.id));
+  expect(JSON.stringify(notices)).not.toContain("LIA_GOOGLE_PASSWORD");
+
+  // A variable-style label is no label; without one the site stands in for it.
+  const other = await requestRow(await askFor(await v.runFor(f.owner.id), { name: "X_KEY", label: "X_KEY_LABEL" }));
+  expect(other.label).toBeNull();
+  expect(secretLabelOf(other)).toBe("accounts.google.com");
+  expect(secretLabelOf({ label: null, site: null, name: "NPM_TOKEN" })).toBe("Npm token");
+  for (const label of ["lia_google_password", "LIA-GOOGLE-PASSWORD", "Lia_Google"])
+    expect(friendlyLabel(label)).toBeNull();
+  expect(friendlyLabel("Senha da Conta Google")).toBe("Senha da Conta Google");
+  expect(friendlyLabel("PIN")).toBeNull();
+
+  // Its reason is its own sentence: the name it wrote in it goes, there and in the call's audit.
+  const said = await requestRow(
+    await askFor(await v.runFor(f.owner.id), {
+      name: "SHOP_PASSWORD",
+      label: "Senha da loja",
+      purpose: "Salve em SHOP_PASSWORD para eu entrar.",
+    }),
+  );
+  expect(said.purpose).toStartWith("Salve em Senha da loja para eu entrar.");
+  const calls = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, f.org.id));
+  expect(JSON.stringify(calls)).not.toContain("SHOP_PASSWORD");
+});
+
+test("a newer request closes the open one for the same thing, which points to it, and its run goes on", async () => {
+  const v = await vaultSetup();
+  const first = await askFor(await v.runFor(f.owner.id));
+  const newer = await askFor(await v.runFor(f.owner.id));
+  const closed = await requestRow(first);
+  expect(closed).toMatchObject({ status: "canceled", endReason: "superseded", supersededBy: newer });
+  expect(secretRequestView(closed)).toMatchObject({ endReason: "superseded", supersededBy: newer, publicKey: null });
+  expect(secretResult(closed).content).toContain("Don't ask again here");
+  expect((await requestRow(newer)).status).toBe("pending");
+  // Another secret isn't this one.
+  const elsewhere = await askFor(await v.runFor(f.owner.id), { name: "OTHER_PASSWORD" });
+  expect((await requestRow(elsewhere)).status).toBe("pending");
+  expect((await requestRow(newer)).status).toBe("pending");
+  // Nor is another account, or another person's: each keeps its card, and nobody is led to one they can't open.
+  const account = await askFor(await v.runFor(f.owner.id), { username: "other@acme.example" });
+  expect((await requestRow(account)).status).toBe("pending");
+  expect((await requestRow(newer)).status).toBe("pending");
+  const brunos = await askFor(await v.runFor(v.bruno.id), { username: "other@acme.example" });
+  expect((await requestRow(brunos)).status).toBe("pending");
+  expect((await requestRow(account)).status).toBe("pending");
+});
+
+test("a request whose run stopped leads to the one that asked again", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const stopped = await askFor(ana);
+  await f.db.transaction((tx) => cancelSecretRequests(tx, ana.runId));
+  const newer = await askFor(await v.runFor(f.owner.id));
+  expect(await requestRow(stopped)).toMatchObject({
+    status: "canceled",
+    endReason: "run_stopped",
+    supersededBy: newer,
+  });
+  // It stays what it was: nothing in it opens or resumes again.
+  expect((await requestRow(newer)).status).toBe("pending");
+});
+
+test("sending says the real reason: a closed request, a computer away (still open), one that can't take it anymore", async () => {
+  const v = await vaultSetup();
+  const deps = { db: f.db, pubsub: f.pubsub, machines: { hub: v.hub } } as unknown as Parameters<
+    typeof deliverSecret
+  >[0];
+  const box = { v: 1, epk: "e", iv: "i", ct: "c" };
+  const send = (id: string, d = deps) => deliverSecret(d, f.owner.id, f.org.id, id, box);
+
+  const closed = await askFor(await v.runFor(f.owner.id));
+  await f.db.update(schema.secretRequests).set({ status: "canceled" }).where(eq(schema.secretRequests.id, closed));
+  await expect(send(closed)).rejects.toMatchObject({ code: "secret.closed" });
+
+  // Away: refused with the computer's own code, and the card goes on.
+  const away = await askFor(await v.runFor(f.owner.id), { name: "AWAY_PASSWORD" });
+  const offline = {
+    ...deps,
+    machines: { hub: { ...v.hub, status: async (id: string) => ({ ...(await v.hub.status(id)), online: false }) } },
+  } as typeof deps;
+  await expect(send(away, offline)).rejects.toBeInstanceOf(MachineOfflineError);
+  expect((await requestRow(away)).status).toBe("pending");
+
+  // Its key is gone: it can never open, so the request ends and says so.
+  const gone = await askFor(await v.runFor(f.owner.id), { name: "GONE_PASSWORD" });
+  const noKey = {
+    ...deps,
+    machines: {
+      hub: {
+        ...v.hub,
+        call: () => Promise.reject(new MachineRequestError("not_found", "This request's key is gone")),
+      },
+    },
+  } as unknown as typeof deps;
+  await expect(send(gone, noKey)).rejects.toMatchObject({ code: "secret.closed" });
+  expect(await requestRow(gone)).toMatchObject({ status: "canceled", endReason: "computer_changed" });
+
+  // The computer itself was removed: the same.
+  const removed = await askFor(await v.runFor(f.owner.id), { name: "REMOVED_PASSWORD" });
+  const noComputer = {
+    ...deps,
+    machines: { hub: { ...v.hub, status: async () => null } },
+  } as unknown as typeof deps;
+  await expect(send(removed, noComputer)).rejects.toMatchObject({ code: "secret.closed" });
+  expect(await requestRow(removed)).toMatchObject({ status: "canceled", endReason: "computer_changed" });
+});
+
+test("a stopped run leaves its request saying so", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const id = await askFor(ana);
+  await f.db.transaction((tx) => cancelSecretRequests(tx, ana.runId));
+  expect(await requestRow(id)).toMatchObject({ status: "canceled", endReason: "run_stopped" });
 });

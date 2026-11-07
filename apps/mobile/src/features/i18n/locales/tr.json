@@ -120,7 +120,6 @@
     "refuse": "Reddet",
     "approve": "Onayla",
     "hold": "Onaylamak için basılı tutun",
-    "holding": "Basılı tutmaya devam edin…",
     "holdNote": "Yüksek risk: düğmeyi bir saniye basılı tutun.",
     "tapNote": "Onaylarsanız hemen yapılır.",
     "tapNoteAhead": "Şimdi onaylarsanız {{when}} için de geçerli olur.",
@@ -206,7 +205,6 @@
       "active": "Devam ediyor",
       "proposed": "Önerildi"
     },
-    "empty": "Henüz sohbet yok.",
     "sayHi": "{{name}} ile selamlaşın.",
     "channelEmpty": "Henüz mesaj yok. Sohbeti başlatın.",
     "closed": "Kapalı",
@@ -255,7 +253,6 @@
     "channelFine": "Bir ekip ya da konu için.",
     "chatSearch": "Bir kişi veya ajan arayın",
     "people": "Kişiler",
-    "nobody": "Burada henüz kimse yok.",
     "search": "Kişi veya ajan",
     "create": "Oluştur",
     "agentHint": "Adı ve ne yaptığı",
@@ -308,7 +305,6 @@
     "switchNone": "Bu adla bir sohbet yok.",
     "switchWorking": "çalışıyor",
     "join": "Kanala katıl",
-    "empty": "Burada henüz kimse yazmadı.",
     "sending": "Gönderiliyor…",
     "failed": "Gönderilmedi · Tekrar deneyin",
     "notSent": "Mesaj gönderilmedi.",
@@ -334,9 +330,9 @@
       "wellNow": "Notunuzu okumak için durdu"
     },
     "stopped": {
-      "byYou": "Siz durdurdunuz",
-      "by": "{{name}} durdurdu",
-      "plain": "Durduruldu",
+      "byYou": "Burada durdu",
+      "by": "{{name}} burada durdurdu",
+      "plain": "Burada durdu",
       "limit": "Adım sınırına ulaştı",
       "stuck": "Takıldığı için durdu",
       "continue": "Devam et",
@@ -654,9 +650,7 @@
     "section": {
       "missions": "Misyonlar",
       "threads": "İleti dizileri"
-    },
-    "empty": "Henüz ileti dizisi ya da misyon yok",
-    "emptyHint": "İleti dizisinde yanıtlamak ya da misyona dönüştürmek için bir mesajı basılı tutun."
+    }
   },
   "agents": {
     "title": "Ajanlar",
@@ -670,11 +664,12 @@
     "create": "Ajan oluştur",
     "created": "{{name}} ekibe katıldı",
     "createFailed": "Ajan oluşturulamadı. Bu ad alınmış olabilir.",
-    "empty": "Henüz ajan yok.",
-    "noneForYou": "Henüz sizinle çalışan bir ajan yok.",
-    "noneForYouHint": "Bir yöneticiden erişim isteyin.",
     "freeSection": "Boşta",
     "noGroupSection": "Departman yok"
+  },
+  "team": {
+    "entry": "Liste, organizasyon şeması ve harita",
+    "mapHint": "Bir ajanı başka bir kanala taşımak için web'deki haritayı kullanın veya {{name}} ile konuşun."
   },
   "agentEdit": {
     "missing": "Bu ajan artık yok.",
@@ -747,6 +742,8 @@
       "older": "Daha eski"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} bir iyileştirme öneriyor",
+      "proposal_waiting_other": "{{names}} iyileştirme öneriyor",
       "mention_one": "{{names}} sizden bahsetti",
       "mention_other": "{{names}} sizden bahsetti",
       "thread_reply_one": "{{names}} ileti dizisinde yanıtladı",
@@ -831,6 +828,10 @@
       "desktop_taken_other": "{{names}}, {{agent}} ajanının bilgisayar ekranını devraldı",
       "desktop_taken_female_one": "{{names}}, {{agent}} ajanının bilgisayar ekranını devraldı",
       "desktop_taken_female_other": "{{names}}, {{agent}} ajanının bilgisayar ekranını devraldı",
+      "plan_lent_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_female_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_female_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
       "connector_tool_changed_one": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "connector_tool_changed_other": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "computer_disk_full_one": "Bir bilgisayarın diski neredeyse dolu",
@@ -838,11 +839,7 @@
       "computer_no_chrome_one": "Bir bilgisayarın Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "computer_no_chrome_other": "Bilgisayarların Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "app_created_one": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
-      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
-      "plan_lent_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
-      "plan_lent_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
-      "plan_lent_female_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
-      "plan_lent_female_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı"
+      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu"
     },
     "markRead": "Okundu olarak işaretle",
     "markUnread": "Okunmadı olarak işaretle",
@@ -932,6 +929,8 @@
     "issues": "Görevler",
     "issuesWithMe_one": "{{count}} tanesi sizde",
     "issuesWithMe_other": "{{count}} tanesi sizde",
+    "proposalsWaiting_one": "{{count}} bekliyor",
+    "proposalsWaiting_other": "{{count}} bekliyor",
     "drive": "Drive",
     "connectors": "Bağlayıcılar ve MCP'ler",
     "usage": "Kullanım",
@@ -987,6 +986,8 @@
     }
   },
   "delete": {
+    "intro": "Bunun geri dönüşü yok.",
+    "introGrace": "Fikrinizi değiştirmek için 7 gününüz var.",
     "goes": {
       "account": "Hesabınız, erişimleriniz ve oturumlarınız silinir.",
       "orgs": "Tek üyesi olduğunuz çalışma alanları silinir.",
@@ -997,8 +998,7 @@
     "addPasswordFirst": "Önce web sitesinden hesabınıza bir şifre ekleyin, sonra buraya yazın.",
     "addPasswordWeb": "Web sitesinde şifre ekle",
     "otherAccount": "Başka bir hesaba giriş yaptınız. Hiçbir şey silinmedi.",
-    "hold": "Silmek için basılı tutun",
-    "holding": "Basılı tutmaya devam edin…"
+    "hold": "Silmek için basılı tutun"
   },
   "files": {
     "type": {
@@ -1065,8 +1065,6 @@
       "canceled": "İptal edildi"
     },
     "until": "son tarih {{date}}",
-    "empty": "Burada görev yok",
-    "emptyOpen": "Bir sohbette de görev isteyebilirsiniz.",
     "loadFailed": "Görevler yüklenemedi.",
     "createdBy": "oluşturan: {{name}}",
     "fromMessage": "bir mesajdan",
@@ -1141,8 +1139,6 @@
       "file": "Dosya"
     },
     "by": "{{name}} · {{when}}",
-    "empty": "Drive'da henüz bir şey yok",
-    "emptySub": "Ajanların ve kişilerin sohbetlerde oluşturduğu veya gönderdiği her şey burada görünür.",
     "noResults": "Bu filtrelerle bir şey yok.",
     "loadFailed": "Drive yüklenemedi.",
     "more": "Daha fazla göster"
@@ -1159,8 +1155,6 @@
     "recent": "Yeni öğrenilenler",
     "mostUsed": "En çok kullanılanlar",
     "noMatch": "Bununla ilgili bellek kaydı yok.",
-    "emptyTitle": "Henüz öğrenilen bir şey yok",
-    "empty": "Ajanlar sizinle çalıştıkça öğrendiklerini burada saklar.",
     "gone": "Bu bellek kaydı artık yok.",
     "of": "{{name}} adlı ajanın bellek kaydı",
     "line_one": "{{name}} · {{count}} kez kullanıldı",
@@ -1183,8 +1177,6 @@
     "usedBy": "Kullanan ajanlar",
     "readsWeek_one": "Bu hafta {{count}} okuma",
     "readsWeek_other": "Bu hafta {{count}} okuma",
-    "empty": "İlkini yazmak için Yeni sayfa'ya dokunun.",
-    "missing": "Bu sayfa artık yok ya da adı değişti.",
     "blank": "Boş sayfa.",
     "folderGone": "Bu klasörde artık sayfa yok.",
     "reads_one": "{{count}} kez",
@@ -1499,7 +1491,11 @@
         "Tab": "Tab",
         "Enter": "Enter",
         "Backspace": "Sil",
-        "Escape": "Esc"
+        "Escape": "Esc",
+        "ArrowLeft": "Sol ok",
+        "ArrowUp": "Yukarı ok",
+        "ArrowDown": "Aşağı ok",
+        "ArrowRight": "Sağ ok"
       },
       "unavailable": {
         "reconnectingF": "Yeniden bağlanıyor…",
@@ -1552,8 +1548,6 @@
     "connected": "Bağlı",
     "suggested": "{{org}} için önerilenler",
     "all": "Tümü",
-    "empty": "Ajanlarınız henüz hiçbir şey kullanmıyor",
-    "emptySub": "Bir hizmet bağlayın, ajanlar orada okumaya ve iş yapmaya başlasın.",
     "noResults": "Bu adla bir hizmet yok. Adresini deneyin.",
     "soon": "Yakında",
     "loadFailed": "Bağlayıcılar yüklenemedi.",
@@ -1683,11 +1677,8 @@
   },
   "ai": {
     "yourPlan": "Yapay zeka planınız",
-    "coding": "Kodlama planı",
-    "codingSub": "GLM, Kimi, MiniMax veya OpenCode",
+    "plansSub": "Claude, ChatGPT, Gemini, GLM ve diğerleri",
     "plansFoot": "Ajanlar planınızla düşünür, API anahtarı gerekmez. Plan, ajanın bilgisayarında oturum açar.",
-    "whichPlan": "Hangi plan",
-    "codingFoot": "Kodlama planı, ajanın bilgisayarında kendi anahtarıyla oturum açar.",
     "change": "Değiştir",
     "how": "Nasıl bağlanır",
     "whose": "Anahtar kimin",
@@ -1773,13 +1764,6 @@
       "login": "Bir web sitesi, kullanıcı adı ve şifre. Ajanlar şifreyi görmeden giriş yapar.",
       "key": "Bir API anahtarı ya da token. Ajanlar onu görmeden bir komutta kullanır.",
       "contact": "Ajanların formlara doldurduğu ad, şirket, e-posta, telefon ve adres."
-    },
-    "empty": {
-      "personalTitle": "Henüz size ait bir şey yok",
-      "personalText": "Buraya bir giriş bilgisi ya da anahtar kaydedin, ajanlarınız siz istediğinizde kullanır.",
-      "teamTitle": "Henüz paylaşılan bir şey yok",
-      "teamText": "Ajanlarınızın ekip için kullandığı giriş bilgilerini ve anahtarları kaydedin.",
-      "teamReadText": "Biri sizinle bir giriş bilgisi ya da anahtar paylaştığında burada görünür."
     },
     "import": {
       "title": "Bir bilgisayardan içe aktar",
@@ -1968,7 +1952,6 @@
       "as": "{{username}} olarak giriş yapar.",
       "saved": "Vault'a kaydedildi",
       "notSaved": "Gönderildi ama Vault'a kaydedilmedi",
-      "codeLabel": "{{name}} için kod",
       "codeIncomplete": "Kodun tüm rakamlarını yazın.",
       "codeNote": "Şifrelenmiş olarak doğrudan bilgisayara gönderilir. Kodlar hiçbir zaman kaydedilmez."
     }
@@ -2050,8 +2033,126 @@
       }
     }
   },
-  "team": {
-    "entry": "Liste, organizasyon şeması ve harita",
-    "mapHint": "Bir ajanı başka bir kanala taşımak için web'deki haritayı kullanın veya {{name}} ile konuşun."
+  "empty": {
+    "agents": {
+      "title": "Ajan ekibinizi kurun",
+      "text": "Her ajan bir rol üstlenir ve sohbette sizinle birlikte çalışır.",
+      "viewerTitle": "Ajan ekibiniz burada",
+      "viewerText": "Bu çalışma alanında ajan oluşturan kişi ilkini ekler ve burada görünür."
+    },
+    "agentsForYou": {
+      "title": "Ajanlarınız burada görünür",
+      "text": "Ajanları yöneten kişi hangilerinin sizinle çalışacağını seçer."
+    },
+    "drive": {
+      "title": "Ekibin ürettiği her şey tek yerde",
+      "text": "Ajanların ve kişilerin raporları, tabloları ve dosyaları burada kalır, kolayca bulunur.",
+      "viewerTitle": "Ekibin ürettiklerini bulun",
+      "viewerText": "Ajanların ve kişilerin sohbetlerde oluşturdukları burada görünür."
+    },
+    "tasks": {
+      "title": "İşi ekibe devredin",
+      "text": "Bir ajan veya kişi için görev oluşturun ve sonuna kadar takip edin.",
+      "viewerTitle": "Ekibin işini takip edin",
+      "viewerText": "Biri ilk görevi oluşturduğu anda görevler burada görünür."
+    },
+    "routines": {
+      "title": "Tekrarlayan işleri ajanlarınıza bırakın",
+      "text": "Bir rutin belirli bir saatte veya bir şey olduğunda kendiliğinden çalışır.",
+      "viewerTitle": "Kendiliğinden çalışanları görün",
+      "viewerText": "Rutinleri yöneten veya ajanı olan kişiler oluşturur ve burada görünür."
+    },
+    "wiki": {
+      "title": "Ekibin bilmesi gerekenleri saklayın",
+      "text": "Kişiler ve ajanlar bu sayfaları okur, böylece herkes aynı bilgiyle çalışır.",
+      "viewerTitle": "Ekibin bildiklerine bakın",
+      "viewerText": "Wiki'yi düzenleyen kişi ilk sayfayı yazar ve burada görünür."
+    },
+    "memory": {
+      "title": "Ajanlarınız çalışırken öğrenir",
+      "text": "Sohbetlerden edindikleri burada kalır, böylece ne bildiklerini görürsünüz.",
+      "ask": "Burada nasıl çalıştığımızı anlatmak istiyorum.",
+      "noneForAgent": "Bu ajanın anısı yok."
+    },
+    "threads": {
+      "title": "Her konu kendi sohbetinde",
+      "text": "İleti dizisinde yanıtlamak ya da misyona dönüştürmek için bir mesajı basılı tutun.",
+      "action": "Sohbetlere git"
+    },
+    "chats": {
+      "title": "Ajanlarınızla konuşun",
+      "text": "Bir sohbette bir şey isteyin, bir ajan işe koyulsun.",
+      "action": "Yeni sohbet"
+    },
+    "channels": {
+      "title": "Kişileri ve ajanları bir kanalda toplayın",
+      "text": "Her kanal bir konuyla ilgilenenleri bir araya getirir.",
+      "viewerTitle": "Ekibin kanalları burada",
+      "viewerText": "Kanal oluşturan kişi ilkini açar ve burada görünür.",
+      "action": "Kanal oluştur"
+    },
+    "people": {
+      "title": "Ekibinizle burada çalışın",
+      "text": "Kişileri davet edip onlarla ve ajanlarınızla tek yerde konuşun.",
+      "viewerTitle": "Ekibiniz burada görünür",
+      "viewerText": "Kişileri davet eden kişi ekibin geri kalanını getirir ve burada görünürler."
+    },
+    "chat": {
+      "title": "Her şey bir mesajla başlar",
+      "text": "Aşağıya yazın, buradaki herkes görsün.",
+      "viewerTitle": "Mesajlar burada görünür",
+      "viewerText": "Biri yazınca burada okursunuz."
+    },
+    "ai": {
+      "title": "Ajanlarınıza düşünmeleri için bir yapay zekâ verin",
+      "text": "Zaten ödediğiniz bir planı bağlayın, onunla çalışmaya başlasınlar."
+    },
+    "vaultPersonal": {
+      "title": "Girişlerinizi güvenle saklayın",
+      "text": "Bir giriş bilgisi veya anahtar kaydedin, istediğinizde ajanlarınız kullansın."
+    },
+    "vaultTeam": {
+      "title": "Parola dolaştırmadan girişleri paylaşın",
+      "text": "Ajanlarınızın ekip için kullandığı giriş bilgilerini ve anahtarları kaydedin.",
+      "viewerTitle": "Ekibin girişleri burada görünür",
+      "viewerText": "Biri sizinle bir giriş bilgisi veya anahtar paylaştığında burada görünür."
+    },
+    "skills": {
+      "title": "Ajanlarınıza işleri nasıl yaptığınızı öğretin",
+      "text": "Bir beceri bir görevin adımlarını tutar, ajanlar gerektiğinde açar."
+    },
+    "apps": {
+      "title": "Diğer uygulamalardan ajanlarınıza sorun",
+      "text": "Claude'u veya başka bir uygulamayı bağlayın, oradan çıkmadan görev isteyin."
+    },
+    "access": {
+      "title": "Her ajanın neyi kullanacağını seçin",
+      "text": "Bir hizmet bağlayın ve her ajanın erişimini burada ayarlayın.",
+      "viewerTitle": "Her ajanın erişimi burada görünür",
+      "viewerText": "Bağlayıcıları yöneten kişi ilk hizmeti bağlar.",
+      "action": "Hizmet bağla"
+    },
+    "board": {
+      "title": "Önemli olanı tek panoda görün",
+      "text": "Bir widget ekleyin, bir ajandan isteyin veya sohbetten bir blok sabitleyin.",
+      "viewerTitle": "Bu pano şekilleniyor",
+      "viewerText": "Bu panoyu düzenleyen kişi widget'ları ekler ve burada görünürler."
+    },
+    "computers": {
+      "title": "Ajanlarınıza başka bir bilgisayar verin",
+      "text": "Evdeki bir Mac mini'yi veya başka bir sunucuyu kodla bağlayın.",
+      "viewerTitle": "Diğer bilgisayarlar burada görünür",
+      "viewerText": "Bilgisayarları bağlayan kişi ekler ve burada görünürler."
+    },
+    "connectors": {
+      "title": "Ajanlarınıza gerçek araçlar verin",
+      "text": "Bir hizmet bağlayın, orada okumaya ve işlem yapmaya başlasınlar.",
+      "viewerTitle": "Ajanlarınızın araçları burada görünür",
+      "viewerText": "Bağlayıcıları yöneten kişi aşağıdaki hizmetleri bağlar."
+    },
+    "audit": {
+      "title": "İncelenecek bir şey yok",
+      "text": "Bir ajan sohbet dışında bir şey yaptığında burada görünür."
+    }
   }
 }

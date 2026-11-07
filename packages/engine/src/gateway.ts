@@ -11,6 +11,10 @@ import {
   isCustomModel,
   isKnownModel,
   isOpenRouterModel,
+  type KeyRefusal,
+  keyCheckRequest,
+  keyFailureWords,
+  keyRefusalOf,
   type ModelInfo,
   type ModelMessage,
   type ModelProvider,
@@ -37,7 +41,7 @@ import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationE
 import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
 import { addPersonSpend, assertPersonUnderLimit, personSpendAdded } from "./person-usage";
-import { assertCanWork } from "./standing";
+import { assertCanWork, standingRefusal } from "./standing";
 import { redactCredentials } from "./tool-detail";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
@@ -134,14 +138,52 @@ export interface GatewayResult extends ModelResult {
 export const RESERVATION_TTL_MS = 15 * 60_000;
 /** Below this many output tokens a call isn't worth making: the budget counts as exhausted. */
 export const MIN_OUTPUT_TOKENS = 256;
+/** A test call that takes longer says the key couldn't be checked: it never holds a person's save up for long. */
+export const KEY_CHECK_TIMEOUT_MS = 15_000;
+
+/** A key and what its calls carry, for `verifyKey`. */
+export interface KeyToVerify {
+  orgId: string;
+  provider: string;
+  key: { apiKey: string; workspaceId?: string; organization?: string; project?: string };
+}
+
+/** What a test call said of a key. `said`: the provider's words, with no secret in them. */
+export type KeyCheck =
+  | { state: "ok"; record(credentialId: string): Promise<void> }
+  | { state: "unchecked" }
+  | { state: "refused"; refusal: KeyRefusal; said: string };
 
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
-/** A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked. */
-const masked = (error: unknown) =>
-  error instanceof ProviderError
-    ? new ProviderError(redactCredentials(error.message), error.retryable, error.status, error.partial)
-    : error;
+/** The call's own key first: a key of an unusual shape is one no pattern knows. */
+const withoutKey = (text: string, apiKey: string) => redactCredentials(apiKey ? text.replaceAll(apiKey, "••••") : text);
+
+/**
+ * A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked,
+ * and who answered, on whose key. The key it ran on goes by its value: not every provider's has a shape we know.
+ */
+const masked = (
+  error: unknown,
+  provider: string,
+  key: { apiKey: string; credentialId: string | null; endpoint?: Endpoint },
+) => {
+  if (!(error instanceof ProviderError)) return error;
+  const clean = (text: string) => withoutKey(text, key.apiKey);
+  const out = new ProviderError(
+    clean(error.message),
+    error.retryable,
+    error.status,
+    error.partial,
+    error.said && clean(error.said),
+  );
+  // A workspace's own endpoint has no name of its own: people know it by its address.
+  out.provider = key.endpoint
+    ? redactCredentials(key.endpoint.baseURL.replace(/^https?:\/\//, "").split("/")[0] ?? "")
+    : provider;
+  out.platformKey = key.credentialId === null;
+  return out;
+};
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
@@ -285,7 +327,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (info) return info;
     if (!isOpenRouterModel(model)) throw new ValidationError(`Model ${model} is not in the catalog`);
     // Without its list no call can be priced: like an outage, the run tries again later.
-    if (!openRouterListed()) throw new ProviderError("could not reach provider", true);
+    if (!openRouterListed()) {
+      const outage = new ProviderError("could not reach provider", true);
+      outage.provider = label("openrouter");
+      throw outage;
+    }
     throw new ValidationError(`OpenRouter doesn't list ${model} anymore. Pick another model in the agent's settings.`);
   }
 
@@ -733,7 +779,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         });
         if (personId && usage)
           await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: actual, at: now() });
-        throw masked(error);
+        throw masked(error, label(providerId), key);
       }
 
       const { record, spent, personSpent } = await settleCall({
@@ -758,7 +804,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       return {
         ...result,
         // The refusal that sent the call again without its thinking: a provider's words, masked like its errors.
-        ...(refused ? { thinking: { ...result.thinking, refused: redactCredentials(refused) } } : {}),
+        ...(refused ? { thinking: { ...result.thinking, refused: withoutKey(refused, key.apiKey) } } : {}),
         usageRecordId: record.id,
         costNanoUsd: record.cost,
         maxTokens,
@@ -808,10 +854,12 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /**
      * Embeds texts for the organization's search index (kind `embedding`,
-     * no agent). Returns null when no embedding provider is configured.
+     * no agent). Returns null when no embedding provider is configured, or on a workspace that may not work.
      */
     async embed(call: { orgId: string; texts: string[]; inputType: "document" | "query" }) {
       if (!deps.embeddings || call.texts.length === 0) return null;
+      // Null, not a refusal: people on a hold still read and search, with full text alone.
+      if (await standingRefusal(db, call.orgId)) return null;
       const { provider, apiKey } = deps.embeddings;
       const result = await provider.embed(call.texts, { apiKey, inputType: call.inputType });
       const cost = embeddingCostNanoUsd(result.model, result.tokens);
@@ -829,6 +877,58 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         createdAt: now(),
       });
       return result;
+    },
+
+    /**
+     * One cheap real call with a key that isn't saved yet (or was just changed), so "connected" is never a guess. A
+     * held workspace calls no model: its key stays unchecked. What the call used is recorded once the key has its row
+     * (`record`), as a `summary` call of the organization.
+     */
+    async verifyKey(input: KeyToVerify): Promise<KeyCheck> {
+      const provider = deps.providers[input.provider];
+      if (!provider || (await standingRefusal(db, input.orgId))) return { state: "unchecked" };
+      if (input.provider === "openrouter") await ensureOpenRouterModels().catch(() => {});
+      const request = keyCheckRequest(input.provider, AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS));
+      if (!request) return { state: "unchecked" };
+      try {
+        const result = await provider.stream(request, { ...input.key, onDelta: () => {} });
+        return {
+          state: "ok",
+          record: async (credentialId) => {
+            await recordUsage(db, {
+              orgId: input.orgId,
+              agentId: null,
+              kind: "summary",
+              credentialId,
+              provider: input.provider,
+              model: result.model,
+              requestedModel: request.model,
+              usage: result.usage,
+              reportedCost: result.costNanoUsd,
+              partial: false,
+            });
+          },
+        };
+      } catch (error) {
+        const refusal = error instanceof ProviderError ? keyRefusalOf(error) : null;
+        if (!refusal || !(error instanceof ProviderError)) return { state: "unchecked" };
+        return { state: "refused", refusal, said: withoutKey(keyFailureWords(error.message), input.key.apiKey) };
+      }
+    },
+
+    /** `verifyKey` on a stored key; null when the org has no such key. The key stays here, only the result leaves. */
+    async verifyStoredKey(orgId: string, credentialId: string) {
+      const credential = await decryptCredential(db, deps.keyWrappers, orgId, credentialId);
+      if (!credential) return null;
+      const { provider, apiKey, workspaceId, options } = credential;
+      if (provider === "custom") return { provider, result: { state: "unchecked" } as KeyCheck };
+      const key = {
+        apiKey,
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(options?.organization ? { organization: options.organization } : {}),
+        ...(options?.project ? { project: options.project } : {}),
+      };
+      return { provider, result: await this.verifyKey({ orgId, provider, key }) };
     },
 
     /** A call for the organization (router, summaries). Not streamed to anyone; no agent budget. */
@@ -869,7 +969,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
-        throw masked(error);
+        throw masked(error, label(providerId), key);
       }
       const record = await recordUsage(db, {
         ...base,

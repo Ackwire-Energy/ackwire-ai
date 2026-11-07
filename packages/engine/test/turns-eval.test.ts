@@ -49,9 +49,9 @@ function scripted(turn: ScriptedTurn) {
   };
 }
 
-async function play(turn: ScriptedTurn) {
+async function play(turn: ScriptedTurn, workspaceComputer?: { billing: boolean }) {
   const reply = scripted(turn);
-  const world = await turnsWorld({ reply: (r) => reply(r) });
+  const world = await turnsWorld({ reply: (r) => reply(r), workspaceComputer });
   w = world;
   const { channelId, body } = placeOf(world, turn);
   await postPersonMessage({ db: world.db, pubsub: world.pubsub }, world.owner.id, world.org.id, channelId, { body });
@@ -101,8 +101,11 @@ const size = (r: ModelRequest) =>
  * author and a key used before an app connection, once two rules stopped repeating each other, 44,966 with rules people
  * gave (`remember` kind rule, ADR 0120), the private card for passwords and codes and @todos, once two more rules
  * stopped repeating others, and 45,669 with a send to someone else settled from the conversation before it goes
- * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`; the
- * ceiling leaves a little room.
+ * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
+ * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
+ * `person` and the rule that what is said in a DM stays there, 45,216 with the `ask_user` rule leaving to its
+ * description what that says already; the ceiling leaves a little room. Where each workspace gets its own computer,
+ * `workspaceComputerText` adds its 441 to that.
  */
 const OI_CEILING_CHARS = 45_900;
 
@@ -112,6 +115,14 @@ test("a DM 'oi' stays under the size ceiling", async () => {
   const chars = size(request);
   console.log(`DM 'oi': ${chars} chars (system ${systemText(request.system).length}, ${request.tools?.length} tools)`);
   expect(chars).toBeLessThan(OI_CEILING_CHARS);
+}, 60_000);
+
+test("a DM 'oi' on the Cloud, with what it says about the workspace's computer, stays under it too", async () => {
+  const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn, { billing: true });
+  if (!request) throw new Error("no call");
+  expect(systemText(request.system)).toContain("# The computer");
+  console.log(`DM 'oi' on the Cloud: ${size(request)} chars`);
+  expect(size(request)).toBeLessThan(OI_CEILING_CHARS);
 }, 60_000);
 
 /** The Anthropic request body a captured request becomes (the transport refuses after reading it: no network). */

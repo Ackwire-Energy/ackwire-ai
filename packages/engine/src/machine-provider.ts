@@ -2,14 +2,23 @@ import {
   type AgentScope,
   type ExecRequest,
   type ExecResult,
+  FILE_PULL_PROTOCOL,
+  generateSecretKeyPair,
   MAX_INLINE_FILE_BYTES,
+  madePasswordAad,
+  openSecret,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
+  type PasswordClass,
   policyRefusal,
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
+  VAULT_PASSWORD_PROTOCOL,
   VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
-import { type MachineCaller, MachineRequestError } from "./machine-hub";
+import { ARTIFACT_LIMITS } from "./artifacts";
+import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
 
 /** Provider id of connected machines; their computer id is the machine id. */
@@ -47,7 +56,7 @@ export function notAllowedMessage(name: string, detail: string, path?: string, m
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
  * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
  */
-function explain(error: unknown, name: string, path?: string, managed = false): Error {
+function explain(error: unknown, name: string, path?: string, managed = false, tooLarge?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
   const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
@@ -61,10 +70,13 @@ function explain(error: unknown, name: string, path?: string, managed = false): 
       return said(error.message);
     case "too_large":
       return said(
-        `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
+        tooLarge ??
+          `${path ?? "The file"} is too large to read here (max ${MB(MAX_INLINE_FILE_BYTES)}). upload_file sends it to the Drive, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
       );
     case "upload_failed":
       return said(`${path ?? "The file"} didn't reach the Drive. ${error.message}`);
+    case "pull_failed":
+      return said(`${path ?? "The file"} didn't reach ${name}: ${error.message}`);
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
       return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path, managed));
@@ -83,21 +95,66 @@ function explain(error: unknown, name: string, path?: string, managed = false): 
   }
 }
 
+/** A tool's `length` and `classes`, what a site's rules asked for; anything left out, the strong default. */
+function passwordRules(input: { length?: unknown; classes?: unknown }) {
+  const length = typeof input.length === "number" ? input.length : PASSWORD_LENGTH.default;
+  const given = Array.isArray(input.classes)
+    ? PASSWORD_CLASSES.filter((c) => (input.classes as unknown[]).includes(c))
+    : [];
+  return { length, classes: (given.length > 0 ? given : [...PASSWORD_CLASSES]) as PasswordClass[] };
+}
+
+/**
+ * A new password made on the agent's computer (ADR 0144 §8): it comes back sealed to a key pair made for this one
+ * call, whose private half never leaves this function, so everything between (the hub, a relay, root in system mode)
+ * only ever holds a box. Opened here for the caller to seal into the Vault at once.
+ */
+export async function requestMadePassword(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  input: { length?: unknown; classes?: unknown },
+  signal?: AbortSignal,
+): Promise<string> {
+  const status = await hub.status(machineId);
+  const name = status?.name ?? "computer";
+  if (!status || status.protocol < VAULT_PASSWORD_PROTOCOL)
+    throw new Error(vaultUpdateText(status ?? { name }, "make passwords"));
+  const pair = await generateSecretKeyPair();
+  const requestId = crypto.randomUUID();
+  try {
+    const reply = await hub.call<"vault.password">(
+      machineId,
+      { agent, op: "vault.password", requestId, publicKey: pair.publicKey, rules: passwordRules(input) },
+      { signal, timeoutMs: 30_000 },
+    );
+    return await openSecret(pair.privateKey, reply.box, madePasswordAad({ requestId, agentId: String(agent.id) }));
+  } catch (error) {
+    if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
+    if (error instanceof MachineRequestError) throw explain(error, name);
+    throw new Error(`The password from the computer ${name} didn't open. Nothing was saved. Try again.`);
+  }
+}
+
 /**
  * Connected machines as a `SandboxProvider` (ADR 0025): the channel over the hub. A machine is on while its
  * runner is connected; people pair it, and we never create, start or stop it. Files travel base64 up to 5 MB;
- * uploads go through `push`, straight to our upload URL. Every request is for `agent`, which the runner keeps
- * in its own folder of the workspace.
+ * past that the computer moves them itself over HTTP, to our upload URL (`push`) or from our file URL (`pull`).
+ * Every request is for `agent`, which the runner keeps in its own folder of the workspace.
  */
 export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
-  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string): Promise<T> => {
+  const guard = async <T>(id: string, fn: () => Promise<T>, path?: string, tooLarge?: string): Promise<T> => {
     try {
       return await fn();
     } catch (error) {
       if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
       const status = await hub.status(id);
-      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed");
+      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed", tooLarge);
     }
+  };
+  const pullRefusal = async (id: string) => {
+    const status = await hub.status(id);
+    return status && status.protocol < FILE_PULL_PROTOCOL ? pullUpdateText(status) : null;
   };
   const execOn = async (
     id: string,
@@ -137,7 +194,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
     async writeFile(id, path, data) {
       if (data.byteLength > MAX_INLINE_FILE_BYTES) {
         throw new Error(
-          `${path} is too large to copy to a connected computer (max ${MB(MAX_INLINE_FILE_BYTES)}); ask the person to put it on that machine.`,
+          `${path} is too large to write in one piece (max ${MB(MAX_INLINE_FILE_BYTES)}). A Drive file reaches the computer whole with import_file, up to ${MB(ARTIFACT_LIMITS.fileBytes)}.`,
         );
       }
       await guard(
@@ -175,7 +232,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       } catch (error) {
         // The runner's own words ("This request's key is gone…"), not the file-tool wording.
         if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
-          throw new Error(error.message);
+          throw new Error(error.message, { cause: error });
         }
         throw error;
       }
@@ -201,14 +258,28 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
               );
             }),
         path,
+        `${path} is too large to send to the Drive (max ${MB(target.maxBytes)}).`,
       );
+    },
+    pullRefusal,
+    async pullFile(id, path, { signal, ...source }) {
+      const refusal = await pullRefusal(id);
+      if (refusal) throw new Error(refusal);
+      await guard(id, () => hub.call(id, { agent, op: "pull", path, ...source }, { signal }), path);
     },
   };
 }
 
-/** What a computer too old for the Vault answers (ADR 0144): its owner updates the runner. */
-export const vaultUpdateText = (machineName: string, what: string) =>
-  `The computer ${machineName} needs an update to ${what}. Its owner can run \`agentes-runner update\`.`;
+/** What a computer too old for `pull` answers for a file past what a `write` carries. */
+export const pullUpdateText = (status: Pick<MachineStatus, "name" | "kind">) =>
+  vaultUpdateText(status, `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`);
+
+/**
+ * What a computer too old for the Vault answers (ADR 0144): its owner updates the runner, or the workspace's own
+ * computer updates by itself (its runner refuses `agentes-runner update`).
+ */
+export const vaultUpdateText = (status: { name: string; kind?: MachineStatus["kind"] }, what: string) =>
+  `The computer ${status.name} needs an update to ${what}. ${status.kind === "managed" ? "It updates by itself, so try again later." : "Its owner can run `agentes-runner update`."}`;
 
 /** A one-use key on the agent's computer (ADR 0144, protocol 45): a Vault value is sealed to it, never sent bare. */
 export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };
@@ -227,7 +298,7 @@ export async function requestVaultKey(
 ): Promise<VaultKey> {
   const status = await hub.status(machineId);
   const name = status?.name ?? "computer";
-  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(name, what));
+  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(status ?? { name }, what));
   try {
     const reply = await hub.call<"vault.key">(machineId, { agent, op: "vault.key" }, { signal, timeoutMs: 30_000 });
     const key = reply?.vaultKey;

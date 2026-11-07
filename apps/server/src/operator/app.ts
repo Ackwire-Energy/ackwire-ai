@@ -7,6 +7,7 @@ import { apiError, domainErrorResponse, routeOf, validationHook } from "../http/
 import type { Logger } from "../logger";
 import { registerOperatorAccess } from "./access";
 import { registerOperatorAnalytics } from "./analytics";
+import { registerOperatorClaudeAuth } from "./claude-auth";
 import { registerOperatorEvents } from "./events";
 import { registerOperatorLimits } from "./limits";
 import { registerOperatorMachines } from "./machines";
@@ -62,13 +63,14 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
   registerOperatorMachines(api, deps);
   registerOperatorAccess(api, deps);
   registerOperatorAnalytics(api, deps);
+  registerOperatorClaudeAuth(api, deps);
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
     info: {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), how new Claude sign-ins for all agents are made (ADR 0150), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

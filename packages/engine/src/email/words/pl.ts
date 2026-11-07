@@ -266,7 +266,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Wpisz ten kod, żeby usunąć całe konto ",
       { b: email },
-      ", a nie tylko jedną przestrzeń roboczą. Zniknie od razu, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
+      ", a nie tylko jedną przestrzeń roboczą. Od razu zostanie wylogowane wszędzie i po 7 dniach usunięte na dobre, a razem z nim zamkną się przestrzenie robocze, w których jesteś tylko ty.",
     ],
     support: (address) => [
       "Działa przez 10 minut i bez niego nic nie zostanie usunięte. Jeśli to nie ty, nikomu go nie podawaj i napisz na ",
@@ -311,6 +311,28 @@ export const words: EmailWords = {
     button: "Zobacz podłączone aplikacje",
     why: (org) =>
       `Otrzymujesz tę wiadomość, ponieważ do twojego konta w przestrzeni roboczej ${org} w agentes.chat podłączono aplikację.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Twoje konto agentes.chat zostanie usunięte ${day}`,
+    preheader: "Masz 7 dni, żeby zmienić zdanie.",
+    headline: "Twoje konto jest usuwane",
+    body: (email, day, time) => [
+      "Usuniemy konto ",
+      { b: email },
+      ` ${day} o ${time}. Zostało wylogowane wszędzie i nikt nie może się tu z tobą skontaktować, dopóki nie wrócisz.`,
+    ],
+    closes: (count, names) => [
+      plural("pl", count, {
+        one: "Przestrzeń robocza, w której nie było nikogo poza tobą, właśnie się zamknęła i zniknie tego samego dnia: ",
+        other:
+          "Przestrzenie robocze, w których nie było nikogo poza tobą, właśnie się zamknęły i znikną tego samego dnia: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Zmieniasz zdanie? Zaloguj się przed tą datą i naciśnij Przywróć.",
+    button: "Zaloguj się, aby przywrócić",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres ma konto w agentes.chat.",
   },
   accountDeleted: {
     subject: "Twoje konto agentes.chat zostało usunięte",
@@ -397,5 +419,35 @@ export const words: EmailWords = {
     note: "Odbierz go jednym kliknięciem w powiadomieniach, a agent przestanie myśleć z twoim planem.",
     button: "Otwórz powiadomienia",
     why: (org) => `Dostajesz ten e-mail, bo ktoś w ${org} połączył twój plan z agentem.`,
+  },
+  planWaiting: {
+    subject: "Twój zespół czeka",
+    preheader: "Twoja przestrzeń robocza jest gotowa. Do startu potrzebny jest plan agentes.chat.",
+    headline: "Twój zespół czeka",
+    body: (agents, channels, routines) => {
+      const a = plural("pl", agents, {
+        one: `1 agent`,
+        few: `${agents} agenci`,
+        many: `${agents} agentów`,
+        other: `${agents} agenta`,
+      });
+      const c = plural("pl", channels, {
+        one: `1 kanał`,
+        few: `${channels} kanały`,
+        many: `${channels} kanałów`,
+        other: `${channels} kanału`,
+      });
+      const r = plural("pl", routines, {
+        one: `1 rutyna`,
+        few: `${routines} rutyny`,
+        many: `${routines} rutyn`,
+        other: `${routines} rutyny`,
+      });
+      return routines > 0
+        ? `Gotowe: ${a}, ${c} i ${r}. Do startu potrzebny jest plan agentes.chat.`
+        : `Gotowe: ${a} i ${c}. Do startu potrzebny jest plan agentes.chat.`;
+    },
+    button: "Zobacz plany agentes.chat",
+    why: (org) => `Ten e-mail przyszedł, bo prowadzisz ${org} w agentes.chat. Wysyłamy tylko dwa takie powiadomienia.`,
   },
 };

@@ -92,6 +92,7 @@ import type {
   GifKey,
   GifPage,
   GitHubAppInstallation,
+  GitHubOrgAccess,
   GitHubRepositories,
   Health,
   HostComputer,
@@ -512,6 +513,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
       deletionCode: () => request<CodeSent>("/api/app/account/deletion/code", { json: {} }),
       delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
+      restore: () => request<void>("/api/app/account/deletion", { method: "DELETE" }),
     },
     push: {
       webKey: async () =>
@@ -721,9 +723,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             ...(locale ? { query: { locale } } : {}),
           })
         ).templates,
-      applyTeamTemplate: (orgId, templateId, locale) =>
+      applyTeamTemplate: (orgId, templateId, locale, tap) =>
         request<{ channelId: string; messageId: string }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, {
-          json: locale ? { locale } : {},
+          json: { ...(locale ? { locale } : {}), ...(tap ? { tap } : {}) },
         }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
@@ -760,11 +762,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       rotateCredential: (orgId, id, input) =>
         request<Credential>(`${org(orgId)}/credentials/${enc(id)}/rotate`, { json: input }),
-      removeCredential: (orgId, id, purge) =>
+      removeCredential: (orgId, id, purge, release) =>
         request<void>(`${org(orgId)}/credentials/${enc(id)}`, {
           method: "DELETE",
-          query: { purge: purge ? "true" : undefined },
+          query: { purge: purge ? "true" : undefined, release: release ? "true" : undefined },
         }),
+      checkCredential: (orgId, id) =>
+        request<{ check: "ok" | "unchecked" }>(`${org(orgId)}/credentials/${enc(id)}/check`, { json: {} }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
@@ -812,8 +816,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
-      cancelRun: (orgId, runId, reason) =>
-        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: reason ? { reason } : {} }),
+      cancelRun: (orgId, runId, reason, chain) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, {
+          json: { ...(reason ? { reason } : {}), ...(chain ? { chain } : {}) },
+        }),
       stopReason: (orgId, runId, reason) =>
         request<void>(`${org(orgId)}/runs/${enc(runId)}/stop-reason`, { json: { reason } }),
       continueRun: (orgId, runId) =>
@@ -1028,6 +1034,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ installUrl: string }>(`${org(orgId)}/github-app/install`, { json: { returnTo } })).installUrl,
       remove: (orgId, id) => request<void>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
       repositories: (orgId) => request<GitHubRepositories>(`${org(orgId)}/github/repositories`),
+      access: (orgId) => request<GitHubOrgAccess>(`${org(orgId)}/github/access`),
     },
     search: {
       query: async (orgId, input) =>
@@ -1309,7 +1316,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       get: (orgId, number) => request<Issue>(`${org(orgId)}/issues/by-number/${number}`),
       create: (orgId, input) => request<Issue>(`${org(orgId)}/issues`, { json: input }),
       update: (orgId, id, patch) => request<Issue>(`${org(orgId)}/issues/${enc(id)}`, { method: "PATCH", json: patch }),
+      delete: (orgId, id) => request<void>(`${org(orgId)}/issues/${enc(id)}`, { method: "DELETE" }),
       share: (orgId, id) => request<Issue>(`${org(orgId)}/issues/${enc(id)}/share`, { method: "POST" }),
+      setAudience: (orgId, id, audience) =>
+        request<Issue>(`${org(orgId)}/issues/${enc(id)}/audience`, { method: "PUT", json: audience }),
       setCriterion: (orgId, id, criterionId, done) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/criteria/${enc(criterionId)}`, {
           method: "PUT",
@@ -1617,6 +1627,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/dismiss`, { json: {} }),
     },
     secrets: {
+      get: (orgId, requestId) => request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}`),
       deliver: (orgId, requestId, box) =>
         request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}/deliver`, { json: { box } }),
       decline: (orgId, requestId) =>

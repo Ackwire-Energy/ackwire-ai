@@ -51,6 +51,7 @@ import {
   type IconName,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuNote,
@@ -63,6 +64,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { usePersonMenu } from "@/components/entity-menus";
 import { useFilterCopy } from "@/components/filters";
 import { useCopied } from "@/components/invite/copied";
@@ -368,6 +370,8 @@ function InviteActions() {
   const links = useInviteLinks(org.id);
   const make = useMakeInviteLink(org.id);
   const [copied, copy] = useCopied();
+  // Nobody joins on a billing hold: the invite dialog says so, and a link would open on a refusal.
+  const held = usePlanHold() !== null;
   const copyLink = async () => {
     const shown = links.data?.find((l) => l.url !== null)?.url;
     const url = shown ?? (await make.mutateAsync().catch(() => null))?.url;
@@ -375,9 +379,11 @@ function InviteActions() {
   };
   return (
     <div className="row members-acts">
-      <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
-        {copied ? t("common.copied") : t("members.copyInviteLink")}
-      </Button>
+      {!held && (
+        <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
+          {copied ? t("common.copied") : t("members.copyInviteLink")}
+        </Button>
+      )}
       {invite && (
         <Button variant="primary" icon="plus" onClick={() => invite.open()}>
           {t("members.inviteTitle")}
@@ -444,8 +450,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
     deny.mutate(
       { id: denying.id, reason: reason.trim() || undefined },
       {
-        onSuccess: () => toast.show(t("members.requests.denied")),
-        onSettled: () => setDenying(null),
+        onSuccess: () => {
+          toast.show(t("members.requests.denied"));
+          setDenying(null);
+        },
+        // Any other failure keeps the dialog: the reason stays there to send again.
+        onError: (e) => {
+          if (errorCode(e) === "join.answered") setDenying(null);
+        },
       },
     );
   };
@@ -540,11 +552,18 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
         closeLabel={t("common.close")}
         width={440}
       >
-        <DialogBody>
-          <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
-            <Textarea rows={3} maxLength={JOIN_REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={deny.isPending}>
+          <DialogBody>
+            <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
+              <Textarea
+                rows={3}
+                maxLength={JOIN_REASON_MAX}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button onClick={() => setDenying(null)}>{t("common.cancel")}</Button>
           <Button variant="danger" loading={deny.isPending} onClick={denyOne}>
@@ -831,9 +850,11 @@ function InvitationRoles({
       closeLabel={t("common.close")}
       width={440}
     >
-      <DialogBody>
-        <RolesPicker roles={orgRoles} value={value} onChange={setValue} label={title} />
-      </DialogBody>
+      <Locked when={save.isPending}>
+        <DialogBody>
+          <RolesPicker roles={orgRoles} value={value} onChange={setValue} label={title} />
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -1009,41 +1030,43 @@ function SuggestDialog({ open, onClose, inviters }: { open: boolean; onClose: ()
       closeLabel={t("common.close")}
       width={480}
     >
-      <DialogBody>
-        <Field label={t("members.suggest.email")} id="suggest-email" error={error}>
-          <Input
-            type="email"
-            autoComplete="off"
-            value={email}
-            placeholder={t("members.emailsPlaceholder")}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              submit();
-            }}
-          />
-        </Field>
-        <Field
-          id="suggest-note"
-          label={
-            <>
-              {t("members.suggest.who")} <span className="invite-optional">{t("members.dialog.optional")}</span>
-            </>
-          }
-        >
-          <Textarea
-            rows={2}
-            maxLength={JOIN_NOTE_MAX}
-            value={note}
-            placeholder={t("members.suggest.whoPlaceholder")}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </Field>
-      </DialogBody>
+      <Locked when={suggest.isPending}>
+        <DialogBody>
+          <Field label={t("members.suggest.email")} id="suggest-email" error={error}>
+            <Input
+              type="email"
+              autoComplete="off"
+              value={email}
+              placeholder={t("members.emailsPlaceholder")}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                submit();
+              }}
+            />
+          </Field>
+          <Field
+            id="suggest-note"
+            label={
+              <>
+                {t("members.suggest.who")} <span className="invite-optional">{t("members.dialog.optional")}</span>
+              </>
+            }
+          >
+            <Textarea
+              rows={2}
+              maxLength={JOIN_NOTE_MAX}
+              value={note}
+              placeholder={t("members.suggest.whoPlaceholder")}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={suggest.isPending} onClick={submit}>

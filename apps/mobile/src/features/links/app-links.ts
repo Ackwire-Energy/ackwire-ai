@@ -77,6 +77,9 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
   const open = isSafeId(q.open) ? q.open : null;
   // A widget open on Home or on its dashboard (`?widget=`, ADR 0135): its own screen.
   const widget = isSafeId(q.widget) ? q.widget : null;
+  // The thread open in a conversation's panel (`?thread=`, with `tm` for the panel's message): its own screen here.
+  if ((page === "c" || page === "dm") && isSafeId(q.thread))
+    return { thread: q.thread, m: isSafeId(q.tm) ? q.tm : null };
   switch (page) {
     case "":
     case "home":
@@ -106,6 +109,8 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       if (number === undefined || number === null) return "/issues";
       return /^\d{1,9}$/.test(number) ? `/issues/${number}` : null;
     }
+    case "proposals":
+      return "/proposals";
     case "routines":
       return open ? `/routines/${open}` : "/routines";
     case "search":

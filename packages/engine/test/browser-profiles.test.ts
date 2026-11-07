@@ -470,7 +470,7 @@ test("request_permission offers profiles apart from 'all tools'; approving grant
   const missing = await missingPermissions(ctx);
   expect(missing.map((m) => m.id)).toContain(`browser-profile:${p.id}`);
   const [tool] = await createPermissionToolSource().tools(ctx);
-  const out = await tool?.execute({ permission: `browser-profile:${p.id}`, reason: "Answer the shop's chat." }, ctx);
+  const out = await tool?.execute({ permission: `browser-profile:${p.id}` }, ctx);
   expect(out?.content).toContain('Turned on: Browser profile "Shop chat"');
   expect((await listBrowserProfiles(f.db, f.owner.id, f.org.id))[0]?.agentIds).toEqual([f.agent.id]);
   expect((await missingPermissions(ctx)).map((m) => m.id)).not.toContain(`browser-profile:${p.id}`);

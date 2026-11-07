@@ -20,18 +20,21 @@ test("the anchor carries its work's view; agent.work goes out live; Parar is ref
     release = r;
   });
   t = await createTestServer({
+    // Call 1 is the key's test when `seedOrg` saves it.
     reply: (_req, call) =>
       call === 1
-        ? {
-            chunks: [],
-            toolUses: [
-              {
-                name: "work_in_background",
-                input: { title: "Migrar a cobrança", say: "Vou cuidar disso em segundo plano." },
-              },
-            ],
-          }
-        : { chunks: ["Ainda ", "migrando."], hold },
+        ? { chunks: ["ok"] }
+        : call === 2
+          ? {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "work_in_background",
+                  input: { title: "Migrar a cobrança", say: "Vou cuidar disso em segundo plano." },
+                },
+              ],
+            }
+          : { chunks: ["Ainda ", "migrando."], hold },
   });
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

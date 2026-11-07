@@ -466,12 +466,14 @@ describe("browser_ask_person", () => {
     await start();
     const ana = await addMember(f.db, f.org.id, "member", "ana");
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    // A plain member: an administrator reads every channel (ADR 0151), so the link would open for them.
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db.update(schema.agents).set({ ownerUserId: bob.id }).where(eq(schema.agents.id, f.agent.id));
     const run = await runFor(ana.id);
-    await leave(f.owner.id);
     const { h, notices } = await askFrom(run);
     const of = (userId: string) => notices.find((n) => n.userId === userId)?.source;
     expect(of(ana.id)).toMatchObject({ channelId: f.general.id, messageId: h?.id, handoffId: h?.id });
-    expect(of(f.owner.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
+    expect(of(bob.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
   });
 
   test("pending it waits 24 hours by default; in control there's no deadline, only the grace while they're away", async () => {
@@ -1032,9 +1034,9 @@ describe("live view", () => {
     const a = viewer(f.owner.id);
     const b = viewer("someone-else");
     const slow = viewer("slow", true);
-    const stopA = await live.watch(a.viewer, f.org.id, f.agent.id);
-    const stopB = await live.watch(b.viewer, f.org.id, f.agent.id);
-    const stopSlow = await live.watch(slow.viewer, f.org.id, f.agent.id);
+    const { stop: stopA } = await live.watch(a.viewer, f.org.id, f.agent.id);
+    const { stop: stopB } = await live.watch(b.viewer, f.org.id, f.agent.id);
+    const { stop: stopSlow } = await live.watch(slow.viewer, f.org.id, f.agent.id);
     expect(calls.filter((c) => c.op === "browser.stream.start")).toHaveLength(1);
     expect(calls[0]).toMatchObject({ op: "browser.stream.start", mode: "watch", agent: { id: f.agent.id } });
 
@@ -1093,7 +1095,7 @@ describe("live view", () => {
     const { hub } = fakeHub();
     const warmed: unknown[] = [];
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, warm: (at) => warmed.push(at) });
-    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const { stop } = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     expect(warmed).toEqual([{ orgId: f.org.id, agentId: f.agent.id, machineId: machine.machineId }]);
     stop();
     live.close();
@@ -1103,11 +1105,11 @@ describe("live view", () => {
     await start();
     const { hub, calls } = fakeHub();
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, stopDelayMs: 30 });
-    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const { stop } = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     stop();
     await Bun.sleep(5);
     // Back before the stop: same stream, nothing asked of the computer.
-    const stopAgain = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const { stop: stopAgain } = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await Bun.sleep(50);
     expect(calls.map((c) => c.op)).toEqual(["browser.stream.start"]);
     // Gone for good: stopped once, after the delay, even when a page opens meanwhile.
@@ -1277,7 +1279,7 @@ describe("live view", () => {
     const { hub } = fakeHub();
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, graceMs: 30 });
     const a = viewer(f.owner.id);
-    const stop = await live.watch(a.viewer, f.org.id, f.agent.id);
+    const { stop } = await live.watch(a.viewer, f.org.id, f.agent.id);
     await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
     stop();
     await Bun.sleep(5);
@@ -1298,7 +1300,7 @@ describe("live view", () => {
     const deadline = () => f.db.update(schema.browserHandoffs).set({ expiresAt: soon });
     const expiresAt = async () => (await handoffs())[0]?.expiresAt.getTime();
     await deadline();
-    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const { stop } = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await Bun.sleep(5);
     // "Opening…" with no page: their watching doesn't hold control.
     expect(await expiresAt()).toBe(soon.getTime());
@@ -1472,7 +1474,7 @@ describe("live view", () => {
     await start();
     const { hub } = fakeHub();
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, graceMs: 10 });
-    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    const { stop } = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
     await Bun.sleep(5);
     stop();
@@ -1511,7 +1513,8 @@ describe("live view", () => {
     const { hub } = fakeHub();
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
     const a = viewer(f.owner.id);
-    await live.watch(a.viewer, f.org.id, f.agent.id);
+    // Nothing streams here for it: the realtime layer opens no frame socket for it.
+    expect((await live.watch(a.viewer, f.org.id, f.agent.id)).streaming).toBe(false);
     expect(a.got[0]).toMatchObject({ type: "browser.unavailable", reason: "no_computer" });
 
     const machine = await pairMachine(deps(), f.owner.id, f.org.id, { name: "Box" });
@@ -1522,7 +1525,7 @@ describe("live view", () => {
       hub: { ...hub, isLocal: () => false } as BrowserLiveDeps["hub"],
     });
     const b = viewer(f.owner.id);
-    await remote.watch(b.viewer, f.org.id, f.agent.id);
+    expect((await remote.watch(b.viewer, f.org.id, f.agent.id)).streaming).toBe(false);
     expect(b.got[0]).toMatchObject({ type: "browser.unavailable", reason: "offline" });
   });
 

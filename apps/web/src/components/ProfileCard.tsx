@@ -38,7 +38,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
+import { isOutOfOffice, statusEndNote } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -49,6 +49,7 @@ import {
   Button,
   EmojiPickerPopover,
   Icon,
+  Locked,
   Menu,
   Meter,
   PlanMeter,
@@ -259,34 +260,41 @@ function MessageBox({ target, label, onSent }: { target: DmTarget; label: string
   };
   return (
     <div className="mcard__foot">
-      <div className="ac-input-affix mcard__dm">
-        <input
-          ref={field}
-          value={text}
-          placeholder={label}
-          aria-label={label}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            submit();
-          }}
-        />
-        <EmojiPickerPopover
-          labels={emojiLabels}
-          side="top"
-          align="end"
-          onPick={(emoji) => {
-            setText((v) => v + emoji);
-            field.current?.focus();
-          }}
-          trigger={
-            <button type="button" className="mcard__emoji" aria-label={t("presence.emoji")} title={t("presence.emoji")}>
-              <Icon name="smile" size={18} />
-            </button>
-          }
-        />
-      </div>
+      <Locked when={send.isPending}>
+        <div className="ac-input-affix mcard__dm">
+          <input
+            ref={field}
+            value={text}
+            placeholder={label}
+            aria-label={label}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              submit();
+            }}
+          />
+          <EmojiPickerPopover
+            labels={emojiLabels}
+            side="top"
+            align="end"
+            onPick={(emoji) => {
+              setText((v) => v + emoji);
+              field.current?.focus();
+            }}
+            trigger={
+              <button
+                type="button"
+                className="mcard__emoji"
+                aria-label={t("presence.emoji")}
+                title={t("presence.emoji")}
+              >
+                <Icon name="smile" size={18} />
+              </button>
+            }
+          />
+        </div>
+      </Locked>
     </div>
   );
 }
@@ -305,6 +313,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
   const shown = usePersonPresence(userId);
   const line = shown?.status ? personLine(shown.status) : null;
+  const endNote = shown?.status && statusEndNote(t, i18n.language, shown.status.until, userId === me.user.id);
   const seen = person?.lastSeenAt
     ? t("presence.seen", { when: relativeTime(t, i18n.language, person.lastSeenAt) })
     : null;
@@ -358,7 +367,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
           </span>
           <span>
             {line.text}
-            <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+            {endNote && <small>{endNote}</small>}
           </span>
         </div>
       )}
@@ -772,15 +781,17 @@ function AudienceEdit({ agent }: { agent: Agent }) {
         }
       >
         <span className="mcard-audience__title">{t("audience.title", g)}</span>
-        <AudienceChoice
-          compact
-          value={draft}
-          onChange={setDraft}
-          ownerUserId={agent.ownerUserId}
-          agentName={agent.name}
-          idPrefix={`mcard-audience-${agent.id}`}
-          onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
-        />
+        <Locked when={update.isPending}>
+          <AudienceChoice
+            compact
+            value={draft}
+            onChange={setDraft}
+            ownerUserId={agent.ownerUserId}
+            agentName={agent.name}
+            idPrefix={`mcard-audience-${agent.id}`}
+            onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
+          />
+        </Locked>
         {!valid && (
           <span className="small mcard-audience__err" role="alert">
             {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
@@ -793,7 +804,8 @@ function AudienceEdit({ agent }: { agent: Agent }) {
           <Button
             size="sm"
             variant="primary"
-            disabled={!valid || update.isPending}
+            disabled={!valid}
+            loading={update.isPending}
             onClick={async () => {
               if (!(await asks.ask(draft)([]))) return;
               update.mutate(

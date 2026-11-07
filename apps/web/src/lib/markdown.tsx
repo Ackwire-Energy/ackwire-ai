@@ -1,11 +1,14 @@
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { type ReactNode, useMemo } from "react";
+import { LinkPill } from "@/chat/LinkPill";
 import { MessageRef } from "@/chat/MessageRef";
 import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
+import { TableBox } from "@/components/TableBox";
 
 /**
  * A small, safe Markdown renderer for chat messages and artifact documents
@@ -77,10 +80,15 @@ function withMentions(text: string, key: string, mention?: MentionRenderer, word
   return out;
 }
 
-/** A link opens in a new tab; one to a message here (`parseMessageLink`) is its pill, opening in the app. */
-function link(href: string, key: string, children: ReactNode) {
+/**
+ * A link opens in a new tab; one to a message here (`parseMessageLink`) is its pill, opening in the app. `bare`: an
+ * address written as it is, shown as its service's pill when its shape is known (`linkPill`).
+ */
+function link(href: string, key: string, children: ReactNode, bare = false) {
   const message = parseMessageLink(href, [window.location.origin]);
   if (message) return <MessageRef key={key} link={message} />;
+  const pill = bare ? linkPill(href) : null;
+  if (pill) return <LinkPill key={key} href={href} pill={pill} />;
   return (
     <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="ac-link">
       {children}
@@ -97,11 +105,13 @@ export function renderInline(
   /** Each plain word in its own `.ac-word` span (a streaming answer's words fade in). */
   words?: boolean,
   channel?: ChannelRenderer,
+  /** Bare addresses as pills. Off while being written, which would change pill at every letter, and in a link's words. */
+  pills = !words,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
-  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel);
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel, pills);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
@@ -129,7 +139,9 @@ export function renderInline(
     else if (m[4]) {
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
-      out.push(SAFE_URL.test(href) ? link(href, k, renderInline(parts?.[1] ?? "", k, mention, wiki)) : tok);
+      const label = parts?.[1] ?? "";
+      const own = renderInline(label, k, mention, wiki, undefined, undefined, undefined, false);
+      out.push(SAFE_URL.test(href) ? link(href, k, own, pills && label === href) : tok);
     } else if (m[6]) {
       const { title, label } = parseWikiToken(tok);
       out.push(
@@ -141,7 +153,7 @@ export function renderInline(
           </span>
         ),
       );
-    } else out.push(link(tok, k, tok));
+    } else out.push(link(tok, k, tok, pills));
     rest = rest.slice(m.index + tok.length);
   }
   return out;
@@ -298,7 +310,7 @@ export function Markdown({
         );
       case "table":
         return (
-          <div key={k} className="md__table">
+          <TableBox key={k}>
             <table>
               <thead>
                 <tr>
@@ -324,7 +336,7 @@ export function Markdown({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableBox>
         );
     }
     return null;

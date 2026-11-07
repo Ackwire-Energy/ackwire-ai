@@ -2,10 +2,12 @@ import type { TFunction } from "i18next";
 import type { AgentStatusLine, WorkView } from "../api/types";
 import { runErrorText } from "./errors";
 import { formatTime, lowerFirst } from "./format";
+import { plainLines } from "./markdown";
 
 /**
  * Long work (ADR 0121), the same on every app: the line under the agent's "Vou cuidar disso" (WorkLine on web, its
- * counterpart on the phone), the card's block and the agent's status line. Plain text, never cut: lines wrap.
+ * counterpart on the phone), the card's block and the agent's status line. Plain text, never cut: lines wrap, but for
+ * the question it waits on, kept to two lines (its card, one tap away, has all of it).
  */
 
 /** `t` with keys built at run time (a state's, a code's): the typed `t` of the web only takes literal keys. */
@@ -30,6 +32,8 @@ export interface WorkLineView {
   text: string;
   /** The latest update, as a second line (the agent's words, or the server's in the reader's language). */
   update: string | null;
+  /** What it waits to hear, in place of that update: the question it asked. */
+  question: { text: string; messageId: string | null } | null;
   /** "Tarefa #42", when it has a card. */
   task: { id: string; number: number; label: string } | null;
   /** Parar: while it isn't over, for who may stop it. */
@@ -61,8 +65,12 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   const task = w.issue ? { ...w.issue, label: say("work.task", { number: w.issue.number }) } : null;
   const over = workIsOver(w);
   const stop = !over && c.canStop && w.runId ? { runId: w.runId } : null;
+  const asked = w.state === "waiting_input" ? w.question : null;
+  // Its card draws the Markdown; a line of plain text can't.
+  const question = asked ? { ...asked, text: plainLines(asked.text).join(" ") || asked.text } : null;
   // The last update is news only while it works: once over, the report says where it ended.
-  const base = { task, stop, threadId: w.threadId, update: over ? null : (w.lastUpdate?.text ?? null) };
+  const update = over || question ? null : (w.lastUpdate?.text ?? null);
+  const base = { task, stop, threadId: w.threadId, update, question };
   const took = workDuration(t, (w.finishedAt ? Date.parse(w.finishedAt) : now.getTime()) - since);
   if (w.status === "done")
     return {
@@ -98,7 +106,9 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
     };
   const waits: Partial<Record<NonNullable<WorkView["state"]>, string>> = {
     waiting_approval: mine ? "work.line.waitingApprovalYou" : "work.line.waitingApproval",
-    waiting_input: mine ? "work.line.waitingAnswerYou" : "work.line.waitingAnswer",
+    waiting_input: (asked?.requestedForUserId ? asked.requestedForUserId === c.meId : mine)
+      ? "work.line.waitingAnswerYou"
+      : "work.line.waitingAnswer",
     waiting_computer: "work.line.waitingComputer",
   };
   if (w.state === "paused")
@@ -121,6 +131,10 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
   return { ...base, tone: "working", text: parts.join(" · "), result: null };
 }
 
+/** Held on a person's answer or approval, whose card is in its thread: its line opens the thread, whatever else does. */
+export const workWaitsOnPerson = (w: Pick<WorkView, "state">) =>
+  w.state === "waiting_input" || w.state === "waiting_approval";
+
 /** A work that ended (done, failed or stopped): its anchor is dimmed and keeps no promise. */
 export const workIsOver = (w: Pick<WorkView, "status">) =>
   w.status === "done" || w.status === "failed" || w.status === "canceled";
@@ -137,16 +151,18 @@ export function workAnchorBody(t: TFunction, body: string, meta: Record<string, 
   return kept || body;
 }
 
-/** The AI provider's errors (`run.provider_error`, `run.provider_unavailable`): mirrors `PROVIDER_ERRORS` in the engine. */
-const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_account", "run.provider_unavailable"]);
-
 /**
  * A work's end posted home after its AI provider failed (`meta.workEnd`): Continuar goes on from there, once (ADR 0121).
  * Null for any other message or once it was continued.
  */
 export function workContinuable(meta: Record<string, unknown> | undefined): { continuedRunId: string | null } | null {
-  const end = meta?.workEnd as { status?: unknown; errorCode?: unknown; continuedRunId?: unknown } | undefined;
-  if (end?.status !== "failed" || typeof end.errorCode !== "string" || !PROVIDER_ERRORS.has(end.errorCode)) return null;
+  const end = meta?.workEnd as
+    | { status?: unknown; errorCode?: unknown; errorParams?: { provider?: unknown }; continuedRunId?: unknown }
+    | undefined;
+  if (end?.status !== "failed" || typeof end.errorCode !== "string") return null;
+  // `run.our_error` with a provider: it failed there on the server's own key (`providerFailure` in the engine).
+  if (!end.errorCode.startsWith("run.provider_") && !(end.errorCode === "run.our_error" && end.errorParams?.provider))
+    return null;
   return { continuedRunId: typeof end.continuedRunId === "string" ? end.continuedRunId : null };
 }
 

@@ -2,6 +2,7 @@ import type { Agent, Memory, MemoryKind } from "@agenteschat/client";
 import { useMemory, useMemoryAction, useProposals } from "@agenteschat/client";
 import { daysBetween, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import {
   Button,
   Chip,
@@ -23,10 +24,12 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
-import { LoadingPage } from "@/components/Loading";
+import { ErrorState, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 
 export type MemoryTab = "known" | "lessons" | "archived";
 
@@ -99,6 +102,48 @@ export function MemoryPage({ agentId }: { agentId: string }) {
   return <MemoryView agent={agent} />;
 }
 
+/**
+ * Nothing to show of an agent's memory: its own face and a way to teach it when it holds `none` at all, a way out of
+ * the search, or one line for a tab with nothing in it while the others have.
+ */
+export function NoMemories({
+  agent,
+  q,
+  none,
+  onClear,
+}: {
+  agent: Agent;
+  q: string;
+  none: boolean;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  if (q.trim())
+    return (
+      <EmptyState
+        size="inline"
+        actions={
+          <Button size="sm" onClick={onClear}>
+            {t("filters.clearSearch")}
+          </Button>
+        }
+      >
+        {t("memory.emptySearch", { q })}
+      </EmptyState>
+    );
+  if (!none) return <EmptyState size="inline">{t("memory.emptyTab")}</EmptyState>;
+  return (
+    <EmptyState
+      size="panel"
+      agent={lookOf(agent) ?? true}
+      title={t("memory.emptyTitle", { name: agent.name })}
+      actions={<AskAgentButton agent={agent} variant="primary" />}
+    >
+      {t("memory.emptyText")}
+    </EmptyState>
+  );
+}
+
 function MemoryView({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -164,7 +209,11 @@ function MemoryView({ agent }: { agent: Agent }) {
 
       <List role="tabpanel" aria-label={t(`memory.tabs.${tab}`)}>
         {items.map((m) => (
-          <article key={m.id} className="memory-item" aria-label={`${t(`memory.kinds.${m.kind}`)}: ${m.text}`}>
+          <article
+            key={m.id}
+            className="memory-item"
+            aria-label={`${t(`memory.kinds.${m.kind}`)}: ${memoryLine(t, m)}`}
+          >
             <div className="row">
               <Chip icon={KIND_ICON[m.kind]}>{t(`memory.kinds.${m.kind}`)}</Chip>
               {m.pinned && <Chip icon="pin">{t("memory.pinned")}</Chip>}
@@ -184,7 +233,7 @@ function MemoryView({ agent }: { agent: Agent }) {
               )}
               <span className="memory-item__used">{usageLabel(t, m)}</span>
             </div>
-            <p className="memory-item__text">{m.text}</p>
+            <p className="memory-item__text">{memoryLine(t, m)}</p>
             {m.supersedes && (
               <p className="small muted" style={{ margin: 0 }}>
                 {t("memory.supersedes")} <span className="struck">{m.supersedes}</span>
@@ -219,10 +268,9 @@ function MemoryView({ agent }: { agent: Agent }) {
             </div>
           </article>
         ))}
+        {memory.isError && !memory.data && <ErrorState error={memory.error} onRetry={() => void memory.refetch()} />}
         {memory.isSuccess && items.length === 0 && (
-          <p className="muted" style={{ margin: 0, padding: "32px 16px", textAlign: "center" }}>
-            {q.trim() ? t("memory.emptySearch", { q }) : t("memory.empty", g)}
-          </p>
+          <NoMemories agent={agent} q={q} none={all.length === 0} onClear={() => setQ("")} />
         )}
       </List>
       <p className="page__note">

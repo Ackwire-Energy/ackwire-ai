@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedFooter, GroupedHeader, useTheme, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, Locked, useTheme, useToast } from "@/ui";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
@@ -70,21 +70,23 @@ function NewBoard() {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
-        <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
-        <TextArea
-          value={title}
-          onChangeText={setTitle}
-          placeholder={t("dashboards.create.namePlaceholder")}
-          accessibilityLabel={t("dashboards.create.name")}
-          multiline={false}
-          minHeight={50}
-          maxLength={TITLE_MAX}
-          returnKeyType="done"
-          autoFocus
-        />
-        <GroupedFooter>{t("dashboards.create.askHint")}</GroupedFooter>
+        <Locked when={create.isPending}>
+          <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
+          <TextArea
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t("dashboards.create.namePlaceholder")}
+            accessibilityLabel={t("dashboards.create.name")}
+            multiline={false}
+            minHeight={50}
+            maxLength={TITLE_MAX}
+            returnKeyType="done"
+            autoFocus
+          />
+          <GroupedFooter>{t("dashboards.create.askHint")}</GroupedFooter>
 
-        <AudienceFields draft={draft} onChange={setDraft} members={members.data?.length ?? 0} />
+          <AudienceFields draft={draft} onChange={setDraft} members={members.data?.length ?? 0} />
+        </Locked>
       </ScrollView>
     </View>
   );

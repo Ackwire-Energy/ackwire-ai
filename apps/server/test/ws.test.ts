@@ -290,8 +290,6 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "agent.run",
     "agent.typing",
     "agent.delta",
-    "agent.delta",
-    "agent.delta",
     "message.created",
     "agent.run",
     "agent.idle",
@@ -307,7 +305,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
       .map((e) => e.text)
       .join(""),
   ).toBe("Hello there");
-  const reply = events[10] as {
+  const reply = events[8] as {
     message: { body: string; threadId: string | null; author: { type: string; id: string } };
   };
   // Asked in the channel, answered in the channel.
@@ -318,6 +316,43 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   });
   expect(await t.adapters.presence.online(orgId)).toHaveLength(1);
   c.ws.close();
+});
+
+test("someone taken off a task's list loses its conversation's socket at once", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const anaId = (await meId(ana)) ?? "";
+  const ownerId = (await meId(owner)) ?? "";
+  const api = `/api/app/organizations/${orgId}/issues`;
+  const issue = (await (
+    await owner(api, { json: { title: "Plano", audience: { mode: "people", userIds: [ownerId, anaId] } } })
+  ).json()) as { id: string };
+  const { channelId } = (await (await ana(`${api}/${issue.id}/conversation`, { method: "POST", json: {} })).json()) as {
+    channelId: string;
+  };
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  a.send({ type: "subscribe", channelId });
+  await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const changed = await owner(`${api}/${issue.id}/audience`, {
+    method: "PUT",
+    json: { mode: "people", userIds: [ownerId] },
+  });
+  expect(changed.status).toBe(200);
+  expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId)).toEqual({
+    type: "unsubscribed",
+    channelId,
+    reason: "revoked",
+  });
+  a.ws.close();
 });
 
 test("membership changes drop live subscriptions at once (channel, then organization)", async () => {
@@ -461,4 +496,44 @@ test("a new message reaches the other members' sockets as `channel.activity` (no
   expect(a.frames.some((f) => (f.event as { threadId?: string } | undefined)?.threadId === root.id)).toBe(false);
   a.ws.close();
   o.ws.close();
+});
+
+test("a socket subscribed to no channel hears of the agents and channels the workspace makes, ids left out", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  await c.next((f) => f.type === "ready");
+  const heard = (type: string) => c.next((f) => (f.event as { type?: string } | undefined)?.type === type);
+
+  const made = await owner(`/api/app/organizations/${orgId}/channels`, { json: { name: "vendas" } });
+  expect(made.status).toBe(201);
+  const channel = await heard("channels.changed");
+  expect(channel).toEqual({ type: "event", scope: "org", event: { type: "channels.changed" } });
+
+  const agent = await owner(`/api/app/organizations/${orgId}/agents/${agentId}`, {
+    method: "PATCH",
+    json: { appearance: { color: "violet", eyes: "round", accessory: "headset" } },
+  });
+  expect(agent.status).toBe(200);
+  expect(await heard("agents.changed")).toEqual({ type: "event", scope: "org", event: { type: "agents.changed" } });
+
+  c.frames.length = 0;
+  const brain = await owner(`/api/app/organizations/${orgId}/agents/${agentId}/brain`, {
+    method: "PUT",
+    json: { fallback: false },
+  });
+  expect(brain.status).toBe(200);
+  expect(await heard("agents.changed")).toEqual({ type: "event", scope: "org", event: { type: "agents.changed" } });
+
+  c.frames.length = 0;
+  const dm = await owner(`/api/app/organizations/${orgId}/dms`, { json: { agentId } });
+  expect(dm.status).toBe(200);
+  expect(await heard("channels.changed")).toEqual({
+    type: "event",
+    scope: "user",
+    event: { type: "channels.changed" },
+  });
+  c.ws.close();
 });

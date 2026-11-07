@@ -15,6 +15,7 @@ import {
   accountSaved,
   agentAccounts,
   existingRows,
+  flowBack,
   modelInput,
   modelRows,
   modelSections,
@@ -214,6 +215,15 @@ describe("the agent's AI", () => {
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
   });
 
+  test("under a hold, Uso's empty plans card says what comes first and invites no plan", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const usage = await Bun.file(new URL("../../src/features/usage/UsageScreen.tsx", import.meta.url).pathname).text();
+    expect(usage).toContain("usePlanHold(orgId, org)");
+    expect(usage.indexOf("<PlanHoldNote")).toBeGreaterThan(-1);
+    expect(usage.indexOf("<PlanHoldNote")).toBeLessThan(usage.indexOf('place="ai"'));
+    expect(usage).toContain("data.accounts.length === 0 && hold ?");
+  });
+
   test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
@@ -401,6 +411,17 @@ describe("the agent's AI", () => {
     expect(home.indexOf('t("connectAi.have.title")')).toBeGreaterThan(-1);
     expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.yourPlan")'));
     expect(home).toContain("<AiRow");
+    // A plan or a key, one row each; whose is one searched list, the plan's page and the key's steps as before.
+    expect(home).toContain('onView({ page: "plans" })');
+    expect(home).toContain('onView({ page: "key" })');
+    const plans = connect.slice(connect.indexOf("function Plans("), connect.indexOf("function Makers("));
+    expect(plans).toContain("<PickList");
+    expect(plans).toContain("options={PLAN_CHOICES.map(");
+    expect(plans).toContain('onView({ page: "plan", choice: o.value })');
+    const makers = connect.slice(connect.indexOf("function Makers("));
+    expect(makers).toContain("<PickList");
+    expect(makers).toContain("...PROVIDERS.map(");
+    expect(connect.slice(connect.indexOf("function KeyPage("))).toContain("onPress={onMakers}");
     expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name)");
     // The workspace's keys only in Connect an AI (a sheet), as on the web: the first run's saved key already serves
     // every agent with no plan.
@@ -467,9 +488,12 @@ describe("the agent's AI", () => {
     );
     expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock">\s*\{t\("connectAi\.accountsLocked", \{/);
     expect(grouped).toContain("if (items.length === 0) return null;");
-    // The card's mark sits on the first line of its title, which wraps to two or three on a phone.
-    expect(card).toContain('<LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16}');
-    expect(card).toContain('top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },');
+    // Still waiting, a waiting pill (its sentence wraps to two or three lines on a phone): the breathing mark and
+    // Connect tinted for who may connect, a quiet bolt and who can for anyone else.
+    expect(card).toContain(
+      '<AskWaiting forMe={action !== null} mark="bolt" words={title} actions={action} below={action ? null : locked} />',
+    );
+    expect(card).not.toContain("<Button");
     // "Ada's page": its Conectar opens on the plan she thinks with (`agentPlan`), ChatGPT for Codex.
     expect(profile).toContain("openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })");
     // A plan's page asks the computers for their own sign-ins again: Codex's is known by a usage read with it.
@@ -768,8 +792,10 @@ describe("the agent's AI", () => {
     expect(flow).not.toContain("status.isError");
     expect(flow).toMatch(/read === "reconnecting" \? t\("agentPage\.work\.brain\.add\.reconnecting"\)/);
     // Past the wait, the computer that didn't answer; what the computer says still shows at once.
-    expect(flow).toContain('const noAnswer = startFailed || read === "noAnswer";');
-    expect(flow).toMatch(/: noAnswer\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/);
+    expect(flow).toContain('const noAnswer = startFailed !== null || read === "noAnswer";');
+    expect(flow).toMatch(
+      /: noAnswer\s*\?\s*\(startFailed \?\? t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)\)/,
+    );
     expect(flow).toContain('result?.state === "failed" || result?.state === "expired"');
     // Its computer offline mid-sign-in: the steps stay, with no offline card or key over them, and nothing restarts.
     expect(connect).toContain(
@@ -994,5 +1020,32 @@ describe("Seus planos' rows", () => {
     const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
     expect(row).toContain("padding: 14,");
     expect(row).not.toContain("paddingVertical");
+  });
+});
+
+describe("Back in Connect an AI", () => {
+  test("a plan picked from the list goes back to the list, a sign-in from a row of what the person has to that row", () => {
+    const plan = { page: "plan", choice: "chatgpt" } as const;
+    expect(flowBack(plan, false)).toEqual({ page: "plans" });
+    expect(flowBack(plan, true)).toEqual({ page: "home" });
+    expect(flowBack({ page: "plans" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
+    expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
+    expect(flowBack({ page: "home" }, false)).toBeNull();
+  });
+});
+
+describe("Outro provedor on the phone", () => {
+  test("the API under a header across the width, Buscar modelos on the add line's header, + in the field, × per model", async () => {
+    // The screen is a component the tests can't render: what it wires in, as text.
+    const form = await Bun.file(new URL("../../src/features/ai/EndpointForm.tsx", import.meta.url).pathname).text();
+    expect(form).toContain('<GroupedHeader>{t("endpoint.style")}</GroupedHeader>');
+    expect(form).toContain('wide="fit"');
+    expect(form.indexOf('t("endpoint.style")')).toBeLessThan(form.indexOf('t("endpoint.address")'));
+    expect(form).toMatch(
+      /<GroupedHeader\s+aside=\{\s*<Button\s+variant="text"\s+size="sm"\s+label=\{t\("endpoint\.fetch"\)\}/,
+    );
+    expect(form).toContain('<IconButton icon="plus" label={t("endpoint.add")}');
+    expect(form).toContain("withoutModel(d, m.id)");
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { AiAccounts, AiComputer } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -76,19 +77,15 @@ describe("Contas de IA", () => {
   test("never blank: with no plan yet, one way to connect one, the same picker as everywhere", async () => {
     await page([]);
     const plans = screen().getByRole("region", { name: "Seus planos" });
-    // Its title and ⓘ (what a plan is for and where it stays), Connect, the empty line: nothing else to read.
+    // Its title and ⓘ (what a plan is for and where it stays), what a plan gives and the one way to connect it.
     expect(hintOf("Seus planos", plans).text).toBe(
       "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O agentes.chat guarda só o nome, o email e o uso.",
     );
-    expect(shownText(plans)).toBe("Seus planosConectar uma IANenhum plano ainda.");
-    // Its action in its head, the way Provider keys has Add key: the same kind of button in the same place.
+    expect(shownText(plans)).toBe(
+      "Seus planosUse o plano de IA que você já pagaEntre com sua conta e os agentes pensam com ela.Conectar uma IA",
+    );
     const connect = within(plans).getByRole("button", { name: "Conectar uma IA" });
-    const add = within(screen().getByRole("region", { name: "Chaves de provedor" })).getByRole("button", {
-      name: "Adicionar chave",
-    });
-    expect(connect.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Seus planos");
-    expect(add.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
-    expect(connect.className).toBe(add.className);
+    expect(connect.closest(".ac-empty__actions")).not.toBeNull();
     await act(async () => fireEvent.click(connect));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
@@ -116,6 +113,14 @@ describe("Contas de IA", () => {
     await page([WORK]);
     expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
+  });
+
+  test("a signed-out account its computer couldn't check says so, and still signs in again", async () => {
+    const { rows } = await page([{ ...WORK, status: "signed_out" as const, statusKnown: false }]);
+    const row = rows()[0] as HTMLElement;
+    expect(row.textContent).toContain("O computador não conseguiu confirmar o login desta vez.");
+    expect(row.textContent).not.toContain("Saiu da conta.");
+    expect(within(row).getByRole("button", { name: "Entrar de novo" })).toBeTruthy();
   });
 
   test("Sign in again: the account's own email goes to Claude's sign-in unseen; another account coming back is said, with Try again only", async () => {
@@ -146,6 +151,37 @@ describe("Contas de IA", () => {
     // No agent here to think with the one that came back: nothing to use it for.
     expect(within(dialog).queryByRole("button", { name: /^Usar / })).toBeNull();
     expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
+  test("a sign-in the server refuses says why, not that the computer didn't answer; one it can't explain still does", async () => {
+    const out = { ...WORK, status: "signed_out" as const };
+    const { api, rows } = await page([out]);
+    api.machines.beginAccountLogin = async () => {
+      throw new ApiError(409, "account.method_unsupported", "This computer can't connect Claude this way yet.");
+    };
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Entrar de novo" }));
+    const dialog = screen().getByRole("dialog", { name: "Trabalho" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    const signIn = async () => {
+      await click(within(dialog).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    };
+    try {
+      await signIn();
+      expect(shownText(dialog)).toContain(
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
+      );
+      expect(shownText(dialog)).not.toContain("não respondeu");
+      api.machines.beginAccountLogin = async () => {
+        throw new ApiError(409, "account.runner_old", "The runner on MacBook is too old for accounts. Update it.");
+      };
+      await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+      await signIn();
+      expect(shownText(dialog)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    } finally {
+      window.open = realOpen;
+    }
   });
 
   test("disconnecting names the agent that thinks with it; renaming saves the new name", async () => {

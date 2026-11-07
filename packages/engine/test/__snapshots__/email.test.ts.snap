@@ -2840,7 +2840,7 @@ a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important
 </td></tr>
 <tr><td class="card" style="background:#ffffff;border:1px solid #e3e3e3;border-radius:16px;padding:32px">
 <h1 class="h1 ink" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:#151514">Seu código</h1>
-<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">Digite este código para apagar a conta inteira <b class="ink" style="font-weight:600;color:#151514">ana@ padariasouza. com. br</b>, não só um workspace. Ela some na hora, e os workspaces em que só você está fecham <span style="display:inline-block">com ela.</span></p>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">Digite este código para apagar a conta inteira <b class="ink" style="font-weight:600;color:#151514">ana@ padariasouza. com. br</b>, não só um workspace. Ela sai de todos os aparelhos na hora e é apagada de vez 7 dias depois, e os workspaces em que só você está fecham <span style="display:inline-block">com ela.</span></p>
 <table width="100%" class="well" role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:#f3f3f0;border-radius:12px;margin:0 0 20px"><tr>
 <td class="ink" align="center" style="padding:16px 16px 16px 24px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:32px;line-height:40px;font-weight:700;letter-spacing:8px;font-variant-numeric:tabular-nums;color:#151514;text-align:center">482913</td></tr></table>
 <p class="mu" style="margin:0 0 2px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:14px;line-height:20px;color:#5c5c58">Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e avise quem cuida <span style="display:inline-block">deste servidor.</span></p>
@@ -3839,6 +3839,251 @@ a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important
 <tr><td style="padding:24px 0 0"><img class="sky" src="https://x.test/email/sky-band.png" width="552" height="27" alt="" style="display:block;border:0;outline:none;width:552px;max-width:100%;height:auto"></td></tr>
 <tr><td style="padding:16px 0 40px">
 <p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Você recebeu este e-mail porque alguém na Padaria Souza conectou o seu plano a <span style="display:inline-block">um agente.</span></p>
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Enviado pelo servidor do agentes.chat <span style="display:inline-block">em x.test.</span></p>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</div>
+</body>
+</html>"
+`;
+
+exports[`every email, in both languages account_deleting.en: snapshot 1`] = `
+"<!doctype html>
+<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light dark">
+<title>Your agentes.chat account will be deleted on November 6, 2026</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>body,table,td,p,a,span,b,h1,h2{font-family:'Segoe UI',Arial,sans-serif!important}</style><![endif]-->
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+body{margin:0!important;padding:0!important;width:100%!important}
+a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
+@media (max-width:620px){.px{padding-left:16px!important;padding-right:16px!important}.card{padding:24px 20px!important}.h1{font-size:22px!important;line-height:28px!important}.sky{width:100%!important;height:auto!important}}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.bg{background:#0f0f0e!important}.card{background:#1c1c1b!important;border-color:#3e3e3d!important}.ink{color:#efefec!important}.tx{color:#d6d6d2!important}.mu{color:#a3a39e!important}.fa{color:#8f8f89!important}.well{background:#0a0a09!important}.wh{border-color:#232322!important}.num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}.btn{background:#efefec!important;color:#0f0f0e!important}.btn span{color:#0f0f0e!important}.ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}.avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}.warn{background:#33260e!important}.warn-t{color:#e0a84a!important}.ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}.ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}.end-btn{margin-bottom:4px!important}.logo-ink{display:none!important}.logo-bone{display:block!important}}
+</style>
+<style>
+[data-ogsc] .bg{background:#0f0f0e!important}[data-ogsb] .bg{background:#0f0f0e!important}
+[data-ogsc] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}[data-ogsb] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}
+[data-ogsc] .ink{color:#efefec!important}[data-ogsb] .ink{color:#efefec!important}
+[data-ogsc] .tx{color:#d6d6d2!important}[data-ogsb] .tx{color:#d6d6d2!important}
+[data-ogsc] .mu{color:#a3a39e!important}[data-ogsb] .mu{color:#a3a39e!important}
+[data-ogsc] .fa{color:#8f8f89!important}[data-ogsb] .fa{color:#8f8f89!important}
+[data-ogsc] .well{background:#0a0a09!important}[data-ogsb] .well{background:#0a0a09!important}
+[data-ogsc] .wh{border-color:#232322!important}[data-ogsb] .wh{border-color:#232322!important}
+[data-ogsc] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}[data-ogsb] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}
+[data-ogsc] .btn{background:#efefec!important;color:#0f0f0e!important}[data-ogsb] .btn{background:#efefec!important;color:#0f0f0e!important}
+[data-ogsc] .btn span{color:#0f0f0e!important}[data-ogsb] .btn span{color:#0f0f0e!important}
+[data-ogsc] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}[data-ogsb] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}
+[data-ogsc] .warn{background:#33260e!important}[data-ogsb] .warn{background:#33260e!important}
+[data-ogsc] .warn-t{color:#e0a84a!important}[data-ogsb] .warn-t{color:#e0a84a!important}
+[data-ogsc] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .end-btn{margin-bottom:4px!important}[data-ogsb] .end-btn{margin-bottom:4px!important}
+[data-ogsc] .logo-ink{display:none!important}[data-ogsb] .logo-ink{display:none!important}
+[data-ogsc] .logo-bone{display:block!important}[data-ogsb] .logo-bone{display:block!important}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#c7c7c4 0%,#efefec 100%)!important}}
+</style>
+<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('https://x.test/email/source-sans-3-latin.woff2') format('woff2')}</style><!--<![endif]-->
+</head>
+<body class="body bg" style="margin:0;padding:0;width:100%;background:#fbfbfa;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all">You have 7 days to change your mind.&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;</div>
+<div role="article" aria-roledescription="email" aria-label="Your agentes.chat account will be deleted on November 6, 2026" lang="en" dir="ltr">
+<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fbfbfa">
+<tr><td align="center" class="px" style="padding:0 24px">
+<!--[if mso]><table role="presentation" width="552" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:552px;margin:0 auto">
+<tr><td style="padding:32px 0 20px">
+<a href="https://x.test" target="_blank" style="display:inline-block;text-decoration:none">
+<img class="logo-ink" src="https://x.test/email/logo-ink.png" width="173" height="36" alt="agentes.chat" style="display:block;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#151514">
+<!--[if !mso]><!--><img class="logo-bone" src="https://x.test/email/logo-bone.png" width="173" height="36" alt="agentes.chat" style="display:none;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#efefec"><!--<![endif]-->
+</a>
+</td></tr>
+<tr><td class="card" style="background:#ffffff;border:1px solid #e3e3e3;border-radius:16px;padding:32px">
+<h1 class="h1 ink" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:#151514">Your account is <span style="display:inline-block">being deleted</span></h1>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">We will delete the account <b class="ink" style="font-weight:600;color:#151514">ana@ souzabakery. com</b> on November 6, 2026 at 1:42 PM EST. It&#39;s signed out everywhere, and nobody can reach you here until <span style="display:inline-block">you&#39;re back.</span></p>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">The workspace only you were in closed now and goes on the same date: <span style="display:inline-block"><b class="ink" style="font-weight:600;color:#151514">Souza Bakery</b>.</span></p>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">Changed your mind? Sign in before that date and <span style="display:inline-block">press Restore.</span></p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr><td><a class="btn" href="https://agentes.chat" target="_blank" style="display:inline-block;background-color:#151514;background:#151514 linear-gradient(180deg,#3e3e3d 0%,#151514 100%);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45);color:#fbfbfa;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:at-least;font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px;mso-padding-alt:0;text-underline-color:#151514"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:#fbfbfa">Sign in to restore</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a></td></tr></table>
+<p class="mu" style="margin:0 0 2px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:14px;line-height:20px;color:#5c5c58">If it wasn&#39;t you, write <span style="display:inline-block">to <a class="ln-m" href="mailto:help@agentes.chat" style="color:#5c5c58;text-decoration:underline;text-decoration-color:#e3e3e3;text-underline-offset:3px">help@agentes.chat</a>.</span></p>
+</td></tr>
+<tr><td style="padding:24px 0 0"><img class="sky" src="https://x.test/email/sky-band.png" width="552" height="27" alt="" style="display:block;border:0;outline:none;width:552px;max-width:100%;height:auto"></td></tr>
+<tr><td style="padding:16px 0 40px">
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">You got this email because this address has an account <span style="display:inline-block">on agentes.chat.</span></p>
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Sent by the agentes.chat server <span style="display:inline-block">at x.test.</span></p>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</div>
+</body>
+</html>"
+`;
+
+exports[`every email, in both languages account_deleting.pt-BR: snapshot 1`] = `
+"<!doctype html>
+<html lang="pt-BR" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light dark">
+<title>Sua conta do agentes.chat vai ser apagada em 6 de novembro de 2026</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>body,table,td,p,a,span,b,h1,h2{font-family:'Segoe UI',Arial,sans-serif!important}</style><![endif]-->
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+body{margin:0!important;padding:0!important;width:100%!important}
+a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
+@media (max-width:620px){.px{padding-left:16px!important;padding-right:16px!important}.card{padding:24px 20px!important}.h1{font-size:22px!important;line-height:28px!important}.sky{width:100%!important;height:auto!important}}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.bg{background:#0f0f0e!important}.card{background:#1c1c1b!important;border-color:#3e3e3d!important}.ink{color:#efefec!important}.tx{color:#d6d6d2!important}.mu{color:#a3a39e!important}.fa{color:#8f8f89!important}.well{background:#0a0a09!important}.wh{border-color:#232322!important}.num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}.btn{background:#efefec!important;color:#0f0f0e!important}.btn span{color:#0f0f0e!important}.ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}.avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}.warn{background:#33260e!important}.warn-t{color:#e0a84a!important}.ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}.ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}.end-btn{margin-bottom:4px!important}.logo-ink{display:none!important}.logo-bone{display:block!important}}
+</style>
+<style>
+[data-ogsc] .bg{background:#0f0f0e!important}[data-ogsb] .bg{background:#0f0f0e!important}
+[data-ogsc] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}[data-ogsb] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}
+[data-ogsc] .ink{color:#efefec!important}[data-ogsb] .ink{color:#efefec!important}
+[data-ogsc] .tx{color:#d6d6d2!important}[data-ogsb] .tx{color:#d6d6d2!important}
+[data-ogsc] .mu{color:#a3a39e!important}[data-ogsb] .mu{color:#a3a39e!important}
+[data-ogsc] .fa{color:#8f8f89!important}[data-ogsb] .fa{color:#8f8f89!important}
+[data-ogsc] .well{background:#0a0a09!important}[data-ogsb] .well{background:#0a0a09!important}
+[data-ogsc] .wh{border-color:#232322!important}[data-ogsb] .wh{border-color:#232322!important}
+[data-ogsc] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}[data-ogsb] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}
+[data-ogsc] .btn{background:#efefec!important;color:#0f0f0e!important}[data-ogsb] .btn{background:#efefec!important;color:#0f0f0e!important}
+[data-ogsc] .btn span{color:#0f0f0e!important}[data-ogsb] .btn span{color:#0f0f0e!important}
+[data-ogsc] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}[data-ogsb] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}
+[data-ogsc] .warn{background:#33260e!important}[data-ogsb] .warn{background:#33260e!important}
+[data-ogsc] .warn-t{color:#e0a84a!important}[data-ogsb] .warn-t{color:#e0a84a!important}
+[data-ogsc] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .end-btn{margin-bottom:4px!important}[data-ogsb] .end-btn{margin-bottom:4px!important}
+[data-ogsc] .logo-ink{display:none!important}[data-ogsb] .logo-ink{display:none!important}
+[data-ogsc] .logo-bone{display:block!important}[data-ogsb] .logo-bone{display:block!important}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#c7c7c4 0%,#efefec 100%)!important}}
+</style>
+<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('https://x.test/email/source-sans-3-latin.woff2') format('woff2')}</style><!--<![endif]-->
+</head>
+<body class="body bg" style="margin:0;padding:0;width:100%;background:#fbfbfa;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all">Você tem 7 dias para mudar de ideia.&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;</div>
+<div role="article" aria-roledescription="email" aria-label="Sua conta do agentes.chat vai ser apagada em 6 de novembro de 2026" lang="pt-BR" dir="ltr">
+<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fbfbfa">
+<tr><td align="center" class="px" style="padding:0 24px">
+<!--[if mso]><table role="presentation" width="552" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:552px;margin:0 auto">
+<tr><td style="padding:32px 0 20px">
+<a href="https://x.test" target="_blank" style="display:inline-block;text-decoration:none">
+<img class="logo-ink" src="https://x.test/email/logo-ink.png" width="173" height="36" alt="agentes.chat" style="display:block;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#151514">
+<!--[if !mso]><!--><img class="logo-bone" src="https://x.test/email/logo-bone.png" width="173" height="36" alt="agentes.chat" style="display:none;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#efefec"><!--<![endif]-->
+</a>
+</td></tr>
+<tr><td class="card" style="background:#ffffff;border:1px solid #e3e3e3;border-radius:16px;padding:32px">
+<h1 class="h1 ink" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:#151514">Sua conta está <span style="display:inline-block">sendo apagada</span></h1>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">Vamos apagar a conta <b class="ink" style="font-weight:600;color:#151514">ana@ souzabakery. com</b> em 6 de novembro de 2026 às 15:42 BRT. Ela saiu de todos os aparelhos, e ninguém fala com você aqui até <span style="display:inline-block">você voltar.</span></p>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">Mudou de ideia? Entre antes dessa data e <span style="display:inline-block">aperte Restaurar.</span></p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr><td><a class="btn" href="https://agentes.chat" target="_blank" style="display:inline-block;background-color:#151514;background:#151514 linear-gradient(180deg,#3e3e3d 0%,#151514 100%);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45);color:#fbfbfa;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:at-least;font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px;mso-padding-alt:0;text-underline-color:#151514"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:#fbfbfa">Entrar para restaurar</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a></td></tr></table>
+<p class="mu" style="margin:0 0 2px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:14px;line-height:20px;color:#5c5c58">Se não foi você, avise quem cuida <span style="display:inline-block">deste servidor.</span></p>
+</td></tr>
+<tr><td style="padding:24px 0 0"><img class="sky" src="https://x.test/email/sky-band.png" width="552" height="27" alt="" style="display:block;border:0;outline:none;width:552px;max-width:100%;height:auto"></td></tr>
+<tr><td style="padding:16px 0 40px">
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Você recebeu este e-mail porque este endereço tem uma conta <span style="display:inline-block">no agentes.chat.</span></p>
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Enviado pelo servidor do agentes.chat <span style="display:inline-block">em x.test.</span></p>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</div>
+</body>
+</html>"
+`;
+
+exports[`every email, in both languages plan_waiting.pt-BR: snapshot 1`] = `
+"<!doctype html>
+<html lang="pt-BR" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light dark">
+<title>Seu time está esperando</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>body,table,td,p,a,span,b,h1,h2{font-family:'Segoe UI',Arial,sans-serif!important}</style><![endif]-->
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+body{margin:0!important;padding:0!important;width:100%!important}
+a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
+@media (max-width:620px){.px{padding-left:16px!important;padding-right:16px!important}.card{padding:24px 20px!important}.h1{font-size:22px!important;line-height:28px!important}.sky{width:100%!important;height:auto!important}}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.bg{background:#0f0f0e!important}.card{background:#1c1c1b!important;border-color:#3e3e3d!important}.ink{color:#efefec!important}.tx{color:#d6d6d2!important}.mu{color:#a3a39e!important}.fa{color:#8f8f89!important}.well{background:#0a0a09!important}.wh{border-color:#232322!important}.num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}.btn{background:#efefec!important;color:#0f0f0e!important}.btn span{color:#0f0f0e!important}.ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}.avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}.warn{background:#33260e!important}.warn-t{color:#e0a84a!important}.ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}.ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}.end-btn{margin-bottom:4px!important}.logo-ink{display:none!important}.logo-bone{display:block!important}}
+</style>
+<style>
+[data-ogsc] .bg{background:#0f0f0e!important}[data-ogsb] .bg{background:#0f0f0e!important}
+[data-ogsc] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}[data-ogsb] .card{background:#1c1c1b!important;border-color:#3e3e3d!important}
+[data-ogsc] .ink{color:#efefec!important}[data-ogsb] .ink{color:#efefec!important}
+[data-ogsc] .tx{color:#d6d6d2!important}[data-ogsb] .tx{color:#d6d6d2!important}
+[data-ogsc] .mu{color:#a3a39e!important}[data-ogsb] .mu{color:#a3a39e!important}
+[data-ogsc] .fa{color:#8f8f89!important}[data-ogsb] .fa{color:#8f8f89!important}
+[data-ogsc] .well{background:#0a0a09!important}[data-ogsb] .well{background:#0a0a09!important}
+[data-ogsc] .wh{border-color:#232322!important}[data-ogsb] .wh{border-color:#232322!important}
+[data-ogsc] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}[data-ogsb] .num{background:#1c1c1b!important;border-color:#3e3e3d!important;color:#a3a39e!important}
+[data-ogsc] .btn{background:#efefec!important;color:#0f0f0e!important}[data-ogsb] .btn{background:#efefec!important;color:#0f0f0e!important}
+[data-ogsc] .btn span{color:#0f0f0e!important}[data-ogsb] .btn span{color:#0f0f0e!important}
+[data-ogsc] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln{color:#efefec!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}[data-ogsb] .avp{background:#0a0a09!important;color:#d6d6d2!important;border-color:#3e3e3d!important}
+[data-ogsc] .warn{background:#33260e!important}[data-ogsb] .warn{background:#33260e!important}
+[data-ogsc] .warn-t{color:#e0a84a!important}[data-ogsb] .warn-t{color:#e0a84a!important}
+[data-ogsc] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-d{color:#f08a80!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}[data-ogsb] .ln-m{color:#a3a39e!important;text-decoration-color:#3e3e3d!important}
+[data-ogsc] .end-btn{margin-bottom:4px!important}[data-ogsb] .end-btn{margin-bottom:4px!important}
+[data-ogsc] .logo-ink{display:none!important}[data-ogsb] .logo-ink{display:none!important}
+[data-ogsc] .logo-bone{display:block!important}[data-ogsb] .logo-bone{display:block!important}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#c7c7c4 0%,#efefec 100%)!important}}
+</style>
+<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('https://x.test/email/source-sans-3-latin.woff2') format('woff2')}</style><!--<![endif]-->
+</head>
+<body class="body bg" style="margin:0;padding:0;width:100%;background:#fbfbfa;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all">Seu workspace está pronto. Falta um plano do agentes.chat para ele começar.&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;</div>
+<div role="article" aria-roledescription="email" aria-label="Seu time está esperando" lang="pt-BR" dir="ltr">
+<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fbfbfa">
+<tr><td align="center" class="px" style="padding:0 24px">
+<!--[if mso]><table role="presentation" width="552" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:552px;margin:0 auto">
+<tr><td style="padding:32px 0 20px">
+<a href="https://x.test" target="_blank" style="display:inline-block;text-decoration:none">
+<img class="logo-ink" src="https://x.test/email/logo-ink.png" width="173" height="36" alt="agentes.chat" style="display:block;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#151514">
+<!--[if !mso]><!--><img class="logo-bone" src="https://x.test/email/logo-bone.png" width="173" height="36" alt="agentes.chat" style="display:none;border:0;outline:none;width:173px;height:36px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:20px;font-weight:600;line-height:36px;color:#efefec"><!--<![endif]-->
+</a>
+</td></tr>
+<tr><td class="card" style="background:#ffffff;border:1px solid #e3e3e3;border-radius:16px;padding:32px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px"><tr><td valign="bottom" style="padding:0 4px 0px 0px"><img src="https://x.test/email/agent-indigo-round-cap.png" width="36" height="46" alt="" style="display:block;border:0;outline:none;width:36px;height:46px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:11px;line-height:14px;color:#5c5c58"></td><td valign="bottom" style="padding:0 4px 0px 0px"><img src="https://x.test/email/agent-green-wide-headphones.png" width="36" height="46" alt="" style="display:block;border:0;outline:none;width:36px;height:46px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:11px;line-height:14px;color:#5c5c58"></td><td valign="bottom" style="padding:0 4px 0px 0px"><img src="https://x.test/email/agent-rose-dots-flower.png" width="36" height="46" alt="" style="display:block;border:0;outline:none;width:36px;height:46px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:11px;line-height:14px;color:#5c5c58"></td><td valign="bottom" style="padding:0 4px 0px 0px"><img src="https://x.test/email/agent-amber-round-antenna.png" width="36" height="46" alt="" style="display:block;border:0;outline:none;width:36px;height:46px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:11px;line-height:14px;color:#5c5c58"></td></tr></table><h1 class="h1 ink" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:#151514">Seu time <span style="display:inline-block">está esperando</span></h1>
+<p class="tx" style="margin:0 0 16px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:16px;line-height:24px;color:#2a2a28">4 agentes, 3 canais e 2 rotinas estão prontos. Falta um plano do agentes.chat para <span style="display:inline-block">eles começarem.</span></p>
+<table class="end-btn" role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 6px"><tr><td><a class="btn" href="https://agentes.chat/org/6f1d2c9a-58c1-4f7e-9d3b-2a7c1e0b9f44/settings/billing" target="_blank" style="display:inline-block;background-color:#151514;background:#151514 linear-gradient(180deg,#3e3e3d 0%,#151514 100%);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45);color:#fbfbfa;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:at-least;font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px;mso-padding-alt:0;text-underline-color:#151514"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:#fbfbfa">Ver planos do agentes.chat</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a></td></tr></table>
+</td></tr>
+<tr><td style="padding:24px 0 0"><img class="sky" src="https://x.test/email/sky-band.png" width="552" height="27" alt="" style="display:block;border:0;outline:none;width:552px;max-width:100%;height:auto"></td></tr>
+<tr><td style="padding:16px 0 40px">
+<p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Você recebeu este e-mail porque administra Padaria Souza no agentes.chat. São só dois avisos <span style="display:inline-block">como este.</span></p>
 <p class="fa" style="margin:0 0 6px;font-family:'Source Sans 3',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,'Hiragino Sans','PingFang SC','Microsoft YaHei','Apple SD Gothic Neo','Malgun Gothic',sans-serif;mso-line-height-rule:exactly;word-break:break-word;font-size:13px;line-height:19px;color:#6f6f6a">Enviado pelo servidor do agentes.chat <span style="display:inline-block">em x.test.</span></p>
 </td></tr>
 </table>

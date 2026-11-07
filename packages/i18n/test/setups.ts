@@ -89,6 +89,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // The computer step's plan offer: only where the workspace gets its own computer (`setupView`, as
     // `computerSetup.`) and waits for its first plan (ADR 0079).
     "onboarding.computer.payment.",
+    // The wall's line on what the plan brings: only on a billing hold, which only the Cloud has (`planHoldOf`).
+    "noAi.kept.plan",
   ],
   selfhost: [
     "auth.owner.",
@@ -106,7 +108,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "browser.live.noComputer",
     "computers.hostMissing",
     "computers.lead",
-    "connectAi.key.platform",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
     "machines.download.step2",
@@ -124,7 +125,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.computer.otherComputer",
     // A self-hosted server on a private host, which AI apps on the internet can't reach.
     "onboarding.import.aiApp.private",
-    "onboarding.platformKeyDesc",
     "openOnPhone.stepTailscale",
     "outage.dialog.none",
     "settings.platformAvailable",

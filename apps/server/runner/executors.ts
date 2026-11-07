@@ -45,6 +45,15 @@ const missing = (r: RunResult) =>
     r.status !== 0 &&
     /is not recognized as an internal or external command/i.test(r.stderr ?? ""));
 
+export const isExecutable = (file: string) => {
+  try {
+    accessSync(file, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * `command`'s full path on the current `process.env.PATH`, or the bare name. The app mode adopts the login
  * shell's PATH after start (`adoptLoginPath`); a compiled runner still looks commands up on the PATH it
@@ -59,10 +68,7 @@ export function resolveCommand(
   const dirs = pathList.split(delimiter).filter((dir) => dir && dir !== sharedBin);
   for (const dir of dirs) {
     const full = join(dir, command);
-    try {
-      accessSync(full, constants.X_OK);
-      return full;
-    } catch {}
+    if (isExecutable(full)) return full;
   }
   // A bare name would be looked up on the PATH again, shared `bin/` included: a path that isn't there fails the same.
   return sharedBin && dirs[0] ? join(dirs[0], command) : command;

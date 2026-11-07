@@ -4,6 +4,7 @@ import {
   BROWSER_PROTOCOL,
   type BrowserHandoffInfo,
   brainTopic,
+  CLAUDE_SHARED_PROTOCOL,
   type ErrorReporter,
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
@@ -51,6 +52,7 @@ import {
 import {
   assertNotPaused,
   authenticateMachine,
+  deletedAgentIds,
   getMachineById,
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
@@ -278,10 +280,14 @@ export interface MachineHubDeps {
  */
 export const BRAIN_IDLE_TIMEOUT_MS = 15 * 60_000;
 
-/** Default time a request may take: a command's own timeout plus slack; an upload 5.5 minutes; the rest 2 minutes. */
+/**
+ * Default time a request may take: a command's own timeout plus slack; an upload 5.5 minutes; a pull 10.5 (the
+ * runner's own limit is 10, and says why); the rest 2 minutes.
+ */
 export function requestTimeoutMs(request: MachineRequest) {
   if (request.op === "exec") return (request.timeoutSeconds + 30) * 1000;
   if (request.op === "push") return 330_000;
+  if (request.op === "pull") return 630_000;
   // A clone of a big repository on a slow link: its own deadline plus slack.
   if (request.op === "git.sync") return (Math.max(1, request.timeoutSeconds) + 30) * 1000;
   // A brain turn may wait on a person (a command approval) for up to 30 minutes, more than once.
@@ -580,8 +586,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
         // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058);
-        // protocol 21: whether agents can use their desktops (ADR 0062).
-        ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
+        // protocol 21: whether agents can use their desktops (ADR 0062); protocol 50: which Claude sign-ins for all
+        // agents it can make (an older runner says nothing: `claudeLoginMethodsOf` reads that).
+        ...(frame.executors ||
+        frame.browser ||
+        frame.desktop ||
+        frame.terminal ||
+        frame.desktopUse ||
+        frame.claudeLoginMethods
           ? {
               executors: {
                 // A runner that hasn't looked yet leaves the CLIs out: the last ones stored stand.
@@ -593,6 +605,9 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
+                ...(frame.claudeLoginMethods ? { claudeLoginMethods: frame.claudeLoginMethods } : {}),
+                ...(frame.claudeLoginBlocked ? { claudeLoginBlocked: frame.claudeLoginBlocked } : {}),
+                ...(frame.authEgressGroup ? { authEgressGroup: true as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
               },
             }
@@ -703,7 +718,10 @@ export function createMachineHub(deps: MachineHubDeps) {
   async function sendAgents(conn: MachineConnection) {
     if (!conn.machineId || !conn.orgId || conn.protocol < PAUSE_PROTOCOL) return;
     const agents = await machineAgents(db, conn.orgId, conn.machineId).catch(() => null);
-    if (agents) send(conn, { type: "agents", agents });
+    if (!agents) return;
+    const deleted =
+      conn.protocol >= CLAUDE_SHARED_PROTOCOL ? await deletedAgentIds(db, conn.orgId).catch(() => []) : [];
+    send(conn, { type: "agents", agents, ...(deleted.length ? { deleted } : {}) });
   }
 
   /** `runner.state` (protocol 9): paused, resumed or a new `until`; stored and told to the org. */
@@ -1409,6 +1427,11 @@ export function createMachineHub(deps: MachineHubDeps) {
 
     /** Whether this replica holds the machine's socket. */
     isLocal: (machineId: string) => local.has(machineId),
+
+    /** The protocol of a computer whose socket is here; null when it isn't here. */
+    localProtocol(machineId: string): number | null {
+      return local.get(machineId)?.protocol ?? null;
+    },
 
     /**
      * `browser.handoff` to a computer whose socket is here (protocol 12+), for

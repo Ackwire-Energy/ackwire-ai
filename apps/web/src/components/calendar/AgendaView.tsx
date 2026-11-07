@@ -1,7 +1,9 @@
 import { type CalItem, dayRuns, onDay, sameDay } from "@agenteschat/client/lib/calendar";
 import { toYmd } from "@agenteschat/client/lib/format";
+import { Button, EmptyState } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { dayLabel, EventChip } from "./EventChip";
 import { dayRunsLabel, MAX_DAY_MARKS, RunMarks } from "./RunMarks";
 
@@ -17,6 +19,8 @@ export function AgendaView({
   openKey,
   onOpenKey,
   details,
+  onNew,
+  onClearFilters,
 }: {
   days: Date[];
   items: CalItem[];
@@ -24,8 +28,13 @@ export function AgendaView({
   openKey: string | null;
   onOpenKey: (key: string | null) => void;
   details: (item: CalItem) => ReactNode;
+  /** Absent for who can't post: creating an event is posting. */
+  onNew?: (() => void) | undefined;
+  /** With a source filtered out: nothing here says little about the days, the way out is the filter. */
+  onClearFilters?: (() => void) | undefined;
 }) {
   const { t, i18n } = useTranslation();
+  const look = useRightHandLook();
   const groups = days
     .map((d) => ({
       d,
@@ -35,7 +44,29 @@ export function AgendaView({
       runs: dayRuns(items, d),
     }))
     .filter((g) => g.list.length > 0 || g.runs.length > 0);
-  if (groups.length === 0) return <p className="cal-agenda__empty muted">{t("calendar.agendaEmpty")}</p>;
+  if (groups.length === 0 && onClearFilters)
+    return (
+      <EmptyState size="panel" actions={<Button onClick={onClearFilters}>{t("filters.clearAll")}</Button>}>
+        {t("calendar.noResults")}
+      </EmptyState>
+    );
+  if (groups.length === 0)
+    return (
+      <EmptyState
+        size="page"
+        agent={look}
+        title={t("calendar.agendaEmptyTitle")}
+        actions={
+          onNew && (
+            <Button variant="primary" icon="plus" onClick={onNew}>
+              {t("calendar.new")}
+            </Button>
+          )
+        }
+      >
+        {t("calendar.agendaEmpty")}
+      </EmptyState>
+    );
   return (
     <div className="cal-agenda">
       {groups.map((g) => (

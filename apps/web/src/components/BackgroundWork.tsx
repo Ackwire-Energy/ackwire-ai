@@ -1,5 +1,6 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
-import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { heldBack } from "@agenteschat/client/lib/issues";
+import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,8 +45,9 @@ function useWorkLine(work: WorkView) {
 }
 
 /**
- * Under the agent's "Vou cuidar disso": how the work stands, its last update, Tarefa #, Parar, Ver resultado. Once its
- * thread has replies, the thread's own line under it opens the thread (`threaded`): no second way in.
+ * Under the agent's "Vou cuidar disso": how the work stands, its last update or what it asks, Tarefa #, Parar, Ver
+ * resultado. Once its thread has replies, the thread's own line under it opens the thread (`threaded`): no second way
+ * in, unless it waits on someone, who goes straight to the card in the panel.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const work = message.longWork;
@@ -63,10 +65,13 @@ function AnchorLine({ work, threaded }: { work: WorkView; threaded: boolean }) {
       tone={view.tone}
       text={view.text}
       update={view.update}
+      question={view.question?.text}
       actions={
         <>
-          {view.threadId && !threaded && actions?.openThread && (
-            <WorkLineAction onClick={() => actions.openThread?.(view.threadId as string)}>
+          {view.threadId && (!threaded || workWaitsOnPerson(work)) && actions?.openThread && (
+            <WorkLineAction
+              onClick={() => actions.openThread?.(view.threadId as string, view.question?.messageId ?? undefined)}
+            >
               {t("work.openThread")}
             </WorkLineAction>
           )}
@@ -123,15 +128,18 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
     onError: () => toast.show(t("work.shareFailed"), "error"),
   });
   // Only a card a DM or a private channel holds back, for who may show it (who asked, its creator, an admin).
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
+  const held = heldBack(issue, channels.data);
   const mayShare =
     work.requestedByUserId === me.user.id ||
     (issue.createdBy.type === "person" && issue.createdBy.id === me.user.id) ||
     can(org, "manage_agents");
   const openConversation = () =>
     view.threadId
-      ? void navigate({ to: "/org/$orgId/threads/$threadId", params: { orgId: org.id, threadId: view.threadId } })
+      ? void navigate({
+          to: "/org/$orgId/threads/$threadId",
+          params: { orgId: org.id, threadId: view.threadId },
+          search: view.question?.messageId ? { m: view.question.messageId } : {},
+        })
       : void navigate({
           to: "/org/$orgId/c/$channelId",
           params: { orgId: org.id, channelId: work.channelId },
@@ -143,6 +151,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
         tone={view.tone}
         text={view.text}
         update={view.update ? `${t("work.lastUpdate")}: ${view.update}` : null}
+        question={view.question?.text}
         actions={
           <>
             <WorkLineAction onClick={openConversation}>{t("work.openThread")}</WorkLineAction>
@@ -151,7 +160,7 @@ function CardBlock({ issue, work }: { issue: Issue; work: WorkView }) {
                 {t("work.stop")}
               </WorkLineAction>
             )}
-            {heldBack && mayShare && (
+            {held && mayShare && (
               <WorkLineAction disabled={share.isPending} onClick={() => share.mutate()}>
                 {t("work.shareEveryone")}
               </WorkLineAction>

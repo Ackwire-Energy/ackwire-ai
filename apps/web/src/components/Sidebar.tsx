@@ -41,7 +41,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
-import { AVAILABILITIES, clearsText, isOutOfOffice, presenceOfAvailability } from "@agenteschat/client/lib/presence";
+import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } from "@agenteschat/client/lib/presence";
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
@@ -221,12 +221,13 @@ export function Sidebar() {
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [customizing, setCustomizing] = useState(false);
   const navigate = useNavigate();
+  const onProposals = useRouterState({ select: (r) => r.location.pathname.endsWith("/proposals") });
   useEffect(() => {
     const open = () => setCreatingChannel(true);
     window.addEventListener(NEW_CHANNEL_EVENT, open);
     return () => window.removeEventListener(NEW_CHANNEL_EVENT, open);
   }, []);
-  const pending = overview.data?.approvalsWaitingForMe ?? 0;
+  const proposalsWaiting = overview.data?.proposalsWaitingForMe ?? 0;
   // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
   const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
   const lastUnread = useRef(unreadNotifications);
@@ -244,12 +245,21 @@ export function Sidebar() {
   const sidebarItems = useSidebarItems(orgId).data;
   // An unread reply counts as "something" for a Threads set to show "when there's something": it comes into the list
   // lit, and leaves once read, as Approvals does once nothing waits.
-  const counts: Partial<Record<SidebarItem, number>> = { approvals: pending, threads: missionsWaiting + unreadThreads };
+  // Proposals are a tab of Aprovações and count there, unless the person gave them a row of their own.
+  const proposalsRow = inSidebarList(sidebarPlace(sidebarItems, "proposals"), proposalsWaiting);
+  const pending = (overview.data?.approvalsWaitingForMe ?? 0) + (proposalsRow ? 0 : proposalsWaiting);
+  const counts: Partial<Record<SidebarItem, number>> = {
+    approvals: pending,
+    proposals: proposalsWaiting,
+    threads: missionsWaiting + unreadThreads,
+  };
   const listed = SIDEBAR_ITEMS.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id), counts[id] ?? 0));
   const inMore = SIDEBAR_ITEMS.filter((id) => !listed.includes(id));
   const countOf = (id: SidebarItem) =>
     id === "approvals" && pending > 0 ? (
       <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
+    ) : id === "proposals" && proposalsWaiting > 0 ? (
+      <CountBadge aria-label={t("shell.pendingProposals", { count: proposalsWaiting })}>{proposalsWaiting}</CountBadge>
     ) : id === "threads" && missionsWaiting > 0 ? (
       // Missões is a tab of Threads: the missions waiting for me as a neutral count.
       <CountChip
@@ -260,16 +270,17 @@ export function Sidebar() {
         {missionsWaiting}
       </CountChip>
     ) : null;
+  // The name is on the row: only the rail, which hides it, says it on hover.
+  const railTip = (id: SidebarItem | "home") => (rail ? t(`shell.${id}`) : undefined);
   const toolRow = (id: SidebarItem) => (
     <Link
       key={id}
       to={SIDEBAR_TOOLS[id].to}
       params={{ orgId }}
       className="sidebar__item"
-      title={
-        id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : t(`shell.${id}`)
-      }
+      title={id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : railTip(id)}
       data-unread={id === "threads" && unreadThreads > 0}
+      inactiveProps={id === "approvals" && onProposals && !proposalsRow ? { "data-status": "active" } : undefined}
     >
       <Icon name={SIDEBAR_TOOLS[id].icon} />
       <span className="sidebar__item-label">{t(`shell.${id}`)}</span>
@@ -298,7 +309,7 @@ export function Sidebar() {
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
   const pinned = useSidebarPins();
   const { view, setView, pins } = pinned;
-  // "Mensagens diretas": the people I talked to, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
+  // "Mensagens diretas": the people I talked to or just opened a DM with, latest first (an agent's row in AGENTES is its DM), pinned ones on top.
   const pinnedPeople = pins.people.flatMap((id) => {
     const m = id === me.user.id ? undefined : dir.memberById.get(id);
     return m ? [m] : [];
@@ -495,7 +506,7 @@ export function Sidebar() {
     tools: (
       // The tools each person keeps in sight; the rest open beside the sidebar from More.
       <div className="sidebar__group sidebar__tools">
-        <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={t("shell.home")}>
+        <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={railTip("home")}>
           <Icon name="home" />
           <span className="sidebar__item-label">{t("shell.home")}</span>
         </Link>
@@ -992,7 +1003,7 @@ const CATEGORY_KEY = "category:";
  * dragging, from its right click ("Mover para…") or in its details.
  */
 function SidebarChannels({
-  channels,
+  channels: all,
   loading,
   sections,
   onNewChannel,
@@ -1028,6 +1039,10 @@ function SidebarChannels({
   const removeCategory = useDeleteChannelCategory(orgId);
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
+  // An administrator reads every channel (ADR 0151): the ones they aren't in wait under one row, not in the list.
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const channels = all.filter((c) => !c.seenAsAdmin || path.endsWith(`/c/${c.id}`));
+  const others = all.filter((c) => !channels.includes(c));
   const mayCreate = can(org, "create_channels");
   const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
@@ -1331,6 +1346,28 @@ function SidebarChannels({
         {pinnedChannels.map((c) => row(c, true))}
         {pinnedChannels.length > 0 && (loose.length > 0 || shown.length > 0) && <hr className="sidebar__pins-end" />}
         {loose.map((c) => row(c))}
+        {others.length > 0 && (
+          <Menu
+            label={t("shell.otherChannels")}
+            trigger={
+              <button type="button" className="sidebar__item" data-kind="channel">
+                <Icon name="lock" />
+                <span className="sidebar__item-label">{t("shell.otherChannels")}</span>
+                <CountChip className="sidebar__count">{others.length}</CountChip>
+              </button>
+            }
+          >
+            {others.map((c) => (
+              <MenuItem
+                key={c.id}
+                icon="lock"
+                onSelect={() => void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } })}
+              >
+                {c.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
       </SidebarSection>
       {shown.map((category) => {
         const actions = categoryActions(category);
@@ -1456,31 +1493,6 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {/* Dashboards (ADR 0135 §14) and the task manager (ADR 0128): always here, not tools a person places. */}
-        <Link
-          to="/org/$orgId/dashboards"
-          params={{ orgId: org.id }}
-          className="ac-menu__item sidebar__more-item"
-          onClick={() => setOpen(false)}
-        >
-          <Icon name="chart" />
-          <span className="ac-menu__label">
-            {t("dashboards.sidebar")}
-            <span className="ac-menu__desc">{t("dashboards.navWhat")}</span>
-          </span>
-        </Link>
-        <Link
-          to="/org/$orgId/task-manager"
-          params={{ orgId: org.id }}
-          className="ac-menu__item sidebar__more-item"
-          onClick={() => setOpen(false)}
-        >
-          <Icon name="stageProgress" />
-          <span className="ac-menu__label">
-            {t("taskManager.title")}
-            <span className="ac-menu__desc">{t("taskManager.navWhat")}</span>
-          </span>
-        </Link>
         <div className="ac-menu__separator" aria-hidden="true" />
         <button
           type="button"
@@ -1496,28 +1508,8 @@ function MoreTools({
           <span className="ac-menu__label">{t("shell.customizeSidebar")}</span>
         </button>
       </Popover>
-      <div className="sidebar__more-active">
-        {items.map(row)}
-        {/* A board's own page too (`/dashboards/<id>`): the link is active on the pages under it. */}
-        <Link
-          to="/org/$orgId/dashboards"
-          params={{ orgId: org.id }}
-          className="sidebar__item"
-          title={t("dashboards.sidebar")}
-        >
-          <Icon name="chart" />
-          <span className="sidebar__item-label">{t("dashboards.sidebar")}</span>
-        </Link>
-        <Link
-          to="/org/$orgId/task-manager"
-          params={{ orgId: org.id }}
-          className="sidebar__item"
-          title={t("taskManager.title")}
-        >
-          <Icon name="stageProgress" />
-          <span className="sidebar__item-label">{t("taskManager.nav")}</span>
-        </Link>
-      </div>
+      {/* Proposals in More are a tab of Aprovações: its row lights up for them. */}
+      <div className="sidebar__more-active">{items.filter((id) => id !== "proposals").map(row)}</div>
     </>
   );
 }
@@ -1906,7 +1898,7 @@ function AccountMenu() {
             </span>
             <span>
               {line.text}
-              <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+              <small>{statusEndNote(t, i18n.language, shown.status.until, true)}</small>
             </span>
           </div>
         )}

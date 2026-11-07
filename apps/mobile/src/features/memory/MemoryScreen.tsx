@@ -1,5 +1,8 @@
 import { type Memory, useMemoryAction, useOrgMemories } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
+import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,8 +27,10 @@ import { canEditMemories } from "../agents/logic";
 import { useMemoryOriginText } from "../agents/useMemoryOriginText";
 import { StarCard, StarStrip } from "../constellation/Constellation";
 import { aroundStar, memoryMap } from "../constellation/logic";
+import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -45,6 +50,9 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
   const orgId = useOrgId();
   const dir = useDirectory();
   const memories = useOrgMemories(orgId);
+  const openDm = useOpenDm();
+  // Whoever answers this person: the right hand first (the server's `canTalk` holds the talk permission).
+  const listener = [rightHandOf(dir.agents), ...dir.agents].find((a) => a && canTalk(a));
   const [q, setQ] = useState("");
   const [agent, setAgent] = useState(initialAgent || "all");
   const [picked, setPicked] = useState<string | null>(null);
@@ -61,7 +69,7 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
       key={m.id}
       divider={i > 0}
       leading={<Face who={{ type: "agent", id: m.agentId }} size={36} live={false} />}
-      title={m.summary ?? m.text}
+      title={m.summary ?? memoryLine(t, m)}
       subtitle={`${dir.nameOf({ type: "agent", id: m.agentId })} · ${when(m.updatedAt)}`}
       chevron
       onPress={() => openMemory(m.id)}
@@ -103,7 +111,19 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
         </View>
       ) : null}
       {memories.isSuccess && (memories.data ?? []).length === 0 ? (
-        <EmptyState icon="brain" title={t("mobile.memory.emptyTitle")} subtitle={t("mobile.memory.empty")} />
+        <FirstUse
+          place="memory"
+          size="panel"
+          mood="thinking"
+          acts={Boolean(listener)}
+          label={listener ? t("team.sectors.ask", { name: listener.name }) : undefined}
+          icon="chat"
+          onPress={
+            listener
+              ? () => void openDm({ agentId: listener.id }, { compose: true, text: t("mobile.empty.memory.ask") })
+              : undefined
+          }
+        />
       ) : null}
       {(memories.data ?? []).length > 0 ? (
         <Filters
@@ -117,7 +137,17 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
       ) : null}
       {search ? (
         <Animated.View key="found" {...fade}>
-          {found.length === 0 ? <EmptyState icon="search" title={t("mobile.memory.noMatch")} /> : found.map(row)}
+          {found.length === 0 ? (
+            <EmptyState
+              size="inline"
+              title={t("mobile.memory.noMatch")}
+              action={
+                <Button variant="secondary" size="sm" label={t("filters.clearSearch")} onPress={() => setQ("")} />
+              }
+            />
+          ) : (
+            found.map(row)
+          )}
         </Animated.View>
       ) : selected ? (
         <Animated.View key="sky" {...fade}>
@@ -136,6 +166,14 @@ export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
           <SectionHeader title={t("mobile.memory.mostUsed")} />
           {mostUsed(shown).map(row)}
         </Animated.View>
+      ) : (memories.data ?? []).length > 0 ? (
+        <EmptyState
+          size="inline"
+          title={t("mobile.empty.memory.noneForAgent")}
+          action={
+            <Button variant="secondary" size="sm" label={t("mobile.memory.all")} onPress={() => setAgent("all")} />
+          }
+        />
       ) : null}
     </PushedLargeTitle>
   );
@@ -235,7 +273,7 @@ function MemoryDetail({ id }: { id: string }) {
             </Text>
           </View>
           <Text variant="title2" accessibilityRole="header">
-            {m.summary ?? m.text}
+            {m.summary ?? memoryLine(t, m)}
           </Text>
           {m.summary ? (
             <Pressable
@@ -251,7 +289,7 @@ function MemoryDetail({ id }: { id: string }) {
               {details ? (
                 <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
                   <Text variant="subhead" tone="muted" selectable>
-                    {m.text}
+                    {memoryLine(t, m)}
                   </Text>
                 </Animated.View>
               ) : null}

@@ -1,4 +1,4 @@
-import type { Agent } from "@agenteschat/client";
+import type { Agent, AgentSecret } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
@@ -29,11 +29,10 @@ export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: 
     enabled: canManage,
   });
   const remove = useMutation({
-    mutationFn: (s: { name: string; machineId: string | null }) =>
-      api.secrets.remove(org.id, agent.id, s.name, s.machineId),
+    mutationFn: (s: AgentSecret) => api.secrets.remove(org.id, agent.id, s.name, s.machineId),
     meta: { silent: true },
     onSuccess: (_v, s) => {
-      toast.show(t("agentSecrets.removed", { name: s.name }));
+      toast.show(t("agentSecrets.removed", { name: s.label }));
       void qc.invalidateQueries({ queryKey: keys.agentSecrets(org.id, agent.id) });
     },
     onError: () => toast.show(t("agentSecrets.removeFailed"), "error"),
@@ -52,7 +51,7 @@ export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: 
           {secrets.map((s) => (
             <li key={`${s.machineId ?? "none"}:${s.name}`} className="agent-secrets__row">
               <span className="agent-secrets__name">
-                <code>{s.name}</code>
+                <b>{s.label}</b>
                 <span className="small muted">
                   {s.target.kind === "file"
                     ? t("agentSecrets.file", { path: s.target.path })
@@ -70,10 +69,10 @@ export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: 
                 size="sm"
                 variant="ghost"
                 icon="trash"
-                aria-label={t("agentSecrets.removeLabel", { name: s.name })}
+                aria-label={t("agentSecrets.removeLabel", { name: s.label })}
                 loading={remove.isPending && remove.variables?.name === s.name}
                 disabled={remove.isPending}
-                onClick={() => remove.mutate({ name: s.name, machineId: s.machineId })}
+                onClick={() => remove.mutate(s)}
               >
                 {t("agentSecrets.remove")}
               </Button>

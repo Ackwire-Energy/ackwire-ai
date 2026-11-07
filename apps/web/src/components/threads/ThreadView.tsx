@@ -138,10 +138,12 @@ function ThreadTitle({ thread }: { thread: ThreadInfo }) {
 export function ThreadHeader({
   thread,
   onClose,
+  onBack,
   onSeeInChannel,
 }: {
   thread: ThreadInfo;
   onClose?: () => void;
+  onBack?: (() => void) | undefined;
   onSeeInChannel?: (messageId: string, channelId: string) => boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -172,6 +174,17 @@ export function ThreadHeader({
             onClick={() => void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams })}
           />
         </>
+      )}
+      {onBack && (
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="chevronLeft"
+          aria-label={t("threads.view.backToResults")}
+          title={t("threads.view.backToResults")}
+          onClick={onBack}
+        />
       )}
       <span className="thread-head__who" aria-hidden="true">
         {people.length > 0 ? (

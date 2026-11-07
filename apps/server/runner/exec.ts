@@ -14,6 +14,14 @@ const CUT_MARKER = "\n[… cut …]\n";
 
 export type ExecReply = MachineReplies["exec"];
 
+/** `62.7KB`: how Claude Code writes a size. */
+export function formatBytes(bytes: number): string {
+  const units = ["bytes", "KB", "MB", "GB"];
+  const at = Math.min(Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** at;
+  return at === 0 ? `${bytes} bytes` : `${Number(value.toFixed(1))}${units[at]}`;
+}
+
 /** Keeps the first and last `limit / 2` bytes of a stream. */
 export class OutputBuffer {
   private head: Buffer[] = [];
@@ -114,7 +122,7 @@ export function killTree(child: { pid?: number; kill(signal: NodeJS.Signals): un
   }
 }
 
-function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number {
+export function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number {
   if (code !== null) return code;
   if (signal) {
     const n = (constants.signals as Record<string, number | undefined>)[signal];

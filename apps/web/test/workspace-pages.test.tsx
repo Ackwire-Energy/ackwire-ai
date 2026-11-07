@@ -207,7 +207,8 @@ describe("Memória e propostas", () => {
 
   test("proposals: neutral diff, edit before accepting, accept", async () => {
     const r = await go(`proposals?agent=${ADA_ID}`);
-    expect(screen().getByRole("heading", { level: 1, name: "Propostas de melhoria" })).toBeTruthy();
+    expect(screen().getByRole("heading", { level: 1, name: "Aprovações" })).toBeTruthy();
+    expect(screen().getByRole("tab", { name: /Propostas de melhoria/, selected: true }).textContent).toContain("2");
     expect(screen().getByRole("link", { name: "O que a Ada sabe" })).toBeTruthy();
     const detail = screen().getByRole("article");
     expect(detail.textContent).toContain("Ada propõe · instruções da Ada");
@@ -260,6 +261,44 @@ describe("Memória e propostas (fase 5)", () => {
     expect(screen().getByRole("article").textContent).toContain("Ficou velha");
     expect(screen().queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
     expect(r.state.calls.some((c) => c.method === "proposals.accept")).toBe(true);
+  });
+
+  test("proposals are a tab of Aprovações, and a reason the server wrote reads in the person's language", async () => {
+    const state = seedState();
+    const [first] = state.proposals;
+    if (first) Object.assign(first, { why: "Remover o sistema antigo.", whyCode: "corrected" });
+    const r = await go("approvals", state);
+    await act(async () =>
+      fireEvent.mouseDown(screen().getByRole("tab", { name: /Propostas de melhoria/ }), { button: 0 }),
+    );
+    await settle(6);
+    expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/proposals`);
+    expect(screen().getByRole("article").textContent).toContain("Uma pessoa corrigiu: Remover o sistema antigo.");
+    await act(async () => fireEvent.mouseDown(screen().getByRole("tab", { name: /Pedidos/ }), { button: 0 }));
+    await settle(6);
+    expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/approvals`);
+  });
+
+  test("stale rows aren't listed, what waits on you comes first and says so, and an empty tab has no count", async () => {
+    const state = seedState();
+    const [mine, other] = state.proposals;
+    if (!mine || !other) throw new Error("two proposals expected");
+    state.proposals.push({ ...other, id: "prop-twin", stale: true, status: "refused" });
+    Object.assign(mine, { canDecide: false, createdAt: "2026-11-05T10:00:00.000Z" });
+    Object.assign(other, { canDecide: true, createdAt: "2026-11-01T10:00:00.000Z" });
+    await go("proposals", state);
+    const rows = within(screen().getByRole("navigation", { name: "Propostas" })).getAllByRole("button");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.textContent).toContain("Aguardando você");
+    expect(rows[0]?.getAttribute("aria-current")).toBe("true");
+  });
+
+  test("a tab with nothing waiting shows no count", async () => {
+    const state = seedState();
+    state.approvals = [];
+    for (const p of state.proposals) p.canDecide = false;
+    await go("proposals", state);
+    expect(screen().getByRole("tab", { name: /Pedidos/ }).textContent).toBe("Pedidos");
   });
 
   test("proposals you can't decide have no actions", async () => {

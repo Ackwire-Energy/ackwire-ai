@@ -14,6 +14,7 @@ import {
   DialogFooter,
   Field,
   Input,
+  Locked,
   RoleMark,
   Select,
   Token,
@@ -55,9 +56,20 @@ export function ChannelAccessChoice({
   const [choosing, setChoosing] = useState(false);
   const pickedRoles = candidates.filter((r) => value.roleIds.includes(r.id));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="channel-access">
       {/* A dropdown, as "Categoria" above it: three cards side by side broke their words in a narrow dialog. */}
-      <Field label={t("newChannel.visibility")} id={`${idPrefix}-vis`} help={t(`newChannel.${value.mode}Desc`)}>
+      <Field
+        label={t("newChannel.visibility")}
+        id={`${idPrefix}-vis`}
+        help={t(`newChannel.${value.mode}Desc`)}
+        labelAside={
+          value.mode === "roles" && (
+            <button type="button" className="ac-link ac-link--muted small" onClick={() => setChoosing(true)}>
+              {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
+            </button>
+          )
+        }
+      >
         <Select
           value={value.mode}
           onValueChange={(mode) => {
@@ -85,18 +97,6 @@ export function ChannelAccessChoice({
             </li>
           ))}
         </TokenList>
-      )}
-      {value.mode === "roles" && (
-        <span>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={pickedRoles.length > 0 ? "edit" : "plus"}
-            onClick={() => setChoosing(true)}
-          >
-            {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
-          </Button>
-        </span>
       )}
       {value.mode === "roles" && (
         <span className={`small ${showError && !accessValid(value) ? "ac-field__error" : "muted"}`}>
@@ -268,48 +268,50 @@ export function NewChannelDialog({
           if (!error && accessValid(access)) create.mutate();
         }}
       >
-        <DialogBody>
-          <Field
-            label={t("newChannel.name")}
-            id="ch-name"
-            help={t("newChannel.nameHelp", { name: name || "canal" })}
-            error={
-              touched || (name && error === "taken")
-                ? error === "invalid"
-                  ? t("newChannel.nameInvalid")
-                  : error === "taken"
-                    ? t("newChannel.nameTaken", { name })
-                    : undefined
-                : undefined
-            }
-          >
-            <Input
-              value={name}
-              onChange={(e) => setName(toChannelName(e.target.value))}
-              placeholder={t("newChannel.namePlaceholder")}
-              autoFocus
+        <Locked when={create.isPending}>
+          <DialogBody>
+            <Field
+              label={t("newChannel.name")}
+              id="ch-name"
+              help={t("newChannel.nameHelp", { name: name || "canal" })}
+              error={
+                touched || (name && error === "taken")
+                  ? error === "invalid"
+                    ? t("newChannel.nameInvalid")
+                    : error === "taken"
+                      ? t("newChannel.nameTaken", { name })
+                      : undefined
+                  : undefined
+              }
+            >
+              <Input
+                value={name}
+                onChange={(e) => setName(toChannelName(e.target.value))}
+                placeholder={t("newChannel.namePlaceholder")}
+                autoFocus
+              />
+            </Field>
+            <Field label={t("newChannel.topic")} id="ch-topic">
+              <Input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder={t("newChannel.topicPlaceholder")}
+              />
+            </Field>
+            <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
+              <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
+            </Field>
+            <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />
+            <PeoplePicker
+              label={t("newChannel.members")}
+              searchLabel={t("newChannel.membersSearch")}
+              emptyText={(q) => t("newChannel.membersEmpty", { q })}
+              selected={selected}
+              onChange={setSelected}
+              channel
             />
-          </Field>
-          <Field label={t("newChannel.topic")} id="ch-topic">
-            <Input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder={t("newChannel.topicPlaceholder")}
-            />
-          </Field>
-          <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
-            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
-          </Field>
-          <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />
-          <PeoplePicker
-            label={t("newChannel.members")}
-            searchLabel={t("newChannel.membersSearch")}
-            emptyText={(q) => t("newChannel.membersEmpty", { q })}
-            selected={selected}
-            onChange={setSelected}
-            channel
-          />
-        </DialogBody>
+          </DialogBody>
+        </Locked>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>

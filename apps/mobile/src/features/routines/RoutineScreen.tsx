@@ -48,6 +48,7 @@ import {
   useReducedMotion,
 } from "@/ui";
 import { approvalTitleText, useCancelAhead } from "../approvals/parts";
+import { FoldedBody } from "../chat/FoldedBody";
 import { chatHref, widgetHref } from "../links/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -613,14 +614,9 @@ function RunItem({ run: x, routine: r, last }: { run: RoutineRun; routine: Routi
   const approval = x.status === "waiting" && x.approvalId ? x.approvalId : null;
   const href = approval ? `/approval/${approval}` : link ? chatHref(link.channelId, link.threadId) : null;
   const when = whenAt(t, i18n.language, x.at);
+  const go = href ? () => router.push(href) : undefined;
   return (
-    <Pressable
-      onPress={href ? () => router.push(href) : undefined}
-      disabled={!href}
-      accessibilityRole={href ? "button" : undefined}
-      accessibilityLabel={[outcome, words, when].filter(Boolean).join(", ")}
-      style={({ pressed }) => [styles.run, pressed && href ? { backgroundColor: c.sunken } : null]}
-    >
+    <View style={styles.run}>
       <View style={styles.rail}>
         <View style={[styles.node, { backgroundColor: node.bg }]}>
           {node.icon ? (
@@ -632,24 +628,32 @@ function RunItem({ run: x, routine: r, last }: { run: RoutineRun; routine: Routi
         {last ? null : <View style={[styles.stem, { backgroundColor: c.line2 }]} />}
       </View>
       <View style={styles.grow}>
-        <Text variant="subhead" style={[styles.bold, approval ? styles.underline : null]}>
-          {outcome}
-        </Text>
-        {words ? (
-          <Text variant="footnote" tone="muted" numberOfLines={6}>
-            {words}
+        {/* Its parts apart, not one button: the agent's words hold links and their own "Mostrar mais". */}
+        <Pressable
+          onPress={go}
+          disabled={!go}
+          accessibilityRole={go ? "button" : undefined}
+          accessibilityLabel={`${outcome}, ${when}`}
+          style={({ pressed }) => (pressed && go ? styles.pressed : null)}
+        >
+          <Text variant="subhead" style={[styles.bold, approval ? styles.underline : null]}>
+            {outcome}
           </Text>
-        ) : null}
+        </Pressable>
+        {words ? <FoldedBody body={words} muted /> : null}
         {link && !approval ? (
-          <Text variant="footnote" tone="muted" style={styles.open}>
-            {t("routines.openInChat")}
-          </Text>
+          // Nothing added above: that is where its words' "Mostrar mais" is.
+          <Pressable onPress={go} accessibilityRole="button" hitSlop={{ bottom: 13, left: 13, right: 13 }}>
+            <Text variant="footnote" tone="muted" style={styles.open}>
+              {t("routines.openInChat")}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
       <Text variant="caption" tone="faint" style={styles.when}>
         {when}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -684,6 +688,7 @@ const styles = StyleSheet.create({
   dash: { width: 8, height: 1.7, borderRadius: 999 },
   stem: { flex: 1, width: 1.5, marginTop: 4, marginBottom: -12 },
   underline: { textDecorationLine: "underline" },
+  pressed: { opacity: 0.6 },
   open: { marginTop: 2 },
   when: { paddingTop: 2 },
   // The "x" glyph sits 10 px inside its 40 px button: 4 px more on the right reads as the left's 14.

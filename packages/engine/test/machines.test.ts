@@ -1194,10 +1194,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       publicKey: row.publicKey,
     });
     // Its text is for previews and notifications, a sentence that names who asked (the card names the key).
-    expect(card?.body).toBe(`${f.agent.name} asked for a key: NPM_TOKEN`);
+    expect(card?.body).toBe(`${f.agent.name} asked for a key: Npm token`);
     expect((card?.meta as { bodyParams?: unknown } | undefined)?.bodyParams).toEqual({
       agent: f.agent.name,
-      name: "NPM_TOKEN",
+      name: "Npm token",
     });
 
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
@@ -1367,7 +1367,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       .where(eq(schema.messages.id, again?.messageId as string));
     expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest).toMatchObject({
       name: "TYPESAFE_API_KEY",
-      purpose: "A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?",
+      purpose: "A chave Typesafe api key foi recusada (401). Manda uma nova?",
       replaces: true,
     });
 
@@ -1535,9 +1535,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
-    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
-      "already answered",
-    );
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toMatchObject({
+      code: "secret.closed",
+      params: { status: "declined", endReason: null },
+    });
     expect(stagedWhilePending).toBe(true);
     expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
     expect(runner.staged.has(row.id)).toBe(false);
@@ -1559,9 +1560,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
-    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
-      "already answered or expired",
-    );
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toMatchObject({
+      code: "secret.closed",
+      params: { status: "expired" },
+    });
     const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
     expect(closed?.status).toBe("pending");
     expect(closed?.deliveredAt).toBeNull();
@@ -2029,7 +2031,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const n = await notice();
     expect(n).toMatchObject({ userId: f.owner.id, kind: "secret_request", waiting: true, doneAt: null });
     expect(n?.latest).toMatchObject({
-      title: "NPM_TOKEN",
+      title: "Npm token",
       text: "publicar o pacote no npm",
       expiresAt: row.expiresAt.toISOString(),
     });

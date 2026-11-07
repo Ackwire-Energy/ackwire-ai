@@ -247,7 +247,7 @@ export const words: EmailWords = {
     account: (email) => [
       "Typ deze code om het hele account ",
       { b: email },
-      " te verwijderen, niet alleen één werkruimte. Het verdwijnt meteen, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
+      " te verwijderen, niet alleen één werkruimte. Het wordt meteen overal uitgelogd en 7 dagen later definitief verwijderd, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
     ],
     support: (address) => [
       "Hij werkt 10 minuten, en zonder deze code wordt er niets verwijderd. Was jij het niet? Deel hem dan niet en schrijf naar ",
@@ -291,6 +291,27 @@ export const words: EmailWords = {
     note: "Heb je hem niet gekoppeld? Ontkoppel hem nu en wijzig je wachtwoord.",
     button: "Gekoppelde apps bekijken",
     why: (org) => `Je krijgt deze e-mail omdat er een app is gekoppeld aan je account in ${org} op agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Je agentes.chat-account wordt op ${day} verwijderd`,
+    preheader: "Je hebt 7 dagen om van gedachten te veranderen.",
+    headline: "Je account wordt verwijderd",
+    body: (email, day, time) => [
+      "We verwijderen het account ",
+      { b: email },
+      ` op ${day} om ${time}. Het is overal uitgelogd en niemand kan je hier bereiken tot je terug bent.`,
+    ],
+    closes: (count, names) => [
+      plural("nl", count, {
+        one: "De werkruimte waar alleen jij in zat is nu gesloten en verdwijnt op dezelfde datum: ",
+        other: "De werkruimtes waar alleen jij in zat zijn nu gesloten en verdwijnen op dezelfde datum: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Toch van gedachten veranderd? Log voor die datum in en druk op Herstellen.",
+    button: "Inloggen om te herstellen",
+    why: "Je krijgt deze e-mail omdat dit adres een account heeft op agentes.chat.",
   },
   accountDeleted: {
     subject: "Je agentes.chat-account is verwijderd",
@@ -378,5 +399,21 @@ export const words: EmailWords = {
     note: "Neem het met één klik terug in je meldingen, dan denkt de agent niet meer met je abonnement.",
     button: "Meldingen openen",
     why: (org) => `Je krijgt deze e-mail omdat iemand in ${org} je abonnement aan een agent heeft gekoppeld.`,
+  },
+  planWaiting: {
+    subject: "Je team wacht",
+    preheader: "Je werkruimte is klaar. Er is een agentes.chat-abonnement nodig om te beginnen.",
+    headline: "Je team wacht",
+    body: (agents, channels, routines) => {
+      const a = plural("nl", agents, { one: `1 agent`, other: `${agents} agents` });
+      const c = plural("nl", channels, { one: `1 kanaal`, other: `${channels} kanalen` });
+      const r = plural("nl", routines, { one: `1 routine`, other: `${routines} routines` });
+      return routines > 0
+        ? `${a}, ${c} en ${r} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`
+        : `${a} en ${c} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`;
+    },
+    button: "agentes.chat-abonnementen bekijken",
+    why: (org) =>
+      `Je krijgt deze e-mail omdat je ${org} beheert op agentes.chat. We sturen maar twee van deze berichten.`,
   },
 };

@@ -1,4 +1,10 @@
-import { CODEX_FOLDER_PROTOCOL, PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
+import {
+  CODEX_FOLDER_PROTOCOL,
+  PERMISSION_TOOL,
+  type PlanUsage,
+  type ProviderFailureCause,
+  type PubSub,
+} from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -20,6 +26,7 @@ import {
   isAutoModel,
   type ModelMessage,
   type ModelResult,
+  PROVIDERS,
   ProviderError,
   type StopReason,
   type SystemBlock,
@@ -34,7 +41,7 @@ import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
-import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
+import { type AgentAi, agentAiState, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { deciderName, publishApproval } from "./approvals";
 import { accountablePerson, fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
@@ -138,6 +145,7 @@ import {
   stableFirst,
   teammatesNowAgain,
   thisTurnParts,
+  type WorkspaceComputer,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
@@ -178,23 +186,36 @@ import {
   publishChannelEvent,
   publishMessageCreated,
 } from "./events";
-import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
+import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
-import { askVerdict, handOffHolds } from "./hand-off";
+import { askVerdict, handOffHolds, repeatedAsk, saysNeedsNothing } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
+import {
+  KEY_LINE_PERSON_MINUTES,
+  type KeyLinePlace,
+  keyLineGate,
+  keyLineOf,
+  kickKeyLine,
+  rateLimited,
+} from "./key-line";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
-import { publishAccountsChanged, touchMachineAccount } from "./machine-accounts";
+import {
+  accountFailureCause,
+  noteAccountFailure,
+  publishAccountsChanged,
+  touchMachineAccount,
+} from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
-import { postNoAiCard } from "./no-ai";
+import { type NoAiCardReason, postNoAiCard } from "./no-ai";
 import {
   notifyCatchUpClosed,
   notifyCatchUpClosedAsker,
@@ -207,7 +228,6 @@ import { type OutsideMemo, personWords, runReadOutside } from "./outside";
 import { assertPersonUnderLimit } from "./person-usage";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
-import { reachWillHand } from "./reach";
 import {
   endsWithSentinel,
   isSentinelOnly,
@@ -245,6 +265,7 @@ import {
   invokeToolForRun,
   invokeWithChip,
   mergeToolEffects,
+  type PauseRequests,
   postPauseCards,
   publishPauseCards,
   type RunToolScope,
@@ -260,7 +281,8 @@ import {
   NO_AI,
   OUR_ERROR,
   PERSON_LIMIT,
-  PROVIDER_ACCOUNT,
+  providerFailureOf,
+  providerFailureText,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -270,7 +292,7 @@ import {
 import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
-import { standingErrorDetail, standingRefusal } from "./standing";
+import { billingHold, standingErrorDetail, standingRefusal } from "./standing";
 import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
@@ -432,6 +454,8 @@ export interface EngineDeps {
   prepareCode?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
+  /** Each workspace gets its own computer here (`workspaceComputerText`); absent: people connect theirs. */
+  workspaceComputer?: WorkspaceComputer;
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
   /** How long a run waits, still working, for a computer just gone (default `COMPUTER_BLIP_WAIT_MS`). */
@@ -595,9 +619,9 @@ export interface Transcript {
   /**
    * The provider failed every attempt with a retryable error (I5): the run is parked on `OUTAGE_PARK`'s ladder
    * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
-   * answers.
+   * answers. On a rate limit it also waits in its key's line (`key-line.ts`).
    */
-  outage?: { since: number; n: number; waitId: string };
+  outage?: { since: number; n: number; waitId: string; noteId?: string } & KeyLinePlace;
   /**
    * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
    * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
@@ -683,6 +707,8 @@ export class BrainFailure extends Error {
     readonly serverStop = false,
     /** A plan limit: whether the turn used a tool before it was cut (undefined: unknown, counted as worked). */
     readonly worked?: boolean,
+    /** Why the provider refused or failed it, as the computer said (runner protocol 50). */
+    readonly provider: { cause?: ProviderFailureCause; httpStatus?: number } = {},
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -796,10 +822,13 @@ const userFacing = (error: unknown): string | null => {
   // The message says what to do ("Add an API key…"); the UI shows it translated by its code (`runErrorDetail`).
   if (error instanceof MissingCredentialError) return error.message;
   if (error instanceof ValidationError || error instanceof NotFoundError) return error.message;
-  if (error instanceof ProviderError && !error.retryable)
-    return `provider_error: ${ACCOUNT_REFUSALS.has(error.status ?? 0) ? PROVIDER_ACCOUNT : ""}${error.message}`;
+  if (error instanceof ProviderError && !error.retryable) return providerFailureText("provider_error", error);
   return null;
 };
+
+/** The run's error when a provider's or a computer's failure outlasted every retry. */
+const gaveUp = (error: ProviderError | BrainFailure) =>
+  error instanceof ProviderError ? providerFailureText("gave_up", error) : `gave_up: ${error.message}`;
 
 /** A provider (or brain) failure that may pass by itself: the run waits it out (`OUTAGE_PARK`), anything else fails. */
 const retryableOutage = (error: unknown) =>
@@ -808,8 +837,20 @@ const retryableOutage = (error: unknown) =>
 /** The card's words when the person behind a run is at their monthly limit (`bodyCode` `person_limit`). */
 const PERSON_LIMIT_TEXT = "The person who asked reached their usage limit for this month.";
 
-/** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
+/** The note a run parked on a provider outage posts once; the apps word it by its cause (`outageNote`). */
 const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
+/** That note once the provider answers again (`bodyCode` `provider_back`): it no longer says a wait is on. */
+const PROVIDER_BACK_TEXT = "My AI is back.";
+
+/** Causes a run waits out. Any other that still came as retryable reads by the provider's own words. */
+const OUTAGE_CAUSES: ReadonlySet<string> = new Set(["rate_limit", "down", "timeout", "unreachable", "ours"]);
+
+const outageNote = (error: unknown) => {
+  const failure = error instanceof ProviderError ? providerFailureOf(error) : null;
+  if (!failure?.provider) return bodyCode("provider_unavailable");
+  const { cause, provider, detail } = failure;
+  return bodyCode(`provider_wait_${OUTAGE_CAUSES.has(cause) ? cause : "said"}`, { provider, detail });
+};
 
 /** The result of a call in a step cut by a server restart that never started. */
 const NOT_RUN_BY_RESTART =
@@ -934,10 +975,28 @@ async function executeRunInner(
           string | null
         >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'since', ${agentRuns.transcript}->'usageWait'->>'since')`,
         busyRetries: sql<number | null>`(${agentRuns.transcript}->'catchUpTriage'->>'busyRetries')::int`,
+        keyLine: sql<string | null>`${agentRuns.transcript}->'outage'->>'line'`,
+        outageWait: sql<string | null>`${agentRuns.transcript}->'outage'->>'waitId'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // Only the head of its key's line tries the provider again; the others look later, without claiming. A wake for
+    // another wait (its budget, once back from the park) isn't this line's to hold.
+    if (row.keyLine && row.outageWait === options.wait) {
+      const behind = await keyLineGate(db, { id: runId, orgId: row.orgId }, row.keyLine);
+      if (behind) {
+        await enqueue(db, {
+          orgId: row.orgId,
+          kind: "agent_run.execute",
+          payload: { runId, wait: options.wait },
+          dedupeKey: `agent_run.execute:${runId}:key-line:${options.wait}:${behind.retryAt}`,
+          runAt: new Date(behind.retryAt),
+          maxAttempts: 4,
+        });
+        return;
+      }
+    }
     // A catch-up about to be checked while another agent still answers in its conversation: it waits for that answer
     // (60 s at a time, `BUSY_RETRIES` times), so the check reads it whole instead of half of it. Its place holds.
     const busyTries = row.busyRetries ?? 0;
@@ -1040,7 +1099,11 @@ async function executeRunInner(
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const stored = run.transcript as unknown as Transcript | null;
       // Resumes when the last decision or answer comes in.
-      if (await pauseOpen(db, run.id, stored)) return;
+      if (await pauseOpen(db, run.id, stored)) {
+        // One answer of several: the work's line goes on to what it still asks.
+        await pauseWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
+        return;
+      }
       // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
       // (`suspendedByBridge`), so the brain's session never takes two turns at once.
       if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;
@@ -1089,11 +1152,13 @@ async function executeRunInner(
   // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
-  const [channelRow, topTrigger] = await Promise.all([
+  const [firstChannel, topTrigger] = await Promise.all([
     getChannelCached(db, run.orgId, run.channelId),
     topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
   ]);
-  // Where it answers. Long work (ADR 0121) moves it to its anchor's thread mid-run (`adoptWork`).
+  let channelRow = firstChannel;
+  // Where it answers. Long work (ADR 0121) moves it to its anchor's thread mid-run, a move a person asked for to
+  // another place (`adoptWork`).
   let replyThreadId = replyThreadOf(run);
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   // Background work (a routine's run, or long work) says so: the apps keep it out of the conversation's "working" row.
@@ -1124,6 +1189,8 @@ async function executeRunInner(
   let turnEnd: TurnEndDecision | null = null;
   /** A failure's own code when the run error's prefix is too broad (`brain_unavailable: …`), and the plan it names. */
   let failCause: { code?: string; plan?: string } | undefined;
+  /** The last turn's brain failure, for `run.finished` when the run fails after it. */
+  let brainFailure: { code: string; cause: ProviderFailureCause | null } | undefined;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   /** Messages that got receipts (`message.actions` goes out once they are published). */
   const withReceipts: string[] = [];
@@ -1326,7 +1393,10 @@ async function executeRunInner(
     const plan = brainPlan && isComputerBrain(brainPlan.kind) ? BRAIN_PLAN_NAMES[brainPlan.kind] : undefined;
     failCause = { ...(ledger ? { code: ledger.code } : {}), ...(plan ? { plan } : {}) };
     await addRunStep(db, run, "error", { reason });
-    const failed = await transitionRun(db, run.id, "running", "failed", { error: reason });
+    const failed = await transitionRun(db, run.id, "running", "failed", {
+      error: reason,
+      ...(brainFailure ? { failure: brainFailure } : {}),
+    });
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
@@ -1338,7 +1408,7 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"], model?: string) => {
+  const failNoAi = async (why: NoAiCardReason, own?: AgentAi["own"], model?: string) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
       await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model)
@@ -1385,8 +1455,16 @@ async function executeRunInner(
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
   // before it starts anything.
+  // A billing hold keeps a person's message for after the plan: the agent's card says so, and it can be answered then.
+  // Background work and an agent's call have nobody's message to keep: they end saying why.
   const refusal = await standingRefusal(db, run.orgId, run.agentId);
-  if (refusal) return fail(refusal.message);
+  if (refusal) {
+    const kept =
+      !run.background &&
+      (await billingHold(db, run.orgId)) !== null &&
+      (await getMessage(db, run.orgId, run.triggerMessageId))?.authorType === "person";
+    return kept ? failNoAi("plan_hold") : fail(refusal.message);
+  }
 
   const ctx: ToolContext = {
     db,
@@ -1415,24 +1493,29 @@ async function executeRunInner(
   // Back to its long work after a wait (a person, its plan, its computer): the promise starts over (ADR 0121 §3).
   if (backFromWait && run.workId) await resumeWorkTimer({ db, pubsub: deps.pubsub }, run).catch(() => {});
   /**
-   * The run moved to the background (its own tool, the bridge's on another replica, or the safety net): from now on it
-   * answers in the work's thread, outside the conversation's working row, and its report goes home.
+   * The run moved to the background (its own tool, the bridge's on another replica, or the safety net), or a person
+   * sent it elsewhere (`moveRun`): from now on it answers there, background work outside the conversation's working
+   * row, and its report goes home.
    */
   const adoptWork = async () => {
-    if (run.workId) return false;
     const [row] = await db
-      .select({ workId: agentRuns.workId, threadRootId: agentRuns.threadRootId })
+      .select({ workId: agentRuns.workId, threadRootId: agentRuns.threadRootId, channelId: agentRuns.channelId })
       .from(agentRuns)
       .where(eq(agentRuns.id, run.id));
-    if (!row?.workId) return false;
+    if (!row) return;
     run.workId = row.workId;
     run.threadRootId = row.threadRootId;
     ctx.threadRootId = row.threadRootId;
     replyThreadId = replyThreadOf(run);
     where.threadId = replyThreadId;
-    bg = { background: true };
+    if (row.channelId !== ctx.channelId) {
+      run.channelId = row.channelId;
+      ctx.channelId = row.channelId;
+      where.channelId = row.channelId;
+      channelRow = await getChannelCached(db, run.orgId, row.channelId);
+    }
+    if (row.workId) bg = { background: true };
     await loadWorkHome();
-    return true;
   };
   /** Where a closing message goes: a work's report home (where it was asked), else where the run answers. */
   const workThread = () => (workHome ? workHome.homeThreadId : replyThreadId);
@@ -1546,7 +1629,8 @@ async function executeRunInner(
             message: trigger?.body ?? "",
             recent,
             tools: granted,
-            keep,
+            // The message's words may not mention its file (it may have none), and the agent has to open it.
+            keep: Array.isArray(trigger?.meta.artifacts) ? [...keep, toolGroupKey({ scope: "drive:read" })] : keep,
           });
           toolChoice = choice;
           ctx.loadedGroups = choice.groups;
@@ -1928,6 +2012,7 @@ async function executeRunInner(
         mayPass: policy.mayPass,
         machines: deps.machines,
         ai: { gateway: deps.gateway, machines: deps.machines },
+        workspaceComputer: deps.workspaceComputer,
       }),
       contextDeps
         ? // A person's own message already names who is behind the run: no read for it.
@@ -2032,7 +2117,7 @@ async function executeRunInner(
     // Loaded, not only granted: on demand, the wiki tools' own descriptions say it (token-trim B4).
     if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
       system.push({
-        text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
+        text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X") or your routine\'s instructions say so. Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
     }
     const read = [
@@ -2090,48 +2175,62 @@ async function executeRunInner(
   prof.mark("context");
   /** What a resumed computer brain reads first: the results of the calls that waited for a person. */
   let resumeText: string | null = null;
+  /** The provider answered again: its note changes in place, so nobody reads a wait that ended. */
+  const outageOver = async (noteId: string) => {
+    const [row] = await db
+      .update(messages)
+      .set({
+        body: PROVIDER_BACK_TEXT,
+        meta: sql`${messages.meta} || ${JSON.stringify(bodyCode("provider_back"))}::jsonb`,
+      })
+      .where(and(eq(messages.orgId, run.orgId), eq(messages.id, noteId)))
+      .returning();
+    if (!row) return;
+    const [view] = await withWikiLinks(db, run.orgId, [messageView(row)]);
+    if (view) await publishMessageCreated(deps.pubsub, view);
+  };
+
   /**
    * The provider is down past the job's own retries (I5): instead of `gave_up`, the run waits on the ladder and
    * resumes the same turn, nothing repeated. Past `OUTAGE_PARK.maxMs` it fails for good, and the failure is
    * reported (`reportRunFailure`). False when it can't park anymore.
    */
-  const parkOutage = async (message: string): Promise<boolean> => {
+  const parkOutage = async (error: unknown, line?: string): Promise<boolean> => {
     const t = transcript as Transcript;
+    const message = error instanceof Error ? error.message : String(error);
     const since = t.outage?.since ?? Date.now();
     const n = t.outage?.n ?? 0;
     if (Date.now() - since >= OUTAGE_PARK.maxMs) return false;
     const waitId = Bun.randomUUIDv7();
-    t.outage = { since, n: n + 1, waitId };
+    const people = Boolean(t.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+    const step = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
+    const minutes = line && people ? Math.min(step, KEY_LINE_PERSON_MINUTES) : step;
+    const at = Date.now() + minutes * 60_000;
+    const noteId = t.outage?.noteId;
+    t.outage = { since, n: n + 1, waitId, ...(noteId ? { noteId } : {}), ...(line ? { line, at, people } : {}) };
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
     // Said once where it answers, so the wait reads as the provider's, not as a question to a person.
     const note =
       n === 0 && !run.background && viaRoutine === null
         ? await db.transaction(async (tx) => {
-            const m = await post(
-              tx,
-              replyThreadId,
-              PROVIDER_UNAVAILABLE_TEXT,
-              bodyCode("provider_unavailable"),
-              undefined,
-              true,
-            );
+            const m = await post(tx, replyThreadId, PROVIDER_UNAVAILABLE_TEXT, outageNote(error), undefined, true);
             t.postedCount++;
             t.postedUpTo = t.messages.length;
             return m;
           })
         : null;
     if (note) {
+      t.outage.noteId = note.id;
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
-    const minutes = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
     await enqueue(db, {
       orgId: run.orgId,
       kind: "agent_run.execute",
       payload: { runId: run.id, wait: waitId },
       dedupeKey: `agent_run.execute:${run.id}:outage:${waitId}`,
-      runAt: new Date(Date.now() + minutes * 60_000),
+      runAt: new Date(at),
       maxAttempts: 4,
     });
     if (!(await transitionRun(db, run.id, "running", "waiting_input", { transcript: storedTranscript(t) })))
@@ -2252,7 +2351,8 @@ async function executeRunInner(
    * wrote so far, nothing lost, with "Stopped by …", and tell the channel.
    * A background run posts nothing (ADR 0053 §5): its ledger says who stopped it.
    */
-  const stopCanceled = async (partial: string) => {
+  /** `partial` goes on the transcript ("Continuar" reads on from it); `said`, what of it the stopped reply shows. */
+  const stopCanceled = async (partial: string, said = partial) => {
     await deferred;
     const t = transcript as Transcript;
     const [row] = await db.select({ error: agentRuns.error }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -2277,23 +2377,24 @@ async function executeRunInner(
     const wrote = [
       ...t.messages
         .slice(t.postedUpTo)
-        .filter((m) => m.role === "assistant")
+        // A step that called a tool wrote working text: it stays on the transcript and the run's activity.
+        .filter((m) => m.role === "assistant" && !hasToolUse(m))
         .map((m) => stripSentinel(textOf(m.content))),
-      stripSentinel(partial),
+      stripSentinel(said),
     ]
       .filter(Boolean)
       .join("\n\n");
     // The apps show `canceled.text`, not the body: the right hand's is scrubbed here, before both (ADR 0137 §4).
-    const said = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
+    const shown = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
     // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
     if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
       t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
     const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
-      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
+      const m = await post(tx, replyThreadId, shown ? `${shown}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
         // `text`: what the agent wrote; the app adds "Stopped by …" in the person's language.
-        canceled: { byUserId: by, text: said },
+        canceled: { byUserId: by, text: shown },
       });
       t.postedUpTo = t.messages.length;
       t.postedCount++;
@@ -2399,8 +2500,6 @@ async function executeRunInner(
       }),
     ]);
     if (counted[0]) run = counted[0];
-    if (said)
-      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: cutText(said, 4000) });
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
@@ -2467,8 +2566,8 @@ async function executeRunInner(
     // choice kept for the next attempt.
     if (brainPlan.kind === "model" && isAutoModel(agent.model) && !applied.apiModel) {
       const outage = new ProviderError("could not reach provider", true);
-      if (options.finalAttempt)
-        return (await parkOutage(outage.message)) ? undefined : fail(`gave_up: ${outage.message}`);
+      outage.provider = PROVIDERS[provider as keyof typeof PROVIDERS]?.label;
+      if (options.finalAttempt) return (await parkOutage(outage)) ? undefined : fail(gaveUp(outage));
       t.autoModel = choice;
       await saveTranscript(db, t);
       await addRunStep(db, run, "error", { reason: "transient", message: String(outage), willRetry: true });
@@ -2535,6 +2634,8 @@ async function executeRunInner(
   // Read once: a later pause of this run resumes with its own text.
   delete transcript.continued;
   let computerTurns = 0;
+  /** This run ranks first in its computer's line, a person waiting on it: every computer turn of the claim says so. */
+  let personWaiting = false;
   /** The plan said "limit" during the current computer turn (`onLimit`): a turn that went on anyway proves no room. */
   let turnLimited = false;
   // Brought in without being named: another agent may have answered the same message since (the context
@@ -2781,7 +2882,12 @@ async function executeRunInner(
     const stillBusy = busy && t.roomWaitSince !== undefined;
     if (busy) {
       t.roomWaitSince ??= Date.now();
-      if (!run.background && run.hop <= 1 && viaRoutine === null) t.roomPeople = true;
+      if (!run.background && run.hop <= 1 && viaRoutine === null) {
+        t.roomPeople = true;
+        // Only the head asks again, and a person's slot can leave too little for the right hand's first ask: behind
+        // people's turns it would wait for each, though its floor is the lowest and they can't pass it.
+        if (isRightHand(agent)) t.roomOrderSince = 0;
+      }
     }
     // Just gone (our own deploy, a runner dialing again): it waits without a word until the outage grace is over.
     let quietUntil: number | null = null;
@@ -3704,15 +3810,19 @@ async function executeRunInner(
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
-        const people = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+        personWaiting = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
         // A routine's run: a person scheduled it.
         transcript.roomAsked ??=
-          !people && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
+          !personWaiting && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
         if (options.lineSince) transcript.roomOrderSince ??= options.lineSince;
-        const behind = await roomGate(db, run, roomMachine, {
-          rank: people ? 0 : transcript.roomAsked ? 1 : 2,
-          since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
-        });
+        // The right hand is how people find out what the line is doing: it never waits behind it. Its turn is
+        // locked down, so the runner lets it in on a lower floor (`admit`).
+        const behind = isRightHand(agent)
+          ? null
+          : await roomGate(db, run, roomMachine, {
+              rank: personWaiting ? 0 : transcript.roomAsked ? 1 : 2,
+              since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
+            });
         if (behind) {
           const handled = await brainUnavailable({
             code: "busy",
@@ -3727,25 +3837,17 @@ async function executeRunInner(
         }
       }
       const turn = run.turns + 1;
-      const deltas = createDeltaPublisher(
-        deps.pubsub,
-        run,
-        replyThreadId,
-        deps.deltaFlushMs ?? 50,
-        transcript.deltaSeq,
-        {
-          turn,
-          event: { type: "agent.typing", ...where },
-          onFirst: () => {
-            deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
-            if (admitted?.fromLine && !askingForRoom)
-              void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
-          },
-          quiet: run.background,
-          scrub: isRightHand(agent),
-          stretches: plan.kind === "claude_code",
+      const deltas = createDeltaPublisher(deps.pubsub, run, where, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
+        turn,
+        onFirst: () => {
+          deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
+          if (admitted?.fromLine && !askingForRoom)
+            void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
         },
-      );
+        quiet: run.background,
+        scrub: isRightHand(agent),
+        stretches: plan.kind === "claude_code",
+      });
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
       // message at once. Computer brains run tools inside their turn, so they read it at the next step.
       const turnAbort = plan.kind === "model" ? registerTurnAbort(run.id, (id) => readIds.has(id)) : null;
@@ -3815,6 +3917,7 @@ async function executeRunInner(
         }
       }
       let result: BrainStep;
+      brainFailure = undefined;
       /** The computer turned the turn away for want of room: nothing ended there that frees room. */
       let refused = false;
       // Whose month this turn counts for (ADR 0141): the person behind the run, else a routine's creator. The
@@ -3835,6 +3938,7 @@ async function executeRunInner(
             unattended,
             found: computerTurns === 0 || !turnPlan.session?.resume,
             personId,
+            personWaiting,
             // Synced during the quiet window for this very turn; where it starts is picked again from its words now
             // (what came in meanwhile may name another repository).
             ...(earlyCode?.plan === turnPlan && computerTurns === 0
@@ -3918,7 +4022,10 @@ async function executeRunInner(
           carried = null;
           // The account it ran with (ADR 0041): when it was last used, after the turn.
           const account = turnPlan.account;
-          if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
+          if (account && computerTurns === 1) {
+            const succeeded = turnPlan.kind === "claude_code";
+            later(() => touchMachineAccount(db, run.orgId, account.id, { succeeded }));
+          }
           // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
           delete transcript.roomWaitSince;
@@ -3949,9 +4056,19 @@ async function executeRunInner(
         await deltas.flush();
         await deferred;
         // Canceled mid-stream: the gateway recorded the usage so far; keep the text so far.
-        if (await isCanceled()) return stopCanceled(deltas.text());
+        if (await isCanceled()) return stopCanceled(deltas.text(), deltas.answer());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
+        if (error instanceof BrainFailure) {
+          const cause = accountFailureCause(error.code, error.provider.cause);
+          brainFailure = { code: error.code, cause };
+          const account = turnPlan.kind === "claude_code" ? turnPlan.account : undefined;
+          if (account && cause) {
+            const { httpStatus } = error.provider;
+            const failure = { orgId: run.orgId, accountId: account.id, code: error.code, cause };
+            later(() => noteAccountFailure(db, httpStatus ? { ...failure, httpStatus } : failure));
+          }
+        }
         // Anything but "no room" means the computer took the turn: that wait for room is over.
         refused = error instanceof BrainFailure && error.code === "busy";
         // Dropped before the computer said or did anything (a deploy as the turn went out): still in line.
@@ -4074,14 +4191,19 @@ async function executeRunInner(
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) {
-          if (error instanceof ProviderError && !ACCOUNT_REFUSALS.has(error.status ?? 0)) options.failed?.(error);
+          // Refused on the server's own key, the account is ours: nobody else will tell us.
+          if (error instanceof ProviderError && (error.platformKey || !ACCOUNT_REFUSALS.has(error.status ?? 0)))
+            options.failed?.(error);
           return fail(reason);
         }
-        if (options.finalAttempt) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (retryableOutage(error) && (await parkOutage(message))) return;
+        // Back from a park and refused again: one try per wake, or a line's head would hit the limit on every job retry.
+        if (options.finalAttempt || (transcript.outage && retryableOutage(error))) {
+          const line = rateLimited(error) ? keyLineOf(thinker) : undefined;
+          if (retryableOutage(error) && (await parkOutage(error, line))) return;
           options.failed?.(error);
-          return fail(`gave_up: ${message}`);
+          if (error instanceof ProviderError || error instanceof BrainFailure) return fail(gaveUp(error));
+          // Neither the provider's nor the computer's: the run's catch words it as ours.
+          throw error;
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;
@@ -4094,8 +4216,21 @@ async function executeRunInner(
           await publishQueueChanged(deps.pubsub, run.orgId, ranOn);
         }
       }
-      await deltas.flush();
+      // A bridged call paused the run in this turn: what it wrote leads to a card, or the card says it already.
+      const [now] =
+        turnPlan.kind === "model"
+          ? []
+          : await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
+      await deltas.flush(
+        result.toolCalls.length === 0 && now?.status !== "waiting_approval" && now?.status !== "waiting_input",
+      );
+      if (transcript.outage?.noteId) await outageOver(transcript.outage.noteId).catch(() => {});
+      const passedLine = transcript.outage?.line;
       delete transcript.outage;
+      if (passedLine) {
+        await saveTranscript(db, transcript);
+        await kickKeyLine(db, run.orgId, passedLine);
+      }
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
       transcript.deltaSeq = deltas.seq();
@@ -4103,7 +4238,7 @@ async function executeRunInner(
       if (turnPlan.kind !== "model") mergeToolEffects(transcript, await takeBridgeEffects(db, run.id));
       // A computer brain's turn with nothing to say (its tools ran through the bridge) adds no empty message.
       if (result.content.length > 0) transcript.messages.push({ role: "assistant", content: result.content });
-      // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
+      // Text before tool calls is narration of the work: kept on the model call's step for its activity, never live.
       const turnText = dropSquashedEcho(textOf(result.content).trim());
       const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
       // The calls a computer turn ran itself (Codex's commands and edits, Claude Code's Bash, WebSearch…):
@@ -4151,20 +4286,11 @@ async function executeRunInner(
         await saveTranscript(db, transcript);
         return stopCanceled("");
       }
-      if (narration) {
-        await publishChannelEvent(deps.pubsub, {
-          type: "agent.narration",
-          ...where,
-          turn,
-          text: cutText(narration, 4000),
-        });
-      }
-
       const toolUses = result.toolCalls;
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
-        const asks: { id: string; toolUseId: string; text: string; choices: string[] | null; why: string }[] = [];
+        const asks: PauseRequests["questions"] = [];
         const secretAsks: string[] = [];
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
@@ -4189,6 +4315,7 @@ async function executeRunInner(
               toolUseId: use.id,
               text: outcome.text,
               choices: outcome.choices,
+              requestedForUserId: outcome.requestedForUserId,
               why: outcome.why,
             });
           } else if (!outcome.output.isError && waitOf(outcome.output.data)) {
@@ -4493,17 +4620,8 @@ async function executeRunInner(
               handedTo: run.id,
             }).catch(() => [])
           : [];
-      // The ones the message's reach hands it to as a note (`settleReach`) are handed already.
-      const handedByReach =
-        channelRow && outside.length > 0
-          ? await reachWillHand(db, run, channelRow, outside).catch(() => [] as string[])
-          : [];
       const unreached = channelRow
-        ? unreachedNote(
-            outside.filter((h) => !handedByReach.includes(h)),
-            channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
-            channelRow.kind !== "dm",
-          )
+        ? unreachedNote(outside, channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`, channelRow.kind !== "dm")
         : "";
       const judging = evidenceFor(t);
       // Help it asked for in this run and stopped waiting on (a person wrote meanwhile): only then a lookup.
@@ -4535,6 +4653,7 @@ async function executeRunInner(
         wakesLater: async () =>
           (plan.missionId ? await missionAsksPerson(db, plan.missionId) : false) ||
           wakesLater(db, run, (t as { detachedWaits?: { waitId: string }[] }).detachedWaits),
+        comesBack: () => comesBackHere(db, run),
         verdict: judge
           ? async () =>
               continuationVerdict(judge, {
@@ -4554,17 +4673,20 @@ async function executeRunInner(
           : null,
         evidence: judging.evidence,
       });
-      // Read as needing a person (`ask`) yet asking them for nothing it needs (a status note, an optional offer): it is
-      // its answer, never a nudge to ask nor a question card the run would wait on. On a judge error the rule stands.
-      if (judge && decision.verdict === "ask" && (decision.rule === "ask" || decision.rule === "ask_card")) {
-        const asks = await askVerdict(judge, {
-          orgId: run.orgId,
-          agentId: run.agentId,
-          runId: run.id,
-          question: judged,
-          request: t.request ?? triggerMessage?.body ?? triggerText,
-          ...judging.evidence,
-        }).catch(() => "person" as const);
+      // On its way to asking a person, by the verdict `ask` or by repeating a promise (`continue`), yet asking them for
+      // nothing it needs (a status note, an optional offer, a question it already asked): it is its answer, never a
+      // nudge to ask nor a question card the run would wait on. On a judge error the rule stands.
+      if (judge && (decision.rule === "ask" || decision.rule === "ask_card")) {
+        const asks = (await repeatedAsk(db, run, judged))
+          ? "none"
+          : await askVerdict(judge, {
+              orgId: run.orgId,
+              agentId: run.agentId,
+              runId: run.id,
+              question: judged,
+              request: t.request ?? triggerMessage?.body ?? triggerText,
+              ...judging.evidence,
+            }).catch(() => (saysNeedsNothing(judged) ? ("none" as const) : ("person" as const)));
         if (asks === "none") decision = { outcome: "done", rule: "asks_nothing", verdict: "done" };
       }
       turnEnd = decision;
@@ -4765,7 +4887,13 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null; unattended?: boolean } = {},
+  options: {
+    found?: boolean;
+    code?: Promise<CodeSetup | null>;
+    personId?: string | null;
+    personWaiting?: boolean;
+    unattended?: boolean;
+  } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
   // Refused once in this run, its other turns don't ask again.
@@ -4825,6 +4953,7 @@ function brainTurnOf(
     trigger,
     ...(options.code ? { code: options.code } : {}),
     ...(options.personId ? { personId: options.personId } : {}),
+    ...(options.personWaiting ? { personWaiting: true } : {}),
   };
 }
 
@@ -4974,6 +5103,10 @@ async function thinkOnce(
         undefined,
         event.serverStop === true,
         event.worked,
+        {
+          ...(event.cause ? { cause: event.cause } : {}),
+          ...(event.httpStatus ? { httpStatus: event.httpStatus } : {}),
+        },
       );
     } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     else if (event.type === "speed_fallback") hooks.onSpeedFallback?.(event.message);
@@ -5126,6 +5259,9 @@ export async function executeToolForRun(
   return { ...result, isError: result.isError === true };
 }
 
+const hasToolUse = (m: Transcript["messages"][number]) =>
+  typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use");
+
 /**
  * When the final model call wrote nothing: the agent's last narration since
  * the last post ("Installed Go and built it."), else a plain "Done." when it
@@ -5138,7 +5274,7 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
     .filter(Boolean)
     .at(-1);
   if (last) return last;
-  const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
+  const usedTools = turns.some(hasToolUse);
   return usedTools && !anythingPosted ? DONE_TEXT : "";
 }
 
@@ -5183,22 +5319,30 @@ function postAgentMessage(
   });
 }
 
+/** Model text this long is read as the answer: what it writes before a tool call ("I need the inbox id") is shorter. */
+const WORKING_TEXT_MAX = 280;
+
 /**
  * Batches stream deltas so a fast model doesn't send one pub/sub message per
  * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
  * NOTIFY payload limit. `seq` continues across the turns of a run. The silence
  * word (NO_REPLY) never shows live, on any run: what could still become it is
  * held, and it is cut when it shows up (`visibleText`, reply-policy.ts).
+ *
+ * People read a reply's answer, never its working text. No brain's stream says which is which until the next tool
+ * call or the turn's end, so each stretch is held until it ends the turn (`flush(true)`) or reaches `WORKING_TEXT_MAX`;
+ * a tool call drops what was held. The cost: a short answer arrives whole at the turn's end, and working text past
+ * that length still shows until its call.
  */
 function createDeltaPublisher(
   pubsub: PubSub,
   run: AgentRun,
-  threadId: string | null,
+  /** Where the run answers, read at each event: a computer brain's turn can move mid-way. */
+  where: { channelId: string; threadId: string | null; agentId: string; runId: string },
   flushMs: number,
   startSeq = 0,
   first: {
     turn: number;
-    event?: ChannelEvent;
     onFirst?: () => void;
     /** Background work (a routine's run): nothing of its text shows live in the conversation. */
     quiet?: boolean;
@@ -5216,6 +5360,13 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
+  /** The stretches read as the answer so far, and where the current one starts in `all`. */
+  let kept = "";
+  let openAt = 0;
+  const showable = (final: boolean) => {
+    const open = all.slice(openAt);
+    return final || open.trim().length >= WORKING_TEXT_MAX ? kept + open : kept;
+  };
   const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
@@ -5247,7 +5398,7 @@ function createDeltaPublisher(
     timer = null;
     sentUpTo = all.length;
     if (first.quiet) return;
-    const said = visibleText(all, final);
+    const said = visibleText(showable(final), final);
     const visible = first.scrub ? scrubSignIns(final ? said : said.slice(0, said.search(/\S*$/)), "••••").text : said;
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
@@ -5263,8 +5414,8 @@ function createDeltaPublisher(
       rest = rest.slice(MAX_CHUNK);
       const evt: ChannelEvent = {
         type: "agent.delta",
-        channelId: run.channelId,
-        threadId,
+        channelId: where.channelId,
+        threadId: where.threadId,
         runId: run.id,
         agentId: run.agentId,
         seq: seq++,
@@ -5283,17 +5434,16 @@ function createDeltaPublisher(
         started = true;
         first.onFirst?.();
         // Published in order, before the first delta.
-        const typing = first.quiet ? undefined : first.event;
-        if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
+        if (!first.quiet) pending = pending.then(() => publishChannelEvent(pubsub, { type: "agent.typing", ...where }));
       }
       all += text;
       if (text) marks.push([Date.now(), all.length]);
       if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
       else timer ??= setTimeout(() => send(), flushMs);
     },
-    async flush() {
-      // The turn's text is complete: what was held is shown now, unless it was the word.
-      send(true);
+    /** `answer`: the turn ended on this text, not on a tool call or a failure: what was held shows, unless it was the word. */
+    async flush(answer = false) {
+      send(answer);
       liveTurns.delete(run.id);
       await pending;
     },
@@ -5301,6 +5451,8 @@ function createDeltaPublisher(
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
       breaks.push([Date.now(), all.length]);
+      kept = showable(false);
+      openAt = all.length;
       if (!first.stretches) return;
       // The stretch is over, so what waited for its last word to grow is whole, and starts no later text.
       send(true);
@@ -5317,6 +5469,8 @@ function createDeltaPublisher(
      * calls set apart as paragraphs.
      */
     text: () => stretches().join("\n\n"),
+    /** What a stopped reply shows: the stretches read as the answer and the one it was on, none a call ended. */
+    answer: () => showable(true),
     /**
      * What the brain said after its last call, as its final answer is (the model brain's is its last call's text): the
      * stretches before it were said on the way, or dropped half-written for a call and written again after it.

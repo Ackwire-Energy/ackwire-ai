@@ -153,6 +153,18 @@ describe("Anthropic adapter (scripted transport)", () => {
   });
 });
 
+test("a stream that fails with no words is the provider's own failure: it's retried, never \"rejected (?)\"", async () => {
+  const { fetcher } = scripted(sse([start(5)], "event: error\ndata: {}\n\n"));
+  const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+  const error = await provider
+    .stream(
+      { model: "claude-haiku-5-5", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 100 },
+      { apiKey: "k", onDelta: () => {} },
+    )
+    .catch((e: unknown) => e);
+  expect(error).toMatchObject({ message: "provider error", retryable: true });
+});
+
 test("effort none: Haiku 5.5 thinks not at all at low effort; a model that can't stop thinking gets low", async () => {
   const done = sse([
     start(1),
@@ -425,6 +437,22 @@ describe("preserved thinking: thinking sent back under other tools (accounts cre
       retryable: false,
       status: 400,
       message: `${REFUSAL} (sent again without its thinking: provider rejected the request (400 invalid_request_error): prompt is too long: 1048577 tokens > 1000000 maximum)`,
+      said: "prompt is too long: 1048577 tokens > 1000000 maximum",
+    });
+  });
+
+  test("a 403 keeps the API's words: they say why the key has no access", async () => {
+    const said = "This organization has been disabled.";
+    const { fetcher } = scripted(
+      JSON.stringify({ type: "error", error: { type: "permission_error", message: said } }),
+      403,
+    );
+    const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+    const error = await ask(provider, unreadableHistory(), AFTER).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      message: `provider denied access (403 permission_error): ${said}`,
+      status: 403,
+      said,
     });
   });
 

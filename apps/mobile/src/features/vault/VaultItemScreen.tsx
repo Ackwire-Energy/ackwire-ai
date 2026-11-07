@@ -140,6 +140,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
       title={item.title}
       subtitle={`${kindName} · ${scopeName}`}
       {...(editable && dirty ? { action: { label: t("common.save"), onPress: save, disabled: update.isPending } } : {})}
+      locked={update.isPending}
     >
       {item.missing ? (
         <View style={styles.note}>

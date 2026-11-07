@@ -9,6 +9,7 @@ import {
   isHowTo,
   isPlaybook,
   itemVisibleIn,
+  itemWords,
   listAgentMemoryRows,
   listOrgMemoryRows,
   listProposals,
@@ -17,10 +18,13 @@ import {
   ownerDecides,
   type Proposal as ProposalRow,
   requirePermission,
+  resolveNotifications,
   revertMemoryChange,
+  SERVER_REASONS,
   SETTING_GROUP,
   settingsGroup,
   userVisibleChannels,
+  WAITING_GROUP,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -36,6 +40,10 @@ const Memory = z
         "`rule`: a lasting rule a person gave the agent (a permission, where to send things), followed in every run it does for them; `origin` says who and when.",
     }),
     text: z.string(),
+    how: z.enum(["refused", "corrected"]).nullable().optional().openapi({
+      description:
+        "A lesson from something a person refused or corrected: `text` is what it is about, and the apps say the rest in the person's language.",
+    }),
     source: z.string().openapi({ example: "Learned in #eng · Oct 12" }),
     origin: z
       .object({
@@ -154,7 +162,11 @@ const Proposal = z
         "`agent_settings` once applied: its receipt on the card, for Desfazer (`POST …/agent-actions/{id}/undo`).",
     }),
     title: z.string(),
-    why: z.string(),
+    why: z.string().openapi({ description: "Words of a person or an agent; empty when `whyCode` alone says it." }),
+    whyCode: z.enum(["refused", "corrected", "seen", "skill", "asked", "budget", "no_channel"]).nullable().openapi({
+      description:
+        "How it came, for the apps to say in the person's language (`why` holds the words it is about, if any): a refusal or a correction it was made from, `seen` (its memory is gone), `skill` (from using the skill), `asked` (in a conversation, no reason given), `budget` or `no_channel` (the week's review of the team). Null: `why` as it is.",
+    }),
     evidence: z.array(
       z.object({
         where: z.string(),
@@ -184,6 +196,17 @@ const Proposal = z
     decidedAt: z.string().nullable(),
   })
   .openapi("Proposal");
+
+/** The reason a proposal gives people: never a template or a line written for the agent. */
+function proposalWhy(r: ProposalRow, items: ContextItem[]) {
+  const words = items.map(itemWords);
+  if (words.length > 0)
+    return { why: words.map((w) => w.text).join(" "), whyCode: words.find((w) => w.how)?.how ?? null };
+  if (r.target === "skill") return { why: "", whyCode: "skill" as const };
+  if (r.itemIds.length > 0) return { why: "", whyCode: "seen" as const };
+  const whyCode = SERVER_REASONS[r.rationale] ?? null;
+  return { why: whyCode ? "" : r.rationale, whyCode };
+}
 
 const shortDate = (d: Date) => d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
 
@@ -225,7 +248,9 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       ),
     );
   // A version merged in from a channel the viewer can't read isn't quoted.
-  const previous = new Map(replaced.filter((r) => itemVisibleIn(r, visible)).map((r) => [r.supersededBy, r.content]));
+  const previous = new Map(
+    replaced.filter((r) => itemVisibleIn(r, visible)).map((r) => [r.supersededBy, itemWords(r).text]),
+  );
   const people = items.flatMap((i) => (i.createdByKind === "person" && i.createdById ? [i.createdById] : []));
   const names = new Map(
     (people.length
@@ -262,7 +287,7 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       id: i.id,
       agentId: i.agentId ?? "",
       kind: KIND[i.kind],
-      text: i.content,
+      ...itemWords(i),
       source: `${how}${where} · ${shortDate(i.createdAt)}`,
       origin: { by, name, channel, at: i.createdAt.toISOString() },
       uses: i.useCount,
@@ -422,11 +447,11 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
       askedAt: r.askedAt ? r.askedAt.toISOString() : null,
       undoActionId: receiptOf.get(r.id) ?? null,
       title: TITLE[r.target](r.target === "skill" ? (r.access?.[0]?.label ?? "") : name),
-      why: sourceItems.map((i) => i.content).join(" ") || r.rationale,
+      ...proposalWhy(r, sourceItems),
       evidence: sourceItems.flatMap((i) =>
         i.evidence.map((e) => ({
           where: evidenceLabel[e.type],
-          what: i.content,
+          what: itemWords(i).text,
           channelId: i.channelIds[0] ?? null,
           type: e.type,
         })),
@@ -609,6 +634,12 @@ export function memoryRoutes(deps: AppDeps) {
         status: q.status === "refused" ? "rejected" : q.status,
         ids: q.ids?.split(",").filter((id) => z.uuid().safeParse(id).success),
       });
+      // An inbox row can outlive what it was for (the text changed by hand, the agent archived): this list ends it.
+      if (!q.ids && !q.status && !q.agentId && !rows.some((r) => r.canDecide))
+        await resolveNotifications({ db, pubsub: deps.adapters.pubsub }, c.req.valid("param").orgId, {
+          groupKey: WAITING_GROUP,
+          userIds: [c.get("user").id],
+        });
       return c.json({ proposals: await proposalViews(db, rows) }, 200);
     },
   );

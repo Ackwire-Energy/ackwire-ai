@@ -1,13 +1,12 @@
 import type { ArtifactRef, Message, ReplyRef } from "../api/types";
+import { artifactRefs } from "./artifacts";
+import { plainLine } from "./markdown";
 import { mediaKindOf, messageMediaOf } from "./media";
 import { voiceOf } from "./voice";
 
-/** Same rule as the server (`replyExcerpt`): one line, no code fences, ~200 characters. */
+/** Same rule as the server (`replyExcerpt`): one line of plain words, ~200 characters. */
 export function quoteExcerpt(body: string, max = 200): string {
-  const line = body
-    .replace(/```[\w+-]*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const line = plainLine(body);
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }
 
@@ -30,6 +29,7 @@ export function replyOf(meta: Record<string, unknown> | undefined): ReplyRef | n
     authorName: typeof o.authorName === "string" ? o.authorName : "",
     excerpt: o.excerpt,
     ...(media ? { media } : {}),
+    ...(o.deleted === true ? { deleted: true } : {}),
   };
 }
 
@@ -46,7 +46,7 @@ export function localMeta(quote: Message | null, authorName: string, files: Arti
       author: quote.author,
       authorName,
       // A quote of a voice message names it: its words never travel.
-      excerpt: voice ? "" : quoteExcerpt(quote.body),
+      excerpt: voice ? "" : quoteExcerpt(quote.body || (artifactRefs(quote.meta)[0]?.title ?? "")),
       ...(media ? { media } : {}),
     } satisfies ReplyRef;
   }

@@ -3,7 +3,13 @@ import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { proposalTarget, proposalTitle, proposerOf } from "@agenteschat/client/lib/proposals";
+import {
+  proposalTarget,
+  proposalTitle,
+  proposalWhy,
+  proposerOf,
+  sortProposals,
+} from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -14,6 +20,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  Locked,
   PageHeader,
   Textarea,
 } from "@agenteschat/ui";
@@ -21,28 +28,27 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ApprovalsTabs } from "@/components/ApprovalsTabs";
 import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useToast } from "@/lib/toast";
-
-/** Pending first, then decided; newest first inside each. */
-export function sortProposals(list: Proposal[]) {
-  return [...list].sort((a, b) => {
-    if ((a.status === "pending") !== (b.status === "pending")) return a.status === "pending" ? -1 : 1;
-    return a.createdAt < b.createdAt ? 1 : -1;
-  });
-}
 
 /** Proposals: list + detail with evidence and a neutral before/after diff. */
 export function ProposalsPage({ agentId }: { agentId?: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const look = useRightHandLook();
   const dir = useDirectory(org.id);
   const proposals = useProposals(org.id);
   const decide = useDecideProposal(org.id);
-  const list = useMemo(() => sortProposals(proposals.data ?? []), [proposals.data]);
   const [selected, setSelected] = useState<string | null>(null);
+  // A stale row asks nothing of anyone and repeats what newer rows say: only the one open here stays, with its note.
+  const list = useMemo(
+    () => sortProposals((proposals.data ?? []).filter((p) => !p.stale || p.id === selected)),
+    [proposals.data, selected],
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [staleError, setStaleError] = useState<string | null>(null);
@@ -78,9 +84,11 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
     p.stale
       ? t("proposals.stale")
       : p.status === "pending"
-        ? p.decider.type === "user"
-          ? t("proposals.waitingFor", { name: p.decider.name })
-          : t("proposals.waitingAdmin")
+        ? p.canDecide
+          ? t("approval.waitingYou")
+          : p.decider.type === "user"
+            ? t("proposals.waitingFor", { name: p.decider.name })
+            : t("proposals.waitingAdmin")
         : p.status === "accepted"
           ? t("proposals.accepted")
           : t("proposals.refused");
@@ -94,7 +102,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   };
 
   return (
-    <div className="page page--full page--tight">
+    <div className="page page--full page--tight" style={{ gap: 14 }}>
       {backAgent && (
         <Link
           to="/org/$orgId/agents/$agentId/memory"
@@ -105,9 +113,14 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <PageHeader title={t("proposals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <PageHeader title={t("approvals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <ApprovalsTabs value="proposals" />
 
-      {proposals.isSuccess && list.length === 0 && <EmptyState icon="agent">{t("proposals.empty")}</EmptyState>}
+      {proposals.isSuccess && list.length === 0 && (
+        <EmptyState size="page" agent={look} mood="deal" title={t("proposals.emptyTitle")}>
+          {t("proposals.empty")}
+        </EmptyState>
+      )}
 
       {current && (
         <div className="proposals">
@@ -149,7 +162,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                 <Chip icon="close">{t("proposals.stale")}</Chip>
               ) : current.status === "pending" ? (
                 <Chip icon="waiting" tone="waiting">
-                  {current.canDecide ? t("approval.waitingYou") : statusText(current)}
+                  {statusText(current)}
                 </Chip>
               ) : current.status === "accepted" ? (
                 <Chip icon="check" tone="done">
@@ -165,7 +178,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
             <section aria-label={t("proposals.why")} className="section section--tight">
               <span className="ac-eyebrow">{t("proposals.why")}</span>
-              <p style={{ margin: 0 }}>{current.why}</p>
+              <p style={{ margin: 0 }}>{proposalWhy(t, current)}</p>
               <ul className="evidence">
                 {current.evidence.map((e) => (
                   <li key={`${e.where}-${e.what}`} className="ac-iconline">
@@ -182,7 +195,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               <div className="row">
                 <span className="ac-eyebrow spacer">{t("proposals.change", { target: targetLabel(current) })}</span>
                 {current.status === "pending" && current.canDecide && isText(current) && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                  <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
                   </Button>
                 )}
@@ -196,7 +209,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   }
                   id="prop-edit"
                 >
-                  <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  <Locked when={decide.isPending || current.stale}>
+                    <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  </Locked>
                 </Field>
               ) : (
                 <Diff

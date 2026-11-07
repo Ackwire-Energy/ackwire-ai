@@ -210,7 +210,7 @@ export const words: EmailWords = {
     account: (email) => [
       "输入这个验证码即可删除整个账号 ",
       { b: email },
-      "，而不只是一个工作区。账号会立即删除，只有你一人的工作区也会随之关闭。",
+      "，而不只是一个工作区。账号会立即在所有设备上退出登录，7 天后被永久删除，只有你一人的工作区也会随之关闭。",
     ],
     support: (address) => [
       "验证码 10 分钟内有效，没有它什么都不会被删除。如果不是你本人操作，请不要告诉任何人，并写信至 ",
@@ -253,6 +253,20 @@ export const words: EmailWords = {
     note: "不是你连接的？请立即断开它，并修改密码。",
     button: "查看已连接的应用",
     why: (org) => `你收到这封邮件，是因为有应用连接到了你在 agentes.chat 上 ${org} 的账号。`,
+  },
+  accountDeleting: {
+    subject: (day) => `你的 agentes.chat 账号将于 ${day} 删除`,
+    preheader: "你有 7 天时间改变主意。",
+    headline: "你的账号正在删除",
+    body: (email, day, time) => [
+      "我们将删除账号 ",
+      { b: email },
+      `，时间是 ${day} ${time}。它已在所有设备上退出登录，在你回来之前，这里没有人能联系到你。`,
+    ],
+    closes: (_count, names) => ["只有你一人的工作区现已关闭，并在同一天删除：", ...names, "。"],
+    undo: "改变主意了？在那之前登录并点击“恢复”。",
+    button: "登录并恢复",
+    why: "你收到这封邮件，是因为这个地址在 agentes.chat 上有一个账号。",
   },
   accountDeleted: {
     subject: "你的 agentes.chat 账号已删除",
@@ -331,5 +345,20 @@ export const words: EmailWords = {
     note: "在通知里点一下就能收回，之后这个智能体不再用你的套餐思考。",
     button: "打开通知",
     why: (org) => `你收到这封邮件，是因为 ${org} 里有人把你的套餐连接到了一个智能体。`,
+  },
+  planWaiting: {
+    subject: "你的团队正在等待",
+    preheader: "你的工作区已就绪。还需要一个 agentes.chat 套餐才能开始。",
+    headline: "你的团队正在等待",
+    body: (agents, channels, routines) => {
+      const a = `${agents} 个智能体`;
+      const c = `${channels} 个频道`;
+      const r = `${routines} 个例行任务`;
+      return routines > 0
+        ? `${a}、${c}和${r}已就绪。还需要一个 agentes.chat 套餐才能开始。`
+        : `${a}和${c}已就绪。还需要一个 agentes.chat 套餐才能开始。`;
+    },
+    button: "查看 agentes.chat 套餐",
+    why: (org) => `你收到这封邮件，是因为你在 agentes.chat 上管理 ${org}。此类提醒只发送两次。`,
   },
 };

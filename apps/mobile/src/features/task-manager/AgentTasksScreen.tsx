@@ -1,15 +1,24 @@
 import type { ManagedTask } from "@agenteschat/client";
-import { linePlace, taskSince, taskTitle, taskWhere } from "@agenteschat/client/lib/task-manager";
+import {
+  agentCardLine,
+  helpersOf,
+  hiddenCount,
+  linePlace,
+  taskSince,
+  taskTitle,
+  taskWhere,
+} from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Chip, Count, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
+import { Button, Chip, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useAgentTasks, useStopper } from "./hooks";
@@ -47,8 +56,10 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   const layout = reduced ? undefined : LinearTransition.duration(220);
   const name = dir.nameOf({ type: "agent", id: agentId }) || t("channel.unknownAgent");
   const count = view?.rows.length ?? 0;
+  const hidden = hiddenCount(query.data?.hidden, agentId);
   const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
+  const helpers = helpersOf((view?.rows ?? []).map((r) => r.task).filter((task) => stoppable.includes(task.runId)));
   return (
     <PushedLargeTitle
       title={t("taskManager.agentTasks", { name })}
@@ -91,16 +102,19 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
                       stopping={stopping}
                       now={now}
                       divider={i > 0}
-                      onStop={() => stop([task.runId])}
+                      onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
                     />
                   </Animated.View>
                 ))}
               </>
             ) : (
               <Animated.View {...fade}>
-                <Text variant="footnote" tone="faint" style={styles.free}>
-                  {t("taskManager.agentPanel.none", { name })}
-                </Text>
+                <EmptyState
+                  size="panel"
+                  agent={agentLook(dir.anyAgent(agentId))}
+                  mood="deal"
+                  title={hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
+                />
               </Animated.View>
             )}
             {asking && stoppable.length > 1 ? (
@@ -108,10 +122,11 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
                 <StopConfirm
                   agentId={agentId}
                   count={stoppable.length}
+                  helpers={helpers}
                   onCancel={() => setAsking(false)}
                   onStop={(reason) => {
                     setAsking(false);
-                    stop(stoppable, reason);
+                    stop(stoppable, reason, helpers > 0);
                   }}
                 />
               </Animated.View>

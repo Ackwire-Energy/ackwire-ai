@@ -124,7 +124,8 @@ test("Quem pensa: Gemini where its runner and CLI are, its models as the CLI lis
     models: [{ value: "gemini-4-argon-high", label: "Gemini 4 Argon (High)", modelId: "gemini-4-argon" }],
   });
   expect(option(machine({ protocol: ANTIGRAVITY_PROTOCOL - 1 }))).toMatchObject({ reason: "runner_old" });
-  expect(option(machine({ executors: {} }))).toMatchObject({ reason: "not_installed" });
+  expect(option(machine({ executors: { detectedAt: "x" } }))).toMatchObject({ reason: "not_installed" });
+  expect(option(machine({ executors: {} }))).toMatchObject({ reason: "not_reported" });
   expect(antigravityModels([]).map((m) => m.value)).toEqual(ANTIGRAVITY_MODELS.map((m) => m.id));
   expect(defaultBrainModel("antigravity")).toBeNull();
   expect(isBrainKind("antigravity") && isComputerBrain("antigravity")).toBe(true);

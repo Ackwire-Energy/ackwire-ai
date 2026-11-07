@@ -47,7 +47,7 @@ import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { holdersOf } from "@agenteschat/client/lib/roles";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { SKILL_UPDATE_TOAST } from "@agenteschat/client/lib/skills";
-import { Button, Dialog, Icon, Spinner } from "@agenteschat/ui";
+import { Button, Dialog, EventPillAction, Icon, Spinner } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -62,7 +62,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { PersonLimitCardView } from "@/components/PeopleUsage";
-import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
+import { RequestCard, RequestDone, RequestFuse, RequestOpen, useExpired } from "@/components/RequestCard";
 import {
   ApprovalsCardView,
   MemberChangesCardView,
@@ -74,7 +74,7 @@ import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
 import { TeamPlanCardView } from "@/components/TeamPlan";
 import { TeamWeekCardView } from "@/components/TeamWeekCard";
-import { UsagePauseCardView } from "@/components/UsagePauseCard";
+import { TextAction, UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { inPlaceClick } from "@/lib/navigate";
@@ -89,11 +89,12 @@ const DAY_MS = 24 * 3_600_000;
 const NewAgentPage = lazy(() => import("@/pages/NewAgentPage").then((m) => ({ default: m.NewAgentPage })));
 
 /**
- * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
- * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
- * the agents it names (the dialog says what each person may do), and is one line, "Conectado", once they can think.
- * A proposal of a new agent (ADR 0081) is a request while it is open (`AgentProposalCardView`); a stretch's pause with
- * Continuar (ADR 0089) is its own card.
+ * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's credentials or
+ * consent, one click away, as a waiting pill (`RequestOpen`) that turns into a decided one (`RequestDone`). "Connect
+ * an AI" waits for the viewer with "Connect", which opens the Connect dialog at the card's step for the agents it names
+ * (the dialog says what each person may do), its why under it; "Connected" once they can think. A proposal of a new
+ * agent (ADR 0081) is a request card while it is open (`AgentProposalCardView`); a stretch's pause with "Continue"
+ * (ADR 0089) is its own pill.
  */
 export function ActionCard({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -141,17 +142,16 @@ export function ActionCard({ message }: { message: Message }) {
       </RequestDone>
     );
   }
+  // The dialog says what each person may connect: Connect is everyone's.
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="plug" size={16} />
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      {connect && (
-        <span className="waitcard__acts">
-          <Button
-            size="sm"
+    <RequestOpen
+      mine={connect !== null}
+      icon="plug"
+      label={title}
+      action={
+        connect ? (
+          <EventPillAction
+            primary
             onClick={() =>
               connect.open({
                 intent: card.what,
@@ -162,17 +162,21 @@ export function ActionCard({ message }: { message: Message }) {
             }
           >
             {t("actionCard.connect")}
-          </Button>
-        </span>
-      )}
-    </div>
+          </EventPillAction>
+        ) : undefined
+      }
+      below={card.why ? <p>{card.why}</p> : undefined}
+    >
+      {title}
+    </RequestOpen>
   );
 }
 
 /**
- * "Conectar Linear" / "Adicionar MCP" (`offer_connect_app`): Conectar opens the same connect dialog as Settings, at the
- * catalog entry or at connecting by address with the address filled in; the person signs in or types the key there.
- * Who may not connect reads who does. Done once the workspace has it.
+ * "Connect Linear" / "Add MCP" (`offer_connect_app`) as a waiting pill: "Connect" opens the same connect dialog as
+ * Settings, at the catalog entry or at connecting by address with the address filled in; the person signs in or types
+ * the key there. Its why and address go under it, and who may not connect reads who does there. Done once the
+ * workspace has it.
  */
 function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
   const { t } = useTranslation();
@@ -192,35 +196,48 @@ function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
       </RequestDone>
     );
   }
+  const may = can(org, "manage_connectors");
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        {def ? <ConnectorIcon def={def} label={name} /> : <Icon name="plug" size={16} />}
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      {card.url && (
-        <p className="small">
-          <code>{card.url}</code>
-        </p>
-      )}
-      <span className="waitcard__acts">
-        {can(org, "manage_connectors") ? (
-          <Button size="sm" onClick={() => setFlow(def ? { step: 0, def } : { step: 0, def: null, url: card.url })}>
-            {t("actionCard.connect")}
-          </Button>
-        ) : (
-          <span className="small muted">{t("actionCard.connect_app.adminOnly")}</span>
-        )}
-      </span>
+    <>
+      <RequestOpen
+        mine={may}
+        icon="plug"
+        label={title}
+        action={
+          may ? (
+            <EventPillAction
+              primary
+              onClick={() => setFlow(def ? { step: 0, def } : { step: 0, def: null, url: card.url })}
+            >
+              {t("actionCard.connect")}
+            </EventPillAction>
+          ) : undefined
+        }
+        below={
+          card.why || card.url || !may ? (
+            <>
+              {card.why && <p>{card.why}</p>}
+              {card.url && (
+                <p>
+                  <code>{card.url}</code>
+                </p>
+              )}
+              {!may && <p>{t("actionCard.connect_app.adminOnly")}</p>}
+            </>
+          ) : undefined
+        }
+      >
+        {title}
+      </RequestOpen>
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
-    </div>
+    </>
   );
 }
 
 /**
- * "Instalar uma skill" (`offer_install_skill`): Instalar opens Instalar skill with the link read, its skills listed to
- * pick; who manages agents installs there. Done once the library has a skill from that link.
+ * "Install a skill" (`offer_install_skill`) as a waiting pill, its why and link under it: "Install" opens Install
+ * skill with the link read, its skills listed to pick; who manages agents installs there. Done once the library has a
+ * skill from that link.
  */
 function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
   const { t } = useTranslation();
@@ -237,24 +254,30 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
     );
   }
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="book" size={16} />
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      <p className="small">
-        <code>{card.url}</code>
-      </p>
-      <span className="waitcard__acts">
-        {may ? (
-          <Button size="sm" onClick={() => setOpen(true)}>
-            {t("actionCard.install_skill.open")}
-          </Button>
-        ) : (
-          <span className="small muted">{t("actionCard.install_skill.adminOnly")}</span>
-        )}
-      </span>
+    <>
+      <RequestOpen
+        mine={may}
+        icon="book"
+        label={title}
+        action={
+          may ? (
+            <EventPillAction primary onClick={() => setOpen(true)}>
+              {t("actionCard.install_skill.open")}
+            </EventPillAction>
+          ) : undefined
+        }
+        below={
+          <>
+            {card.why && <p>{card.why}</p>}
+            <p>
+              <code>{card.url}</code>
+            </p>
+            {!may && <p>{t("actionCard.install_skill.adminOnly")}</p>}
+          </>
+        }
+      >
+        {title}
+      </RequestOpen>
       {may && (
         <InstallSkillDialog
           open={open}
@@ -263,14 +286,14 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
           initialUrl={open ? card.url : undefined}
         />
       )}
-    </div>
+    </>
   );
 }
 
 /**
- * "Atualizar skills" (`update_skill_from_source`): each skill with where it stands. Atualizar reads its link (new text
- * applies, files that run wait); Revisar opens the skill, where its waiting update is applied or refused. Done once
- * every one was read after the card and nothing waits.
+ * "Update skills" (`update_skill_from_source`) as a waiting pill, each skill a line under it with where it stands.
+ * "Update" reads its link (new text applies, files that run wait); "Review" opens the skill, where its waiting update
+ * is applied or refused. Done once every one was read after the card and nothing waits.
  */
 function UpdateSkillsCardView({ message, card }: { message: Message; card: UpdateSkillsCard }) {
   const { t } = useTranslation();
@@ -299,56 +322,63 @@ function UpdateSkillsCardView({ message, card }: { message: Message; card: Updat
       </RequestDone>
     );
   }
+  const update = (r: (typeof rows)[number]) =>
+    action.mutate(
+      { type: "updateFromSource", id: r.id },
+      { onSuccess: (u) => toast.show(t(SKILL_UPDATE_TOAST[(u as SkillSourceUpdate).status], { name: r.name })) },
+    );
+  const named = rows.filter((r) => r.name);
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="book" size={16} />
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      <ul className="stack-2">
-        {rows
-          .filter((r) => r.name)
-          .map((r) => (
-            <li key={r.id} className="row" style={{ gap: 8, alignItems: "center" }}>
-              <b>{r.name}</b>
-              {r.state === "done" ? (
-                <span className="small muted">{t("actionCard.update_skills.done")}</span>
-              ) : !may ? (
-                r.state === "waiting" && <span className="small muted">{t("actionCard.update_skills.waiting")}</span>
-              ) : r.state === "waiting" ? (
-                <Button size="sm" onClick={() => setOpen(r.id)}>
-                  {t("actionCard.update_skills.review")}
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  disabled={action.isPending}
-                  onClick={() =>
-                    action.mutate(
-                      { type: "updateFromSource", id: r.id },
-                      {
-                        onSuccess: (u) =>
-                          toast.show(t(SKILL_UPDATE_TOAST[(u as SkillSourceUpdate).status], { name: r.name })),
-                      },
-                    )
-                  }
-                >
-                  {t("actionCard.update_skills.update")}
-                </Button>
-              )}
-            </li>
-          ))}
-      </ul>
-      {!may && <span className="small muted">{t("actionCard.update_skills.adminOnly")}</span>}
+    <>
+      <RequestOpen
+        mine={may}
+        icon="book"
+        label={title}
+        below={
+          <>
+            {card.why && <p>{card.why}</p>}
+            {/* A skill a line, each with its own action ("Update", "Review"): the pill's sentence covers them all. */}
+            <ul className="waitcard__lines">
+              {named.map((r) => (
+                <li key={r.id} className="ac-iconline">
+                  <Icon name={r.state === "done" ? "check" : "book"} size={14} />
+                  <span>
+                    <b>{r.name}</b>
+                    {r.state === "done" ? (
+                      <> · {t("actionCard.update_skills.done")}</>
+                    ) : !may ? (
+                      r.state === "waiting" && <> · {t("actionCard.update_skills.waiting")}</>
+                    ) : (
+                      <>
+                        {" · "}
+                        {r.state === "waiting" ? (
+                          <TextAction onClick={() => setOpen(r.id)}>{t("actionCard.update_skills.review")}</TextAction>
+                        ) : (
+                          <TextAction pending={action.isPending} onClick={() => update(r)}>
+                            {t("actionCard.update_skills.update")}
+                          </TextAction>
+                        )}
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {!may && <p>{t("actionCard.update_skills.adminOnly")}</p>}
+          </>
+        }
+      >
+        {title}
+      </RequestOpen>
       {open && <SkillSheet id={open} users={usage.get(open) ?? []} onClose={() => setOpen(null)} />}
-    </div>
+    </>
   );
 }
 
 /**
- * "Convidar pessoas" (`offer_invites`): Convidar opens the workspace's invite dialog with the addresses filled in, as
- * members; the person sends it there. Done once each address is invited or a member.
+ * "Invite people" (`offer_invites`) as a waiting pill, its why and addresses under it: "Invite" opens the workspace's
+ * invite dialog with the addresses filled in, as members; the person sends it there. Done once each address is
+ * invited or a member.
  */
 function InviteCardView({ card }: { card: InviteCard }) {
   const { t } = useTranslation();
@@ -370,23 +400,27 @@ function InviteCardView({ card }: { card: InviteCard }) {
     );
   }
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="personAdd" size={16} />
-        <span>{title}</span>
-      </span>
-      {card.why && <p>{card.why}</p>}
-      <p className="small muted">{card.emails.join(", ")}</p>
-      <span className="waitcard__acts">
-        {mayInvite && invite ? (
-          <Button size="sm" onClick={() => invite.open({ emails: card.emails })}>
+    <RequestOpen
+      mine={mayInvite && invite !== null}
+      icon="personAdd"
+      label={title}
+      action={
+        mayInvite && invite ? (
+          <EventPillAction primary onClick={() => invite.open({ emails: card.emails })}>
             {t("actionCard.invite.open")}
-          </Button>
-        ) : (
-          <span className="small muted">{t("actionCard.invite.adminOnly")}</span>
-        )}
-      </span>
-    </div>
+          </EventPillAction>
+        ) : undefined
+      }
+      below={
+        <>
+          {card.why && <p>{card.why}</p>}
+          <p>{card.emails.join(", ")}</p>
+          {!(mayInvite && invite) && <p>{t("actionCard.invite.adminOnly")}</p>}
+        </>
+      }
+    >
+      {title}
+    </RequestOpen>
   );
 }
 
@@ -569,6 +603,7 @@ export function AgentProposalCardView({
           }
           end={<RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />}
           what={draft.name}
+          locked={busy || ask.isPending}
         />
         {reviewing && (
           // Over the conversation: creating, saying no or leaving closes it, and the person is where they were.
@@ -658,15 +693,19 @@ export function AgentProposalCardView({
           label: t(delegate?.state === "approved" ? "rightHandApprovals.card.why" : "approval.seeDetails"),
           content: details,
         }}
+        time={delegate?.at ? whenAt(t, i18n.language, delegate.at) : undefined}
       >
         <b>{draft.name}</b> · {delegated}
-        {delegate?.at && ` · ${whenAt(t, i18n.language, delegate.at)}`}
       </RequestDone>
     );
   return (
-    <RequestDone done={status === "created"} label={title} more={{ label: t("approval.seeDetails"), content: details }}>
+    <RequestDone
+      done={status === "created"}
+      label={title}
+      more={{ label: t("approval.seeDetails"), content: details }}
+      time={at ? whenAt(t, i18n.language, at) : undefined}
+    >
       {ended}: <b>{draft.name}</b>
-      {at && ` · ${whenAt(t, i18n.language, at)}`}
     </RequestDone>
   );
 }

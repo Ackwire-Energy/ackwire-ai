@@ -338,10 +338,15 @@ describe("the workspace's computer on its way, on Conversas", () => {
     }
     // Ready, its agent getting it at the next refresh: seconds, nothing to offer.
     expect(offersKeyNow({ state: "preparing", view: null }, false)).toBe(false);
+    // A billing hold: a key is no way around it.
+    expect(offersKeyNow({ state: "billing", hold: "payment" }, true)).toBe(false);
     // Where the plan can't sign in there: as before.
     expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
     expect(offersKeyNow({ state: "missing" }, false)).toBe(true);
     expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false)).toBe(true);
+    // On a hold no key runs, and the line says the hold.
+    for (const gate of [{ state: "offline" }, { state: "unsupported", reason: "keys" }] as const)
+      expect(offersKeyNow(gate, true)).toBe(false);
     expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
     expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
     expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);
@@ -362,6 +367,7 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "runner_old" }, "cloud")).toBe(true);
     expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "selfhost")).toBe(false);
+    expect(pollsPlan({ state: "unsupported", reason: "not_reported" }, "selfhost")).toBe(true);
   });
 });
 

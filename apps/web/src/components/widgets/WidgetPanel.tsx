@@ -2,6 +2,7 @@ import type { WidgetDetail, WidgetSchedule, WidgetUpdate } from "@agenteschat/cl
 import { useAskWidgetChange, useRefreshWidget, useUpdateWidget, useWidget } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
+import { plainInline } from "@agenteschat/client/lib/markdown";
 import {
   Button,
   Composer,
@@ -9,6 +10,7 @@ import {
   DialogBody,
   Icon,
   Input,
+  Locked,
   Select,
   Spinner,
   Switch,
@@ -367,22 +369,24 @@ function AlertEdit({
   const id = useId();
   return (
     <div className="wd__alert">
-      <div className="wd__alert-on">
-        <Switch id={`${id}-on`} checked={enabled} onCheckedChange={setEnabled} />
-        <label htmlFor={`${id}-on`}>{t("widgets.alert.label")}</label>
-      </div>
-      {enabled && (
-        <div className="wd__cond">
-          <label htmlFor={`${id}-cond`}>{t("widgets.alert.condition")}</label>
-          <Input
-            id={`${id}-cond`}
-            value={condition}
-            maxLength={200}
-            placeholder={t("widgets.alert.placeholder")}
-            onChange={(e) => setCondition(e.target.value)}
-          />
+      <Locked when={saving}>
+        <div className="wd__alert-on">
+          <Switch id={`${id}-on`} checked={enabled} onCheckedChange={setEnabled} />
+          <label htmlFor={`${id}-on`}>{t("widgets.alert.label")}</label>
         </div>
-      )}
+        {enabled && (
+          <div className="wd__cond">
+            <label htmlFor={`${id}-cond`}>{t("widgets.alert.condition")}</label>
+            <Input
+              id={`${id}-cond`}
+              value={condition}
+              maxLength={200}
+              placeholder={t("widgets.alert.placeholder")}
+              onChange={(e) => setCondition(e.target.value)}
+            />
+          </div>
+        )}
+      </Locked>
       <div className="wd__alert-acts">
         <Button size="sm" variant="ghost" onClick={onCancel}>
           {t("common.cancel")}
@@ -409,7 +413,7 @@ function HistoryRow({ update, name, now }: { update: WidgetUpdate; name: string;
       <div className="wd__row">
         <time dateTime={update.at}>{whenAt(t, i18n.language, update.at, new Date(now))}</time>
         <span className="wd__grow" data-tone={failed ? "warn" : undefined}>
-          {failed ? historyFailure(t, update, name) : update.summary || t("widgets.panel.updated")}
+          {failed ? historyFailure(t, update, name) : plainInline(update.summary ?? "") || t("widgets.panel.updated")}
           {update.alert && <small>{t("widgets.panel.alerted", { text: update.alert })}</small>}
           {update.change && <small>{t("widgets.panel.changed", { text: update.change })}</small>}
         </span>
@@ -420,7 +424,7 @@ function HistoryRow({ update, name, now }: { update: WidgetUpdate; name: string;
 
 const historyFailure = (t: TFunction, u: WidgetUpdate, name: string) =>
   u.failureCode === "agent_reported" && u.summary
-    ? u.summary
+    ? plainInline(u.summary)
     : failureText(t, { code: u.failureCode ?? "error", detail: u.summary || null }, name);
 
 /** "Ask for a change": the words go to the agent, who redoes the widget with them. */

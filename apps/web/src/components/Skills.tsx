@@ -62,12 +62,14 @@ import {
   DialogSearchList,
   Diff,
   diffLines,
+  EmptyState,
   Field,
   Icon,
   type IconName,
   Input,
   List,
   ListRow,
+  Locked,
   SearchField,
   Switch,
   TabPanel,
@@ -80,6 +82,7 @@ import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 
@@ -185,8 +188,10 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
   const usage = useSkillUsage(org.id, admin && list.length > 0);
   const settings = useSkillSettings(org.id, admin);
   const action = useSkillAction(org.id);
+  const look = useRightHandLook();
   if (!admin) return null;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
+  const noSkills = skills.isSuccess && list.length === 0;
   return (
     <Card aria-labelledby="sec-skills">
       <CardHeader
@@ -194,7 +199,8 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         icon="bulb"
         title={t("skills.title")}
         action={
-          !unavailable && (
+          !unavailable &&
+          !noSkills && (
             <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
               {t("skills.install")}
             </Button>
@@ -217,7 +223,20 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         </>
       )}
       {skills.isLoading && <LoadingList count={3} avatar={false} />}
-      {skills.isSuccess && list.length === 0 && <p className="small muted">{t("skills.empty")}</p>}
+      {noSkills && (
+        <EmptyState
+          size="panel"
+          agent={look}
+          title={t("skills.emptyTitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setInstalling(true)}>
+              {t("skills.install")}
+            </Button>
+          }
+        >
+          {t("skills.emptyText")}
+        </EmptyState>
+      )}
       {list.length > 0 && (
         <List aria-label={t("skills.title")}>
           {list.slice(0, INLINE).map((s) => (
@@ -508,131 +527,140 @@ export function InstallSkillDialog({
             void submit();
           }}
         >
-          <DialogBody>
-            <Tabs
-              value={tab}
-              onValueChange={(v) => {
-                setTab(v);
-                setError(null);
-                setHidden(null);
-              }}
-              label={t("skills.installHow")}
-              items={[
-                { value: "github", label: t("skills.tab.github") },
-                { value: "zip", label: t("skills.tab.zip") },
-                { value: "write", label: t("skills.tab.write") },
-              ]}
-            >
-              <TabPanel value="github">
-                <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
-                  <Input
-                    value={url}
-                    onChange={(e) => {
-                      setUrl(e.target.value);
-                      setChoices(null);
-                      setHidden(null);
-                    }}
-                    placeholder="https://github.com/…"
-                    inputMode="url"
-                  />
-                </Field>
-                {repos.data?.connected && !choices && (
-                  <div className="row">
-                    <Button size="sm" onClick={() => setBrowsing(true)}>
-                      <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
-                      {t("skills.fromConnected")}
-                    </Button>
-                  </div>
-                )}
-                {said && (
-                  <div className="skill-hidden">
-                    <Alert tone="neutral">{said.text}</Alert>
-                    {said.connect && github && (
-                      <div className="row">
-                        <Button size="sm" variant="primary" onClick={() => setFlow({ step: 0, def: github })}>
-                          <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
-                          {t("skills.hidden.connectButton")}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {choices && via && <ViaLine>{skillViaText(t, via, url)}</ViaLine>}
-                {choices && (
-                  <fieldset className="skill-picks">
-                    <legend className="small muted">
-                      {t("skills.pickLead", { count: choices.length + skipped.length })}
-                    </legend>
-                    <label htmlFor="skill-pick-all" className="scope-row">
-                      <Checkbox
-                        id="skill-pick-all"
-                        checked={picked.size === 0 ? false : picked.size === choices.length ? true : "indeterminate"}
-                        onCheckedChange={(on) =>
-                          pick(
-                            choices.map((c) => c.path),
-                            on,
-                          )
-                        }
-                      />
-                      <span className="scope-row__text">{t("skills.pickAll")}</span>
-                    </label>
-                    {choices.map((c, i) => (
-                      <label key={c.path} htmlFor={`skill-pick-${i}`} className="scope-row">
+          <Locked when={action.isPending}>
+            <DialogBody>
+              <Tabs
+                value={tab}
+                onValueChange={(v) => {
+                  setTab(v);
+                  setError(null);
+                  setHidden(null);
+                }}
+                label={t("skills.installHow")}
+                items={[
+                  { value: "github", label: t("skills.tab.github") },
+                  { value: "zip", label: t("skills.tab.zip") },
+                  { value: "write", label: t("skills.tab.write") },
+                ]}
+              >
+                <TabPanel value="github">
+                  <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
+                    <Input
+                      value={url}
+                      onChange={(e) => {
+                        setUrl(e.target.value);
+                        setChoices(null);
+                        setHidden(null);
+                      }}
+                      placeholder="https://github.com/…"
+                      inputMode="url"
+                    />
+                  </Field>
+                  {repos.data?.connected && !choices && (
+                    <div className="row">
+                      <Button size="sm" onClick={() => setBrowsing(true)}>
+                        <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+                        {t("skills.fromConnected")}
+                      </Button>
+                    </div>
+                  )}
+                  {said && (
+                    <div className="skill-hidden">
+                      <Alert tone="neutral">{said.text}</Alert>
+                      {said.connect && github && (
+                        <div className="row">
+                          <Button size="sm" variant="primary" onClick={() => setFlow({ step: 0, def: github })}>
+                            <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+                            {t("skills.hidden.connectButton")}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {choices && via && <ViaLine>{skillViaText(t, via, url)}</ViaLine>}
+                  {choices && (
+                    <fieldset className="skill-picks">
+                      <legend className="small muted">
+                        {t("skills.pickLead", { count: choices.length + skipped.length })}
+                      </legend>
+                      <label htmlFor="skill-pick-all" className="scope-row">
                         <Checkbox
-                          id={`skill-pick-${i}`}
-                          checked={picked.has(c.path)}
-                          onCheckedChange={(on) => pick([c.path], on)}
+                          id="skill-pick-all"
+                          checked={picked.size === 0 ? false : picked.size === choices.length ? true : "indeterminate"}
+                          onCheckedChange={(on) =>
+                            pick(
+                              choices.map((c) => c.path),
+                              on,
+                            )
+                          }
                         />
-                        <span className="scope-row__text">
-                          <span className="skill-pick__name">{c.name}</span>
-                          <span className="small muted skill-pick__about">{c.description}</span>
-                        </span>
+                        <span className="scope-row__text">{t("skills.pickAll")}</span>
                       </label>
-                    ))}
-                    {skipped.map((s, i) => (
-                      <label key={s.path} htmlFor={`skill-skip-${i}`} className="scope-row">
-                        <Checkbox id={`skill-skip-${i}`} checked={false} disabled />
-                        <span className="scope-row__text">
-                          <span className="skill-pick__name">{s.path}</span>
-                          <span className="small muted skill-pick__about">{skippedSkillText(t, s)}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </fieldset>
-                )}
-              </TabPanel>
-              <TabPanel value="zip">
-                <span className="small muted">{t("skills.zipHelp")}</span>
-                {/* Our button over a hidden file input: never the native control look. */}
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".zip,application/zip"
-                  className="ac-visually-hidden"
-                  aria-label={t("skills.zipPick")}
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-                <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                  <Button type="button" icon="attach" onClick={() => fileInput.current?.click()}>
-                    {t("skills.zipPick")}
-                  </Button>
-                  <span className="small muted">{file ? file.name : t("skills.zipNone")}</span>
-                </div>
-              </TabPanel>
-              <TabPanel value="write">
-                <Field label={t("skills.name")} id="skill-name">
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </Field>
-                <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
-                  <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-                </Field>
-                <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
-                  <Textarea rows={10} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
-                </Field>
-              </TabPanel>
-            </Tabs>
-            {error && <Alert>{error}</Alert>}
-          </DialogBody>
+                      {choices.map((c, i) => (
+                        <label key={c.path} htmlFor={`skill-pick-${i}`} className="scope-row">
+                          <Checkbox
+                            id={`skill-pick-${i}`}
+                            checked={picked.has(c.path)}
+                            onCheckedChange={(on) => pick([c.path], on)}
+                          />
+                          <span className="scope-row__text">
+                            <span className="skill-pick__name">{c.name}</span>
+                            <span className="small muted skill-pick__about">{c.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                      {skipped.map((s, i) => (
+                        <label key={s.path} htmlFor={`skill-skip-${i}`} className="scope-row">
+                          <Checkbox id={`skill-skip-${i}`} checked={false} disabled />
+                          <span className="scope-row__text">
+                            <span className="skill-pick__name">{s.path}</span>
+                            <span className="small muted skill-pick__about">{skippedSkillText(t, s)}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                </TabPanel>
+                <TabPanel value="zip">
+                  <span className="small muted">{t("skills.zipHelp")}</span>
+                  {/* Our button over a hidden file input: never the native control look. */}
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".zip,application/zip"
+                    className="ac-visually-hidden"
+                    aria-label={t("skills.zipPick")}
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <Button type="button" icon="attach" onClick={() => fileInput.current?.click()}>
+                      {t("skills.zipPick")}
+                    </Button>
+                    <span className="small muted">{file ? file.name : t("skills.zipNone")}</span>
+                  </div>
+                </TabPanel>
+                <TabPanel value="write">
+                  <Field label={t("skills.name")} id="skill-name">
+                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </Field>
+                  <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
+                    <Input
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    />
+                  </Field>
+                  <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
+                    <Textarea
+                      rows={10}
+                      value={form.body}
+                      onChange={(e) => setForm({ ...form, body: e.target.value })}
+                    />
+                  </Field>
+                </TabPanel>
+              </Tabs>
+              {error && <Alert>{error}</Alert>}
+            </DialogBody>
+          </Locked>
           <DialogFooter note={installStep}>
             <Button type="button" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
@@ -853,8 +881,8 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   return (
     <>
       {waiting && (
-        <section className="waitcard skill-wait" aria-label={t("skills.waitingChip")}>
-          <span className="waitcard__top ac-iconline">
+        <section className="skill-wait" aria-label={t("skills.waitingChip")}>
+          <span className="skill-wait__top ac-iconline">
             <Icon name="alert" size={16} />
             <span>{waiting.title}</span>
           </span>
@@ -872,7 +900,7 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           </ul>
           <p>{waiting.lead}</p>
           <PendingDiff skill={s} />
-          <span className="waitcard__acts">
+          <span className="skill-wait__acts">
             <Button
               size="sm"
               variant="primary"
@@ -1227,21 +1255,23 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
         );
       }}
     >
-      {skill.source === "url" && <Alert tone="neutral">{t("skills.editLinkNote")}</Alert>}
-      <Field label={t("skills.description")} id="edit-skill-desc">
-        <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-      </Field>
-      <Field label={t("skills.body")} id="edit-skill-body" help={t("skills.newVersion")}>
-        <Textarea rows={14} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
-      </Field>
-      <span className="row" style={{ gap: 10, alignItems: "center" }}>
-        <Switch
-          id="edit-skill-default"
-          checked={form.defaultForNewAgents}
-          onCheckedChange={(on) => setForm({ ...form, defaultForNewAgents: on })}
-        />
-        <label htmlFor="edit-skill-default">{t("skills.defaultForNew")}</label>
-      </span>
+      <Locked when={action.isPending}>
+        {skill.source === "url" && <Alert tone="neutral">{t("skills.editLinkNote")}</Alert>}
+        <Field label={t("skills.description")} id="edit-skill-desc">
+          <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </Field>
+        <Field label={t("skills.body")} id="edit-skill-body" help={t("skills.newVersion")}>
+          <Textarea rows={14} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+        </Field>
+        <span className="row" style={{ gap: 10, alignItems: "center" }}>
+          <Switch
+            id="edit-skill-default"
+            checked={form.defaultForNewAgents}
+            onCheckedChange={(on) => setForm({ ...form, defaultForNewAgents: on })}
+          />
+          <label htmlFor="edit-skill-default">{t("skills.defaultForNew")}</label>
+        </span>
+      </Locked>
       <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
         <Button type="button" onClick={onDone}>
           {t("common.cancel")}

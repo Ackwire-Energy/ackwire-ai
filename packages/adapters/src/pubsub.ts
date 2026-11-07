@@ -18,6 +18,24 @@ export interface PubSub {
   close?(): Promise<void>;
 }
 
+/**
+ * For a transaction: `pubsub` keeps what its steps publish, and `flush` sends it after the commit, each event once.
+ * An app told earlier would read the rows before they exist, and one told of a rollback would read rows that never do.
+ */
+export function holdEvents<T extends PubSub | undefined>(target: T) {
+  const held = new Map<string, [string, RealtimeEvent]>();
+  const holding: PubSub | undefined = target && {
+    publish: async (topic, event) => void held.set(`${topic} ${JSON.stringify(event)}`, [topic, event]),
+    subscribe: (topic, handler) => target.subscribe(topic, handler),
+  };
+  const pubsub = holding as T;
+  const flush = async () => {
+    for (const [topic, event] of held.values()) await target?.publish(topic, event).catch(() => {});
+    held.clear();
+  };
+  return { pubsub, flush };
+}
+
 /** Topic of everything happening in one channel. */
 export const channelTopic = (channelId: string) => `channel:${channelId}`;
 

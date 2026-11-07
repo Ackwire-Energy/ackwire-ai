@@ -142,7 +142,7 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   const withMac = (await (await api(`/agents/${agentId}/brain`)).json()) as Brain;
   expect(withMac.computer?.name).toBe("mac");
   expect(withMac.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
-  expect(withMac.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
+  expect(withMac.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_reported" });
 
   // Choosing a plan asks nothing: it answers only its owner until they let others in.
   expect((await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "codex" } })).status).toBe(409);

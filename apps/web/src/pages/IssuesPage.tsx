@@ -1,7 +1,9 @@
 import type { Actor, Issue, IssueColumn, IssuePriority, IssueStatus, IssuesView } from "@agenteschat/client";
 import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@agenteschat/client";
 import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { githubLinkLabel } from "@agenteschat/client/lib/github-link";
 import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Chip,
@@ -21,12 +23,15 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { actorFromKey, actorKey, NO_ACTOR, useActors } from "@/components/actors";
 import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
+import { GitHubMark } from "@/components/GitHubMark";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { TaskCardConversation } from "@/components/TaskConversation";
+import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
@@ -49,6 +54,7 @@ import { inPlaceClick } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
 import { type ToastText, useToast } from "@/lib/toast";
 import { AddColumnDialog, Board, type CardState, type IssueGroup, useMoveIssue, usePatchIssue } from "./IssueBoard";
+import { IssueDeleteProvider, useIssueDeleting } from "./IssueDelete";
 import { IssueDialog } from "./IssuePage";
 import { DisplayButton, IssueFilters, PRIORITY_ICON } from "./IssuesToolbar";
 import { type CardMove, type DropResult, type IssueDrag, useIssueDrag } from "./issue-drag";
@@ -95,6 +101,9 @@ export function IssuesPage() {
       (view.assignees.length === 0 || view.assignees.includes(actorKey(i.assignee))) &&
       (view.priorities.length === 0 || view.priorities.includes(i.priority)),
   );
+  const noIssues = issues.isSuccess && all.length === 0 && !search;
+  const look = useRightHandLook();
+  const posts = can(org, "post");
   const open = all.filter(isOpen);
   const opened = all.find((i) => i.number === openNumber) ?? null;
   const toggle = (n: number) => setOpenParam(openNumber === n ? null : n);
@@ -108,7 +117,7 @@ export function IssuesPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
-        setCreating({ columnId: null });
+        if (posts) setCreating({ columnId: null });
       } else if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -116,127 +125,157 @@ export function IssuesPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [posts]);
   return (
-    <div className="page issues">
-      <div className="issues__main">
-        <PageHeader
-          className="issues-head"
-          title={t("issues.title")}
-          meta={
-            <>
-              <span>
-                {t("issues.summary", {
-                  open: open.length,
-                  agents: open.filter((i) => i.assignee?.type === "agent").length,
-                })}
-              </span>
-              {open.some((i) => !i.assignee) && (
-                <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
-              )}
-            </>
-          }
-          actions={
-            <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
-              {t("issues.new")}
-            </Button>
-          }
-        />
-        <WorkingNow issues={all} onOpen={toggle} />
-        <Toolbar
-          label={t("issues.filters")}
-          search={
-            <SearchField
-              ref={searchRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onClear={() => setQ("")}
-              clearLabel={copy.clearSearch}
-              placeholder={t("issues.search")}
-              aria-label={t("issues.search")}
-              shortcut={<Kbd aria-hidden="true">/</Kbd>}
-            />
-          }
-          actions={
-            <span className="issues-tools">
-              <DisplayButton view={view} onChange={changeView} />
-              {view.group === "stage" && (
-                <Menu
-                  align="end"
-                  label={t("issues.moreOptions")}
-                  trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
-                >
-                  <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
-                    {t("issues.columns.add")}
-                  </MenuItem>
-                </Menu>
-              )}
-            </span>
-          }
-        >
-          <IssueFilters view={view} issues={all} onChange={changeView} />
-        </Toolbar>
-        {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
-          (view.layout === "board" ? (
-            <div className="issues-board">
-              {BOARD.map((status) => (
-                <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
-                  <div className="issues-col__head">
-                    <h2>{t(`issues.status.${status}`)}</h2>
-                  </div>
-                  <LoadingCards count={2} className="loading-cards loading-cards--tight" />
-                </section>
-              ))}
-            </div>
-          ) : (
-            <LoadingList count={5} avatar={false} trailing />
-          ))}
-        {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
-        {issues.isSuccess && all.length === 0 && !search && (
-          <EmptyState
-            sky
-            title={t("issues.emptyTitle")}
+    <IssueDeleteProvider onDeleted={() => setOpenParam(null)}>
+      <div className="page issues">
+        <div className="issues__main">
+          <PageHeader
+            className="issues-head"
+            title={t("issues.title")}
+            meta={
+              <>
+                <span>
+                  {t("issues.summary", {
+                    open: open.length,
+                    agents: open.filter((i) => i.assignee?.type === "agent").length,
+                  })}
+                </span>
+                {open.some((i) => !i.assignee) && (
+                  <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
+                )}
+              </>
+            }
             actions={
-              // The page head has the one primary "New task": here it is secondary.
-              <Button icon="plus" onClick={() => setCreating({ columnId: null })}>
-                {t("issues.new")}
-              </Button>
+              // The empty state takes over this button: one way in, in the middle of the page.
+              !noIssues &&
+              posts && (
+                <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
+                  {t("issues.new")}
+                </Button>
+              )
+            }
+          />
+          <WorkingNow issues={all} onOpen={toggle} />
+          <Toolbar
+            label={t("issues.filters")}
+            search={
+              <SearchField
+                ref={searchRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onClear={() => setQ("")}
+                clearLabel={copy.clearSearch}
+                placeholder={t("issues.search")}
+                aria-label={t("issues.search")}
+                shortcut={<Kbd aria-hidden="true">/</Kbd>}
+              />
+            }
+            actions={
+              <span className="issues-tools">
+                <DisplayButton view={view} onChange={changeView} />
+                {view.group === "stage" && (
+                  <Menu
+                    align="end"
+                    label={t("issues.moreOptions")}
+                    trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
+                  >
+                    <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
+                      {t("issues.columns.add")}
+                    </MenuItem>
+                  </Menu>
+                )}
+              </span>
             }
           >
-            {t("issues.empty")}
-          </EmptyState>
+            <IssueFilters view={view} issues={all} onChange={changeView} />
+          </Toolbar>
+          {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
+            (view.layout === "board" ? (
+              <div className="issues-board">
+                {BOARD.map((status) => (
+                  <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
+                    <div className="issues-col__head">
+                      <h2>{t(`issues.status.${status}`)}</h2>
+                    </div>
+                    <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <LoadingList count={5} avatar={false} trailing />
+            ))}
+          {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
+          {noIssues && (
+            <EmptyState
+              size="page"
+              agent={look}
+              title={t(posts ? "issues.emptyTitle" : "issues.emptyViewerTitle")}
+              actions={
+                posts && (
+                  <>
+                    <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
+                      {t("issues.new")}
+                    </Button>
+                    <AskAgentButton draft={t("issues.askFirst")} />
+                  </>
+                )
+              }
+            >
+              {t(posts ? "issues.empty" : "issues.emptyViewer")}
+            </EmptyState>
+          )}
+          {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
+            <EmptyState
+              size="panel"
+              actions={
+                <Button
+                  onClick={() => {
+                    setQ("");
+                    changeView({ assignees: [], priorities: [] });
+                  }}
+                >
+                  {copy.clearAll}
+                </Button>
+              }
+            >
+              {t("issues.noResults")}
+            </EmptyState>
+          )}
+          {columnsQuery.isError && !columns && (
+            <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
+          )}
+          {!viewLoading && filtered.length > 0 && columns && (
+            <IssuesBody
+              view={view}
+              columns={columns}
+              issues={filtered.filter((i) => view.showCanceled || i.status !== "canceled")}
+              all={all}
+              openNumber={openNumber}
+              onOpen={toggle}
+              onNew={(columnId) => setCreating({ columnId })}
+            />
+          )}
+        </div>
+        {opened && (
+          <IssueDialog issue={opened} focusMessageId={focusParam ?? undefined} onClose={() => setOpenParam(null)} />
         )}
-        {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
-          <EmptyState icon="search">{t("issues.noResults")}</EmptyState>
-        )}
-        {columnsQuery.isError && !columns && (
-          <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
-        )}
-        {!viewLoading && filtered.length > 0 && columns && (
-          <IssuesBody
-            view={view}
+        <NewIssueDialog
+          open={creating !== false}
+          columnId={creating ? creating.columnId : null}
+          columns={columns ?? []}
+          onClose={() => setCreating(false)}
+        />
+        {columns && (
+          <AddColumnDialog
+            open={addingColumn}
+            afterId={null}
             columns={columns}
-            issues={filtered.filter((i) => view.showCanceled || i.status !== "canceled")}
-            all={all}
-            openNumber={openNumber}
-            onOpen={toggle}
-            onNew={(columnId) => setCreating({ columnId })}
+            onClose={() => setAddingColumn(false)}
           />
         )}
       </div>
-      {opened && (
-        <IssueDialog issue={opened} focusMessageId={focusParam ?? undefined} onClose={() => setOpenParam(null)} />
-      )}
-      <NewIssueDialog
-        open={creating !== false}
-        columnId={creating ? creating.columnId : null}
-        columns={columns ?? []}
-        onClose={() => setCreating(false)}
-      />
-      {columns && (
-        <AddColumnDialog open={addingColumn} afterId={null} columns={columns} onClose={() => setAddingColumn(false)} />
-      )}
-    </div>
+    </IssueDeleteProvider>
   );
 }
 
@@ -592,12 +631,13 @@ function WhoLine({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** An issue's right click (board card, list row): open beside the list, open its page, copy its link. */
+/** An issue's right click (board card, list row): open beside the list, open its page, copy its link, delete it. */
 function useIssueMenu() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();
   const toast = useToast();
+  const { ask, mayDelete } = useIssueDeleting();
   return (i: Issue, onOpen: () => void) =>
     entityMenu(() => [
       { kind: "header", label: `#${i.number} ${i.title}` },
@@ -621,6 +661,19 @@ function useIssueMenu() {
             toast.show(t("contextMenu.linkCopied")),
           ),
       },
+      ...(mayDelete(i)
+        ? ([
+            { kind: "separator" },
+            {
+              kind: "item",
+              id: "delete",
+              label: t("issues.delete.action"),
+              icon: "trash",
+              danger: true,
+              run: () => ask(i),
+            },
+          ] as const)
+        : []),
     ]);
 }
 
@@ -633,6 +686,15 @@ function withMenuKeys(menu: ReturnType<ReturnType<typeof useIssueMenu>>, drag: C
     menu.onKeyDown(e);
     drag.onKeyDown(e);
   };
+}
+
+/** The task's GitHub link on its row: the row opens the task, the page opens the link. */
+function GithubChip({ url }: { url: string }) {
+  return (
+    <Chip lead={<GitHubMark />} className="issue-card__pr" title={url}>
+      {githubLinkLabel(url)}
+    </Chip>
+  );
 }
 
 function IssueCard({
@@ -654,6 +716,7 @@ function IssueCard({
   const { org } = useOrg();
   const color = useAssigneeColor();
   const pr = fields.pullRequest ? i.pullRequests.at(-1) : undefined;
+  const github = fields.pullRequest ? i.githubUrl : null;
   const menu = useIssueMenu()(i, () => !selected && onOpen());
   return (
     <Link
@@ -688,10 +751,11 @@ function IssueCard({
       )}
       {fields.criteria && <Criteria issue={i} />}
       <IssueCardWork issue={i} />
-      {(fields.assignee || pr) && (
+      {(fields.assignee || pr || github) && (
         <span className="issue-card__foot">
           {fields.assignee && <WhoLine issue={i} />}
           <span className="issue-card__grow" />
+          {github && <GithubChip url={github} />}
           {pr && (
             <Chip icon="pullRequest" className="issue-card__pr">
               {t("issues.pr", { number: pr.number })}
@@ -849,6 +913,7 @@ function IssueRows({
               <span className="issue-list__title">
                 <b>{i.title}</b>
                 {fields.priority && <PriorityChip issue={i} />}
+                {fields.pullRequest && i.githubUrl && <GithubChip url={i.githubUrl} />}
               </span>
               <span className="issue-list__crit">{fields.criteria && <Criteria issue={i} />}</span>
               <span className="issue-list__who">{fields.assignee && <WhoLine issue={i} />}</span>

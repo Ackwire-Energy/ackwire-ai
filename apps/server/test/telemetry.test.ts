@@ -14,7 +14,7 @@ import {
   startTelemetry,
   type Timers,
 } from "../src/telemetry";
-import { browser, createTestServer, deletionCode, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, deletionCode, deletionsDue, signUp, type TestServer } from "./harness";
 
 const log = createLogger("error");
 const PROD = { NODE_ENV: "production" };
@@ -320,6 +320,7 @@ describe("the switch in Settings", () => {
     const { owner, other, app } = await server();
     const code = await deletionCode(app, owner, null);
     expect((await owner("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
+    await deletionsDue(app);
     expect((await other("/api/app/telemetry")).status).toBe(404);
     expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
   });
@@ -332,6 +333,7 @@ describe("the switch in Settings", () => {
     expect((await first("/api/app/telemetry")).status).toBe(200);
     const code = await deletionCode(app, first, null);
     expect((await first("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
+    await deletionsDue(app);
     const next = browser(t);
     await signUp(next, "next@example.com");
     expect((await next("/api/app/telemetry")).status).toBe(200);

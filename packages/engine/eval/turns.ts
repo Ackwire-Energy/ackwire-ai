@@ -145,6 +145,15 @@ export const TURNS: ScriptedTurn[] = [
     reachable: [{ tool: "propose_remove_agents", query: "archive or delete agents" }],
     wants: ["propose_remove_agents", "find_tools", "use_tool"],
   },
+  {
+    id: "task",
+    title: "A task on our own board",
+    where: "dm",
+    body: "cria uma tarefa no backlog pra revisar o onboarding",
+    listed: ["find_tools", "use_tool"],
+    reachable: [{ tool: "create_issue", query: "criar tarefa no backlog" }],
+    wants: ["create_issue", "find_tools", "use_tool"],
+  },
 ];
 
 /** A made-up deploy connector: one read, one action that asks a person's approval. */
@@ -180,7 +189,9 @@ const deploys: ToolSource = {
 };
 
 /** Every built-in tool source a production agent has, tools on demand, one teammate, the made-up deploy connector. */
-export async function turnsWorld(options: Pick<NonNullable<Parameters<typeof setup>[0]>, "reply" | "judge"> = {}) {
+export async function turnsWorld(
+  options: Pick<NonNullable<Parameters<typeof setup>[0]>, "reply" | "judge" | "workspaceComputer"> = {},
+) {
   const f = await setup({
     contextTools: true,
     askUser: true,
@@ -214,6 +225,7 @@ export async function turnsWorld(options: Pick<NonNullable<Parameters<typeof set
   });
   await grantScopes(f.db, f.org.id, f.agent.id, [
     { connectionId: null, scope: "sandbox:run" },
+    { connectionId: null, scope: "issues:write" },
     { connectionId: null, scope: "deploys:read" },
     { connectionId: null, scope: "deploys:run" },
   ]);

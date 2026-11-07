@@ -1,6 +1,8 @@
+import { LICENSE_URL, PUBLIC_SOURCE_URL } from "@agenteschat/client/lib/about";
+import { DOCS_SITE } from "@agenteschat/i18n/docs";
 import { Button, Chip } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { type ReactNode, useEffect, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useHost } from "../../app";
 import { noteLines } from "../../control/version";
 import { type UpdateCheck, useLocalServer } from "../../hooks";
@@ -159,6 +161,42 @@ export function Updates({ update }: { update: UpdateCheck }) {
           )}
         </>
       )}
+      <About />
+    </>
+  );
+}
+
+/** An outside page, opened in the browser. */
+function Out({ href, children }: { href: string; children?: ReactNode }) {
+  const host = useHost();
+  return (
+    <button type="button" className="ac-link dk-link" onClick={() => void host.openExternal(href).catch(() => {})}>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * AGPL-3.0's Appropriate Legal Notices and the attribution the license's section 7(b) term requires (LICENSE), with
+ * no setting that hides them.
+ */
+function About() {
+  const { t } = useTranslation();
+  return (
+    <>
+      <CardTitle>{t("settings.section.about")}</CardTitle>
+      <PrefCard padded>
+        <p className="dk-help">
+          <Trans i18nKey="settings.about.basedOn" components={{ site: <Out href={DOCS_SITE} /> }} />
+        </p>
+        <p className="dk-help">
+          <Trans i18nKey="settings.about.license" components={{ license: <Out href={LICENSE_URL} /> }} />
+        </p>
+        <p className="dk-help">
+          <Out href={PUBLIC_SOURCE_URL}>{t("settings.about.source")}</Out>
+        </p>
+        <p className="dk-help">{t("settings.about.copyright")}</p>
+      </PrefCard>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { Message, ReplyChips, TeamPlan, TeamProposalCard } from "../api/types";
+import { teamProposalOf } from "./action-cards";
 import { errorText } from "./errors";
 
 /**
@@ -11,6 +12,8 @@ import { errorText } from "./errors";
 /** The start card's first question: what the business does. `other` writes in the composer instead of sending. */
 export const BUSINESS_TYPES = ["agency", "store", "clinic", "software", "support", "services", "other"] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
+/** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */
+export const isTemplateBusiness = (b: BusinessType): b is Exclude<BusinessType, "other"> => b !== "other";
 
 /** Several answers tapped together go as one message, in this order. */
 export const ANSWER_JOINER = " · ";
@@ -45,20 +48,30 @@ export function answerAfter(
   return sorted.slice(from).find((m) => m.author.type === "person" && m.local !== "failed")?.body ?? null;
 }
 
-/**
- * The start card took a message as its answer and no interview followed: it was something else (often written before
- * an AI was connected), so the card stopped asking with nothing started.
- */
-export const startCardPassed = (
-  messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
-) => answerAfter(messages, null) !== null && !messages?.some((m) => replyChipsOf(m.meta));
-
 /** The answers of `choices` an answer holds: what the card shows checked once it was answered. */
 export const answerPicks = (choices: readonly string[], answer: string | null) => {
   if (answer === null) return [];
   const parts = new Set(answer.split(ANSWER_JOINER).map((p) => p.trim()));
   return choices.filter((c) => parts.has(c));
 };
+
+/**
+ * The start card's answer: the person's first message that is one of its `choices`, wherever it came, or, once the
+ * interview or a team card followed, what they wrote first ("" with nothing written: a template's card). Anything else
+ * ("oi", or something written before an AI was connected) answered nothing: the card keeps asking.
+ */
+export function startCardAnswer(
+  messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
+  choices: readonly string[],
+): string | null {
+  const said = [...(messages ?? [])]
+    .sort(byTime)
+    .filter((m) => m.author.type === "person" && m.local !== "failed")
+    .map((m) => m.body);
+  const pick = said.find((body) => answerPicks(choices, body).length > 0);
+  if (pick !== undefined) return pick;
+  return messages?.some((m) => replyChipsOf(m.meta) || teamProposalOf(m.meta)) ? (said[0] ?? "") : null;
+}
 
 /** Taps put together in the order the answers are listed. */
 export const answerText = (choices: readonly string[], picked: ReadonlySet<string>) =>

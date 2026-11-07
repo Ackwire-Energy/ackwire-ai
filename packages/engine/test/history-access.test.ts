@@ -67,7 +67,14 @@ describe("run history quotes a conversation only to who reads it", () => {
     const colleague = await addMember(f.db, f.org.id, "member", "colleague");
     const [room] = await f.db
       .insert(schema.channels)
-      .values({ orgId: f.org.id, name: "routine-room", visibility: "private", createdByUserId: colleague.id })
+      .values({
+        orgId: f.org.id,
+        name: "routine-room",
+        visibility: "private",
+        kind: "dm",
+        dmKey: "routine:weekly",
+        createdByUserId: colleague.id,
+      })
       .returning();
     const channelId = room?.id ?? "";
     const msg = await insertMessage(f.db, {

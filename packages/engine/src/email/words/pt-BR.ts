@@ -226,7 +226,7 @@ export const ptBR: Words = {
     account: (email) => [
       "Digite este código para apagar a conta inteira ",
       { b: email },
-      ", não só um workspace. Ela some na hora, e os workspaces em que só você está fecham com ela.",
+      ", não só um workspace. Ela sai de todos os aparelhos na hora e é apagada de vez 7 dias depois, e os workspaces em que só você está fecham com ela.",
     ],
     support: (address) => [
       "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",
@@ -270,6 +270,27 @@ export const ptBR: Words = {
     note: "Não foi você? Desconecte agora e troque sua senha.",
     button: "Ver apps conectados",
     why: (org) => `Você recebeu este e-mail porque um app foi conectado à sua conta na ${org} no agentes.chat.`,
+  },
+  accountDeleting: {
+    subject: (day) => `Sua conta do agentes.chat vai ser apagada em ${day}`,
+    preheader: "Você tem 7 dias para mudar de ideia.",
+    headline: "Sua conta está sendo apagada",
+    body: (email, day, time) => [
+      "Vamos apagar a conta ",
+      { b: email },
+      ` em ${day} às ${time}. Ela saiu de todos os aparelhos, e ninguém fala com você aqui até você voltar.`,
+    ],
+    closes: (count, names) => [
+      plural("pt-BR", count, {
+        one: "O workspace em que só você estava fechou agora e some na mesma data: ",
+        other: "Os workspaces em que só você estava fecharam agora e somem na mesma data: ",
+      }),
+      ...names,
+      ".",
+    ],
+    undo: "Mudou de ideia? Entre antes dessa data e aperte Restaurar.",
+    button: "Entrar para restaurar",
+    why: "Você recebeu este e-mail porque este endereço tem uma conta no agentes.chat.",
   },
   accountDeleted: {
     subject: "Sua conta do agentes.chat foi apagada",
@@ -356,5 +377,20 @@ export const ptBR: Words = {
     note: "Tire de volta com um clique nas suas notificações, e o agente para de pensar com o seu plano.",
     button: "Abrir notificações",
     why: (org) => `Você recebeu este e-mail porque alguém na ${org} conectou o seu plano a um agente.`,
+  },
+  planWaiting: {
+    subject: "Seu time está esperando",
+    preheader: "Seu workspace está pronto. Falta um plano do agentes.chat para ele começar.",
+    headline: "Seu time está esperando",
+    body: (agents, channels, routines) => {
+      const a = plural("pt-BR", agents, { one: `1 agente`, other: `${agents} agentes` });
+      const c = plural("pt-BR", channels, { one: `1 canal`, other: `${channels} canais` });
+      const r = plural("pt-BR", routines, { one: `1 rotina`, other: `${routines} rotinas` });
+      return routines > 0
+        ? `${a}, ${c} e ${r} estão prontos. Falta um plano do agentes.chat para eles começarem.`
+        : `${a} e ${c} estão prontos. Falta um plano do agentes.chat para eles começarem.`;
+    },
+    button: "Ver planos do agentes.chat",
+    why: (org) => `Você recebeu este e-mail porque administra ${org} no agentes.chat. São só dois avisos como este.`,
   },
 };

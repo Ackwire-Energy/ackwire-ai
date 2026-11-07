@@ -90,8 +90,9 @@ import {
   ruleToCron,
   type ScheduleRule,
 } from "./rrule";
+import { providerFailure } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
-import { standingRefusal } from "./standing";
+import { assertCanWork, deletionPending, standingRefusal } from "./standing";
 import { alwaysAsks } from "./tools/gateway";
 import {
   assertMayContinuePause,
@@ -250,7 +251,7 @@ export interface RoutineRunView {
   /** The coded reason of a skip, miss, failure or stop (the app translates it); `stopped` carries `by`. */
   code: string | null;
   codeParams?: Record<string, string>;
-  /** Its record or report, cut; '' when the viewer may not see what routines read. */
+  /** Its record or report, cut in `recentRuns`; '' when the viewer may not see what routines read. */
   summary: string;
   /** Recent runs only: its cost (tokens on a plan) relative to the priciest of them (0–1). A share, never money. */
   weight?: number;
@@ -263,7 +264,7 @@ export interface RoutineRunView {
   finishedAt: string | null;
 }
 
-/** How much of a background run's record the views carry (the routine keeps it whole). */
+/** How much of a run's record a routine's list carries (`recentRuns`); its runs' own list has it whole. */
 const RECORD_EXCERPT = 500;
 
 /** How many recent runs each routine carries in the list (its run strip). */
@@ -653,13 +654,17 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
   const by = stopper ? details.names.get(stopper) : undefined;
   const link = detailed && run.messageId ? details.links.get(run.messageId) : undefined;
   const approvalId = detailed && run.agentRunId ? (details.approvals.get(run.agentRunId) ?? null) : null;
+  // A provider's failure says its cause and its words, for who reads the records: the code alone says only "an error".
+  const failure = detailed && status === "failed" ? providerFailure(agentRun?.error) : null;
+  const cause = failure?.errorParams?.provider ? failure : null;
   return {
     id: run.id,
     at: run.at.toISOString(),
     status,
     // Waiting for its computer, not for a person: the app says which.
-    code:
-      status !== "waiting"
+    code: cause
+      ? cause.errorCode.replace(/^run\./, "")
+      : status !== "waiting"
         ? run.code
         : agentAway(agentRun)
           ? "waiting_computer"
@@ -668,8 +673,8 @@ function runView(run: RunRow, details: RunDetails, detailed: boolean): RoutineRu
               ? "waiting_budget"
               : "waiting_plan"
             : run.code,
-    ...(by ? { codeParams: { by } } : {}),
-    summary: detailed && run.status !== "canceled" ? replyExcerpt(run.summary, RECORD_EXCERPT) : "",
+    ...(by ? { codeParams: { by } } : cause ? { codeParams: cause.errorParams } : {}),
+    summary: detailed && run.status !== "canceled" ? run.summary : "",
     brain: run.brain,
     link: link && run.messageId ? { ...link, messageId: run.messageId } : null,
     ...(status === "waiting" ? { approvalId } : {}),
@@ -686,10 +691,14 @@ function recentViews(runs: RunRow[], details: RunDetails, detailed: boolean): Ro
   const byCost = runs.some((r) => used(r).cost > 0);
   const amount = (r: RunRow) => (byCost ? used(r).cost : used(r).tokens);
   const max = Math.max(0, ...runs.map(amount));
-  return runs.map((r) => ({
-    ...runView(r, details, detailed),
-    weight: max > 0 ? Math.round((amount(r) / max) * 100) / 100 : 0,
-  }));
+  return runs.map((r) => {
+    const view = runView(r, details, detailed);
+    return {
+      ...view,
+      summary: replyExcerpt(view.summary, RECORD_EXCERPT),
+      weight: max > 0 ? Math.round((amount(r) / max) * 100) / 100 : 0,
+    };
+  });
 }
 
 /** The conversation a routine reports to (a channel, a thread's, a DM); null for DM and Drive routines. */
@@ -1923,6 +1932,8 @@ export async function queueRoutineRun(
 export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
+  // A person is waiting on this one: told now, where a scheduled slot just passes.
+  await assertCanWork(deps.db, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
   await publishRoutineRuns(deps.pubsub, orgId, routine.id);
   const [view] = await views(deps.db, [routine], actorId, deps.hooks);
@@ -2108,6 +2119,8 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   };
   const creator = routine.createdByUserId;
   const membership = creator ? await getMembership(db, creator, routine.orgId) : null;
+  // Their account waits for its deletion and may come back: the slot passes, the routine keeps its schedule.
+  if (creator && !membership && (await deletionPending(db, creator))) return skip("creator_left");
   if (!creator || !membership) return paused("creator_left");
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
@@ -2225,6 +2238,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     name: routine.name,
     creatorUserId: creator,
     deliverTo,
+    ...(target.type === "artifact" ? { toDrive: true } : {}),
     access: routineAccessOf(routine.access),
     report: routineReportOf(routine.report),
     trigger: run.trigger,

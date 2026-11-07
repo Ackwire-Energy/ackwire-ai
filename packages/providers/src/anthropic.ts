@@ -9,6 +9,7 @@ import type {
 import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
+  deniedError,
   laidOut,
   type ModelMessage,
   type ModelProvider,
@@ -17,6 +18,7 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  shortSaid,
   stableToolsFirst,
   type ToolSpec,
   withoutImages,
@@ -27,9 +29,6 @@ const STRUCTURED_OUTPUT = "structured_output";
 
 /** Lets a request say what happens to thinking the API can no longer read back (`block_binding`). */
 const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
-
-/** What the API said about a refused request, at most (it ends up on the run's error). */
-const API_ERROR_CHARS = 300;
 
 /**
  * Anthropic Messages API, streaming. A client is created per call with the
@@ -115,10 +114,12 @@ export function createAnthropicProvider(
             ]
           : []),
       ];
+      const forced = Boolean(answerSchema && compat?.toolChoiceAny);
       // `none`: thinking off where the model allows it, `low` elsewhere. With thinking off a compatible
-      // endpoint gets no effort: MiniMax takes one only on the model that always thinks.
-      const thinkingOff = request.effort === "none" && info?.leastThinking === "off";
-      const asked = request.effort === "none" ? (thinkingOff && compat ? undefined : "low") : request.effort;
+      // endpoint gets no effort: MiniMax takes one only on the model that always thinks. A forced tool is refused
+      // while the model thinks, so that answer goes without thinking, or unforced on a model that always thinks.
+      const thinkingOff = (request.effort === "none" || forced) && info?.leastThinking === "off";
+      const asked = thinkingOff && compat ? undefined : request.effort === "none" ? "low" : request.effort;
       const effort = compat && asked === "medium" ? "high" : asked;
       const partial: PartialUsage = {
         inputTokens: null,
@@ -147,7 +148,7 @@ export function createAnthropicProvider(
           ),
           ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
           ...(tools.length > 0 ? { tools } : {}),
-          ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
+          ...(forced && thinkingOff ? { tool_choice: { type: "any" as const } } : {}),
           ...(thinkingOff
             ? { thinking: { type: "disabled" as const } }
             : bind
@@ -268,6 +269,7 @@ export function createAnthropicProvider(
           last.retryable,
           last.status,
           last.partial,
+          last.said,
         );
       }
     },
@@ -437,27 +439,34 @@ function mapStopReason(reason: string | null): StopReason {
   return "other";
 }
 
+/** What the API said about a refused request. */
+function saidIn(error: InstanceType<typeof Anthropic.APIError>) {
+  const body = error.error as { error?: { message?: unknown } } | undefined;
+  return (typeof body?.error?.message === "string" && shortSaid(body.error.message)) || undefined;
+}
+
 function toProviderError(error: unknown): ProviderError {
   if (error instanceof ProviderError) return error;
   // Most specific first: rate limits and server errors are worth retrying, bad requests and auth are not.
   if (error instanceof Anthropic.RateLimitError) return new ProviderError("rate limited by provider", true, 429);
   if (error instanceof Anthropic.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);
-  if (error instanceof Anthropic.PermissionDeniedError) return new ProviderError("provider denied access", false, 403);
+  if (error instanceof Anthropic.PermissionDeniedError) return deniedError(error.type, saidIn(error));
   if (error instanceof Anthropic.InternalServerError) return new ProviderError("provider error", true, error.status);
+  if (error instanceof Anthropic.APIConnectionTimeoutError) return new ProviderError("provider timed out", true);
   if (error instanceof Anthropic.APIConnectionError) return new ProviderError("could not reach provider", true);
   if (error instanceof Anthropic.APIUserAbortError) return new ProviderError("request aborted", false);
   if (error instanceof Anthropic.APIError) {
     const status = error.status;
-    const body = error.error as { error?: { message?: unknown } } | undefined;
-    const said =
-      typeof body?.error?.message === "string"
-        ? body.error.message.replace(/\s+/g, " ").trim().slice(0, API_ERROR_CHARS)
-        : "";
+    const said = saidIn(error);
+    // Failed mid-stream with no words: the request was taken, so nothing says it was refused.
+    if (status === undefined && !said && !error.type) return new ProviderError("provider error", true);
     const what = [status ?? "?", error.type].filter(Boolean).join(" ");
     return new ProviderError(
       `provider rejected the request (${what})${said ? `: ${said}` : ""}`,
       status === 529,
       status,
+      undefined,
+      said,
     );
   }
   // With eager input streaming a tool input can arrive as unparseable JSON: retrying the turn is the fix.

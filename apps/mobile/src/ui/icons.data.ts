@@ -144,6 +144,13 @@ export const ICONS = {
   // The receipts of what an agent did (Desfazer, issue, memory).
   undo: [p("M9 7 4.5 11.5 9 16"), p("M5 11.5h9.5a5 5 0 0 1 0 10H11")],
   issue: [c(12, 12, 8.5), c(12, 12, 2.2, true)],
+  // The web's `gitPull` on this grid.
+  gitPull: [
+    c(6.6, 5.4, 2.3),
+    c(6.6, 18.6, 2.3),
+    c(17.4, 18.6, 2.3),
+    p("M6.6 7.7v8.6M17.4 16.3V9.6a3 3 0 0 0-3-3h-3m2.4-2.4-2.4 2.4 2.4 2.4"),
+  ],
   brain: [
     p(
       "M9 5.5a3 3 0 0 0-3 3v.5a3 3 0 0 0-1.5 5.3A3 3 0 0 0 9 18.5h1V5.5ZM15 5.5a3 3 0 0 1 3 3v.5a3 3 0 0 1 1.5 5.3A3 3 0 0 1 15 18.5h-1V5.5Z",

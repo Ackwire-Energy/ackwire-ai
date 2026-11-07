@@ -2,6 +2,7 @@ import {
   ApiError,
   type BrowserFrame,
   type BrowserInputEvent,
+  browserFrameDataUrl,
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
@@ -19,7 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { GestureDetector, GestureStateManager, type TouchData, useManualGesture } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
-import { fieldText, Icon, Text } from "@/ui";
+import { fieldText, Icon, Locked, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { keyPastDraft, LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
@@ -103,7 +104,7 @@ export function FrameView({
     <GestureDetector gesture={gesture}>
       <View style={styles.frame} onLayout={onLayout} accessible accessibilityLabel={t("mobile.browser.live.page")}>
         <Image
-          source={{ uri: `data:image/jpeg;base64,${frame.data}` }}
+          source={{ uri: browserFrameDataUrl(frame) ?? undefined }}
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           fadeDuration={0}
@@ -134,15 +135,18 @@ export function TypeBar({
   onText,
   onKey,
   autoFocus,
+  secret: startSecret = false,
 }: {
   onText: (text: string) => void;
   onKey: (key: LiveKey) => void;
   autoFocus?: boolean;
+  /** Opens in its password mode. */
+  secret?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
-  const [secret, setSecret] = useState(false);
+  const [secret, setSecret] = useState(startSecret);
   const [keys, setKeys] = useState(false);
   // The draft as typed, read by a held Backspace's repeats before the state catches up.
   const draft = useRef("");
@@ -304,36 +308,41 @@ export function AddressBar({
   const ready = url.trim().length > 0 && !busy;
   return (
     <View style={styles.typeWrap}>
-      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
-        <Icon name="globe" size={16} color={c.muted} />
-        <TextInput
-          value={url}
-          onChangeText={(v) => {
-            setUrl(v);
-            setError(null);
-          }}
-          placeholder={t("browser.inCard.goPlaceholder")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("browser.inCard.goLabel")}
-          style={[fieldText("body"), styles.input, { color: c.ink }]}
-          keyboardType="url"
-          textContentType="URL"
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={2048}
-          returnKeyType="go"
-          onSubmitEditing={() => void go()}
-        />
-        <Pressable
-          onPress={() => void go()}
-          disabled={!ready}
-          accessibilityRole="button"
-          accessibilityLabel={t("browser.inCard.go")}
-          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 }]}
-        >
-          <Icon name="right" size={18} color={c.bg} />
-        </Pressable>
-      </View>
+      <Locked when={busy}>
+        <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
+          <Icon name="globe" size={16} color={c.muted} />
+          <TextInput
+            value={url}
+            onChangeText={(v) => {
+              setUrl(v);
+              setError(null);
+            }}
+            placeholder={t("browser.inCard.goPlaceholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("browser.inCard.goLabel")}
+            style={[fieldText("body"), styles.input, { color: c.ink }]}
+            keyboardType="url"
+            textContentType="URL"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={2048}
+            returnKeyType="go"
+            onSubmitEditing={() => void go()}
+          />
+          <Pressable
+            onPress={() => void go()}
+            disabled={!ready}
+            accessibilityRole="button"
+            accessibilityLabel={t("browser.inCard.go")}
+            style={({ pressed }) => [
+              styles.send,
+              { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Icon name="right" size={18} color={c.bg} />
+          </Pressable>
+        </View>
+      </Locked>
       {error ? (
         <Text variant="caption" tone="danger" accessibilityRole="alert">
           {error}
@@ -364,8 +373,10 @@ export interface LiveState {
  * Watches the agent's browser on the app's realtime socket while `enabled` (the card is open), as the
  * web's `useBrowserLive`: frames, who is in control, why it can't be shown. Watches again after the
  * socket reconnects; the shared connection retries on its own while the computer is "reconnecting".
+ * `maxFps`: the frames a second this view needs (`BROWSER_FPS.preview` for a small picture; none for the
+ * stream's own rate), changed in place as the card opens or closes (ADR 0040 §7.1).
  */
-export function useLiveConnection(agentId: string, enabled: boolean): LiveState {
+export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: number): LiveState {
   const connection = useConnection();
   const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
@@ -375,6 +386,9 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [online, setOnline] = useState(false);
   const [lost, setLost] = useState<LiveState["lost"]>(null);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
+  // The rate when the watch starts; a change later goes through `setMaxFps` (never a new watch).
+  const fps = useRef(maxFps);
+  fps.current = maxFps;
 
   useEffect(() => {
     if (!connection || !enabled) return;
@@ -384,6 +398,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       // Shared per socket: one watch per agent however often the card re-renders or remounts.
       watcher: connection.browserWatcher,
       agentId,
+      maxFps: fps.current,
       onFrame: (f) => {
         setUnavailable(null);
         setFrame(f);
@@ -433,6 +448,10 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       setHidden(false);
     };
   }, [connection, agentId, enabled]);
+
+  useEffect(() => {
+    liveRef.current?.setMaxFps(maxFps);
+  }, [maxFps]);
 
   const sendInput = useCallback((events: BrowserInputEvent[]) => {
     liveRef.current?.sendInput(events);

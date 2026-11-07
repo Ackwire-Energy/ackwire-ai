@@ -5,6 +5,7 @@ import {
   useAgentBrain,
   useApi,
   useModelLabel,
+  usePlatformKey,
   useRoles,
   useSetTeamWeekPrefs,
   useTeamWeekPrefs,
@@ -37,6 +38,7 @@ import {
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
+import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
@@ -80,7 +82,10 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   const kind = view && view.brain !== "model" ? view.brain : null;
   const signIn = view?.accounts.find((a) => a.id === view.account);
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0];
-  const fallback = view?.workspaceAi ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first) : "";
+  const platform = usePlatformKey(orgId).data === true;
+  const fallback = view?.workspaceAi
+    ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first, platform)
+    : "";
   const shared = signIn?.ownerId && signIn.ownerId !== meId ? first(signIn.ownerId) : undefined;
   const back = () =>
     void api.agents
@@ -127,7 +132,8 @@ function PlanRows({
   dir: Directory;
 }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
@@ -153,7 +159,9 @@ function PlanRows({
           label={signIn?.label ?? t(`aiAccounts.connect.${kind}`)}
           {...(owner && signIn?.ownerId !== meId ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
         />
-        <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
+        {held ? null : (
+          <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
+        )}
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.planHelp")}</GroupedFooter>
       {view ? (
@@ -186,7 +194,8 @@ function PlanRows({
 /** The plans the workspace's AI may move onto (the admin's own, everyone's with `use_others_plans`), a tap each. */
 function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const hold = usePlanHold(orgId, org);
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
@@ -202,6 +211,7 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
           void qc.invalidateQueries({ queryKey: key });
       })
       .catch(failed);
+  if (hold) return <PlanHoldNote org={org} />;
   return (
     <>
       {plans.length > 0 ? (
@@ -238,6 +248,7 @@ function Form({ agent }: { agent: Agent }) {
   const modelLabel = useModelLabel();
   const dir = useDirectory();
   const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
+  const key = useAgentBrain(orgId, agent.id, true, false, "workspace").data?.workspaceAi?.key;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));
@@ -289,6 +300,7 @@ function Form({ agent }: { agent: Agent }) {
             <GroupedRow
               icon="brain"
               label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+              {...(key ? { sub: key.label } : {})}
               chevron
               onPress={() => openAgentAi(agent.id)}
             />

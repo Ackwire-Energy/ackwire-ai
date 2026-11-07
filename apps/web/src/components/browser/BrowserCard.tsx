@@ -4,11 +4,13 @@ import type {
   BrowserInputEvent,
   BrowserProfileWait,
   BrowserStep,
+  DesktopViewState,
   LiveRun,
   PageTarget,
   ScreenKind,
 } from "@agenteschat/client";
 import {
+  browserFrameDataUrl,
   browserSiteUrl,
   browserSteps,
   controlledBy,
@@ -36,8 +38,8 @@ import {
   useBrowserHandoffMutations,
   useBrowserProfileMutations,
   useBrowserProfiles,
+  useBrowserScreen,
   useBrowserStuck,
-  useDesktopStatus,
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
@@ -49,11 +51,11 @@ import {
   agentGradient,
   Button,
   Chip,
-  cx,
   FilterToggle,
   Icon,
   type IconName,
   isApple,
+  Locked,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
@@ -66,7 +68,7 @@ import {
   Fragment,
   type KeyboardEvent,
   type PointerEvent,
-  type ReactNode,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -77,21 +79,28 @@ import { Trans, useTranslation } from "react-i18next";
 import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
+import { usePageVisible } from "@/hooks/useWindowActive";
 import { pastes } from "@/lib/keys";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
 import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed } from "../computer/head";
-import { useOpenComputer } from "../computer/open";
+import { useOpenComputer, useOpenedComputer } from "../computer/open";
+import { DesktopView } from "../desktop/DesktopView";
 import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
 import { useOrg } from "../org-context";
-import { ComputerSky, colorOf } from "../Sky";
+import { colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
+import { Cover } from "./Cover";
+import { LivePicture } from "./LivePicture";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
+
+// The computer dialog takes it from here too.
+export { Cover } from "./Cover";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
 /** The reason goes before it, in the 1000 the server takes. */
@@ -116,6 +125,7 @@ const STEP_ICON = {
   browser_scroll: "chevronDown",
   browser_upload: "upload",
   browser_type_secret: "key",
+  browser_make_password: "key",
   browser_wait: "clock",
   browser_screenshot: "image",
   browser_ask_person: "person",
@@ -275,53 +285,6 @@ export function useHeldTakeover(agentId: string, runId: string, enabled = true):
 }
 
 /**
- * What covers the page (or the agent's desktop) instead of it: a state said plainly, with a spinner only
- * while something is on its way; `action`: what the person can do about it.
- */
-export function Cover({
-  icon,
-  art,
-  spinner,
-  sky,
-  color,
-  text,
-  help,
-  action,
-  className,
-  clear,
-}: {
-  className?: string;
-  /** Dimmed, not frosted: the picture under it stays in sight (a switch between watching and control, a question). */
-  clear?: boolean;
-  icon?: IconName;
-  /** A picture over the words instead of the icon (the computer's portrait). */
-  art?: ReactNode;
-  spinner?: boolean;
-  /** The agent's sky behind it (a screen opening). */
-  sky?: boolean;
-  color: ReturnType<typeof colorOf>;
-  text: ReactNode;
-  help?: ReactNode;
-  action?: ReactNode;
-}) {
-  const box = useRef<HTMLSpanElement>(null);
-  return (
-    <div className={cx("brw-dim", sky && "brw-dim--sky", clear && "is-clear", className)}>
-      {sky && <ComputerSky color={color} clear={() => [box.current]} />}
-      <span className="brw-dim__box" role="status" ref={box}>
-        {art}
-        <span className="brw-dim__row">
-          {spinner ? <PixelSpinner size={16} color={color} /> : icon && <Icon name={icon} size={16} />}
-          {text}
-        </span>
-        {help && <small>{help}</small>}
-        {action}
-      </span>
-    </div>
-  );
-}
-
-/**
  * An agent's browser in its card (ADR 0040 §6–7): in the conversation and on its computer's page; in the
  * computer dialog (`surface`), its page.
  * In the conversation the live page is always in view, in a frame of the agent's color whose top says the
@@ -380,8 +343,13 @@ export function BrowserCard({
   const head = useDialogHead();
   const sayFailed = useSayFailed();
   const openComputer = useOpenComputer();
+  // The dialog over this card shows the same screen ("Ver a tela inteira"), and a hidden tab shows nothing: the card's
+  // own view of it closes (one stream per person, none for nobody).
+  const dialogOpen = useOpenedComputer() === agentId;
+  const pageVisible = usePageVisible();
   // The workspace's own computer is never off and nobody connects one: its words say so.
-  const cloud = useComputerEdition(org.id) === "cloud";
+  const edition = useComputerEdition(org.id);
+  const cloud = edition === "cloud";
   const agent = dir.agentById.get(agentId);
   const g = agentGrammar(name);
   const color = colorOf(agent);
@@ -406,20 +374,52 @@ export function BrowserCard({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const watching = !chat || visible || holding;
+  const [full, setFull] = useState(false);
+  const openQ = useAgentBrowserHandoff(org.id, agentId, !profile);
+  // The agent's browser runs on its screen (ADR 0058 §7): for whoever may watch that screen, the card shows all of it,
+  // and watches no frames meanwhile (nobody keeps the computer's screencast running for nothing). Whoever holds the
+  // browser drives it on its frames, whose watch keeps their control alive.
+  const quiet = newest(openQ.data ?? null, given && isOpenHandoff(given) ? given : null);
+  const screen = useBrowserScreen(org.id, agentId, {
+    enabled: !surface && !profile,
+    userId: me.user.id,
+    shown: (!chat || visible || full) && !dialogOpen && pageVisible,
+    holdsBrowser: holding || controlledBy(quiet, me.user.id),
+  });
+  const shows = screen.desktop;
+  // What the card's screen shows: Take over and Stop go over it once it is live.
+  const [screenState, setScreenState] = useState<DesktopViewState>("connecting");
+  const { report } = screen;
+  const onScreenView = useCallback(
+    (state: DesktopViewState) => {
+      setScreenState(state);
+      report(state);
+    },
+    [report],
+  );
+  useEffect(() => {
+    if (!screen.connect) setScreenState("connecting");
+  }, [screen.connect]);
+  // Parar here: the card says so until a new page comes, which only its frames tell (the browser is closed, so none
+  // stream meanwhile), then it shows the screen again.
+  const [stoppedAt, setStoppedAt] = useState<string | null>(null);
+  // The frames wait for the screen's status: a card that shows the screen never opens them first.
+  const watching = (!chat || visible || holding) && (holding || stoppedAt !== null || (screen.settled && !shows));
+  // The page shown here is how people follow the agent's work: it gets the stream's own rate everywhere (only the
+  // phone's small thumbnails ask for less, ADR 0040 §7.1).
   const live = useBrowserLive(profile ? profileLiveKey(profile.id) : agentId, watching);
   const profileActions = useBrowserProfileMutations(org.id);
   // After Devolver on a profile: who may use it now, in place of the page.
   const [handedProfile, setHandedProfile] = useState(false);
-  const [still, setStill] = useState<typeof live.frame>(null);
-  const [stoppedAt, setStoppedAt] = useState<string | null>(null);
+  // The last page that came, kept while a view that starts again has none yet. Read while rendering (not set in an
+  // effect), so each frame renders the card once, not twice.
+  const lastFrame = useRef<BrowserFrame | null>(null);
+  if (live.frame) lastFrame.current = live.frame;
+  const still = lastFrame.current;
   useEffect(() => {
-    if (!live.frame) return;
-    setStill(live.frame);
     // A new page after Parar: the browser is open again (the agent, or a person opening a site).
-    setStoppedAt(null);
+    if (live.frame) setStoppedAt(null);
   }, [live.frame]);
-  const openQ = useAgentBrowserHandoff(org.id, agentId, !profile);
   // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
   const control = useAgentScreenControl(org.id, agentId, !given && !profile);
   const mayDrive = canTakeOver && (profile ? profile.canDrive : given !== null || control.data !== false);
@@ -427,13 +427,10 @@ export function BrowserCard({
   const machines = useMachines(org.id);
   const imgRef = useRef<HTMLImageElement>(null);
   // The agent's desktop runs (its Chrome shows there): "Ver a tela inteira" opens it in the computer dialog.
-  const desktop = useDesktopStatus(org.id, agentId, { enabled: !profile });
-  const onDesktop = desktop.data?.available === true && desktop.data.running;
+  const desktop = screen.status.data;
+  const onDesktop = desktop?.available === true && desktop.running;
 
-  const handoff = newest(
-    live.status?.handoff ?? null,
-    newest(openQ.data ?? null, given && isOpenHandoff(given) ? given : null),
-  );
+  const handoff = newest(live.status?.handoff ?? null, quiet);
   const controller = handoff?.status === "active" ? handoff.controllerUserId : null;
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
@@ -461,7 +458,6 @@ export function BrowserCard({
   const [keysOpen, setKeysOpen] = useState(false);
   // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
   const touch = useMatchMedia(TOUCH);
-  const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -489,10 +485,11 @@ export function BrowserCard({
     if (closedNow) setWait({ frame: live.frame, why: "closed" });
   }, [closedNow, live.frame]);
   const waitingFor = wait && live.frame === wait.frame ? wait : null;
-  const closed = waitingFor?.why === "closed";
-  const opening = waitingFor?.why === "opening";
+  // The frames' own states say nothing while the card shows the screen.
+  const closed = !shows && waitingFor?.why === "closed";
+  const opening = !shows && waitingFor?.why === "opening";
   // Someone else is in control: the server sends this view no frames until it's handed back.
-  const hidden = live.status?.hidden === true;
+  const hidden = !shows && live.status?.hidden === true;
 
   // The bar or a notification asked for this card: bring it into view.
   const asked = useBrowserCardRequest({ agentId, ...(given ? { handoffId: given.id } : {}) });
@@ -715,7 +712,9 @@ export function BrowserCard({
     kept.current = null;
     return () => {
       const { still: last, inControl: control } = leaving.current;
-      kept.current = last ? { src: `data:image/jpeg;base64,${last.data}`, control } : null;
+      // As a `data:` URL: the view that takes it may hold it as long as it likes, and nothing has to free it.
+      const src = last ? browserFrameDataUrl(last) : null;
+      kept.current = src ? { src, control } : null;
     };
   }, [kept]);
   useEffect(() => {
@@ -848,11 +847,12 @@ export function BrowserCard({
     });
   };
 
-  const unavailable = live.unavailable;
+  const unavailable = shows ? null : live.unavailable;
   const reconnecting = unavailable?.reason === "reconnecting";
   // What can't change by waiting is said plainly; everything else is "opening" while it retries.
-  const blocker =
-    unavailable?.reason === "offline"
+  const blocker = shows
+    ? null
+    : unavailable?.reason === "offline"
       ? t(cloud ? "browser.inCard.offlineCloud" : "browser.inCard.offline", g)
       : unavailable?.reason === "no_computer"
         ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
@@ -861,11 +861,12 @@ export function BrowserCard({
           : live.error === "too_many_browsers"
             ? t("browser.inCard.tooMany")
             : null;
-  const starting = !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
+  const starting = !shows && !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
   // Opening or reconnecting for too long says so, with Try again: who may drive it restarts the browser, the
   // others watch again. Only while this view watches on an open socket: off screen or offline no page can come.
   const online = useConnectionStatus() === "open";
   const [attempt, setAttempt] = useState(0);
+  // Never on the screen: the card watches no frames there (`watching`).
   const stuck = useBrowserStuck(watching && online && !hidden && (starting || reconnecting || opening), attempt);
   const retry = () => {
     setAttempt((n) => n + 1);
@@ -963,7 +964,6 @@ export function BrowserCard({
     );
   }
 
-  const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
   // The page as last seen, for the title: none while closed, opening or hidden.
   const pic = closed || opening || hidden ? null : (frame ?? still);
@@ -986,6 +986,7 @@ export function BrowserCard({
         : asTitle === "opening"
           ? t("browser.inCard.opening")
           : t("browser.inCard.group", g);
+  // On the screen (ADR 0058 §7) no frame says the page: what the agent does now, or watching.
   const sub = inControl
     ? profile
       ? t("browser.profiles.controlSub")
@@ -1004,7 +1005,7 @@ export function BrowserCard({
           ? t("browser.inCard.subStuck")
           : reconnecting
             ? t("browser.inCard.subReconnect", g)
-            : starting || (!lastStep && !pic)
+            : starting || (!lastStep && !pic && !shows)
               ? t("browser.inCard.subStarting", g)
               : lastStep
                 ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
@@ -1104,7 +1105,7 @@ export function BrowserCard({
     </small>
   );
   const cover =
-    switchingTo && (src || keptSrc) ? (
+    switchingTo && (frame || keptSrc) ? (
       <Cover clear color={color} spinner text={switchingTo} />
     ) : asking.asking ? (
       <Cover
@@ -1298,7 +1299,29 @@ export function BrowserCard({
       )}
       <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
         <div className="brw-ac__stage" {...asking.stage}>
-          {src ? (
+          {shows ? (
+            // The agent's whole screen, scaled into the card: its browser is a window there (ADR 0058 §7). Off screen
+            // its place keeps the screen's shape, so the conversation never jumps.
+            screen.connect ? (
+              <DesktopView
+                preview
+                agentId={agentId}
+                name={name}
+                computer={machine?.name ?? ""}
+                // Only its covers read it, and the card leaves those for its frames at once.
+                edition={edition ?? "selfhost"}
+                machine={machine ?? null}
+                canTakeOver={false}
+                onView={onScreenView}
+              />
+            ) : (
+              <div className="dsk dsk--card" aria-hidden="true">
+                <div className="dsk-stage">
+                  <div className="dsk-screen" />
+                </div>
+              </div>
+            )
+          ) : frame ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
             <div
               ref={pageRef}
@@ -1321,7 +1344,7 @@ export function BrowserCard({
               }}
             >
               {inControl && <textarea ref={pasteRef} className="brw-paste" tabIndex={-1} aria-hidden="true" />}
-              <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
+              <LivePicture frame={frame} alt={t("browser.live.page", g)} imgRef={imgRef} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
                 <span className="brw-ac__capture" role="status" data-esc-layer="">
@@ -1346,8 +1369,8 @@ export function BrowserCard({
               )}
             </div>
           )}
-          {cover}
-          {framed && !inControl && !otherInControl && (
+          {!shows && cover}
+          {framed && !inControl && !otherInControl && (!shows || screenState === "live") && (
             <span className={confirmStop ? "brw-mf__over is-pinned" : "brw-mf__over"}>
               {watchActs}
               {seeWhole}
@@ -1373,33 +1396,35 @@ export function BrowserCard({
       {inControl &&
         (failing ? (
           <div className="brw-ac__foot brw-ac__fail">
-            <b>{t("browser.live.failTitle")}</b>
-            <span className="small muted">{t("browser.live.failHelp", g)}</span>
-            <div className="brw-reasons">
-              {FAIL_REASONS.map((r) => (
-                <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
-                  {t(`browser.live.failReasons.${r}`)}
-                </FilterToggle>
-              ))}
-            </div>
-            <Textarea
-              rows={1}
-              autoGrow
-              className="brw-ac__note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t("browser.live.failPlaceholder")}
-              maxLength={FAIL_NOTE_MAX}
-            />
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
-                {t("browser.live.failSend", g)}
-              </Button>
-            </div>
+            <Locked when={actions.failed.isPending}>
+              <b>{t("browser.live.failTitle")}</b>
+              <span className="small muted">{t("browser.live.failHelp", g)}</span>
+              <div className="brw-reasons">
+                {FAIL_REASONS.map((r) => (
+                  <FilterToggle key={r} pressed={reason === r} onPressedChange={(on) => setReason(on ? r : null)}>
+                    {t(`browser.live.failReasons.${r}`)}
+                  </FilterToggle>
+                ))}
+              </div>
+              <Textarea
+                rows={1}
+                autoGrow
+                className="brw-ac__note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t("browser.live.failPlaceholder")}
+                maxLength={FAIL_NOTE_MAX}
+              />
+              <div className="brw-ac__row">
+                <span className="brw-grow" />
+                <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
+                  {t("browser.live.back")}
+                </Button>
+                <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
+                  {t("browser.live.failSend", g)}
+                </Button>
+              </div>
+            </Locked>
           </div>
         ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.

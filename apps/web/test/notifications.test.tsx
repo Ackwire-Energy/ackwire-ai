@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent, AgentQuestion, AppNotification } from "@agenteschat/client";
+import type { AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { dispatchPushOpen, pushOpenPath } from "../src/lib/push-open";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
@@ -144,8 +144,14 @@ describe("Notificações", () => {
     expect(title.nextElementSibling?.className).toBe("ac-pagehead__meta");
     expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
     const waiting = screen().getByRole("region", { name: "Esperando você" });
-    expect(waiting.textContent).toContain("Ada está parada até você responder.");
-    expect(waiting.textContent).toContain(question.text);
+    // The day groups' head: the title and how many, nothing else.
+    expect(waiting.querySelector(".list-group-head")?.textContent).toBe("Esperando você1");
+    // The question as the conversation's request card, stopped until I answer.
+    const card = waiting.querySelector(".rq") as HTMLElement;
+    expect(card.querySelector(".rq__kind")?.textContent).toContain("Pergunta");
+    expect(card.querySelector(".rq__state")?.textContent).toBe("esperando você");
+    expect(card.querySelector(".rq__lead")?.textContent).toBe(question.text);
+    expect(card.querySelector(".rq__end")?.textContent).toMatch(/^Parada há /);
     expect(within(waiting).getByRole("button", { name: "Usa o cupom antigo" })).toBeTruthy();
     const today = screen().getByRole("region", { name: "Hoje" });
     expect(today.textContent).toContain("João e Ada responderam em Login 401");
@@ -170,7 +176,7 @@ describe("Notificações", () => {
     expect(document.body.textContent).toContain("reagiram à sua mensagem");
   });
 
-  test("an approval says who wants what in one sentence, who asked, and the agent's why behind Por quê?", async () => {
+  test("an approval is the conversation's card: the agent's why, the action in its well, who asked behind Ver detalhes", async () => {
     const asked = notification({
       id: "n-ap",
       kind: "approval",
@@ -188,45 +194,19 @@ describe("Notificações", () => {
     });
     await go(seedState({ notifications: [asked] }));
     const region = screen().getByRole("region", { name: "Esperando você" });
-    const text = region.textContent ?? "";
-    expect(text).toContain("Pedido pela rotina «Vigiar erros» enquanto ninguém acompanhava");
-    expect(text).toContain("Atlas quer fazer um deploy");
-    expect(text).not.toContain("O erro 500 voltou depois do deploy 2.14.");
-    await click(within(region).getByRole("button", { name: "Por quê?" }));
-    expect(region.textContent).toContain("O erro 500 voltou depois do deploy 2.14.");
-    // Decided right here: a deploy takes a hold, and Recusar asks for the reason.
-    expect(within(region).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
-    await click(within(region).getByRole("button", { name: "Recusar" }));
-    expect(region.querySelector("textarea")).toBeTruthy();
-  });
-
-  test("who is stopped until I answer: up to three agents by name, then how many more", async () => {
-    const asking = (agentId: string, m: number) =>
-      notification({
-        id: `n-${agentId}`,
-        kind: "approval",
-        waiting: true,
-        actors: [{ type: "agent", id: agentId }],
-        source: { approvalId: `ap-${m}`, channelId: ENG_ID },
-        latest: { title: "Run deploy workflow" },
-        createdAt: ago(m),
-        updatedAt: ago(m),
-      });
-    const stopped = async (count: number) => {
-      const state = seedState();
-      const ada = state.agents[0] as Agent;
-      state.agents.push(
-        { ...ada, id: "00000000-0000-4000-8000-0000000000a3", name: "Lia", handle: "lia" },
-        { ...ada, id: "00000000-0000-4000-8000-0000000000a4", name: "Theo", handle: "theo" },
-      );
-      state.notifications = state.agents.slice(0, count).map((a, i) => asking(a.id, i + 1));
-      await go(state);
-      const text = screen().getByRole("region", { name: "Esperando você" }).querySelector(".nt-wh small")?.textContent;
-      cleanup();
-      return text;
-    };
-    expect(await stopped(2)).toBe("Ada e Atlas estão parados até você responder.");
-    expect(await stopped(4)).toBe("Ada, Atlas, Lia e mais 1 estão parados até você responder.");
+    const card = region.querySelector(".rq") as HTMLElement;
+    expect(card.getAttribute("data-ask-kind")).toBe("approval");
+    expect(card.querySelector(".rq__kind")?.textContent).toBe("Pede sua aprovação");
+    expect(card.querySelector(".rq__well")).toBeTruthy();
+    // Decided right here: a deploy takes a hold, and Agora não asks for the reason. Remind me later and Done end it.
+    expect(within(card).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
+    expect(
+      within(card.querySelector(".rq__end .nt-tail") as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Lembrar depois", "Feito"]);
+    await click(within(card).getByRole("button", { name: "Agora não" }));
+    expect(card.querySelector("textarea")).toBeTruthy();
   });
 
   test("Feito leaves at once (optimistic) and Desfazer brings it back", async () => {
@@ -319,13 +299,16 @@ describe("Notificações", () => {
     expect(shown).toContain("Mandei o lembrete pelo WhatsApp.");
   });
 
-  test("an agent's question: a suggestion fills the answer, Enviar answers through the question", async () => {
+  test("an agent's question: its suggestions are the card's answers, one a line; a pick answers through the question", async () => {
     const { state } = await go();
     const waiting = screen().getByRole("region", { name: "Esperando você" });
-    await click(within(waiting).getByRole("button", { name: "Usa o cupom antigo" }));
-    const box = within(waiting).getByRole("textbox", { name: "Responder à Ada" }) as HTMLTextAreaElement;
-    expect(box.value).toBe("Usa o cupom antigo");
-    await click(within(waiting).getByRole("button", { name: "Enviar" }));
+    const list = waiting.querySelector(".rq__choices") as HTMLElement;
+    // Its last line writes another: the reply box opens in the card.
+    const lines = [...list.querySelectorAll(".rq__choice")].map((b) => b.textContent);
+    expect(lines.at(-1)).toBe("Outra resposta");
+    await click(within(list).getByRole("button", { name: "Outra resposta" }));
+    expect(within(waiting).getByRole("textbox", { name: "Responder à Ada" })).toBeTruthy();
+    await click(within(list).getByRole("button", { name: "Usa o cupom antigo" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,
@@ -436,7 +419,7 @@ describe("Notificações", () => {
 
   test("empty: Tudo em dia", async () => {
     await go(seedState({ notifications: [] }));
-    expect(document.querySelector(".nt-calm")?.textContent).toBe(
+    expect(document.querySelector(".ac-empty--page")?.textContent).toBe(
       "Tudo em diaQuando alguém precisar de você, aparece aqui.",
     );
     expect((screen().getByRole("button", { name: "Marcar tudo como lido" }) as HTMLButtonElement).disabled).toBe(true);
@@ -770,9 +753,8 @@ describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
     const row = document.querySelector('[data-n="n-hand"]') as HTMLElement;
     expect(row.classList.contains("nt-wr")).toBe(true);
     expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("Entrar no painel");
-    expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    expect(row.querySelector(".rq__head > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
     // Two lines: the first one's capitals start at the face's top.
-    expect(row.querySelector(".nt-wr__l1")?.classList.contains("ac-captop")).toBe(true);
     await click(row.querySelector(".nt-wr__sub") as HTMLElement);
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
@@ -799,14 +781,14 @@ describe("an agent asks for a secret (ADR 0027)", () => {
     expect(row.classList.contains("nt-wr")).toBe(true);
     expect(row.querySelector(".nt-what")?.textContent).toBe("Ada pediu um segredo a você");
     expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("NPM_TOKEN · publicar o pacote no npm");
-    expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    expect(row.querySelector(".rq__head > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
     await click(row.querySelector(".nt-wr__sub") as HTMLElement);
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 });
 
-describe("Esperando você: what only points somewhere is one row", () => {
+describe("Esperando você: what only points somewhere is a card of the requests' shape", () => {
   const asks = (over: Partial<AppNotification> = {}) =>
     notification({
       id: "n-join",
@@ -822,16 +804,12 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const read = asks({ id: "n-read", latest: { title: "Marina Alves", names: ["Marina Alves"] }, readAt: ago(1) });
     await go(seedState({ notifications: [asks(), read] }));
     expect(row().classList.contains("nt-wr")).toBe(true);
-    expect(row().querySelector(".nt-meta, .nt-body")).toBeNull();
-    // The words on one line: the headline, where it opens and when.
-    const l1 = row().querySelector(".nt-wr__l1") as HTMLElement;
-    expect(l1.querySelector(".nt-what")?.textContent).toBe("Felipe Ramos pede para entrar");
-    expect(l1.querySelector(".nt-wr__src")?.textContent).toBe("Membros");
-    expect(l1.querySelector(".nt-wr__tm")?.textContent).toBe("agora");
-    // One line: it centres on the face, with the actions.
-    expect(l1.classList.contains("ac-captop")).toBe(false);
-    const acts = row().querySelector(".nt-wr__acts") as HTMLElement;
-    expect(acts.classList.contains("ac-acts")).toBe(true);
+    // A card of the requests' shape: where it is from and when on top, the headline as its words.
+    expect(row().querySelector(".nt-wr__main")?.classList.contains("rq")).toBe(true);
+    expect(row().querySelector(".rq__kind .nt-wr__src")?.textContent).toBe("Membros");
+    expect(row().querySelector(".rq__kind .nt-wr__tm")?.textContent).toBe(" · agora");
+    expect(row().querySelector(".rq__lead.nt-what")?.textContent).toBe("Felipe Ramos pede para entrar");
+    const acts = row().querySelector(".rq__foot.nt-wr__acts") as HTMLElement;
     const buttons = within(acts).getAllByRole("button");
     expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual([
       "Abrir",
@@ -840,8 +818,9 @@ describe("Esperando você: what only points somewhere is one row", () => {
     ]);
     expect(buttons[0]?.className).not.toContain("ac-btn--primary");
     expect(buttons[0]?.querySelector("svg")).toBeNull();
-    // Remind me later and Done: a group nested in the same row of actions.
-    expect(acts.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
+    // Remind me later and Done end the footer, as on the request cards.
+    expect(acts.lastElementChild?.matches(".rq__end")).toBe(true);
+    expect(acts.lastElementChild?.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
     // Unread is the headline's weight, and a screen reader hears it; read, neither.
     expect(row().classList.contains("is-unread")).toBe(true);
     expect(row().getAttribute("aria-label")).toBe("Felipe Ramos pede para entrar, não lida");
@@ -879,7 +858,7 @@ describe("Esperando você: what only points somewhere is one row", () => {
     expect(state.calls.some((c) => c.method === "notifications.read")).toBe(false);
   });
 
-  test("the cards end their action line with the same pair: Abrir em Aprovações before it, no spacer", async () => {
+  test("the cards end their footer with the same pair, after the time", async () => {
     const approval = notification({
       id: "n-ap",
       kind: "approval",
@@ -892,79 +871,52 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const items = inbox();
     await go(seedState({ notifications: [...items, approval, asks()] }));
     for (const id of ["n-q", "n-ap"]) {
-      const line = row(id).querySelector(".nt-wacts") as HTMLElement;
-      expect(line.classList.contains("ac-acts")).toBe(true);
-      expect(line.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
-      expect(line.querySelector(".nt-grow")).toBeNull();
+      const end = row(id).querySelector(".rq__foot > .rq__end") as HTMLElement;
+      expect(end.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);
       expect(
-        within(line.lastElementChild as HTMLElement)
+        within(end.lastElementChild as HTMLElement)
           .getAllByRole("button")
           .map((b) => b.getAttribute("aria-label")),
       ).toEqual(["Lembrar depois", "Feito"]);
     }
-    expect(row("n-ap").querySelector(".nt-wacts > .nt-tail")?.previousElementSibling?.textContent).toBe(
-      "Abrir em Aprovações",
-    );
-    expect(row().querySelector(".nt-wr__acts > :last-child")?.matches(".nt-tail.ac-acts")).toBe(true);
+    expect(row().querySelector(".nt-wr__acts > .rq__end > :last-child")?.matches(".nt-tail.ac-acts")).toBe(true);
   });
 
-  test("its geometry, from the stylesheets: the kit's action rows, the face's middle, one column for every pair", async () => {
+  test("its geometry, from the stylesheets: the kit's action rows, the request card's shape, one column for every pair", async () => {
     const read = async (path: string) =>
       (await Bun.file(new URL(path, import.meta.url).pathname).text()).replace(/\/\*[\s\S]*?\*\//g, "");
     const css = await read("../src/pages/notifications.css");
     const kit = await read("../../../packages/ui/src/styles/components.css");
     const block = (sheet: string, media: string) => sheet.split(`\n@media ${media} {`)[1]?.split("\n}")[0] ?? "";
     const phone = block(css, "(max-width: 720px)");
-    const wraps = block(css, "(max-width: 1023px)");
     /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
     const rule = (selector: string, sheet = css) =>
       new RegExp(`\\n *${selector.replace(/[.()>:*[\]]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
     const value = (selector: string, prop: string, sheet = css) =>
       new RegExp(`(?:^|[;\\s])${prop}: ([^;]+);`).exec(rule(selector, sheet))?.[1];
     const px = (selector: string, prop: string, sheet = css) => Number.parseFloat(value(selector, prop, sheet) ?? "");
-    const right = (selector: string, sheet = css) => {
-      const [top, r = top] = (value(selector, "padding", sheet) ?? "").split(" ");
-      return r;
-    };
 
     // The pair is a nested `.ac-acts`: in a row it joins the row's actions. In a card's line, which wraps, it keeps a
     // box, so a wrap never splits it, and its margin pushes it to the end. The kit spaces what is in it.
     expect(value(".ac-acts > .ac-acts", "display", kit)).toBe("contents");
-    expect(value(".nt-wacts > .nt-tail.ac-acts", "display")).toBe("flex");
-    expect(value(".nt-wacts > .nt-tail.ac-acts", "margin-left")).toBe("auto");
-    expect(value(".nt-wacts", "flex-wrap")).toBe("wrap");
+    expect(value(".rq__end > .nt-tail.ac-acts", "display")).toBe("flex");
     expect(css).not.toMatch(/\.nt-tail(?:\.ac-acts)? > [^{]*\{[^}]*margin/);
-    // The words keep the gap the kit puts between actions, and the actions sit on the face's middle.
-    expect(value(".nt-wr__main", "column-gap")).toBe(value(".ac-acts", "column-gap", kit));
-    expect(px(".nt-wr__acts", "height")).toBe(px(".nt-av40", "height"));
-    // Rows and cards end at one padding line, wide and on a phone: every clock and check share two columns.
-    expect(right(".nt-wr")).toBe(right(".nt-wi"));
-    expect(right(".nt-wr", phone)).toBe(right(".nt-wi", phone));
-    // A line alone centres on the face, at every width, and the line is the chips'. Two or more take `.ac-captop`.
-    const line = px(".nt-wr__l1", "line-height");
-    expect(line).toBe(px(".ac-chip", "height", kit));
-    expect(px(".nt-wr__l1:not(.ac-captop)", "margin-block-start")).toBe((px(".nt-av40", "height") - line) / 2);
-    // Under 1024px the words wrap, three lines at most, the time at their end and never alone on the last line. A
-    // chip on its line's top keeps every line the chips' height, and a name with no spaces breaks instead of running
-    // under the clip.
-    expect(value(".nt-wr__l1", "display", wraps)).toBe("-webkit-box");
-    expect(value(".nt-wr__l1", "-webkit-line-clamp", wraps)).toBe("3");
-    expect(value(".nt-wr__l1", "text-wrap", wraps)).toBe("pretty");
-    expect(value(".nt-wr__l1", "overflow-wrap", wraps)).toBe("anywhere");
-    expect(value(".nt-wr .nt-what", "white-space", wraps)).toBe("normal");
-    expect(value(".nt-wr__l1 > .ac-chip", "vertical-align", wraps)).toBe("top");
-    // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard, and the
-    // source chip goes. The faces stay 40px.
+    // What only points somewhere is a request card itself: no corners or padding of its own, its face on the kind's
+    // line as every waiting item's.
+    expect(rule(".nt-wr__main")).not.toMatch(/border-radius|padding/);
+    expect(px(".nt-wi > .nt-face", "padding-top")).toBe(12);
+    expect(value(".nt-wr .rq__lead.nt-what", "white-space")).toBe("normal");
+    expect(value(".nt-wr__sub", "-webkit-line-clamp")).toBe("2");
+    // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard. The faces
+    // keep their size.
     expect(css).not.toMatch(/\.nt-wr__open[^{]*\{[^}]*display: none/);
     expect(value(".nt-wr__open:not(:focus-visible)", "position", phone)).toBe("absolute");
     expect(value(".nt-wr__open:not(:focus-visible)", "clip-path", phone)).toBe("inset(50%)");
-    expect(value(".nt-wr__src", "display", phone)).toBe("none");
-    expect(rule(".nt-av40", phone)).toBe("");
+    expect(rule(".nt-av32", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
-    // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
-    const ring = value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow");
-    expect(ring).toBe("var(--focus-ring-inset)");
-    expect(value("html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
+    // A day's row clips: its ring goes inside. A waiting item is a face and a card, its ring around it.
+    expect(value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow")).toBe("var(--focus-ring-inset)");
+    expect(value("html:not([data-pointer]) .nt-wi:focus-visible", "box-shadow")).toBe("var(--focus-ring)");
   });
 });
 

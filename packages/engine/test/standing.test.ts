@@ -272,7 +272,7 @@ describe("suspended", () => {
     });
     let suspending: Promise<unknown> | null = null;
     f.pubsub.subscribe(channelTopic(f.general.id), (event) => {
-      if (event.type === "agent.delta" && !suspending) suspending = standing("suspended").finally(release);
+      if (event.type === "agent.typing" && !suspending) suspending = standing("suspended").finally(release);
     });
     await post("@dev check the logs");
     await drainOutbox(f.db, f.handlers);

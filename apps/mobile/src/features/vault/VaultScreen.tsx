@@ -20,6 +20,7 @@ import {
 } from "@/ui";
 import { Note } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
+import { FirstUse } from "../shared/FirstUse";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { Loaded, MONO } from "../shared/parts";
 import {
@@ -71,19 +72,25 @@ export function VaultScreen() {
   const counts = vaultCounts(data);
   // A new item starts where the person is: the team's tab adds to the team when they may.
   const newScope = current === "team" && data.canManageTeam ? "team" : "personal";
+  const tabEmpty = current === newScope && !data.items.some((i) => i.scope === current);
   return (
     <SettingsPage title={title}>
       <Loaded>
         <GroupedFooter>{t("settings.sectionText.vault")}</GroupedFooter>
-        <Gap />
-        <GroupedList>
-          <GroupedRow
-            icon="plus"
-            label={t("mobile.vault.newItem")}
-            chevron
-            onPress={() => router.push(vaultHref.create(newScope) as never)}
-          />
-        </GroupedList>
+        {/* Empty, the button in the tab's empty state is the one way to add. */}
+        {tabEmpty ? null : (
+          <>
+            <Gap />
+            <GroupedList>
+              <GroupedRow
+                icon="plus"
+                label={t("mobile.vault.newItem")}
+                chevron
+                onPress={() => router.push(vaultHref.create(newScope) as never)}
+              />
+            </GroupedList>
+          </>
+        )}
         <View style={styles.tabs}>
           <Segmented
             items={[
@@ -120,31 +127,22 @@ function Items({ data, tab, onNew }: { data: VaultOverview; tab: "team" | "perso
   const mayAdd = tab === "personal" || data.canManageTeam;
   return (
     <>
-      <GroupedFooter>
-        {tab === "personal"
-          ? t("mobile.vault.personalText")
-          : data.canManageTeam
-            ? t("mobile.vault.teamText")
-            : t("mobile.vault.teamReadText")}
-      </GroupedFooter>
+      {all.length > 0 ? (
+        <GroupedFooter>
+          {tab === "personal"
+            ? t("mobile.vault.personalText")
+            : data.canManageTeam
+              ? t("mobile.vault.teamText")
+              : t("mobile.vault.teamReadText")}
+        </GroupedFooter>
+      ) : null}
       {all.length === 0 ? (
-        <EmptyState
-          icon={tab === "personal" ? "lock" : "members"}
-          title={tab === "personal" ? t("mobile.vault.empty.personalTitle") : t("mobile.vault.empty.teamTitle")}
-          subtitle={
-            tab === "personal"
-              ? t("mobile.vault.empty.personalText")
-              : mayAdd
-                ? t("mobile.vault.empty.teamText")
-                : t("mobile.vault.empty.teamReadText")
-          }
-          {...(mayAdd
-            ? {
-                action: (
-                  <Button variant="primary" size="sm" icon="plus" label={t("mobile.vault.newItem")} onPress={onNew} />
-                ),
-              }
-            : {})}
+        <FirstUse
+          place={tab === "personal" ? "vaultPersonal" : "vaultTeam"}
+          size="panel"
+          acts={mayAdd}
+          label={t("mobile.vault.newItem")}
+          onPress={onNew}
         />
       ) : (
         <>
@@ -173,7 +171,21 @@ function Items({ data, tab, onNew }: { data: VaultOverview; tab: "team" | "perso
             <Gap />
           )}
           {shown.length === 0 ? (
-            <GroupedFooter>{t("mobile.vault.noResults", { q: q.trim() })}</GroupedFooter>
+            <EmptyState
+              size="inline"
+              title={t("mobile.vault.noResults", { q: q.trim() })}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={t("filters.clearAll")}
+                  onPress={() => {
+                    setQ("");
+                    setKind("all");
+                  }}
+                />
+              }
+            />
           ) : (
             <GroupedList>
               {shown.map((item) => (

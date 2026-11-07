@@ -6,7 +6,21 @@ import type {
   SearchKind,
   SearchQuery,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
 import { cutText } from "./format";
@@ -18,6 +32,7 @@ import { isAgentOnlyNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
+import { adminChannelSql, taskSeenSql } from "./task-access";
 import { visibleWikiPageIds } from "./wiki-links";
 
 const { messages, channelMembers, channels, contextItems } = schema;
@@ -209,14 +224,39 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
     .map((r) => r.id);
 }
 
-/** Channels a person can read: the ones they belong to. */
-export async function userVisibleChannels(db: Database, orgId: string, userId: string) {
+/** Channels a person can read: the ones they belong to and, for an administrator, every channel (never a DM). */
+export async function userVisibleChannels(
+  db: Database,
+  orgId: string,
+  userId: string,
+  options: { archived?: boolean } = {},
+) {
   const rows = await db
-    .select({ id: channelMembers.channelId })
-    .from(channelMembers)
-    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId), isNull(channels.archivedAt)));
+    .select({ id: channels.id })
+    .from(channels)
+    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        options.archived ? undefined : isNull(channels.archivedAt),
+        or(isNotNull(channelMembers.id), adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`)),
+      ),
+    );
   return rows.map((r) => r.id);
+}
+
+/**
+ * The tasks a person sees outside what `userVisibleChannels` gives them, as the ids their search documents carry: one
+ * limited to people is its own scope, one tied to a conversation that conversation (for an administrator, a DM it never
+ * reads). Only tasks' documents are searched with them (`visibleIssueScopes`).
+ */
+async function issueSearchScopes(db: Database, orgId: string, userId: string) {
+  const rows = rowsOf<{ scope: string }>(
+    await db.execute(sql`select coalesce(i.channel_id, i.id) as scope from ${schema.issues} i
+      where i.org_id = ${orgId}::uuid and (i.restricted or i.channel_id is not null)
+        and ${taskSeenSql("i", sql`${userId}::text`)}`),
+  );
+  return [...new Set(rows.map((r) => r.scope))];
 }
 
 /** Hybrid search with the query embedded when possible (else full-text only). */
@@ -229,7 +269,7 @@ export async function searchVisible(
     kinds?: SearchKind[];
     limit?: number;
     match?: "all" | "any";
-  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort">,
+  } & Pick<SearchQuery, "after" | "before" | "messages" | "sort" | "visibleIssueScopes">,
 ): Promise<SearchHit[]> {
   // A list by date ranks by no vector: no embedding to pay for.
   const embedded =
@@ -241,6 +281,7 @@ export async function searchVisible(
     text: input.text,
     embedding: embedded?.vectors[0] ?? null,
     visibleChannelIds: input.visibleChannelIds,
+    visibleIssueScopes: input.visibleIssueScopes,
     kinds: input.kinds,
     limit: input.limit,
     match: input.match,
@@ -276,7 +317,25 @@ export async function searchForUser(
   // A channel scope or a message filter searches messages alone (a workspace-wide wiki page is in no channel).
   const kinds = channelIds || input.messages ? (["message"] satisfies SearchKind[]) : input.kinds;
   const messages = input.messages ?? (channelIds ? {} : undefined);
-  let hits = await searchVisible(deps, { orgId, ...rest, kinds, messages, visibleChannelIds: visible });
+  const visibleIssueScopes = channelIds ? [] : await issueSearchScopes(deps.db, orgId, userId);
+  let hits = await searchVisible(deps, {
+    orgId,
+    ...rest,
+    kinds,
+    messages,
+    visibleChannelIds: visible,
+    visibleIssueScopes,
+  });
+  // A task's document follows a change of who sees it a moment later: the task itself decides.
+  const tasks = hits.filter((h) => h.kind === "issue").map((h) => h.sourceId);
+  if (tasks.length > 0) {
+    const shown = await deps.db
+      .select({ id: schema.issues.id })
+      .from(schema.issues)
+      .where(and(inArray(schema.issues.id, tasks), taskSeenSql("issues", sql`${userId}::text`)));
+    const seen = new Set(shown.map((t) => t.id));
+    hits = hits.filter((h) => h.kind !== "issue" || seen.has(h.sourceId));
+  }
   // Memory is indexed by channel only: the same rule as `listContextItems` for an agent's and a person's items.
   const items = hits.filter((h) => h.kind === "context_item").map((h) => h.sourceId);
   if (items.length > 0) {

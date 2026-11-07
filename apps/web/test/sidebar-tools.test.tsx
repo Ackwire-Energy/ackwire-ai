@@ -57,6 +57,7 @@ const sent = (state: State) =>
 const noneWaiting = () => {
   const state = seedState();
   for (const a of state.approvals) a.status = "approved";
+  for (const p of state.proposals) p.status = "accepted";
   return state;
 };
 
@@ -82,15 +83,47 @@ describe("the bell", () => {
 });
 
 describe("the tools on top", () => {
+  test("each tool row shows its own grip, saying what it moves; a click on it opens nothing; Início carries the section's", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const before = router.state.location.pathname;
+    const tasks = within(nav()).getByRole("link", { name: "Tarefas" });
+    const grip = tasks.querySelector(".sidebar__tool-grip") as HTMLElement;
+    expect(grip.getAttribute("title")).toBe("Arraste para mover Tarefas");
+    await click(grip);
+    expect(router.state.location.pathname).toBe(before);
+    const home = within(nav()).getByRole("link", { name: "Início" });
+    expect(home.querySelector(".sidebar__tool-grip")).toBeNull();
+    expect(home.getAttribute("draggable")).toBeNull();
+    const section = within(nav()).getByRole("button", { name: /seção Ferramentas/ });
+    expect(section.getAttribute("title")).toBe("Arraste para mover a seção Ferramentas ou clique para ver as opções");
+  });
+
+  test("a row says its name on hover only in the rail, which hides it: beside the words it would just repeat them", async () => {
+    await go();
+    const row = (name: string) => within(nav()).getByRole("link", { name });
+    expect(row("Tarefas").getAttribute("title")).toBeNull();
+    expect(row("Início").getAttribute("title")).toBeNull();
+    await click(within(nav()).getByRole("button", { name: "Minimizar barra lateral" }));
+    expect(row("Tarefas").getAttribute("title")).toBe("Tarefas");
+    expect(row("Início").getAttribute("title")).toBe("Início");
+    await click(within(nav()).getByRole("button", { name: "Expandir barra lateral" }));
+  });
+
   test("by default Threads, Tarefas, Drive and Equipe, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");
-    // Dashboards (ADR 0135) is no row of its own: it is in More.
     expect(rows()).not.toContain("Painéis");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
     const more = await openMore();
-    // Dashboards (ADR 0135) and the task manager (ADR 0128) are always there, after the tools a person places.
-    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Painéis", "Gerenciador de tarefas"]);
+    expect(inMore(more)).toEqual([
+      "Propostas de melhoria",
+      "Wiki",
+      "Rotinas",
+      "Calendário",
+      "Painéis",
+      "Gerenciador de tarefas",
+    ]);
     expect(
       within(more)
         .getByRole("link", { name: /Painéis/ })
@@ -107,6 +140,7 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Threads", "Tarefas", "Drive", "Equipe"]);
     expect(inMore(await openMore())).toEqual([
       "Aprovações",
+      "Propostas de melhoria",
       "Wiki",
       "Rotinas",
       "Calendário",
@@ -168,6 +202,21 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Equipe"]);
   });
 
+  test("Painéis and the task manager are tools like the rest: Sempre brings them into the list, each line one row", async () => {
+    const state = await go(noneWaiting());
+    const dialog = await openSetup();
+    expect([...dialog.querySelectorAll(".sidebar-setup__name")].map((n) => n.textContent)).toEqual(
+      expect.arrayContaining(["Painéis", "Gerenciador de tarefas"]),
+    );
+    expect(chosen(dialog, "Gerenciador de tarefas")).toBe("Em Mais");
+    await choose(dialog, "Gerenciador de tarefas", "Sempre");
+    await choose(dialog, "Painéis", "Sempre");
+    expect(sent(state)).toContainEqual(["taskManager", "always"]);
+    expect(sent(state)).toContainEqual(["dashboards", "always"]);
+    expect(listed()).toEqual(expect.arrayContaining(["Painéis", "Gerenciador de tarefas"]));
+    expect(dialog.querySelector(".ac-dialog__foot-note")).toBeNull();
+  });
+
   test("the choices couldn't be read: a choice here moves only its tool, and the server's answer shows the rest", async () => {
     const state = noneWaiting();
     state.sidebarItems = { wiki: "always", routines: "always" };
@@ -185,11 +234,38 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Rotinas", "Equipe"]);
   });
 
+  test("proposals waiting count on Aprovações, and on their own row once a person gives them one", async () => {
+    const waiting = () => {
+      const state = noneWaiting();
+      for (const p of state.proposals) Object.assign(p, { status: "pending", canDecide: true });
+      return state;
+    };
+    await go(waiting());
+    const row = (name: string) =>
+      [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item")].find(
+        (a) => a.querySelector(".sidebar__item-label")?.textContent === name,
+      );
+    expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
+    expect(row("Aprovações")?.textContent).toContain("2");
+    cleanup();
+    await go({ ...waiting(), sidebarItems: { proposals: "auto" } });
+    expect(listed()).toEqual(["Propostas de melhoria", "Threads", "Tarefas", "Drive", "Equipe"]);
+    expect(row("Propostas de melhoria")?.textContent).toContain("2");
+    expect(row("Propostas de melhoria")?.getAttribute("href")).toBe(`/org/${ORG_ID}/proposals`);
+    cleanup();
+    // A tab of Aprovações: its row is the one lit, with no second row for the page.
+    await renderApp(`/org/${ORG_ID}/proposals`, { api: createFakeApi(waiting()) });
+    await settle(10);
+    expect(row("Aprovações")?.getAttribute("data-status")).toBe("active");
+    expect(nav().querySelector(`.sidebar__more-active a[href$="/proposals"]`)).toBeNull();
+  });
+
   test("the choices are the server's: the same sidebar on every device", async () => {
     await go(seedState({ sidebarItems: { drive: "more", routines: "always", approvals: "more" } }));
     expect(listed()).toEqual(["Threads", "Tarefas", "Rotinas", "Equipe"]);
     expect(inMore(await openMore())).toEqual([
       "Aprovações",
+      "Propostas de melhoria",
       "Wiki",
       "Drive",
       "Calendário",
@@ -263,7 +339,19 @@ describe("the tools on top", () => {
       // Wiki waits in More between Tarefas and Drive: one press is one step in the list.
       expect(listed()).toEqual(["Aprovações", "Threads", "Drive", "Tarefas", "Equipe"]);
       expect(toolOrder(state)).toEqual([
-        ["approvals", "threads", "drive", "issues", "wiki", "routines", "calendar", "team"],
+        [
+          "approvals",
+          "proposals",
+          "threads",
+          "drive",
+          "issues",
+          "wiki",
+          "routines",
+          "calendar",
+          "team",
+          "dashboards",
+          "taskManager",
+        ],
       ]);
       expect(tool("Drive").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+ArrowUp Alt+Shift+ArrowDown");
       // At the top, up does nothing; an arrow alone is the page's.
@@ -296,6 +384,7 @@ describe("the tools on top", () => {
       // Wiki stays where the steps left it, in More: the order is Drive's own spot now, not the default's.
       expect(toolOrder(state).at(-1)).toEqual([
         "approvals",
+        "proposals",
         "threads",
         "issues",
         "drive",
@@ -303,6 +392,8 @@ describe("the tools on top", () => {
         "routines",
         "calendar",
         "team",
+        "dashboards",
+        "taskManager",
       ]);
     });
 
@@ -311,14 +402,15 @@ describe("the tools on top", () => {
       const dialog = await openSetup();
       const names = () =>
         [...dialog.querySelectorAll(".sidebar-setup__row .sidebar-setup__name")].map((n) => n.textContent);
-      expect(names().slice(0, 3)).toEqual(["Aprovações", "Threads", "Tarefas"]);
+      expect(names().slice(0, 3)).toEqual(["Aprovações", "Propostas de melhoria", "Threads"]);
       expect(
         (within(dialog).getByRole("button", { name: "Mover para cima: Aprovações" }) as HTMLButtonElement).disabled,
       ).toBe(true);
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
-      expect(names().slice(0, 4)).toEqual(["Aprovações", "Threads", "Drive", "Tarefas"]);
+      expect(names().slice(0, 5)).toEqual(["Aprovações", "Propostas de melhoria", "Threads", "Drive", "Tarefas"]);
       // At the top its up arrow turns off: the focus goes to the row's down arrow, not out of the dialog.
+      await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
       expect(document.activeElement === within(dialog).getByRole("button", { name: "Mover para baixo: Threads" })).toBe(
         true,

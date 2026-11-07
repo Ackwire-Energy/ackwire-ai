@@ -131,6 +131,31 @@ test("push: limits, missing files, escapes and server errors", async () => {
   expect(message).toBe("upload_failed: The upload expired");
 });
 
+test("a failed upload never tells the agent the host or a proxy's page", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  writeFileSync(path.join(ws, "a.txt"), "hi");
+  const opts = {
+    url: "https://up.example/x",
+    token: "t",
+    uploadId: "u",
+    maxBytes: 1000,
+    path: "a.txt",
+    workspaceReal: ws,
+  };
+  const said = (fetch: FetchLike) =>
+    pushPath({ ...opts, fetch }).then(
+      () => "",
+      (err: Error) => err.message,
+    );
+  const noHost = await said(async () => {
+    throw new Error("getaddrinfo ENOTFOUND internal.host.example");
+  });
+  expect(noHost).toBe("The upload stopped. Try again.");
+  const page = await said(async () => new Response("<html>internal.host.example</html>", { status: 502 }));
+  expect(page).toBe("The server refused it (502). Try again.");
+});
+
 test("push goes to the paired server, at the path the server gave (its public address may not be reachable here)", async () => {
   const ws = tempDir();
   dirs.push(ws);

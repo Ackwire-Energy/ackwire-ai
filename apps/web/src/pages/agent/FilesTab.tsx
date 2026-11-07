@@ -1,15 +1,18 @@
 import type { Artifact, ArtifactKind } from "@agenteschat/client";
 import { useArtifacts, useChannels } from "@agenteschat/client";
+import { mayAsk } from "@agenteschat/client/lib/audience";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, Card, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
+import { Button, Card, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AskAgentButton } from "@/components/AskAgentButton";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { DrivePreview } from "@/components/drive/DrivePreview";
-import { LoadingLine } from "@/components/Loading";
+import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { lookOf } from "@/lib/look";
 import { CardHead, useAgentEdit } from "./context";
 
 const KINDS: ArtifactKind[] = ["document", "table", "file", "diagram", "html", "diff"];
@@ -103,24 +106,41 @@ export function FilesTab() {
       )}
       {files.isLoading ? (
         <LoadingLine width={260} />
+      ) : files.isError && !files.data ? (
+        <ErrorState error={files.error} onRetry={() => void files.refetch()} />
       ) : list.length === 0 ? (
-        <div className="agp-empty">
-          <b>{t("agentPage.files.empty", g)}</b>
-          <span>{t("agentPage.files.emptyText", g)}</span>
-        </div>
+        <EmptyState
+          size="panel"
+          agent={lookOf(agent) ?? true}
+          title={mayAsk(org, agent) ? t("agentPage.files.empty") : undefined}
+          actions={
+            <AskAgentButton
+              agent={agent}
+              variant="primary"
+              label={t("agentPage.files.ask")}
+              draft={t("agentPage.files.askText")}
+            />
+          }
+        >
+          {t("agentPage.files.emptyText", g)}
+        </EmptyState>
       ) : shown.length === 0 ? (
-        <div className="agp-empty">
-          <b>{t("drive.noResults")}</b>
-          <Button
-            size="sm"
-            onClick={() => {
-              setKind("all");
-              setQ("");
-            }}
-          >
-            {t("drive.clear")}
-          </Button>
-        </div>
+        <EmptyState
+          size="inline"
+          actions={
+            <Button
+              size="sm"
+              onClick={() => {
+                setKind("all");
+                setQ("");
+              }}
+            >
+              {t("drive.clear")}
+            </Button>
+          }
+        >
+          {t("drive.noResults")}
+        </EmptyState>
       ) : (
         <ul className="agp-list agp-files">
           {shown.map((a) => (

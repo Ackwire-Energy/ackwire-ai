@@ -81,7 +81,7 @@ export const mobilePtBR = {
   },
   account: {
     deleteFailed: "Não deu para apagar sua conta agora. Tente de novo.",
-    deleted: "Sua conta foi apagada.",
+    deleted: "Sua conta some de vez em {{date}}. Entre antes disso para restaurar.",
     signedOut: "Você saiu.",
   },
   theme: {

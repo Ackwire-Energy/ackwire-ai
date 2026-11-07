@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import {
+  appendFileSync,
   closeSync,
   cpSync,
   existsSync,
@@ -105,6 +106,10 @@ export { excludeLocally };
  *   its descriptor 3 and the CLI on its own, never a file or an environment.
  *   Without `account`, the computer's own sign-in. A CLI that found nothing to
  *   sign in with ends with what its agent can do instead (`noSignInResult`).
+ * - A Claude sign-in several agents share (`AccountGrant` `hosted`): its CLI is root's and no wrapper runs here. All the
+ *   rest stays with this manager: root hears where the task runs (`HostedTask`) and sends the CLI's lines back into the
+ *   same logs, then how it ended into `exit.json`, so the watcher reads it like any other. Such a CLI dies with the
+ *   runner, so the task ends as interrupted then, for the server to resume.
  */
 
 export const DEFAULT_MAX_CONCURRENT_TASKS = 3;
@@ -183,6 +188,8 @@ interface Entry {
   startSha?: string;
   /** Protocol 31: the agent's account its CLI signs in with (absent: the computer's own sign-in). */
   account?: string;
+  /** Its CLI is root's: there is no wrapper, and `pid` is this worker's own, never one to signal. */
+  hosted?: true;
   /** Its env holds that account's coding plan key, which its redaction must hide (never the key itself). */
   planKey?: boolean;
   /** Why the runner canceled it: what its agent reads first in the result. */
@@ -206,6 +213,19 @@ interface ExitFile {
   endedAt: string;
   error?: string;
 }
+
+/** What root needs of a task it hosts, from the worker that prepared it, besides the request itself. */
+export interface HostedTask {
+  cwd: string;
+  /** Where an item works, told first in its prompt. */
+  where: string;
+  /** The folder is a git repository: the mission's rules hold as sent. */
+  git: boolean;
+  maxSeconds: number;
+}
+
+/** How a hosted task's CLI ended, as root says. */
+export type HostedExit = Pick<ExitFile, "exitCode" | "signal" | "reason" | "error">;
 
 export interface TaskSecrets {
   env: Record<string, string>;
@@ -268,6 +288,8 @@ export interface TaskManagerOptions {
   caffeinate?: boolean;
   /** How a Claude Code or Codex task's wrapper starts (a worker under systemd: in the agent's AI CLIs slice). */
   spawnCli?: Spawn;
+  /** System mode, in a worker: root stops the CLI of a task it hosts. */
+  hostedStop?: (taskId: string) => void;
   now?: () => number;
 }
 
@@ -549,6 +571,8 @@ function toolLine(name: string, input: Record<string, unknown>, rel: (p: string)
 }
 
 const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+/** Claude Code's own tools as the agent's worker serves them on a shared sign-in; the server's are in lower case. */
+const DELEGATED_TOOL = /^mcp__agentes__(?=[A-Z])/;
 
 /** What one line of output says: a human line, files touched, the final result, the session. */
 export interface ParsedLine {
@@ -643,9 +667,10 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
               if (prUrl) out.prUrl = prUrl;
             } else if (block.type === "tool_use" && typeof block.name === "string") {
               const input = (block.input ?? {}) as Record<string, unknown>;
-              out.line = toolLine(block.name, input, rel);
+              const name = block.name.replace(DELEGATED_TOOL, "");
+              out.line = toolLine(name, input, rel);
               const p = input.file_path ?? input.notebook_path;
-              if (EDIT_TOOLS.has(block.name) && typeof p === "string" && p) files.push(rel(p));
+              if (EDIT_TOOLS.has(name) && typeof p === "string" && p) files.push(rel(p));
             }
           }
         }
@@ -799,6 +824,11 @@ interface Watch {
   cancelAt?: number;
 }
 
+const addDenial = (w: Watch, denial: TaskDenial) => {
+  if (w.denials.length >= TASK_LIMITS.denials || w.denials.some((x) => x.command === denial.command)) return;
+  w.denials.push(denial);
+};
+
 export class TaskManager {
   private journal: Journal = { tasks: [] };
   private readonly watches = new Map<string, Watch>();
@@ -806,6 +836,8 @@ export class TaskManager {
   private readonly releases = new Map<string, () => void>();
   /** How each task this runner started was launched, for its retry (`retryOtherFlag`); in memory only, until it ends. */
   private readonly launches = new Map<string, { env: NodeJS.ProcessEnv; token?: string }>();
+  /** Tasks whose CLI root runs for this very process: one it doesn't know began before a restart and has ended. */
+  private readonly hostedRuns = new Set<string>();
   private send: ((frame: RunnerFrame) => void) | null = null;
   private caffeinate: ChildProcess | null = null;
   private readonly log: (line: string) => void;
@@ -1028,7 +1060,8 @@ export class TaskManager {
     const prompt = typeof req.prompt === "string" ? req.prompt : "";
     if (executor !== "shell" && !prompt.trim())
       throw new RunnerError("bad_request", `A ${executor} task needs a prompt`);
-    const signIn = executor === "shell" ? null : await this.signIn(executor, req.account, grant);
+    const hosted = executor === "claude" && grant?.kind === "hosted";
+    const signIn = executor === "shell" || hosted ? null : await this.signIn(executor, req.account, grant);
     if (signIn?.release) this.releases.set(taskId, signIn.release);
     const plan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
     const folder = await this.opts.agentFolder(agent);
@@ -1116,7 +1149,9 @@ export class TaskManager {
     // On an account, Claude Code's endpoint and proxies are pinned in its own `--settings`, as a turn's: a project's
     // settings never send its sign-in elsewhere.
     const accountSettings = executor === "claude" && signIn ? { env: accountSettingsEnv(plan, undefined) } : {};
-    if (missionId && this.opts.mcp) {
+    if (hosted) {
+      // Its CLI's files and tools are root's and this worker's bridge's.
+    } else if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
       writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
       const configFile = path.join(dir, "mcp.json");
@@ -1217,76 +1252,84 @@ export class TaskManager {
     }
     // A coding plan serves only its own models: Claude Code asks for one by the alias the plan maps (as a turn).
     if (executor === "claude" && plan) extra.push("--model", claudeCodeModel(plan, undefined));
-    const command = executorCommand(executor, {
-      command: req.command,
-      ...(readOnly && executor === "claude" ? { permissionMode: "dontAsk" as const } : {}),
-      session,
-      resume,
-      extra,
-      ...(allowed?.grants?.length ? { addDirs: allowed.grants.filter((g) => !isInside(g, cwd)) } : {}),
-      ...(executor === "codex"
-        ? {
-            codex: {
-              cwd,
-              sandbox: readOnly ? ("read-only" as const) : ("workspace-write" as const),
-              lastFile: path.join(dir, "last.txt"),
-              ...(codexThread ? { thread: codexThread } : {}),
-            },
-          }
-        : {}),
-    });
+    const command = hosted
+      ? "claude"
+      : executorCommand(executor, {
+          command: req.command,
+          ...(readOnly && executor === "claude" ? { permissionMode: "dontAsk" as const } : {}),
+          session,
+          resume,
+          extra,
+          ...(allowed?.grants?.length ? { addDirs: allowed.grants.filter((g) => !isInside(g, cwd)) } : {}),
+          ...(executor === "codex"
+            ? {
+                codex: {
+                  cwd,
+                  sandbox: readOnly ? ("read-only" as const) : ("workspace-write" as const),
+                  lastFile: path.join(dir, "last.txt"),
+                  ...(codexThread ? { thread: codexThread } : {}),
+                },
+              }
+            : {}),
+        });
     const maxSeconds = clampInt(
       req.maxSeconds,
       1,
       TASK_MAX_SECONDS_CAP,
       this.opts.defaultMaxSeconds ?? DEFAULT_TASK_MAX_SECONDS,
     );
-    const shell = shellCommand(command);
-    writeJson(path.join(dir, "spec.json"), {
-      file: shell.file,
-      args: shell.args,
-      verbatim: shell.verbatim,
-      cwd,
-      maxSeconds,
-      ...(signIn?.token ? { tokenFd: true } : {}),
-    });
-    if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
-    const base: NodeJS.ProcessEnv = { ...process.env, ...(secrets?.env ?? {}) };
-    // As a turn's (ADR 0041 §5): the account's folder is the CLI's home and nothing else signs it in; a plan's key
-    // goes in the env under the plan's name, a token only on descriptor 3 (`spawnWrapper`).
-    const env = signIn ? accountEnv(signIn.kind, signIn.home, base) : base;
-    if (plan && signIn?.planKey) env[plan.claudeCode.tokenEnv] = signIn.planKey.key;
-    if (signIn?.token) Object.assign(env, TOKEN_FD_ENV);
-    // Claude Code and Codex tasks run on their sign-in (the account's, or the computer's own): a route there stops
-    // first (two processes on one sign-in race on its refresh token), right before the task starts.
-    if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code", signIn?.home);
-    let child: ChildProcess;
-    let launch: { env: NodeJS.ProcessEnv; token?: string };
-    try {
-      // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.
-      const mcpEnv: Record<string, string> =
-        executor === "codex" && mcpToken && this.opts.mcp
-          ? {
-              [CODEX_MCP_ENV[0]]: mcpToken,
-              [CODEX_MCP_ENV[1]]: this.opts.mcp.socketPath,
-              [CODEX_MCP_ENV[2]]: path.dirname(this.opts.root),
-            }
-          : executor === "claude" && mcpToken
-            ? // A permission prompt waits for a person (up to PERMISSION_WAIT_MS): our tool call may take that long.
-              { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
-            : {};
-      // The agent's secrets (ADR 0027) through the environment only, never on disk here.
-      launch = { env: { ...env, ...mcpEnv }, ...(signIn?.token ? { token: signIn.token } : {}) };
-      child = this.spawnWrapper(dir, launch.env, executor, launch.token);
-    } catch (err) {
-      throw new RunnerError("internal", `Couldn't start the task: ${err instanceof Error ? err.message : String(err)}`);
+    let pid: number | undefined = process.pid;
+    if (!hosted) {
+      const shell = shellCommand(command);
+      writeJson(path.join(dir, "spec.json"), {
+        file: shell.file,
+        args: shell.args,
+        verbatim: shell.verbatim,
+        cwd,
+        maxSeconds,
+        ...(signIn?.token ? { tokenFd: true } : {}),
+      });
+      if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
+      const base: NodeJS.ProcessEnv = { ...process.env, ...(secrets?.env ?? {}) };
+      // As a turn's (ADR 0041 §5): the account's folder is the CLI's home and nothing else signs it in; a plan's key
+      // goes in the env under the plan's name, a token only on descriptor 3 (`spawnWrapper`).
+      const env = signIn ? accountEnv(signIn.kind, signIn.home, base) : base;
+      if (plan && signIn?.planKey) env[plan.claudeCode.tokenEnv] = signIn.planKey.key;
+      if (signIn?.token) Object.assign(env, TOKEN_FD_ENV);
+      // Claude Code and Codex tasks run on their sign-in (the account's, or the computer's own): a route there stops
+      // first (two processes on one sign-in race on its refresh token), right before the task starts.
+      if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code", signIn?.home);
+      let child: ChildProcess;
+      let launch: { env: NodeJS.ProcessEnv; token?: string };
+      try {
+        // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.
+        const mcpEnv: Record<string, string> =
+          executor === "codex" && mcpToken && this.opts.mcp
+            ? {
+                [CODEX_MCP_ENV[0]]: mcpToken,
+                [CODEX_MCP_ENV[1]]: this.opts.mcp.socketPath,
+                [CODEX_MCP_ENV[2]]: path.dirname(this.opts.root),
+              }
+            : executor === "claude" && mcpToken
+              ? // A permission prompt waits for a person (up to PERMISSION_WAIT_MS): our tool call may take that long.
+                { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
+              : {};
+        // The agent's secrets (ADR 0027) through the environment only, never on disk here.
+        launch = { env: { ...env, ...mcpEnv }, ...(signIn?.token ? { token: signIn.token } : {}) };
+        child = this.spawnWrapper(dir, launch.env, executor, launch.token);
+      } catch (err) {
+        throw new RunnerError(
+          "internal",
+          `Couldn't start the task: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      (child as unknown as EventEmitter).on("error", () => {});
+      child.unref();
+      pid = child.pid;
+      if (!pid) throw new RunnerError("internal", "Couldn't start the task");
+      this.launches.set(taskId, launch);
     }
-    (child as unknown as EventEmitter).on("error", () => {});
-    child.unref();
-    const pid = child.pid;
-    if (!pid) throw new RunnerError("internal", "Couldn't start the task");
-    this.launches.set(taskId, launch);
     // An allowed folder outside the agent's own (protocol 10) is reported by its absolute path.
     const rel = isInside(folder, cwd) ? path.relative(folder, cwd).split(path.sep).join("/") : cwd;
     const entry: Entry = {
@@ -1298,7 +1341,7 @@ export class TaskManager {
       cwd,
       cwdRel: rel,
       folder,
-      ...(executor === "claude" && session ? { resumed: resume } : {}),
+      ...(executor === "claude" && session && !hosted ? { resumed: resume } : {}),
       ...(branch ? { branch } : {}),
       ...(session ? { session } : {}),
       ...(missionId ? { missionId } : {}),
@@ -1306,6 +1349,7 @@ export class TaskManager {
       ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       ...(commitMessage && startSha ? { commit: commitMessage, startSha } : {}),
       ...(signIn ? { account: signIn.account } : {}),
+      ...(hosted ? { account: String(req.account), hosted: true as const } : {}),
       ...(plan && signIn?.planKey ? { planKey: true } : {}),
       status: "running",
       pid,
@@ -1315,6 +1359,7 @@ export class TaskManager {
     };
     this.journal.tasks.push(entry);
     this.save();
+    if (hosted) this.hostedRuns.add(taskId);
     await this.watch(entry, false, (signIn ? withSignIn(secrets, signIn) : secrets)?.redact);
     this.updateCaffeinate();
     this.log(`[${entry.agentHandle}] task ${taskId} started: ${command.slice(0, 80)}`);
@@ -1326,7 +1371,32 @@ export class TaskManager {
       ...(branch ? { branch } : {}),
       command,
       ...(baseBehind !== undefined ? { baseBehind } : {}),
+      ...(hosted ? { host: { cwd, where, git: isGitRepo(cwd), maxSeconds } satisfies HostedTask } : {}),
     };
+  }
+
+  private hostedTask(taskId: string) {
+    return this.journal.tasks.find((t) => t.taskId === taskId && t.hosted && t.status === "running");
+  }
+
+  /** A line a hosted task's CLI printed, already through root's redaction. */
+  hostedOutput(taskId: string, stream: "stdout" | "stderr", line: string) {
+    if (this.hostedTask(taskId)) appendFileSync(path.join(this.dirOf(taskId), `${stream}.log`), `${line}\n`);
+  }
+
+  /** How a hosted task's CLI ended: the watcher takes it from here. */
+  hostedExit(taskId: string, exit: HostedExit) {
+    if (!this.hostedTask(taskId)) return;
+    writeJson(path.join(this.dirOf(taskId), "exit.json"), { ...exit, endedAt: new Date(this.now()).toISOString() });
+    this.hostedRuns.delete(taskId);
+  }
+
+  /** A tool of a hosted task's session refused a call nobody could approve (Claude Code's own would list it in `result`). */
+  hostedDenial(session: string, tool: string, input: Record<string, unknown>) {
+    const t = this.journal.tasks.find((x) => x.hosted && x.session === session && x.status === "running");
+    const w = t && this.watches.get(t.taskId);
+    const [denial] = claudeDenials([{ tool_name: tool, tool_input: input }]);
+    if (w && denial) addDenial(w, { ...denial, command: w.redact(denial.command) });
   }
 
   /** For the MCP bridge: a mission task's token and whether it still runs. */
@@ -1392,6 +1462,7 @@ export class TaskManager {
     } catch {}
     const w = this.watches.get(t.taskId);
     if (w) w.cancelAt = this.now();
+    if (t.hosted) this.opts.hostedStop?.(t.taskId);
     return { canceled: true };
   }
 
@@ -1439,7 +1510,9 @@ export class TaskManager {
     } catch {}
     const startedAt = Date.parse(t.startedAt);
     // The wrapper writes `alive` as it starts; give it a moment before judging.
-    const gone = !pidAlive(t.pid) || (now - startedAt > ALIVE_STALE_MS && now - aliveAt > ALIVE_STALE_MS);
+    const gone = t.hosted
+      ? !this.hostedRuns.has(t.taskId)
+      : !pidAlive(t.pid) || (now - startedAt > ALIVE_STALE_MS && now - aliveAt > ALIVE_STALE_MS);
     if (gone) {
       // Wait one more look: `exit.json` may be landing right now.
       if (w.missingSince === undefined) {
@@ -1462,6 +1535,7 @@ export class TaskManager {
   }
 
   private hardKill(t: Entry, dir: string) {
+    if (t.hosted) return;
     let childPid: number | undefined;
     try {
       childPid = Number(readFileSync(path.join(dir, "child.pid"), "utf8").trim()) || undefined;
@@ -1508,12 +1582,7 @@ export class TaskManager {
     }
     if (parsed.session && !t.session) t.session = parsed.session;
     if (parsed.result !== undefined) w.result = parsed.result;
-    for (const d of parsed.denials ?? []) {
-      const command = w.redact(d.command);
-      if (w.denials.length < TASK_LIMITS.denials && !w.denials.some((x) => x.command === command)) {
-        w.denials.push({ tool: d.tool, command });
-      }
-    }
+    for (const d of parsed.denials ?? []) addDenial(w, { tool: d.tool, command: w.redact(d.command) });
     const line = parsed.line ? w.redact(parsed.line).slice(0, TASK_LIMITS.line) : "";
     if (line) {
       w.pendingLine = line;

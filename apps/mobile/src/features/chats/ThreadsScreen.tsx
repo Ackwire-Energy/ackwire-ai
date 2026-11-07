@@ -1,8 +1,10 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet } from "react-native";
 import { STORED } from "@/lib/storage";
-import { EmptyState, LargeTitleScreen, Text } from "@/ui";
+import { LargeTitleScreen, Text } from "@/ui";
+import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { useConversations } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
@@ -45,8 +47,16 @@ export function ThreadsScreen() {
         <Text tone="faint" style={styles.center}>
           {t("mobile.common.loading")}
         </Text>
+      ) : list.failed && rows.length === 0 ? (
+        <LoadFailed onRetry={() => void list.refetch()} />
       ) : rows.length === 0 ? (
-        <EmptyState icon="reply" title={t("mobile.threads.empty")} subtitle={t("mobile.threads.emptyHint")} />
+        <FirstUse
+          place="threads"
+          acts
+          label={t("mobile.empty.threads.action")}
+          icon="chat"
+          onPress={() => router.navigate("/")}
+        />
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);

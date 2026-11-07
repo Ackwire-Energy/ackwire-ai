@@ -39,8 +39,9 @@ const passed = (iso: string | undefined, now: number) => iso !== undefined && Da
  * the limit, the words and the percentage always beside the color. `compact`
  * (lists, an agent's facts, Contas de IA): one line with the tightest windows
  * ("semana 40% · 5h 12%", after `label`), one bar for the fullest, every window
- * on hover, and only near the limit when it renews; nothing while no window is
- * known, unless the plan already refused a request ("No limite"). `children` (an
+ * on hover, and only near the limit when it renews, then how old the numbers are
+ * from 10 minutes ("atualizado há 51 min"; out of date past 6 hours); nothing
+ * while no window is known, unless the plan already refused a request ("No limite"). `children` (an
  * account's agents) go between the bars and when they renew: each window's
  * renewal then moves under them, on one line, before how old the numbers are.
  */
@@ -65,11 +66,12 @@ export function PlanMeter({
   if (compact) {
     const shown = planLine(usage, text, now);
     if (!shown) return null;
-    const line = [label, shown.line].filter(Boolean).join(" · ");
+    const line = [label, shown.line, shown.age].filter(Boolean).join(" · ");
     return (
       <div
         className={cx("ac-planmeter", "ac-planmeter--compact", className)}
         data-state={shown.state}
+        data-stale={shown.stale || undefined}
         data-level={planLevel(shown.top?.used ?? 0, shown.state === "limited")}
         title={shown.title}
       >

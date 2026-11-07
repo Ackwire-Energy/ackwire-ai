@@ -205,8 +205,7 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {words && isEmpty(r) && !hits.isFetching ? (
-          // As every search's "nothing found" in the app (Drive, Routines): a quiet magnifier over the words.
-          <EmptyState icon="search" title={t("mobile.find.nothing", { q: q.trim() })} />
+          <EmptyState size="inline" title={t("mobile.find.nothing", { q: q.trim() })} />
         ) : null}
       </View>
     </View>

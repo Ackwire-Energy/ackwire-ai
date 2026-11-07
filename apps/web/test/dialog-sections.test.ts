@@ -21,7 +21,7 @@ const ROOTS = [join(import.meta.dir, "..", "src"), join(REPO, "packages", "ui", 
 /** The dialog's own sections, each on the dialog's inset (`--dialog-pad`). */
 const SECTIONS = new Set(["DialogBody", "DialogFooter", "DialogSearchList"]);
 /** Wrappers whose children are the sections. */
-const WRAPPERS = new Set(["form", "Suspense"]);
+const WRAPPERS = new Set(["form", "Suspense", "Locked"]);
 /**
  * Custom sections, each with its own inset on `--dialog-pad`, or full bleed on purpose under a rule (the catalog's
  * grid, a channel's settings with their nav).
@@ -33,6 +33,7 @@ const SECTION_COMPONENTS = new Set([
   "ConnectFlow",
   "ConnectedRepos",
   "ConnectorSky",
+  "EndpointForm",
   "ServiceDialog",
   "SkyStrip",
   "ComputerStage",

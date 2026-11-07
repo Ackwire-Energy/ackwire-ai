@@ -4,8 +4,11 @@ import {
   ACCOUNTS_PROTOCOL,
   accountCodeAad,
   BRAIN_PROTOCOL,
+  CLAUDE_AUTH_PROTOCOL,
   generateSecretKeyPair,
   type MachineRequest,
+  OPENCODE_KEY_PROVIDER,
+  OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   openSecret,
   orgTopic,
@@ -25,6 +28,8 @@ import {
   beginAccountLogin,
   ConflictError,
   cancelAccountLogin,
+  claudeAuthMethodFor,
+  claudeAuthPolicy,
   createMachineHub,
   deleteAccount,
   ForbiddenError,
@@ -44,6 +49,7 @@ import {
   sendAccountLoginCode,
   setAgentBrain,
   setAgentComputerTarget,
+  setClaudeAuthPolicy,
   syncMachineAccounts,
   ValidationError,
 } from "../src";
@@ -101,7 +107,7 @@ async function sharedMachine() {
   return paired;
 }
 
-async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex", over = {}) {
+async function addAccount(machineId: string, id: string, kind: "claude_code" | "codex" | "opencode", over = {}) {
   await f.db.insert(schema.machineAccounts).values({
     id,
     orgId: f.org.id,
@@ -114,6 +120,36 @@ async function addAccount(machineId: string, id: string, kind: "claude_code" | "
     ...over,
   });
 }
+
+test("OpenCode's CLI on a computer is no sign-in of anyone's: a real key still lists", async () => {
+  f = await setup();
+  const { machineId } = await sharedMachine();
+  await f.db
+    .update(schema.machines)
+    .set({
+      protocol: OPENCODE_PROTOCOL,
+      execAllowed: true,
+      executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+    })
+    .where(eq(schema.machines.id, machineId));
+  const page = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  const row = page.computers.find((c) => c.machineId === machineId);
+  // Available to choose (the free tier), claimed by nobody.
+  expect(row?.own).toEqual({});
+  expect(row?.brains.opencode).toBe(true);
+  expect(row?.canAdd).toBe(true);
+  expect(page.accounts.filter((a) => a.machineId === machineId)).toEqual([]);
+
+  await f.db.update(schema.machines).set({ pairedByUserId: f.owner.id }).where(eq(schema.machines.id, machineId));
+  expect(
+    (await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers.find((c) => c.machineId === machineId)?.own,
+  ).toEqual({});
+
+  const key = "00000000-0000-4000-8000-0000000000c0";
+  await addAccount(machineId, key, "opencode", { provider: OPENCODE_KEY_PROVIDER, label: "OpenCode" });
+  const keyed = await listAiAccounts({ db: f.db }, f.owner.id, f.org.id);
+  expect(keyed.accounts.filter((a) => a.machineId === machineId).map((a) => a.id)).toEqual([key]);
+});
 
 const agentRow = async (id = f.agent.id) => {
   const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, id));
@@ -369,6 +405,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       email: "ana@example.com",
       plan: "max",
       status: "active",
+      statusKnown: true,
       ownerId: f.owner.id,
       ownerName: "ana",
       mine: true,
@@ -378,6 +415,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       provider: null,
       keyHint: null,
       shared: false,
+      providerOrgId: null,
     },
   });
   // Polled again: the same account, added once.
@@ -523,6 +561,7 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
         antigravity: false,
         key: false,
       },
+      off: expect.any(Object),
       brains: {
         claude_code: expect.any(Boolean),
         codex: expect.any(Boolean),
@@ -1773,4 +1812,294 @@ test("where each agent is its own OS user, a key's login made for one agent leav
     state: "failed",
     duplicate: { account: { id } },
   });
+});
+
+// ── How each connection signs in (protocol 50, ADR 0150) ────────────────────
+
+/** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 50). */
+async function systemMachine(protocol = CLAUDE_AUTH_PROTOCOL, methods?: ("cli_login" | "setup_token")[]) {
+  const paired = await ownedMachine(protocol);
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { ...m?.executors, mode: "system", ...(methods ? { claudeLoginMethods: methods } : {}) } })
+    .where(eq(schema.machines.id, paired.machineId));
+  return paired;
+}
+
+test("the Claude sign-in policy: no row is setup-token for the listed workspaces; set once, unknown workspaces refused", async () => {
+  f = await setup();
+  expect(await claudeAuthPolicy(f.db)).toEqual({
+    method: "setup_token",
+    rollout: "selected",
+    orgIds: [],
+    changedAt: null,
+  });
+  const at = new Date("2026-03-02T10:00:00Z");
+  const set = await setClaudeAuthPolicy(
+    f.db,
+    { method: "cli_login", rollout: "selected", orgIds: [f.org.id.toUpperCase(), f.org.id] },
+    at,
+  );
+  expect(set).toEqual({ method: "cli_login", rollout: "selected", orgIds: [f.org.id], changedAt: at });
+  // The same again changes nothing, its time included.
+  const again = await setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id] });
+  expect(again.changedAt).toEqual(at);
+  await expect(
+    setClaudeAuthPolicy(f.db, {
+      method: "cli_login",
+      rollout: "all",
+      orgIds: ["0193dddd-0000-4000-8000-0000000000ff"],
+    }),
+  ).rejects.toMatchObject({ code: "claude_auth.unknown_org" });
+  await expect(setClaudeAuthPolicy(f.db, { method: "api_key", rollout: "all", orgIds: [] })).rejects.toBeInstanceOf(
+    ValidationError,
+  );
+  expect((await claudeAuthPolicy(f.db)).changedAt).toEqual(at);
+
+  // A listed workspace deleted since drops out of the next change; a new id still must exist.
+  const [gone] = await f.db.insert(schema.organizations).values({ name: "Beta" }).returning();
+  const [added] = await f.db.insert(schema.organizations).values({ name: "Gama" }).returning();
+  const goneId = gone?.id ?? "";
+  const addedId = added?.id ?? "";
+  await setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id, goneId] });
+  await f.db.delete(schema.organizations).where(eq(schema.organizations.id, goneId));
+  const kept = await setClaudeAuthPolicy(f.db, {
+    method: "cli_login",
+    rollout: "selected",
+    orgIds: [f.org.id, goneId, addedId],
+  });
+  expect(kept.orgIds).toEqual([f.org.id, addedId].sort());
+  await expect(
+    setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id, goneId] }),
+  ).rejects.toMatchObject({ code: "claude_auth.unknown_org" });
+
+  const other = "0193dddd-0000-4000-8000-0000000000fe";
+  const listed = { method: "cli_login" as const, rollout: "selected" as const, orgIds: [f.org.id] };
+  expect(claudeAuthMethodFor(listed, f.org.id, true)).toBe("cli_login");
+  expect(claudeAuthMethodFor(listed, other, true)).toBe("setup_token");
+  expect(claudeAuthMethodFor({ ...listed, rollout: "all" }, other, true)).toBe("cli_login");
+  expect(claudeAuthMethodFor({ ...listed, method: "setup_token", rollout: "all" }, f.org.id, true)).toBe("setup_token");
+  // Where the agents are the runner's own user, always Claude's own login.
+  expect(claudeAuthMethodFor({ ...listed, method: "setup_token" }, f.org.id, false)).toBe("cli_login");
+});
+
+test("a new Claude sign-in for all agents takes the policy's method once; signing in again keeps the row's", async () => {
+  f = await setup();
+  const { machineId } = await systemMachine(CLAUDE_AUTH_PROTOCOL, ["setup_token"]);
+  const over = { protocol: CLAUDE_AUTH_PROTOCOL };
+  const runner = signingRunner(machineId, () => ({ loggedIn: true, email: "ana@example.com", shared: true }), over);
+  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  expect(runner.calls[0]).toMatchObject({ action: "begin", shared: true, method: "setup_token" });
+  expect(status).toMatchObject({ state: "done" });
+  expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "setup_token", status: "active" });
+
+  // The policy moves this workspace to Claude's own login: a runner that can't is refused, with nothing left behind.
+  await setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id] });
+  const before = (await accountRows(machineId)).length;
+  const refused = fakeHub(machineId, () => ({ url: "https://claude.ai/x" }), over);
+  const error = await beginAccountLogin(refused.deps, f.owner.id, f.org.id, machineId, "claude_code").catch((e) => e);
+  expect(error).toBeInstanceOf(ConflictError);
+  expect(error).toMatchObject({ code: "account.method_unsupported" });
+  expect(refused.calls).toEqual([]);
+  expect((await accountRows(machineId)).length).toBe(before);
+
+  // Signing in again keeps the account's own method, whatever the policy says now.
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ status: "signed_out" })
+    .where(eq(schema.machineAccounts.id, login.loginId));
+  const again = signingRunner(machineId, () => ({ loggedIn: true, email: "ana@example.com", shared: true }), over);
+  await beginAccountLogin(again.deps, f.owner.id, f.org.id, machineId, "claude_code", login.loginId);
+  expect(again.calls[0]).toMatchObject({ action: "begin", again: true, method: "setup_token" });
+
+  // One whose method nobody knows signs in again as the runner always did.
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ authMethod: null })
+    .where(eq(schema.machineAccounts.id, login.loginId));
+  const legacy = signingRunner(machineId, () => ({ loggedIn: true, shared: true }), over);
+  await beginAccountLogin(legacy.deps, f.owner.id, f.org.id, machineId, "claude_code", login.loginId);
+  expect(legacy.calls[0]).not.toHaveProperty("method");
+});
+
+test("a runner that can use Claude's own login for all agents gets it; an older one gets no method, as before", async () => {
+  f = await setup();
+  await setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "all", orgIds: [] });
+  const { machineId } = await systemMachine(CLAUDE_AUTH_PROTOCOL, ["cli_login", "setup_token"]);
+  const over = { protocol: CLAUDE_AUTH_PROTOCOL };
+  const runner = signingRunner(machineId, () => ({ loggedIn: true, shared: true }), over);
+  const login = await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "claude_code");
+  expect(runner.calls[0]).toMatchObject({ shared: true, method: "cli_login" });
+  expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "cli_login", status: "signing_in" });
+
+  // Below protocol 50 in system mode: setup-token is all it does, so the policy's own login is refused.
+  const { machineId: old } = await systemMachine(SHARED_ACCOUNTS_PROTOCOL, ["cli_login"]);
+  const oldRunner = fakeHub(old, () => ({ url: "https://claude.ai/x" }), { protocol: SHARED_ACCOUNTS_PROTOCOL });
+  await expect(beginAccountLogin(oldRunner.deps, f.owner.id, f.org.id, old, "claude_code")).rejects.toMatchObject({
+    code: "account.method_unsupported",
+  });
+  await setClaudeAuthPolicy(f.db, { method: "setup_token", rollout: "selected", orgIds: [] });
+  const legacy = signingRunner(old, () => ({ loggedIn: true, shared: true }), { protocol: SHARED_ACCOUNTS_PROTOCOL });
+  const kept = await beginAccountLogin(legacy.deps, f.owner.id, f.org.id, old, "claude_code");
+  expect(legacy.calls[0]).toEqual({
+    op: "account",
+    action: "begin",
+    kind: "claude_code",
+    loginId: kept.loginId,
+    shared: true,
+  });
+  expect(await accountRow(kept.loginId)).toMatchObject({ authMethod: "setup_token" });
+
+  // A plan's key is a key; ChatGPT signs in with its own CLI.
+  const keys = fakeHub(machineId, async () => ({ publicKey: (await generateSecretKeyPair()).publicKey }), over);
+  const key = await beginAccountLogin(
+    keys.deps,
+    f.owner.id,
+    f.org.id,
+    machineId,
+    "claude_code",
+    undefined,
+    undefined,
+    "zai",
+  );
+  expect(keys.calls[0]).not.toHaveProperty("method");
+  expect(await accountRow(key.loginId)).toMatchObject({ authMethod: "api_key" });
+  const codex = fakeHub(
+    machineId,
+    () => ({ url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234" }),
+    over,
+  );
+  const chatgpt = await beginAccountLogin(codex.deps, f.owner.id, f.org.id, machineId, "codex");
+  expect(await accountRow(chatgpt.loginId)).toMatchObject({ authMethod: "cli_login" });
+});
+
+test("system mode: one agent's Claude login signed in again for all agents goes without its read-off method", async () => {
+  f = await setup();
+  const { machineId } = await systemMachine(CLAUDE_AUTH_PROTOCOL, ["setup_token"]);
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { status: "signed_out", authMethod: "cli_login" });
+  const runner = fakeHub(machineId, () => ({ url: "https://claude.ai/x" }), { protocol: CLAUDE_AUTH_PROTOCOL });
+  await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "claude_code", CLAUDE_ID);
+  expect(runner.calls[0]).toMatchObject({ action: "begin", again: true, shared: true });
+  expect(runner.calls[0]).not.toHaveProperty("method");
+});
+
+test("a runner that says it signs in for all agents with a token alone is in system mode, whatever the hub kept", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { ...m?.executors, claudeLoginMethods: ["setup_token"] } })
+    .where(eq(schema.machines.id, machineId));
+  const runner = fakeHub(machineId, () => ({ url: "https://claude.ai/x" }), { protocol: CLAUDE_AUTH_PROTOCOL });
+  const login = await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "claude_code");
+  expect(runner.calls[0]).toMatchObject({ action: "begin", shared: true, method: "setup_token" });
+  expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "setup_token" });
+});
+
+test("reports: the method and Claude's organization stay when not said; an inconclusive look keeps the status", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { authMethod: "cli_login" });
+  const sync = (accounts: RunnerAccountInfo[]) => syncMachineAccounts({ db: f.db }, f.org.id, machineId, accounts);
+  const base = { id: CLAUDE_ID, kind: "claude_code" as const, email: "ana@example.com" };
+
+  await sync([{ ...base, loggedIn: true, providerOrgId: "org-ada-1", orgName: "Ada Labs" }]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject({
+    authMethod: "cli_login",
+    providerOrgId: "org-ada-1",
+    orgName: "Ada Labs",
+    statusUnknown: false,
+  });
+  // The CLI timed out: the runner's last known answer is "signed in", but nothing flips either way.
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ status: "signed_out" })
+    .where(eq(schema.machineAccounts.id, CLAUDE_ID));
+  await sync([{ ...base, loggedIn: true, statusUnknown: true }]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject({
+    status: "signed_out",
+    statusUnknown: true,
+    authMethod: "cli_login",
+    providerOrgId: "org-ada-1",
+  });
+  expect((await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id))[0]).toMatchObject({
+    status: "signed_out",
+    statusKnown: false,
+  });
+  // A conclusive answer settles it; a method the runner now says replaces the stored one.
+  await sync([{ ...base, loggedIn: true, authMethod: "setup_token" }]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject({
+    status: "active",
+    statusUnknown: false,
+    authMethod: "setup_token",
+  });
+  await sync([{ ...base, loggedIn: false }]);
+  expect(await accountRow(CLAUDE_ID)).toMatchObject({ status: "signed_out", authMethod: "setup_token" });
+});
+
+test("a finished sign-in's account is checked like a hello's: unknown method, bad org id and long names left out", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  const runner = signingRunner(
+    machineId,
+    () =>
+      ({
+        loggedIn: true,
+        email: "ana@example.com",
+        authMethod: "oauth",
+        providerOrgId: "not an id!",
+        orgName: `Ada${"\u0007".repeat(3)} ${"x".repeat(5000)}`,
+        statusUnknown: "yes",
+      }) as unknown as Omit<RunnerAccountInfo, "id" | "kind">,
+    { protocol: CLAUDE_AUTH_PROTOCOL },
+  );
+  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  expect(status).toMatchObject({ state: "done" });
+  const row = await accountRow(login.loginId);
+  expect(row).toMatchObject({ status: "active", authMethod: "cli_login", providerOrgId: null, statusUnknown: false });
+  expect(row?.orgName?.length).toBe(120);
+});
+
+test("one email in two of Claude's organizations is two accounts; a login that doesn't say its organization is either", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { label: "Pessoal", providerOrgId: "org-ana-personal" });
+  const labelOf = async (providerOrgId?: string) => {
+    const runner = signingRunner(machineId, () => ({
+      loggedIn: true,
+      email: "ana@example.com",
+      plan: "team",
+      ...(providerOrgId ? { providerOrgId } : {}),
+    }));
+    return (await signIn(runner, f.owner.id, machineId)).status.account;
+  };
+  // Another organization: a new account, under a name of its own; its owner sees which organization.
+  expect(await labelOf("org-ana-team")).toMatchObject({ label: "Claude", providerOrgId: "org-ana-team" });
+  // The same organization, or one not said: a login of the account it is, under its name.
+  expect((await labelOf("org-ana-personal"))?.label).toBe("Pessoal");
+  expect((await labelOf())?.label).toBe("Pessoal");
+  // A rename renames that account's logins only.
+  await renameMachineAccount({ db: f.db }, f.owner.id, f.org.id, machineId, CLAUDE_ID, "Casa");
+  expect((await accountRows(machineId)).map((r) => r.label).sort()).toEqual(["Casa", "Casa", "Casa", "Claude"]);
+  // Only its owner sees the organization.
+  const bia = await addMember(f.db, f.org.id, "admin", "bia");
+  const asBia = await getMachineAccounts({ db: f.db }, bia.id, f.org.id, machineId);
+  expect(asBia.accounts.map((a) => a.providerOrgId)).toEqual([null, null, null, null]);
+});
+
+test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 50)", async () => {
+  f = await setup();
+  const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+  hubs.push(hub);
+  const { machineId, token } = await ownedMachine();
+  const runner = connectedRunner(hub, token);
+  const executors = async () =>
+    (await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId)))[0]?.executors;
+  await runner.hello([], CLAUDE_AUTH_PROTOCOL, { claudeLoginMethods: ["cli_login"] });
+  expect((await executors())?.claudeLoginMethods).toEqual(["cli_login"]);
+  // An older runner says nothing: nothing of a newer one's stays.
+  await runner.hello([], CLAUDE_AUTH_PROTOCOL - 1, { executors: { claude: { version: "2.1.304" } } });
+  expect((await executors())?.claudeLoginMethods).toBeUndefined();
 });

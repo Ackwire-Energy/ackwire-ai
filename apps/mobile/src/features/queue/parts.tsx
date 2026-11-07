@@ -11,7 +11,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Chip, LineIcon, Text } from "@/ui";
-import { MSG_AVATAR, MSG_GAP, MSG_INSET, MSG_TEXT } from "../chat/logic";
+import { MSG_AVATAR, MSG_GAP, MSG_INSET, MSG_TEXT, rowFrame } from "../chat/logic";
+import { useRhythm } from "../chat/look";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
@@ -23,6 +24,7 @@ import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
  * receipts say the run waits: its computer's line only adds to it ("Waiting for the computer" until it knows the turn).
  */
 export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelId: string; wait: ConversationWait }) {
+  const rhythm = useRhythm();
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const meId = useMeId();
@@ -35,7 +37,7 @@ export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelI
   const first = w?.people && w.purpose.kind === "person" && w.purpose.userId === meId;
   const c = useColors();
   return (
-    <View style={styles.turn} accessibilityLiveRegion="polite">
+    <View style={[styles.turn, rowFrame(rhythm.block, rhythm.turn)]} accessibilityLiveRegion="polite">
       <View style={styles.avslot}>
         <AgentFace agentId={agentId} size={MSG_AVATAR} mode="rest" />
       </View>
@@ -66,6 +68,7 @@ export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelI
  * queue". It goes once none works or waits: each reply is its own message.
  */
 export function FanStrip({ message: m, receipt }: { message: Message; receipt: MessageReceipt | undefined }) {
+  const rhythm = useRhythm();
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
@@ -75,7 +78,7 @@ export function FanStrip({ message: m, receipt }: { message: Message; receipt: M
   if (!fanShows(m, fan, receipt)) return null;
   const summary = fanOutText(t, fan);
   return (
-    <View style={[styles.fan, { borderColor: c.line2 }]} accessibilityLiveRegion="polite">
+    <View style={[styles.fan, { borderColor: c.line2, marginTop: rhythm.part }]} accessibilityLiveRegion="polite">
       <View style={styles.fanHead}>
         <Text variant="footnote" tone="ink2" style={[styles.grow, styles.name]}>
           {summary}
@@ -105,8 +108,6 @@ const styles = StyleSheet.create({
     gap: MSG_GAP,
     paddingLeft: MSG_INSET,
     paddingRight: 16,
-    paddingVertical: 10,
-    marginTop: 4,
   },
   avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0, gap: 4 },
@@ -118,7 +119,6 @@ const styles = StyleSheet.create({
   fan: {
     marginLeft: MSG_TEXT,
     marginRight: 16,
-    marginBottom: 6,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,

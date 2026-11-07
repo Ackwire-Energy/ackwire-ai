@@ -21,6 +21,7 @@ import {
   applyComputerEvent,
   applyConsultEvent,
   applyDashboardEvent,
+  applyIssueEvent,
   applyMachineEvent,
   applyMembershipEvent,
   applyNotificationEvent,
@@ -55,6 +56,7 @@ import {
   dropProvisional,
   emptyStreams,
   expectReply,
+  guessedFrom,
   guessReceipt,
   isActiveStatus,
   isNotificationEvent,
@@ -67,6 +69,9 @@ import {
   reconcileConsults,
   reconcileRuns,
   refreshMission,
+  refreshProposals,
+  refreshRepliedThread,
+  repliedThread,
   retargetProvisional,
   runsInChannel,
   type SocketFactory,
@@ -85,7 +90,6 @@ import {
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
-import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
@@ -314,11 +318,11 @@ export function createStreamsStore(
       set({ ...state, receipts, memory });
     },
     /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
-    expect: (channelId: string, messageId: string, agentIds: string[]) => {
+    expect: (channelId: string, messageId: string, agentIds: string[], threadId = messageId) => {
       let streams = state.streams;
       let receipts = state.receipts;
       for (const agentId of agentIds)
-        streams = expectReply(streams, { channelId, threadId: messageId, agentId }, now());
+        streams = expectReply(streams, { channelId, threadId, agentId, messageId }, now());
       receipts = guessReceipt(receipts, messageId, agentIds);
       set({ ...state, streams, receipts });
     },
@@ -339,11 +343,11 @@ export function createStreamsStore(
     sweep: (at = now()): string[] => {
       const stale = staleProvisional(state.streams, at, provisionalTtlMs);
       if (stale.length === 0) return [];
-      const threads = new Set(stale.map((r) => r.threadId));
+      const asked = new Set(stale.map(guessedFrom));
       const receipts = Object.fromEntries(
-        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+        Object.entries(state.receipts).filter(([id, r]) => !(asked.has(id) && !r.confirmed)),
       );
-      set({ ...state, streams: dropProvisional(state.streams, threads), receipts });
+      set({ ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))), receipts });
       return [...new Set(stale.map((r) => r.channelId))];
     },
     /** The agent won't answer me: show the notice and drop its "pensando…" on that message. */
@@ -360,7 +364,7 @@ export function createStreamsStore(
       };
       set({
         ...state,
-        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.messageId}`),
+        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.threadId ?? e.messageId}`),
         notices: { ...state.notices, [e.channelId]: [...list, notice] },
       });
     },
@@ -461,6 +465,12 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      // The agents, channels and people who came, changed or left meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
@@ -486,9 +496,11 @@ export function RealtimeProvider({
       if (isAgentUnavailable(event)) streams.unavailable(event);
       // A change I asked the right hand for was decided by someone else (ADR 0137): "Aplicado por …" on my card.
       if (event.type === "proposal.decided") {
-        void qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+        void refreshProposals(qc, orgId);
         void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       }
+      // A proposal I may decide: the sidebar's count and Aprovações' tab.
+      if (event.type === "proposal.created") void refreshProposals(qc, orgId);
       // Unread marks: a message where I am, and my reads and mutes from any device.
       applyUnreadEvent(qc, orgId, event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
@@ -540,6 +552,7 @@ export function RealtimeProvider({
         qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
         void qc.invalidateQueries({ queryKey: keys.issues(orgId), predicate: (q) => q.queryKey[3] === "list" });
       }
+      applyIssueEvent(qc, orgId, event);
       // An agent switched computers, or its computer was removed: the cached view takes the new target.
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
@@ -593,7 +606,7 @@ export function RealtimeProvider({
   useEffect(() => {
     const timer = setInterval(() => {
       for (const channelId of streams.sweep()) {
-        void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+        void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
     }, 5000);
     return () => clearInterval(timer);
@@ -741,6 +754,12 @@ export function applyTaskEvent(qc: ReturnType<typeof useQueryClient>, orgId: str
 /** A tab away at least this long reads its open conversation again when it comes back (a quick switch doesn't). */
 export const RESYNC_AFTER_HIDDEN_MS = 10_000;
 
+/**
+ * Events already applied. A thread open beside its channel is a second view of that channel, and every listener gets
+ * the same event object: applied twice, a tool call shows twice and its output doubles.
+ */
+const handledEvents = new WeakSet<ChannelEvent>();
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -774,7 +793,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
       const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
       hiddenAt = null;
-      if (away >= RESYNC_AFTER_HIDDEN_MS) resync();
+      if (away < RESYNC_AFTER_HIDDEN_MS) return;
+      resync();
+      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
@@ -785,6 +806,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   useEffect(() => {
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
+      if (handledEvents.has(event)) return;
+      handledEvents.add(event);
       streams.apply(event);
       applyMembershipEvent(qc, orgId, event);
       if (event.type === "approval.created" || event.type === "approval.decided") {
@@ -855,11 +878,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         }
         // A new top-level message may get agent replies in its thread: start watching it.
         if (event.message) startThreadCache(qc, orgId, event.message);
-        // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
-        // sticker after its reply (ADR 0091) changes none of them.
-        if ((event.message ? event.message.threadId : event.threadId) && !isMediaAfterReply(event.message?.meta)) {
-          void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
-        }
+        const threadId = repliedThread(event);
+        if (threadId) refreshRepliedThread(qc, orgId, threadId);
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
@@ -1000,11 +1020,16 @@ const EMPTY_LIVE: BrowserLiveState = {
  * Watches an agent's browser on the org's socket while mounted (`enabled`):
  * frames, who is in control, and why it can't be shown. Watches again when
  * the socket reconnects, and on `retry`. `sendInput` is for the person in control.
+ * `maxFps`: the frames a second this view needs (`BROWSER_FPS.preview` for a small picture; none for the stream's
+ * own rate), changed in place, never with a new watch (ADR 0040 §7.1).
  */
-export function useBrowserLive(agentId: string, enabled = true) {
+export function useBrowserLive(agentId: string, enabled = true, maxFps?: number) {
   const { connection } = useRealtime();
   const [state, setState] = useState<BrowserLiveState>(EMPTY_LIVE);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
+  // The rate when the watch starts; a change later goes through `setMaxFps`.
+  const fps = useRef(maxFps);
+  fps.current = maxFps;
   useEffect(() => {
     if (!connection || !enabled) return;
     setState(EMPTY_LIVE);
@@ -1013,6 +1038,7 @@ export function useBrowserLive(agentId: string, enabled = true) {
       // Shared per socket: the card, the bar and the full view of one agent are one watch.
       watcher: connection.browserWatcher,
       agentId,
+      maxFps: fps.current,
       // An answer means the watch went through: an earlier refusal (too many browsers) no longer holds.
       onFrame: (frame) =>
         setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null, error: null })),
@@ -1047,6 +1073,9 @@ export function useBrowserLive(agentId: string, enabled = true) {
       liveRef.current = null;
     };
   }, [connection, agentId, enabled]);
+  useEffect(() => {
+    liveRef.current?.setMaxFps(maxFps);
+  }, [maxFps]);
   const sendInput = useCallback((events: BrowserInputEvent[]) => liveRef.current?.sendInput(events) ?? false, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
   return { ...state, sendInput, retry };

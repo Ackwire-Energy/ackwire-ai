@@ -1,6 +1,6 @@
 # 0056. Operator API and external provisioning
 
-- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), 2026-10-30 by ADR 0082 (§5: `agent.deleted`) and ADR 0088 (§4: a workspace's deletion and deletion hold; §5: the deletion's events; §8: a deletion is no standing; §9: the deletion hold; §10: a workspace being deleted waits for no computer), and 2026-10-31 by ADR 0089 (§5: `run.hop_limit`) and ADR 0103 (§4: the analytics reads), and 2026-11-02 by ADR 0127 (§4: the work analytics reads)
+- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), 2026-10-30 by ADR 0082 (§5: `agent.deleted`) and ADR 0088 (§4: a workspace's deletion and deletion hold; §5: the deletion's events; §8: a deletion is no standing; §9: the deletion hold; §10: a workspace being deleted waits for no computer), and 2026-10-31 by ADR 0089 (§5: `run.hop_limit`) and ADR 0103 (§4: the analytics reads), and 2026-11-02 by ADR 0127 (§4: the work analytics reads), and 2026-11-05 by ADR 0150 (§4: the Claude sign-in policy and the AI-accounts reads; §5: `account.failure` and a failed `run.finished`'s `failure`)
 - Date: 2026-10-24
 - Extends: ADR 0002 (nothing private runs in the server process), ADR 0004 (configuration), ADR 0025 (connected computers)
 
@@ -41,6 +41,8 @@ The app API (`/api/app/*`) is the wrong door for them: it acts as one person (co
 | `GET /analytics?from&to` | How connectors and the product are used, in counts, by UTC day (ADR 0103): totals, days per way, connectors per way with their accounts, Composio's executions and events with its month so far, and the product's days from the events feed. At most 400 days, else 400 `analytics.range` |
 | `GET /analytics/connectors/{connector}?from&to` | One connector's days, tools, Composio actions and workspaces (ids only, ADR 0103) |
 | `GET /analytics/work?from&to`, `GET /analytics/work/orgs/{orgId}?from&to` | Agent turns by origin and outcome, waits for room on a computer, reply times and tokens by type and payer with their API price, by day (by hour up to 2 days), per workspace or per agent of one (ADR 0127). At most 90 days |
+| `GET /analytics/ai-accounts?from&to`, `GET /ai-accounts?limit&cursor&orgId&kind&authMethod&status` | The AI accounts people connected (ADR 0150 §6): counts by status, provider, runtime, sign-in method and billing, provider identities, API keys and the computers' own sign-ins apart, failures from `account.failure`, additions by day; and the connections in keyset pages of up to 200. No email, key hint, token or provider organization id. At most 400 days |
+| `GET /claude-auth`, `PUT /claude-auth`, `GET /orgs/{orgId}/claude-auth` | The method of new Claude sign-ins for all agents (ADR 0150 §2) with the connections by method; the one write sets it (affects new sign-ins only); a workspace's effective method and what each of its computers can use |
 
 The reads live in `packages/engine/src/operator.ts` and pick every field by name, the analytics reads in `packages/engine/src/connector-usage.ts` and `work-analytics.ts`, which give counts, keys and ids only. Answers name people and workspaces and say how much is in them, nothing more: never messages, files, prompts or the workspace's context, and never a credential, token or password hash. The review blocks of §6 are the one door to content, and every read of one is recorded.
 
@@ -52,16 +54,19 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 | --- | --- | --- |
 | `user.signed_up` | an account's first sign-in method is created | `email`, `method` (`email`, `google`, `github`, `apple`) |
 | `session.created` | someone signs in | `ip`, `userAgent` (512 characters at most) |
+| `user.deletion_requested` | a person deletes their account; `dueAt`: when it goes for good | `dueAt` |
+| `user.deletion_canceled` | they restore it before that date | none |
 | `user.deleted` | an account is deleted | none |
 | `organization.created` | a workspace is created | `name` |
 | `organization.deletion_requested` | an owner deletes a workspace, or its only member deletes their account, and it closes for 7 days (ADR 0088); `userId` is who asked | `dueAt`, `via` (`owner` or `account`) |
-| `organization.deletion_canceled` | an owner restores a workspace being deleted; `userId` is that owner | none |
+| `organization.deletion_canceled` | an owner restores a workspace being deleted; `userId` is that owner; `via: "account"` when it came back with its member's account | `via` when so |
 | `organization.deleted` | a workspace's data is deleted, at the end of its deletion's 7 days (ADR 0088); `userId` is who asked, null once their account is gone | `requestedAt`, `via` |
 | `invitation.created` | an invitation is sent or resent, or an invite link is made | `emailDomain`, `role`, `resent: true` when resent; `link: true` for a link |
 | `agent.created` | an agent is created | `agentId` |
 | `agent.deleted` | an agent is deleted for good (ADR 0082) | `agentId` |
 | `mail.sent` | an agent sends, replies to or forwards an email | `agentId`, `runId`, `kind`, `recipients` (how many), `domains` |
-| `run.finished` | an agent's run ends (done, failed or canceled) | `runId`, `agentId`, `brain`, `status`, `toolCalls` |
+| `run.finished` | an agent's run ends (done, failed or canceled) | `runId`, `agentId`, `brain`, `status`, `toolCalls`; a failed one `failure` (`code`, `cause`, ADR 0150 §5) |
+| `account.failure` | a turn on a computer's AI account fails for a provider's or sign-in reason, at most once per account and cause every 10 minutes (ADR 0150 §5) | `accountId`, `machineId`, `kind`, `authMethod`, `cause`, `code`, `httpStatus`, `runnerVersion`, `protocol` |
 | `run.hop_limit` | the depth backstop (`AGENT_MAX_HOPS`) stopped an agent's hand-off: the per-stretch limits stop agents long before, so some path lost its stretch (ADR 0089) | `messageId`, `hop` |
 | `task.finished` | a task on a computer ends (done, failed, canceled, or interrupted for good) | `taskId`, `agentId`, `executor`, `status` |
 | `desktop_control.ended` | a screened segment of a person's control of an agent's screen ends, having read something (ADR 0076; only with `SESSION_SCREENING`); `userId` is who was in control | `agentId`, `segmentId`, `startedAt`, `endedAt`, `screens` (how many) |

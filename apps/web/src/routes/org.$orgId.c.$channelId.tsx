@@ -1,13 +1,17 @@
 import { channelMembersQuery, channelsQuery, channelThreadsQuery, messagesQuery } from "@agenteschat/client";
 import { createFileRoute } from "@tanstack/react-router";
+import { threadSearch } from "@/lib/open-param";
 import { ChannelPage } from "@/pages/ChannelPage";
 
 /**
  * A channel; `?m={messageId}` (from "Copiar link") opens it at that message;
- * `?adjust={threadId}` opens "Ajustar trecho" for that thread's range.
+ * `?adjust={threadId}` opens "Ajustar trecho" for that thread's range; `?thread=` is the one in its panel.
  */
 export const Route = createFileRoute("/org/$orgId/c/$channelId")({
-  validateSearch: (search: Record<string, unknown>): { m?: string; adjust?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { m?: string; adjust?: string } & ReturnType<typeof threadSearch> => ({
+    ...threadSearch(search),
     ...(typeof search.m === "string" && search.m ? { m: search.m } : {}),
     ...(typeof search.adjust === "string" && search.adjust ? { adjust: search.adjust } : {}),
   }),

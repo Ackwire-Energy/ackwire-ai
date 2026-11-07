@@ -58,6 +58,7 @@ export function issueSnapshot(i: IssueView): Record<string, unknown> {
     assignee: i.assignee ? { type: i.assignee.type, id: i.assignee.id } : null,
     labels: i.labels,
     dueDate: i.dueDate,
+    githubUrl: i.githubUrl,
     criteria: i.criteria.map((c) => ({ id: c.id, done: c.done })),
   };
 }
@@ -96,6 +97,7 @@ async function applyIssueFields(
   if ("assignee" in values) patch.assignee = (values.assignee as WorkActor | null) ?? null;
   if ("labels" in values) patch.labels = (values.labels as string[]) ?? [];
   if ("dueDate" in values) patch.dueDate = (values.dueDate as string | null) ?? null;
+  if ("githubUrl" in values) patch.githubUrl = (values.githubUrl as string | null) ?? null;
   if (Object.keys(patch).length > 0) await updateIssue(deps, actor, orgId, issueId, patch);
   if (Array.isArray(values.criteria)) {
     let current = await getIssue(deps.db, actor, orgId, { id: issueId });
@@ -426,7 +428,7 @@ const handlers: Record<string, Handler> = {
     if (!channel) throw new NotFoundError("The channel is gone", "action.target_gone");
     if (direction === "redo") {
       if (!channel.archivedAt) throw changedSince();
-      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId);
+      await unarchiveChannel(deps.db, userId, a.orgId, a.targetId, { pubsub: deps.pubsub });
       return undefined;
     }
     if (channel.archivedAt) throw changedSince();

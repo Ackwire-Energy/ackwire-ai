@@ -4,6 +4,7 @@ import {
   type ConnectOutcome,
   type ConnectorDef,
   type CustomServer,
+  type GitHubOrgAccess,
   keys,
   useCatalog,
   useCompleteOAuth,
@@ -11,10 +12,17 @@ import {
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
+  useGithubAccess,
   useStartOAuth,
 } from "@agenteschat/client";
 import { composioConnectText } from "@agenteschat/client/lib/composio";
-import { type ConnectedItem, connectedItems, itemName, outcomeText } from "@agenteschat/client/lib/connected";
+import {
+  type ConnectedItem,
+  connectedItems,
+  itemName,
+  orgAccessChange,
+  outcomeText,
+} from "@agenteschat/client/lib/connected";
 import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -28,12 +36,25 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, GroupedList, GroupedRow, Icon, InfoHint, LineIcon, Text, useTheme, useToast } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  InfoHint,
+  LineIcon,
+  Locked,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { AgentLevelList, WaitTile } from "./Access";
 import { ConnectorIcon } from "./ConnectorIcon";
+import { GithubOrgs } from "./GithubOrgs";
 import {
   type AuthAnswer,
   authAnswerOf,
@@ -426,6 +447,8 @@ function ConnectStep({
   // Composio's page signs in: no key field of ours.
   const viaComposio = item ? item.viaComposio : def?.via === "composio";
   const connectionId = reconnect && item?.custom ? item.id : undefined;
+  const githubOrgs = reconnect && def?.id === "github" && !viaComposio;
+  const access = useGithubAccess(orgId, githubOrgs);
   const how = def ? connectHow(def) : "either";
   const [mode, setMode] = useState<"signIn" | "key">(how === "key" ? "key" : "signIn");
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -446,16 +469,24 @@ function ConnectStep({
 
   // Every ending is felt as well as seen: a success buzz with the sheet moving on, an error buzz with the
   // reason in the sheet.
-  const connected = (id: string, shown: string, outcome: ConnectOutcome = "connected") => {
+  const connected = async (id: string, shown: string, outcome: ConnectOutcome = "connected") => {
     successHaptic();
     if (outcome === "connected") return onConnected(id, shown || shownName);
+    const orgsBefore = githubOrgs ? qc.getQueryData<GitHubOrgAccess>(keys.githubAccess(orgId))?.orgs : null;
+    const orgsNow = orgsBefore ? await access.refetch().then((r) => r.data?.orgs) : null;
     // The lists were read again on the way back: the account's own name and whether its provider named it.
     const now = connectedItems(
       qc.getQueryData<Connection[]>(keys.connections(orgId)) ?? [],
       qc.getQueryData<CustomServer[]>(keys.customServers(orgId)) ?? [],
       catalog.data?.connectors ?? [],
     ).find((i) => i.id === id);
-    toast({ title: now ? outcomeText(t, outcome, now) : t("mobile.connectors.connectedDone") });
+    const said = now ? outcomeText(t, outcome, now) : t("mobile.connectors.connectedDone");
+    toast({
+      title:
+        orgsBefore && orgsNow
+          ? t("common.joinSentences", { a: said, b: orgAccessChange(t, orgsBefore, orgsNow) })
+          : said,
+    });
     onDone();
     // Landed on another connection (a catalog connector's new sign-in is a new one): the screen behind follows it.
     if (item && id !== item.id) router.replace(`/connectors/${id}`);
@@ -480,7 +511,7 @@ function ConnectStep({
         return oops(own ?? t("mobile.connectors.refused", { name: shownName }));
       }
       const done = await complete.mutateAsync({ state: answer.state, code: answer.code });
-      connected(done.connectionId, name, done.outcome);
+      await connected(done.connectionId, name, done.outcome);
     } catch (error) {
       fail(error);
     } finally {
@@ -504,7 +535,7 @@ function ConnectStep({
           setMode("key");
           return oops(needsKeyText(t, res, shownName));
         }
-        return connected(res.server.id, res.server.label, res.outcome);
+        return await connected(res.server.id, res.server.label, res.outcome);
       }
       if (!def) return;
       const authorizeUrl = await start.mutateAsync({ connector: def.id, returnTo: APP_OAUTH_RETURN });
@@ -527,13 +558,13 @@ function ConnectStep({
           ...(label ? { label } : {}),
           ...(connectionId ? { connectionId } : {}),
         });
-        if (res.status === "connected") return connected(res.server.id, res.server.label, res.outcome);
+        if (res.status === "connected") return await connected(res.server.id, res.server.label, res.outcome);
         return fail();
       }
       if (!def) return;
       const conn = await withKey.mutateAsync({ connector: def.id, apiKey: key.trim() });
       // One account per catalog connector: connecting it again is its new sign-in.
-      connected(conn.id, name, reconnect ? "reconnected" : "connected");
+      await connected(conn.id, name, reconnect ? "reconnected" : "connected");
     } catch (error) {
       fail(error);
     }
@@ -554,7 +585,7 @@ function ConnectStep({
       ) : null}
       {askUrl && phase === "address" ? (
         <>
-          <View style={styles.fieldBox}>
+          <Locked when={busy} style={styles.fieldBox}>
             <Text variant="footnote" tone="faint">
               {t("mobile.connectors.addressLabel")}
             </Text>
@@ -575,8 +606,8 @@ function ConnectStep({
               accessibilityLabel={t("mobile.connectors.addressLabel")}
               style={field}
             />
-          </View>
-          <Button variant="primary" wide label={t("connectFlow.next")} onPress={toEnter} />
+          </Locked>
+          <Button variant="primary" wide label={t("connectFlow.next")} disabled={busy} onPress={toEnter} />
           {error ? <Problem key={error} text={error} /> : null}
         </>
       ) : (
@@ -587,9 +618,16 @@ function ConnectStep({
               <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.grow}>
                 {serverUrl}
               </Text>
-              <Button variant="text" size="sm" label={t("common.back")} onPress={() => setPhase("address")} />
+              <Button
+                variant="text"
+                size="sm"
+                label={t("common.back")}
+                disabled={busy}
+                onPress={() => setPhase("address")}
+              />
             </View>
           ) : null}
+          {githubOrgs ? <GithubOrgs /> : null}
           {mode === "signIn" ? (
             <Button
               variant="primary"
@@ -606,7 +644,7 @@ function ConnectStep({
             />
           ) : (
             <>
-              <View style={styles.fieldBox}>
+              <Locked when={busy} style={styles.fieldBox}>
                 <InfoHint
                   name={t("common.about", { label: keyLabel })}
                   text={t("mobile.connectors.keyHelp")}
@@ -643,7 +681,7 @@ function ConnectStep({
                     </Text>
                   </Pressable>
                 </View>
-              </View>
+              </Locked>
               <Button
                 variant="primary"
                 wide
@@ -659,6 +697,7 @@ function ConnectStep({
               variant="text"
               size="sm"
               label={mode === "signIn" ? t("mobile.connectors.useKey") : t("mobile.connectors.useSignIn")}
+              disabled={busy}
               onPress={() => setMode(mode === "signIn" ? "key" : "signIn")}
             />
           ) : null}

@@ -17,9 +17,16 @@ test("a message's words use the whole column; a code block or a table scrolls in
     expect(value(selector, "max-width")).toBeUndefined();
   expect(value(".ac-msg__text pre", "overflow")).toBe("auto hidden");
   expect(value(".md__table", "overflow")).toBe("auto");
-  // As wide as its columns, up to the column: a small table doesn't stretch across the whole message.
+  // Outside a message (a wiki page) as wide as its columns, up to the page's.
   expect(value(".md__table", "width")).toBe("fit-content");
   expect(value(".md__table", "max-width")).toBe("100%");
+  // In a message every table is the message's width, so tables one under another line up; a wide one scrolls
+  // inside its box, which fades on the side with more columns.
+  expect(value(".md--message .md__table", "width")).toBe("100%");
+  expect(value(".md__table-scroll", "overflow-x")).toBe("auto");
+  expect(value('.md__table[data-more="end"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
+  expect(value('.md__table[data-more="start"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
+  expect(value('.md__table[data-more="both"] > .md__table-scroll', "mask-image")).toContain("linear-gradient");
   expect(value(".code-card__code", "overflow-x")).toBe("auto");
 });
 
@@ -38,8 +45,8 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".chart-card",
     ".correction-ask",
     ".iw-card",
-    // Connect an AI, a proposed agent, a stretch, waiting for its computer.
-    ".waitcard",
+    // A request still waiting as a pill: connect an AI, a stretch, waiting for its computer.
+    ".rq-open",
     // A mission's link and its command to approve, the browser's request and where it browsed.
     ".mi-linkcard",
     ".mi-cmd",
@@ -71,9 +78,8 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
   // Light: a well is the plate's tint over the row (darker hovered or not); dark: its own darker ground.
   expect(declarations(css, '[data-theme="light"]')).toContainEqual(["--msg-well", "var(--plate-soft)"]);
   expect(declarations(css, '[data-theme="dark"]')).toContainEqual(["--msg-well", "var(--sunken)"]);
-  // Receipts, and what waits for a click (connect an AI, a stretch, waiting for its computer, "refazer ou
-  // explicar?"), are cards like the tools: the card face and its hairline, never the sunken gray.
-  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask"]) {
+  // Receipts and "redo or explain?" are cards like the tools: the card face and its hairline, never the sunken gray.
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".correction-ask"]) {
     expect([selector, value(selector, "background")]).toEqual([selector, "var(--surface-raised)"]);
     expect([selector, value(selector, "box-shadow")]).toEqual([selector, "var(--card-shadow)"]);
   }
@@ -81,8 +87,11 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
   expect(value(".rq", "background")).toBe("var(--raised)");
   expect(value(".rq", "box-shadow")).toBe("0 0 0 1px var(--line2)");
   // No card in a message sits on the well: the well is the hover plate's tint.
-  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask", ".ac-approval", ".rq"])
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".correction-ask", ".ac-approval", ".rq"])
     expect(`${selector} ${value(selector, "background")}`).not.toMatch(/sunken|msg-well|plate/);
+  // What waits for a click (connect an AI, a stretch, waiting for its computer) is a pill: a hairline, no fill.
+  for (const selector of [".rq-open", ".rq-done"])
+    expect([selector, value(selector, "background")]).toEqual([selector, undefined]);
 });
 
 test("a receipt's sentence and a tool's line wrap, whole: no ellipsis", () => {
@@ -100,11 +109,10 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
   expect(value(".ac-card__head+.settings-rows>.settings-row:first-child", "border-top")).toBe("1px solid var(--line)");
 });
 
-test("two agents talking is one pair row; on a reach line it sits with the rows, no reply face to line up with", () => {
+test("two agents talking is one pair row; on a reach line it ends where the list's own line ends", () => {
   expect(value(".consult-pair__row", "display")).toBe("inline-flex");
   expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
-  expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding")).toBe("0");
-  expect(value(".ag-rc--talk .consult-pair__detail", "padding-left")).toBe("0");
+  expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
 });
 
 test("a select's list keeps room under its last row once scrolled to the bottom", () => {

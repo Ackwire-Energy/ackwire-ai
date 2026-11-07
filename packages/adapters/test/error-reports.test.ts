@@ -201,5 +201,6 @@ describe("the reporter", () => {
     } finally {
       await close();
     }
-  });
+    // A fresh database runs every migration first, which passes 5 s on a busy CI runner.
+  }, 30_000);
 });

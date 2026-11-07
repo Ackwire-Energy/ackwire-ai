@@ -1,8 +1,15 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
-import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountChoices,
+  offersSignInAgain,
+  ownSignInListed,
+  ownSignInName,
+  signInOf,
+} from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -50,7 +57,7 @@ import {
   thinkingUsage,
 } from "./logic";
 import { openConnectAi } from "./NoAiCard";
-import { AiRow, Note } from "./parts";
+import { AiRow, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile, under what
@@ -103,6 +110,7 @@ function useSaveBrain(agentId: string) {
 export function AgentAiScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
+  const hold = usePlanHold(orgId, org);
   const api = useApi();
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -142,7 +150,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       ...(kind && !planOf(a?.provider) ? { intent: planOfKind(kind) } : {}),
       ...(also && a?.email ? { email: a.email } : {}),
     });
-  const computer = view?.computer?.name ?? "";
+  const computer = computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "");
   const mayPick = view !== undefined && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
@@ -161,18 +169,21 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const limited = usage ? planState(usage).state === "limited" : false;
   const modelLimit = modelLimitText(t, i18n.language, usage, current?.provider, model?.value);
   const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
-  const signedOut = current?.status === "signed_out" && current.mine;
+  const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
+  const signInAgain = current != null && offersSignInAgain(current) && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
-  const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
+  const refused = signInAgain && current && isPlanId(current.provider) ? current.provider : null;
   // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
   const lends = view?.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent?.ownerUserId);
   const accountNote = signedOut
     ? t(refused ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : lends
-      ? t("agentPage.work.brain.accountOthers")
-      : view && !view.canUsePlans && ownerFirst
-        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-        : null;
+    : current != null && signInOf(current) === "unknown"
+      ? t("aiAccounts.page.statusUnknown")
+      : lends
+        ? t("agentPage.work.brain.accountOthers")
+        : view && !view.canUsePlans && ownerFirst
+          ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+          : null;
   const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);
   const choices = view ? accountChoices(accounts, [view.account]) : [];
   const adds = view?.canUsePlans === true && view.canManageAccounts;
@@ -194,6 +205,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
             {thinks.text}
           </Text>
         </View>
+        {hold ? <PlanHoldNote org={org} /> : null}
         {!allowed ? (
           <Note icon="lock">{t("agentPage.lock.admins")}</Note>
         ) : brain.isPending ? (
@@ -210,7 +222,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   {ownRow ? (
                     <GroupedRow
                       leading={<ProviderLogo id={kind} size="sm" />}
-                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
+                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer, kind)}
                       checked={view.account === null}
                       disabled={!mayPick}
                       onPress={() => choose(null)}
@@ -231,7 +243,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       label={
                         refused
                           ? t("aiAccounts.page.newKey")
-                          : signedOut
+                          : signInAgain
                             ? t("agentPage.work.brain.signInAgain")
                             : t("agentPage.work.brain.addAccount")
                       }

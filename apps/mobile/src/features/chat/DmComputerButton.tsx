@@ -1,5 +1,7 @@
 import { entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
+import { computerName } from "@agenteschat/client/lib/computer";
 import { useTranslation } from "react-i18next";
+import { useOrg } from "@/providers/org";
 import { IconButton } from "@/ui";
 import { openComputer } from "../computer/AgentComputerRow";
 import { useAgentComputer } from "../computer/useAgentComputer";
@@ -22,6 +24,7 @@ const SAYS: ReadonlySet<string> = new Set(["needsYou", "needsOther", "working", 
 /** What a screen reader hears with the DM header's computer entry (the web's dot), "" when nothing worth hearing. */
 export function useComputerSays(agentId: string) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const dir = useDirectory();
   const view = useWatchableComputer(agentId);
   const f = view?.facts;
@@ -31,7 +34,7 @@ export function useComputerSays(agentId: string) {
     ? entryLine(t, entry, {
         edition: f.edition,
         locale: i18n.language,
-        computer: view.machine?.name ?? "",
+        computer: computerName(t, org?.name ?? "", view.machine),
         lastSeenAt: null,
         person: (id) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson"),
         step: null,

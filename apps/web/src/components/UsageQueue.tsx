@@ -138,6 +138,7 @@ export function UsageQueueDialog({
           <div className="uq">
             {waiting > 0 && skipped > 0 && (
               <Segmented
+                block
                 size="sm"
                 label={t("usageQueue.lists")}
                 value={tab}

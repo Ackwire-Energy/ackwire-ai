@@ -104,6 +104,12 @@ describe("the delivery card", () => {
     expect(card().textContent).toContain("Missão concluída");
   });
 
+  test("its summary reads as Markdown", async () => {
+    await withDelivery({ summary: "- **Fotos:** 40 em `zip`" });
+    expect(card().querySelector("li strong")?.textContent).toBe("Fotos:");
+    expect(card().querySelector("code")?.textContent).toBe("zip");
+  });
+
   test("Pedir ajustes: an inline note that resumes the work", async () => {
     const { calls } = await withDelivery();
     await act(async () => fireEvent.click(within(card()).getByRole("button", { name: "Pedir ajustes" })));

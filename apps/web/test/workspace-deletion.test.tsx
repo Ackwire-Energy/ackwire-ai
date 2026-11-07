@@ -303,7 +303,7 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     const cards = document.querySelectorAll(".settings__body > .ac-card");
     expect(cards[cards.length - 1]).toBe(card);
     expect(card.classList.contains("settings-danger")).toBe(true);
-    expect(card.textContent).toContain("Você sai de todos os workspaces e a sua conta é apagada de vez.");
+    expect(card.textContent).toContain("a sua conta é apagada de vez 7 dias depois. Até lá, dá para restaurar.");
     await click(within(card).getByRole("button", { name: "Apagar conta…" }));
     await settle(6);
     // Kept in the address: a sign-in again comes back to it.
@@ -507,7 +507,8 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     const { router } = await open(`/org/${ORG_ID}/issues?account=delete`, { state });
     const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
     for (const line of [
-      "Isto apaga a sua conta inteira, não só um workspace. Não tem volta.",
+      "Isto apaga a sua conta inteira, não só um workspace.",
+      "Sua conta some de vez em",
       // What each one holds, so one with work in it can't be taken for an empty copy.
       "Acme fecha agora, com 12 agentes e 340 mensagens. Só você está lá, então ele é apagado de vez em",
       "Vazio fecha agora, sem agentes nem mensagens.",
@@ -544,7 +545,39 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     await settle(8);
     expect(state.calls.find((c) => c.method === "account.delete")?.args).toEqual([{ code: "482913" }]);
     expect(router.state.location.pathname).toBe("/login");
-    expect(document.body.textContent).toContain("Conta apagada");
+    expect(document.body.textContent).toContain("Entre antes disso para restaurar.");
+  });
+});
+
+describe("an account waiting for its deletion", () => {
+  const waiting = (dueAt: string | null) => {
+    const state = seedState();
+    if (!state.me) throw new Error("signed in");
+    state.me.user.deletion = { dueAt, requestedAt: soon(-1) };
+    state.me.organizations = [];
+    return state;
+  };
+
+  test("signing in shows one screen in place of the app: when it goes, Restaurar and Sair", async () => {
+    const state = waiting(soon(6));
+    const { router } = await renderApp("/", { api: createFakeApi(state) });
+    await settle(8);
+    expect(screen().getByRole("heading", { name: "Sua conta está sendo apagada" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Sair" })).toBeTruthy();
+    const restore = screen().getByRole("button", { name: "Restaurar conta" });
+    await click(restore);
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "account.restore")).toBe(true);
+    expect(screen().queryByRole("heading", { name: "Sua conta está sendo apagada" })).toBeNull();
+    expect(router.state.location.pathname).not.toBe("/login");
+  });
+
+  test("past its date there is nothing to press but Sair", async () => {
+    await renderApp("/", { api: createFakeApi(waiting(null)) });
+    await settle(8);
+    expect(screen().getByRole("heading", { name: "Sua conta está sendo apagada" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Restaurar conta" })).toBeNull();
+    expect(screen().getByRole("button", { name: "Sair" })).toBeTruthy();
   });
 });
 

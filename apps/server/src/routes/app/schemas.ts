@@ -12,6 +12,14 @@ import {
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
+/** Who a task or a wiki page is for (ADR 0151): "only me" is a list of one. Administrators always see it. */
+export const AudienceChoice = z
+  .discriminatedUnion("mode", [
+    z.object({ mode: z.literal("everyone") }),
+    z.object({ mode: z.literal("people"), userIds: z.array(z.string().min(1).max(200)).max(200) }),
+  ])
+  .openapi("AudienceChoice");
+
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
 export const MediaKind = z.enum(["gif", "sticker", "voice"]).nullable().openapi({
   description:
@@ -214,6 +222,14 @@ export const Credential = z
       .boolean()
       .optional()
       .openapi({ description: "The workspace's default key (agents without their own key, router, summaries)." }),
+    usedBy: z
+      .array(z.object({ id: z.uuid(), name: z.string() }))
+      .optional()
+      .openapi({ description: "The agents that think with it, in a list of keys: what removing it would change." }),
+    check: z
+      .enum(["ok", "unchecked"])
+      .optional()
+      .openapi({ description: "On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
@@ -417,6 +433,9 @@ export const Channel = z
       description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
     }),
     isMember: z.boolean(),
+    seenAsAdmin: z.boolean().optional().openapi({
+      description: "Listed only because you're an administrator (ADR 0151): off the sidebar until opened or joined.",
+    }),
     createdByUserId: z
       .string()
       .nullable()
@@ -541,6 +560,12 @@ export const WorkView = z
     finishedAt: z.string().nullable(),
     nextUpdateAt: z.string().nullable(),
     lastUpdate: z.object({ text: z.string(), at: z.string(), seq: z.number() }).nullable(),
+    question: z
+      .object({ text: z.string(), messageId: z.uuid().nullable(), requestedForUserId: z.string().nullable() })
+      .nullable()
+      .openapi({
+        description: "Waiting on an answer: what its run asked, the message that holds the card, and who it is for.",
+      }),
     plan: z.array(z.object({ id: z.string(), text: z.string(), state: z.enum(["todo", "doing", "done"]) })),
     issue: z.object({ id: z.uuid(), number: z.number() }).nullable(),
     resultMessageId: z.uuid().nullable(),
@@ -601,6 +626,10 @@ const MessageBase = z.object({
         .literal(true)
         .optional()
         .openapi({ description: "Routed to nobody: the organization had no AI connected." }),
+      kept: z
+        .literal(true)
+        .optional()
+        .openapi({ description: "With `noAi`: it came in on a billing hold, to be answered after the plan." }),
       platformCap: z.literal(true).optional().openapi({
         description: "Routed to nobody: the workspace used up its platform AI for the month; @mentions still answer.",
       }),
@@ -739,14 +768,21 @@ export const BrainKind = z
   .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
   .openapi("BrainKind");
 
+export const BrainUnavailable = z.enum([
+  "no_computer",
+  "exec_off",
+  "runner_old",
+  "tool_off",
+  "not_installed",
+  "outdated",
+  "not_reported",
+]);
+
 export const BrainOption = z
   .object({
     kind: BrainKind,
     available: z.boolean(),
-    reason: z
-      .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
-      .optional()
-      .openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    reason: BrainUnavailable.optional().openapi({ description: "Why it can't be chosen now (computer brains)." }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -808,6 +844,10 @@ export const MachineAccount = z
       .nullable()
       .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
+    statusKnown: z.boolean().openapi({
+      description:
+        "False: the computer's last look at its sign-in said nothing for sure (runner protocol 50); `status` is the last known.",
+    }),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
@@ -823,6 +863,10 @@ export const MachineAccount = z
     shared: z.boolean().openapi({
       description:
         "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 29); else for one.",
+    }),
+    providerOrgId: z.string().nullable().openapi({
+      description:
+        "Claude's organization it is signed in to (opaque, runner protocol 50); only for its owner. Logins of one email in two organizations are two accounts.",
     }),
   })
   .openapi("MachineAccount", {
@@ -847,11 +891,12 @@ export const AgentBrain = z
         brain: BrainKind,
         ownerId: z.string().nullable(),
         servesYou: z.boolean(),
+        key: z.object({ provider: z.string(), label: z.string() }).nullable().optional(),
       })
       .optional()
       .openapi({
         description:
-          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+          "The team's right hand: the workspace's AI, `model` for an API key (`key`, by its provider and name; null with none), else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
       }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),

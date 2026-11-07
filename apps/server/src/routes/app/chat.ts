@@ -98,6 +98,7 @@ export function chatRoutes(deps: AppDeps) {
             visibility: r.visibility,
             audienceRoleIds: r.audienceRoleIds,
             isMember: r.isMember,
+            seenAsAdmin: r.seenAsAdmin,
             createdByUserId: r.createdByUserId,
             createdAt: r.createdAt.toISOString(),
             categoryId: r.categoryId,
@@ -198,7 +199,9 @@ export function chatRoutes(deps: AppDeps) {
       responses: { 201: json(Channel, "Created"), ...errors },
     }),
     async (c) => {
-      const r = await createChannel(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      const r = await createChannel(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"), {
+        pubsub: adapters.pubsub,
+      });
       return c.json(
         {
           id: r.id,
@@ -505,10 +508,7 @@ export function chatRoutes(deps: AppDeps) {
         params: ChannelParams,
         query: z.object({
           threadId: z.uuid().optional(),
-          before: z.iso
-            .datetime()
-            .optional()
-            .openapi({ description: "Page backwards from this time (top-level messages)." }),
+          before: z.iso.datetime().optional().openapi({ description: "Page backwards from this time." }),
           limit: z.coerce.number().int().min(1).max(200).optional(),
           include: z
             .string()
@@ -551,7 +551,7 @@ export function chatRoutes(deps: AppDeps) {
             threadId: z.uuid().nullable().optional(),
             replyTo: z.uuid().nullable().optional().openapi({
               description:
-                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind? }); `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
+                "Quote reply: a message of this channel and, from a thread, of that thread. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind?, deleted? }), `deleted` once the original is gone; `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
             }),
             media: z
               .discriminatedUnion("kind", [

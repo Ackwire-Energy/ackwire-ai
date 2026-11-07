@@ -160,17 +160,28 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
+export {
+  EventPill,
+  EventPillAction,
+  type EventPillActionProps,
+  EventPillMore,
+  type EventPillProps,
+} from "./components/EventPill";
 export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,
   Field,
   type FieldProps,
+  FormActions,
+  FormStack,
   Input,
+  Locked,
   PickerHeading,
   SearchInput,
   Textarea,
   useAutoGrow,
   useFieldControl,
+  useLocked,
 } from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,
@@ -411,6 +422,7 @@ export {
   useHoverCard,
 } from "./hooks/useHoverCard";
 export { useNow } from "./hooks/useNow";
+export { type ScrollSides, useScrollSides } from "./hooks/useScrollSides";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { driveFolder, initialsOf, isIdHandle } from "./names";
 export {

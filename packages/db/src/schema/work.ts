@@ -56,10 +56,9 @@ export const issueColumns = pgTable(
 );
 
 /**
- * Native issues. Visible to the whole org, or like the channel they
- * came from (`channel_id`, e.g. "Transformar em issue" in a private
- * channel). Acceptance criteria are a checklist; assignee is a person or an
- * agent.
+ * Native issues. Visible to the whole org, or like the conversation they came from (`channel_id`: a DM or a private
+ * channel, set by "Transformar em issue" and by an agent's `create_issue` there). Acceptance criteria are a checklist;
+ * assignee is a person or an agent.
  */
 export const issues = pgTable(
   "issues",
@@ -93,10 +92,18 @@ export const issues = pgTable(
     /** `{ type: "manual" | "message" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
+    /**
+     * Limited to `audienceUserIds` (ADR 0151), with no `channelId`: who sees it is that list, and administrators always.
+     * Not limited: the workspace, or the people of the conversation in `channelId`.
+     */
+    restricted: boolean().notNull().default(false),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /** A sub-issue of this one (a step of a plan). */
     parentIssueId: uuid().references((): AnyPgColumn => issues.id, { onDelete: "set null" }),
     /** `[{ number, url, openedBy }]`. */
     pullRequests: jsonb().$type<Record<string, unknown>[]>().notNull().default([]),
+    /** The GitHub issue or pull request this task is about: a link and nothing more, no sync. */
+    githubUrl: text(),
     artifactIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Long work stopped on something (ADR 0121 §4): a badge on the card, the card stays in its stage. */
     blocked: jsonb().$type<{ reason: string; since: string; text?: string }>(),

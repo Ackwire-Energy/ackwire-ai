@@ -8,8 +8,10 @@ import {
   createOutboxPump,
   type DesktopControl,
   enqueue,
+  enqueueAccountContacts,
   enqueueAutonomyReport,
   enqueueIdleReflections,
+  enqueueOverdueAccountDeletions,
   enqueueOverdueDeletions,
   enqueueSkillUpdates,
   enqueueTeamWeeks,
@@ -222,9 +224,10 @@ export function startWorkers(deps: WorkerDeps) {
 
   every("deletions", WORKER_INTERVALS_MS.deletions, async () => {
     await pruneDeletionCodes(db);
+    const accounts = await enqueueOverdueAccountDeletions(db);
     const due = await enqueueOverdueDeletions(db);
-    if (due > 0) {
-      log.info("workspace deletions due", { due });
+    if (due + accounts > 0) {
+      log.info("workspace deletions due", { due, accounts });
       void ticks.get("outbox")?.();
     }
   });
@@ -370,6 +373,10 @@ export function startWorkers(deps: WorkerDeps) {
   // Confirmed waiting list entries from before contacts were synced (no-op for the rest: dedupe key).
   void enqueueWaitlistContacts(db).catch((error) =>
     log.error("background job failed", { job: "waitlistContacts", error }),
+  );
+  // Accounts from before contacts were synced (no-op for the rest: dedupe key).
+  void enqueueAccountContacts(db).catch((error) =>
+    log.error("background job failed", { job: "accountContacts", error }),
   );
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());

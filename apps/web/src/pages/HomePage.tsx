@@ -33,23 +33,25 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Button, Composer, cx, Icon, PageHeader, Select, SkyGlow } from "@agenteschat/ui";
+import { Button, Composer, cx, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useMissionsWaitingYou } from "@/components/missions/MissionWaiting";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { Face, Headline, SystemFace } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
-import { colorOf } from "@/components/Sky";
 import { HomeMural } from "@/components/widgets/HomeMural";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
 import { agentLine, useAgentPresence } from "@/hooks/usePresence";
 import { TYPED_VALUES } from "@/i18n";
+import { lookOf } from "@/lib/look";
 import { firstStepsHidden, hideFirstSteps } from "@/lib/start";
 import "./home.css";
 // Its "Para você" draws the inbox's rows (Face, SystemFace, the calm card).
@@ -101,6 +103,7 @@ export function HomePage() {
     .filter((a) => listsAgent(org, a) && canTalk(a))
     .sort((a, b) => (lastTalk.get(b.id) ?? "").localeCompare(lastTalk.get(a.id) ?? ""));
 
+  const held = usePlanHold() !== null;
   const steps = stepsHidden
     ? []
     : firstSteps({
@@ -111,6 +114,7 @@ export function HomePage() {
         people: overview.data?.people ?? 1,
         routines: routines.data?.length ?? 0,
         may: stepPermissions(org, me.user.id, dir.agents),
+        held,
       });
   // Each check reads what it needs, so the card doesn't flash its steps open while the lists still come.
   const stepsReady = !dir.loading && ai.isFetched && statuses.isFetched && overview.isFetched && routines.isFetched;
@@ -172,13 +176,14 @@ export function HomePage() {
                 ].slice(0, HOME_ROWS)}
               </ul>
             ) : calm ? (
-              <div className="nt-calm home-calm">
-                <div className="nt-calm__glow">
-                  <SkyGlow color={colorOf(askable[0] ?? dir.agents[0])} />
-                </div>
-                <b>{t("home.calm.title")}</b>
-                <p>{t("home.calm.text")}</p>
-              </div>
+              <EmptyState
+                size="panel"
+                agent={lookOf(askable[0] ?? dir.agents[0]) ?? true}
+                mood="deal"
+                title={t("home.calm.title")}
+              >
+                {t("home.calm.text")}
+              </EmptyState>
             ) : loaded ? (
               <p className="wg__empty">{t("home.summary.calm")}</p>
             ) : null,
@@ -612,6 +617,12 @@ function StepAction({ id, onAsk }: { id: FirstStep["id"]; onAsk: () => void }) {
   const connect = useConnectAi();
   const label = t(`home.steps.${id}.action`);
   const params = { orgId: org.id };
+  if (id === "plan")
+    return (
+      <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary" className="home-row__act">
+        {label}
+      </BillingLinkButton>
+    );
   if (id === "agent")
     return (
       <Button size="sm" asChild className="home-row__act">

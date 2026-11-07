@@ -1,8 +1,9 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
-import { PROVIDERS } from "@agenteschat/providers";
-import { pgSafeJson } from "./format";
+import { PROVIDERS, type ProviderCause, type ProviderError, providerCause } from "@agenteschat/providers";
+import { cutText, pgSafeJson } from "./format";
 import { recordRunFinished } from "./operator-events";
 import { standingErrorDetail } from "./standing";
+import { redactCredentials } from "./tool-detail";
 
 const { agentRuns, agentRunSteps } = schema;
 
@@ -90,6 +91,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** The `strategy` of a `no_ai` decision made on a billing hold: its receipt says `kept`, and it is answered after the plan. */
+export const KEPT_ON_HOLD = "plan_hold";
 /** A run's error when the person behind it is at their monthly AI limit (ADR 0141): its card says so. */
 export const PERSON_LIMIT = "person_limit" as const;
 /** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */
@@ -112,8 +115,34 @@ const CLI_FAILED = /^[a-z]+(?:_[a-z]+)*_failed$/;
 /** A run that stopped on an error of ours that kept repeating (`gave up` in the executor): its stored text's start. */
 export const OUR_ERROR = "Stopped after an error";
 
-/** Starts a `provider_error:`'s detail when the provider refused the key's account (`run.provider_account`). */
-export const PROVIDER_ACCOUNT = "account: ";
+/** Starts a `provider_error:`'s detail in older rows, when the provider refused the key's account. */
+const PROVIDER_ACCOUNT = "account: ";
+
+const OUR_KEY_CAUSES: ReadonlySet<ProviderCause> = new Set(["no_credit", "invalid_key", "no_access", "rate_limit"]);
+
+/**
+ * A provider failure in the terms the apps word it: a known cause, `ours` (it came on the server's own key, so nothing
+ * of the person's is wrong), or `said` (only the provider's own words, masked and cut, tell).
+ */
+export function providerFailureOf(error: ProviderError) {
+  const found = providerCause(error);
+  const ours = error.platformKey && found !== null && OUR_KEY_CAUSES.has(found);
+  return {
+    cause: ours ? "ours" : (found ?? "said"),
+    provider: error.provider ?? "",
+    detail: cutText(redactCredentials(error.said ?? error.message), 200),
+  };
+}
+
+/** `cause@Provider: detail`, after a stored `provider_error:` or `gave_up:`. Older rows hold only the detail. */
+const PROVIDER_FAILURE =
+  /^(no_credit|invalid_key|no_access|model_unavailable|rate_limit|down|timeout|unreachable|said|ours)@(.*?): ([\s\S]*)$/;
+
+/** A provider failure as a run stores it (`runErrorDetail` reads it back). */
+export function providerFailureText(kind: "provider_error" | "gave_up", error: ProviderError) {
+  const { cause, provider, detail } = providerFailureOf(error);
+  return provider ? `${kind}: ${cause}@${provider}: ${detail}` : `${kind}: ${detail}`;
+}
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
@@ -146,6 +175,13 @@ export function runErrorDetail(error: string | null | undefined): {
   if (error === "account_missing") return { errorCode: "run.account_missing" };
   // Ours, not the person's: the detail (a driver's message) stays for the log, never shown as the reason.
   if (error.startsWith(OUR_ERROR)) return { errorCode: "run.our_error" };
+  const coded = PROVIDER_FAILURE.exec(error.replace(/^(?:provider_error|gave_up):\s*/, ""));
+  if (coded) {
+    const [, cause, provider = "", detail = ""] = coded;
+    return cause === "ours"
+      ? { errorCode: "run.our_error", errorParams: { provider } }
+      : { errorCode: `run.provider_${cause}`, errorParams: { provider, detail } };
+  }
   if (error.startsWith("provider_error:")) {
     const detail = error.slice(15).trim();
     return detail.startsWith(PROVIDER_ACCOUNT)
@@ -184,12 +220,19 @@ export function runErrorDetail(error: string | null | undefined): {
       errorParams: { modelProvider: providerNow(wrong[1] as string), keyProvider: providerNow(wrong[2] as string) },
     };
   }
-  const unregistered = /^No provider registered for (.+)$/.exec(error);
-  if (unregistered)
-    return { errorCode: "run.provider_unavailable", errorParams: { detail: unregistered[1] as string } };
+  if (error.startsWith("No provider registered for ")) return { errorCode: "run.our_error" };
   const unlisted = /^OpenRouter doesn't list (.+) anymore\./.exec(error);
   if (unlisted) return { errorCode: "run.model_unlisted", errorParams: { model: unlisted[1] as string } };
   return { errorCode: "run.failed", errorParams: { detail: error.slice(0, 300) } };
+}
+
+/** The detail of a run error its AI provider caused, on the person's key or the server's: worth another try. */
+export function providerFailure(error: string | null | undefined) {
+  const detail = runErrorDetail(error);
+  const provider =
+    detail?.errorCode.startsWith("run.provider_") ||
+    (detail?.errorCode === "run.our_error" && detail.errorParams?.provider);
+  return provider ? detail : null;
 }
 
 export const isTerminal = (status: RunStatus) => RUN_TRANSITIONS[status].length === 0;
@@ -218,9 +261,12 @@ export async function transitionRun(
     transcript?: Record<string, unknown> | SQL;
     /** Waiting for this computer (ADR 0032 §5), or asking it from its line; cleared by any move that doesn't name it. */
     waitingMachineId?: string | null;
+    /** A failure: the brain's code and the provider's cause (`run.finished`; not stored on the run). */
+    failure?: { code: string; cause?: string | null };
   } = {},
 ): Promise<AgentRun | null> {
   if (!canTransition(from, to)) throw new InvalidRunTransitionError(from, to);
+  const { failure, ...set } = patch;
   const now = new Date();
   const [row] = await db
     .update(agentRuns)
@@ -233,12 +279,18 @@ export async function transitionRun(
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       // Only a run waiting for its computer keeps the machine it waits for.
       waitingMachineId: null,
-      ...patch,
+      ...set,
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
   if (row && isTerminal(to)) {
-    await recordRunFinished(db, row);
+    await recordRunFinished(
+      db,
+      row,
+      to === "failed"
+        ? { code: failure?.code ?? runErrorDetail(row.error)?.errorCode ?? null, cause: failure?.cause ?? null }
+        : undefined,
+    );
     await releaseProfileTurns(db, row.id);
   }
   return row ?? null;
@@ -254,18 +306,33 @@ export async function releaseProfileTurns(db: Executor, runId: string) {
 
 export type StepKind = (typeof schema.agentRunStepKindEnum.enumValues)[number];
 
-/** Appends a step to a run's trail (numbered in order). */
+/** Tries for a free number: tool calls that run side by side each lose at most to the others. */
+const STEP_TRIES = 20;
+
+/**
+ * Appends a step to a run's trail (numbered in order). Two at once read the same last number, and the unique
+ * `(run_id, seq)` would fail the whole run: the loser takes the next one.
+ */
 export async function addRunStep(
   db: Executor,
   run: Pick<AgentRun, "id" | "orgId">,
   kind: StepKind,
   data: Record<string, unknown>,
 ) {
-  await db.insert(agentRunSteps).values({
-    orgId: run.orgId,
-    runId: run.id,
-    kind,
-    data: pgSafeJson(data),
-    seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
-  });
+  const safe = pgSafeJson(data);
+  for (let i = 0; i < STEP_TRIES; i++) {
+    const added = await db
+      .insert(agentRunSteps)
+      .values({
+        orgId: run.orgId,
+        runId: run.id,
+        kind,
+        data: safe,
+        seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
+      })
+      .onConflictDoNothing()
+      .returning({ id: agentRunSteps.id });
+    if (added.length > 0) return;
+  }
+  throw new Error(`No free step number on run ${run.id}`);
 }

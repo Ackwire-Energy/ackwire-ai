@@ -1,14 +1,17 @@
 import { type TeamAgent, useAgentGroups, useChannels, useMembers, useTeam } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
-import { chartByPerson, mapColumns } from "@agenteschat/client/lib/team-views";
+import { chartByPerson, mapColumns, noSectorsCopy } from "@agenteschat/client/lib/team-views";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
-import { ListRow, SectionHeader, Text } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Button, EmptyState, ListRow, SectionHeader, Text } from "@/ui";
 import { chatHref } from "../links/logic";
-import { useOpenDm } from "../new/useOpenDm";
 import { AgentFace, Face } from "../shared/Face";
+import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { Tile, useSurface } from "../shared/parts";
 import { teamSections } from "./logic";
@@ -28,18 +31,18 @@ const CHANNEL_FACES = 4;
 /**
  * Equipe on the phone (ADR 0148), one page with each thing said once: the org chart (the right hand on top, each
  * person with the agents that report to them, joined by lines), the channels as places with who works in each, who is
- * in none, and the setores with their lead and substitute. With no setores, a way to ask the right hand to set them
- * up. Editing setores, the map's drag and Governança e uso are on the web.
+ * in none, and the setores with their lead and substitute. With no setores, what they give and, for who can, the first
+ * one. Editing setores, the map's drag and Governança e uso are on the web.
  */
 export function TeamScreen() {
   const { t } = useTranslation();
   const orgId = useOrgId();
+  const { org } = useOrg();
   const dir = useDirectory();
   const team = useTeam(orgId);
   const groups = useAgentGroups(orgId);
   const channels = useChannels(orgId);
   const members = useMembers(orgId);
-  const openDm = useOpenDm();
   const pull = usePullRefresh(() =>
     Promise.allSettled([team.refetch(), groups.refetch(), channels.refetch(), members.refetch()]),
   );
@@ -61,6 +64,8 @@ export function TeamScreen() {
     rightHandId: lodi?.id ?? null,
   }).filter((s) => s.group);
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
+  const arranges = can(org, "manage_agents");
+  const noSectors = noSectorsCopy(arranges);
   const summary = [
     t("team.agents", { count: agents.length }),
     t("team.people", { count: chart.filter((c) => c.personId).length }),
@@ -110,22 +115,29 @@ export function TeamScreen() {
         </>
       ) : null}
 
-      <SectionHeader
-        title={t("team.view.sectors")}
-        {...(sectors.length > 0 ? { count: sectors.length } : {})}
-        action={
-          sectors.length === 0 && lodi
+      <SectionHeader title={t("team.view.sectors")} {...(sectors.length > 0 ? { count: sectors.length } : {})} />
+      {groups.isError && !groups.data ? (
+        <LoadFailed onRetry={() => void groups.refetch()} />
+      ) : !groups.data ? null : sectors.length === 0 ? (
+        <EmptyState
+          size="panel"
+          agent={lodi ? agentLook(lodi) : true}
+          title={t(noSectors.title)}
+          subtitle={t(noSectors.text)}
+          {...(arranges
             ? {
-                label: t("team.sectors.ask", { name: lodi.name }),
-                onPress: () => void openDm({ agentId: lodi.id }, { compose: true, text: t("team.sectors.askText") }),
+                action: (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="plus"
+                    label={t("agentGroups.create")}
+                    onPress={() => router.push("/sector-new")}
+                  />
+                ),
               }
-            : null
-        }
-      />
-      {sectors.length === 0 ? (
-        <Text variant="footnote" tone="muted" style={styles.note}>
-          {t("team.sectors.lead")}
-        </Text>
+            : {})}
+        />
       ) : (
         sectors.map((s, i) => (
           <ListRow
@@ -310,7 +322,6 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -8 },
   more: { marginLeft: 6 },
   outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: PAGE, paddingTop: 14 },
-  note: { paddingHorizontal: 20 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   pressed: { opacity: 0.7 },

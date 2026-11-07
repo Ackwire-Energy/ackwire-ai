@@ -802,6 +802,32 @@ describe("Members › Esperando você", () => {
     expect(text()).toContain("Alguém já respondeu este pedido.");
   });
 
+  test("deny: the reason is off while it goes, Cancelar stays, and a refusal gives it back with its words", async () => {
+    setSystemTime(MIDDAY);
+    const api = createFakeApi(seedState({ joinRequests: requests() }));
+    let refuse = (_: unknown) => {};
+    api.joinRequests.deny = () =>
+      new Promise((_, reject) => {
+        refuse = reject;
+      });
+    await renderApp(`/org/${ORG_ID}/settings/members`, { api });
+    await settle(6);
+    await click(within(card("Ana Souza")).getByRole("button", { name: "Recusar" }));
+    const dialog = screen().getByRole("dialog", { name: "Recusar o pedido de Ana Souza?" });
+    const reason = within(dialog).getByLabelText("Diga o motivo") as HTMLTextAreaElement;
+    await type(reason, "Só a equipe");
+    await click(within(dialog).getByRole("button", { name: "Recusar" }));
+    await settle(2);
+    expect(reason.closest("fieldset[disabled]")).not.toBeNull();
+    expect(reason.value).toBe("Só a equipe");
+    expect((within(dialog).getByRole("button", { name: "Cancelar" }) as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => refuse(new ApiError(500, "internal", "boom")));
+    await settle(4);
+    expect(reason.isConnected).toBe(true);
+    expect(reason.closest("fieldset[disabled]")).toBeNull();
+    expect(reason.value).toBe("Só a equipe");
+  });
+
   test("the email's links: Deny opens its dialog, Approve focuses its button, a gone request says so", async () => {
     await members("?request=r2&do=deny");
     expect(screen().getByRole("dialog", { name: "Recusar o pedido de Bruno Lima?" })).toBeTruthy();
@@ -1061,7 +1087,7 @@ test("the admins' notice: who asks, a Members chip, and it opens Members, from A
   expect(row.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar, não lida");
   expect(row.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
   expect(row.querySelector(".nt-face")?.textContent).toBe("AS");
-  expect(row.querySelector(".ac-chip")?.textContent).toBe("Membros");
+  expect(row.querySelector(".nt-wr__src")?.textContent).toBe("Membros");
   await click(within(row).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
@@ -1093,7 +1119,7 @@ test("the admins' notice names the first two who asked and counts the rest", asy
     await settle(6);
     const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
     expect(notice.getAttribute("aria-label")).toBe(`${said}, não lida`);
-    expect(notice.querySelector(".nt-wr__l1")?.textContent).toContain(said);
+    expect(notice.querySelector(".nt-what")?.textContent).toContain(said);
     cleanup();
   }
 });

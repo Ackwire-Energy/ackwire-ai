@@ -22,9 +22,10 @@ describe("Missões", () => {
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Trabalho longo de um agente no computador dele, numa thread.",
     );
-    expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();
-    // The title and New mission: what a mission is, the subtitle already says.
-    expect(document.querySelector(".ac-empty__text")).toBeNull();
+    expect(screen().getByText("Dê um objetivo e acompanhe o agente")).toBeTruthy();
+    expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Uma missão é uma thread com plano, decisões e o trabalho de um agente no computador dele.",
+    );
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     // Missões is a tab of Threads: one sidebar item.
     expect(within(nav).getByRole("link", { name: /Threads/ })).toBeTruthy();
@@ -72,10 +73,9 @@ describe("Missões", () => {
       const view = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
       await settle(8);
       const line = document.querySelector('[data-message-id="m-task"]') as HTMLElement;
-      expect(line.textContent).toStartWith(
-        computers.length > 1
-          ? "“Rodar os testes” terminou em 2 min no MacBook ·"
-          : "“Rodar os testes” terminou em 2 min ·",
+      // The pill's words, its time in a slot of its own.
+      expect(line.querySelector(".ac-eventpill__text")?.textContent).toBe(
+        computers.length > 1 ? "“Rodar os testes” terminou em 2 min no MacBook" : "“Rodar os testes” terminou em 2 min",
       );
       view.unmount();
     }

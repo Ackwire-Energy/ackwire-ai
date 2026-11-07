@@ -299,6 +299,10 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
 .ap-hold {
   position: relative;
   overflow: hidden;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
 }
 .ap-hold::before {
   content: "";
@@ -348,6 +352,13 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   outline: none;
   box-shadow: inset 0 0 0 1.5px var(--ink);
 }
+.ap-refuse textarea:disabled {
+  background: var(--sunken);
+  color: var(--muted);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .ap-refuse__suggest {
   display: flex;
   flex-wrap: wrap;
@@ -366,8 +377,12 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   line-height: normal;
   cursor: pointer;
 }
-.ap-refuse__suggest button:hover {
+.ap-refuse__suggest button:hover:not(:disabled) {
   color: var(--ink);
+}
+.ap-refuse__suggest button:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
 }
 html:not([data-pointer]) .ap-refuse__suggest button:focus-visible {
   outline: none;

@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, DirectMessage } from "../api/types";
+import type { Agent, AgentBrain, BrainScope, Credential, DirectMessage, Model } from "../api/types";
+import { agentGrammar } from "./grammar";
 import { PRESETS } from "./onboarding";
+import { AUTO, keyRuns } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -26,11 +28,43 @@ export function rightHandFallback(
   meId: string | undefined,
   name: Record<string, unknown>,
   firstName: (userId: string) => string | undefined,
+  /** This server has a key of its own, which serves where the workspace has none. */
+  platform = false,
 ): string {
-  if (ai.brain === "model") return t("rightHand.settings.fallbackKey");
+  if (ai.brain === "model") {
+    if (ai.key) return t("rightHand.settings.fallbackKeyOf", { label: ai.key.label });
+    return t(ai.key === null && !platform ? "rightHand.settings.fallbackNoKey" : "rightHand.settings.fallbackKey");
+  }
   const owner = (ai.ownerId && firstName(ai.ownerId)) ?? "";
   if (!ai.servesYou) return t("rightHand.settings.fallbackNone", { ...name, owner });
   return ai.ownerId === meId ? t("rightHand.settings.fallbackYours") : t("rightHand.settings.fallbackPlan", { owner });
+}
+
+/**
+ * What a connect flow says once an AI is chosen. The team's right hand has two AIs, and the words say which moved:
+ * the workspace's (everyone without a plan of their own) or the person's alone. Any other agent has one.
+ */
+export const thinksWithLine = (t: TFunction, scope: BrainScope | undefined, agent: string, label: string) =>
+  scope
+    ? t(`rightHand.saved.${scope}`, { ...agentGrammar(agent), label })
+    : t("aiAccounts.done.savedAgent", { agent, label });
+
+/**
+ * The right hand on a workspace key, web and phone: the workspace's AI goes to its API key, the key is pinned, with
+ * Automático where the model chosen before can't run on it, and the person's own DM goes back to that AI. In that
+ * order: someone the workspace's AI refuses keeps their own as it was.
+ */
+export async function rightHandOnKey(
+  api: ApiClient,
+  orgId: string,
+  agent: Pick<Agent, "id" | "model">,
+  key: Pick<Credential, "id" | "provider">,
+  models: readonly Model[],
+) {
+  await api.agents.setBrain(orgId, agent.id, { scope: "workspace", brain: "model" });
+  const fits = keyRuns(key, agent.model, models);
+  await api.agents.update(orgId, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
+  await api.agents.setBrain(orgId, agent.id, { brain: "model" });
 }
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
@@ -75,23 +109,27 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
 
 /**
- * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
- * Not while the start card still asks, or its interview runs: with no team, those are the way.
+ * Whether its greeting ends with the way to build the team again, for whoever may create agents once an AI is there:
+ * only with a team and no card left under the greeting (`cards`), which would offer the same or ask something first.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
   aiKnown: boolean;
   createsAgents: boolean;
   hasTeam: boolean;
-  /** `startCardPassed`. */
-  cardPassed: boolean;
-}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
+  /** `introCards`. */
+  cards: readonly string[];
+  /** A billing hold (`planHoldOf`): it can't answer, so its line would send a message that gets refused. */
+  held?: boolean;
+}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0;
 
 /**
- * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
- * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
- * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
- * there, how the person wants agents to talk to them, until they pick (ADR 0147).
+ * The cards under the right hand's greeting at the top of its DM (ADR 0137), one question at a time: Connect AI while
+ * there is none. With one, how to start (for whoever may create agents): with no agent yet, or, still alone, while the
+ * team is only ready-made agents and some are left, each tile its own Criar, beside what next. Once that is settled,
+ * how the person wants agents to talk to them, until they pick (ADR 0147), and only then what next: the team here and
+ * nobody else yet. On a billing hold, how to start and what next alone: an AI comes after the plan, and a saved key
+ * reading as ready changes nothing.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -104,8 +142,12 @@ export function introCards(s: {
   alone: boolean;
   /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
   askStyle?: boolean;
+  /** A billing hold (`planHoldOf`). */
+  held?: boolean;
+  /** A no-AI card already answered them in this conversation: its Connect is the one to press. */
+  noAiCard?: boolean;
 }): ("connect" | "start" | "next" | "style")[] {
-  if (s.noAi) return ["connect"];
+  if (s.noAi && !s.held) return s.noAiCard ? [] : ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
     s.aiKnown &&
@@ -113,9 +155,7 @@ export function introCards(s: {
     (s.teamHandles.length === 0 ||
       (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
   const next = s.teamHandles.length > 0 && s.alone;
-  return [
-    ...(start ? (["start"] as const) : []),
-    ...(next ? (["next"] as const) : []),
-    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
-  ];
+  if (start) return next ? ["start", "next"] : ["start"];
+  if (s.askStyle && s.aiKnown && !s.held) return ["style"];
+  return next ? ["next"] : [];
 }

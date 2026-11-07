@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu workspace e os seus direitos.",
-  updated: "2026-11-04",
+  updated: "2026-11-06",
   sections: [
     {
       id: "overview",
@@ -48,7 +48,7 @@ export const privacyPtBR: LegalDocument = {
       heading: "4. Conteúdo do Workspace, tratado em nome dos workspaces",
       blocks: [
         "O Conteúdo do Workspace inclui mensagens em canais, threads e mensagens diretas, arquivos do Drive e páginas da wiki. Inclui também tarefas, rotinas, eventos do calendário e aprovações, as instruções, configurações e a memória dos agentes, o que os agentes escrevem e fazem, e os dados que os agentes leem pelos conectores, bancos de dados e computadores que o workspace conecta. Nós o tratamos só para fazer funcionar o workspace e os agentes como o workspace os configurou, mostrá-lo aos membros do workspace, enviar as notificações que eles pedem e prestar suporte.",
-        "O Conteúdo do Workspace pertence ao workspace: os membros veem o que os canais e as permissões dele permitem, e os donos e administradores dele o gerenciam. As mensagens que você escreveu continuam no workspace depois que você sai dele ou exclui a sua conta, a não ser que o workspace as apague.",
+        "O Conteúdo do Workspace pertence ao workspace: os membros veem o que os canais e as permissões dele permitem, e os donos e administradores dele o gerenciam. Os donos e administradores do workspace veem todos os canais, tarefas e páginas da wiki, inclusive os privados. Eles não leem mensagens diretas entre outras pessoas. As mensagens que você escreveu continuam no workspace depois que você sai dele ou exclui a sua conta, a não ser que o workspace as apague.",
       ],
     },
     {
@@ -93,7 +93,7 @@ export const privacyPtBR: LegalDocument = {
       blocks: [
         {
           list: [
-            "**Dados de conta:** enquanto a conta existir. Quando você exclui a sua conta no app, ela é apagada na hora e sai dos nossos backups em até 30 dias, exceto registros que a lei nos obriga a manter. Qualquer workspace em que você era o único membro fecha no mesmo momento, e o conteúdo dele é apagado 7 dias depois, como descrito a seguir. Os workspaces em que você esteve guardam o seu nome e o seu e-mail nos registros de auditoria deles enquanto cada um existir.",
+            "**Dados de conta:** enquanto a conta existir. Quando você exclui a sua conta no app, ela sai de todos os aparelhos na hora e é apagada 7 dias depois, a não ser que você a restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto registros que a lei nos obriga a manter. Qualquer workspace em que você era o único membro fecha no mesmo momento, e o conteúdo dele é apagado 7 dias depois, como descrito a seguir. Os workspaces em que você esteve guardam o seu nome e o seu e-mail nos registros de auditoria deles enquanto cada um existir.",
             "**Conteúdo do Workspace:** enquanto o workspace existir, e antes disso quando o workspace apaga um conteúdo. Quando o plano do agentes.chat de um workspace termina, o conteúdo dele fica disponível por 90 dias e depois é apagado. Quando um dono exclui um workspace, ele fecha para todos na hora e o conteúdo dele é apagado 7 dias depois, a não ser que um dono o restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto o conteúdo que a lei nos obriga a manter ou que é registro de abuso (abaixo).",
             "**Registros:** registros de requisições e de segurança por até 90 dias. Registros de uso de modelos (tokens e custo) enquanto o workspace existir, porque os orçamentos e os relatórios de uso dependem deles.",
             "**Dados de cobrança:** enquanto você paga por um workspace e, depois disso, pelo tempo que as leis fiscais e contábeis exigirem.",

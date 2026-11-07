@@ -1,5 +1,5 @@
-import type { PubSub } from "@agenteschat/adapters";
-import { and, count, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { holdEvents, type PubSub } from "@agenteschat/adapters";
+import { and, count, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
 import { actWithUndo } from "./agent-actions";
 import {
@@ -84,6 +84,7 @@ export const APP_PAGES = {
   audit: "The audit log",
   usage: "Usage and costs",
   computers: "Computers for the agents",
+  task_manager: "Task manager: what each agent is doing now, what waits for room on the computer, stopping a task",
   connectors: "Apps, MCP servers, mailboxes and databases",
   skills: "Skills",
   storage: "File storage",
@@ -91,6 +92,7 @@ export const APP_PAGES = {
   right_hand: "Your own settings (name, AI, budget, who may use you)",
   import: "Importing agents",
   approvals: "Approvals, waiting and decided",
+  proposals: "Proposed changes to agents and the workspace context, waiting and decided (a tab of Approvals)",
   routines: "Routines",
   drive: "Drive (files)",
   wiki: "Wiki",
@@ -275,18 +277,37 @@ export async function hopOf(ctx: ToolContext) {
   return run?.hop ?? 0;
 }
 
-/** The run's cards so far (Connect cards and proposals alike), or an error once it has made its share. */
-export async function cardsLeft(ctx: ToolContext): Promise<ToolOutput | null> {
-  const [[made], self] = await Promise.all([
+/** What the right hand puts to the person for an answer: one a turn (`cardsLeft`). */
+const ASKING_CARDS = ["connect_ai", "connect_app", "invite_people", "team_proposal"];
+
+/**
+ * The run's cards so far (Connect cards and proposals alike), or an error once it has made its share. `asks`: this
+ * card waits on the person, and the right hand waits for one answer before the next thing (ADR 0137 §10), so a second
+ * one in a turn tells it to stop, as no error: nothing failed, and the person can always type.
+ */
+export async function cardsLeft(ctx: ToolContext, asks = false): Promise<ToolOutput | null> {
+  const here = and(eq(messages.orgId, ctx.orgId), eq(messages.agentRunId, ctx.runId));
+  const [[made], [asked], self] = await Promise.all([
+    ctx.db
+      .select({ n: count() })
+      .from(messages)
+      .where(and(here, sql`${messages.meta} ? 'actionCard'`)),
     ctx.db
       .select({ n: count() })
       .from(messages)
       .where(
-        and(eq(messages.orgId, ctx.orgId), eq(messages.agentRunId, ctx.runId), sql`${messages.meta} ? 'actionCard'`),
+        and(
+          here,
+          or(sql`${messages.meta} ? 'replyChips'`, inArray(sql`${messages.meta}->'actionCard'->>'kind'`, ASKING_CARDS)),
+        ),
       ),
     getAgentCached(ctx.db, ctx.orgId, ctx.agentId),
   ]);
-  const cap = isRightHand(self) ? MAX_CARDS_PER_RUN_RIGHT_HAND : MAX_CARDS_PER_RUN;
+  const rightHand = isRightHand(self);
+  if (asks && rightHand && (asked?.n ?? 0) > 0) {
+    return { content: "Not posted: one thing at a time. End your turn now and bring this up after they answer." };
+  }
+  const cap = rightHand ? MAX_CARDS_PER_RUN_RIGHT_HAND : MAX_CARDS_PER_RUN;
   return (made?.n ?? 0) >= cap ? { content: `You already offered ${cap} cards in this turn.`, isError: true } : null;
 }
 
@@ -366,7 +387,7 @@ export function createSetupToolSource(deps: {
             const self = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
             if (self) targets = [{ id: self.id, handle: self.handle, name: self.name }];
           }
-          const full = await cardsLeft(ctx);
+          const full = await cardsLeft(ctx, true);
           if (full) return full;
           const card: ActionCard = {
             kind: "connect_ai",
@@ -453,20 +474,24 @@ export function createSetupToolSource(deps: {
             const [person] = matches;
             if (person && person.userId !== requester) people.set(person.userId, person.name);
           }
+          const events = holdEvents(deps.pubsub);
           const channel = await actWithUndo(
             ctx,
             async (db) => {
-              const created = await createChannel(db, requester, ctx.orgId, {
-                name: str(input.name).trim().replace(/^#/, ""),
-                topic: str(input.topic).trim(),
-              });
+              const created = await createChannel(
+                db,
+                requester,
+                ctx.orgId,
+                { name: str(input.name).trim().replace(/^#/, ""), topic: str(input.topic).trim() },
+                events,
+              );
               // Agents first: only they can be refused (their owner or an admin adds them), and a refusal
               // undoes the whole channel before anyone was told they're in it.
               for (const a of agents.rows) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { agentId: a.id }, events);
               }
               for (const userId of people.keys()) {
-                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, deps);
+                await addChannelMember(db, requester, ctx.orgId, created.id, { userId }, events);
               }
               return created;
             },
@@ -478,6 +503,7 @@ export function createSetupToolSource(deps: {
               after: { name: created.name },
             }),
           );
+          await events.flush();
           const members = [...people.values(), ...agents.rows.map((a) => `@${a.handle}`)];
           return {
             content: `Created #${channel.name}${members.length ? ` with ${members.join(", ")}` : ""}.`,
@@ -804,7 +830,7 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
-          const full = await cardsLeft(ctx);
+          const full = await cardsLeft(ctx, true);
           if (full) return full;
           const card: ConnectAppCard = {
             kind: "connect_app",
@@ -874,7 +900,7 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
-          const full = await cardsLeft(ctx);
+          const full = await cardsLeft(ctx, true);
           if (full) return full;
           const card: InviteCard = { kind: "invite_people", forUserId, params: { emails, why } };
           const message = await insertMessage(ctx.db, {

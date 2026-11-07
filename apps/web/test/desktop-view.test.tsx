@@ -3,11 +3,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent, BrowserHandoff, DesktopStatus, SocketFactory } from "@agenteschat/client";
+import type { Agent, BrowserHandoff, DesktopStatus, DesktopViewState, SocketFactory } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
+import { DesktopView } from "@/components/desktop/DesktopView";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, meWithRole, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { renderPage, screen, settle } from "./render";
@@ -2110,4 +2111,64 @@ test("a connection quality change adjusts the active screen without reopening it
   expect(active.compressionLevel).toBe(6);
   expect(t.sockets.desktops).toHaveLength(count);
   expect(rfb()).toBe(active);
+});
+
+describe("a browser card's view of the screen (ADR 0058 §7)", () => {
+  async function card() {
+    const b = await backend(RUNNING);
+    const states: DesktopViewState[] = [];
+    const onView = (state: DesktopViewState) => void states.push(state);
+    await renderPage(
+      <DesktopView
+        preview
+        agentId={ADA_ID}
+        name="Ada"
+        computer="Servidor de casa"
+        edition="selfhost"
+        machine={b.machine}
+        canTakeOver={false}
+        onView={onView}
+      />,
+      { api: b.api, org: true, createSocket: b.sockets.factory },
+    );
+    await settle(6);
+    return { ...b, states };
+  }
+
+  test("the whole screen, watching only: nothing to take, read or type under it, and its state goes to the card", async () => {
+    const t = await card();
+    const socket = t.sockets.desktops.at(-1) as DesktopSocket;
+    expect(socket.url).toContain("preview=1&mode=watch");
+    expect(socket.url).not.toContain("switch=1");
+    expect(t.states.at(-1)).toBe("connecting");
+    await connected();
+    expect(t.states.at(-1)).toBe("live");
+    expect(rfb().viewOnly).toBe(true);
+    const root = document.querySelector(".dsk") as HTMLElement;
+    expect(root.classList.contains("dsk--card")).toBe(true);
+    // The card's own stage holds it: none of the dialog's.
+    expect(root.querySelector(".brw-ac__stage")).toBeNull();
+    expect(root.querySelector(".dsk-stage > .dsk-screen")).not.toBeNull();
+    expect(root.querySelector("button")).toBeNull();
+    expect(root.querySelector(".dsk-keys")).toBeNull();
+    expect(root.querySelector(".dsk-line")).toBeNull();
+    // A click or a key on it asks nothing.
+    const stage = root.querySelector(".dsk-stage") as HTMLElement;
+    await act(async () => void fireEvent.pointerDown(stage));
+    await act(async () => void fireEvent.keyDown(stage, { key: "a" }));
+    await settle(2);
+    expect(root.querySelector(".dsk-ask")).toBeNull();
+    expect(rfb().log).toEqual([]);
+  });
+
+  test("a close it can't wait out ends it at once: the card shows the frames, no socket opens again", async () => {
+    const t = await card();
+    await connected();
+    const count = t.sockets.desktops.length;
+    await act(async () => (t.sockets.desktops.at(-1) as DesktopSocket).serverClose(4429, "preview_yield"));
+    await settle(4);
+    expect(t.states.at(-1)).toBe("busy");
+    await act(() => new Promise((r) => setTimeout(r, 1_200)));
+    expect(t.sockets.desktops).toHaveLength(count);
+  });
 });

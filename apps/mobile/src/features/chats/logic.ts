@@ -11,6 +11,7 @@ import type {
 } from "@agenteschat/client";
 import { hiddenAgentIds, hiddenDm } from "@agenteschat/client/lib/audience";
 import type { FirstStepId } from "@agenteschat/client/lib/home";
+import { dmActivityAt } from "@agenteschat/client/lib/recent";
 import { looksUnread, unreadTotal } from "@agenteschat/client/lib/unread";
 import type { IconName } from "@/ui";
 import { previewOf } from "../shared/logic";
@@ -169,7 +170,7 @@ export function buildConversations(input: {
             ...(d.lastMessage.mediaKind ? { mediaKind: d.lastMessage.mediaKind } : {}),
           }
         : null,
-      at: d.lastMessage?.createdAt ?? null,
+      at: dmActivityAt(d),
       unread: Math.max(0, d.unread),
       working: d.with.type === "agent" && Boolean(input.workingChannels?.has(d.channelId)),
     });
@@ -541,7 +542,7 @@ export function waitingTotal(input: {
 // ── A new workspace's first steps (ADR 0108) ────────────────────────────────
 
 /** The screen each of Conversas' first steps opens, and its tile. */
-export const FIRST_STEP_SCREENS: Record<FirstStepId, { icon: IconName; href: string }> = {
+export const FIRST_STEP_SCREENS: Record<Exclude<FirstStepId, "plan">, { icon: IconName; href: string }> = {
   agent: { icon: "agent", href: "/new-agent" },
   ai: { icon: "brain", href: "/connect-ai" },
   ask: { icon: "chat", href: "/new-chat" },

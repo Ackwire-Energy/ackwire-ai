@@ -426,6 +426,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           ...(permissions ? { permissions } : {}),
           ...accountFields(status?.protocol, turn),
           ...contextFields(status?.protocol, turn),
+          ...(turn.personWaiting ? { personWaiting: true } : {}),
         };
         deps.hub
           .call<"brain.turn">(

@@ -4,6 +4,7 @@ import {
   type QueryClient,
   queryOptions,
   useInfiniteQuery,
+  useIsMutating,
   useMutation,
   useQueries,
   useQuery,
@@ -20,7 +21,7 @@ import { forPeople } from "../lib/consultations";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
-import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
+import { GIF_PAGE, isMediaAfterReply, messageMediaOf, postedMedia } from "../lib/media";
 import {
   allItems,
   matchesFilter,
@@ -36,16 +37,23 @@ import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import {
+  knownToolOrder,
+  SIDEBAR_DEFAULTS,
+  SIDEBAR_ITEMS,
+  SIDEBAR_SECTIONS,
+  withSidebarPlace,
+} from "../lib/sidebar-items";
 import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import { voiceOf } from "../lib/voice";
+import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
-import { setOrgDeletion } from "../realtime/machines";
+import { readUnknownMembers, setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi, useCardVia } from "./context";
 import { ApiError } from "./http";
@@ -83,6 +91,7 @@ import type {
   CalendarEventPatch,
   CardDelegate,
   Channel,
+  ChannelEvent,
   ChannelInput,
   ChannelOverride,
   ComputerSetup,
@@ -175,6 +184,12 @@ import type {
 
 // ── Shared query options (also used by route guards) ─────────────────────────
 
+/**
+ * The lists of who and where. Back to a tab, what went stale is read at once: the socket may have stayed up while
+ * events never reached it (a sleeping tab), so no reconnect would catch it up.
+ */
+const BACK_TO_TAB = { refetchOnWindowFocus: true } as const;
+
 export const meQuery = (api: ApiClient) =>
   // Kept for good: the device snapshot (`snapshot.ts`) is dropped when `me` leaves the cache.
   queryOptions({
@@ -188,7 +203,12 @@ export const authConfigQuery = (api: ApiClient) =>
 export const instanceQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.instance, queryFn: () => api.system.instance(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
-  queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
+  queryOptions({
+    queryKey: keys.channels(orgId),
+    queryFn: () => api.chat.channels(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 /**
  * An invitation's preview (its page, and the sign-in that leads to it). One that got no answer is asked twice more:
  * the server may be restarting, and it's no expired link.
@@ -332,6 +352,16 @@ export const CLOSING_POLL_MS = 30_000;
 export const useClosingMe = () =>
   useQuery({ ...meQuery(useApi()), refetchInterval: CLOSING_POLL_MS, refetchOnWindowFocus: "always" });
 
+/** Brings my account back; `GET /me` then opens its workspaces again. */
+export function useRestoreAccount() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.account.restore(),
+    onSuccess: () => qc.refetchQueries({ queryKey: keys.me }),
+  });
+}
+
 /** What deleting my account would do (`GET /account/deletion`): asked anew each time. */
 export const useAccountDeletionPlan = (enabled = true) => {
   const api = useApi();
@@ -401,7 +431,12 @@ export const useOrganization = (orgId: string) => {
 
 export const useMembers = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.members(orgId), queryFn: () => api.orgs.members(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.members(orgId),
+    queryFn: () => api.orgs.members(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 export function useChangeRole(orgId: string) {
@@ -589,7 +624,12 @@ export function useRevokeInvitation(orgId: string) {
 
 export const useAgents = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.agents(orgId),
+    queryFn: () => api.agents.list(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 /** Agents no longer in the team: the directories name their old messages with these (fresh with `useAgents`). */
@@ -728,8 +768,8 @@ export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
-      api.agents.applyTeamTemplate(orgId, templateId, locale),
+    mutationFn: ({ templateId, locale, tap }: { templateId: string; locale?: string; tap?: string }) =>
+      api.agents.applyTeamTemplate(orgId, templateId, locale, tap),
     onSuccess: ({ channelId }) => void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) }),
   });
 }
@@ -827,10 +867,12 @@ export function useWidenAudience(orgId: string, agentId: string) {
   return { widen, busy: save.isPending, done: save.isSuccess && save.data !== null };
 }
 
-export function useAddCredential(orgId: string) {
+/** `silent`: the caller shows a failure itself (a refused key, in its dialog with the way to fix it). */
+export function useAddCredential(orgId: string, silent = false) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
     onSuccess: () => {
       // An OpenRouter key brings its models into the pickers.
@@ -1006,8 +1048,13 @@ export function usePlaceChannel(orgId: string) {
 export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.channelMembers(orgId, channelId),
-    queryFn: () => api.chat.members(orgId, channelId),
+    queryFn: async ({ client }) => {
+      const members = await api.chat.members(orgId, channelId);
+      readUnknownMembers(client, orgId, members);
+      return members;
+    },
     staleTime: 30_000,
+    ...BACK_TO_TAB,
   });
 
 export const useChannelMembers = (orgId: string, channelId: string, enabled = true) => {
@@ -1140,9 +1187,8 @@ export function useAddChannelMember(orgId: string) {
 }
 
 /**
- * Puts a message in the right cache: the channel list, or its thread (a thread's list starts with its root
- * when a channel list here has it). Replaces the optimistic copy (same `clientId`), which always waits in the
- * channel list (a thread may not be loaded yet): a reply's copy is removed
+ * Puts a message in the right cache: the channel list, or its thread. Replaces the optimistic copy (same
+ * `clientId`), which always waits in the channel list (a thread may not be loaded yet): a reply's copy is removed
  * from there too, or it would stay "sending…" next to the real one.
  */
 export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
@@ -1151,12 +1197,37 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   const withoutLocal = (list: Message[] | undefined) =>
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
-  // A thread's first list holds its root, as the server lists it: a panel opened on it shows the root.
-  const started = !message.threadId || qc.getQueryData(key) !== undefined;
+  // A thread no one read yet stays unread: a list started by one reply would pass for the whole thread, and open
+  // without the replies before it. A read on its way may have missed this one, which it keeps (`withLocalCopies`).
+  const query = qc.getQueryCache().find({ queryKey: key, exact: true });
+  if (message.threadId && query?.state.data === undefined && query?.state.fetchStatus !== "fetching") {
+    // Open on a read that failed: this one mustn't be lost with the rest of the thread.
+    void qc.refetchQueries({ queryKey: key, exact: true, type: "active" });
+    return;
+  }
+  // While that read is on its way, the root stands in as `useThreadMessages` shows it.
   const root = message.threadId ? cachedTopLevel(qc, orgId, message.threadId, message.channelId) : undefined;
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
-  // Its root in no list here (an older thread): the reply alone must not pass for the whole thread.
-  if (!started && !root) void qc.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
+}
+
+/**
+ * The thread whose count a `message.created` moves. One too big for its event still says it; an agent's sticker or
+ * GIF after its reply (ADR 0091) moves none.
+ */
+export function repliedThread(event: Extract<ChannelEvent, { type: "message.created" }>) {
+  const threadId = event.message ? event.message.threadId : event.threadId;
+  return threadId && !isMediaAfterReply(event.message?.meta) ? threadId : null;
+}
+
+/** A reply landed: the lists behind the thread lines, and that thread's header (count, last reply, who is in it). */
+export function refreshRepliedThread(qc: ReturnType<typeof useQueryClient>, orgId: string, threadId: string) {
+  void qc.invalidateQueries({
+    queryKey: keys.threads(orgId),
+    predicate: (q) => q.queryKey[3] !== "one" || q.queryKey[4] === threadId,
+  });
+  // A task's conversation: its count and last line on the task's dialog.
+  if (qc.getQueryData<ThreadInfo>(keys.threadInfo(orgId, threadId))?.channelKind === "task")
+    void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
 }
 
 /**
@@ -1219,7 +1290,10 @@ export async function catchUpChannel(
       .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
       .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
   );
-  for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  const added = read.filter((m) => !known.has(m.id));
+  for (const m of added) cacheMessage(qc, orgId, m);
+  // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
+  for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
   return read;
 }
 
@@ -1689,12 +1763,27 @@ function keepOwnRights(previous: Approval | undefined, approval: Approval): Appr
   return approval;
 }
 
+const decidingKey = (orgId: string) => ["approval-decision", orgId];
+
+/** Whether any of these requests is being decided: each of a card's buttons runs its own mutation. */
+export function useApprovalsDeciding(orgId: string, ids: readonly string[]) {
+  const deciding = useIsMutating({
+    mutationKey: decidingKey(orgId),
+    predicate: (mutation) => {
+      const input = mutation.state.variables as { id?: string; ids?: string[] } | undefined;
+      return (input?.ids ?? [input?.id]).some((id) => id !== undefined && ids.includes(id));
+    },
+  });
+  return deciding > 0;
+}
+
 /** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const via = useCardVia();
   return useMutation({
+    mutationKey: decidingKey(orgId),
     mutationFn: ({
       id,
       decision,
@@ -1738,6 +1827,7 @@ export function useDecideApprovals(orgId: string) {
   const qc = useQueryClient();
   const via = useCardVia();
   return useMutation({
+    mutationKey: decidingKey(orgId),
     mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
       api.approvals.decideMany(orgId, via ? { ...input, via } : input),
     onSuccess: (result, { decision }) => {
@@ -1949,6 +2039,18 @@ export const useGitHubRepos = (orgId: string, enabled = true) => {
     queryFn: () => api.githubApp.repositories(orgId),
     enabled,
     staleTime: 60_000,
+    retry: false,
+  });
+};
+
+/** The organizations GitHub lets us reach. Read again on every return to the tab: they're granted on GitHub's own page. */
+export const useGithubAccess = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.githubAccess(orgId),
+    queryFn: () => api.githubApp.access(orgId),
+    enabled,
+    refetchOnWindowFocus: "always",
     retry: false,
   });
 };
@@ -2661,10 +2763,11 @@ export const useAiStatus = (
   });
 };
 
-export function useRotateCredential(orgId: string) {
+export function useRotateCredential(orgId: string, silent = false) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: ({ id, apiKey }: { id: string; apiKey: string }) => api.agents.rotateCredential(orgId, id, { apiKey }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
   });
@@ -2674,8 +2777,14 @@ export function useRemoveCredential(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, purge }: { id: string; purge?: boolean }) => api.agents.removeCredential(orgId, id, purge),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+    mutationFn: ({ id, purge, release }: { id: string; purge?: boolean; release?: boolean }) =>
+      api.agents.removeCredential(orgId, id, purge, release),
+    // `aiStatus` lives under `credentials`; the agents that used it have no key of their own now.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
+      return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+    },
   });
 }
 
@@ -2746,9 +2855,14 @@ export const useRoster = (orgId: string, channelId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.roster(orgId, channelId),
-    queryFn: () => api.chat.roster(orgId, channelId),
+    queryFn: async ({ client }) => {
+      const roster = await api.chat.roster(orgId, channelId);
+      readUnknownMembers(client, orgId, roster);
+      return roster;
+    },
     enabled,
     staleTime: 30_000,
+    ...BACK_TO_TAB,
   });
 };
 
@@ -2827,7 +2941,12 @@ export function useDeleteChannel(orgId: string) {
 
 export const useDms = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.dms(orgId), queryFn: () => api.dms.list(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.dms(orgId),
+    queryFn: () => api.dms.list(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 /** "Visto" in a DM between people: where the others stopped reading (live: `channel.read`). */
@@ -3238,6 +3357,12 @@ function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
     void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
 }
 
+/** The proposals and the sidebar's count of them: after a decision here, or a `proposal.*` event from elsewhere. */
+export function refreshProposals(qc: QueryClient, orgId: string) {
+  void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+  return qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3249,7 +3374,7 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 
@@ -3287,7 +3412,7 @@ export function useDecideProposals(orgId: string) {
     },
     meta: { silent: true },
     onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 
@@ -3619,9 +3744,10 @@ export const useIssues = (orgId: string, q = "") => {
   });
 };
 
-export const useIssue = (orgId: string, number: number) => {
+export const useIssue = (orgId: string, number: number, enabled = true) => {
   const api = useApi();
   return useQuery({
+    enabled,
     queryKey: keys.issue(orgId, number),
     queryFn: () => api.issues.get(orgId, number),
     refetchInterval: (query) => (query.state.data?.work && query.state.data.work.state !== "stalled" ? 10_000 : false),
@@ -3686,7 +3812,10 @@ export function useIssueLive(
   const channelId = issue?.channelId ?? null;
   useEffect(() => {
     if (!connection || !issueId) return;
-    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const take = (event: { type: string }) => {
+      applyIssueEvent(qc, orgId, event);
+      applyIssueActivityEvent(qc, orgId, issueId, event);
+    };
     const offOrg = connection.onUserEvent(take);
     const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
     const offReconnect = connection.onReconnect(() => {
@@ -3708,21 +3837,27 @@ export function useIssueAction(orgId: string) {
       action:
         | { type: "create"; input: IssueInput }
         | { type: "update"; id: string; patch: IssuePatch }
+        | { type: "delete"; id: string }
         | { type: "criterion"; id: string; criterionId: string; done: boolean }
         | { type: "comment"; id: string; text: string; attachmentIds?: string[] }
-        | { type: "ask"; id: string; agentId: string },
+        | { type: "ask"; id: string; agentId: string }
+        | { type: "audience"; id: string; audience: AudienceChoice },
     ): Promise<unknown> => {
       switch (action.type) {
         case "create":
           return api.issues.create(orgId, action.input);
         case "update":
           return api.issues.update(orgId, action.id, action.patch);
+        case "delete":
+          return api.issues.delete(orgId, action.id);
         case "criterion":
           return api.issues.setCriterion(orgId, action.id, action.criterionId, action.done);
         case "comment":
           return api.issues.comment(orgId, action.id, action.text, action.attachmentIds);
         case "ask":
           return api.issues.askAgent(orgId, action.id, action.agentId);
+        case "audience":
+          return api.issues.setAudience(orgId, action.id, action.audience);
       }
     },
     onSettled: () => {
@@ -4493,6 +4628,7 @@ export function useWikiAction(orgId: string) {
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
         | { type: "audience"; slug: string; access: WikiAccess }
+        | { type: "who"; slug: string; audience: WikiAccess["audience"] }
         | {
             type: "append";
             slug: string;
@@ -4515,6 +4651,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.pin(orgId, action.slug, action.pinned);
         case "audience":
           return api.wiki.audience(orgId, action.slug, action.access);
+        case "who":
+          return api.wiki.audience(orgId, action.slug, { audience: action.audience });
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
@@ -4673,6 +4811,9 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
     },
     enabled: Boolean(channelId),
     staleTime: 30_000,
+    // Every opening reads it: a reply heard live keeps the list looking fresh while it may lack what was said when
+    // this channel wasn't listened to.
+    refetchOnMount: "always",
   });
 }
 
@@ -4689,7 +4830,12 @@ export async function loadThreadRange(api: ApiClient, orgId: string, thread: Thr
   const ctx = thread.context;
   if (!ctx) return [];
   if (ctx.moved) {
-    const all = await api.chat.messages(orgId, thread.channelId, { threadId: thread.id, limit: 200 });
+    // Only those before the root: a thread's read holds its latest replies, and these are its oldest.
+    const all = await api.chat.messages(orgId, thread.channelId, {
+      threadId: thread.id,
+      before: thread.createdAt,
+      limit: 200,
+    });
     return all.filter((m) => m.id !== thread.id && m.createdAt < thread.createdAt);
   }
   let list = await api.chat.messages(orgId, ctx.channelId, { limit: 200 });
@@ -4999,7 +5145,7 @@ export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
     queryFn: () => api.orgs.sidebarToolOrder(orgId),
     staleTime: 60_000,
   }).data;
-  return saved ? [...new Set([...saved, ...SIDEBAR_ITEMS])] : [...SIDEBAR_ITEMS];
+  return knownToolOrder(saved ?? []);
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
@@ -5335,6 +5481,17 @@ function readOncePerBurst(key: string, read: () => void) {
   );
 }
 
+/** A task changed, a reply in its conversation too (ADR 0145): the boards on screen read again, once per burst. */
+export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
+  if (
+    event.type === "issue.created" ||
+    event.type === "issue.updated" ||
+    event.type === "issue.deleted" ||
+    event.type === "issue.audience"
+  )
+    readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
+}
+
 /**
  * My own topic's unread marks, on the web and the phone: a message in a conversation I'm in has its list read again
  * (the DMs or the channels; a thread's reply, which the server sends only to its followers, the threads too), once
@@ -5471,14 +5628,16 @@ export function useTaskSteps(orgId: string, runId: string | null, pollMs: number
 /**
  * "Parar" from the task manager or the chat's strip (ADR 0128): stops each task (with the reason the agent reads)
  * and refreshes the lists. Stopping several (an agent's "Parar todas") stops them one by one; one refused doesn't
- * keep the others running.
+ * keep the others running. `chain`: what each asked of other agents stops with it.
  */
 export function useStopTasks(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { runIds: string[]; reason?: string }) => {
-      const results = await Promise.allSettled(input.runIds.map((id) => api.agents.cancelRun(orgId, id, input.reason)));
+    mutationFn: async (input: { runIds: string[]; reason?: string; chain?: boolean }) => {
+      const results = await Promise.allSettled(
+        input.runIds.map((id) => api.agents.cancelRun(orgId, id, input.reason, input.chain)),
+      );
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === results.length && failed > 0) throw (results[0] as PromiseRejectedResult).reason;
       return { stopped: results.length - failed, failed };

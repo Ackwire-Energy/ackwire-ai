@@ -257,22 +257,31 @@ scenario("S12", "a handover by mention wakes the agent, and it can act on it", a
   await assertInvariants(w);
 });
 
-scenario("S37", "a mention of an agent outside a DM is not lost: it goes as a note, at no extra turn", async () => {
-  const w = await world({
-    agents: ["ada", "nina"],
-    dmWith: "ada",
-    judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
-    script: {
-      ada: [{ text: "@nina revisa o PR #227" }, { text: "A Nina aprovou o #227." }],
-      nina: [{ text: "Aprovado." }],
-    },
-  });
-  await w.say("pede para a nina revisar o #227");
-  await w.settle();
-  expect(await w.runs("nina")).toHaveLength(1);
-  expect((await w.posts("ada")).at(-1)?.body).toContain("aprovou");
-  await assertInvariants(w);
-});
+scenario(
+  "S37",
+  "a hand-off by @ to an agent outside a DM reaches nobody, and the author is told to use tell_agent",
+  async () => {
+    const w = await world({
+      agents: ["ada", "nina"],
+      dmWith: "ada",
+      judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
+      script: {
+        ada: [
+          { text: "@nina revisa o PR #227" },
+          { calls: [{ name: "tell_agent", input: { agent: "@nina", message: "Revisa o PR #227." } }] },
+          { text: "Pedi para a Nina revisar o #227." },
+          { text: "A Nina aprovou o #227." },
+        ],
+        nina: [{ text: "Aprovado." }],
+      },
+    });
+    await w.say("pede para a nina revisar o #227");
+    await w.settle();
+    expect((await w.calls("ada")).map((c) => c.name)).toEqual(["tell_agent"]);
+    expect(await w.runs("nina")).toHaveLength(1);
+    await assertInvariants(w);
+  },
+);
 
 scenario("S48", "an agent outside the conversation only named in an answer costs no extra turn", async () => {
   const w = await world({
@@ -298,22 +307,18 @@ scenario("S48", "an agent outside the conversation only named in an answer costs
   await assertInvariants(w);
 });
 
-scenario("S52", "in a public channel a mention the reach hands over as a note costs no extra turn", async () => {
+scenario("S52", "a passing @ of an agent outside a public channel wakes nobody and costs no extra turn", async () => {
   const w = await world({
     agents: ["ada", "nina"],
-    judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
-    script: {
-      ada: [{ text: "@nina revisa o PR #227" }, { text: "A Nina aprovou o #227." }],
-      nina: [{ text: "Aprovado." }],
-    },
+    judge: { followThrough: () => "done", mention: { nina: { handoff: 0.9, needsNothing: 0.1 } } },
+    script: { ada: [{ text: "O arquivo do app vem da @nina." }], nina: [{ text: "Eu de novo." }] },
   });
   await removeChannelMember(w.db, w.owner.id, w.org.id, w.channelId, { agentId: w.agents.nina?.id ?? "" });
-  await w.say("@ada pede para a nina revisar o #227");
+  await w.say("@ada de onde vem o arquivo do app?");
   await w.settle();
-  expect(await w.calls("ada")).toEqual([]);
-  expect(await w.runs("nina")).toHaveLength(1);
+  expect(await w.runs("nina")).toHaveLength(0);
   const here = (await w.posts("ada")).filter((m) => m.channelId === w.channelId);
-  expect(here.map((m) => m.body)).toEqual(["@nina revisa o PR #227", "A Nina aprovou o #227."]);
+  expect(here.map((m) => m.body)).toEqual(["O arquivo do app vem da @nina."]);
   await assertInvariants(w);
 });
 

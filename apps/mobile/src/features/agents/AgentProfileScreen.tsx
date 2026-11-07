@@ -26,6 +26,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planMeterText, usageShown } from "@agenteschat/client/lib/plan-usage";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { planLine } from "@agenteschat/ui/plan-state";
@@ -48,6 +49,7 @@ import {
   Icon,
   IconButton,
   type IconName,
+  Locked,
   PixelOrbit,
   ProviderLogo,
   Segmented,
@@ -60,6 +62,7 @@ import {
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { LetMeTalkButton } from "../chat/ReachLines";
 import { AgentComputerButton, AgentComputerPicture } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
@@ -183,7 +186,10 @@ function Profile({ id }: { id: string }) {
   const mailboxes = useAgentMailboxes(id, details && !rightHand);
   const work = useWorkingNow().filter((w) => w.agentId === id);
   const asking = useWaitingApprovals().filter((a) => a.agentId === id);
-  const noAi = aiStateOf(useAiStatus(orgId).data, id) === "no_ai";
+  // On a billing hold an AI comes after the plan: no row to connect one.
+  const held = usePlanHold(orgId, org) !== null;
+  const aiStatus = useAiStatus(orgId);
+  const noAi = !held && aiStateOf(aiStatus.data, id) === "no_ai";
   const waitingNow = asking[0];
   const [allDid, setAllDid] = useState(false);
   const look = agentLook(agent);
@@ -285,7 +291,7 @@ function Profile({ id }: { id: string }) {
     <GroupedRow
       key={m.id}
       icon="brain"
-      label={m.summary ?? m.text}
+      label={m.summary ?? memoryLine(t, m)}
       labelLines={2}
       sub={originText(m)}
       {...(editable ? { chevron: true, onPress: () => fix(m) } : {})}
@@ -994,7 +1000,9 @@ export function MemoryFix({
   return (
     <>
       <SheetTitle title={t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
-      <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
+      <Locked when={action.isPending}>
+        <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
+      </Locked>
       <View style={styles.src}>
         <Icon name="chat" size={15} color={c.muted} />
         <Text variant="small" tone="muted" numberOfLines={1} style={styles.grow}>

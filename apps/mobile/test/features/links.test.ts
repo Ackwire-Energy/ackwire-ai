@@ -62,6 +62,9 @@ describe("push payloads", () => {
   test("someone asking to join opens the requests (never answered from the push)", () => {
     expect(hrefForPush({ kind: "join_request", orgId: "o1", notificationId: "n1" })).toBe("/join-requests");
   });
+  test("proposals waiting open their screen", () => {
+    expect(hrefForPush({ kind: "proposal_waiting", orgId: "o1", notificationId: "n1" })).toBe("/proposals");
+  });
   test("anything else opens Atividade", () => {
     expect(hrefForPush({ kind: "nope" })).toBe("/activity");
     expect(hrefForPush({ channelId: 5 })).toBe("/activity");

@@ -25,6 +25,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -37,6 +38,7 @@ import { sectionName, useSectionOrder } from "./SidebarOrder";
 /** The tools at the top of the sidebar: the page each opens and its icon. */
 export const SIDEBAR_TOOLS = {
   approvals: { to: "/org/$orgId/approvals", icon: "waiting" },
+  proposals: { to: "/org/$orgId/proposals", icon: "bulb" },
   threads: { to: "/org/$orgId/threads", icon: "thread" },
   issues: { to: "/org/$orgId/issues", icon: "issues" },
   wiki: { to: "/org/$orgId/wiki", icon: "book" },
@@ -44,6 +46,8 @@ export const SIDEBAR_TOOLS = {
   routines: { to: "/org/$orgId/routines", icon: "routines" },
   calendar: { to: "/org/$orgId/calendar", icon: "calendar" },
   team: { to: "/org/$orgId/team", icon: "agent" },
+  dashboards: { to: "/org/$orgId/dashboards", icon: "chart" },
+  taskManager: { to: "/org/$orgId/task-manager", icon: "stageProgress" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
 /**
@@ -79,9 +83,11 @@ const MOVE_KEYS = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
 /**
  * The tools shown in the sidebar's list, in the person's order: each dragged onto another goes before or after it,
  * and Alt+Shift+↑/↓ on a focused one moves it past its neighbour (the setup dialog's arrows do it too). The rows stay
- * the links `row` makes, so the browser's own menu on them is kept.
+ * the links `row` makes, so the browser's own menu on them is kept. Each shows its own grip on hover: the row is what
+ * moves, so a mouse drags from anywhere on it and a click on the grip doesn't open the tool.
  */
 export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: SidebarItem) => ReactElement }) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const { order, put } = useToolOrder(org.id);
   const dragging = useRef<SidebarItem | null>(null);
@@ -91,8 +97,22 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
     dragging.current = null;
     setMark(null);
   };
-  return shown.map((id) =>
-    cloneElement(row(id) as ReactElement<Record<string, unknown>>, {
+  return shown.map((id) => {
+    const link = row(id) as ReactElement<{ children?: ReactNode }>;
+    return cloneElement(link as ReactElement<Record<string, unknown>>, {
+      children: (
+        <>
+          {link.props.children}
+          <span
+            className="sidebar__tool-grip"
+            aria-hidden="true"
+            title={t("shell.sidebarSetup.moveTool", { name: t(`shell.${id}`) })}
+            onClick={(e) => e.preventDefault()}
+          >
+            <Icon name="grip" size={14} />
+          </span>
+        </>
+      ),
       draggable: true,
       "aria-keyshortcuts": MOVE_KEYS,
       "data-drop": mark?.id === id ? mark.where : undefined,
@@ -124,8 +144,8 @@ export function ToolList({ items, row }: { items: SidebarItem[]; row: (id: Sideb
         put(placeTool(order, from, m.id, m.where));
       },
       onDragEnd: end,
-    }),
-  );
+    });
+  });
 }
 
 /**
@@ -158,7 +178,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
       title={t("shell.customizeSidebar")}
       description={t("shell.sidebarSetup.description")}
       closeLabel={t("common.close")}
-      width={520}
+      width={640}
     >
       <DialogBody>
         <ul className="sidebar-setup">
@@ -169,6 +189,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
               </span>
               <span className="sidebar-setup__name">{t(`shell.${id}`)}</span>
               <Segmented
+                block
                 size="sm"
                 label={t(`shell.${id}`)}
                 value={sidebarPlace(items, id)}
@@ -198,7 +219,17 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
             </li>
           ))}
         </ul>
-        <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+        <div className="ac-field__label-row">
+          <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+          <button
+            type="button"
+            className="ac-link ac-link--muted small"
+            disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
+            onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+          >
+            {t("contextMenu.restoreOrder")}
+          </button>
+        </div>
         <p className="small muted sidebar-setup__hint">{t("shell.sidebarSetup.orderHint")}</p>
         <ol className="sidebar-setup sidebar-setup--order">
           {sections.order.map((id, i) => (
@@ -229,15 +260,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
           ))}
         </ol>
       </DialogBody>
-      <DialogFooter note={t("shell.sidebarSetup.instant")}>
-        <Button
-          variant="ghost"
-          icon="undo"
-          disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
-          onClick={() => sections.put([...SIDEBAR_SECTIONS])}
-        >
-          {t("contextMenu.restoreOrder")}
-        </Button>
+      <DialogFooter>
         <Button
           variant="ghost"
           icon="undo"

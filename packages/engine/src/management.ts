@@ -14,9 +14,10 @@ import {
   placesAgentsIn,
   readableChannelIds,
 } from "./channels";
+import { proposalsWaitingFor } from "./context/proposals";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishChannelEvent, publishChannelsChanged } from "./events";
 import { agentBudgetState } from "./gateway";
 import {
   AGENT_MEDIA_LEVELS,
@@ -263,7 +264,7 @@ function mergeAutoModels(
   return out;
 }
 
-/** Counts for the sidebar: people, agents, the workspace's budget use, approvals waiting for me. */
+/** Counts for the sidebar: people, agents, the workspace's budget use, approvals and proposals waiting for me. */
 export async function orgOverview(db: Database, actorId: string, orgId: string, now = new Date()) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const [people] = await db
@@ -287,6 +288,7 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     /** This month's spend of the workspace's agents over the sum of their budgets (no money). */
     budgetUsedPercent: await workspaceBudgetPercent(db, orgId, now),
     approvalsWaitingForMe: pending?.n ?? 0,
+    proposalsWaitingForMe: await proposalsWaitingFor(db, actorId, orgId),
   };
 }
 
@@ -483,6 +485,7 @@ export async function setAgentChannels(
       channelId: c.id,
       member: member(c.autoReply),
     });
+  if (adding.length + removing.length + retuned.length > 0) await publishChannelsChanged(options.pubsub, orgId);
   return listAgentChannels(db, actorId, orgId, agentId);
 }
 
@@ -556,6 +559,7 @@ export async function updateChannel(
     // What agents may search depends on visibility (agentSearchChannels).
     if (input.visibility !== undefined) caches.scopes.deletePrefix(`${orgId}:`);
     await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, leavers);
+    await publishChannelsChanged(options.pubsub, orgId);
     return row;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);
@@ -578,7 +582,7 @@ export async function channelMembersDetail(db: Database, orgId: string, channelI
     .from(channelMembers)
     .leftJoin(users, eq(users.id, channelMembers.userId))
     .leftJoin(agents, eq(agents.id, channelMembers.agentId))
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId)))
+    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), isNull(agents.archivedAt)))
     .orderBy(asc(channelMembers.createdAt));
 }
 

@@ -7,6 +7,7 @@ import { isComputerBrain } from "./brains/types";
 import { addChannelMember, removeChannelMember, setChannelAgentAutoReply } from "./channels";
 import { sha256 } from "./crypto";
 import { NotFoundError } from "./errors";
+import { publishAgentsChanged } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { can, getMembership } from "./organizations";
 import { maySql } from "./permissions";
@@ -110,11 +111,20 @@ async function setValue(
     case "model":
       return void (await updateAgent(db, actorId, orgId, agentId, { model: String(value) }, { pubsub }));
     case "budget":
-      return void (await updateAgent(db, actorId, orgId, agentId, { monthlyBudgetNanoUsd: value as number | null }));
+      return void (await updateAgent(
+        db,
+        actorId,
+        orgId,
+        agentId,
+        { monthlyBudgetNanoUsd: value as number | null },
+        { pubsub },
+      ));
     case "owner":
       return void (await updateAgent(db, actorId, orgId, agentId, { ownerUserId: value as string | null }, { pubsub }));
     case "archive":
-      return value ? archiveAgent(db, actorId, orgId, agentId) : unarchiveAgent(db, actorId, orgId, agentId);
+      return value
+        ? archiveAgent(db, actorId, orgId, agentId, pubsub)
+        : unarchiveAgent(db, actorId, orgId, agentId, { pubsub });
     // Deleting stops its work and closes its missions outside the decision's transaction (`decideProposal`).
     case "delete":
       return;
@@ -389,4 +399,6 @@ export async function revertSettings(
   for (const l of steps)
     if (!same(await valueNow(deps.db, agent, l), direction === "undo" ? l.to : l.from)) throw changedSince();
   for (const l of steps) await setValue(deps, userId, a.orgId, agent.id, l, direction === "undo" ? l.from : l.to);
+  // Who it answers and its AI have no event of their own.
+  await publishAgentsChanged(deps.pubsub, a.orgId);
 }

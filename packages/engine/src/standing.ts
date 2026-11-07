@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { en } from "@agenteschat/i18n/en";
+import { enqueueAccountContact } from "./account-contacts";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
@@ -246,6 +247,12 @@ export async function orgStanding(db: Executor, orgId: string): Promise<Workspac
   })) as WorkspaceStanding;
 }
 
+/** The billing hold work is refused for here, or null: a workspace being deleted is closed for that, not for its plan. */
+export async function billingHold(db: Executor, orgId: string): Promise<BillingHold | null> {
+  const standing = await orgStanding(db, orgId);
+  return !standing.deletionDueAt && isBillingHold(standing) ? (standing.reason as BillingHold) : null;
+}
+
 /** This agent's hold (its stored reason), or null while it isn't held: cached 5 s per process like the standing. */
 async function agentHold(db: Executor, orgId: string, agentId: string): Promise<{ reason: string | null } | null> {
   return (await caches.standing.getOrLoad(`${orgId}:${agentId}`, async () => {
@@ -485,6 +492,27 @@ export async function isUserBlocked(db: Executor, userId: string) {
 }
 
 /**
+ * An account in use: not blocked, and not waiting for its deletion (ADR 0088 §10). Anything else counts as nobody:
+ * no membership, no mention, no DM, no email or push.
+ */
+export const accountInUse = sql<boolean>`(${users.blockedAt} is null and ${users.deletionDueAt} is null)`;
+
+/** Whether this account can't join or make anything: blocked, or waiting for its deletion. */
+export async function accountClosed(db: Executor, userId: string) {
+  const [row] = await db.select({ open: accountInUse }).from(users).where(eq(users.id, userId));
+  return row?.open !== true;
+}
+
+/** Whether this account waits for its deletion (ADR 0088 §10). */
+export async function deletionPending(db: Executor, userId: string) {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), isNotNull(users.deletionDueAt)));
+  return !!row;
+}
+
+/**
  * Blocks an account, or lets it back (the operator API). Blocked, it can't sign in (`auth.ts`), its sessions
  * and phones are gone, and every membership check reads it as no member (`getMembership`): that bites on
  * its next request, even while a browser's cookie cache still holds the session for minutes. Its open
@@ -506,6 +534,7 @@ export async function setUserBlocked(
       .where(eq(users.id, userId))
       .returning({ blockedAt: users.blockedAt, reason: users.blockedReason });
     if (!row) return null;
+    await enqueueAccountContact(tx, userId);
     if (!change.blocked) return { ...row, sessionsRevoked: 0, orgIds: [] };
     const revoked = await tx.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
     await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));

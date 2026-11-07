@@ -4,7 +4,11 @@
 // `signed-in` in that folder is the sign-in.
 // $FAKE_ACCOUNT_MODE: "silent" prints nothing and waits; "fail" refuses.
 // $FAKE_ACCOUNT_CODE: the Claude code it accepts (default "good-code").
-// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder, `terminal` when it runs in one).
+// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder, `terminal` when it runs in one, `authGroup` when
+// $FAKE_AUTH_GROUP is set: the test's stand-in for the auth egress prefix; `asUser` when $FAKE_ACCOUNT_USER is set: its
+// stand-in for running as the sign-in's own user).
+// $FAKE_ACCOUNT_STATUS: "garbage" makes `auth status` answer no JSON; "org" adds the Claude organization.
+// $FAKE_ACCOUNT_STATUS_DELAY: `auth status` answers after that many ms (and logs `done` then).
 // `auth login --email <address>` signs in like `auth login` (the address is only the account
 // to offer). With $ANTHROPIC_API_KEY set, `auth status` says it is signed in with that key, as
 // Claude Code does whatever the folder holds. `setup-token` draws Claude Code 2.1.314's screen
@@ -23,7 +27,11 @@ const home = (claude ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;
-if (log) appendFileSync(log, `${JSON.stringify({ args, home, ...(process.stdin.isTTY ? { terminal: true } : {}) })}\n`);
+if (log)
+  appendFileSync(
+    log,
+    `${JSON.stringify({ args, home, ...(process.stdin.isTTY ? { terminal: true } : {}), ...(process.env.FAKE_AUTH_GROUP ? { authGroup: true } : {}), ...(process.env.FAKE_ACCOUNT_USER ? { asUser: true } : {}) })}\n`,
+  );
 
 const ESC = "\x1b";
 const CLAUDE_URL =
@@ -173,15 +181,29 @@ switch (args.replace(/^auth login --email \S+$/, "auth login")) {
     );
     break;
   }
-  case "auth status --json":
-    if (process.env.ANTHROPIC_API_KEY) end(0, `${JSON.stringify({ loggedIn: true, authMethod: "api_key" })}\n`);
-    else if (existsSync(marker)) {
-      end(
-        0,
-        `${JSON.stringify({ loggedIn: true, authMethod: "claude.ai", email: "dev@acme.test", subscriptionType: "max" })}\n`,
-      );
-    } else end(1, `${JSON.stringify({ loggedIn: false, authMethod: "none" })}\n`);
+  case "auth status --json": {
+    const status = process.env.FAKE_ACCOUNT_STATUS ?? "";
+    const org = status === "org" ? { orgId: "0193aaaa-0000-7000-8000-00000000000a", orgName: "Ada\u0007 Labs" } : {};
+    const answer = () => {
+      if (status === "garbage") end(0, "Something went wrong\n");
+      else if (process.env.ANTHROPIC_API_KEY) end(0, `${JSON.stringify({ loggedIn: true, authMethod: "api_key" })}\n`);
+      else if (existsSync(marker)) {
+        end(
+          0,
+          `${JSON.stringify({ loggedIn: true, authMethod: "claude.ai", email: "dev@acme.test", subscriptionType: "max", ...org })}\n`,
+        );
+      } else end(1, `${JSON.stringify({ loggedIn: false, authMethod: "none" })}\n`);
+    };
+    const delay = Number(process.env.FAKE_ACCOUNT_STATUS_DELAY ?? 0);
+    if (!delay) answer();
+    else {
+      setTimeout(() => {
+        if (log) appendFileSync(log, `${JSON.stringify({ args, home, done: true })}\n`);
+        answer();
+      }, delay);
+    }
     break;
+  }
   case "login status":
     if (existsSync(marker)) end(0, "Logged in using ChatGPT\n", process.stderr);
     else end(1, "Not logged in\n", process.stderr);

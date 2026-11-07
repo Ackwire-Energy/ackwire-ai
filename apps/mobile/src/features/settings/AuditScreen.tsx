@@ -33,6 +33,8 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import {
+  Button,
+  EmptyState,
   Filters,
   GroupedFooter,
   GroupedHeader,
@@ -46,6 +48,7 @@ import {
 import { Note } from "../ai/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
+import { useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { copyText, Tile } from "../shared/parts";
 import { chooseAction, Gap, SettingsPage } from "./parts";
@@ -76,6 +79,7 @@ export function AuditScreen({ agentId: first = null }: { agentId?: string | null
   const dir = useDirectory();
   const { orgId, org } = useOrg();
   const admin = can(org, "view_audit");
+  const look = useEmptyLook();
   const [show, setShow] = useState<AuditShow>("all");
   const [agentId, setAgentId] = useState<string | null>(first);
   const audit = useAudit(orgId, auditQueryOf(show, agentId), admin);
@@ -128,7 +132,31 @@ export function AuditScreen({ agentId: first = null }: { agentId?: string | null
             </View>
           ) : null}
           {audit.isSuccess && rows.length === 0 ? (
-            <GroupedFooter>{show === "all" && !agentId ? t("audit.empty") : t("audit.emptyFiltered")}</GroupedFooter>
+            show === "all" && !agentId ? (
+              <EmptyState
+                size="panel"
+                agent={look}
+                mood="deal"
+                title={t("mobile.empty.audit.title")}
+                subtitle={t("mobile.empty.audit.text")}
+              />
+            ) : (
+              <EmptyState
+                size="inline"
+                title={t("audit.emptyFiltered")}
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("filters.clearAll")}
+                    onPress={() => {
+                      setShow("all");
+                      setAgentId(null);
+                    }}
+                  />
+                }
+              />
+            )
           ) : null}
           {days.map(([day, list]) => (
             <Fragment key={day}>

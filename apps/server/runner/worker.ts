@@ -12,14 +12,17 @@ import {
   type MachineErrorCode,
   parseAccess,
   parsePause,
+  type TurnContext,
 } from "@agenteschat/adapters/machine-protocol";
+import { realFoldersFor } from "./access";
 import { agentAccountHome, grantOf, lentAccounts } from "./accounts";
-import { BrainManager } from "./brain";
+import { BrainManager, turnContext } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
 import type { BrowserPorts } from "./browser-ports";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
+import { type DelegatedBridge, DelegatedTools, delegatedTask, parseBridge, type ToolNotice } from "./delegated-tools";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
 import { RUNNER_VERSION, RunnerError, toMachineError } from "./errors";
 import type { CacheFill, CloneSlots } from "./git";
@@ -42,7 +45,7 @@ import {
   type WorkerLinkFrame,
   type WorkerState,
 } from "./supervisor";
-import { TaskManager } from "./tasks";
+import { type HostedExit, TaskManager } from "./tasks";
 
 /**
  * System mode: one agent's runner (`agentes-runner worker --agent <id>`),
@@ -114,6 +117,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
     : null;
 }
 
+type PullFrame = Extract<WorkerLinkFrame, { type: "pull.head" | "pull.chunk" | "pull.end" }>;
+
 /**
  * The worker's end of the link. Each dial is one session on the same pipes;
  * `worker.close` ends it (the supervisor's own session with the server
@@ -122,6 +127,7 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
 export class WorkerLink {
   private session: SocketHandlers | null = null;
   private readonly uploads = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "upload.reply" }>) => void>();
+  private readonly pulls = new Map<string, (frame: PullFrame) => void>();
   private readonly desktops = new Map<string, (reply: Extract<WorkerLinkFrame, { type: "desktop.ensured" }>) => void>();
   private nextEnsure = 0;
   private readonly enters = new Map<string, () => void>();
@@ -131,6 +137,8 @@ export class WorkerLink {
   private nextGit = 0;
   onState: (state: WorkerState) => void = () => {};
   onDesktopTaken: () => void = () => {};
+  /** Root: the agent's live view has room for its browser's next frame, or (`view` false) it has none. */
+  onBrowserRoom: (agentId: string, view: boolean) => void = () => {};
   onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
@@ -139,6 +147,15 @@ export class WorkerLink {
    * else whether an idle CLI of this agent's closed.
    */
   onReclaim: (ask: { spare?: string; peek: boolean }) => Promise<BrainReclaimed> = async () => ({ closed: false });
+  /** A delegated CLI's bridge, or its end. */
+  onBridge: (bridge: DelegatedBridge) => void = () => {};
+  onTurnPrepare: (ask: { agent: AgentScope; cwd?: string; text: boolean }) => Promise<TurnContext> = async () => {
+    throw new RunnerError("not_allowed", "This worker serves no turn of root's");
+  };
+  onTaskOut: (taskId: string, stream: "stdout" | "stderr", line: string) => void = () => {};
+  onTaskExit: (taskId: string, session: string, exit: HostedExit) => void = () => {};
+  onTurnCancel: (session: string) => void = () => {};
+  onTurnDetach: (session: string) => void = () => {};
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
 
@@ -211,8 +228,16 @@ export class WorkerLink {
       case "desktop.taken":
         this.onDesktopTaken();
         return;
+      case "browser.room":
+        if (typeof f.agentId === "string") this.onBrowserRoom(f.agentId, f.view === true);
+        return;
       case "upload.reply":
         if (typeof f.uploadId === "string") this.uploads.get(f.uploadId)?.(f as never);
+        return;
+      case "pull.head":
+      case "pull.chunk":
+      case "pull.end":
+        if (typeof f.pullId === "string") this.pulls.get(f.pullId)?.(f as never);
         return;
       case "desktop.ensured":
         if (typeof f.ensureId === "string") this.desktops.get(f.ensureId)?.(f as never);
@@ -247,6 +272,45 @@ export class WorkerLink {
             );
         }
         return;
+      case "bridge.token": {
+        const bridge = parseBridge(f);
+        if (bridge) this.onBridge(bridge);
+        return;
+      }
+      case "turn.prepare": {
+        const agent = f.agent as Partial<AgentScope> | undefined;
+        if (typeof f.prepareId !== "string" || typeof agent?.id !== "string" || typeof agent.handle !== "string")
+          return;
+        const prepareId = f.prepareId.slice(0, 64);
+        const ask = {
+          agent: agent as AgentScope,
+          ...(typeof f.cwd === "string" ? { cwd: f.cwd } : {}),
+          text: f.text === true,
+        };
+        void this.onTurnPrepare(ask).then(
+          (context) => this.write(JSON.stringify({ type: "turn.context", prepareId, ...context })),
+          (err: unknown) => this.write(JSON.stringify({ type: "turn.context", prepareId, error: toMachineError(err) })),
+        );
+        return;
+      }
+      case "task.out":
+        if (typeof f.taskId === "string" && typeof f.line === "string") {
+          this.onTaskOut(f.taskId, f.stream === "stderr" ? "stderr" : "stdout", f.line);
+        }
+        return;
+      case "task.exit":
+        if (typeof f.taskId === "string") {
+          const { exitCode, signal, reason, error } = f as unknown as HostedExit;
+          const session = typeof f.session === "string" ? f.session : "";
+          this.onTaskExit(f.taskId, session, { exitCode, signal, reason, ...(error ? { error } : {}) });
+        }
+        return;
+      case "turn.cancel":
+        if (typeof f.session === "string") this.onTurnCancel(f.session);
+        return;
+      case "turn.detach":
+        if (typeof f.session === "string") this.onTurnDetach(f.session);
+        return;
       case "browser.show": {
         const agent = f.agent as Partial<AgentScope> | undefined;
         if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
@@ -257,6 +321,20 @@ export class WorkerLink {
       default:
         this.session?.onMessage(line);
     }
+  }
+
+  bridgeReady(process: string, error?: string) {
+    this.write(
+      JSON.stringify({ type: "bridge.ready", process, ...(error ? { error } : {}) } satisfies WorkerLinkFrame),
+    );
+  }
+
+  toolNotice(notice: ToolNotice) {
+    this.write(JSON.stringify({ type: "tool.notice", ...notice } satisfies WorkerLinkFrame));
+  }
+
+  taskStop(taskId: string) {
+    this.write(JSON.stringify({ type: "task.stop", taskId } satisfies WorkerLinkFrame));
   }
 
   /** `agent-browser` downloads first, for that click. */
@@ -364,11 +442,12 @@ export class WorkerLink {
   }
 
   /**
-   * `push` without the machine token: the bytes go to the supervisor in
-   * pieces, it uploads them to the request's URL and says how that went.
+   * `push` and `pull` without the machine token: the supervisor makes the request to the URL of the server's own
+   * request, which also keeps it off the route the agent's programs take, and the bytes cross the link in pieces.
    */
   readonly fetch: FetchLike = (_url, init) => {
     const headers = new Headers(init.headers as Record<string, string>);
+    if (init.method === "GET") return this.pull(headers.get("x-agentes-pull-id") ?? "", init.signal ?? undefined);
     const uploadId = headers.get("x-agentes-upload-id") ?? "";
     const body = init.body instanceof Uint8Array ? init.body : new Uint8Array();
     const signal = init.signal ?? undefined;
@@ -403,6 +482,38 @@ export class WorkerLink {
       );
     });
   };
+
+  private pull(pullId: string, signal?: AbortSignal) {
+    return new Promise<Response>((resolve, reject) => {
+      let sink: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const done = () => {
+        this.pulls.delete(pullId);
+        signal?.removeEventListener("abort", abort);
+      };
+      const fail = (error: Error) => {
+        done();
+        reject(error);
+        sink?.error(error);
+      };
+      const abort = () => fail(signal?.reason instanceof Error ? signal.reason : new Error("Canceled"));
+      const body = new ReadableStream<Uint8Array>({
+        start: (controller) => {
+          sink = controller;
+        },
+        cancel: done,
+      });
+      this.pulls.set(pullId, (f) => {
+        if (f.type === "pull.head") resolve(new Response(body, { status: f.status }));
+        else if (f.type === "pull.chunk") sink?.enqueue(Buffer.from(f.data, "base64"));
+        else if (f.error === undefined) {
+          done();
+          sink?.close();
+        } else fail(new Error(f.error));
+      });
+      signal?.addEventListener("abort", abort, { once: true });
+      this.write(JSON.stringify({ type: "pull.start", pullId } satisfies WorkerLinkFrame));
+    });
+  }
 }
 
 /** Runs the worker until the supervisor goes away; its background tasks keep running (ADR 0029). */
@@ -456,7 +567,9 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     accounts,
     ...(self.compiled ? { wrapperCommand: [...self.command, "task-wrapper"] } : {}),
     ...(cli ? { spawnCli: cli } : {}),
+    hostedStop: (taskId) => link.taskStop(taskId),
   });
+  link.onTaskOut = (taskId, stream, line) => tasks.hostedOutput(taskId, stream, line);
   await tasks.init();
   const brainLimits = () => ({
     idleMs: state.limits.brainIdleMinutes * 60_000,
@@ -481,9 +594,60 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     log,
   });
+  // Claude Code's own tools for a CLI root runs on a shared sign-in: nothing here until root opens a bridge.
+  const delegatedRuns = new Map<string, McpTaskInfo>();
+  const delegated = new DelegatedTools({
+    secrets: () => agentSecrets(secretsDir, { id: o.agentId, handle: "agent" }),
+    onNotice: (notice) => link.toolNotice(notice),
+    onDenied: (session, tool, input) => tasks.hostedDenial(session, tool, input),
+    ...(cli ? { spawn: cli } : {}),
+    log,
+  });
+  const openBridge = async (bridge: DelegatedBridge) => {
+    const { token } = bridge;
+    if (token === null || bridge.agent.id !== o.agentId) {
+      delegatedRuns.delete(bridge.process);
+      return;
+    }
+    if (bridge.socketPath) await mcp.listenForRelays(bridge.socketPath);
+    const [folder, grants, secrets] = await Promise.all([
+      agentWorkspace(workspaceReal, bridge.agent),
+      realFoldersFor(state.access, o.agentId),
+      agentSecrets(secretsDir, bridge.agent),
+    ]);
+    const where = { folder, grants, runnerHome: home, ...(secrets ? { redact: secrets.redact } : {}) };
+    delegatedRuns.set(bridge.process, delegatedTask({ ...bridge, token }, delegated, where));
+    link.bridgeReady(bridge.process);
+  };
+  // In order: a turn's frame must not land after the next turn's, which would leave its tools with no run.
+  let bridging: Promise<void> = Promise.resolve();
+  link.onBridge = (bridge) => {
+    bridging = bridging.then(() =>
+      openBridge(bridge).catch((err: unknown) => {
+        const said = err instanceof Error ? err.message : String(err);
+        log(`delegated tools: ${said}`);
+        link.bridgeReady(bridge.process, said);
+      }),
+    );
+  };
+  link.onTurnPrepare = async ({ agent, cwd, text }) => {
+    if (agent.id !== o.agentId) throw new RunnerError("not_allowed", "This worker serves another agent");
+    const [folder, grants] = await Promise.all([
+      agentWorkspace(workspaceReal, agent),
+      realFoldersFor(state.access, o.agentId),
+    ]);
+    return turnContext({ folder, grants, ...(cwd ? { cwd } : {}), text });
+  };
+  link.onTaskExit = (taskId, session, exit) => {
+    tasks.hostedExit(taskId, exit);
+    delegated.endSession(session);
+  };
+  link.onTurnCancel = (session) => delegated.cancel(session);
+  link.onTurnDetach = (session) => delegated.detach(session);
   const mcp = new McpBridge({
     socketPath,
-    task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
+    task: (taskId) =>
+      tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? delegatedRuns.get(taskId) ?? null,
     log,
   });
   await mcp
@@ -501,6 +665,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const lease = () => {
     if (browser.onDesktopInUse(o.agentId)) link.browserOnDesktop();
   };
+  // Agents whose live view is root's (ADR 0040 §7.1): their stream's next frame waits for root's `browser.room`.
+  const viewed = new Set<string>();
   const browser = new BrowserManager({
     home,
     privateNetwork: () => state.privateNetwork === true,
@@ -513,6 +679,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
       : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,
+    frameRoom: (agentId) => !viewed.has(agentId),
     secret: (agent, name) => secretValue(secretsDir, agent, name),
     desktops: {
       ensure: ensureDesktop("browser"),
@@ -537,7 +704,12 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   link.onReclaim = async ({ spare, peek }) => {
     if (!peek) return { closed: await brains.reclaimIdle(spare) };
     const idle = brains.idleCandidate(spare);
-    return idle ? { closed: false, idle } : { closed: false };
+    return { closed: false, ...(idle ? { idle } : {}), ...(spare && brains.warm(spare) ? { warm: true } : {}) };
+  };
+  link.onBrowserRoom = (agentId, view) => {
+    if (view) viewed.add(agentId);
+    else viewed.delete(agentId);
+    browser.room(agentId);
   };
   link.onDesktopTaken = () => {
     desktopUse.stopInput(o.agentId);
@@ -624,6 +796,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     onState: (s) => {
       if (s === "online") return;
       browser.stopStreams();
+      // Root's views went with the session: the next one says again.
+      viewed.clear();
       browser.clearHandoffs();
     },
   });
@@ -653,6 +827,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   tasks.close();
   brains.close();
   codexApp.close();
+  delegated.close();
   await browser.close().catch(() => undefined);
   link.traffic(browser.takeTraffic());
   await mcp.close().catch(() => undefined);

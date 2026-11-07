@@ -2,7 +2,7 @@ import type { WikiPageSummary } from "@agenteschat/client";
 import { useWikiPage, useWikiTree } from "@agenteschat/client";
 import { readsAsPageTitle } from "@agenteschat/client/lib/markdown";
 import { resolveWikiLink, splitSection } from "@agenteschat/client/lib/wiki";
-import { Popover, useHoverCard } from "@agenteschat/ui";
+import { movesByKeys, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -79,7 +79,9 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
           params={{ orgId: org.id, slug: page.slug }}
           hash={section ? `h-${headingId(section)}` : undefined}
           className="wiki-link"
-          onFocus={() => card.onOpenChange(true)}
+          onFocus={() => {
+            if (movesByKeys()) card.onOpenChange(true);
+          }}
           onBlur={card.close}
         >
           {label}

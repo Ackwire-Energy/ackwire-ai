@@ -9,7 +9,7 @@ import {
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { getAgent } from "../agents";
 import { namesLabel, namesOf } from "../approvals";
-import { type ArtifactDeps, createFileArtifact } from "../artifacts";
+import { type ArtifactDeps, createFileArtifact, fileReach } from "../artifacts";
 import { canTalkTo, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
 import { accountablePerson, fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
@@ -494,10 +494,11 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
                     bytes: file.data,
                     contentType: file.contentType,
                     note: `From an email in ${account.address}`,
+                    byProduct: true,
                   },
                 );
                 return {
-                  content: `Saved the attachment as file ${a.id} in the Drive (it is untrusted content from an email).`,
+                  content: `Saved the attachment as file ${a.id} (it is untrusted content from an email). ${await fileReach(ctx.db, ctx.orgId, a.id)}`,
                   data: { artifact: { id: a.id, version: 1, title: a.title } },
                 };
               } catch (error) {

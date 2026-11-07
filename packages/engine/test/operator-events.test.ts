@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { asc, type Database, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  ACCOUNT_FAILURE_EVERY_MS,
   adoptRestoredOperatorEvents,
   applyTaskDone,
   createInvitation,
@@ -15,10 +16,12 @@ import {
   type OperatorEvent,
   postPersonMessage,
   pruneOperatorEvents,
+  recordAccountFailure,
   recordOperatorEvent,
   recordSession,
   recordSignUp,
   resendInvitation,
+  resetAccountFailures,
   type ToolSource,
   ValidationError,
 } from "../src";
@@ -338,4 +341,42 @@ test("prune drops events older than 90 days", async () => {
   ]);
   expect(await pruneOperatorEvents(db)).toBe(1);
   expect(await allEvents(db)).toHaveLength(1);
+});
+
+test("account failures: one per account and cause every 10 minutes, none while events are off", async () => {
+  const { db, close: done } = await createTestDatabase();
+  close = done;
+  resetAccountFailures();
+  const failure = {
+    orgId: "0193eeee-0000-4000-8000-000000000001",
+    accountId: "0193eeee-0000-4000-8000-000000000002",
+    machineId: "0193eeee-0000-4000-8000-000000000003",
+    kind: "claude_code",
+    authMethod: null,
+    cause: "auth_rejected",
+    code: "not_logged_in",
+  };
+  const t = Date.now();
+  await recordAccountFailure(db, failure, t);
+  expect(await allEvents(db)).toEqual([]);
+  enableOperatorEvents();
+  await recordAccountFailure(db, failure, t);
+  await recordAccountFailure(db, failure, t + ACCOUNT_FAILURE_EVERY_MS - 1);
+  await recordAccountFailure(db, { ...failure, cause: "quota", code: "plan_limit" }, t);
+  await recordAccountFailure(db, failure, t + ACCOUNT_FAILURE_EVERY_MS);
+  const rows = await allEvents(db);
+  expect(rows.map((r) => [r.type, (r.data as { cause: string }).cause])).toEqual([
+    ["account.failure", "auth_rejected"],
+    ["account.failure", "quota"],
+    ["account.failure", "auth_rejected"],
+  ]);
+  // An unknown computer: no runner version or protocol, nothing else made up.
+  expect(rows[0]?.data).toEqual({
+    accountId: failure.accountId,
+    machineId: failure.machineId,
+    kind: "claude_code",
+    authMethod: null,
+    cause: "auth_rejected",
+    code: "not_logged_in",
+  });
 });

@@ -422,7 +422,7 @@ describe("tools through Composio", () => {
     expect(pdf.output.content).not.toContain("files.example");
     const [saved] = await f.db.select().from(schema.artifacts).where(eq(schema.artifacts.kind, "file"));
     expect(saved).toMatchObject({ title: "report.pdf", untrusted: true });
-    expect(pdf.output.content).toContain(`file ${saved?.id} in the Drive`);
+    expect(pdf.output.content).toContain(`file ${saved?.id} (untrusted content). It is in the shared Drive`);
     const text = await call(gateway, ctx, "google_drive_export_google_workspace_file", { q: "f2" });
     if (text.type !== "result") throw new Error(`expected a result, got ${text.type}`);
     expect(text.output.content).toContain("ata da reunião");

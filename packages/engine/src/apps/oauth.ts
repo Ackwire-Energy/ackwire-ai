@@ -5,7 +5,7 @@ import { sha256 } from "../crypto";
 import { emailLocale, queueEmail } from "../email";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { getMembership, listMemberships } from "../organizations";
-import { workRefusal } from "../standing";
+import { accountClosed, workRefusal } from "../standing";
 import {
   type AppIdentity,
   appIdentity,
@@ -376,11 +376,15 @@ async function revokeFamily(db: Executor, familyIds: string[]) {
     .where(and(inArray(appTokens.familyId, familyIds), isNull(appTokens.revokedAt)));
 }
 
-/** The grant behind a token can still be used: not revoked, its person still in its workspace. */
+/**
+ * The grant behind a token can still be used: not revoked, its person still in its workspace. Null: not now, and
+ * nothing ends: its account is blocked or waits for its deletion, and comes back with its apps.
+ */
 async function grantUsable(db: Database, grant: schema.AppGrant) {
   if (grant.revokedAt) return false;
   const membership = await getMembership(db, grant.userId, grant.orgId);
   if (membership) return true;
+  if (await accountClosed(db, grant.userId)) return null;
   await db.transaction((tx) => revokeMemberApps(tx, grant.orgId, grant.userId));
   return false;
 }
@@ -475,8 +479,9 @@ export async function refreshTokens(deps: OauthDeps, form: Record<string, string
   if (token.revokedAt) return tokenError("invalid_grant", "The token was revoked");
   if (token.expiresAt && token.expiresAt.getTime() <= Date.now())
     return tokenError("invalid_grant", "The token expired");
-  if (!(await grantUsable(db, grant))) {
-    await revokeFamily(db, [token.familyId]);
+  const usable = await grantUsable(db, grant);
+  if (!usable) {
+    if (usable === false) await revokeFamily(db, [token.familyId]);
     return tokenError("invalid_grant", "Authorize the app again");
   }
   if (deps.admitRefresh && !(await deps.admitRefresh(grant.id)))

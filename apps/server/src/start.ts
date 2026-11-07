@@ -55,6 +55,7 @@ import {
   drainLocalRuns,
   EMAIL_PICTURES,
   emailArtFor,
+  enableAccountContacts,
   enableCaches,
   enableOperatorEvents,
   ensureRightHands,
@@ -69,6 +70,7 @@ import {
   retireMillionSendMailboxes,
   setMessageLinkBase,
   setRestrictionNotices,
+  surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
 } from "@agenteschat/engine";
@@ -76,7 +78,7 @@ import {
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createModelProviders, enableOpenRouterModels } from "@agenteschat/providers";
 import { createApp } from "./app";
-import { appleTokenRevoker, createAuth } from "./auth";
+import { createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { checkHumanCheckAtBoot } from "./http/human-check";
 import { createLogger, type Logger } from "./logger";
@@ -289,6 +291,7 @@ async function boot(
   // OpenRouter's public model list (ADR 0087): read only while a workspace has an OpenRouter key.
   enableOpenRouterModels(fetch);
   applyBootSwitches(config);
+  enableAccountContacts(config.PUBLIC_URL, adapters.email);
   if (config.OPERATOR_API_TOKEN) {
     // Before the API serves a page: a caller restarting after a restore must find these rows first.
     const adopted = await adoptRestoredOperatorEvents(database.db);
@@ -347,6 +350,12 @@ async function boot(
       if (moved > 0) log.info("task comments moved to conversations", { moved });
     })
     .catch((error: unknown) => log.warn("task comments move failed", { error: String(error) }));
+  // Off the boot path: files agents saved in rooms no person reads go to the person they worked for (ADR 0111).
+  void surfaceRoomFiles(database.db)
+    .then((moved) => {
+      if (moved > 0) log.info("files moved out of agent rooms", { moved });
+    })
+    .catch((error: unknown) => log.warn("files move out of agent rooms failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -402,7 +411,6 @@ async function boot(
         speech: engine.speech,
         voice: engine.voice,
         gitProxy: engine.gitProxy,
-        appleRevoke: appleTokenRevoker(config),
       },
     },
     log,

@@ -279,6 +279,7 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
   flex-wrap: wrap;
   gap: 10px 12px;
   padding: 0 0 10px;
+  border-top: 0;
 }
 .dm-side__sec .settings-row > .settings-row__text {
   flex: 1 1 0;

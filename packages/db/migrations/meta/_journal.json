@@ -1569,6 +1569,83 @@
       "when": 1793990000000,
       "tag": "0225_agent_speed",
       "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0226_machine_file_pulls",
+      "breakpoints": true
+    },
+    {
+      "idx": 227,
+      "version": "7",
+      "when": 1794000100000,
+      "tag": "0227_agent_passwords",
+      "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1794010000000,
+      "tag": "0228_agents_write_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 229,
+      "version": "7",
+      "when": 1794020000000,
+      "tag": "0229_private_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "7",
+      "when": 1794030000000,
+      "tag": "0230_account_deletion",
+      "breakpoints": true
+    },
+    {
+      "idx": 231,
+      "version": "7",
+      "when": 1794040000000,
+      "tag": "0231_claude_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "7",
+      "when": 1794280000000,
+      "tag": "0232_task_github_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 233,
+      "version": "7",
+      "when": 1794380000000,
+      "tag": "0233_refusal_proposals",
+      "breakpoints": true
+    },
+    {
+      "idx": 234,
+      "version": "7",
+      "when": 1794480000000,
+      "tag": "0234_task_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 235,
+      "version": "7",
+      "when": 1794580000000,
+      "tag": "0235_question_for_person",
+      "breakpoints": true
+    },
+    {
+      "idx": 236,
+      "version": "7",
+      "when": 1794581000000,
+      "tag": "0236_dm_memory_stays_personal",
+      "breakpoints": true
     }
   ]
 }

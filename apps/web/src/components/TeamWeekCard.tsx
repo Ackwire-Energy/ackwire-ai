@@ -169,7 +169,7 @@ export function TeamWeekCardView({ message, card }: { message: Message; card: Te
                     proposal={proposals.find((p) => "proposalId" in row && p.id === row.proposalId)}
                     doneText={teamWeekDoneText(t, row, lodi?.name ?? "Lodi")}
                     onApply={() => apply(row).catch(failed)}
-                    busy={applying}
+                    busy={applying || act.isPending}
                   />
                 ))}
               </div>
@@ -178,7 +178,13 @@ export function TeamWeekCardView({ message, card }: { message: Message; card: Te
         )}
         <div className="rq__foot">
           {!dismissed && bulk.length > 0 && (
-            <Button size="sm" variant="primary" loading={applying} onClick={() => void applyAll()}>
+            <Button
+              size="sm"
+              variant="primary"
+              loading={applying}
+              disabled={act.isPending}
+              onClick={() => void applyAll()}
+            >
               {t("teamWeek.applyAll", { count: bulk.length })}
             </Button>
           )}
@@ -187,6 +193,7 @@ export function TeamWeekCardView({ message, card }: { message: Message; card: Te
               size="sm"
               variant="ghost"
               disabled={applying}
+              loading={act.isPending}
               onClick={() => act.mutate({ messageId: message.id, act: { dismiss: true } }, { onError: failed })}
             >
               {t("teamWeek.notNow")}

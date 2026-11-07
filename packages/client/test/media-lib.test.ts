@@ -143,6 +143,8 @@ describe("the word for a GIF or a sticker where text shows", () => {
     expect(previewBody(t, "", { media: { kind: "gif" } })).toBe("GIF");
     expect(previewBody(t, "valeu!", null, "sticker")).toBe("valeu!");
     expect(previewBody(t, "", null)).toBe("");
+    expect(previewBody(t, "**O deploy**\n\n| a |\n| - |\n| b |", null)).toBe("O deploy a b");
+    expect(previewBody(t, "**O deploy**", {})).toBe("O deploy");
   });
 
   test("a quote of a GIF says GIF, read from the server's reply ref and written in the optimistic one", () => {
@@ -158,6 +160,18 @@ describe("the word for a GIF or a sticker where text shows", () => {
     const local = localMeta(message({ id: "m-gif", meta: { media: GIF } }), "Ana", []);
     expect(replyOf(local)).toMatchObject({ messageId: "m-gif", excerpt: "", media: "gif" });
     expect(quoteText(t, { excerpt: "oi", media: "gif" })).toBe("oi");
+  });
+
+  test("a quote's line reads as words: no Markdown's marks, and something where the original has none", () => {
+    expect(quoteText(t, { excerpt: "## Resumo **do deploy** em [produção](https://x.test)" })).toBe(
+      "Resumo do deploy em produção",
+    );
+    expect(quoteText(t, { excerpt: "- primeiro item" })).toBe("primeiro item");
+    expect(quoteText(t, { excerpt: "" })).toBe("channel.quoteNoWords");
+    const file = { id: "a-1", version: 1, title: "relatorio.pdf" };
+    expect(replyOf(localMeta(message({ id: "m-file", meta: { artifacts: [file] } }), "Ana", []))?.excerpt).toBe(
+      "relatorio.pdf",
+    );
   });
 
   test("a reply shown away from its root quotes it: a sticker root says Figurinha", () => {
@@ -179,6 +193,7 @@ describe("the word for a GIF or a sticker where text shows", () => {
 
   test("a search hit says its words, else what it was: only a voice message's hit says voice message", () => {
     expect(hitText(t, { snippet: "deploy notes", mediaKind: "gif" })).toBe("deploy notes");
+    expect(hitText(t, { snippet: "**O deploy**\n\n```sh\nbun run\n```" })).toBe("O deploy bun run");
     expect(hitText(t, { snippet: "", mediaKind: "voice" })).toBe("Mensagem de voz");
     // Listed by filters alone: a GIF or a sticker sent with no words.
     expect(hitText(t, { snippet: "", mediaKind: "gif" })).toBe("GIF");

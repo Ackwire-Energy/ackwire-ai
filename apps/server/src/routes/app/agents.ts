@@ -16,6 +16,7 @@ import {
   cancelUsageQueue,
   canTalkTo,
   canViewCost,
+  checkCredential,
   checkEndpoint,
   createAgent,
   createAgentFromProposal,
@@ -55,6 +56,7 @@ import {
   pickerEndpoint,
   pickerModels,
   proposeChannelMove,
+  publishAgentsChanged,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
@@ -82,6 +84,7 @@ import {
   createAppRouter,
   errors,
   json,
+  keyTester,
   noContent,
   OrgParams,
   requireSession,
@@ -330,6 +333,7 @@ const TeamProposalCard = z
       approvals: z.string(),
       invite: z.array(z.string()),
       template: z.string().optional(),
+      example: z.string().optional(),
     }),
     state: z.enum(["pending", "creating", "created", "denied", "superseded", "undone"]),
     decidedByUserId: z.string().nullable(),
@@ -433,7 +437,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Add a provider API key",
       description:
-        "The key is encrypted at rest and never returned by any endpoint. An OpenRouter key is checked with OpenRouter first, with no model call (ADR 0087): refused (`provider_key_invalid`) or a management key (`provider_key_management`) is never stored. `custom` (ADR 0146) takes `endpoint`, may have no key, and answers with one test call per model (`checks`).",
+        "The key is encrypted at rest and never returned by any endpoint. It makes one cheap real call first: a key the provider refuses (`provider_key_invalid`), with no credit (`provider_key_no_credit`) or with no permission to call (`provider_key_denied`) is never stored, and `params` carry the provider's name and words (`said`). A provider that gives no answer about the key doesn't stop the save: `check` is `unchecked`. An OpenRouter key is checked with OpenRouter too (ADR 0087): a management key (`provider_key_management`) is never stored. `custom` (ADR 0146) takes `endpoint`, may have no key, and answers with one test call per model (`checks`).",
       request: {
         params: OrgParams,
         body: body(
@@ -473,7 +477,7 @@ export function agentRoutes(deps: AppDeps) {
         userId,
         orgId,
         { ...input, ...(endpoint ? { endpoint: { ...endpoint, models: endpoint.models.map(modelIn) } } : {}) },
-        { fetch: deps.extras?.http, net: endpointNet(deps) },
+        { fetch: deps.extras?.http, net: endpointNet(deps), verify: (await keyTester(deps, userId))?.verifyKey },
       );
       const checks = row.endpoint ? await endpointChecks(deps, userId, orgId, row.id) : undefined;
       return c.json({ ...credentialOut(row), ...(checks ? { checks } : {}) }, 201);
@@ -547,18 +551,41 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Revoke a provider API key (or delete it for good with ?purge=true)",
-      description: "Purging is refused while agents use the key, so they never fall back to the platform key silently.",
+      description:
+        "Purging is refused while the key is a default (`credential.default`) or agents use it (`credential.in_use`), so they never move to another key silently. `release=true`, sent once the person read what happens: the agents using it lose it and it stops being a default.",
       request: {
         params: OrgParams.extend({ credentialId: z.uuid() }),
-        query: z.object({ purge: z.stringbool().optional() }),
+        query: z.object({ purge: z.stringbool().optional(), release: z.stringbool().optional() }),
       },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, credentialId } = c.req.valid("param");
-      if (c.req.valid("query").purge) await deleteCredential(db, c.get("user").id, orgId, credentialId);
+      const { purge, release } = c.req.valid("query");
+      if (purge) await deleteCredential(db, c.get("user").id, orgId, credentialId, { release });
       else await revokeCredential(db, c.get("user").id, orgId, credentialId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/credentials/{credentialId}/check",
+      tags,
+      security,
+      summary: "Try a stored key with one cheap real call (admins)",
+      description:
+        "Answers as saving a key does: `check` is `ok` or `unchecked`, and a refusal comes as `provider_key_invalid`, `provider_key_no_credit` or `provider_key_denied`.",
+      request: { params: OrgParams.extend({ credentialId: z.uuid() }) },
+      responses: { 200: json(z.object({ check: z.enum(["ok", "unchecked"]) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, credentialId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const gateway = await keyTester(deps, userId);
+      if (!gateway) return c.json({ check: "unchecked" as const }, 200);
+      return c.json({ check: await checkCredential(db, gateway, userId, orgId, credentialId) }, 200);
     },
   );
 
@@ -896,13 +923,19 @@ export function agentRoutes(deps: AppDeps) {
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
           // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).
-          { remember: true },
+          { remember: true, pubsub: adapters.pubsub },
         );
       let agent = proposal
         ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
         : await make();
-      if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
-      if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
+      if (audience) {
+        agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
+        await publishAgentsChanged(adapters.pubsub, orgId);
+      }
+      if (appearance)
+        agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance, {
+          pubsub: adapters.pubsub,
+        });
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       const userId = c.get("user").id;
@@ -1200,22 +1233,27 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Post a template's team as the right hand's card in your DM with it (\"Usar este modelo\")",
       description:
-        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn.",
+        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn. On a billing hold, no question, and `tap` (what the person tapped) is kept as their message with no run.",
       request: {
         params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
-        body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
+        body: {
+          ...body(z.object({ locale: z.string().max(20).optional(), tap: z.string().min(1).max(200).optional() })),
+          required: false,
+        },
       },
       responses: { 200: json(z.object({ channelId: z.uuid(), messageId: z.uuid() })), ...errors },
     }),
     async (c) => {
       const { orgId, templateId } = c.req.valid("param");
       const context = deps.extras?.context;
+      const input = c.req.valid("json");
       const out = await useTeamTemplate(
         { db, pubsub: adapters.pubsub, context },
         c.get("user").id,
         orgId,
         templateId,
-        c.req.valid("json")?.locale,
+        input?.locale,
+        input?.tap,
       );
       return c.json(out, 200);
     },
@@ -1383,8 +1421,12 @@ export function agentRoutes(deps: AppDeps) {
             { pubsub: adapters.pubsub },
           )
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
-      if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
+      if (audience) {
+        agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
+        await publishAgentsChanged(adapters.pubsub, orgId);
+      }
+      if (appearance !== undefined)
+        agent = await setAgentAppearance(db, actor, orgId, agentId, appearance, { pubsub: adapters.pubsub });
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
@@ -1718,6 +1760,7 @@ export function agentRoutes(deps: AppDeps) {
       // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
       // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      await publishAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
     },
   );
@@ -1766,6 +1809,7 @@ export function agentRoutes(deps: AppDeps) {
       // Their computers hear which account each agent thinks with now (system mode lends the folders by it).
       if (!input.preview && results.some((r) => r.status === "applied")) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
+        await publishAgentsChanged(adapters.pubsub, orgId);
       }
       return c.json({ results }, 200);
     },

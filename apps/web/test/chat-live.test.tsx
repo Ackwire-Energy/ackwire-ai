@@ -1028,12 +1028,14 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
 });
 
 describe("empty conversations", () => {
-  test("a channel: its greeting and the suggestions; a DM with a person: the greeting alone", async () => {
+  test("a channel: its greeting, its line and the suggestions; a DM with a person: the greeting alone", async () => {
     await open(seedState(), `c/${GENERAL_ID}`);
     await settle(4);
     const channel = document.querySelector(".ac-empty") as HTMLElement;
     expect(channel.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi em #general");
-    expect(channel.querySelector(".ac-empty__text")).toBeNull();
+    expect(channel.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Mencione um agente com @ e ele entra na conversa.",
+    );
     cleanup();
     await open(seedState(), "dm/person/u-joao");
     await settle(4);
@@ -1423,7 +1425,7 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
   });
 
   test("her question before then: its card and the wait for the answer show, and stay as the list changes", async () => {
@@ -1437,7 +1439,7 @@ describe("caught up once the server confirms the channel's subscription", () => 
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
     await push(socket, {
       type: "message.created",
       messageId: "m-atlas",
@@ -1454,6 +1456,6 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(rowsWith("Deploy das 9h no ar.")).toHaveLength(1);
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
   });
 });

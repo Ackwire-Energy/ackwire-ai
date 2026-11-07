@@ -216,11 +216,68 @@ export class ProviderError extends Error {
     public readonly status?: number,
     /** Set when the failure happened mid-stream, so the gateway can bill what was consumed. */
     public partial?: PartialUsage,
+    /** The provider's own words, when it gave any. */
+    public said?: string,
   ) {
     super(message);
     this.name = "ProviderError";
   }
+  /** Who answered, as people read the name. The gateway sets it: an adapter serves several. */
+  provider?: string;
+  /** It came on the server's own key: the person has nothing to fix. */
+  platformKey?: boolean;
 }
+
+/** What a provider's failure comes down to, for the words and the way out people get. */
+export type ProviderCause =
+  | "no_credit"
+  | "invalid_key"
+  | "no_access"
+  | "model_unavailable"
+  | "rate_limit"
+  | "down"
+  | "timeout"
+  | "unreachable";
+
+const NO_CREDIT =
+  /no prepaid credit|insufficient[ _](?:credits?|quota|balance|funds)|credit balance|requires more credits|exceeded your current quota|key limit exceeded|quota used up|api usage limits|billing (?:hard )?limit/i;
+const BAD_KEY = /invalid (?:x-)?(?:provider )?api[ _-]?key|incorrect api key|api key not valid/i;
+const NO_MODEL =
+  /not a valid model|model[_ ]not[_ ]found|no endpoints found|no allowed providers|model .{0,80}does not exist/i;
+
+/**
+ * The cause in a failure's status and words, or null when they name none. The words come first for credit: OpenAI
+ * says it on a 429, Claude on a 400 and OpenRouter on a 403 (a key's own limit).
+ */
+export function providerCause(error: Pick<ProviderError, "status" | "message" | "said">): ProviderCause | null {
+  const { status = 0 } = error;
+  const words = `${error.said ?? ""} ${error.message}`;
+  if (status === 402 || NO_CREDIT.test(words)) return "no_credit";
+  if (status === 401 || BAD_KEY.test(words)) return "invalid_key";
+  if (status === 404 || NO_MODEL.test(words)) return "model_unavailable";
+  // OpenRouter's 403 is also its moderation refusing the text: no key fixes that, its words say why.
+  if (status === 403) return /moderation|flagged/i.test(words) ? null : "no_access";
+  if (status === 429 || /rate.?limit|too many requests/i.test(words)) return "rate_limit";
+  if (status === 408 || status === 504 || status === 524 || /timed? ?out/i.test(words)) return "timeout";
+  if (status >= 500 || /overloaded/i.test(words)) return "down";
+  return /could not reach/.test(words) ? "unreachable" : null;
+}
+
+/** A provider's words on one line, short enough to show. */
+export const shortSaid = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 300);
+
+/**
+ * A 403, with the provider's words when it gave any: a key with no rights and a project that doesn't offer one model
+ * are both 403s, and only the words tell them apart (`keyRefusalOf`).
+ */
+export const deniedError = (code?: string | null, said = "") =>
+  new ProviderError(
+    `provider denied access${said ? ` (${["403", code].filter(Boolean).join(" ")}): ${said}` : ""}`,
+    false,
+    403,
+    undefined,
+    said || undefined,
+  );
 
 /** Rough token estimate (≈ 4 characters per token), used only when the provider gave no count. */
 export const estimateTokens = (chars: number) => Math.ceil(chars / 4);

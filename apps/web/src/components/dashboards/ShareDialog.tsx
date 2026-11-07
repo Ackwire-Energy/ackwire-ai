@@ -1,7 +1,7 @@
 import type { DashboardSummary } from "@agenteschat/client";
 import { dashboardAccessOf, editorsInput, useMembers, useShareDashboard } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Locked } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PersonAvatar } from "@/components/AgentAvatar";
@@ -84,33 +84,35 @@ function ShareBody({ board, onClose }: { board: DashboardSummary; onClose: () =>
     );
   return (
     <>
-      <DialogBody className="db-dialog__body">
-        <AudienceFields value={draft} onChange={setDraft} saved={board.audience} />
-        <div className="db-f">
-          <span className="db-lbl" id={`share-access-${board.id}`}>
-            {t("dashboards.share.access")}
-          </span>
-          <ul className="db-people" aria-labelledby={`share-access-${board.id}`}>
-            {people.map((m) => {
-              const access = dashboardAccessOf(
-                { userId: m.userId, roleIds: m.roleIds ?? [], admin: adminOf(m, roles) },
-                { kind: board.kind, ...draft, ownerUserId: board.ownerUserId },
-              );
-              const line = m.role === "owner" ? t("dashboards.share.owner") : roleNames(roles, m.roleIds ?? []);
-              return (
-                <li key={m.userId} data-on={access !== "none"}>
-                  <PersonAvatar id={m.userId} name={m.name} size="sm" />
-                  <span className="db-people__who">
-                    <b>{m.userId === me.user.id ? t("dashboards.share.you", { name: m.name }) : m.name}</b>
-                    {line && <small>{line}</small>}
-                  </span>
-                  <span className="db-people__can">{t(`dashboards.share.${access}`)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </DialogBody>
+      <Locked when={share.isPending}>
+        <DialogBody className="db-dialog__body">
+          <AudienceFields value={draft} onChange={setDraft} saved={board.audience} />
+          <div className="db-f">
+            <span className="db-lbl" id={`share-access-${board.id}`}>
+              {t("dashboards.share.access")}
+            </span>
+            <ul className="db-people" aria-labelledby={`share-access-${board.id}`}>
+              {people.map((m) => {
+                const access = dashboardAccessOf(
+                  { userId: m.userId, roleIds: m.roleIds ?? [], admin: adminOf(m, roles) },
+                  { kind: board.kind, ...draft, ownerUserId: board.ownerUserId },
+                );
+                const line = m.role === "owner" ? t("dashboards.share.owner") : roleNames(roles, m.roleIds ?? []);
+                return (
+                  <li key={m.userId} data-on={access !== "none"}>
+                    <PersonAvatar id={m.userId} name={m.name} size="sm" />
+                    <span className="db-people__who">
+                      <b>{m.userId === me.user.id ? t("dashboards.share.you", { name: m.name }) : m.name}</b>
+                      {line && <small>{line}</small>}
+                    </span>
+                    <span className="db-people__can">{t(`dashboards.share.${access}`)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button
           variant="ghost"
@@ -120,9 +122,7 @@ function ShareBody({ board, onClose }: { board: DashboardSummary; onClose: () =>
           {t("dashboards.share.copyLink")}
         </Button>
         <span className="db-grow" />
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={share.isPending} disabled={!audienceReady(draft)} onClick={save}>
           {t("dashboards.share.save")}
         </Button>

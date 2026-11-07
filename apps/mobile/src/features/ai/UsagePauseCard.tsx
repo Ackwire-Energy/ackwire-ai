@@ -15,8 +15,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { Button, EventPillAction, EventPillText, Text } from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
+import { AskDone, AskWaiting } from "../chat/asks";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
@@ -25,18 +26,16 @@ import { openAgentAi } from "./AgentAiScreen";
 
 /**
  * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
- * limit is back. Words only (a ghost button): put it in `textActs`. Greyed for anyone but the person behind it, the
- * agent's owner and admins; the agent's status and its queue follow.
+ * limit is back; the agent's status and its queue follow.
  */
-export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
-  const { t } = useTranslation();
+function useDontRun(runId: string | null) {
   const api = useApi();
   const qc = useQueryClient();
   const { orgId } = useOrg();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
-  if (!runId) return null;
   const go = async () => {
+    if (!runId) return;
     setPending(true);
     try {
       await api.agents.cancelRun(orgId, runId);
@@ -47,6 +46,17 @@ export function DontRunButton({ runId, may, count = 1 }: { runId: string | null;
       void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     }
   };
+  return { pending, go };
+}
+
+/**
+ * "Don't run it" as words only (a ghost button): put it in `textActs`. Greyed for anyone but the person behind it,
+ * the agent's owner and admins.
+ */
+export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
+  const { t } = useTranslation();
+  const { pending, go } = useDontRun(runId);
+  if (!runId) return null;
   return (
     <Button
       variant="text"
@@ -166,20 +176,21 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
 }
 
 /**
- * The web's card of long work paused near its plan's or budget's limit (ADR 0118), in place of its text: when it
- * picks up by itself, and Continuar agora for the person behind the work, the agent's owner and admins (anyone else
- * sees it greyed, with who may press it).
+ * The web's pause of long work near its plan's or budget's limit (ADR 0118), in place of its text, as a waiting pill:
+ * when it picks up by itself under it, and "Continue now" (tinted) and "Don't run it" for the person behind the work,
+ * the agent's owner and admins (anyone else reads who may press them). Then a decided request's pill: who let it go
+ * on, or that it picked up, ended or was canceled.
  */
 export function UsagePauseCard({ message: m }: { message: Message }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
-  const { colors } = useTheme();
   const meId = useMeId();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
   const card = usagePauseCardOf(m.meta);
+  const dontRun = useDontRun(card?.runId ?? null);
   if (!card || m.author.type !== "agent") return null;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
@@ -197,56 +208,66 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
       setPending(false);
     }
   };
-  const done = card.state !== "paused";
-  return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
-      <View style={styles.row}>
-        <LineIcon name={done ? "check" : "pause"} variant="subhead" size={16} color={colors.ink2} />
-        <Text variant="subhead" style={styles.title}>
-          {title}
-        </Text>
-      </View>
-      {card.state === "continued" && by ? (
-        <Text variant="footnote" tone="faint">
-          {by === meId
+  if (card.state === "continued" && by)
+    return (
+      <AskDone
+        done
+        words={
+          by === meId
             ? t("stretchCard.continuedByYou", { time })
-            : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
-        </Text>
-      ) : card.state === "resumed" || card.state === "ended" || card.state === "canceled" ? (
-        <Text variant="footnote" tone="faint">
-          {t(`usageCard.${card.state}`, { agent: name })}
-        </Text>
-      ) : (
-        <>
-          <Text variant="footnote" tone="faint">
+            : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })
+        }
+      />
+    );
+  if (card.state === "resumed" || card.state === "ended" || card.state === "canceled")
+    return <AskDone done={card.state === "resumed"} words={t(`usageCard.${card.state}`, { agent: name })} />;
+  const busy = pending || dontRun.pending;
+  return (
+    <AskWaiting
+      forMe={may}
+      mark="pause"
+      words={title}
+      actions={
+        may
+          ? [
+              <EventPillAction
+                key="continue"
+                primary
+                label={t("usageCard.continue")}
+                loading={pending}
+                disabled={busy}
+                onPress={() => void go()}
+              />,
+              card.runId ? (
+                <EventPillAction
+                  key="dontRun"
+                  label={t("usageCard.dontRun")}
+                  loading={dontRun.pending}
+                  disabled={busy}
+                  onPress={() => void dontRun.go()}
+                />
+              ) : null,
+            ]
+          : null
+      }
+      below={
+        <EventPillText>
+          <Text variant="footnote" tone="muted">
             {line}
           </Text>
-          <Button
-            variant="primary"
-            size="sm"
-            label={t("usageCard.continue")}
-            disabled={pending || !may}
-            onPress={() => void go()}
-          />
-          <View style={styles.textActs}>
-            <DontRunButton runId={card.runId} may={may} />
-          </View>
-          {!may ? (
-            <Text variant="footnote" tone="faint">
+          {may ? null : (
+            <Text variant="footnote" tone="muted">
               {t("usageCard.forbidden")}
             </Text>
-          ) : null}
-        </>
-      )}
-    </View>
+          )}
+        </EventPillText>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, fontWeight: "600" },
-  acts: { marginTop: 4, gap: 2, alignItems: "flex-start" },
+  acts: { gap: 2, alignItems: "flex-start" },
   // Words-only actions: the ghost buttons' own side padding hangs outside, so their words line up with the text.
   textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginLeft: -14 },
 });

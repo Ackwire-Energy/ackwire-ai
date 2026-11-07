@@ -1,5 +1,6 @@
 import { type Issue, type Message, useApi, useChannels, type WorkView } from "@agenteschat/client";
-import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
+import { heldBack } from "@agenteschat/client/lib/issues";
+import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -56,8 +57,9 @@ function useLine(work: WorkView) {
   return { view, stop, t };
 }
 
-/** The work's thread, where its updates are. */
-const threadHref = (work: WorkView) => chatHref(work.channelId, work.threadId ?? work.anchorMessageId);
+/** The work's thread, where its updates are, on the question it waits on. */
+const threadHref = (work: WorkView) =>
+  chatHref(work.channelId, work.threadId ?? work.anchorMessageId, work.question?.messageId);
 
 function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void; extra?: ReactNode }) {
   const c = useColors();
@@ -92,6 +94,11 @@ function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void
         <Text variant="small" tone="ink2">
           {view.text}
         </Text>
+        {view.question ? (
+          <Text variant="small" tone="ink" numberOfLines={2}>
+            {view.question.text}
+          </Text>
+        ) : null}
         {view.update ? (
           <Text variant="small" tone="muted">
             {view.update}
@@ -153,14 +160,15 @@ function Action({
 
 /**
  * Under the agent's "Vou cuidar disso": the work's line. Abrir thread only where nothing else opens it: not under a
- * root whose thread link shows (`threaded`), nor inside that thread.
+ * root whose thread link shows (`threaded`), unless it waits on someone, nor inside that thread.
  */
 export function MessageWorkLine({ message, threaded }: { message: Message; threaded?: boolean }) {
   const { thread } = useLocalSearchParams<{ thread?: string }>();
   const work = message.longWork;
   if (!work) return null;
   const inside = thread === (work.threadId ?? work.anchorMessageId);
-  return <Line work={work} onThread={threaded || inside ? undefined : () => router.push(threadHref(work))} />;
+  const hidden = inside || (threaded && !workWaitsOnPerson(work));
+  return <Line work={work} onThread={hidden ? undefined : () => router.push(threadHref(work))} />;
 }
 
 /** On a task's screen: the work's line and the agent's plan. */
@@ -213,7 +221,7 @@ export function IssueWorkLine({ issue }: { issue: Issue }) {
  * Mostrar para todos: a card a DM or a private channel holds back, for who may show it to the whole workspace (who
  * asked for the work, its creator, an admin).
  */
-function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
+function ShareAction({ issue, work }: { issue: Issue; work?: WorkView }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -230,11 +238,12 @@ function ShareAction({ issue, work }: { issue: Issue; work: WorkView }) {
     },
     onError: () => toast({ title: t("work.shareFailed"), icon: "info" }),
   });
-  const channel = issue.channelId ? channels.data?.find((c) => c.id === issue.channelId) : undefined;
-  const heldBack = Boolean(issue.channelId && channels.data && (!channel || channel.visibility === "private"));
   const mayShare =
-    work.requestedByUserId === meId || (issue.createdBy.type === "person" && issue.createdBy.id === meId) || admin;
-  if (!heldBack || !mayShare) return null;
+    !work ||
+    work.requestedByUserId === meId ||
+    (issue.createdBy.type === "person" && issue.createdBy.id === meId) ||
+    admin;
+  if (!heldBack(issue, channels.data) || !mayShare) return null;
   return (
     <Action
       label={t("work.shareEveryone")}
@@ -251,7 +260,6 @@ const styles = StyleSheet.create({
   line: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,

@@ -176,7 +176,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "browser:use": {
     label: "Use a browser",
     description:
-      "Browse websites in its own browser on the agent's connected computer (logins kept per agent). Needs the browser turned on on that computer.",
+      "Browse websites in its own browser on the agent's computer (logins kept per agent). Needs the browser turned on on that computer.",
   },
   "desktop:use": {
     label: "Use its desktop",
@@ -196,7 +196,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "vault:write": {
     label: "Edit Vault contacts",
     description:
-      "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved.",
+      "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved.",
   },
 };
 
@@ -208,14 +208,17 @@ export const VAULT_READ_SCOPE = "vault:read";
 export const VAULT_WRITE_SCOPE = "vault:write";
 /** The tool whose grant stands for using the Vault at all: a login typed or a key given to a command checks it. */
 export const VAULT_LIST_TOOL = "vault_list";
+/** The tool whose grant stands for keeping things in the Vault: a password an agent makes checks it. */
+export const VAULT_SAVE_TOOL = "vault_save";
 
 /** A built-in scope by name: own keys only, so "constructor" or "toString" never passes as one. */
 export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, scope);
 
 /**
  * Granted to every new agent: reading context, keeping its own notes,
- * reading and writing Drive files, and reading issues (so any agent can check
- * the org's issues before answering about them; low risk), setting up the
+ * reading and writing Drive files, reading and writing issues (any agent checks
+ * the org's issues before answering about them, and a task someone asks for
+ * lands on the workspace's board, not in another tool; low risk), setting up the
  * workspace for whoever asks (cards a person clicks, channels with Undo), the
  * Vault (what people share with it there, ADR 0144), and its computer (running commands, its own browser and desktop): on a connected
  * computer each still needs the switch the person at that computer turned on.
@@ -224,6 +227,7 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
   "issues:read",
+  "issues:write",
   "memory:write",
   "drive:read",
   "drive:write",

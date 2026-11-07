@@ -2,7 +2,7 @@ import type { Channel } from "@agenteschat/client";
 import { useDeleteChannel } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { matchesName } from "@agenteschat/client/lib/text";
-import { AffixInput, Button, Dialog, DialogBody, DialogFooter, Field, Icon } from "@agenteschat/ui";
+import { AffixInput, Button, Dialog, DialogBody, DialogFooter, Field, Icon, Locked } from "@agenteschat/ui";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -65,37 +65,39 @@ export function DeleteChannelDialog({
           confirm();
         }}
       >
-        <DialogBody>
-          <ul className="agp-delete">
-            <li className="ac-iconline">
-              <Icon name="trash" size={16} />
-              <span>{t("channel.deleteGoes")}</span>
-            </li>
-            {channel?.visibility === "private" && (
+        <Locked when={remove.isPending}>
+          <DialogBody>
+            <ul className="agp-delete">
               <li className="ac-iconline">
-                <Icon name="issues" size={16} />
-                <span>{t("channel.deleteIssues")}</span>
+                <Icon name="trash" size={16} />
+                <span>{t("channel.deleteGoes")}</span>
               </li>
-            )}
-            <li className="ac-iconline">
-              <Icon name="archive" size={16} />
-              <span>{t("channel.deleteOrArchive")}</span>
-            </li>
-          </ul>
-          <Field
-            label={t("channel.deleteTypeName", { channel: name })}
-            id="channel-delete-name"
-            error={remove.error ? errorText(t, remove.error) : undefined}
-          >
-            <AffixInput
-              prefix="#"
-              value={typed}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setTyped(e.target.value)}
-            />
-          </Field>
-        </DialogBody>
+              {channel?.visibility === "private" && (
+                <li className="ac-iconline">
+                  <Icon name="issues" size={16} />
+                  <span>{t("channel.deleteIssues")}</span>
+                </li>
+              )}
+              <li className="ac-iconline">
+                <Icon name="archive" size={16} />
+                <span>{t("channel.deleteOrArchive")}</span>
+              </li>
+            </ul>
+            <Field
+              label={t("channel.deleteTypeName", { channel: name })}
+              id="channel-delete-name"
+              error={remove.error ? errorText(t, remove.error) : undefined}
+            >
+              <AffixInput
+                prefix="#"
+                value={typed}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setTyped(e.target.value)}
+              />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={close}>
             {t("common.cancel")}

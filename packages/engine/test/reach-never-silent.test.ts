@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { asc, eq, schema } from "@agenteschat/db";
-import { type ModelRequest, systemText } from "@agenteschat/providers";
+import type { ModelRequest } from "@agenteschat/providers";
 import {
   createAgent,
   createAskAgentToolSource,
@@ -19,9 +19,9 @@ import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, messagesIn, notificationsOf, routineDeps } from "./routine-fixtures";
 
 /**
- * A message meant for an agent reaches it, or someone is told why not: an agent's @mention of an agent outside the
- * conversation goes to it as a note, one the person behind it can't talk to says so under the message, and a
- * routine whose creator can't reach the agent tells the agent's owner. Every skip is in `routing_decisions`.
+ * A member an agent's message names is reached, or someone is told why not: one the person behind it can't talk to
+ * says so under the message, and a routine whose creator can't reach the agent tells the agent's owner. Every skip is
+ * in `routing_decisions`. An agent's @ of an agent outside the conversation reaches nobody: `tell_agent` does that.
  */
 
 setDefaultTimeout(60_000);
@@ -33,7 +33,6 @@ afterEach(async () => {
 });
 
 const isRoutine = (req: ModelRequest) => (req.tools ?? []).some((t) => t.name === "hand_off");
-const inAgentDm = (req: ModelRequest) => systemText(req.system).includes("A private conversation between agents");
 const NO_ROUTE = { chunks: ['{"needs_agent":0,"scores":[],"reason":"none"}'] };
 
 async function agentOf(name: string, handle: string, options: { inGeneral: boolean }) {
@@ -74,46 +73,49 @@ const messageOf = async (id: string) =>
   (await f.db.select().from(schema.messages).where(eq(schema.messages.id, id)))[0];
 
 describe("an agent's mention of an agent outside the conversation", () => {
-  test("goes to it as a note, shows under the message and in the author's next context", async () => {
-    f = await setup({
+  const needed = () =>
+    setup({
       askAgent: true,
       judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
-      reply: (req) =>
-        req.outputSchema ? NO_ROUTE : inAgentDm(req) ? { chunks: ["Vou revisar."] } : { chunks: ["ok"] },
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
     });
+  const untouched = async (ivoId: string, sentId: string) => {
+    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
+    expect((await runsOf()).filter((r) => r.agentId === ivoId)).toEqual([]);
+    expect(reachOf((await messageOf(sentId))?.meta)).toEqual([]);
+  };
+
+  test("a passing name delivers nothing, wakes nobody and shows no line under the message", async () => {
+    f = await needed();
+    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
+    const sent = await devWrites("O arquivo do app (AAB) vem do @ivo.", ["ivo"]);
+    await drainOutbox(f.db, f.handlers);
+    await untouched(ivo.id, sent.id);
+  });
+
+  test("neither does a clear hand-off: that is what tell_agent is for", async () => {
+    f = await needed();
     const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
     const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"]);
     await drainOutbox(f.db, f.handlers);
-
-    const [note] = await f.db.select().from(schema.agentConsultations);
-    expect(note).toMatchObject({ kind: "note", askerAgentId: f.agent.id, targetAgentId: ivo.id });
-    expect(note?.question).toContain("revisa o relatório de hoje");
-    expect((await runsOf()).some((r) => r.agentId === ivo.id && r.channelId === note?.channelId)).toBe(true);
-    const reach = reachOf((await messageOf(sent.id))?.meta);
-    expect(reach).toEqual([{ agentId: ivo.id, handle: "ivo", reason: "not_in_channel", consultationId: note?.id }]);
-    expect((await decisionOf(sent.id))?.reason).toContain("not_in_channel: @ivo");
-    expect(reachNote(reach)).toContain("went to it as a note");
+    await untouched(ivo.id, sent.id);
   });
 
-  test("the judge reads as needing nothing: no note", async () => {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.95 : undefined),
-      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
-    });
-    await agentOf("Ivo", "ivo", { inGeneral: false });
-    const sent = await devWrites("Valeu, @ivo!", ["ivo"]);
-    await drainOutbox(f.db, f.handlers);
-    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
-    expect(reachOf((await messageOf(sent.id))?.meta)).toEqual([]);
+  test("from a private channel and a DM neither", async () => {
+    f = await needed();
+    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
+    const rh = await createChannel(f.db, f.owner.id, f.org.id, { name: "rh", visibility: "private" });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: rh.id, agentId: f.agent.id });
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    for (const place of [rh.id, dm.id]) {
+      const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"], place);
+      await drainOutbox(f.db, f.handlers);
+      await untouched(ivo.id, sent.id);
+    }
   });
 
-  test("one the person behind it can't talk to gets nothing, and the message says so", async () => {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
-      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
-    });
+  test("one the person behind it can't talk to shows nothing either: the @ was never a call", async () => {
+    f = await needed();
     const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
@@ -122,12 +124,7 @@ describe("an agent's mention of an agent outside the conversation", () => {
       .where(eq(schema.agents.id, ivo.id));
     const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"]);
     await drainOutbox(f.db, f.handlers);
-
-    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
-    const reach = reachOf((await messageOf(sent.id))?.meta);
-    expect(reach).toEqual([{ agentId: ivo.id, handle: "ivo", reason: "audience", outside: true, userId: f.owner.id }]);
-    expect((await decisionOf(sent.id))?.reason).toContain("audience: @ivo");
-    expect(reachNote(reach)).toContain("the person you are helping isn't one of them");
+    await untouched(ivo.id, sent.id);
   });
 });
 
@@ -185,6 +182,27 @@ describe("a member that takes consultations for the person behind an agent's mes
     );
     expect(skipped).toEqual([]);
   });
+
+  test("with no AI connected, the line under the message says that, not that the person can't talk to it", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+    });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner", model: "gpt-6-luna", credentialId: null })
+      .where(eq(schema.agents.id, gil.id));
+    const sent = await devWrites("@gil revisa o relatório de hoje.", []);
+    await drainOutbox(f.db, f.handlers);
+
+    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
+    expect(reachOf((await messageOf(sent.id))?.meta)).toEqual([
+      { agentId: gil.id, handle: "gil", reason: "audience", noAi: true },
+    ]);
+  });
 });
 
 describe("a routine whose creator can't reach the agent it names", () => {
@@ -238,7 +256,7 @@ describe("never silent, the edges", () => {
       judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
       reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
     });
-    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
+    await agentOf("Ivo", "ivo", { inGeneral: false });
     const ops = await agentOf("Ops", "ops", { inGeneral: true });
     const strategy: RouterStrategy = {
       name: "fixed",
@@ -257,85 +275,23 @@ describe("never silent, the edges", () => {
     await drainOutbox(f.db, handlers);
 
     expect((await runsOf()).some((r) => r.agentId === ops.id && r.triggerMessageId === sent.id)).toBe(true);
-    expect((await f.db.select().from(schema.agentConsultations)).map((c) => c.targetAgentId)).toEqual([ivo.id]);
-    expect((await decisionOf(sent.id))?.reason).toContain("not_in_channel: @ivo");
+    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
   });
 
-  test("from a private channel too it goes as a note, with the line under it", async () => {
+  test("a tell_agent after a member's mention was handed sends no second note", async () => {
     f = await setup({
       askAgent: true,
       judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
       reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
     });
-    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
-    const rh = await createChannel(f.db, f.owner.id, f.org.id, { name: "rh", visibility: "private" });
-    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: rh.id, agentId: f.agent.id });
-    const sent = await devWrites("Como o @ivo pediu, segue a planilha de salários.", ["ivo"], rh.id);
-    await drainOutbox(f.db, f.handlers);
-
-    const [note] = await f.db.select().from(schema.agentConsultations);
-    expect(note?.targetAgentId).toBe(ivo.id);
-    const reach = reachOf((await messageOf(sent.id))?.meta);
-    expect(reach).toEqual([{ agentId: ivo.id, handle: "ivo", reason: "not_in_channel", consultationId: note?.id }]);
-    expect((await decisionOf(sent.id))?.reason).toContain("not_in_channel: @ivo");
-    expect(reachNote(reach)).toContain("[Delivered as a note]");
-  });
-
-  test("from a DM too it goes as a note, but only to an agent the person behind it may talk to", async () => {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
-      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
-    });
-    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
-    const eva = await agentOf("Eva", "eva", { inGeneral: false });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
     const bob = await addMember(f.db, f.org.id, "member", "bob");
     await f.db
       .update(schema.agents)
-      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
-      .where(eq(schema.agents.id, eva.id));
-    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
-    const sent = await devWrites("@ivo e @eva, revisem o resumo.", ["eva", "ivo"], dm.id);
-    await drainOutbox(f.db, f.handlers);
-
-    const notes = await f.db.select().from(schema.agentConsultations);
-    expect(notes.map((c) => c.targetAgentId)).toEqual([ivo.id]);
-    const reach = reachOf((await messageOf(sent.id))?.meta);
-    expect(reach.map((e) => [e.handle, e.reason, !!e.consultationId]).sort()).toEqual([
-      ["eva", "audience", false],
-      ["ivo", "not_in_channel", true],
-    ]);
-  });
-
-  test("an agent with no AI isn't shown as handed: the line says nothing could answer", async () => {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
-      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
-    });
-    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
-    await f.db
-      .update(schema.agents)
-      .set({ model: "gpt-6-luna", credentialId: null })
-      .where(eq(schema.agents.id, ivo.id));
-    const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"]);
-    await drainOutbox(f.db, f.handlers);
-
-    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
-    expect(reachOf((await messageOf(sent.id))?.meta)).toEqual([
-      { agentId: ivo.id, handle: "ivo", reason: "not_in_channel", noAi: true },
-    ]);
-  });
-
-  test("a tell_agent after the mention was handed sends no second note", async () => {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
-      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
-    });
-    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
-    const sent = await devWrites("@ivo revisa o relatório de hoje.", ["ivo"]);
-    // Ivo never works on it: the note stays open.
+      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, gil.id));
+    const sent = await devWrites("@gil revisa o relatório de hoje.", []);
+    // Gil never works on it: the note stays open.
     const handlers = { ...f.handlers, "agent_run.execute": async () => {} };
     await drainOutbox(f.db, handlers);
     expect(await f.db.select().from(schema.agentConsultations)).toHaveLength(1);
@@ -350,10 +306,10 @@ describe("never silent, the edges", () => {
       triggerMessageId: sent.id,
     };
     const tell = (await createAskAgentToolSource().tools(ctx)).find((t) => t.name === "tell_agent");
-    const out = await tell?.execute({ agent: "@ivo", message: "Confere os logs também." }, ctx);
+    const out = await tell?.execute({ agent: "@gil", message: "Confere os logs também." }, ctx);
     expect(out?.content).toContain("already has it");
     expect(await f.db.select().from(schema.agentConsultations)).toHaveLength(1);
-    expect((await f.db.select().from(schema.agentConsultations))[0]?.targetAgentId).toBe(ivo.id);
+    expect((await f.db.select().from(schema.agentConsultations))[0]?.targetAgentId).toBe(gil.id);
   });
 });
 
