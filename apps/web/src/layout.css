@@ -7468,7 +7468,8 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
     display: none;
   }
 }
-/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it. */
+/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it. The zoom bar comes
+   with the picture (no "100%" while its bytes are on the way). */
 .izoom__status {
   animation: izoom-wait 0.3s;
 }
@@ -7477,6 +7478,9 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   to {
     opacity: 0;
   }
+}
+.izoom:not(:has(.izoom__img[data-ready])) .izoom__bar {
+  visibility: hidden;
 }
 /* Moving through a message's pictures: square buttons on the stage's sides, halfway down, raised like the zoom bar so
    they read on any picture, and "2 de 4" in the head before Baixar. */
