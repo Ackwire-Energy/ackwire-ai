@@ -490,7 +490,9 @@ describe("a board's notices in Waiting on you", () => {
     expect(proposal.textContent).toContain("“Black Friday” para todo o workspace · hoje só você vê");
     const alert = rows[text.findIndex((x) => x.includes("Ada avisou sobre “Vendas hoje”"))] as HTMLElement;
     expect(alert.textContent).toContain("As vendas caíram 24% abaixo de ontem.");
-    const failed = rows[text.findIndex((x) => x.includes("“Tempo de build” parou de atualizar"))] as HTMLElement;
+    const failed = rows[
+      text.findIndex((x) => x.includes("Ada não conseguiu atualizar “Tempo de build”"))
+    ] as HTMLElement;
     expect(failed.textContent).toContain("A última atualização terminou sem dados.");
 
     await click(within(proposal).getByRole("button", { name: "Manter só para mim" }));

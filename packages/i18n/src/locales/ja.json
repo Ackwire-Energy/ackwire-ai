@@ -14617,7 +14617,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b>が「{{title}}」でアラートを出しました",
-      "failed": "「{{title}}」の更新が止まりました",
+      "failed": "<b>{{name}}</b>が「{{title}}」を更新できませんでした",
       "proposal": "<b>{{name}}</b>がダッシュボードの公開を提案しています",
       "proposalWorkspace": "「{{title}}」をワークスペース全体に · 今はあなただけが見られます",
       "proposalRoles": "「{{title}}」を{{roles}}に · 今はあなただけが見られます",

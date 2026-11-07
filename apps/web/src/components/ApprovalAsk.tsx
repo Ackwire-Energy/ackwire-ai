@@ -50,11 +50,14 @@ export function ApprovalAsk({
   approval,
   agent,
   members,
+  who,
   tail,
 }: {
   approval: Approval;
   agent: Agent | undefined;
   members: Map<string, Member>;
+  /** Who asks, before the kind (Notificações: the card stands away from its conversation). */
+  who?: ReactNode;
   /** After the fuse at the footer's end (the notifications' Remind me later and Done). */
   tail?: ReactNode;
 }) {
@@ -83,6 +86,7 @@ export function ApprovalAsk({
       id={approval.id}
       kind="approval"
       agent={agent}
+      who={who}
       label={t("approval.group")}
       mine={approval.canDecide}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
@@ -150,11 +154,14 @@ export function ApprovalGroupAsk({
   items,
   agent,
   members,
+  who,
   tail,
 }: {
   items: Approval[];
   agent: Agent | undefined;
   members: Map<string, Member>;
+  /** Who asks, before the kind (Notificações: the card stands away from its conversation). */
+  who?: ReactNode;
   /** After the fuse at the footer's end (the notifications' Remind me later and Done). */
   tail?: ReactNode;
 }) {
@@ -206,6 +213,7 @@ export function ApprovalGroupAsk({
       id={first.id}
       kind="approval"
       agent={agent}
+      who={who}
       label={t("approval.group")}
       mine={mine}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
