@@ -67,6 +67,7 @@ import {
   createSpeechSettings,
   createStreamBroker,
   createTalker,
+  createTeamStatusToolSource,
   createToolGateway,
   createUsageToolSource,
   createVaultToolSource,
@@ -379,6 +380,8 @@ export function buildEngine(o: EngineOptions) {
       createWorkToolSource({ pubsub: adapters.pubsub }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
+      // The right hand sees what the team is doing, with no model call (ADR 0137 §13).
+      createTeamStatusToolSource(),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub, judge: context.judge, tools: () => tools }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.

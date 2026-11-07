@@ -81,6 +81,36 @@ const accepted = (state: { calls: { method: string; args: unknown[] }[] }) =>
   state.calls.filter((c) => c.method === "proposals.accept").map((c) => c.args[1]);
 const click = (el: HTMLElement) => act(async () => fireEvent.click(el));
 
+describe("a skill proposed in the chat", () => {
+  const skill = (id: string) =>
+    row(id, {
+      target: { type: "skill", agentId: ADA_ID, skillId: "sk-1", name: "relatorios" },
+      before: "# Relatórios\n1. Abrir a planilha.",
+      after: "# Relatórios\n1. Abrir a planilha.\n2. Conferir os totais.",
+      whyCode: "skill",
+    });
+
+  test("its card shows the change and takes it as proposed: Aceitar and Recusar, no Editar", async () => {
+    const state = await openCard([skill("p-skill")]);
+    const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas" });
+    expect(card.textContent).toContain("relatorios");
+    expect(card.querySelector(".rq__wt")?.textContent).toContain("Conferir os totais.");
+    await click(within(card).getByRole("button", { name: "Ver a mudança" }));
+    expect(card.querySelector(".ac-diff__line--add")?.textContent).toContain("Conferir os totais.");
+    expect(within(card).queryByRole("button", { name: "Editar" })).toBeNull();
+    await click(within(card).getByRole("button", { name: "Aceitar mudança" }));
+    await settle(4);
+    expect(accepted(state)).toEqual(["p-skill"]);
+  });
+
+  test("whoever can't decide it sees whom it waits for and the change", async () => {
+    await openCard([{ ...skill("p-skill"), canDecide: false }]);
+    const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas" });
+    expect(within(card).queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
+    expect(card.textContent).toContain("Conferir os totais.");
+  });
+});
+
 describe("a change proposed for several agents in the chat", () => {
   test("one card: the change shown once, a row per agent, 'Aceitar para todos' accepts each row", async () => {
     const state = await openCard([row("p-ada"), atlas("p-atlas")]);

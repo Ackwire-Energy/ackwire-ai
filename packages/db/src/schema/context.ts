@@ -204,6 +204,8 @@ export interface ProposedSettingLine {
     | "channel_add"
     | "channel_remove"
     | "reply_mode"
+    | "name"
+    | "look"
     | "archive"
     | "delete";
   from: unknown;

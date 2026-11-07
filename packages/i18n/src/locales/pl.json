@@ -2061,7 +2061,7 @@
     "composerHint": "nic się nie zmienia bez ciebie",
     "intro": {
       "greeting": "Cześć, tu {{name}}. Zbuduję z tobą zespół.",
-      "lead": "Tworzę agentów, podłączam aplikacje i zapraszam ludzi. Nic się nie zmienia bez twojego kliknięcia i robię tylko to, co ty możesz zrobić.",
+      "lead": "Tworzę agentów, podłączam aplikacje i zapraszam ludzi. Nic się nie zmienia bez twojej prośby i robię tylko to, co ty możesz zrobić.",
       "heldLead": "Wybierz, czym zajmuje się twoja firma, a zespół pojawi się tutaj. Agenci zaczną pracować, gdy workspace będzie mieć plan agentes.chat.",
       "connect": {
         "title": "Podłącz AI dla zespołu",
@@ -2180,6 +2180,8 @@
         "audience": "Tylko admini i opiekun zmieniają, kto z nim rozmawia",
         "channels": "Tylko admini i opiekun zmieniają jego kanały",
         "ai_account": "Przydziela je tylko właściciel konta",
+        "name": "Tylko admini zmieniają nazwę agenta",
+        "look": "Tylko admini i opiekun zmieniają jego wygląd",
         "many": "Tylko admini wprowadzają te zmiany"
       }
     },
@@ -2190,9 +2192,12 @@
       "owner": "Opiekun",
       "audience": "Kto może rozmawiać",
       "archive": "Stan",
-      "channel": "Kanał"
+      "channel": "Kanał",
+      "name": "Nazwa",
+      "look": "Wygląd"
     },
     "value": {
+      "lookDefault": "Domyślny wygląd",
       "none": "Brak",
       "budgetDefault": "Domyślny workspace",
       "anAccount": "Konto AI",
@@ -2867,7 +2872,10 @@
       "updated": "Poprawiono umiejętność <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "Zmieniono ustawienia <b>{{agentName}}</b>"
+      "settings_changed": "Zmieniono ustawienia <b>{{agentName}}</b>",
+      "settings_changed_instructions": "Zmieniono instrukcje <b>{{agentName}}</b>",
+      "settings_changed_role": "Zmieniono rolę <b>{{agentName}}</b>",
+      "settings_changed_apps": "Zmieniono aplikacje <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "Scalono PR <b>#{{number}}</b> w <b>{{repo}}</b>",

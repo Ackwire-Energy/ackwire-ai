@@ -1837,7 +1837,7 @@
     "composerHint": "당신 없이는 아무것도 바뀌지 않아요",
     "intro": {
       "greeting": "안녕하세요, {{name}}예요. 당신과 함께 팀을 꾸려요.",
-      "lead": "에이전트를 만들고, 앱을 연결하고, 사람들을 초대해요. 당신이 클릭하지 않으면 아무것도 바뀌지 않고, 당신이 할 수 있는 일만 해요.",
+      "lead": "에이전트를 만들고, 앱을 연결하고, 사람들을 초대해요. 당신이 요청하지 않으면 아무것도 바뀌지 않고, 당신이 할 수 있는 일만 해요.",
       "heldLead": "회사가 하는 일을 고르면 여기에 팀이 나타나요. 워크스페이스에 agentes.chat 요금제가 생기면 에이전트가 일하기 시작해요.",
       "connect": {
         "title": "팀을 위한 AI 연결",
@@ -1956,6 +1956,8 @@
         "audience": "대화할 수 있는 사람은 관리자와 담당자만 바꿀 수 있어요",
         "channels": "채널은 관리자와 담당자만 바꿀 수 있어요",
         "ai_account": "계정 주인만 줄 수 있어요",
+        "name": "에이전트 이름은 관리자만 바꿀 수 있어요",
+        "look": "모습은 관리자와 담당자만 바꿀 수 있어요",
         "many": "이 변경은 관리자만 할 수 있어요"
       }
     },
@@ -1966,9 +1968,12 @@
       "owner": "담당자",
       "audience": "대화할 수 있는 사람",
       "archive": "상태",
-      "channel": "채널"
+      "channel": "채널",
+      "name": "이름",
+      "look": "모습"
     },
     "value": {
+      "lookDefault": "기본 모습",
       "none": "없음",
       "budgetDefault": "워크스페이스 기본값",
       "anAccount": "AI 계정 하나",
@@ -2583,7 +2588,10 @@
       "updated": "스킬 <b>{{name}}</b>을(를) 수정했어요"
     },
     "agent": {
-      "settings_changed": "<b>{{agentName}}</b>의 설정을 변경했어요"
+      "settings_changed": "<b>{{agentName}}</b>의 설정을 변경했어요",
+      "settings_changed_instructions": "<b>{{agentName}}</b>의 지침을 변경했어요",
+      "settings_changed_role": "<b>{{agentName}}</b>의 역할을 변경했어요",
+      "settings_changed_apps": "<b>{{agentName}}</b>의 앱을 변경했어요"
     },
     "pr": {
       "merged": "<b>{{repo}}</b>의 PR <b>#{{number}}</b>을 병합했어요",

@@ -11,6 +11,7 @@ import {
   insertMessage,
   linkRunActions,
   listNotifications,
+  openPersonAgentDm,
   SKILL_CHANGE_LIMITS,
   type SkillDetail,
   saveSkill,
@@ -49,12 +50,12 @@ async function personSkill(fx: Fixture) {
   return { author, skill };
 }
 
-/** A finished run of the agent answering the owner in general. */
-async function personRun(fx: Fixture) {
+/** A finished run of the agent answering the owner (or `userId`) in general. */
+async function personRun(fx: Fixture, userId = fx.owner.id) {
   const msg = await insertMessage(fx.db, {
     orgId: fx.org.id,
     channelId: fx.general.id,
-    author: { type: "person", userId: fx.owner.id },
+    author: { type: "person", userId },
     body: "@dev deploy it",
   });
   const [run] = await fx.db
@@ -258,7 +259,7 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
     await setSkillSettings(f.db, f.owner.id, f.org.id, { agentsImprove: false });
     expect(await getSkillSettings(f.db, member.id, f.org.id)).toEqual({ agentsImprove: false });
 
-    const run = await personRun(f);
+    const run = await personRun(f, member.id);
     await usedSkill(run);
     const out = await invoke(run, "update_skill", {
       name: "deploy",
@@ -266,6 +267,11 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
       files: [{ path: "references/guide.md", content: "New guide." }],
     });
     expect(out.content).toContain("Agents don't change this skill by themselves here, so the change is a proposal");
+    expect(out.data?.memoryUpdate).toMatchObject({
+      action: "proposed",
+      canDecide: false,
+      requestedByUserId: member.id,
+    });
     expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).version).toBe(1);
     expect((await proposals()).map((p) => p.skillPath).sort()).toEqual(["references/guide.md", null].sort());
 
@@ -275,6 +281,98 @@ describe("agents improve skills by themselves (ADR 0120, ADR 0020)", () => {
     expect((await invoke(run, "update_skill", { name: "deploy", body: "# deploy\n1. Build once." })).content).toBe(
       "Updated deploy (v2).",
     );
+  });
+
+  test("who may decide asked in their own words: it applies at once with Undo, the setting off or the skill locked", async () => {
+    f = await setup({ skillTools: true });
+    const { skill } = await personSkill(f);
+    await setSkillSettings(f.db, f.owner.id, f.org.id, { agentsImprove: false });
+    await f.db.update(schema.skills).set({ locked: true }).where(eq(schema.skills.id, skill.id));
+    const run = await personRun(f);
+    await usedSkill(run);
+    const out = await invoke(run, "update_skill", { name: "deploy", body: "# deploy\n1. Build twice." });
+    expect(out.content).toBe("Updated deploy (v2).");
+    expect(out.data?.memoryUpdate).toBeUndefined();
+    const [receipt] = await f.db
+      .select()
+      .from(schema.agentActions)
+      .where(eq(schema.agentActions.kind, "skill.updated"));
+    await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
+    expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).body).toBe("# deploy\n1. Build.");
+  });
+
+  test("a file that runs still waits on its card, whoever asked", async () => {
+    f = await setup({ skillTools: true });
+    await personSkill(f);
+    const run = await personRun(f);
+    await usedSkill(run);
+    const out = await invoke(run, "update_skill", {
+      name: "deploy",
+      body: "# deploy\n1. Build twice.",
+      files: [{ path: "scripts/run.sh", content: "echo new" }],
+    });
+    expect(out.content).toContain("Updated deploy (v2)");
+    const [proposal] = await proposals();
+    expect(out.data?.memoryUpdate).toMatchObject({
+      action: "proposed",
+      canDecide: true,
+      proposalIds: [proposal?.id],
+    });
+  });
+
+  test("a proposal reaches people: a card under the reply, and an inbox row for other deciders", async () => {
+    f = await setup({ skillTools: true });
+    await personSkill(f);
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const run = await personRun(f);
+    await usedSkill(run);
+    await step(run, "web_fetch", { url: "https://vendor.example" }, "page");
+    const out = await invoke(run, "update_skill", { name: "deploy", body: "# deploy\n1. Build twice." });
+    const [proposal] = await proposals();
+    expect(out.data?.memoryUpdate).toMatchObject({ action: "proposed", proposalIds: [proposal?.id] });
+    expect(proposal).toMatchObject({ requestedByUserId: f.owner.id, proposedByAgentId: f.agent.id });
+    const rows = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.kind, "proposal_waiting"));
+    expect(rows.map((n) => n.userId)).toContain(admin.id);
+    expect(rows.map((n) => n.userId)).not.toContain(f.owner.id);
+  });
+
+  test("in a room the person doesn't read (a hand-off in the agents' DM), they get the inbox row", async () => {
+    f = await setup({ skillTools: true });
+    await personSkill(f);
+    const run = await personRun(f);
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const between = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
+    await f.db.update(schema.agentRuns).set({ channelId: between.id }).where(eq(schema.agentRuns.id, run.id));
+    const away = { ...run, channelId: between.id };
+    await usedSkill(away);
+    await step(away, "web_fetch", { url: "https://vendor.example" }, "page");
+    const out = await invoke(away, "update_skill", { name: "deploy", body: "# deploy\n1. Build twice." });
+    expect(out.data?.memoryUpdate).toBeUndefined();
+    const [proposal] = await proposals();
+    expect(proposal?.requestedByUserId).toBeNull();
+    const rows = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.kind, "proposal_waiting"));
+    expect(rows.map((n) => n.userId)).toContain(f.owner.id);
+  });
+
+  test("with nobody behind the run there is no card, and who decides has the inbox row", async () => {
+    f = await setup({ skillTools: true });
+    await personSkill(f);
+    const run = await personRun(f);
+    await f.db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, run.id));
+    await usedSkill(run);
+    const out = await invoke(run, "update_skill", { name: "deploy", body: "# deploy\n1. Build twice." });
+    expect(out.data?.memoryUpdate).toBeUndefined();
+    const rows = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.kind, "proposal_waiting"));
+    expect(rows.map((n) => n.userId)).toContain(f.owner.id);
   });
 
   test("after outside content, nothing applies at once: a proposal, whatever the setting", async () => {

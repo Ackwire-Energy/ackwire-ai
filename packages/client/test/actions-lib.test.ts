@@ -109,6 +109,21 @@ describe("receipt sentence values", () => {
     expect(actionTextValues(viewer, t, "u1").assignee).toBe("Bia");
   });
 
+  test("a change applied at once says what it changed; a card's settings stay settings", () => {
+    const applied = action({
+      kind: "agent.settings_changed",
+      target: { type: "agent", id: "a" },
+      params: { agentName: "Ada", fields: ["instructions"] },
+    });
+    expect(actionTextValues(applied, t)).toEqual({ agentName: "Ada", context: "instructions" });
+    const card = action({
+      kind: "agent.settings_changed",
+      target: { type: "agent", id: "a" },
+      params: { agentName: "Ada", fields: ["model"] },
+    });
+    expect(actionTextValues(card, t)).toEqual({ agentName: "Ada" });
+  });
+
   test("routine paused, channel, thread", () => {
     const paused = action({
       kind: "routine.updated",

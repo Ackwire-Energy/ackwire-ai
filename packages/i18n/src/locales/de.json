@@ -1912,7 +1912,7 @@
     "composerHint": "nichts ändert sich ohne dich",
     "intro": {
       "greeting": "Hallo, ich bin {{name}}. Ich stelle das Team mit dir zusammen.",
-      "lead": "Ich erstelle die Agenten, verbinde die Apps und lade die Leute ein. Nichts ändert sich ohne deinen Klick, und ich tue nur, was du tun darfst.",
+      "lead": "Ich erstelle die Agenten, verbinde die Apps und lade die Leute ein. Nichts ändert sich, ohne dass du darum bittest, und ich tue nur, was du tun darfst.",
       "heldLead": "Wähle, was dein Unternehmen macht, und das Team erscheint hier. Die Agenten beginnen zu arbeiten, sobald der Workspace einen agentes.chat-Tarif hat.",
       "connect": {
         "title": "Eine KI für das Team verbinden",
@@ -2031,6 +2031,8 @@
         "audience": "Nur Admins und der Verantwortliche ändern, wer mit ihm spricht",
         "channels": "Nur Admins und der Verantwortliche ändern seine Kanäle",
         "ai_account": "Nur die Person, der das Konto gehört, vergibt es",
+        "name": "Nur Admins benennen einen Agenten um",
+        "look": "Nur Admins und sein Verantwortlicher ändern sein Aussehen",
         "many": "Nur Admins machen diese Änderungen"
       }
     },
@@ -2041,9 +2043,12 @@
       "owner": "Verantwortlich",
       "audience": "Wer sprechen darf",
       "archive": "Status",
-      "channel": "Kanal"
+      "channel": "Kanal",
+      "name": "Name",
+      "look": "Aussehen"
     },
     "value": {
+      "lookDefault": "Das Standardaussehen",
       "none": "Keins",
       "budgetDefault": "Standard des Workspace",
       "anAccount": "Ein KI-Konto",
@@ -2687,7 +2692,10 @@
       "updated": "Skill <b>{{name}}</b> korrigiert"
     },
     "agent": {
-      "settings_changed": "Einstellungen von <b>{{agentName}}</b> geändert"
+      "settings_changed": "Einstellungen von <b>{{agentName}}</b> geändert",
+      "settings_changed_instructions": "Anweisungen von <b>{{agentName}}</b> geändert",
+      "settings_changed_role": "Rolle von <b>{{agentName}}</b> geändert",
+      "settings_changed_apps": "Apps von <b>{{agentName}}</b> geändert"
     },
     "pr": {
       "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemergt",

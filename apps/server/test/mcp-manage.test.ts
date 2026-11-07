@@ -207,7 +207,70 @@ describe("update_agent_instructions", () => {
   });
 });
 
+describe("update_agent", () => {
+  test("an admin changes the role, the name and the look; what is left out stays", async () => {
+    const { b, orgId, agentId } = await setup();
+    const app = await connectApp(t, b, orgId, MANAGE);
+    const res = data(
+      await callTool(t, app.access, "update_agent", {
+        agent: "@dev",
+        role: "Revisora",
+        name: "Ada",
+        avatar_color: "teal",
+        avatar_eyes: "happy",
+      }),
+    );
+    expect(res).toMatchObject({ id: agentId, name: "Ada" });
+    const [agent] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
+    expect(agent).toMatchObject({
+      role: "Revisora",
+      name: "Ada",
+      appearance: { color: "teal", eyes: "happy", accessory: "none" },
+    });
+    const [audit] = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "apps.updated"));
+    expect(audit?.details).toMatchObject({ client: "Claude", changed: ["role", "name", "look"] });
+
+    data(await callTool(t, app.access, "update_agent", { agent: "@dev", avatar_accessory: "crown" }));
+    const [after] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
+    expect(after?.appearance).toEqual({ color: "teal", eyes: "happy", accessory: "crown" });
+    expect((await callTool(t, app.access, "update_agent", { agent: "@dev" })).isError).toBe(true);
+  });
+
+  test("a member without manage_agents can't", async () => {
+    const { b, orgId, agentId } = await setup();
+    const member = await joinByInvitation(t, b, orgId, "member@example.com");
+    const app = await connectApp(t, member, orgId, MANAGE);
+    expect((await callTool(t, app.access, "update_agent", { agent: "dev", role: "Outra" })).isError).toBe(true);
+    const [agent] = await t.db.select().from(schema.agents).where(eq(schema.agents.id, agentId));
+    expect(agent?.role).not.toBe("Outra");
+  });
+});
+
 describe("skills", () => {
+  test("update_skill changes a skill as a new version; a member can't", async () => {
+    const { b, orgId } = await setup();
+    const app = await connectApp(t, b, orgId, MANAGE);
+    const made = data(
+      await callTool(t, app.access, "create_skill", {
+        markdown: "---\nname: release-notes\ndescription: Writes release notes\n---\nOld steps.",
+      }),
+    );
+    const changed = data(await callTool(t, app.access, "update_skill", { skill: "release-notes", body: "New steps." }));
+    expect(changed).toMatchObject({ id: made.id, version: 2 });
+    const [skill] = await t.db
+      .select()
+      .from(schema.skills)
+      .where(eq(schema.skills.id, String(made.id)));
+    expect(skill).toMatchObject({ body: "New steps.", description: "Writes release notes" });
+    expect((await callTool(t, app.access, "update_skill", { skill: "release-notes" })).isError).toBe(true);
+    expect((await callTool(t, app.access, "update_skill", { skill: "nope", body: "x" })).isError).toBe(true);
+
+    const member = await joinByInvitation(t, b, orgId, "member@example.com");
+    const memberApp = await connectApp(t, member, orgId, MANAGE);
+    const refused = await callTool(t, memberApp.access, "update_skill", { skill: "release-notes", body: "Mine." });
+    expect(refused.isError).toBe(true);
+  });
+
   test("create_skill from a SKILL.md or plain Markdown, turned on for an agent; list_skills lists them", async () => {
     const { b, orgId, agentId } = await setup();
     const app = await connectApp(t, b, orgId, MANAGE);

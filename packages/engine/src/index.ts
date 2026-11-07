@@ -257,6 +257,7 @@ export * from "./team";
 export * from "./team-actions";
 export * from "./team-map";
 export * from "./team-proposals";
+export * from "./team-status";
 export * from "./team-templates";
 export * from "./team-week";
 export * from "./telemetry";

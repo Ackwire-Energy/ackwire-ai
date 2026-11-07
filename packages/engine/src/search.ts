@@ -349,6 +349,8 @@ export async function searchVisible(
 export interface UserSearchFilters extends Pick<SearchQuery, "after" | "before" | "sort"> {
   /** Only these channels and DMs (`in:`); the ones the person can't read are dropped, never searched. */
   channelIds?: string[];
+  /** What an agent reads for them, in place of `userVisibleChannels` (`personReach`). */
+  reach?: string[];
   messages?: MessageFilter;
 }
 
@@ -360,8 +362,8 @@ export async function searchForUser(
   input: { text: string; kinds?: SearchKind[]; limit?: number } & UserSearchFilters,
 ) {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
-  const { channelIds, ...rest } = input;
-  let visible = await userVisibleChannels(deps.db, orgId, userId);
+  const { channelIds, reach, ...rest } = input;
+  let visible = reach ?? (await userVisibleChannels(deps.db, orgId, userId));
   if (channelIds) {
     const wanted = new Set(channelIds);
     visible = visible.filter((id) => wanted.has(id));

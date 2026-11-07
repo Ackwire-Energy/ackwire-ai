@@ -42,6 +42,7 @@ import {
   resolvePermissions,
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
+import { isRoutineRoomKey } from "./routine-brief";
 import { accountInUse, closedRefusal, STANDING_COLUMNS } from "./standing";
 import { adminChannelSql, channelReaderSql, channelReadersSql, taskReaderSql } from "./task-access";
 
@@ -496,6 +497,40 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
       ) as ok`),
   );
   return row?.ok === true;
+}
+
+/** Of `channelIds`, what a person reads (`readableChannelIds`), and public channels, which they may join at will. */
+export async function readsOrMayJoin(db: Database, orgId: string, userId: string, channelIds: readonly string[]) {
+  const reads = await readableChannelIds(db, orgId, userId, channelIds);
+  const open = channelIds.length
+    ? await db
+        .select({ id: channels.id })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.orgId, orgId),
+            inArray(channels.id, [...new Set(channelIds)]),
+            eq(channels.kind, "channel"),
+            eq(channels.visibility, "public"),
+            isNull(channels.archivedAt),
+          ),
+        )
+    : [];
+  for (const c of open) reads.add(c.id);
+  return reads;
+}
+
+/**
+ * What the right hand reads for a person in their DM with it (ADR 0137 §13): `readsOrMayJoin` over the workspace, never
+ * a routine's room, which is its own runs' (`agentSearchChannels`).
+ */
+export async function personReach(db: Database, orgId: string, userId: string) {
+  const rows = await db
+    .select({ id: channels.id, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), isNull(channels.archivedAt), isNull(channels.deletedAt)));
+  const ids = rows.filter((c) => !isRoutineRoomKey(c.dmKey)).map((c) => c.id);
+  return [...(await readsOrMayJoin(db, orgId, userId, ids))];
 }
 
 /**

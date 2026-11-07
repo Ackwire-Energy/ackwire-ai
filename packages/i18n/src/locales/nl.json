@@ -1911,7 +1911,7 @@
     "composerHint": "niets verandert zonder jou",
     "intro": {
       "greeting": "Hoi, ik ben {{name}}. Ik bouw het team samen met jou.",
-      "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert zonder jouw klik, en ik doe alleen wat jij mag doen.",
+      "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert als jij het niet vraagt, en ik doe alleen wat jij mag doen.",
       "heldLead": "Kies wat je bedrijf doet en het team verschijnt hier. De agents gaan aan het werk zodra de workspace een agentes.chat-abonnement heeft.",
       "connect": {
         "title": "Een AI voor het team koppelen",
@@ -2030,6 +2030,8 @@
         "audience": "Alleen admins en de verantwoordelijke wijzigen wie met hem praat",
         "channels": "Alleen admins en de verantwoordelijke wijzigen zijn kanalen",
         "ai_account": "Alleen de eigenaar van het account geeft het",
+        "name": "Alleen admins hernoemen een agent",
+        "look": "Alleen admins en de verantwoordelijke wijzigen het uiterlijk",
         "many": "Alleen admins maken deze wijzigingen"
       }
     },
@@ -2040,9 +2042,12 @@
       "owner": "Verantwoordelijke",
       "audience": "Wie mag praten",
       "archive": "Status",
-      "channel": "Kanaal"
+      "channel": "Kanaal",
+      "name": "Naam",
+      "look": "Uiterlijk"
     },
     "value": {
+      "lookDefault": "Het standaarduiterlijk",
       "none": "Geen",
       "budgetDefault": "Standaard van de workspace",
       "anAccount": "Een AI-account",
@@ -2688,7 +2693,10 @@
       "updated": "Skill <b>{{name}}</b> verbeterd"
     },
     "agent": {
-      "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd"
+      "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd",
+      "settings_changed_instructions": "Heb de instructies van <b>{{agentName}}</b> gewijzigd",
+      "settings_changed_role": "Heb de rol van <b>{{agentName}}</b> gewijzigd",
+      "settings_changed_apps": "Heb de apps van <b>{{agentName}}</b> gewijzigd"
     },
     "pr": {
       "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemerged",
