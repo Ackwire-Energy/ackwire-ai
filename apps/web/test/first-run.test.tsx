@@ -47,7 +47,7 @@ describe("the first-run checklist", () => {
     expect(rows().map((r) => r.querySelector("b")?.textContent)).toEqual([
       "Me conte o que a Acme faz.",
       "Monte o time.",
-      "Penso com Automático",
+      "Penso com AutomáticoTrocar",
       "Conecte os apps do trabalho.",
       "Chame quem trabalha com você.",
     ]);
@@ -83,6 +83,16 @@ describe("the first-run checklist", () => {
     await click(within(row("Conecte os apps do trabalho.")).getByRole("button", { name: "Agora não" }));
     expect(calls(state, "agents.confirmSetup").map((c) => c.args.slice(1))).toEqual([[LODI_ID, "apps"]]);
     expect(row("Sem apps por enquanto")).toBeTruthy();
+  });
+
+  test("row 4 lists the apps to connect with one way out: Fechar, no Cancelar beside it", async () => {
+    await openDm(fresh());
+    await click(within(row("Conecte os apps do trabalho.")).getByRole("button", { name: "Escolher" }));
+    const dialog = screen().getByRole("dialog", { name: "Os apps do trabalho" });
+    expect(within(dialog).getAllByRole("button", { name: "Conectar" }).length).toBeGreaterThan(0);
+    // The corner X and the footer's Fechar.
+    expect(within(dialog).getAllByRole("button", { name: "Fechar" }).length).toBe(2);
+    expect(within(dialog).queryByRole("button", { name: "Cancelar" })).toBeNull();
   });
 
   test("complete: Tudo pronto, then how agents talk, and the asks that go to Lodi", async () => {

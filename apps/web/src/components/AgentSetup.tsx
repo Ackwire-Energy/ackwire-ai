@@ -529,6 +529,7 @@ export function StepDialog({
   onOk,
   onClose,
   note,
+  cancel = true,
   children,
 }: {
   title: string;
@@ -540,6 +541,8 @@ export function StepDialog({
   onOk: () => void;
   onClose: () => void;
   note?: ReactNode;
+  /** False when its one button already closes it (nothing to save): no Cancelar beside it. */
+  cancel?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -555,9 +558,11 @@ export function StepDialog({
     >
       <DialogBody className="setup-dlg__body">{children}</DialogBody>
       <DialogFooter note={note}>
-        <Button variant="ghost" onClick={onClose} disabled={busy}>
-          {t("common.cancel")}
-        </Button>
+        {cancel && (
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            {t("common.cancel")}
+          </Button>
+        )}
         <Button variant="primary" onClick={onOk} disabled={okDisabled} loading={busy}>
           {ok}
         </Button>

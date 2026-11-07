@@ -353,6 +353,7 @@ function AppsDialog({ team, onClose }: { team: Agent[]; onClose: () => void }) {
         title={t("agentSetup.firstRun.apps.title")}
         description={t("agentSetup.firstRun.apps.desc")}
         ok={t("common.close")}
+        cancel={false}
         busy={false}
         onOk={onClose}
         onClose={onClose}
