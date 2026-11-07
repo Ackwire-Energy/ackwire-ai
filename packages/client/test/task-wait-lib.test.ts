@@ -6,6 +6,7 @@ import {
   delegationText,
   groupTasks,
   hiddenCount,
+  taskPlace,
   taskWaitGroups,
   taskWaitGroupText,
   taskWaitWords,
@@ -171,4 +172,10 @@ test("an agent busy out of the viewer's sight is never free: its card counts it,
   expect(agentCardLine(t, 0, 3)).toBe('taskManager.hiddenTasks {"count":3}');
   expect(agentCardLine(t, 1, 3)).toBe('taskManager.tasks {"count":4}');
   expect(agentCardLine(t, 0, 0)).toBe("taskManager.free");
+});
+
+test("a task with no title of its own is called by its place, said once", () => {
+  const base = { routine: null, channelKind: "channel" as const, channelName: "eng", betweenAgents: false };
+  expect(taskPlace(t, { ...base, label: null })).toBeNull();
+  expect(taskPlace(t, { ...base, label: "Release 8 na loja" })).toBe("#eng");
 });

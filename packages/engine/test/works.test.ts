@@ -826,6 +826,24 @@ test("an automatic move is named by the cheap model in the conversation's words,
   expect(JSON.stringify(view)).not.toContain("qual permissao");
 });
 
+test("a top-level ask is named with the messages just before it, and the call is recorded with its agent", async () => {
+  const assessing = (req: ModelRequest) => systemText(req.system).startsWith("You read a conversation thread");
+  f = await setup({
+    reply: (req) => ({
+      chunks: [assessing(req) ? JSON.stringify({ title: "Release 8 na loja", resolved: false }) : "ok"],
+    }),
+  });
+  await ask("a versão 8 precisa sair na loja hoje");
+  await f.db.update(schema.agentRuns).set({ status: "done" });
+  const run = await working("@dev pode fazer isso?");
+  const out = await moveToBackground({ ...deps(), context: f.context }, run.id, { how: "auto", title: "" });
+  expect(out?.work.title).toBe("Release 8 na loja");
+  const prompt = JSON.stringify(f.provider.calls.find((c) => assessing(c.request))?.request.messages);
+  expect(prompt).toMatch(/<earlier>.*versão 8.*<\/earlier>.*<thread>.*pode fazer isso/);
+  const usage = await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.kind, "summary"));
+  expect(usage.map((u) => [u.agentId, u.runId])).toEqual([[f.agent.id, run.id]]);
+});
+
 test("a work the cheap model can't name has no title, and gets its card only once named", async () => {
   let named = "";
   const assessing = (req: ModelRequest) => systemText(req.system).startsWith("You read a conversation thread");

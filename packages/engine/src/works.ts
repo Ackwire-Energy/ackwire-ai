@@ -557,7 +557,7 @@ async function workTitle(deps: { db: Database; context?: ContextDeps }, runId: s
   const title = plainText(given, WORK_LIMITS.titleMax);
   if (title) return title;
   const [run] = await deps.db
-    .select({ orgId: agentRuns.orgId, rootId: agentRuns.threadRootId })
+    .select({ orgId: agentRuns.orgId, rootId: agentRuns.threadRootId, agentId: agentRuns.agentId })
     .from(agentRuns)
     .where(eq(agentRuns.id, runId));
   if (!run) return "";
@@ -567,7 +567,7 @@ async function workTitle(deps: { db: Database; context?: ContextDeps }, runId: s
     .where(and(eq(schema.threads.orgId, run.orgId), eq(schema.threads.rootMessageId, run.rootId)));
   if (thread?.title?.trim() && !thread.auto) return plainText(thread.title, WORK_LIMITS.titleMax);
   if (!deps.context) return "";
-  const named = await nameConversation(deps.context, { orgId: run.orgId, rootId: run.rootId }).catch(() => null);
+  const named = await nameConversation(deps.context, { ...run, runId }).catch(() => null);
   return plainText(named, WORK_LIMITS.titleMax);
 }
 
