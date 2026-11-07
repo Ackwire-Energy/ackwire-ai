@@ -2260,11 +2260,17 @@ async function executeRunInner(
     const decided: string[] = [];
     /** A person decided one of them (an approval, a question, a secret), not another agent's answer: ADR 0089. */
     let byPerson = false;
+    /** Who decided, by name: not always the person who asked the agent, and its reply is for them. */
+    const deciders = new Set<string>();
     for (const call of transcript.pending.calls) {
       let result = call.result;
       if (!result && call.secretRequestId) {
         const [request] = await db.select().from(secretRequests).where(eq(secretRequests.id, call.secretRequestId));
-        if (request?.status === "delivered" || request?.status === "declined") byPerson = true;
+        if (request?.status === "delivered" || request?.status === "declined") {
+          byPerson = true;
+          // Only the person it was asked of can deliver or decline it.
+          deciders.add(await deciderName(db, request.requestedForUserId, null));
+        }
         result = { isError: false, ...secretResult(request) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
@@ -2275,7 +2281,10 @@ async function executeRunInner(
         });
       } else if (!result && call.questionId) {
         const [question] = await db.select().from(agentQuestions).where(eq(agentQuestions.id, call.questionId));
-        if (question?.status === "answered" || question?.status === "dismissed") byPerson = true;
+        if (question?.status === "answered" || question?.status === "dismissed") {
+          byPerson = true;
+          if (question.answeredByUserId) deciders.add(await deciderName(db, question.answeredByUserId, null));
+        }
         result = { isError: false, ...questionResult(question) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
@@ -2286,7 +2295,13 @@ async function executeRunInner(
         });
       } else if (!result && call.approvalId) {
         const [approval] = await db.select().from(approvals).where(eq(approvals.id, call.approvalId));
-        if (approval?.decidedByUserId) byPerson = true;
+        const decider = approval?.decidedByUserId
+          ? await deciderName(db, approval.decidedByUserId, approval.decidedForUserId ?? null)
+          : undefined;
+        if (decider) {
+          byPerson = true;
+          deciders.add(decider);
+        }
         if (approval?.status === "approved" && deps.tools) {
           const output = await deps.tools.executeApproved(ctx, approval);
           result = { content: output.content, isError: output.isError === true };
@@ -2294,11 +2309,7 @@ async function executeRunInner(
           const [ran] = await db.select().from(approvals).where(eq(approvals.id, approval.id));
           if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else {
-          const by = approval?.status === "refused" ? approval.decidedByUserId : null;
-          result = toolResultFor(
-            approval,
-            by ? await deciderName(db, by, approval?.decidedForUserId ?? null) : undefined,
-          );
+          result = toolResultFor(approval, approval?.status === "refused" ? decider : undefined);
         }
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
@@ -2320,6 +2331,11 @@ async function executeRunInner(
     if (blocks.length > 0) transcript.messages.push({ role: "user", content: blocks });
     if (bridgedLines.length > 0) {
       resumeText = `What a person decided on your waiting call${bridgedLines.length > 1 ? "s" : ""}:\n${bridgedLines.join("\n")}`;
+    }
+    if (deciders.size > 0) {
+      const who = [...deciders].join(" and ");
+      const line = `Decided by ${who}. Your reply is for ${who}: address them, not whoever asked you before.`;
+      resumeText = resumeText ? `${resumeText}\n\n${line}` : line;
     }
     if (meanwhile) resumeText = resumeText ? `${resumeText}\n\n${meanwhile}` : meanwhile;
     if (resumeText) appendUserText(transcript, resumeText);

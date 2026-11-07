@@ -12,6 +12,7 @@ import {
   ne,
   or,
   rowsOf,
+  type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -678,6 +679,32 @@ export async function insertMessageWithRuns(
   const deliver = person && options.deliver !== false && !mediaOnly;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
+  // A quote reply to an agent's message is for that agent (`replyRefFor` wrote it, never the client).
+  const quoted = person ? (input.meta?.replyTo as ReplyRef | undefined)?.author : undefined;
+  const quotedAgentId = quoted?.type === "agent" && quoted.id && UUID.test(quoted.id) ? quoted.id : null;
+  /**
+   * SQL: the message is for another agent than `agent`: it mentions others and not it, or quotes another agent's
+   * message. Then no task in progress of `agent`, question of its, background work or held run takes it: it is routed.
+   */
+  const forAnother = (
+    agent: SQL,
+  ) => sql`((exists (select 1 from mentioned) and ${agent} not in (select id from mentioned))
+    or (${quotedAgentId}::uuid is not null and ${agent} <> ${quotedAgentId}::uuid))`;
+  /**
+   * SQL: a reply in a thread joins run `r` only when the person talks to its agent there: not for another agent, and
+   * it quotes that agent, the run answers this person, or that agent spoke last in the thread. A run another agent
+   * started by naming it is not who the person talks to while the agent that named it spoke last.
+   */
+  const talkingTo = (r: SQL) => sql`(not ${forAnother(sql`${r}.agent_id`)} and (
+    ${r}.agent_id = ${quotedAgentId}::uuid
+    or exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid and tm.id = ${r}.trigger_message_id
+      and tm.author_user_id = ${userId})
+    or ${r}.agent_id = coalesce(
+      (select lm.author_agent_id from ${messages} lm where lm.org_id = ${input.orgId}::uuid
+        and lm.channel_id = ${input.channelId}::uuid and lm.thread_id = ${threadId}::uuid and lm.author_type = 'agent'
+        order by lm.created_at desc limit 1),
+      (select rm.author_agent_id from ${messages} rm where rm.org_id = ${input.orgId}::uuid
+        and rm.id = ${threadId}::uuid))))`;
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
   const clientId = person ? normalizeClientId(input.clientId) : null;
   // Where the message may go: no thread, or a top-level message of this channel (`m` checks it too).
@@ -775,7 +802,7 @@ export async function insertMessageWithRuns(
                 or exists (select 1 from ${agentRuns} ar join ${messages} tm on tm.id = ar.trigger_message_id
                   where ar.id = oq.run_id and tm.author_user_id = ${userId}))
             order by oq.created_at desc limit 1)
-          and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
+          and not ${forAnother(sql`q.agent_id`)}
           and q.agent_id not in (select agent_id from muted)
           and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`, inChannel)})
           and (${threadId}::uuid is null or exists (
@@ -795,6 +822,7 @@ export async function insertMessageWithRuns(
           and w.status in ('live', 'queued')
           and ((w.own_thread and w.anchor_message_id = ${threadId}::uuid)
             or (not w.own_thread and w.home_thread_id = ${threadId}::uuid))
+          and not ${forAnother(sql`w.agent_id`)}
           and exists (select 1 from ${channels} wc where wc.id = ${input.channelId}::uuid and wc.kind = 'channel')
           and ${audienceSql("wa", sql`${userId}::text`, inChannel)}
       ), addressed as (
@@ -829,6 +857,7 @@ export async function insertMessageWithRuns(
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
+          and not ${forAnother(sql`r.agent_id`)}
           and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
           and ra.archived_at is null
           and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
@@ -838,7 +867,7 @@ export async function insertMessageWithRuns(
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
-        -- thread, any agent working in that thread (no mention needed to talk to it there). A new
+        -- thread, an agent working in that thread the person talks to (talkingTo: no mention needed). A new
         -- message in the channel joins the agent's run that answers in the channel itself (not one in
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
         -- an approval or an answer would hold the new request), or while it waits for its computer, its plan or its
@@ -871,6 +900,7 @@ export async function insertMessageWithRuns(
                   and ${inChannelRun(sql`r`)})`
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
+              and ${talkingTo(sql`r`)}
               and ${audienceSql("ra", sql`${userId}::text`, inChannel)})
             or (r.id in (select id from floor_runs) and (select count(distinct agent_id) from floor_runs) = 1)
           )
@@ -887,6 +917,7 @@ export async function insertMessageWithRuns(
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
+          and ${talkingTo(sql`r`)}
           and ${audienceSql("ra", sql`${userId}::text`, inChannel)}
       ), steered as (
         -- Queued on the run only while it is still active: one that ended since (its unread messages

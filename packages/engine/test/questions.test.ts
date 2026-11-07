@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   answerQuestion,
   ConflictError,
   cancelRun,
@@ -14,7 +15,7 @@ import {
   postPersonMessage,
   ValidationError,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 // The first test pays for migrating the PGlite template (2-3 s idle, past 5 s under a full suite's load), and the
 // preload's longer default reaches only a run's first file.
@@ -105,6 +106,24 @@ describe("ask_user", () => {
     expect(after.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ status: "answered" });
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "question.answered")).toBe(true);
+  });
+
+  test("someone else answers: the run is told who decided and replies to them", async () => {
+    f = await setup({ askUser: true, reply });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Teste");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    await post("@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    const [q] = await questions();
+    await f.db
+      .update(schema.agentQuestions)
+      .set({ requestedForUserId: null })
+      .where(eq(schema.agentQuestions.id, q?.id ?? ""));
+    await answerQuestion({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, q?.id ?? "", { choice: "staging" });
+    await drainOutbox(f.db, f.handlers);
+    const told = lastText(f.provider.calls.at(-1)?.request as ModelRequest);
+    expect(told).toContain("The person answered: staging");
+    expect(told).toContain("Decided by Bia Teste. Your reply is for Bia Teste");
   });
 
   test("a canceled run closes its question's card, so no one is offered an answer that can't arrive", async () => {
