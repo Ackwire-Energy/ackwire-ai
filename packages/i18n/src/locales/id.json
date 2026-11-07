@@ -14571,7 +14571,11 @@
       "paused": "Dijeda di {{computer}} sampai {{time}}",
       "pausedPlain": "Dijeda di {{computer}}",
       "noComputer": "Belum ada komputer",
-      "outdated": "Perlu pembaruan di {{computer}}"
+      "outdated": "Perlu pembaruan di {{computer}}",
+      "updating": "Sedang diperbarui · kembali sendiri",
+      "screensOff": "Layar dimatikan di {{computer}}",
+      "screensMissing": "{{computer}} belum bisa menampilkan layar",
+      "browserOff": "Browser mati di {{computer}}"
     },
     "screen": "Layar {{name}}, langsung",
     "sub": {

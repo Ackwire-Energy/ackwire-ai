@@ -15152,7 +15152,11 @@
       "paused": "Gepauzeerd op {{computer}} tot {{time}}",
       "pausedPlain": "Gepauzeerd op {{computer}}",
       "noComputer": "Nog geen computer",
-      "outdated": "Update nodig op {{computer}}"
+      "outdated": "Update nodig op {{computer}}",
+      "updating": "Wordt bijgewerkt · komt vanzelf terug",
+      "screensOff": "Schermen staan uit op {{computer}}",
+      "screensMissing": "{{computer}} kan nog geen schermen tonen",
+      "browserOff": "De browser staat uit op {{computer}}"
     },
     "screen": "Scherm van {{name}}, live",
     "screen_female": "Scherm van {{name}}, live",

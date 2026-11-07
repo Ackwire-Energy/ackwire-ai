@@ -66,6 +66,7 @@ export function useAgentComputer(agentId: string, poll: number | false = false) 
           machine,
           desktop,
           browser: browserQ.data?.available === true,
+          browserReason: browserQ.data?.reason ?? null,
           browserGranted: browserGranted(access.data),
           handoff: browserOpen ?? screenOpen,
           userId: meId,

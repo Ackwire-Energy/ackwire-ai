@@ -14920,7 +14920,11 @@
       "paused": "{{computer}} üzerinde duraklatıldı · bitiş: {{time}}",
       "pausedPlain": "{{computer}} üzerinde duraklatıldı",
       "noComputer": "Henüz bilgisayar yok",
-      "outdated": "{{computer}} üzerinde güncelleme gerekiyor"
+      "outdated": "{{computer}} üzerinde güncelleme gerekiyor",
+      "updating": "Güncelleniyor · kendiliğinden geri gelir",
+      "screensOff": "{{computer}} üzerinde ekranlar kapalı",
+      "screensMissing": "{{computer}} henüz ekran gösteremiyor",
+      "browserOff": "{{computer}} üzerinde tarayıcı kapalı"
     },
     "screen": "{{name}} ajanının ekranı, canlı",
     "sub": {

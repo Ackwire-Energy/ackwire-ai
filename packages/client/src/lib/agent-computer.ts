@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/types";
+import type { BrowserHandoff, BrowserUnavailableReason, DesktopStatus, Edition, Machine } from "../api/types";
 import { handoffTimeLeft, isWaitingHandoff } from "../browser";
 import { drivesOnDesktop } from "../desktop";
 import {
@@ -36,6 +36,8 @@ export interface AgentComputerFacts {
     | null;
   /** Its browser can run on its computer now. */
   browser: boolean;
+  /** Why its browser can't, when it can't (`GET …/browser`); absent while unknown. */
+  browserReason?: BrowserUnavailableReason | null;
   /** The agent may use its browser (`browser:use`). */
   browserGranted: boolean;
   /** Its open request or take over, on either screen. */
@@ -59,12 +61,43 @@ export type EntryState =
   | { kind: "you" }
   | { kind: "other"; userId: string }
   | { kind: "working" }
-  | { kind: "unavailable"; outdated: boolean }
+  | { kind: "unavailable"; cause: CantShow }
   | { kind: "noScreen" }
   /** `noScreen` on a computer with no screens for agents (a Mac, a PC): only its browser could show there. */
   | { kind: "noBrowser" }
   | { kind: "noComputer" }
   | { kind: "available" };
+
+/** Why nothing of the agent's computer can be shown (`unavailable`): what its line says, and its cover. */
+export type CantShow =
+  /** The program on its computer is too old to show it. */
+  | "outdated"
+  /** Screens are turned off on its computer. */
+  | "screensOff"
+  /** Its computer can't show screens yet: something to install there (`DesktopStatus.detail`). */
+  | "screensMissing"
+  /** Only its browser could show here, and that is turned off on its computer. */
+  | "browserOff"
+  /** The Cloud's computer is ready and gives itself to the agent at its next hello. */
+  | "joining"
+  /** Nothing says why: the screen's state didn't load, or a reason this app doesn't know. */
+  | "unknown";
+
+/**
+ * The cause, from the screen's reason (`GET …/desktop`) and, where only the agent's browser could show (it uses no
+ * screen, this person may see only its browser, or its computer has no screens for agents), the browser's.
+ */
+export function cantShow(f: AgentComputerFacts): CantShow {
+  if (!f.machine && f.edition === "cloud") return "joining";
+  const reason = f.desktop?.reason;
+  const browserOnly =
+    reason === "no_desktop" || reason === "browser_only" || f.machine?.desktopUse?.available === false;
+  if (browserOnly && f.browserReason === "switched_off") return "browserOff";
+  if (reason === "runner_outdated" || (browserOnly && f.browserReason === "outdated")) return "outdated";
+  if (browserOnly) return "unknown";
+  if (reason === "not_allowed") return "screensOff";
+  return reason === "desktop_unavailable" ? "screensMissing" : "unknown";
+}
 
 /** The workspace's own computer isn't ready, and the agent has none yet: it waits for that one. */
 const waitsForWorkspace = (f: Pick<AgentComputerFacts, "edition" | "setup" | "machine">) =>
@@ -102,9 +135,7 @@ export function entryState(f: AgentComputerFacts, nowMs = Date.now()): EntryStat
   if (f.working) return { kind: "working" };
   const neither = f.desktop?.reason === "no_desktop" && !f.browserGranted;
   const shown = f.desktop?.available === true || f.browser;
-  if (!shown && !neither && (f.machine || f.edition === "cloud")) {
-    return { kind: "unavailable", outdated: f.desktop?.reason === "runner_outdated" };
-  }
+  if (!shown && !neither && (f.machine || f.edition === "cloud")) return { kind: "unavailable", cause: cantShow(f) };
   if (neither) {
     const screens = f.edition === "cloud" || f.machine?.desktopUse?.available !== false;
     return { kind: screens ? "noScreen" : "noBrowser" };
@@ -194,9 +225,7 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
         ? t("agentComputer.status.working", { now: lowerFirst(w.step, w.locale) })
         : t("agentComputer.status.workingPlain");
     case "unavailable":
-      return s.outdated && w.edition === "selfhost"
-        ? t("agentComputer.status.outdated", { computer: w.computer })
-        : t("agentComputer.status.unavailable");
+      return cantShowLine(t, s.cause, w) ?? t("agentComputer.status.unavailable");
     case "noScreen":
       return t("agentComputer.status.noScreen");
     case "noBrowser":
@@ -205,6 +234,34 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
       return t("agentComputer.status.noComputer");
     default:
       return t("agentComputer.status.available");
+  }
+}
+
+/**
+ * Why nothing shows, in the entry's words (`agentComputer.status.*`): the cause, which the entry's button opens the way
+ * out of; null when nothing says why. The Cloud's program is updated by itself; a self-hoster updates theirs. Screens
+ * and the browser are switched at a self-hoster's own computer: the Cloud's has them on, so it never says they're off.
+ */
+export function cantShowLine(
+  t: TFunction,
+  cause: CantShow,
+  w: Pick<EntryWords, "edition" | "computer">,
+): string | null {
+  const computer = { computer: w.computer };
+  const own = w.edition === "selfhost";
+  switch (cause) {
+    case "outdated":
+      return own ? t("agentComputer.status.outdated", computer) : t("agentComputer.status.updating");
+    case "screensOff":
+      return own ? t("agentComputer.status.screensOff", computer) : null;
+    case "screensMissing":
+      return t("agentComputer.status.screensMissing", computer);
+    case "browserOff":
+      return own ? t("agentComputer.status.browserOff", computer) : null;
+    case "joining":
+      return t("agentComputer.status.preparingPlain");
+    default:
+      return null;
   }
 }
 

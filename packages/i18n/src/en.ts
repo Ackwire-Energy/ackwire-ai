@@ -14810,6 +14810,11 @@ export const en = {
       pausedPlain: "Paused on {{computer}}",
       noComputer: "No computer yet",
       outdated: "Needs an update on {{computer}}",
+      /** The Cloud's computer, whose program is updated by itself. */
+      updating: "Being updated · back by itself",
+      screensOff: "Screens are off on {{computer}}",
+      screensMissing: "{{computer}} can't show screens yet",
+      browserOff: "The browser is off on {{computer}}",
     },
     screen: "{{name}}'s screen, live",
     sub: {

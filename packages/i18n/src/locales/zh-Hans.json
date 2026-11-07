@@ -14631,7 +14631,11 @@
       "paused": "在 {{computer}} 上暂停，直到 {{time}}",
       "pausedPlain": "在 {{computer}} 上暂停",
       "noComputer": "还没有电脑",
-      "outdated": "{{computer}} 需要更新"
+      "outdated": "{{computer}} 需要更新",
+      "updating": "正在更新 · 会自动恢复",
+      "screensOff": "{{computer}} 上的屏幕已关闭",
+      "screensMissing": "{{computer}} 暂时还不能显示屏幕",
+      "browserOff": "{{computer}} 上的浏览器已关闭"
     },
     "screen": "{{name}} 的屏幕，实时",
     "screen_female": "{{name}} 的屏幕，实时",

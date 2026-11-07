@@ -14461,7 +14461,11 @@
       "paused": "{{time}}까지 {{computer}}에서 일시 중지됨",
       "pausedPlain": "{{computer}}에서 일시 중지됨",
       "noComputer": "아직 컴퓨터가 없어요",
-      "outdated": "{{computer}} 업데이트 필요"
+      "outdated": "{{computer}} 업데이트 필요",
+      "updating": "업데이트 중 · 저절로 돌아와요",
+      "screensOff": "{{computer}}에서 화면이 꺼져 있어요",
+      "screensMissing": "{{computer}}에서 아직 화면을 표시할 수 없어요",
+      "browserOff": "{{computer}}에서 브라우저가 꺼져 있어요"
     },
     "screen": "{{name}}의 실시간 화면",
     "sub": {

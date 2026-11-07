@@ -36235,6 +36235,18 @@
   "agentComputer.status.outdated": {
     "value": "Needs an update on {{computer}}"
   },
+  "agentComputer.status.updating": {
+    "value": "Being updated · back by itself"
+  },
+  "agentComputer.status.screensOff": {
+    "value": "Screens are off on {{computer}}"
+  },
+  "agentComputer.status.screensMissing": {
+    "value": "{{computer}} can't show screens yet"
+  },
+  "agentComputer.status.browserOff": {
+    "value": "The browser is off on {{computer}}"
+  },
   "agentComputer.screen": {
     "value": "{{name}}'s screen, live"
   },

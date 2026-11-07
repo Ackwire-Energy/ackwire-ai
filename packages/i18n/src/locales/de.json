@@ -14990,7 +14990,11 @@
       "paused": "Pausiert auf {{computer}} bis {{time}}",
       "pausedPlain": "Pausiert auf {{computer}}",
       "noComputer": "Noch kein Computer",
-      "outdated": "Braucht ein Update auf {{computer}}"
+      "outdated": "Braucht ein Update auf {{computer}}",
+      "updating": "Wird aktualisiert · kommt von selbst zurück",
+      "screensOff": "Bildschirme sind auf {{computer}} aus",
+      "screensMissing": "{{computer}} kann noch keine Bildschirme zeigen",
+      "browserOff": "Der Browser ist auf {{computer}} aus"
     },
     "screen": "Bildschirm von {{name}}, live",
     "sub": {

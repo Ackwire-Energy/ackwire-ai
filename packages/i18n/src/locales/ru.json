@@ -15954,7 +15954,11 @@
       "paused": "На паузе на {{computer}} до {{time}}",
       "pausedPlain": "На паузе на {{computer}}",
       "noComputer": "Компьютера пока нет",
-      "outdated": "Нужно обновление на {{computer}}"
+      "outdated": "Нужно обновление на {{computer}}",
+      "updating": "Обновляется · вернётся само",
+      "screensOff": "Экраны на {{computer}} выключены",
+      "screensMissing": "{{computer}} пока не умеет показывать экраны",
+      "browserOff": "Браузер на {{computer}} выключен"
     },
     "screen": "Экран {{name}} в реальном времени",
     "sub": {

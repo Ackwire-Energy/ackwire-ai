@@ -14469,7 +14469,11 @@
       "paused": "{{computer}}で{{time}}まで一時停止中",
       "pausedPlain": "{{computer}}で一時停止中",
       "noComputer": "コンピューターはまだありません",
-      "outdated": "{{computer}}でアップデートが必要です"
+      "outdated": "{{computer}}でアップデートが必要です",
+      "updating": "アップデート中 · 自動で戻ります",
+      "screensOff": "{{computer}}で画面表示がオフになっています",
+      "screensMissing": "{{computer}}はまだ画面を表示できません",
+      "browserOff": "{{computer}}でブラウザがオフになっています"
     },
     "screen": "{{name}}の画面（ライブ）",
     "sub": {

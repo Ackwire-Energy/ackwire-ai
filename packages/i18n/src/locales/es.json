@@ -15451,7 +15451,11 @@
       "paused": "En pausa en {{computer}} hasta {{time}}",
       "pausedPlain": "En pausa en {{computer}}",
       "noComputer": "Todavía sin computadora",
-      "outdated": "Necesita una actualización en {{computer}}"
+      "outdated": "Necesita una actualización en {{computer}}",
+      "updating": "Actualizándose · vuelve solo",
+      "screensOff": "Las pantallas están desactivadas en {{computer}}",
+      "screensMissing": "{{computer}} todavía no puede mostrar pantallas",
+      "browserOff": "El navegador está desactivado en {{computer}}"
     },
     "screen": "Pantalla de {{name}}, en vivo",
     "sub": {

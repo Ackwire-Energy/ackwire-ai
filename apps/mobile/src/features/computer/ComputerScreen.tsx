@@ -5,7 +5,7 @@ import {
   handoffScreen,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
-import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
+import { cantShow, cantShowLine, liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -270,12 +270,16 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       />
     );
   } else {
-    const outdated = f.edition === "selfhost" && view.desktopQ.data?.reason === "runner_outdated";
+    // Why, as the entry's line says it; a self-hoster's old program gets what to do.
+    const cause = cantShow(f);
+    const outdated = f.edition === "selfhost" && cause === "outdated";
     body = (
       <Cover
         icon="eyeoff"
         text={
-          outdated ? t("agentComputer.state.outdated", { ...g, computer }) : t("agentComputer.state.unavailable", g)
+          outdated
+            ? t("agentComputer.state.outdated", { ...g, computer })
+            : (cantShowLine(t, cause, { edition: f.edition, computer }) ?? t("agentComputer.state.unavailable", g))
         }
         help={outdated ? undefined : t("agentComputer.state.unavailableHelp")}
         action={<DockText label={t("desktop.retry")} onPress={() => void view.desktopQ.refetch()} />}

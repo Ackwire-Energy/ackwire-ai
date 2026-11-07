@@ -15578,7 +15578,11 @@
       "paused": "En pause sur {{computer}} jusqu'à {{time}}",
       "pausedPlain": "En pause sur {{computer}}",
       "noComputer": "Pas encore d'ordinateur",
-      "outdated": "Mise à jour nécessaire sur {{computer}}"
+      "outdated": "Mise à jour nécessaire sur {{computer}}",
+      "updating": "Mise à jour en cours · revient tout seul",
+      "screensOff": "Les écrans sont désactivés sur {{computer}}",
+      "screensMissing": "{{computer}} ne peut pas encore afficher d'écrans",
+      "browserOff": "Le navigateur est désactivé sur {{computer}}"
     },
     "screen": "Écran de {{name}}, en direct",
     "screen_female": "Écran de {{name}}, en direct",

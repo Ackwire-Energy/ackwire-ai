@@ -10,6 +10,7 @@ import {
 import {
   asksMe,
   type ComputerSurface,
+  cantShow,
   entryLine,
   entryState,
   liveSubLine,
@@ -587,6 +588,7 @@ function ComputerStage({
             name={agent.name}
             reason={view.desktop?.reason ?? null}
             detail={view.desktop?.detail ?? null}
+            cause={cantShow(f)}
             color={color}
             onRetry={retry}
           />

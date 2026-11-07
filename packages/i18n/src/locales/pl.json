@@ -16021,7 +16021,11 @@
       "paused": "Wstrzymany na {{computer}} do {{time}}",
       "pausedPlain": "Wstrzymany na {{computer}}",
       "noComputer": "Brak komputera",
-      "outdated": "Wymaga aktualizacji na {{computer}}"
+      "outdated": "Wymaga aktualizacji na {{computer}}",
+      "updating": "Trwa aktualizacja · wróci samo",
+      "screensOff": "Ekrany są wyłączone na komputerze {{computer}}",
+      "screensMissing": "{{computer}} nie może jeszcze pokazywać ekranów",
+      "browserOff": "Przeglądarka jest wyłączona na komputerze {{computer}}"
     },
     "screen": "Ekran agenta {{name}} na żywo",
     "screen_female": "Ekran agenta {{name}} na żywo",

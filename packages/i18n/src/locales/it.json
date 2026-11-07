@@ -15582,7 +15582,11 @@
       "paused": "In pausa su {{computer}} fino a {{time}}",
       "pausedPlain": "In pausa su {{computer}}",
       "noComputer": "Ancora nessun computer",
-      "outdated": "Serve un aggiornamento su {{computer}}"
+      "outdated": "Serve un aggiornamento su {{computer}}",
+      "updating": "In aggiornamento · torna da solo",
+      "screensOff": "Gli schermi sono disattivati su {{computer}}",
+      "screensMissing": "{{computer}} non può ancora mostrare gli schermi",
+      "browserOff": "Il browser è disattivato su {{computer}}"
     },
     "screen": "Lo schermo di {{name}}, in diretta",
     "screen_female": "Lo schermo di {{name}}, in diretta",

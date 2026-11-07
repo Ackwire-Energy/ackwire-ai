@@ -306,10 +306,15 @@ function ComputerSection({ agent }: { agent: Agent }) {
               onClick={() => openComputer(agent.id)}
             />
           </>
+        ) : shows ? (
+          <Button size="sm" icon="eye" onClick={() => openComputer(agent.id)}>
+            {watch}
+          </Button>
         ) : (
-          shows && (
-            <Button size="sm" icon="eye" onClick={() => openComputer(agent.id)}>
-              {watch}
+          // Nothing to show: the line says why, and the computer's cover the way out (try again, what to run there).
+          state.kind === "unavailable" && (
+            <Button size="sm" icon="computer" onClick={() => openComputer(agent.id)}>
+              {t("agentComputer.open")}
             </Button>
           )
         )}
