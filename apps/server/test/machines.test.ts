@@ -6,6 +6,7 @@ import { createDiskBlobStore } from "@agenteschat/adapters";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { schema } from "@agenteschat/db";
 import { ARTIFACT_LIMITS, createUpload, issueManagedMachine, setProvisioning } from "@agenteschat/engine";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import { handleRequest } from "../runner/handlers";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 import { removeDirs, tempDir } from "./runner/helpers";
@@ -83,6 +84,34 @@ test("connecting over HTTP: code, confirm page, confirm, the token once; errors 
   // The old pairing is gone.
   expect((await api("/machines/pairings", { json: { name: "x" } })).status).toBe(404);
   expect((await runnerPost("/api/machines/pair", { code: "AAAA-BBBB" })).status).toBe(404);
+});
+
+test("where each workspace gets its own computer the agents read so, and one with none waits for it", async () => {
+  const asked: ModelRequest[] = [];
+  t = await createTestServer({
+    env: {
+      MACHINE_PROVISIONING: "external",
+      OPERATOR_API_TOKEN: "o".repeat(40),
+      BILLING_URL: "https://billing.example.com",
+      BILLING_LINK_SECRET: "b".repeat(32),
+    },
+    reply: (r) => {
+      asked.push(r);
+      return { chunks: ["Ok."] };
+    },
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev oi" } });
+  await t.drain();
+  const request = asked.at(-1);
+  if (!request) throw new Error("no model call");
+  expect(systemText(request.system)).toContain("a bigger plan may bring a bigger one (Settings › Plan and billing)");
+  // Paid, nothing reported by the provisioner yet: never "connect one".
+  const runCode = request.tools?.find((tool) => tool.name === "run_code");
+  expect(runCode?.description).toContain("still being prepared");
+  expect(runCode?.description).not.toContain("connect one");
 });
 
 test("a server that gives each workspace its own computer refuses people's pairing; that computer still enrolls", async () => {

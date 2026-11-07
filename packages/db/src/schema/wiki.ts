@@ -35,7 +35,7 @@ export const wikiPages = pgTable(
     /** "Fixadas": shown at the top of the wiki for everyone. */
     pinned: boolean().notNull().default(false),
     /**
-     * Limited to an audience (ADR 0023 addendum): only owners, the people holding one of `audienceRoleIds` and the
+     * Limited to an audience (ADR 0023 addendum): only administrators, the people holding one of `audienceRoleIds` and the
      * people in `audienceUserIds` see it.
      */
     restricted: boolean().notNull().default(false),
@@ -44,7 +44,7 @@ export const wikiPages = pgTable(
     /** Limited to some agents: only `audienceAgentIds` read it. Independent of `restricted`. */
     agentsLimited: boolean().notNull().default(false),
     audienceAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
-    /** Only these people edit it, among those who see it and hold `edit_wiki`. Owners always do. */
+    /** Only these people edit it, among those who see it and hold `edit_wiki`. Administrators always do. */
     editorsLimited: boolean().notNull().default(false),
     editorRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     editorUserIds: text().array().notNull().default(sql`'{}'::text[]`),

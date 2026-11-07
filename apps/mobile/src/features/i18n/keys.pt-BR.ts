@@ -126,7 +126,6 @@ export const featureKeysPtBR = {
     refuse: "Recusar",
     approve: "Aprovar",
     hold: "Segure para aprovar",
-    holding: "Segure…",
     holdNote: "Alto risco: segure o botão por um segundo.",
     tapNote: "Aprovar faz a ação na hora.",
     tapNoteAhead: "Aprovar agora vale para {{when}}.",
@@ -339,9 +338,9 @@ export const featureKeysPtBR = {
       wellNow: "Parou para ler seu recado",
     },
     stopped: {
-      byYou: "Parado por você",
-      by: "Parado por {{name}}",
-      plain: "Parado",
+      byYou: "Parou aqui",
+      by: "{{name}} parou aqui",
+      plain: "Parou aqui",
       limit: "No limite de passos",
       stuck: "Parou porque travou",
       continue: "Continuar",
@@ -759,6 +758,8 @@ export const featureKeysPtBR = {
       older: "Mais antigas",
     },
     kind: {
+      proposal_waiting_one: "{{names}} propõe uma melhoria",
+      proposal_waiting_other: "{{names}} propõem melhorias",
       mention_one: "{{names}} mencionou você",
       mention_other: "{{names}} mencionaram você",
       thread_reply_one: "{{names}} respondeu na thread",
@@ -945,6 +946,8 @@ export const featureKeysPtBR = {
     issues: "Tarefas",
     issuesWithMe_one: "{{count}} com você",
     issuesWithMe_other: "{{count}} com você",
+    proposalsWaiting_one: "{{count}} esperando",
+    proposalsWaiting_other: "{{count}} esperando",
     drive: "Drive",
     connectors: "Conectores e MCPs",
     usage: "Uso",
@@ -1014,7 +1017,6 @@ export const featureKeysPtBR = {
     addPasswordWeb: "Adicionar senha no site",
     otherAccount: "Você entrou em outra conta. Nada foi apagado.",
     hold: "Segure para apagar",
-    holding: "Segure…",
   },
   files: {
     type: {

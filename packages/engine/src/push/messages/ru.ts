@@ -54,6 +54,7 @@ export const strings: Partial<PushStrings> = {
     failing: "Несколько раз подряд не удалось, поэтому обновление остановлено.",
   },
   widgetFailedBody: "Нажмите, чтобы узнать причину.",
+  proposalWaitingTitle: (a) => `${a} предлагает улучшение`,
   dashboardProposalTitle: (a) => `${a} хочет опубликовать дашборд`,
   dashboardProposalBody: (d) => (d ? `«${d}» · Нажмите, чтобы решить.` : "Нажмите, чтобы решить."),
   joinRequestTitle: (name, org) => `${name} просит доступ в ${org}`,

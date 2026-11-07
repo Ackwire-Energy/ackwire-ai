@@ -177,11 +177,13 @@ describe("issue.created", () => {
 
   test("only routines whose creator can see the issue fire", async () => {
     f = await setup();
-    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    // A plain member: an administrator sees every task (ADR 0151).
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
     // Whoever creates a routine must be able to post where it reports.
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
     const event = { trigger: { type: "event" as const, event: "issue.created" as const } };
     const mine = await channelRoutine(f, event);
+    await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
     const hers = await channelRoutine(f, event, bia.id);
     const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secreto", visibility: "private" });
     await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {

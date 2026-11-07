@@ -4,20 +4,20 @@ import { mayContinueStretch, type StretchCard, stretchCardText } from "@agentesc
 import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Icon } from "@agenteschat/ui";
+import { EventPillAction } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
-import { RequestDone } from "@/components/RequestCard";
+import { RequestDone, RequestOpen } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /**
- * A stretch's pause card (ADR 0089), in place of its text: the agents did what they may do on their own since a
- * person last acted, and wait here. Continuar starts exactly the wake-ups it holds, with a fresh allowance; the card
- * then folds to one quiet line saying who let them go on. Money only for people who can see costs; everyone else
- * reads the percentage.
+ * A stretch's pause (ADR 0089), in place of its text, as a waiting pill: the agents did what they may do on their own
+ * since a person last acted, and wait here. "Continue" (primary, for who may) starts exactly the wake-ups it holds,
+ * with a fresh allowance; the pill then turns into a decided one saying who let them go on and when. Money only for
+ * people who can see costs; everyone else reads the percentage.
  */
 export function StretchCardView({ message, card }: { message: Message; card: StretchCard }) {
   const { t, i18n } = useTranslation();
@@ -68,18 +68,19 @@ export function StretchCardView({ message, card }: { message: Message; card: Str
     );
   }
   return (
-    <div className="waitcard">
-      <span className="waitcard__top ac-iconline">
-        <Icon name="pause" size={16} />
-        <span>{text}</span>
-      </span>
-      {may && (
-        <span className="waitcard__acts">
-          <Button size="sm" variant="primary" loading={pending} onClick={go}>
+    <RequestOpen
+      mine={may}
+      icon="pause"
+      label={text}
+      action={
+        may ? (
+          <EventPillAction primary disabled={pending} onClick={go}>
             {t("run.continueRun")}
-          </Button>
-        </span>
-      )}
-    </div>
+          </EventPillAction>
+        ) : undefined
+      }
+    >
+      {text}
+    </RequestOpen>
   );
 }

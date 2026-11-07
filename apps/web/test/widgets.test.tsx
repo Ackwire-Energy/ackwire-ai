@@ -330,6 +330,16 @@ describe("a widget's side panel", () => {
         change: null,
         costUsd: null,
       },
+      {
+        id: "u0",
+        at: ago(132),
+        status: "failed",
+        summary: "A fonte **não** respondeu",
+        alert: null,
+        failureCode: "agent_reported",
+        change: null,
+        costUsd: null,
+      },
     ]);
     const { state, router, sales } = await open(`/org/${ORG_ID}/home`, s);
     await click(within(widget("Vendas hoje")).getByRole("button", { name: "Vendas hoje" }));
@@ -337,6 +347,7 @@ describe("a widget's side panel", () => {
     expect((router.state.location.search as { widget?: string }).widget).toBe(sales.id);
     const panel = screen().getByRole("dialog", { name: "Vendas hoje" });
     expect(panel.textContent).toContain("Ada cuida deste widget");
+    expect(panel.textContent).toContain("A fonte não respondeu");
     expect(within(panel).getByRole("article", { name: "Vendas hoje" }).querySelector(".wk-num")?.textContent).toBe(
       "R$18.420",
     );

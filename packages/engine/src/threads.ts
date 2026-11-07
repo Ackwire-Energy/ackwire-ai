@@ -1020,13 +1020,16 @@ async function queryThreads(
         or exists (select 1 from ${schema.agentRuns} ar2 where ar2.org_id = ${orgId}::uuid
           and ar2.thread_root_id = l.id and ar2.agent_id = ${input.agentId}::uuid))`
     : sql``;
+  // One channel's list: an administrator reads it without being in it (ADR 0151). The Threads page stays their own.
+  const inList = input.channelId
+    ? sql`c.id = ${input.channelId}::uuid and (cm.id is not null
+        or (c.kind = 'channel' and ${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "administrator")}))`
+    : sql`cm.id is not null`;
   const rows = rowsOf<ThreadSqlRow>(
     await db.execute(sql`with visible as (
-        select c.id, c.name, c.kind, cm.created_at as joined_at from ${channelMembers} cm
-        join ${channels} c on c.id = cm.channel_id
-        where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId} and c.org_id = ${orgId}::uuid
-          and c.archived_at is null and c.kind in ('channel', 'dm')
-          ${input.channelId ? sql`and c.id = ${input.channelId}::uuid` : sql``}
+        select c.id, c.name, c.kind, cm.created_at as joined_at from ${channels} c
+        left join ${channelMembers} cm on cm.org_id = c.org_id and cm.channel_id = c.id and cm.user_id = ${userId}
+        where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind in ('channel', 'dm') and ${inList}
       ), replies as (
         select m.thread_id as root_id, count(*)::int as reply_count, max(m.created_at) as last_at
         from ${messages} m
@@ -1063,9 +1066,10 @@ async function queryThreads(
             -- Waiting for its computer to come back isn't working.
             and ar.waiting_machine_id is null) as working,
           (
-            (exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
+            exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
               and aq.channel_id = root.channel_id and aq.thread_id = root.id and aq.status = 'open'
-              and aq.expires_at > now()) and ${participated})
+              and aq.expires_at > now()
+              and (aq.requested_for_user_id = ${userId} or (aq.requested_for_user_id is null and ${participated})))
             or exists (select 1 from ${schema.approvals} ap where ap.org_id = ${orgId}::uuid
               and ap.status = 'pending' and ap.thread_root_id = root.id
               and (${maySql(orgId, userId, "approve_actions")} or ap.owner_user_id = ${userId}))

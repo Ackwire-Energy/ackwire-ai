@@ -399,4 +399,20 @@ export const words: EmailWords = {
     button: "Bildirimleri aç",
     why: (org) => `Bu e-postayı ${org} içinde biri planını bir ajana bağladığı için aldın.`,
   },
+  planWaiting: {
+    subject: "Ekibin bekliyor",
+    preheader: "Çalışma alanın hazır. Başlamak için bir agentes.chat planı gerekiyor.",
+    headline: "Ekibin bekliyor",
+    body: (agents, channels, routines) => {
+      const a = plural("tr", agents, { one: `1 ajan`, other: `${agents} ajan` });
+      const c = plural("tr", channels, { one: `1 kanal`, other: `${channels} kanal` });
+      const r = plural("tr", routines, { one: `1 rutin`, other: `${routines} rutin` });
+      return routines > 0
+        ? `${a}, ${c} ve ${r} hazır. Başlamak için bir agentes.chat planı gerekiyor.`
+        : `${a} ve ${c} hazır. Başlamak için bir agentes.chat planı gerekiyor.`;
+    },
+    button: "agentes.chat planlarını gör",
+    why: (org) =>
+      `Bu e-postayı agentes.chat üzerinde ${org} alanını yönettiğin için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.`,
+  },
 };

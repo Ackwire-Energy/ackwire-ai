@@ -17,6 +17,7 @@ import type { Config } from "@agenteschat/config";
 import { and, type Database, eq, inArray, isNotNull, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   activityAudience,
+  adminChannelSql,
   announcePresence,
   type BrowserFrameMessage,
   type BrowserLive,
@@ -269,6 +270,7 @@ export async function currentSubscriptions(
           isNotNull(schema.channelMembers.id),
           // A task's conversation: whoever sees the task (ADR 0145).
           and(eq(schema.channels.kind, "task"), taskReaderSql(sql`${schema.channels.id}`, sql`${userId}::text`)),
+          adminChannelSql(sql`${orgId}::uuid`, sql`${userId}::text`),
         ),
       ),
     );

@@ -309,9 +309,7 @@ function RenameBody({ board, onClose }: { board: Dashboard; onClose: () => void 
         </DialogBody>
       </Locked>
       <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button type="submit" variant="primary" disabled={!ready} loading={update.isPending}>
           {t("common.save")}
         </Button>
@@ -337,9 +335,7 @@ function DeleteDialog({ board, open, onClose }: { board: Dashboard; open: boolea
       width={440}
     >
       <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="danger"
           loading={remove.isPending}

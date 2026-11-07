@@ -123,7 +123,6 @@
     "refuse": "Refuser",
     "approve": "Approuver",
     "hold": "Maintenir pour approuver",
-    "holding": "Continuez d'appuyer…",
     "holdNote": "Risque élevé : maintenez le bouton une seconde.",
     "tapNote": "Approuver lance l'action tout de suite.",
     "tapNoteAhead": "Approuver maintenant couvre {{when}}.",
@@ -342,9 +341,9 @@
       "wellNow": "S'est arrêté pour lire votre note"
     },
     "stopped": {
-      "byYou": "Arrêté par vous",
-      "by": "Arrêté par {{name}}",
-      "plain": "Arrêté",
+      "byYou": "Arrêté ici",
+      "by": "{{name}} l'a arrêté ici",
+      "plain": "Arrêté ici",
       "limit": "Limite d'étapes atteinte",
       "stuck": "Arrêté car bloqué",
       "continue": "Continuer",
@@ -688,6 +687,10 @@
     "freeSection": "Libres",
     "noGroupSection": "Sans service"
   },
+  "team": {
+    "entry": "Liste, organigramme et carte",
+    "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
+  },
   "agentEdit": {
     "missing": "Cet agent n'existe plus.",
     "saved": "Modifications enregistrées",
@@ -760,6 +763,9 @@
       "older": "Plus ancien"
     },
     "kind": {
+      "proposal_waiting_one": "{{names}} propose une amélioration",
+      "proposal_waiting_many": "{{names}} proposent des améliorations",
+      "proposal_waiting_other": "{{names}} proposent des améliorations",
       "mention_one": "{{names}} vous a mentionné",
       "mention_many": "{{names}} vous ont mentionné",
       "mention_other": "{{names}} vous ont mentionné",
@@ -883,6 +889,12 @@
       "desktop_taken_female_one": "{{names}} a pris le contrôle de l'écran de l'ordinateur de {{agent}}",
       "desktop_taken_female_many": "{{names}} ont pris le contrôle de l'écran de l'ordinateur de {{agent}}",
       "desktop_taken_female_other": "{{names}} ont pris le contrôle de l'écran de l'ordinateur de {{agent}}",
+      "plan_lent_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
       "connector_tool_changed_one": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "connector_tool_changed_many": "Un serveur connecté a modifié des outils que vous aviez approuvés",
       "connector_tool_changed_other": "Un serveur connecté a modifié des outils que vous aviez approuvés",
@@ -894,13 +906,7 @@
       "computer_no_chrome_other": "Des ordinateurs ont besoin de Google Chrome. Téléchargez-le sur google.com/chrome",
       "app_created_one": "Une app d'IA a créé des choses pour vous",
       "app_created_many": "Une app d'IA a créé des choses pour vous",
-      "app_created_other": "Une app d'IA a créé des choses pour vous",
-      "plan_lent_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
-      "plan_lent_female_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}"
+      "app_created_other": "Une app d'IA a créé des choses pour vous"
     },
     "markRead": "Marquer comme lu",
     "markUnread": "Marquer comme non lu",
@@ -992,6 +998,9 @@
     "issuesWithMe_one": "{{count}} avec vous",
     "issuesWithMe_many": "{{count}} avec vous",
     "issuesWithMe_other": "{{count}} avec vous",
+    "proposalsWaiting_one": "{{count}} en attente",
+    "proposalsWaiting_many": "{{count}} en attente",
+    "proposalsWaiting_other": "{{count}} en attente",
     "drive": "Drive",
     "connectors": "Connecteurs et MCP",
     "usage": "Consommation",
@@ -1059,8 +1068,7 @@
     "addPasswordFirst": "Ajoutez d'abord un mot de passe à votre compte sur le site, puis saisissez-le ici.",
     "addPasswordWeb": "Ajouter un mot de passe sur le site",
     "otherAccount": "Vous vous êtes connecté à un autre compte. Rien n'a été supprimé.",
-    "hold": "Maintenir pour supprimer",
-    "holding": "Continuez d'appuyer…"
+    "hold": "Maintenir pour supprimer"
   },
   "files": {
     "type": {
@@ -2119,10 +2127,6 @@
         "proposal": "Tableau de bord"
       }
     }
-  },
-  "team": {
-    "entry": "Liste, organigramme et carte",
-    "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
   },
   "empty": {
     "agents": {

@@ -95,6 +95,7 @@ export function CommandMenu() {
       { key: "home", to: "/org/$orgId/home", icon: "home", label: t("shell.home") },
       { key: "dashboards", to: "/org/$orgId/dashboards", icon: "chart", label: t("dashboards.title") },
       { key: "approvals", to: "/org/$orgId/approvals", icon: "waiting", label: t("shell.approvals") },
+      { key: "proposals", to: "/org/$orgId/proposals", icon: "bulb", label: t("shell.proposals") },
       { key: "issues", to: "/org/$orgId/issues", icon: "issues", label: t("shell.issues") },
       { key: "routines", to: "/org/$orgId/routines", icon: "routines", label: t("shell.routines") },
       { key: "task-manager", to: "/org/$orgId/task-manager", icon: "stageProgress", label: t("taskManager.title") },

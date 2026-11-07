@@ -881,8 +881,8 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   return (
     <>
       {waiting && (
-        <section className="waitcard skill-wait" aria-label={t("skills.waitingChip")}>
-          <span className="waitcard__top ac-iconline">
+        <section className="skill-wait" aria-label={t("skills.waitingChip")}>
+          <span className="skill-wait__top ac-iconline">
             <Icon name="alert" size={16} />
             <span>{waiting.title}</span>
           </span>
@@ -900,7 +900,7 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           </ul>
           <p>{waiting.lead}</p>
           <PendingDiff skill={s} />
-          <span className="waitcard__acts">
+          <span className="skill-wait__acts">
             <Button
               size="sm"
               variant="primary"

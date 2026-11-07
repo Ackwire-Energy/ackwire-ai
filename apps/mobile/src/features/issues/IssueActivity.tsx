@@ -60,7 +60,9 @@ export function IssueActivityFeed({ issue }: { issue: Issue }) {
                 {a.text ? <MessageText body={a.text} /> : null}
                 {a.attachments?.length ? (
                   // The chat's files: a print at its own shape (tap opens the viewer), other files as a card.
-                  <MessageFiles files={a.attachments.map((f) => ({ id: f.id, title: f.title, deleted: false }))} />
+                  <View style={styles.files}>
+                    <MessageFiles files={a.attachments.map((f) => ({ id: f.id, title: f.title, deleted: false }))} />
+                  </View>
                 ) : null}
               </View>
             </Animated.View>
@@ -72,6 +74,7 @@ export function IssueActivityFeed({ issue }: { issue: Issue }) {
 }
 
 const styles = StyleSheet.create({
+  files: { marginTop: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   none: { paddingHorizontal: 20 },

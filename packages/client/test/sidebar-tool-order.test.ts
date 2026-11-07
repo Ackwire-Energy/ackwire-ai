@@ -1,13 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import type { SidebarItem } from "../src/api/types";
-import { moveSection, moveShownTool, placeTool, SIDEBAR_ITEMS } from "../src/lib/sidebar-items";
+import { knownToolOrder, moveSection, moveShownTool, placeTool, SIDEBAR_ITEMS } from "../src/lib/sidebar-items";
 
 const order: SidebarItem[] = [...SIDEBAR_ITEMS];
 
 describe("the tools' order", () => {
   test("a tool dropped before or after another takes that place; on itself or an unknown one, nothing moves", () => {
-    expect(placeTool(order, "drive", "threads", "before").slice(0, 3)).toEqual(["approvals", "drive", "threads"]);
-    expect(placeTool(order, "approvals", "issues", "after").slice(0, 3)).toEqual(["threads", "issues", "approvals"]);
+    expect(placeTool(order, "drive", "threads", "before").slice(0, 3)).toEqual(["approvals", "proposals", "drive"]);
+    expect(placeTool(order, "approvals", "issues", "after").slice(0, 4)).toEqual([
+      "proposals",
+      "threads",
+      "issues",
+      "approvals",
+    ]);
     expect(placeTool(order, "drive", "drive", "after")).toEqual(order);
     expect(placeTool(order, "drive", "nope" as SidebarItem, "after")).toEqual(order);
     expect(new Set(placeTool(order, "calendar", "approvals", "before")).size).toBe(order.length);
@@ -24,8 +29,16 @@ describe("the tools' order", () => {
     expect(moveShownTool(order, shown, "drive", 1)).toEqual(order);
   });
 
+  test("a tool this build has no page for is dropped, one the saved order lacks comes last", () => {
+    const saved = ["drive", "from_a_newer_server", "threads"] as SidebarItem[];
+    const known = knownToolOrder(saved);
+    expect(known.slice(0, 2)).toEqual(["drive", "threads"]);
+    expect([...known].sort()).toEqual([...SIDEBAR_ITEMS].sort());
+    expect(knownToolOrder([])).toEqual(order);
+  });
+
   test("the setup dialog moves a tool one place in the whole order", () => {
-    expect(moveSection(order, "issues", -1).slice(0, 3)).toEqual(["approvals", "issues", "threads"]);
-    expect(moveSection(order, "team", 1)).toEqual(order);
+    expect(moveSection(order, "issues", -1).slice(0, 4)).toEqual(["approvals", "proposals", "issues", "threads"]);
+    expect(moveSection(order, "taskManager", 1)).toEqual(order);
   });
 });

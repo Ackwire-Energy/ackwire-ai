@@ -220,7 +220,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Workspace-Inhalte, verarbeitet im Auftrag von Workspaces",
         blocks: [
           "Zu den Workspace-Inhalten gehören Nachrichten in Kanälen, Threads und Direktnachrichten, Dateien im Drive und Wiki-Seiten. Dazu gehören außerdem Aufgaben, Routinen, Kalendertermine und Freigaben, die Anweisungen, Einstellungen und Erinnerungen von Agenten, was Agenten schreiben und tun, sowie die Daten, die Agenten über die Konnektoren, Datenbanken und Computer lesen, die der Workspace anbindet. Wir verarbeiten sie nur, um den Workspace und seine Agenten so zu betreiben, wie der Workspace sie konfiguriert, um sie den Mitgliedern des Workspace anzuzeigen, um die von ihnen gewünschten Benachrichtigungen zu senden und um Support zu leisten.",
-          "Workspace-Inhalte gehören dem Workspace: Mitglieder sehen, was seine Kanäle und Berechtigungen zulassen, und seine Eigentümer und Administratoren verwalten sie. Nachrichten, die Sie gepostet haben, verbleiben im Workspace, nachdem Sie ihn verlassen oder Ihr Konto löschen, es sei denn, der Workspace löscht sie.",
+          "Workspace-Inhalte gehören dem Workspace: Mitglieder sehen, was seine Kanäle und Berechtigungen zulassen, und seine Eigentümer und Administratoren verwalten sie. Eigentümer und Administratoren des Workspace können jeden Kanal, jede Aufgabe und jede Wiki-Seite sehen, auch private. Direktnachrichten zwischen anderen Personen können sie nicht lesen. Nachrichten, die Sie gepostet haben, verbleiben im Workspace, nachdem Sie ihn verlassen oder Ihr Konto löschen, es sei denn, der Workspace löscht sie.",
         ],
       },
       {

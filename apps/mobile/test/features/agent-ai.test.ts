@@ -488,9 +488,12 @@ describe("the agent's AI", () => {
     );
     expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock">\s*\{t\("connectAi\.accountsLocked", \{/);
     expect(grouped).toContain("if (items.length === 0) return null;");
-    // The card's mark sits on the first line of its title, which wraps to two or three on a phone.
-    expect(card).toContain('<LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16}');
-    expect(card).toContain('top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },');
+    // Still waiting, a waiting pill (its sentence wraps to two or three lines on a phone): the breathing mark and
+    // Connect tinted for who may connect, a quiet bolt and who can for anyone else.
+    expect(card).toContain(
+      '<AskWaiting forMe={action !== null} mark="bolt" words={title} actions={action} below={action ? null : locked} />',
+    );
+    expect(card).not.toContain("<Button");
     // "Ada's page": its Conectar opens on the plan she thinks with (`agentPlan`), ChatGPT for Codex.
     expect(profile).toContain("openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })");
     // A plan's page asks the computers for their own sign-ins again: Codex's is known by a usage read with it.
@@ -799,7 +802,7 @@ describe("the agent's AI", () => {
       'const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);',
     );
     expect(connect).toContain('} else if (why && !(gate.state === "offline" && signingIn)) {');
-    expect(connect).toContain("offersKeyNow(gate, hold !== null, mayAddKey) && !signingIn");
+    expect(connect).toContain("offersKeyNow(gate, hold !== null) && !signingIn");
     expect(connect).toContain("onSigningIn={setSigningIn}");
     expect(flow).toMatch(
       /useEffect\(\(\) => \{\s*onSigningIn\?\.\(begun\);\s*return \(\) => onSigningIn\?\.\(false\);/,
@@ -1029,5 +1032,20 @@ describe("Back in Connect an AI", () => {
     expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
     expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
     expect(flowBack({ page: "home" }, false)).toBeNull();
+  });
+});
+
+describe("Outro provedor on the phone", () => {
+  test("the API under a header across the width, Buscar modelos on the add line's header, + in the field, × per model", async () => {
+    // The screen is a component the tests can't render: what it wires in, as text.
+    const form = await Bun.file(new URL("../../src/features/ai/EndpointForm.tsx", import.meta.url).pathname).text();
+    expect(form).toContain('<GroupedHeader>{t("endpoint.style")}</GroupedHeader>');
+    expect(form).toContain('wide="fit"');
+    expect(form.indexOf('t("endpoint.style")')).toBeLessThan(form.indexOf('t("endpoint.address")'));
+    expect(form).toMatch(
+      /<GroupedHeader\s+aside=\{\s*<Button\s+variant="text"\s+size="sm"\s+label=\{t\("endpoint\.fetch"\)\}/,
+    );
+    expect(form).toContain('<IconButton icon="plus" label={t("endpoint.add")}');
+    expect(form).toContain("withoutModel(d, m.id)");
   });
 });

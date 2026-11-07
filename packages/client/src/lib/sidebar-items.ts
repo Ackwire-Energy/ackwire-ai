@@ -3,6 +3,7 @@ import type { SidebarItem, SidebarItems, SidebarPlace, SidebarSection } from "..
 /** The tools at the top of the sidebar, in their order (mirrors `SIDEBAR_ITEMS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "approvals",
+  "proposals",
   "threads",
   "issues",
   "wiki",
@@ -10,11 +11,14 @@ export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "routines",
   "calendar",
   "team",
+  "dashboards",
+  "taskManager",
 ];
 
 /** Where each tool goes for someone who never moved it. */
 export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   approvals: "auto",
+  proposals: "more",
   threads: "always",
   issues: "always",
   wiki: "more",
@@ -22,10 +26,12 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   routines: "more",
   calendar: "more",
   team: "always",
+  dashboards: "more",
+  taskManager: "more",
 };
 
 /** The tools with a count in the sidebar: only these can wait in More until there is something (`auto`). */
-export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "threads"];
+export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals", "threads"];
 
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];
@@ -39,6 +45,14 @@ export function moveSection<T extends string>(order: readonly T[], section: T, b
   [next[i], next[j]] = [next[j] as T, section];
   return next;
 }
+
+/**
+ * The saved order as this build can show it: only the tools it knows, then any the order lacks. A tab left open across
+ * a deploy reads a newer server's tools, and a tool it has no page for would break the sidebar.
+ */
+export const knownToolOrder = (saved: readonly SidebarItem[]): SidebarItem[] => [
+  ...new Set([...saved.filter((id) => SIDEBAR_ITEMS.includes(id)), ...SIDEBAR_ITEMS]),
+];
 
 export const sameOrder = (a: readonly string[], b: readonly string[]) => a.join() === b.join();
 

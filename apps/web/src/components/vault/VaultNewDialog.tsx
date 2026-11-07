@@ -179,6 +179,7 @@ export function VaultNewDialog({
           <aside className="issue-aside vlt-aside">
             <DetailsSection title={t("vault.access.title")}>
               <Segmented<VaultScope>
+                block
                 label={t("vault.new.who")}
                 value={scope}
                 disabled={!canManageTeam}

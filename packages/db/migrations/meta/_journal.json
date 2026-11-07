@@ -1611,6 +1611,41 @@
       "when": 1794040000000,
       "tag": "0231_claude_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "7",
+      "when": 1794280000000,
+      "tag": "0232_task_github_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 233,
+      "version": "7",
+      "when": 1794380000000,
+      "tag": "0233_refusal_proposals",
+      "breakpoints": true
+    },
+    {
+      "idx": 234,
+      "version": "7",
+      "when": 1794480000000,
+      "tag": "0234_task_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 235,
+      "version": "7",
+      "when": 1794580000000,
+      "tag": "0235_question_for_person",
+      "breakpoints": true
+    },
+    {
+      "idx": 236,
+      "version": "7",
+      "when": 1794581000000,
+      "tag": "0236_dm_memory_stays_personal",
+      "breakpoints": true
     }
   ]
 }

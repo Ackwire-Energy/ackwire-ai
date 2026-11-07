@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation, SecretRequest } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import {
   latestSecret,
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretRequestOf,
@@ -855,6 +857,12 @@ describe("an agent's question (ask_user)", () => {
     expect(
       questionOf({ question: { ...question, status: "answered", answer: null, dismissed: true } })?.dismissed,
     ).toBe(true);
+    // For one person: it keeps who, and waits on them alone.
+    const forBia = questionOf({ question: { ...question, requestedForUserId: "bia" } });
+    expect(forBia?.requestedForUserId).toBe("bia");
+    expect(questionWaitsOn(forBia ?? question, "bia")).toBe(true);
+    expect(questionWaitsOn(forBia ?? question, "ana")).toBe(false);
+    expect(questionWaitsOn(question, "ana")).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();
@@ -1235,7 +1243,7 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(line).toMatchObject({ key: "chat.notice.wakeSkipped", values: { name: "Ada", agents: "Infra, zed" } });
   });
 
-  test("an agent's follow-up: when it will be back and for what, then the line that woke it", () => {
+  test("an agent's follow-up: when it will be back and for what (Cancel while it is to come), then the line that woke it", () => {
     // Today, so the line needs no day.
     const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();
     const when = { time: (iso: string) => (iso === at ? "12:00" : "?"), locale: "pt-BR" };
@@ -1251,6 +1259,7 @@ describe("automatic lines (notices) and fast replies", () => {
       key: "chat.notice.followUp",
       values: { name: "Ada", about: "ver o CI", time: "12:00", day: "" },
       text: "Check CI run 42",
+      pending: true,
     });
     const canceled = eventLineOf(
       agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),
@@ -1258,6 +1267,7 @@ describe("automatic lines (notices) and fast replies", () => {
       when,
     );
     expect(canceled?.key).toBe("chat.notice.followUpCanceled");
+    expect(canceled?.pending).toBe(false);
     const woke = eventLineOf(
       agentMsg("n3", { notice: { kind: "follow_up", text: "x", refs: { ...refs, wake: "1", followUpId: "n1" } } }),
       names,
@@ -1420,6 +1430,20 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretRefusalKey({ code: "machine.offline" })).toBe("secret.computerAway");
     expect(secretRefusalKey({ code: "machine.paused" })).toBe("secret.computerPaused");
     expect(secretRefusalKey({ code: "secret.closed" })).toBeNull();
+  });
+
+  test("a 409 ends the card as the request really ended, and an open one stays open", () => {
+    const r = request as SecretRequest;
+    const refusal = (params?: object) => ({ code: "secret.closed", status: 409, params });
+    const ended = { ...r, status: "declined" as const };
+    expect(secretClosedBy(refusal(), r, ended)).toBe(ended);
+    // Reading it again failed: the refusal itself says how it ended.
+    const changed = secretClosedBy(refusal({ status: "canceled", endReason: "computer_changed" }), r, null);
+    expect(changed).toMatchObject({ status: "canceled", endReason: "computer_changed", publicKey: null });
+    expect(secretClosedBy(refusal({ status: "expired" }), r, null)?.status).toBe("expired");
+    // Still open: nothing says it ended, so the card doesn't either.
+    expect(secretClosedBy({ code: "conflict", status: 409 }, r, r)).toBeNull();
+    expect(secretClosedBy(refusal(), r, null)).toBeNull();
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {

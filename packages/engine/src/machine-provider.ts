@@ -118,7 +118,8 @@ export async function requestMadePassword(
 ): Promise<string> {
   const status = await hub.status(machineId);
   const name = status?.name ?? "computer";
-  if (!status || status.protocol < VAULT_PASSWORD_PROTOCOL) throw new Error(vaultUpdateText(name, "make passwords"));
+  if (!status || status.protocol < VAULT_PASSWORD_PROTOCOL)
+    throw new Error(vaultUpdateText(status ?? { name }, "make passwords"));
   const pair = await generateSecretKeyPair();
   const requestId = crypto.randomUUID();
   try {
@@ -270,16 +271,15 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
 }
 
 /** What a computer too old for `pull` answers for a file past what a `write` carries. */
-export function pullUpdateText(status: Pick<MachineStatus, "name" | "kind">) {
-  const what = `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`;
-  return status.kind === "managed"
-    ? `The computer ${status.name} needs an update to ${what}. It updates by itself, so try again later.`
-    : vaultUpdateText(status.name, what);
-}
+export const pullUpdateText = (status: Pick<MachineStatus, "name" | "kind">) =>
+  vaultUpdateText(status, `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`);
 
-/** What a computer too old for the Vault answers (ADR 0144): its owner updates the runner. */
-export const vaultUpdateText = (machineName: string, what: string) =>
-  `The computer ${machineName} needs an update to ${what}. Its owner can run \`agentes-runner update\`.`;
+/**
+ * What a computer too old for the Vault answers (ADR 0144): its owner updates the runner, or the workspace's own
+ * computer updates by itself (its runner refuses `agentes-runner update`).
+ */
+export const vaultUpdateText = (status: { name: string; kind?: MachineStatus["kind"] }, what: string) =>
+  `The computer ${status.name} needs an update to ${what}. ${status.kind === "managed" ? "It updates by itself, so try again later." : "Its owner can run `agentes-runner update`."}`;
 
 /** A one-use key on the agent's computer (ADR 0144, protocol 45): a Vault value is sealed to it, never sent bare. */
 export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };
@@ -298,7 +298,7 @@ export async function requestVaultKey(
 ): Promise<VaultKey> {
   const status = await hub.status(machineId);
   const name = status?.name ?? "computer";
-  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(name, what));
+  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(status ?? { name }, what));
   try {
     const reply = await hub.call<"vault.key">(machineId, { agent, op: "vault.key" }, { signal, timeoutMs: 30_000 });
     const key = reply?.vaultKey;

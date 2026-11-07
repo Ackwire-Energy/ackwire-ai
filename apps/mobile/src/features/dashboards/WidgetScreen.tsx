@@ -9,6 +9,7 @@ import {
   type WidgetUpdate,
 } from "@agenteschat/client";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
+import { plainInline } from "@agenteschat/client/lib/markdown";
 import { WIDGET_LIMITS, WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -189,7 +190,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
     : t("widgets.panel.noRoutine");
   const history = w.history.slice(0, HISTORY_SHOWN);
   const historyLabel = (u: WidgetUpdate) =>
-    u.status === "ok" ? u.summary || t("widgets.panel.updated") : t("widgets.status.failed");
+    u.status === "ok" ? plainInline(u.summary ?? "") || t("widgets.panel.updated") : t("widgets.status.failed");
   const historyNote = (u: WidgetUpdate) => {
     const notes = [
       u.alert ? t("widgets.panel.alerted", { text: u.alert }) : null,

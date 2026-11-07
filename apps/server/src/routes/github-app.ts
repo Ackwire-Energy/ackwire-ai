@@ -4,6 +4,7 @@ import {
   forgetOrgRepositories,
   type GitHubAppInstallDeps,
   githubAppInstallationView,
+  githubOrgAccess,
   handleGitHubAppWebhook,
   listGitHubAppInstallations,
   listOrgRepositories,
@@ -181,6 +182,28 @@ export function githubAppRoutes(deps: AppDeps) {
       },
     }),
     async (c) => c.json(await listOrgRepositories(listing, c.get("user").id, c.req.valid("param").orgId), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/github/access",
+      tags,
+      security,
+      summary: "The GitHub organizations the connection reaches now, and GitHub's page to grant more (admins)",
+      description:
+        "GitHub's sign-in asks about organizations only the first time, so more of them are granted on `manageUrl`, null on an API key. `orgs` is null when GitHub didn't answer.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z
+            .object({ orgs: z.array(z.string()).nullable(), manageUrl: z.string().nullable() })
+            .openapi("GitHubOrgAccess"),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await githubOrgAccess(listing, c.get("user").id, c.req.valid("param").orgId), 200),
   );
 
   app.openapi(

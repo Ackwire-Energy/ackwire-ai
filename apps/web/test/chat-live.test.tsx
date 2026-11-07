@@ -1425,7 +1425,7 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
   });
 
   test("her question before then: its card and the wait for the answer show, and stay as the list changes", async () => {
@@ -1439,7 +1439,7 @@ describe("caught up once the server confirms the channel's subscription", () => 
     await act(async () => socket.push({ type: "subscribed", channelId: ENG_ID }));
     await settle(4);
     expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
     await push(socket, {
       type: "message.created",
       messageId: "m-atlas",
@@ -1456,6 +1456,6 @@ describe("caught up once the server confirms the channel's subscription", () => 
     });
     await settle(4);
     expect(rowsWith("Deploy das 9h no ar.")).toHaveLength(1);
-    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando sua resposta");
+    expect(receiptOfM1()).toBe("Vista por Ada. Ada está esperando uma resposta");
   });
 });

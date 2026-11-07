@@ -42,6 +42,7 @@ import {
   requireSession,
   security,
 } from "./context";
+import { AudienceChoice } from "./schemas";
 
 const tags = ["Wiki"];
 const Author = z
@@ -343,6 +344,9 @@ export function wikiRoutes(deps: AppDeps) {
             folder: Folder.optional(),
             tags: Tags.optional(),
             note: z.string().max(300).optional(),
+            audience: AudienceChoice.optional().openapi({
+              description: "Who sees it, inside its folder's audience. Left out: its folder's, or everyone.",
+            }),
           }),
         ),
       },
@@ -583,7 +587,7 @@ export function wikiRoutes(deps: AppDeps) {
       summary:
         "Limit a page to roles and people (owners always read it) and to some agents, or open it with `null`; for people who edit the wiki and manage roles",
       description:
-        "`wiki.audience_forbidden`: missing `edit_wiki` or `manage_roles`; `wiki.audience_excludes_you`: the audience must include you; `wiki.audience_wider_than_folder`: inside a limited folder a page can only be narrower; `wiki.editors_exclude_you`: the editors must include you. People outside it get `wiki.no_access` on the page, and those off its editors `wiki.edit_limited` on a write. Leaving out `agentIds`, or `editors` with `agentEditorIds`, keeps the page's own.",
+        "Anyone who edits the page, for `audience` alone. `wiki.audience_forbidden`: `agentIds` or `editors` without `edit_wiki` and `manage_roles`; `wiki.audience_excludes_you`: the audience must include you; `wiki.audience_wider_than_folder`: inside a limited folder a page can only be narrower; `wiki.editors_exclude_you`: the editors must include you. People outside it get `wiki.no_access` on the page, and those off its editors `wiki.edit_limited` on a write. Leaving out `agentIds`, or `editors` with `agentEditorIds`, keeps the page's own.",
       request: {
         params: PageParams,
         body: body(

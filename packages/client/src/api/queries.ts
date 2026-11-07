@@ -37,13 +37,20 @@ import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import {
+  knownToolOrder,
+  SIDEBAR_DEFAULTS,
+  SIDEBAR_ITEMS,
+  SIDEBAR_SECTIONS,
+  withSidebarPlace,
+} from "../lib/sidebar-items";
 import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import { voiceOf } from "../lib/voice";
+import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { readUnknownMembers, setOrgDeletion } from "../realtime/machines";
@@ -761,8 +768,8 @@ export function useApplyTeamTemplate(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ templateId, locale }: { templateId: string; locale?: string }) =>
-      api.agents.applyTeamTemplate(orgId, templateId, locale),
+    mutationFn: ({ templateId, locale, tap }: { templateId: string; locale?: string; tap?: string }) =>
+      api.agents.applyTeamTemplate(orgId, templateId, locale, tap),
     onSuccess: ({ channelId }) => void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) }),
   });
 }
@@ -2032,6 +2039,18 @@ export const useGitHubRepos = (orgId: string, enabled = true) => {
     queryFn: () => api.githubApp.repositories(orgId),
     enabled,
     staleTime: 60_000,
+    retry: false,
+  });
+};
+
+/** The organizations GitHub lets us reach. Read again on every return to the tab: they're granted on GitHub's own page. */
+export const useGithubAccess = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.githubAccess(orgId),
+    queryFn: () => api.githubApp.access(orgId),
+    enabled,
+    refetchOnWindowFocus: "always",
     retry: false,
   });
 };
@@ -3338,6 +3357,12 @@ function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
     void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
 }
 
+/** The proposals and the sidebar's count of them: after a decision here, or a `proposal.*` event from elsewhere. */
+export function refreshProposals(qc: QueryClient, orgId: string) {
+  void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+  return qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3349,7 +3374,7 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 
@@ -3387,7 +3412,7 @@ export function useDecideProposals(orgId: string) {
     },
     meta: { silent: true },
     onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    onSettled: () => refreshProposals(qc, orgId),
   });
 }
 
@@ -3689,9 +3714,10 @@ export const useIssues = (orgId: string, q = "") => {
   });
 };
 
-export const useIssue = (orgId: string, number: number) => {
+export const useIssue = (orgId: string, number: number, enabled = true) => {
   const api = useApi();
   return useQuery({
+    enabled,
     queryKey: keys.issue(orgId, number),
     queryFn: () => api.issues.get(orgId, number),
     refetchInterval: (query) => (query.state.data?.work && query.state.data.work.state !== "stalled" ? 10_000 : false),
@@ -3781,21 +3807,27 @@ export function useIssueAction(orgId: string) {
       action:
         | { type: "create"; input: IssueInput }
         | { type: "update"; id: string; patch: IssuePatch }
+        | { type: "delete"; id: string }
         | { type: "criterion"; id: string; criterionId: string; done: boolean }
         | { type: "comment"; id: string; text: string; attachmentIds?: string[] }
-        | { type: "ask"; id: string; agentId: string },
+        | { type: "ask"; id: string; agentId: string }
+        | { type: "audience"; id: string; audience: AudienceChoice },
     ): Promise<unknown> => {
       switch (action.type) {
         case "create":
           return api.issues.create(orgId, action.input);
         case "update":
           return api.issues.update(orgId, action.id, action.patch);
+        case "delete":
+          return api.issues.delete(orgId, action.id);
         case "criterion":
           return api.issues.setCriterion(orgId, action.id, action.criterionId, action.done);
         case "comment":
           return api.issues.comment(orgId, action.id, action.text, action.attachmentIds);
         case "ask":
           return api.issues.askAgent(orgId, action.id, action.agentId);
+        case "audience":
+          return api.issues.setAudience(orgId, action.id, action.audience);
       }
     },
     onSettled: () => {
@@ -4566,6 +4598,7 @@ export function useWikiAction(orgId: string) {
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
         | { type: "audience"; slug: string; access: WikiAccess }
+        | { type: "who"; slug: string; audience: WikiAccess["audience"] }
         | {
             type: "append";
             slug: string;
@@ -4588,6 +4621,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.pin(orgId, action.slug, action.pinned);
         case "audience":
           return api.wiki.audience(orgId, action.slug, action.access);
+        case "who":
+          return api.wiki.audience(orgId, action.slug, { audience: action.audience });
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
@@ -5080,7 +5115,7 @@ export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
     queryFn: () => api.orgs.sidebarToolOrder(orgId),
     staleTime: 60_000,
   }).data;
-  return saved ? [...new Set([...saved, ...SIDEBAR_ITEMS])] : [...SIDEBAR_ITEMS];
+  return knownToolOrder(saved ?? []);
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
@@ -5418,7 +5453,12 @@ function readOncePerBurst(key: string, read: () => void) {
 
 /** A task changed, a reply in its conversation too (ADR 0145): the boards on screen read again, once per burst. */
 export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
-  if (event.type === "issue.created" || event.type === "issue.updated")
+  if (
+    event.type === "issue.created" ||
+    event.type === "issue.updated" ||
+    event.type === "issue.deleted" ||
+    event.type === "issue.audience"
+  )
     readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
 }
 

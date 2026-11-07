@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -80,4 +81,20 @@ test("questions API: skipping closes the card and the notification, and the agen
   await t.drain();
   const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: { body: string }[] };
   expect(timeline.messages.at(-1)?.body).toBe("?");
+});
+
+test("questions API: one for someone else is refused to anyone else, the workspace's owner included", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  await api(`/channels/${channelId}/messages`, { json: { body: "@dev deploy it" } });
+  await t.drain();
+  await t.db.update(schema.agentQuestions).set({ requestedForUserId: "someone-else" });
+  const [q] = await t.db.select().from(schema.agentQuestions);
+  expect(await (await api(`/questions/${q?.id}`)).json()).toMatchObject({ requestedForUserId: "someone-else" });
+  expect((await api(`/questions/${q?.id}/answer`, { json: { choice: "production" } })).status).toBe(403);
+  expect((await api(`/questions/${q?.id}/dismiss`, { json: {} })).status).toBe(403);
+  expect((await t.db.select().from(schema.agentQuestions))[0]?.status).toBe("open");
 });

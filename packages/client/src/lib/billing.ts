@@ -25,4 +25,5 @@ export const standingActive = (standing: Pick<OrgStanding, "state"> | null | und
  * word, not the server's: until the hold lifts, the hold banner says the payment arrived, and the onboarding says it's
  * being confirmed, for a minute at most. The router reads `1` as a number, and the onboarding forwards it as `true`.
  */
-export const isPaidReturn = (search: Record<string, unknown>) => search.paid === 1 || search.paid === true;
+export const isPaidReturn = (search: Record<string, unknown>) =>
+  search.paid === 1 || search.paid === true || search.paid === "1";

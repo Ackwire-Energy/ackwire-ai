@@ -175,12 +175,12 @@ describe("lists of things", () => {
     await settle(2);
   });
 
-  test("an issue card: open beside, open its page, copy link", async () => {
+  test("an issue card: open beside, open its page, copy link, and delete for who may", async () => {
     await go("issues");
     const card = document.querySelector(".issue-card");
     if (!card) throw new Error("no issue card");
     await rightClick(card);
-    expect(items()).toEqual(["Abrir", "Abrir em página inteira", "Copiar link"]);
+    expect(items()).toEqual(["Abrir", "Abrir em página inteira", "Copiar link", "Excluir tarefa"]);
   });
 });
 

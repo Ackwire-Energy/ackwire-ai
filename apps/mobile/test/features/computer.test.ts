@@ -18,7 +18,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { resources } from "@agenteschat/i18n";
 import { bannedIn, CLOUD_BANNED } from "../../../../packages/i18n/test/edition-words";
-import { keyNowLabel, offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
+import { offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
 import { pageGapKey, stepText } from "../../src/features/browser/logic";
 import {
   offersSwitch,
@@ -333,26 +333,23 @@ describe("the workspace's computer on its way, on Conversas", () => {
   test("the AI step offers an API key now in every wait, a page away on the phone, but not on hold", () => {
     const wait = viewOf({ state: "waiting", step: null, reason: "capacity", secondsLeft: null });
     for (const view of [viewOf(), wait, viewOf({ state: "problem", step: null, secondsLeft: null })]) {
-      expect(offersKeyNow({ state: "preparing", view }, false, true)).toBe(true);
-      expect(offersKeyNow({ state: "preparing", view }, true, true)).toBe(false);
+      expect(offersKeyNow({ state: "preparing", view }, false)).toBe(true);
+      expect(offersKeyNow({ state: "preparing", view }, true)).toBe(false);
     }
     // Ready, its agent getting it at the next refresh: seconds, nothing to offer.
-    expect(offersKeyNow({ state: "preparing", view: null }, false, true)).toBe(false);
-    // A billing hold: whoever may add a key can keep one for when the plan is active, in words that promise no "now".
-    expect(offersKeyNow({ state: "billing", hold: "payment" }, true, true)).toBe(true);
-    expect(offersKeyNow({ state: "billing", hold: "payment" }, true, false)).toBe(false);
-    expect(keyNowLabel({ state: "billing", hold: "payment" })).toBe("noAi.rightHand.useKey");
-    expect(keyNowLabel({ state: "offline" })).toBe("connectAi.wait.useKey");
+    expect(offersKeyNow({ state: "preparing", view: null }, false)).toBe(false);
+    // A billing hold: a key is no way around it.
+    expect(offersKeyNow({ state: "billing", hold: "payment" }, true)).toBe(false);
     // Where the plan can't sign in there: as before.
-    expect(offersKeyNow({ state: "offline" }, false, true)).toBe(true);
-    expect(offersKeyNow({ state: "missing" }, false, true)).toBe(true);
-    expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false, true)).toBe(true);
+    expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
+    expect(offersKeyNow({ state: "missing" }, false)).toBe(true);
+    expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false)).toBe(true);
     // On a hold no key runs, and the line says the hold.
     for (const gate of [{ state: "offline" }, { state: "unsupported", reason: "keys" }] as const)
-      expect(offersKeyNow(gate, true, true)).toBe(false);
-    expect(offersKeyNow({ state: "ready" }, false, true)).toBe(false);
-    expect(offersKeyNow({ state: "loading" }, false, true)).toBe(false);
-    expect(offersKeyNow({ state: "locked", who: "owner" }, false, true)).toBe(false);
+      expect(offersKeyNow(gate, true)).toBe(false);
+    expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
+    expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
+    expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);
   });
 
   test("a plan's page asks again only while it waits on something no event may bring", () => {

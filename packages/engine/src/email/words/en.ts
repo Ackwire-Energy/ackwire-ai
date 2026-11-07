@@ -410,6 +410,19 @@ export const en = {
     button: "Open notifications",
     why: (org: string) => `You got this email because someone in ${org} connected your plan to an agent.`,
   },
+  planWaiting: {
+    subject: "Your team is waiting",
+    preheader: "Your workspace is ready. It needs an agentes.chat plan to start.",
+    headline: "Your team is waiting",
+    body: (agents: number, channels: number, routines: number): Text => {
+      const a = plural("en", agents, { one: "1 agent", other: `${agents} agents` });
+      const c = plural("en", channels, { one: "1 channel", other: `${channels} channels` });
+      const r = plural("en", routines, { one: "1 routine", other: `${routines} routines` });
+      return `${routines > 0 ? `${a}, ${c} and ${r}` : `${a} and ${c}`} are ready. They need an agentes.chat plan to start.`;
+    },
+    button: "See agentes.chat plans",
+    why: (org: string) => `You got this email because you run ${org} on agentes.chat. We send two of these, then stop.`,
+  },
 };
 
 /** Every email's words: English has them all; another language what it translated (`Partial`), English for the rest. */

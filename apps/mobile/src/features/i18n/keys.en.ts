@@ -120,7 +120,6 @@ export const featureKeysEn = {
     refuse: "Decline",
     approve: "Approve",
     hold: "Hold to approve",
-    holding: "Keep holding…",
     holdNote: "High risk: hold the button for a second.",
     tapNote: "Approving does it right away.",
     tapNoteAhead: "Approving now covers {{when}}.",
@@ -332,9 +331,9 @@ export const featureKeysEn = {
       wellNow: "Stopped to read your note",
     },
     stopped: {
-      byYou: "Stopped by you",
-      by: "Stopped by {{name}}",
-      plain: "Stopped",
+      byYou: "Stopped here",
+      by: "{{name}} stopped here",
+      plain: "Stopped here",
       limit: "At the step limit",
       stuck: "Stopped because it got stuck",
       continue: "Continue",
@@ -753,6 +752,8 @@ export const featureKeysEn = {
       older: "Older",
     },
     kind: {
+      proposal_waiting_one: "{{names}} proposes an improvement",
+      proposal_waiting_other: "{{names}} propose improvements",
       mention_one: "{{names}} mentioned you",
       mention_other: "{{names}} mentioned you",
       thread_reply_one: "{{names}} replied in the thread",
@@ -939,6 +940,8 @@ export const featureKeysEn = {
     issues: "Tasks",
     issuesWithMe_one: "{{count}} with you",
     issuesWithMe_other: "{{count}} with you",
+    proposalsWaiting_one: "{{count}} waiting",
+    proposalsWaiting_other: "{{count}} waiting",
     drive: "Drive",
     connectors: "Connectors and MCPs",
     usage: "Usage",
@@ -1011,7 +1014,6 @@ export const featureKeysEn = {
     addPasswordWeb: "Add a password on the website",
     otherAccount: "You signed in to another account. Nothing was deleted.",
     hold: "Hold to delete",
-    holding: "Keep holding…",
   },
   files: {
     type: {

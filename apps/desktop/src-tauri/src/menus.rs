@@ -200,7 +200,12 @@ fn build_app_menu(
     let about = AboutMetadataBuilder::new()
         .name(Some(app.package_info().name.clone()))
         .version(Some(app.package_info().version.to_string()))
-        .copyright(Some("agentes.chat"))
+        // The license's required attribution (LICENSE, AGPL-3.0 section 7(b)); never removed.
+        .copyright(Some(
+            "Based on agentes.chat by Codari Global, LLC\n\
+             Copyright © 2026 Codari Global, LLC and contributors\n\
+             AGPL-3.0-only, with no warranty",
+        ))
         .build();
 
     let app_menu = SubmenuBuilder::new(app, app.package_info().name.clone())

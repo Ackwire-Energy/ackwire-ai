@@ -58,7 +58,7 @@ export interface DispatchResult {
 /** What starting a run on a message reads of it. */
 type Trigger = Pick<
   Message,
-  "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+  "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "authorUserId" | "agentRunId"
 >;
 
 /**
@@ -177,7 +177,7 @@ export async function startOrJoinRun(
     for (const run of active) {
       if (
         run.triggerMessageId === message.id ||
-        (await holdsMessages(tx, run)) ||
+        (await holdsMessages(tx, run, message.authorUserId)) ||
         !(await mayJoin(tx, message, run.id))
       )
         continue;

@@ -3,7 +3,7 @@ import { useUndoRightHand } from "@agenteschat/client";
 import { delegateLine } from "@agenteschat/client/lib/approval-words";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Icon } from "@agenteschat/ui";
+import { EventPillAction, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -33,7 +33,7 @@ export function DelegateNote({ d }: { d: CardDelegate | null | undefined }) {
   );
 }
 
-/** Desfazer on what it approved, while it lasts: for the person it decided for, and admins. */
+/** "Undo" on what it approved, while it lasts (an action of its pill): for the person it decided for, and admins. */
 export function DelegateUndo({ d }: { d: CardDelegate | null | undefined }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -48,13 +48,11 @@ export function DelegateUndo({ d }: { d: CardDelegate | null | undefined }) {
   if (!open || !d.decisionId) return null;
   const id = d.decisionId;
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      loading={undo.isPending}
+    <EventPillAction
+      disabled={undo.isPending}
       onClick={() => undo.mutate(id, { onError: (e) => toast.show(errorText(t, e), "error") })}
     >
       {t("rightHandApprovals.card.undo")}
-    </Button>
+    </EventPillAction>
   );
 }

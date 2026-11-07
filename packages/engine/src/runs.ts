@@ -91,6 +91,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** The `strategy` of a `no_ai` decision made on a billing hold: its receipt says `kept`, and it is answered after the plan. */
+export const KEPT_ON_HOLD = "plan_hold";
 /** A run's error when the person behind it is at their monthly AI limit (ADR 0141): its card says so. */
 export const PERSON_LIMIT = "person_limit" as const;
 /** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */
@@ -304,18 +306,33 @@ export async function releaseProfileTurns(db: Executor, runId: string) {
 
 export type StepKind = (typeof schema.agentRunStepKindEnum.enumValues)[number];
 
-/** Appends a step to a run's trail (numbered in order). */
+/** Tries for a free number: tool calls that run side by side each lose at most to the others. */
+const STEP_TRIES = 20;
+
+/**
+ * Appends a step to a run's trail (numbered in order). Two at once read the same last number, and the unique
+ * `(run_id, seq)` would fail the whole run: the loser takes the next one.
+ */
 export async function addRunStep(
   db: Executor,
   run: Pick<AgentRun, "id" | "orgId">,
   kind: StepKind,
   data: Record<string, unknown>,
 ) {
-  await db.insert(agentRunSteps).values({
-    orgId: run.orgId,
-    runId: run.id,
-    kind,
-    data: pgSafeJson(data),
-    seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
-  });
+  const safe = pgSafeJson(data);
+  for (let i = 0; i < STEP_TRIES; i++) {
+    const added = await db
+      .insert(agentRunSteps)
+      .values({
+        orgId: run.orgId,
+        runId: run.id,
+        kind,
+        data: safe,
+        seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
+      })
+      .onConflictDoNothing()
+      .returning({ id: agentRunSteps.id });
+    if (added.length > 0) return;
+  }
+  throw new Error(`No free step number on run ${run.id}`);
 }

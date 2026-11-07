@@ -32,6 +32,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useReducedMotion } from "@/ui";
+import { useCardTop } from "../chat/look";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -58,6 +59,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
   const c = useColors();
+  const cardTop = useCardTop();
   const dir = useDirectory();
   const channels = useChannels(orgId).data ?? [];
   const proposals = useCardProposals(orgId, card.proposalIds);
@@ -119,8 +121,8 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
   );
   return (
     // Its week ("Como foi a semana do time, de 28 out. a 3 nov.") is the message's text, above.
-    <View style={styles.wrap}>
-      <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+    <View>
+      <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }, cardTop]}>
         <View style={styles.head}>
           <Text variant="footnote" tone="muted" style={styles.semibold}>
             {t("teamWeek.title")}
@@ -336,7 +338,6 @@ function Fix({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 8 },
   card: {
     paddingTop: 12,
     paddingHorizontal: 14,

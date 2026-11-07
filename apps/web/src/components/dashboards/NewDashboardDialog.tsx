@@ -93,9 +93,7 @@ function NewDashboardBody({ nameRef, onClose }: { nameRef: RefObject<HTMLInputEl
         </DialogBody>
       </Locked>
       <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button type="submit" variant="primary" disabled={!ready} loading={create.isPending}>
           {t("dashboards.create.submit")}
         </Button>

@@ -189,7 +189,6 @@ export function ApprovalSheet({
                       {high ? (
                         <HoldButton
                           label={t("mobile.approval.hold")}
-                          holdLabel={t("mobile.approval.holding")}
                           disabled={decide.isPending}
                           onConfirm={() => done("approve")}
                         />

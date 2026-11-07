@@ -16,6 +16,36 @@ import { Icon, type IconName } from "../icons/Icon";
 import { MenuAt } from "./Menu";
 
 /**
+ * A bubble's time sits at the bubble's end, so its details open to the left of it, unless they don't fit there (a
+ * short bubble on the left): then to the right, or to the side with more room, wrapping within the row
+ * (`--tip-room`). Measured as the pointer or the focus arrives, the tooltip still hidden.
+ */
+function placeStampTip(stamp: HTMLElement) {
+  const tip = stamp.querySelector<HTMLElement>(".ac-msg__tip");
+  const row = stamp.closest(".ac-msg")?.getBoundingClientRect();
+  const anchor = tip?.parentElement?.getBoundingClientRect();
+  if (!tip || !row || !anchor) return;
+  stamp.style.removeProperty("--tip-room");
+  const left = anchor.right - row.left - 8;
+  const right = row.right - anchor.left - 8;
+  const side = tip.offsetWidth <= left || left >= right ? "end" : "start";
+  stamp.dataset.tip = side;
+  stamp.style.setProperty("--tip-room", `${Math.max(side === "end" ? left : right, 120)}px`);
+}
+
+/** The stamp's ref: `placeStampTip` as the pointer enters it or the focus reaches its time. */
+function stampTipRef(stamp: HTMLElement | null) {
+  if (!stamp) return;
+  const place = () => placeStampTip(stamp);
+  stamp.addEventListener("pointerenter", place);
+  stamp.addEventListener("focusin", place);
+  return () => {
+    stamp.removeEventListener("pointerenter", place);
+    stamp.removeEventListener("focusin", place);
+  };
+}
+
+/**
  * How the rows under it are drawn. Every row reads it, so a view sets it once: `comfortable` keeps my rows on the right
  * in a gray bubble, `left` draws them as anyone's, `bubbles` puts everyone's words in a bubble, `compact` is one line a
  * row. No provider: `comfortable`.
@@ -79,7 +109,7 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   bare?: boolean;
   /** The name's color in `bubbles`, on a light and on a dark surface. */
   nameColor?: readonly [string, string];
-  /** Wraps the body in a column with gaps (approval cards). */
+  /** Lays the body out as a column (approval cards). */
   stacked?: boolean;
   /** Muted, at the end of the first line, the header's or a grouped message's text's (e.g. the receipt check). */
   aside?: ReactNode;
@@ -223,7 +253,7 @@ export function Message({
   // What a bubble ends with: the time, what the row is doing (a send in flight stands in the time's place, as under
   // a bubble of mine), and the receipt's mark.
   const stamp = inBubble ? (
-    <span className="ac-msg__stamp">
+    <span className="ac-msg__stamp" ref={stampTipRef}>
       {mine ? (
         (statusNode ?? (
           <span className="ac-msg__time ac-msg__time--details" aria-hidden="true">
@@ -261,6 +291,7 @@ export function Message({
       aria-busy={streaming || undefined}
       style={{ ...rowVars, ...style } as CSSProperties}
       data-look={look ? drawn : undefined}
+      data-own={own && !mine ? "true" : undefined}
       data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
       data-names={drawn === "bubbles" && look?.names === false ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}
@@ -291,7 +322,7 @@ export function Message({
       ) : (
         <span className="ac-msg__avatar">{avatar}</span>
       )}
-      <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
+      <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column" } : undefined}>
         {(!inBubble || mine) && head}
         {aside && grouped && !mine && !inBubble && (
           <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>

@@ -9,6 +9,7 @@ import {
   useDecideApproval,
   useDecideApprovals,
 } from "@agenteschat/client";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import {
   approvalCardItems,
   approvalRuns,
@@ -37,7 +38,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { Button, Count, EventPillAction, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -106,16 +107,17 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
 }
 
 /**
- * One decided request, as the conversation's event line: how it ended and what it did ("Aprovado por você · Gerar
- * imagem"); its values (so several of one tool are told apart), when it goes out if approved ahead, and the reason
- * open under it.
+ * One decided request, as the conversation's event pill: how it ended and what it did ("Approved by you: Generate
+ * image"), when it was decided; its values (so several of one tool are told apart), when it goes out if approved
+ * ahead, and the reason open under it ("See details"). Approved ahead and still to run, "Cancel" withdraws it.
  */
 function ApprovalDone({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
   const meId = useMeId();
   const dir = useDirectory();
+  const when = useWhen();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
-  // Approved ahead and still to run: when it goes out, said under its line, and a way to withdraw it.
+  // Approved ahead and still to run: when it goes out, said under its pill, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
   const lines = [
@@ -123,10 +125,20 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
     scheduled ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }) : null,
     a.reason ? t("approval.reasonLine", { reason: a.reason }) : null,
   ].filter((x): x is string => Boolean(x));
-  const done = (
+  return (
     <AskDone
       done={a.status === "approved"}
-      words={`${outcome} · ${markName(approvalHeadline(t, a, i18n.language))}`}
+      words={`${outcome}: ${markName(approvalHeadline(t, a, i18n.language))}`}
+      time={a.decidedAt ? when.short(a.decidedAt) : undefined}
+      actions={
+        scheduled && a.canCancel ? (
+          <EventPillAction
+            label={t("approval.ahead.cancel")}
+            loading={cancelAhead.pending}
+            onPress={() => cancelAhead.cancel(a.id)}
+          />
+        ) : null
+      }
       more={
         lines.length > 0
           ? {
@@ -140,21 +152,6 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
           : undefined
       }
     />
-  );
-  if (!scheduled || !a.canCancel) return done;
-  return (
-    <View>
-      {done}
-      <View style={styles.cancelAhead}>
-        <Button
-          variant="ghost"
-          size="sm"
-          label={t("approval.ahead.cancel")}
-          loading={cancelAhead.pending}
-          onPress={() => cancelAhead.cancel(a.id)}
-        />
-      </View>
-    </View>
   );
 }
 
@@ -263,12 +260,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       <>
         <View style={styles.itemActs}>
           {high ? (
-            <HoldButton
-              size="card"
-              label={label}
-              holdLabel={t("mobile.approval.holding")}
-              onConfirm={() => decideMany(scope, "approve")}
-            />
+            <HoldButton size="card" label={label} onConfirm={() => decideMany(scope, "approve")} />
           ) : (
             <Button
               variant="primary"
@@ -453,12 +445,7 @@ function ApprovalGroupItem({
           <>
             <View style={styles.itemActs}>
               {approvalRisk(a) === "high" ? (
-                <HoldButton
-                  size="card"
-                  label={t("mobile.approval.hold")}
-                  holdLabel={t("mobile.approval.holding")}
-                  onConfirm={onApprove}
-                />
+                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
               ) : (
                 <Button
                   variant="primary"
@@ -583,12 +570,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
             <>
               <View style={styles.itemActs}>
                 {high ? (
-                  <HoldButton
-                    size="card"
-                    label={t("mobile.approval.hold")}
-                    holdLabel={t("mobile.approval.holding")}
-                    onConfirm={() => approve()}
-                  />
+                  <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
                 ) : (
                   <Button
                     variant="primary"
@@ -625,7 +607,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
 /**
  * An agent's question (`ask_user`, `meta.question`) as the request card: the question, then the choices as
  * full-width rows and "Outra resposta" for a free answer beside them; with no choices, just Responder. Once
- * answered, one line with the answer. Anyone in the conversation may answer.
+ * answered, one line with the answer. Anyone in the conversation may answer, unless it is for one person: then
+ * everyone else reads who it waits for, and nothing to press.
  */
 export function QuestionCard({ question }: { question: AgentQuestion }) {
   const { t } = useTranslation();
@@ -708,6 +691,18 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         onSubmit={(text) => answer({ text }).then(() => sheet.close())}
       />,
     );
+  if (!questionWaitsOn(q, meId)) {
+    const person = dir.memberById.get(q.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson");
+    return (
+      <AskCard
+        id={q.id}
+        kind="question"
+        agentId={q.agentId}
+        waitsFor={t("ask.waitingFor", { name: person })}
+        lead={q.text}
+      />
+    );
+  }
   return (
     <AskCard
       id={q.id}
@@ -863,7 +858,6 @@ const styles = StyleSheet.create({
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
   tlink: {
-    marginTop: 8,
     alignSelf: "flex-start",
     maxWidth: "100%",
     flexDirection: "row",

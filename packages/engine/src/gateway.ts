@@ -854,10 +854,12 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
     /**
      * Embeds texts for the organization's search index (kind `embedding`,
-     * no agent). Returns null when no embedding provider is configured.
+     * no agent). Returns null when no embedding provider is configured, or on a workspace that may not work.
      */
     async embed(call: { orgId: string; texts: string[]; inputType: "document" | "query" }) {
       if (!deps.embeddings || call.texts.length === 0) return null;
+      // Null, not a refusal: people on a hold still read and search, with full text alone.
+      if (await standingRefusal(db, call.orgId)) return null;
       const { provider, apiKey } = deps.embeddings;
       const result = await provider.embed(call.texts, { apiKey, inputType: call.inputType });
       const cost = embeddingCostNanoUsd(result.model, result.tokens);

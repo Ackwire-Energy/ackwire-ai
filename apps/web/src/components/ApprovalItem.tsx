@@ -22,7 +22,7 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel, timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { ApprovalCard, Button, cx, Icon } from "@agenteschat/ui";
+import { ApprovalCard, Button, cx, EventPillAction, Icon } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useContext } from "react";
@@ -181,12 +181,24 @@ export function AheadLine({ approval, className }: { approval: Approval; classNa
   );
 }
 
-/** Withdraws an action approved ahead before its time (`canCancel`): its card in the chat, its routine's page. */
-export function CancelAhead({ id }: { id: string }) {
+/**
+ * Withdraws an action approved ahead before its time (`canCancel`): its card in the chat, its routine's page; `pill`:
+ * an action of the decided request's pill.
+ */
+export function CancelAhead({ id, pill = false }: { id: string; pill?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const cancel = useCancelApproval(org.id);
+  if (pill)
+    return (
+      <EventPillAction
+        disabled={cancel.isPending}
+        onClick={() => cancel.mutate(id, { onSuccess: () => toast.show(t("approval.ahead.canceled"), "info") })}
+      >
+        {t("approval.ahead.cancel")}
+      </EventPillAction>
+    );
   return (
     <Button
       size="sm"
@@ -266,6 +278,11 @@ export function InlineApproval({
           : aheadEndLine(t, approval);
     const summary = approvalSummary(approval, i18n.language);
     const requester = requesterDecidesLine(t, approval);
+    // What was decided stays in the words, so several requests for one tool are told apart; who asked and why sit
+    // behind "See details".
+    const details = [requester, approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : ""].filter(
+      Boolean,
+    );
     return (
       <RequestDone
         done={approval.status === "approved"}
@@ -278,18 +295,12 @@ export function InlineApproval({
                 ? "approval.groupCanceled"
                 : "approval.groupRefused",
         )}
-        more={
-          approval.reason
-            ? { label: t("approval.seeDetails"), content: t("approval.reasonLine", { reason: approval.reason }) }
-            : undefined
-        }
+        more={details.length ? { label: t("approval.seeDetails"), content: details.join("\n") } : undefined}
+        time={aheadText || (ended ? whenAt(t, i18n.language, ended) : undefined)}
+        action={ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} pill />}
       >
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
-        {/* What was decided, so several requests for one tool are told apart. */}
         {summary && ` · ${summary}`}
-        {requester && ` · ${requester}`}
-        {aheadText ? ` · ${aheadText}` : ended && ` · ${whenAt(t, i18n.language, ended)}`}
-        {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
       </RequestDone>
     );
   }

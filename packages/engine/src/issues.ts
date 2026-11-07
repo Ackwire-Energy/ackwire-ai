@@ -14,12 +14,14 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { plainLine, plainLines } from "@agenteschat/ui/markdown";
 import { getAgent } from "./agents";
 import { audienceError, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
-import { runAuthorityById } from "./authority";
+import { runAuthorityById, runPerson } from "./authority";
+import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
+import { publishChannelEvent, publishMessageCreated, publishOrgEvent, publishUserEvent } from "./events";
 import { cutText } from "./format";
 import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
@@ -27,9 +29,10 @@ import { getMessage, insertMessage, type MessageView, messageView, postPersonMes
 import { enqueueRunJob } from "./mission-runs";
 import { notifyIssueChanged } from "./notification-producers";
 import { can, getMembership, requireActiveMembership } from "./organizations";
+import { membersWhoMaySql } from "./permissions";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
-import { admitTaskAgents } from "./task-access";
+import { AUDIENCE_MAX, type Audience, admitTaskAgents, taskSeenSql } from "./task-access";
 import {
   ensureTaskConversation,
   type TaskConversationRef,
@@ -40,7 +43,18 @@ import { promptAnswer, promptPoll, toolDetail } from "./tool-detail";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkRow, type WorkView, workViews } from "./works";
 
-const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
+const {
+  issues,
+  issueActivity,
+  issueCounters,
+  channels,
+  channelMembers,
+  artifacts,
+  agentRuns,
+  agentRunSteps,
+  notifications,
+  organizationMembers,
+} = schema;
 
 export type IssueStatus = "todo" | "in_progress" | "in_review" | "done" | "canceled";
 export type IssuePriority = "low" | "normal" | "high";
@@ -74,9 +88,13 @@ export interface IssueView {
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
+  /** Who sees it besides administrators (ADR 0151). */
+  audience: IssueAudience;
   /** The issue this one is a sub-issue of. */
   parentIssueId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
+  /** The GitHub issue or pull request it is about: only a link, nothing syncs. */
+  githubUrl: string | null;
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
   /** The assigned agent's work on it, from its runs (null: a person has it, nobody, or it is closed). */
   work: IssueWork | null;
@@ -88,6 +106,16 @@ export interface IssueView {
   conversation: TaskConversationSummary | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Who sees a task (ADR 0151): the workspace, or some people. `channelId`: those people are whoever is in that
+ * conversation now, DM or private channel, so someone who joins it sees the task and someone who leaves it doesn't.
+ */
+export interface IssueAudience {
+  mode: "everyone" | "people";
+  userIds: string[];
+  channelId: string | null;
 }
 
 /**
@@ -140,6 +168,7 @@ export interface IssueInput {
   priority?: IssuePriority;
   dueDate?: string | null;
   labels?: string[];
+  githubUrl?: string | null;
 }
 
 export type IssuePatch = Partial<{
@@ -153,6 +182,8 @@ export type IssuePatch = Partial<{
   assignee: WorkActor | null;
   dueDate: string | null;
   labels: string[];
+  /** Null removes it. */
+  githubUrl: string | null;
   /**
    * The whole list of acceptance criteria, in order: an `id` keeps that criterion (and whether it is checked), one
    * without is new, and a criterion left out is removed.
@@ -161,12 +192,17 @@ export type IssuePatch = Partial<{
 }>;
 
 /** Who acts: a person, or an agent during a run (it sees what its channel lets it see). */
-export type IssueActor =
-  | { type: "person"; userId: string }
-  /** `runId`: the run acting (links the run to the issue it touches). */
-  | { type: "agent"; agentId: string; channelId: string; runId?: string };
+export type IssueActor = { type: "person"; userId: string } | AgentActor;
+/** `runId`: the run acting (links the run to the issue it touches). */
+type AgentActor = { type: "agent"; agentId: string; channelId: string; runId?: string };
 
 type IssueRow = typeof issues.$inferSelect;
+/** The columns that say who sees a task. */
+type TaskScope = Pick<IssueRow, "channelId" | "restricted" | "audienceUserIds">;
+/** What an agent's reach also reads of a task. */
+type TaskRef = TaskScope & Partial<Pick<IssueRow, "assigneeType" | "assigneeId" | "conversationChannelId">>;
+
+const WORKSPACE_SCOPE: TaskScope = { channelId: null, restricted: false, audienceUserIds: [] };
 
 const STATUSES: readonly IssueStatus[] = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES: readonly IssuePriority[] = ["low", "normal", "high"];
@@ -194,12 +230,12 @@ function cleanLabels(labels: string[] | undefined) {
   return [...new Set(labels.map((l) => l.trim().toLowerCase().slice(0, 40)).filter(Boolean))].slice(0, 20);
 }
 
-/** `channelId`: the conversation the task is tied to, which a person assigned to it must be able to read. */
+/** `scope`: who sees the task, which a person assigned to it must be among. */
 async function checkAssignee(
   db: Database,
   orgId: string,
   a: WorkActor | null | undefined,
-  channelId: string | null = null,
+  scope: TaskScope = WORKSPACE_SCOPE,
 ) {
   if (!a) return;
   if (a.type === "agent") {
@@ -207,17 +243,17 @@ async function checkAssignee(
     if (!agent || agent.archivedAt) throw new ValidationError("That agent does not exist in this organization");
   } else if (!(await getMembership(db, a.id, orgId))) {
     throw new ValidationError("That person is not a member of this organization");
-  } else if (!(await canSee(db, { type: "person", userId: a.id }, orgId, channelId))) {
+  } else if (!(await personSees(db, a.id, orgId, scope))) {
     throw new ValidationError(
-      "That person isn't in this task's conversation, so they can't see it",
+      "That person can't see this task. Add them to who sees it first",
       "issue.assignee_outside",
     );
   }
 }
 
 /**
- * The conversation a task made from `channelId` stays tied to: a DM or a private channel; from a task's own
- * conversation (`task`), whatever that task is tied to. Null where the whole workspace may see it: a public channel,
+ * What a task made from `channelId` is limited to: the people of a DM or a private channel (`tiedTo`); from a task's
+ * own conversation (`scope`), whoever sees that task. Nothing where the whole workspace may see it: a public channel,
  * and a room no person reads (a routine's), whose task would otherwise be nobody's.
  */
 async function conversationOf(db: Database, orgId: string, channelId: string) {
@@ -226,15 +262,53 @@ async function conversationOf(db: Database, orgId: string, channelId: string) {
       kind: channels.kind,
       visibility: channels.visibility,
       taskChannelId: issues.channelId,
+      restricted: issues.restricted,
+      audienceUserIds: issues.audienceUserIds,
       people: sql<boolean>`exists (select 1 from ${channelMembers} cm
         where cm.channel_id = ${channels.id} and cm.user_id is not null)`,
     })
     .from(channels)
     .leftJoin(issues, eq(issues.conversationChannelId, channels.id))
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
-  if (row?.kind === "task") return { task: true, tiedTo: row.taskChannelId };
+  if (row?.kind === "task")
+    return {
+      tiedTo: row.taskChannelId,
+      scope: {
+        channelId: row.taskChannelId,
+        restricted: row.restricted === true,
+        audienceUserIds: row.audienceUserIds ?? [],
+      },
+    };
   const open = !row?.people || (row.kind === "channel" && row.visibility === "public");
-  return { task: false, tiedTo: open ? null : channelId };
+  return { tiedTo: open ? null : channelId, scope: null };
+}
+
+/**
+ * The columns for a chosen audience. "Only me" is a list of one. Who chooses stays in it unless they're an
+ * administrator, who sees it anyway, and a person assigned to the task stays too: taking it from them is a surprise.
+ */
+async function chosenScope(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  audience: Audience,
+  assigneeId: string | null,
+): Promise<TaskScope> {
+  if (audience.mode === "everyone") return WORKSPACE_SCOPE;
+  const membership = actor.type === "person" ? await getMembership(db, actor.userId, orgId) : null;
+  const self = actor.type === "person" && !(membership && can(membership, "administrator")) ? [actor.userId] : [];
+  const wanted = [...new Set([...self, ...(assigneeId ? [assigneeId] : []), ...audience.userIds])].slice(
+    0,
+    AUDIENCE_MAX,
+  );
+  const members = wanted.length
+    ? await db
+        .select({ id: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wanted)))
+    : [];
+  if (members.length === 0) throw new ValidationError("Choose who sees it", "issue.audience_empty");
+  return { channelId: null, restricted: true, audienceUserIds: members.map((m) => m.id).sort() };
 }
 
 /**
@@ -246,43 +320,88 @@ const seenFromDmSql = (orgId: string, dmId: string, channelId: SQL) => sql`exist
     where dm_m.channel_id = ${dmId}::uuid and dm_m.org_id = ${orgId}::uuid and dm_m.user_id is not null
       and exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId} and cm2.user_id = dm_m.user_id))`;
 
-async function canSee(
-  db: Database,
-  actor: IssueActor,
-  orgId: string,
-  channelId: string | null,
-  /** The issue's assignee: an agent working on it from a DM sees what the person there sees. */
-  assignee?: { type: string | null; id: string | null },
-  /** The issue's own conversation (ADR 0145): an agent there sees it (it joined only seeing it, or assigned). */
-  conversationChannelId?: string | null,
-) {
-  if (!channelId) return true;
-  if (actor.type === "agent") {
-    if (conversationChannelId && actor.channelId === conversationChannelId) return true;
-    if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
-    // In a task's conversation, an agent of the place it's tied to reads what's tied there (a step made here). One
-    // assigned from outside reaches its own task only.
-    const [sibling] = await db
-      .select({ id: issues.id })
-      .from(issues)
-      .innerJoin(
-        channelMembers,
-        and(eq(channelMembers.channelId, channelId), eq(channelMembers.agentId, actor.agentId)),
-      )
-      .where(and(eq(issues.conversationChannelId, actor.channelId), eq(issues.channelId, channelId)));
-    if (sibling) return true;
-    if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
-    const [row] = rowsOf<{ yes: boolean | string }>(
-      await db.execute(sql`select ${seenFromDmSql(orgId, actor.channelId, sql`${channelId}::uuid`)} as yes`),
-    );
-    return row?.yes === true || row?.yes === "t";
-  }
+/** Whether a person is in a conversation, which for a public channel is everyone. */
+async function inConversation(db: Database, userId: string, orgId: string, channelId: string) {
   const [row] = await db
     .select({ visibility: channels.visibility, kind: channels.kind, memberId: channelMembers.id })
     .from(channels)
-    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actor.userId)))
+    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   return !!row && (row.memberId !== null || (row.visibility === "public" && row.kind === "channel"));
+}
+
+/** Whether a person sees a task (ADR 0151). Mirrors `taskSeenSql`. */
+async function personSees(db: Database, userId: string, orgId: string, t: TaskScope) {
+  if (t.restricted ? t.audienceUserIds.includes(userId) : !t.channelId) return true;
+  const membership = await getMembership(db, userId, orgId);
+  if (membership && can(membership, "administrator")) return true;
+  return !t.restricted && !!t.channelId && inConversation(db, userId, orgId, t.channelId);
+}
+
+/** An agent's own reach, whoever it works for: what it may list in any conversation of its own. */
+async function agentReaches(db: Database, actor: AgentActor, orgId: string, t: TaskRef) {
+  if (!t.restricted && !t.channelId) return true;
+  if (t.conversationChannelId && actor.channelId === t.conversationChannelId) return true;
+  const assigned = t.assigneeType === "agent" && t.assigneeId === actor.agentId;
+  if (t.restricted) {
+    if (!assigned) return false;
+    const [row] = rowsOf<{ yes: boolean | string }>(
+      await db.execute(sql`select exists (select 1
+        from ${channelMembers} dm_m join ${channels} dm on dm.id = dm_m.channel_id and dm.kind = 'dm'
+        where dm_m.channel_id = ${actor.channelId}::uuid and dm_m.org_id = ${orgId}::uuid
+          and dm_m.user_id = any(${`{${t.audienceUserIds.join(",")}}`}::text[])) as yes`),
+    );
+    return row?.yes === true || row?.yes === "t";
+  }
+  const channelId = t.channelId as string;
+  if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
+  // In a task's conversation, an agent of the place it's tied to reads what's tied there (a step made here). One
+  // assigned from outside reaches its own task only.
+  const [sibling] = await db
+    .select({ id: issues.id })
+    .from(issues)
+    .innerJoin(channelMembers, and(eq(channelMembers.channelId, channelId), eq(channelMembers.agentId, actor.agentId)))
+    .where(and(eq(issues.conversationChannelId, actor.channelId), eq(issues.channelId, channelId)));
+  if (sibling) return true;
+  if (!assigned) return false;
+  const [row] = rowsOf<{ yes: boolean | string }>(
+    await db.execute(sql`select ${seenFromDmSql(orgId, actor.channelId, sql`${channelId}::uuid`)} as yes`),
+  );
+  return row?.yes === true || row?.yes === "t";
+}
+
+/** By id, an agent working for a person also reaches what that person reaches (ADR 0151). */
+export async function canSee(db: Database, actor: IssueActor, orgId: string, t: TaskRef) {
+  if (actor.type === "person") return personSees(db, actor.userId, orgId, t);
+  if (await agentReaches(db, actor, orgId, t)) return true;
+  const person = await runPerson(db, orgId, actor.runId);
+  return person !== null && personSees(db, person, orgId, t);
+}
+
+/**
+ * Of `ids`, the tasks an agent may list in its run's conversation for `person`: what it says reaches everyone there,
+ * so everyone there must see them. Never in a public channel, read by the whole workspace.
+ */
+async function seenByConversation(db: Database, person: string | null, channelId: string, ids: string[]) {
+  if (ids.length === 0) return new Set<string>();
+  const rows = rowsOf<{ id: string }>(
+    await db.execute(sql`select t.id from ${issues} t join ${channels} c on c.id = ${channelId}::uuid
+      where t.id = any(${`{${ids.join(",")}}`}::uuid[]) and c.kind <> 'task'
+        and not (c.kind = 'channel' and c.visibility = 'public')
+        ${person ? sql`and ${taskSeenSql("t", sql`${person}::text`)}` : sql``}
+        and not exists (select 1 from ${channelMembers} h where h.channel_id = c.id and h.user_id is not null
+          and not ${taskSeenSql("t", sql`h.user_id`)})`),
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Whether what an agent says of a task may name it in a conversation: its own, or one where everyone sees it. A task
+ * for the workspace goes anywhere.
+ */
+export async function nameableIn(db: Database, channelId: string, task: IssueView) {
+  if (task.audience.mode === "everyone" || task.conversation?.channelId === channelId) return true;
+  return (await seenByConversation(db, null, channelId, [task.id])).has(task.id);
 }
 
 async function requireOrgMember(db: Database, actor: IssueActor, orgId: string) {
@@ -414,10 +533,11 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
   return out;
 }
 
-async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
+/** `reader`: who reads them, for what only they may get (`backgroundWorksOf`). */
+async function views(db: Database, rows: IssueRow[], reader?: string): Promise<IssueView[]> {
   const [work, works, conversations] = await Promise.all([
     workOf(db, rows),
-    backgroundWorksOf(db, rows),
+    backgroundWorksOf(db, rows, reader),
     taskConversationSummaries(db, rows),
   ]);
   const ids = [...new Set(rows.flatMap((r) => r.artifactIds))];
@@ -429,7 +549,7 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
     : [];
   const byId = new Map(files.map((f) => [f.id, f]));
   const orgId = rows[0]?.orgId;
-  const columns = orgId ? await boardColumns(db, orgId) : [];
+  const [columns, tied] = await Promise.all([orgId ? boardColumns(db, orgId) : [], tiedPeople(db, rows)]);
   return rows.map((r) => ({
     id: r.id,
     number: r.number,
@@ -446,8 +566,10 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
     createdBy: { type: r.createdByType as WorkActor["type"], id: r.createdById },
     source: r.source as unknown as IssueSource,
     channelId: r.channelId,
+    audience: taskAudienceOf(r, tied),
     parentIssueId: r.parentIssueId,
     pullRequests: r.pullRequests as unknown as IssueView["pullRequests"],
+    githubUrl: r.githubUrl,
     artifacts: r.artifactIds.flatMap((id) => {
       const f = byId.get(id);
       return f ? [{ id: f.id, title: f.title, createdBy: { type: f.type as WorkActor["type"], id: f.by } }] : [];
@@ -461,8 +583,36 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
   }));
 }
 
+/** The people of the private conversations these tasks are tied to, by channel. */
+export async function tiedPeople(db: Database, rows: IssueRow[]) {
+  const ids = [...new Set(rows.flatMap((r) => (r.channelId ? [r.channelId] : [])))];
+  const out = new Map<string, string[]>();
+  if (ids.length === 0) return out;
+  const found = await db
+    .select({ id: channels.id, userId: channelMembers.userId })
+    .from(channels)
+    .leftJoin(channelMembers, eq(channelMembers.channelId, channels.id))
+    .where(
+      and(inArray(channels.id, ids), sql`not (${channels.kind} = 'channel' and ${channels.visibility} = 'public')`),
+    );
+  for (const f of found) {
+    const people = out.get(f.id) ?? [];
+    if (f.userId) people.push(f.userId);
+    out.set(f.id, people);
+  }
+  return out;
+}
+
+export function taskAudienceOf(r: IssueRow, tied: Map<string, string[]>): IssueAudience {
+  if (r.restricted) return { mode: "people", userIds: r.audienceUserIds, channelId: null };
+  const people = r.channelId ? tied.get(r.channelId) : undefined;
+  return people
+    ? { mode: "people", userIds: people, channelId: r.channelId }
+    : { mode: "everyone", userIds: [], channelId: null };
+}
+
 /** The newest background work each card tracks (ADR 0121 §4). */
-async function backgroundWorksOf(db: Database, rows: IssueRow[]): Promise<Map<string, WorkView>> {
+async function backgroundWorksOf(db: Database, rows: IssueRow[], reader?: string): Promise<Map<string, WorkView>> {
   const ids = rows.map((r) => r.id);
   const out = new Map<string, WorkView>();
   if (ids.length === 0) return out;
@@ -480,17 +630,35 @@ async function backgroundWorksOf(db: Database, rows: IssueRow[]): Promise<Map<st
     latest.map((l) => l.id),
   );
   const channelOf = new Map(rows.map((r) => [r.id, r.channelId]));
+  const closed = await dmsClosedTo(
+    db,
+    reader,
+    [...views.values()].map((v) => v.channelId),
+  );
   for (const l of latest) {
     const v = views.get(l.id);
     if (!v || !l.issueId) continue;
-    // A card shown to everyone reaches past its work's conversation: what the work asks in there stays in there.
-    out.set(l.issueId, channelOf.get(l.issueId) === v.channelId ? v : { ...v, question: null });
+    // A card shown to everyone reaches past its work's conversation: what the work asks in there stays in there. So
+    // does a DM's for an administrator, who sees the task and never the DM.
+    const asks = channelOf.get(l.issueId) === v.channelId && !closed.has(v.channelId);
+    out.set(l.issueId, asks ? v : { ...v, question: null });
   }
   return out;
 }
 
-async function one(db: Database, row: IssueRow) {
-  const [v] = await views(db, [row]);
+/** Of `channelIds`, the DMs `reader` isn't in; with no reader, every DM. */
+async function dmsClosedTo(db: Database, reader: string | undefined, channelIds: string[]) {
+  if (channelIds.length === 0) return new Set<string>();
+  const found = await db
+    .select({ id: channels.id })
+    .from(channels)
+    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, reader ?? "")))
+    .where(and(inArray(channels.id, channelIds), eq(channels.kind, "dm"), isNull(channelMembers.id)));
+  return new Set(found.map((c) => c.id));
+}
+
+async function one(db: Database, row: IssueRow, reader?: string) {
+  const [v] = await views(db, [row], reader);
   if (!v) throw new Error("issue view missing");
   return v;
 }
@@ -553,6 +721,8 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
       return s(data.dueDate) ? out("due_date_set", { date: s(data.dueDate) as string }) : out("due_date_removed");
     case "pr_linked":
       return s(data.number) ? out(event, { number: s(data.number) as string }) : {};
+    case "github_link":
+      return out(s(data.url) ? "github_linked" : "github_unlinked");
     case "criterion_checked":
       return s(data.text)
         ? out(data.done ? "criterion_checked" : "criterion_unchecked", { text: s(data.text) as string })
@@ -571,26 +741,42 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
       return out(event, s(data.byUserId) ? { byUserId: s(data.byUserId) as string } : {});
     case "shared_everyone":
       return out(event, {});
+    case "audience_changed":
+      return out(data.mode === "everyone" ? "audience_everyone" : "audience_people");
     default:
       return {};
   }
-}
-
-/** Tells whoever can see the issue: its channel, or the whole org. */
-async function announce(
-  pubsub: PubSub | undefined,
-  orgId: string,
-  issue: IssueView,
-  type: "issue.created" | "issue.updated",
-) {
-  if (issue.channelId) await publishChannelEvent(pubsub, { type, channelId: issue.channelId, issue });
-  else await publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type, issue } });
 }
 
 export interface IssueDeps {
   db: Database;
   pubsub?: PubSub;
 }
+
+/** Tells whoever can see the task: the whole org, or its conversation, the people it names and administrators. */
+export async function publishToTaskReaders(
+  deps: IssueDeps,
+  orgId: string,
+  task: { channelId: string | null; audience: Pick<IssueAudience, "mode" | "userIds"> },
+  event:
+    | { type: "issue.created" | "issue.updated"; issue: IssueView }
+    | { type: "issue.deleted"; issueId: string; number: number },
+) {
+  if (task.audience.mode === "everyone") {
+    await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
+    return;
+  }
+  if (!deps.pubsub) return;
+  if (task.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: task.channelId });
+  const admins = rowsOf<{ user_id: string }>(
+    await deps.db.execute(membersWhoMaySql(sql`${orgId}::uuid`, "administrator")),
+  ).map((r) => r.user_id);
+  const named = task.channelId ? [] : task.audience.userIds;
+  for (const userId of new Set([...admins, ...named])) await publishUserEvent(deps.pubsub, orgId, userId, event);
+}
+
+const announce = (deps: IssueDeps, orgId: string, issue: IssueView, type: "issue.created" | "issue.updated") =>
+  publishToTaskReaders(deps, orgId, issue, { type, issue });
 
 /** Creates an issue with the next number of the org. */
 export async function createIssue(
@@ -603,6 +789,8 @@ export async function createIssue(
     parentIssueId?: string | null;
     /** Drive files uploaded from the new-issue box: linked to the issue and kept on its "created" event. */
     attachmentIds?: string[];
+    /** Who sees it (ADR 0151); left out, where it's made decides. A step always follows its parent. */
+    audience?: Audience;
   },
 ): Promise<IssueView> {
   const { db } = deps;
@@ -619,18 +807,26 @@ export async function createIssue(
     .map((text) => ({ id: Bun.randomUUIDv7(), text, done: false }));
   const [parent] = input.parentIssueId
     ? await db
-        .select({ channelId: issues.channelId })
+        .select({ channelId: issues.channelId, restricted: issues.restricted, audienceUserIds: issues.audienceUserIds })
         .from(issues)
         .where(and(eq(issues.id, input.parentIssueId), eq(issues.orgId, orgId)))
     : [];
-  if (input.parentIssueId && (!parent || !(await canSee(db, actor, orgId, parent.channelId)))) {
+  if (input.parentIssueId && (!parent || !(await canSee(db, actor, orgId, parent)))) {
     throw new ValidationError("The parent issue does not exist");
   }
-  // A task never reaches further than where it was made: an agent's, its run's conversation. A step, its parent's.
+  // A task never reaches further than where it was made, unless someone chose: an agent's, its run's conversation. A
+  // step, its parent's.
   const madeIn = input.channelId ?? (actor.type === "agent" ? actor.channelId : null);
   const made = madeIn ? await conversationOf(db, orgId, madeIn) : null;
-  const channelId = parent?.channelId ?? made?.tiedTo ?? (made?.task ? null : (input.channelId ?? null));
-  await checkAssignee(db, orgId, input.assignee, channelId);
+  const assigned = input.assignee?.type === "person" ? input.assignee.id : null;
+  const scope: TaskScope = parent?.restricted
+    ? parent
+    : parent?.channelId
+      ? { ...WORKSPACE_SCOPE, channelId: parent.channelId }
+      : input.audience
+        ? await chosenScope(db, actor, orgId, input.audience, assigned)
+        : (made?.scope ?? { ...WORKSPACE_SCOPE, channelId: made?.tiedTo ?? input.channelId ?? null });
+  await checkAssignee(db, orgId, input.assignee, scope);
   const author = actorOf(actor);
   const source: IssueSource =
     input.source ?? (actor.type === "agent" ? { type: "agent", agentId: actor.agentId } : { type: "manual" });
@@ -653,9 +849,12 @@ export async function createIssue(
         assigneeId: input.assignee?.id ?? null,
         labels: cleanLabels(input.labels) ?? [],
         dueDate: checkDate(input.dueDate) ?? null,
+        githubUrl: checkGithubUrl(input.githubUrl),
         criteria,
         source: source as unknown as Record<string, unknown>,
-        channelId,
+        channelId: scope.channelId,
+        restricted: scope.restricted,
+        audienceUserIds: scope.audienceUserIds,
         parentIssueId: input.parentIssueId ?? null,
         ...(files.length ? { artifactIds: files.map((f) => f.id) } : {}),
         createdByType: author.type,
@@ -676,8 +875,14 @@ export async function createIssue(
     }
     return issue;
   });
-  const view = await one(db, row);
-  await announce(deps.pubsub, orgId, view, "issue.created");
+  await keepFilesWithTask(
+    db,
+    actor,
+    row,
+    files.map((f) => f.id),
+  );
+  const view = await one(db, (await reload(db, row)) ?? row);
+  await announce(deps, orgId, view, "issue.created");
   if (row.assigneeType === "person") await notifyIssueChanged(deps, author, null, row).catch(() => {});
   // Routines on `issue.created` (ADR 0053 §6.5): never for an issue a routine or an unattended run created
   // (a routine would trigger itself), only for routines whose creator can see the issue, and with its id,
@@ -696,14 +901,19 @@ export async function createIssue(
       { summary: `New issue #${view.number} (id ${view.id})`, issueId: view.id, number: view.number, origin },
       {
         dedupeKey: `issue:${view.id}`,
-        visibleTo: (userId) => canSee(db, { type: "person", userId }, orgId, row.channelId),
+        visibleTo: (userId) => personSees(db, userId, orgId, row),
       },
     ).catch(() => 0);
   }
   return view;
 }
 
-async function findVisible(db: Database, actor: IssueActor, orgId: string, where: { id?: string; number?: number }) {
+export async function findVisible(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  where: { id?: string; number?: number },
+) {
   await requireOrgMember(db, actor, orgId);
   const [row] = await db
     .select()
@@ -715,23 +925,14 @@ async function findVisible(db: Database, actor: IssueActor, orgId: string, where
         where.number !== undefined ? eq(issues.number, where.number) : undefined,
       ),
     );
-  if (
-    !row ||
-    !(await canSee(
-      db,
-      actor,
-      orgId,
-      row.channelId,
-      { type: row.assigneeType, id: row.assigneeId },
-      row.conversationChannelId,
-    ))
-  )
-    throw new NotFoundError("Issue not found");
+  if (!row || !(await canSee(db, actor, orgId, row))) throw new NotFoundError("Issue not found");
   return row;
 }
 
+const readerOf = (actor: IssueActor) => (actor.type === "person" ? actor.userId : undefined);
+
 export async function getIssue(db: Database, actor: IssueActor, orgId: string, ref: { id?: string; number?: number }) {
-  return one(db, await findVisible(db, actor, orgId, ref));
+  return one(db, await findVisible(db, actor, orgId, ref), readerOf(actor));
 }
 
 /** An issue with its sub-issues (the ones the actor can see). */
@@ -743,7 +944,7 @@ export async function getIssueDetail(
 ): Promise<IssueDetailView> {
   const row = await findVisible(db, actor, orgId, ref);
   const [view, children] = await Promise.all([
-    one(db, row),
+    one(db, row, readerOf(actor)),
     db
       .select()
       .from(issues)
@@ -752,7 +953,7 @@ export async function getIssueDetail(
   ]);
   const subIssues: IssueDetailView["subIssues"] = [];
   for (const c of children) {
-    if (!(await canSee(db, actor, orgId, c.channelId))) continue;
+    if (!(await canSee(db, actor, orgId, c))) continue;
     subIssues.push({
       id: c.id,
       number: c.number,
@@ -779,6 +980,7 @@ export async function listIssues(
     .where(
       and(
         eq(issues.orgId, orgId),
+        actor.type === "person" ? taskSeenSql("issues", sql`${actor.userId}::text`) : undefined,
         filters.status ? eq(issues.status, filters.status) : undefined,
         filters.parentIssueId ? eq(issues.parentIssueId, filters.parentIssueId) : undefined,
         filters.assignee
@@ -795,12 +997,31 @@ export async function listIssues(
     )
     .orderBy(sql`${issues.status} in ('done', 'canceled')`, desc(issues.updatedAt))
     .limit(Math.min(500, filters.limit ?? 200));
+  if (actor.type === "person") return views(db, rows, actor.userId);
+  const person = await runPerson(db, orgId, actor.runId);
+  const shared = person
+    ? await seenByConversation(
+        db,
+        person,
+        actor.channelId,
+        rows.map((r) => r.id),
+      )
+    : new Set<string>();
   const visible: IssueRow[] = [];
-  for (const r of rows) {
-    const assignee = { type: r.assigneeType, id: r.assigneeId };
-    if (await canSee(db, actor, orgId, r.channelId, assignee, r.conversationChannelId)) visible.push(r);
-  }
+  for (const r of rows) if (shared.has(r.id) || (await agentReaches(db, actor, orgId, r))) visible.push(r);
   return views(db, visible);
+}
+
+/** Mirrors `GITHUB_LINK`, packages/client/src/lib/github-link.ts. */
+const GITHUB_LINK = /^https:\/\/(?:www\.)?github\.com\/[^/\s]+\/[^/\s]+\/(?:issues|pull)\/\d+(?:[/?#]\S*)?$/;
+
+/** A task's GitHub link as stored: people open it from the task, so nothing but that address goes in. */
+function checkGithubUrl(value: string | null | undefined) {
+  const url = value?.trim();
+  if (!url) return null;
+  if (url.length > 500 || !GITHUB_LINK.test(url))
+    throw new ValidationError("That isn't the link of a GitHub issue or pull request");
+  return url;
 }
 
 const isHttpsUrl = (value: string) => {
@@ -823,7 +1044,7 @@ export async function updateIssue(
   const current = await findVisible(db, actor, orgId, { id: issueId });
   if (patch.status && !STATUSES.includes(patch.status)) throw new ValidationError("invalid status");
   if (patch.priority && !PRIORITIES.includes(patch.priority)) throw new ValidationError("invalid priority");
-  if (patch.assignee !== undefined) await checkAssignee(db, orgId, patch.assignee, current.channelId);
+  if (patch.assignee !== undefined) await checkAssignee(db, orgId, patch.assignee, current);
   const author = actorOf(actor);
   const set: Partial<typeof issues.$inferInsert> = { updatedAt: new Date() };
   const events: { text: string; event: string; data?: Record<string, unknown> }[] = [];
@@ -872,6 +1093,17 @@ export async function updateIssue(
     });
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
+  if (patch.githubUrl !== undefined) {
+    const url = checkGithubUrl(patch.githubUrl);
+    if (url !== current.githubUrl) {
+      set.githubUrl = url;
+      events.push({
+        text: url ? "linked it to GitHub" : "removed the GitHub link",
+        event: "github_link",
+        data: { url },
+      });
+    }
+  }
   if (patch.criteria !== undefined) {
     const criteria = editedCriteria(current.criteria, patch.criteria);
     const same =
@@ -929,7 +1161,7 @@ export async function updateIssue(
     await admitTaskAgents(db, orgId, row.conversationChannelId, { ids: [patch.assignee.id] });
   }
   const view = await one(db, (await reload(db, row)) ?? row);
-  await announce(deps.pubsub, orgId, view, "issue.updated");
+  await announce(deps, orgId, view, "issue.updated");
   // The inbox: a new assignee, a status change for whoever follows it.
   if (patch.assignee !== undefined || row.status !== current.status) {
     await notifyIssueChanged(deps, author, current, row).catch(() => {});
@@ -1030,7 +1262,7 @@ export async function setCriterion(
   });
   await linkRun(deps, actor, row);
   const view = await one(deps.db, (await reload(deps.db, row)) ?? row);
-  await announce(deps.pubsub, orgId, view, "issue.updated");
+  await announce(deps, orgId, view, "issue.updated");
   return view;
 }
 
@@ -1067,6 +1299,36 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
   // In the order they were attached.
   return ids.flatMap((id) => files.filter((f) => f.id === id));
 }
+
+/**
+ * A limited task's files stay with it: a file its author brings that isn't in any conversation would be the whole
+ * workspace's in the Drive, so it moves to the task's conversation, read by who sees the task (ADR 0151).
+ */
+async function keepFilesWithTask(
+  db: Database,
+  actor: IssueActor,
+  task: Pick<IssueRow, "id" | "orgId" | "restricted">,
+  fileIds: string[],
+) {
+  if (!task.restricted || fileIds.length === 0) return;
+  const { channelId } = await ensureTaskConversation(db, task.id);
+  const by = actorOf(actor);
+  const moved = await db
+    .update(artifacts)
+    .set({ channelId })
+    .where(
+      and(
+        eq(artifacts.orgId, task.orgId),
+        inArray(artifacts.id, fileIds),
+        isNull(artifacts.channelId),
+        eq(artifacts.createdByType, by.type),
+        eq(artifacts.createdById, by.id),
+      ),
+    )
+    .returning({ id: artifacts.id });
+  for (const f of moved) await enqueueIndex(db, { orgId: task.orgId, kind: "file", sourceId: f.id });
+}
+
 /**
  * A comment: a reply in the task's conversation (ADR 0145), on the chat's own path. A person's goes like any
  * message there (a mention wakes the agent, receipts, the working line); an agent's (`comment_issue`, a reply
@@ -1092,6 +1354,12 @@ export async function commentIssue(
     orgId,
     conversation,
     body,
+    files.map((f) => f.id),
+  );
+  await keepFilesWithTask(
+    deps.db,
+    actor,
+    issue,
     files.map((f) => f.id),
   );
   const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
@@ -1177,7 +1445,7 @@ export async function announceTaskConversation(deps: IssueDeps, orgId: string, m
           .returning()
       )[0] ?? issue)
     : issue;
-  await announce(deps.pubsub, orgId, await one(deps.db, row), "issue.updated");
+  await announce(deps, orgId, await one(deps.db, row), "issue.updated");
 }
 
 /** The task's conversation for whoever sees the task, made on first use (opening it, ADR 0145). */
@@ -1203,15 +1471,18 @@ export async function issueFromMessage(
   if (!message) throw new NotFoundError("Message not found");
   const actor: IssueActor = { type: "person", userId };
   const made = await conversationOf(deps.db, orgId, message.channelId);
-  // People are never members of a task's conversation: they read it as they read its task.
-  if (!(await canSee(deps.db, actor, orgId, made.task ? made.tiedTo : message.channelId)))
-    throw new NotFoundError("Message not found");
-  const firstLine = message.body.split("\n")[0]?.trim() ?? "";
+  // Reading the message, not the task: an administrator reads a private channel, never someone's DM.
+  if (!(await inConversation(deps.db, userId, orgId, message.channelId)))
+    await requireChannelAccess(deps.db, userId, orgId, message.channelId).catch(() => {
+      throw new NotFoundError("Message not found");
+    });
+  const firstLine = plainLines(message.body)[0] ?? plainLine(message.body);
   return createIssue(deps, actor, orgId, {
     title: input.title?.trim() || firstLine.slice(0, 120) || "New issue",
     description: message.body,
     source: { type: "message", channelId: message.channelId, messageId: message.id },
     channelId: made.tiedTo,
+    ...(made.scope?.restricted ? { audience: { mode: "people", userIds: made.scope.audienceUserIds } } : {}),
   });
 }
 
@@ -1297,14 +1568,15 @@ export async function askAgentToImplement(
   const fresh = await reload(db, issue);
   if (!fresh) return updated;
   const view = await one(db, fresh);
-  await announce(pubsub, orgId, view, "issue.updated");
+  await announce(deps, orgId, view, "issue.updated");
   return view;
 }
 
 /** An issue made from a channel message: one discreet line there ("Ada took issue #24"), never a thread. */
 async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMeta) {
   const source = issue.source as IssueSource;
-  if (source.type !== "message" || !deps.pubsub) return;
+  // Limited since it was made: the people of the message's channel may not see it.
+  if (source.type !== "message" || !deps.pubsub || issue.restricted) return;
   const origin = await getMessage(deps.db, issue.orgId, source.messageId);
   if (!origin || origin.channelId !== source.channelId) return;
   const [channel] = await deps.db
@@ -1387,12 +1659,16 @@ export async function openTasksBrief(
         inArray(issues.status, [...OPEN_FOR_WORK]),
         // What `canSee` lets it read from here: an issue of a private channel or DM would leak its title.
         or(
-          isNull(issues.channelId),
+          and(eq(issues.restricted, false), isNull(issues.channelId)),
           inArray(issues.channelId, visible),
           seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
           // From a task's own conversation: that task (ADR 0145), and what's tied to the same place.
           eq(issues.conversationChannelId, channelId),
           sql`${issues.channelId} = (select t.channel_id from ${issues} t where t.conversation_channel_id = ${channelId}::uuid)`,
+          // Limited to people: in a DM of someone it names.
+          sql`${issues.restricted} and exists (select 1
+            from ${channelMembers} dm_m join ${channels} dm on dm.id = dm_m.channel_id and dm.kind = 'dm'
+            where dm_m.channel_id = ${channelId}::uuid and dm_m.user_id = any(${issues.audienceUserIds}))`,
         ),
       ),
     )
@@ -1424,7 +1700,8 @@ registerDocumentBuilder("issue", async (db, orgId, id) => {
     orgId,
     kind: "issue",
     sourceId: i.id,
-    channelIds: i.channelId ? [i.channelId] : [],
+    // A limited task is its own scope: only who sees it searches it (`searchForUser`).
+    channelIds: i.restricted ? [i.id] : i.channelId ? [i.channelId] : [],
     title: `#${i.number} ${i.title}`,
     body: [i.description, ...i.criteria.map((c) => c.text)].join("\n").slice(0, 20_000),
     createdAt: i.createdAt,
@@ -1452,7 +1729,8 @@ export async function linkIssueToWork(
           number: input.number,
         }).catch(() => null)
       : null;
-    issueId = found && (found.channelId === null || found.channelId === work.channelId) ? found.id : null;
+    issueId =
+      found && !found.restricted && (found.channelId === null || found.channelId === work.channelId) ? found.id : null;
   }
   issueId ??= run.issueId;
   if (!issueId) {
@@ -1549,50 +1827,118 @@ export async function setWorkIssueState(
     return updated;
   });
   if (!row) return;
-  await announce(deps.pubsub, work.orgId, await one(deps.db, row), "issue.updated");
+  await announce(deps, work.orgId, await one(deps.db, row), "issue.updated");
+}
+
+/** A task's steps at every depth (`union`: a loop ends). */
+async function stepsOf(db: Database, task: Pick<IssueRow, "id" | "orgId">) {
+  const tree = rowsOf<{ id: string }>(
+    await db.execute(sql`with recursive tree as (
+        select s.id from ${issues} s where s.parent_issue_id = ${task.id}::uuid and s.org_id = ${task.orgId}::uuid
+        union
+        select s.id from ${issues} s join tree on s.parent_issue_id = tree.id
+      ) select id from tree`),
+  );
+  if (tree.length === 0) return [];
+  return db
+    .select()
+    .from(issues)
+    .where(
+      inArray(
+        issues.id,
+        tree.map((t) => t.id),
+      ),
+    );
+}
+
+const sameList = (a: readonly string[], b: readonly string[]) => [...a].sort().join() === [...b].sort().join();
+
+/** Who reads each of these tasks' conversations now, as `channelId userId`. */
+async function conversationReaders(db: Database, orgId: string, ids: string[]) {
+  const rows = rowsOf<{ channel_id: string; user_id: string }>(
+    await db.execute(sql`select t.conversation_channel_id as channel_id, om.user_id
+      from ${issues} t join ${organizationMembers} om on om.org_id = t.org_id
+      where t.org_id = ${orgId}::uuid and t.id = any(${`{${ids.join(",")}}`}::uuid[])
+        and t.conversation_channel_id is not null and ${taskSeenSql("t", sql`om.user_id`)}`),
+  );
+  return new Set(rows.map((r) => `${r.channel_id} ${r.user_id}`));
 }
 
 /**
- * "Mostrar para todos" (ADR 0121 §4): the one way a task tied to a conversation reaches the whole workspace, and only
- * someone who reads that conversation gets this far. A background work's card: who asked for that work, who created
- * the card or an admin. A task an agent made in the conversation has no other owner: anyone there. Any other issue
- * keeps its channel.
+ * Changes who sees a task (ADR 0151), by anyone who can edit it. Limited, its steps go with it at every depth: a step
+ * left open would show what the task keeps. A step with a list of its own keeps it, so nobody new reads it, and a
+ * person assigned to a step stays on it. To everyone, steps stay as they are, so a step someone kept back isn't shown.
+ * Who loses it loses its notifications and, at once, the conversation they have open; everyone's boards read again from
+ * an event that says nothing about it.
  */
-export async function shareIssueWithEveryone(deps: IssueDeps, actor: IssueActor, orgId: string, issueId: string) {
-  const current = await findVisible(deps.db, actor, orgId, { id: issueId });
-  if (!current.channelId) return one(deps.db, current);
-  if (actor.type !== "person") throw new ForbiddenError();
-  const [work] = await deps.db
-    .select({ requestedByUserId: schema.agentWorks.requestedByUserId })
-    .from(schema.agentWorks)
-    .where(and(eq(schema.agentWorks.orgId, orgId), eq(schema.agentWorks.issueId, current.id)))
-    .orderBy(desc(schema.agentWorks.createdAt))
-    .limit(1);
-  const source = current.source as { type?: string; workId?: string };
-  const ofWork = !!work || (source.type === "agent" && !!source.workId);
-  if (!ofWork && current.createdByType !== "agent") throw new ForbiddenError();
-  const membership = await requireActiveMembership(deps.db, actor.userId, orgId);
-  const creator = current.createdByType === "person" && current.createdById === actor.userId;
-  if (ofWork && work?.requestedByUserId !== actor.userId && !creator && !can(membership, "manage_agents"))
-    throw new ForbiddenError();
-  const row = await deps.db.transaction(async (tx) => {
+export async function setIssueAudience(
+  deps: IssueDeps,
+  actor: IssueActor,
+  orgId: string,
+  issueId: string,
+  audience: Audience,
+) {
+  const { db } = deps;
+  const current = await findVisible(db, actor, orgId, { id: issueId });
+  const assignee = current.assigneeType === "person" ? current.assigneeId : null;
+  const scope = await chosenScope(db, actor, orgId, audience, assignee);
+  const tied = (await tiedPeople(db, [current])).has(current.channelId ?? "");
+  const unchanged = current.restricted
+    ? scope.restricted && sameList(scope.audienceUserIds, current.audienceUserIds)
+    : !scope.restricted && !tied;
+  if (unchanged) return one(db, current, readerOf(actor));
+  const steps = scope.restricted
+    ? (await stepsOf(db, current)).filter(
+        (s) => !s.restricted || (current.restricted && sameList(s.audienceUserIds, current.audienceUserIds)),
+      )
+    : [];
+  const changed = [current.id, ...steps.map((s) => s.id)];
+  const readers = await conversationReaders(db, orgId, changed);
+  const row = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(issues)
-      .set({ channelId: null, updatedAt: new Date() })
+      .set({ ...scope, updatedAt: new Date() })
       .where(eq(issues.id, current.id))
       .returning();
-    if (updated)
-      await addActivity(tx, updated, {
-        kind: "event",
-        author: actorOf(actor),
-        text: "showed the card to everyone in the workspace",
-        event: "shared_everyone",
-        data: { channelId: current.channelId },
-      });
-    await enqueueIndex(tx, { orgId, kind: "issue", sourceId: current.id });
+    if (!updated) throw new NotFoundError("Issue not found");
+    for (const s of steps) {
+      const assigned = s.assigneeType === "person" && s.assigneeId ? [s.assigneeId] : [];
+      await tx
+        .update(issues)
+        .set({ ...scope, audienceUserIds: [...new Set([...scope.audienceUserIds, ...assigned])].sort() })
+        .where(eq(issues.id, s.id));
+    }
+    await addActivity(tx, updated, {
+      kind: "event",
+      author: actorOf(actor),
+      text: audience.mode === "everyone" ? "showed the task to everyone" : "changed who sees the task",
+      event: "audience_changed",
+      data: { mode: audience.mode, from: current.channelId },
+    });
+    await recordAudit(tx, {
+      orgId,
+      actor: actor.type === "person" ? { type: "person", id: actor.userId } : { type: "agent", id: actor.agentId },
+      action: "issue.audience_changed",
+      target: { type: "issue", id: current.id },
+      details: { mode: audience.mode, userIds: scope.audienceUserIds },
+    });
+    for (const id of changed) await enqueueIndex(tx, { orgId, kind: "issue", sourceId: id });
+    await tx.execute(sql`delete from ${notifications} n using ${issues} t
+      where n.org_id = ${orgId}::uuid and t.id = any(${`{${changed.join(",")}}`}::uuid[])
+        and n.source->>'issueId' = t.id::text and not ${taskSeenSql("t", sql`n.user_id`)}`);
     return updated;
   });
-  const view = await one(deps.db, row ?? current);
-  await announce(deps.pubsub, orgId, view, "issue.updated");
-  return view;
+  await keepFilesWithTask(db, actor, row, row.artifactIds);
+  const still = await conversationReaders(db, orgId, changed);
+  for (const reader of readers) {
+    if (still.has(reader)) continue;
+    const [channelId, userId] = reader.split(" ") as [string, string];
+    await publishOrgEvent(deps.pubsub, { type: "membership.revoked", orgId, userId, channelId });
+  }
+  await publishOrgEvent(deps.pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: { type: "issue.audience", issueId: current.id },
+  });
+  return one(db, (await reload(db, row)) ?? row, readerOf(actor));
 }

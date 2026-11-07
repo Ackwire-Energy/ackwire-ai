@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { filesOfRun } from "./artifacts";
 import { routineBriefOfRun } from "./background";
 import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
@@ -96,6 +97,8 @@ export async function deliverRoutineReport(
       body: text,
       handedTo: run.id,
     });
+    // Its saved files come with it, as a reply's do: no other card of the run reaches the people.
+    const files = await filesOfRun(tx, run.orgId, run.id, brief.deliverTo.channelId);
     const message = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -105,6 +108,7 @@ export async function deliverRoutineReport(
       body: text,
       meta: {
         routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
+        ...(files.length > 0 ? { artifacts: files } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
         ...(relays ? { readOutside: true } : {}),
       },
@@ -503,8 +507,8 @@ export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
       return {
         content:
           input.wake_me === true
-            ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted."
-            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.`,
+            ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked: plain notes, no title or label. Nothing else is posted."
+            : `Posted.${note ? ` ${note}` : ""} Finish your work now and end with a short record of what you checked (it is not posted): plain notes, no title or label. Nothing else is posted.`,
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },

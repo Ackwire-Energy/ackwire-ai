@@ -45,7 +45,7 @@ import {
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
-import { firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
+import { CHAT_RHYTHM, firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
 import { type ConversationWait, conversationWaits } from "@agenteschat/client/lib/computer-queue";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
@@ -111,6 +111,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { threadTitle } from "../chats/logic";
@@ -166,7 +167,7 @@ import {
   stoppableInLine,
   workingEntries,
 } from "./logic";
-import { RowLookContext, useConversationLook } from "./look";
+import { RowLookContext, useConversationLook, useRhythm } from "./look";
 import { MediaPickerSheet } from "./MediaPickerSheet";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
@@ -203,6 +204,7 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
+import { StoppedRunsContext, stoppedRunsKey, stoppedRunsOf } from "./stopped-runs";
 import { turnOrder, turnRuns, withOpacity } from "./turn";
 import { JumpToMessageContext } from "./WorkLine";
 
@@ -210,7 +212,12 @@ import { JumpToMessageContext } from "./WorkLine";
 const HELD_RECENT_MS = 12 * 60 * 60_000;
 
 type Row =
-  | ChatRow
+  | (ChatRow & {
+      /** A quiet line right under another: they stack as one group. */
+      afterLine?: boolean;
+      /** The next row of a turn under anything but a row of it: it takes a turn's gap. */
+      newTurn?: boolean;
+    })
   | { kind: "marker"; key: string; text: string }
   | { kind: "run"; key: string; run: LiveRun }
   /** A run in line for its computer (`conversationWaits`): no live row of its own, this one for all its messages. */
@@ -221,6 +228,8 @@ type Row =
   | { kind: "unseen"; key: string; fading: boolean };
 
 const rowKey = (r: Row) => r.key;
+const isQuietLine = (r: Row | undefined) =>
+  r?.kind === "message" && (isEventLine(r.message.meta) || issueTakenOf(r.message.meta) !== null);
 /**
  * A row's type for the list, which keeps sizes per type: an agent's block and its saved reply share one (the reply
  * takes the block's row in place); other messages by how long they are and whether they carry a card (as Expensify
@@ -347,6 +356,7 @@ function Chat({
     Boolean(dm) || thread.data?.channelKind === "dm",
     dmAgent ? agentLook(dmAgent).color : undefined,
   );
+  const rhythm = CHAT_RHYTHM[rowLook.style];
   // The right hand (ADR 0137): its own line and composer hint, no computer, and its greeting on top.
   const rightHand = isRightHand(dmAgent) && !isThread;
   // Its DM is open, from its row or any other way in: its row's "Novo" goes.
@@ -358,6 +368,9 @@ function Chat({
   const wave = useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "");
   const waveFrom = useMemo(() => (wave ? frameClock.time() : undefined), [wave]);
   const member = dm ? true : (channel?.isMember ?? true);
+  // An administrator reads every channel without joining it (ADR 0151): only what needs being in it waits for Entrar.
+  const admin = can(useOrg().org, "administrator");
+  const readable = member || admin;
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
   const queueAgents = useMemo(
@@ -372,9 +385,9 @@ function Chat({
   const mentionMembers = useMentionMembers(channelId, !dm && Boolean(channel?.isMember));
 
   // ── Messages ──
-  const top = useMessages(orgId, channelId, member && !isThread);
-  const threadMessages = useThreadMessages(orgId, isThread && member ? channelId : undefined, threadId ?? "");
-  const channelThreads = useChannelThreads(orgId, channelId, "all", member && !isThread);
+  const top = useMessages(orgId, channelId, readable && !isThread);
+  const threadMessages = useThreadMessages(orgId, isThread && readable ? channelId : undefined, threadId ?? "");
+  const channelThreads = useChannelThreads(orgId, channelId, "all", readable && !isThread);
   // Every thread with replies is a link under its root (as on the web): agents asked in the
   // channel answer in the channel, so a thread is always a conversation of its own.
   const linkThreads = useMemo(
@@ -407,7 +420,7 @@ function Chat({
   const seenBy = seenId ? dm?.with.id : undefined;
 
   // ── Live ──
-  const live = useChatLive(orgId, channelId, member);
+  const live = useChatLive(orgId, channelId, readable);
   // People's messages loaded over HTTP start (or catch up) their agents' receipts, as on the web.
   const { seed: seedReceipts } = live;
   useEffect(() => {
@@ -664,6 +677,12 @@ function Chat({
   const foldsKey = [...foldsNow].map(([id, f]) => `${id}:${f.fold === "line" ? f.messageId : f.fold}`).join(" ");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `foldsKey` stands for the folds
   const consultFolds = useMemo(() => foldsNow, [foldsKey]);
+  // One stop is one pill: the stopped reply's, with its notice's words (who, the reason), the notice itself drawing
+  // nothing while that reply is here (`stoppedRunsOf`). Rebuilt with the messages, redrawn only when a stop changes.
+  const stoppedNow = useMemo(() => stoppedRunsOf(shownMessages), [shownMessages]);
+  const stoppedKey = stoppedRunsKey(stoppedNow);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `stoppedKey` stands for the stops
+  const stoppedRuns = useMemo(() => stoppedNow, [stoppedKey]);
   const lineConsults = useMemo(
     () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, liveTurns, "first")),
     [consults, shownMessages, consultList, liveTurns],
@@ -741,10 +760,17 @@ function Chat({
     if (!atEnd && unseen.firstKey) setReached(false);
   }, [atEnd, unseen.firstKey]);
   const shownRows = useMemo<Row[]>(() => {
-    if (!divider) return rows;
-    const at = rows.findIndex((r) => r.key === divider.beforeKey);
-    if (at < 0) return rows;
-    return [...rows.slice(0, at), { kind: "unseen", key: DIVIDER_KEY, fading: divider.fading }, ...rows.slice(at)];
+    const at = divider ? rows.findIndex((r) => r.key === divider.beforeKey) : -1;
+    const all: Row[] =
+      divider && at >= 0
+        ? [...rows.slice(0, at), { kind: "unseen", key: DIVIDER_KEY, fading: divider.fading }, ...rows.slice(at)]
+        : rows;
+    return all.map((r, i) => {
+      if (r.kind !== "message") return r;
+      const above = all[i - 1];
+      if (isQuietLine(r)) return isQuietLine(above) ? { ...r, afterLine: true } : r;
+      return r.grouped && (above?.kind !== "message" || isQuietLine(above)) ? { ...r, newTurn: true } : r;
+    });
   }, [rows, divider]);
   const toEnd = useCallback(() => {
     letGo();
@@ -1634,9 +1660,10 @@ function Chat({
   const receipts: ReceiptsState = useMemo(() => Object.fromEntries(fanNow.filter(([, r]) => r)), [fanKey]);
   // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
   const aiStatus = useAiStatus(orgId);
+  const planHeld = usePlanHold(orgId, org) !== null;
   // The right hand's greeting says it itself (its Connect AI card).
   const banner =
-    member && !rightHand
+    member && !rightHand && !planHeld
       ? noAiBanner(aiStatus.data, {
           agentIds: dmAgentId ? [dmAgentId] : channelAgents,
           dmAgentId,
@@ -1654,13 +1681,13 @@ function Chat({
       switch (item.kind) {
         case "day":
           return (
-            <Text variant="footnote" tone="faint" style={styles.day}>
+            <Text variant="footnote" tone="faint" style={[styles.day, { marginTop: rhythm.turn }]}>
               {when.day(item.iso)}
             </Text>
           );
         case "marker":
           return (
-            <Text variant="footnote" tone="faint" style={styles.day}>
+            <Text variant="footnote" tone="faint" style={[styles.day, { marginTop: rhythm.turn }]}>
               {item.text}
             </Text>
           );
@@ -1677,7 +1704,10 @@ function Chat({
         case "browser": {
           const agentId = item.run ? item.run.agentId : item.handoff.agentId;
           return (
-            <Animated.View entering={isFresh(item.key) ? ENTER : undefined} style={styles.browserRow}>
+            <Animated.View
+              entering={isFresh(item.key) ? ENTER : undefined}
+              style={[styles.browserRow, { marginTop: rhythm.turn }]}
+            >
               {item.run ? (
                 <BrowserRunCard
                   run={item.run}
@@ -1699,9 +1729,16 @@ function Chat({
           // What reached an agent's conversation (a routine's report, another agent's answer) and a routine
           // that ran in the background: quiet lines, never a person's or the agent's own voice.
           if (isEventLine(item.message.meta))
-            return <EventLine message={item.message} fold={consultFolds.get(item.message.id)} />;
+            return (
+              <EventLine
+                message={item.message}
+                fold={consultFolds.get(item.message.id)}
+                gap={item.afterLine ? rhythm.part : rhythm.turn}
+              />
+            );
           // An agent took an issue made from this conversation: one quiet line, not a voice.
-          if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
+          if (issueTakenOf(item.message.meta))
+            return <IssueTakenLine message={item.message} gap={item.afterLine ? rhythm.part : rhythm.turn} />;
           return (
             // A finished reply replaces its streaming row in place: it doesn't rise in again. An agent's sticker or
             // GIF after its reply (ADR 0091) replaces nothing: it rises in.
@@ -1716,6 +1753,7 @@ function Chat({
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}
+                newTurn={item.newTurn}
                 run={runPosition(item.grouped, item.continued ?? false)}
                 above={item.above}
                 aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
@@ -1746,6 +1784,7 @@ function Chat({
     },
     [
       when,
+      rhythm,
       meId,
       channelId,
       isThread,
@@ -1991,66 +2030,69 @@ function Chat({
                     <JumpToMessageContext.Provider value={jumpToMessage}>
                       <RowLookContext.Provider value={rowLook}>
                         <LiveRowsProvider value={liveRows}>
-                          <KeyboardAwareLegendList
-                            ref={listRef}
-                            style={styles.grow}
-                            data={shownRows}
-                            keyExtractor={rowKey}
-                            getItemType={rowType}
-                            renderItem={renderItem}
-                            // The list redraws mounted rows only when this changes: what a row shows beyond its message
-                            // (the thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                            extraData={renderItem}
-                            estimatedItemSize={72}
-                            // Opens at the latest message, short conversations sit at the bottom like any chat.
-                            initialScrollAtEnd
-                            alignItemsAtEnd
-                            // New messages, a reply growing word by word and the working line keep the end in view, but
-                            // only while the person is near it.
-                            maintainScrollAtEnd={!readHold}
-                            maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                            // Older pages above and rows changing size keep what is on screen still.
-                            maintainVisibleContentPosition
-                            // Our own insets, never the system's (the keyboard library's advice for chat lists): the
-                            // bar's room is the content's top padding, the indicator kept below the bar.
-                            contentInsetAdjustmentBehavior="never"
-                            automaticallyAdjustContentInsets={false}
-                            scrollIndicatorInsets={{ top: headerHeight }}
-                            // Still while a sheet or the agent's computer covers the conversation.
-                            freeze={freeze}
-                            onReady={revealList}
-                            onStartReached={loadOlder}
-                            // A look at the waiting requests' cards and the live rows, once a frame and only while
-                            // there is one.
-                            onScroll={onListScroll}
-                            onViewableItemsChanged={onViewable}
-                            viewabilityConfig={STICKER_VIEW}
-                            onScrollBeginDrag={() => {
-                              dragging.current = true;
-                              showDay();
-                            }}
-                            onScrollEndDrag={() => {
-                              releaseAtEnd();
-                              hideDay();
-                            }}
-                            onMomentumScrollBegin={showDay}
-                            onMomentumScrollEnd={() => {
-                              releaseAtEnd();
-                              hideDay();
-                            }}
-                            onStartReachedThreshold={0.5}
-                            keyboardDismissMode="interactive"
-                            keyboardShouldPersistTaps="handled"
-                            keyboardOffset={lift}
-                            contentInsetEndAdjustment={contentInsetEndAdjustment}
-                            contentContainerStyle={listPad}
-                            // The right hand's greeting stays at the conversation's start, once the start is loaded.
-                            ListHeaderComponent={
-                              dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                                <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
-                              ) : undefined
-                            }
-                          />
+                          <StoppedRunsContext.Provider value={stoppedRuns}>
+                            <KeyboardAwareLegendList
+                              ref={listRef}
+                              style={styles.grow}
+                              data={shownRows}
+                              keyExtractor={rowKey}
+                              getItemType={rowType}
+                              renderItem={renderItem}
+                              // The list redraws mounted rows only when this changes: what a row shows beyond its
+                              // message (the thread link that loads after it, a held state) lives in `renderItem`'s
+                              // dependencies.
+                              extraData={renderItem}
+                              estimatedItemSize={72}
+                              // Opens at the latest message, short conversations sit at the bottom like any chat.
+                              initialScrollAtEnd
+                              alignItemsAtEnd
+                              // New messages, a reply growing word by word and the working line keep the end in view,
+                              // but only while the person is near it.
+                              maintainScrollAtEnd={!readHold}
+                              maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                              // Older pages above and rows changing size keep what is on screen still.
+                              maintainVisibleContentPosition
+                              // Our own insets, never the system's (the keyboard library's advice for chat lists): the
+                              // bar's room is the content's top padding, the indicator kept below the bar.
+                              contentInsetAdjustmentBehavior="never"
+                              automaticallyAdjustContentInsets={false}
+                              scrollIndicatorInsets={{ top: headerHeight }}
+                              // Still while a sheet or the agent's computer covers the conversation.
+                              freeze={freeze}
+                              onReady={revealList}
+                              onStartReached={loadOlder}
+                              // A look at the waiting requests' cards and the live rows, once a frame and only while
+                              // there is one.
+                              onScroll={onListScroll}
+                              onViewableItemsChanged={onViewable}
+                              viewabilityConfig={STICKER_VIEW}
+                              onScrollBeginDrag={() => {
+                                dragging.current = true;
+                                showDay();
+                              }}
+                              onScrollEndDrag={() => {
+                                releaseAtEnd();
+                                hideDay();
+                              }}
+                              onMomentumScrollBegin={showDay}
+                              onMomentumScrollEnd={() => {
+                                releaseAtEnd();
+                                hideDay();
+                              }}
+                              onStartReachedThreshold={0.5}
+                              keyboardDismissMode="interactive"
+                              keyboardShouldPersistTaps="handled"
+                              keyboardOffset={lift}
+                              contentInsetEndAdjustment={contentInsetEndAdjustment}
+                              contentContainerStyle={listPad}
+                              // The right hand's greeting stays at the conversation's start, once the start is loaded.
+                              ListHeaderComponent={
+                                dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
+                                  <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                                ) : undefined
+                              }
+                            />
+                          </StoppedRunsContext.Provider>
                         </LiveRowsProvider>
                       </RowLookContext.Provider>
                     </JumpToMessageContext.Provider>
@@ -2190,13 +2232,20 @@ function Chat({
                     voice={voice}
                   />
                 ) : (
-                  <Button
-                    variant="primary"
-                    wide
-                    label={t("mobile.chat.join")}
-                    disabled={join.isPending}
-                    onPress={() => join.mutate()}
-                  />
+                  <>
+                    {admin ? (
+                      <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                        {t("channel.adminReading")}
+                      </Text>
+                    ) : null}
+                    <Button
+                      variant="primary"
+                      wide
+                      label={t("mobile.chat.join")}
+                      disabled={join.isPending}
+                      onPress={() => join.mutate()}
+                    />
+                  </>
                 )}
               </View>
             </KeyboardStickyView>
@@ -2266,6 +2315,7 @@ function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) 
 /** "Novas": before the first message that arrived while the person read above; it fades once read. */
 function UnseenLine({ fading }: { fading: boolean }) {
   const { t } = useTranslation();
+  const rhythm = useRhythm();
   const c = useColors();
   const opacity = useSharedValue(1);
   useEffect(() => {
@@ -2273,7 +2323,7 @@ function UnseenLine({ fading }: { fading: boolean }) {
   }, [fading, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
-    <Animated.View style={[styles.unseen, style]} accessibilityRole="text">
+    <Animated.View style={[styles.unseen, { marginTop: rhythm.turn }, style]} accessibilityRole="text">
       <Text variant="caption" style={[styles.unseenText, { color: c.agent }]}>
         {t("mobile.chat.unseen.divider")}
       </Text>
@@ -2326,13 +2376,13 @@ function Connection({ status }: { status: ConnectionStatus }) {
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   // Under the agent's words, like a card on its message.
-  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16, paddingBottom: 6 },
+  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
   pinBelowBar: { paddingTop: 10 },
-  day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
+  day: { alignSelf: "center", textAlign: "center", fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
   readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
@@ -2343,7 +2393,7 @@ const styles = StyleSheet.create({
   jumpCount: { position: "absolute", top: -6, right: -6, borderWidth: 2, borderRadius: 999 },
   pillFace: { borderWidth: 2, borderRadius: 8 },
   pillOverlap: { marginLeft: -6 },
-  unseen: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginVertical: 6 },
+  unseen: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16 },
   unseenText: { fontWeight: "700" },
   unseenRule: { flex: 1, height: StyleSheet.hairlineWidth * 2, opacity: 0.45 },
   conn: {

@@ -25,7 +25,7 @@ import {
   removeChannelMember,
   requireChannelAccess,
   searchVisible,
-  shareIssueWithEveryone,
+  setIssueAudience,
   updateIssue,
   userVisibleChannels,
   ValidationError,
@@ -44,14 +44,14 @@ const person = (userId: string) => ({ type: "person" as const, userId });
 const ISSUES = ["issues:read", "issues:write"].map((scope) => ({ connectionId: null, scope }));
 const deps = () => ({ db: f.db, pubsub: f.pubsub });
 
-/** The fixture's owner and agent in a DM, a second person outside it who is an admin, and the agent's tools there. */
+/** The fixture's owner and agent in a DM, a second person outside it, and the agent's tools there. */
 async function inDm() {
   f = await setup({ issueTools: true, reply: () => ({ chunks: ["ok"] }) });
   await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
   const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, f.agent.id);
-  const admin = await addMember(f.db, f.org.id, "admin", "ada");
+  const other = await addMember(f.db, f.org.id, "member", "ada");
   const call = await toolsIn(dm.id);
-  return { dm, admin, call };
+  return { dm, other, call };
 }
 
 async function toolsIn(channelId: string) {
@@ -70,29 +70,29 @@ const made = async (call: Awaited<ReturnType<typeof toolsIn>>, title: string, mo
 };
 
 describe("a task made in a private conversation stays there", () => {
-  test("from a DM: the board, a direct link, the number and search show it only to who is in it, an admin included", async () => {
-    const { admin, call, dm } = await inDm();
+  test("from a DM: the board, a direct link, the number and search show it only to who is in it", async () => {
+    const { other, call, dm } = await inDm();
     const task = await made(call, "Reajuste do salário da Bia", { description: "Conversa reservada" });
 
     expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: task.id })).channelId).toBe(dm.id);
     expect((await listIssues(f.db, person(f.owner.id), f.org.id)).map((i) => i.id)).toEqual([task.id]);
 
-    expect(await listIssues(f.db, person(admin.id), f.org.id)).toEqual([]);
-    expect(await listIssues(f.db, person(admin.id), f.org.id, { q: "salário" })).toEqual([]);
-    await expect(getIssue(f.db, person(admin.id), f.org.id, { id: task.id })).rejects.toBeInstanceOf(NotFoundError);
-    await expect(getIssueDetail(f.db, person(admin.id), f.org.id, { number: task.number })).rejects.toBeInstanceOf(
+    expect(await listIssues(f.db, person(other.id), f.org.id)).toEqual([]);
+    expect(await listIssues(f.db, person(other.id), f.org.id, { q: "salário" })).toEqual([]);
+    await expect(getIssue(f.db, person(other.id), f.org.id, { id: task.id })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getIssueDetail(f.db, person(other.id), f.org.id, { number: task.number })).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await expect(updateIssue(deps(), person(admin.id), f.org.id, task.id, { status: "done" })).rejects.toBeInstanceOf(
+    await expect(updateIssue(deps(), person(other.id), f.org.id, task.id, { status: "done" })).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await expect(commentIssue(deps(), person(admin.id), f.org.id, task.id, "oi")).rejects.toBeInstanceOf(NotFoundError);
-    await expect(openTaskConversation(f.db, person(admin.id), f.org.id, task.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(commentIssue(deps(), person(other.id), f.org.id, task.id, "oi")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(openTaskConversation(f.db, person(other.id), f.org.id, task.id)).rejects.toBeInstanceOf(NotFoundError);
 
     await drainOutbox(f.db, f.handlers);
     const found = (visibleChannelIds: string[]) =>
       searchVisible(f.context, { orgId: f.org.id, text: "salário", visibleChannelIds, kinds: ["issue"] });
-    expect(await found(await userVisibleChannels(f.db, f.org.id, admin.id))).toEqual([]);
+    expect(await found(await userVisibleChannels(f.db, f.org.id, other.id))).toEqual([]);
     const mine = await found(await userVisibleChannels(f.db, f.org.id, f.owner.id));
     expect(mine.map((h) => h.sourceId)).toEqual([task.id]);
   });
@@ -111,7 +111,7 @@ describe("a task made in a private conversation stays there", () => {
     );
   });
 
-  test("the agent reaches it from that conversation, and not from anywhere else", async () => {
+  test("the agent lists it in that conversation; elsewhere it reaches it by id for who sees it, never in a list", async () => {
     const { call } = await inDm();
     const task = await made(call, "Fechar a folha");
     expect(await call("list_issues", {})).toMatchObject({ output: { content: expect.stringContaining("Fechar") } });
@@ -120,9 +120,8 @@ describe("a task made in a private conversation stays there", () => {
     });
     const elsewhere = await toolsIn(f.general.id);
     expect(await elsewhere("list_issues", {})).toMatchObject({ output: { content: "No issues." } });
-    expect(await elsewhere("list_issues", { issue: task.id })).toMatchObject({ output: { isError: true } });
-    expect(await elsewhere("update_issue", { issue: task.id, status: "done" })).toMatchObject({
-      output: { isError: true },
+    expect(await elsewhere("list_issues", { issue: task.id })).toMatchObject({
+      output: { content: expect.stringContaining("Fechar") },
     });
   });
 
@@ -139,30 +138,30 @@ describe("a task made in a private conversation stays there", () => {
   });
 
   test("someone outside can't be assigned, by an agent or a person, so nothing reaches them", async () => {
-    const { admin, call } = await inDm();
+    const { other, call } = await inDm();
     const refused = await call("create_issue", { title: "Folha", assignee: "ada" });
-    expect(refused).toMatchObject({ output: { isError: true, content: expect.stringContaining("conversation") } });
+    expect(refused).toMatchObject({ output: { isError: true, content: expect.stringContaining("can't see") } });
 
     const task = await made(call, "Fechar a folha");
     await expect(
-      updateIssue(deps(), person(f.owner.id), f.org.id, task.id, { assignee: { type: "person", id: admin.id } }),
+      updateIssue(deps(), person(f.owner.id), f.org.id, task.id, { assignee: { type: "person", id: other.id } }),
     ).rejects.toBeInstanceOf(ValidationError);
     await updateIssue(deps(), person(f.owner.id), f.org.id, task.id, { status: "done" });
     await drainOutbox(f.db, f.handlers);
-    expect((await listNotifications({ db: f.db }, admin.id, f.org.id)).items).toEqual([]);
+    expect((await listNotifications({ db: f.db }, other.id, f.org.id)).items).toEqual([]);
   });
 
   test("a due date shows on the calendar of who is in it only", async () => {
-    const { admin, call } = await inDm();
+    const { other, call } = await inDm();
     await made(call, "Fechar a folha", { due_date: "2026-11-20" });
     const range = (userId: string) =>
       calendarRange({ db: f.db }, userId, f.org.id, "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z");
     expect((await range(f.owner.id)).deadlines.map((d) => d.title)).toEqual(["Fechar a folha"]);
-    expect((await range(admin.id)).deadlines).toEqual([]);
+    expect((await range(other.id)).deadlines).toEqual([]);
   });
 
   test("a step of a private task, and a task made in its own conversation, stay with it", async () => {
-    const { admin, call, dm } = await inDm();
+    const { other, call, dm } = await inDm();
     const parent = await made(call, "Fechar a folha");
     const step = await createIssue(deps(), person(f.owner.id), f.org.id, {
       title: "Holerites",
@@ -170,7 +169,7 @@ describe("a task made in a private conversation stays there", () => {
     });
     expect(step.channelId).toBe(dm.id);
     await expect(
-      createIssue(deps(), person(admin.id), f.org.id, { title: "Olhar", parentIssueId: parent.id }),
+      createIssue(deps(), person(other.id), f.org.id, { title: "Olhar", parentIssueId: parent.id }),
     ).rejects.toBeInstanceOf(ValidationError);
 
     const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, parent.id);
@@ -184,11 +183,11 @@ describe("a task made in a private conversation stays there", () => {
   });
 
   test("a workspace task's conversation and a room no person reads leave a task the workspace's", async () => {
-    const { admin } = await inDm();
+    const { other } = await inDm();
     const open = await createIssue(deps(), person(f.owner.id), f.org.id, { title: "Aberta" });
     const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, open.id);
     const step = await made(await toolsIn(at.channelId), "Passo aberto");
-    const seen = (await listIssues(f.db, person(admin.id), f.org.id)).map((i) => i.id);
+    const seen = (await listIssues(f.db, person(other.id), f.org.id)).map((i) => i.id);
     expect(seen).toContain(step.id);
 
     const [room] = await f.db
@@ -198,12 +197,12 @@ describe("a task made in a private conversation stays there", () => {
     if (!room) throw new Error("no room");
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: room.id, agentId: f.agent.id });
     const fromRoutine = await made(await toolsIn(room.id), "Da rotina");
-    expect((await listIssues(f.db, person(admin.id), f.org.id)).map((i) => i.id)).toContain(fromRoutine.id);
+    expect((await listIssues(f.db, person(other.id), f.org.id)).map((i) => i.id)).toContain(fromRoutine.id);
   });
 });
 
 describe("what still reads a private task", () => {
-  test("the agent in a task's conversation reaches a step it made there, and an agent elsewhere doesn't", async () => {
+  test("the agent in a task's conversation reaches a step it made there", async () => {
     const { call } = await inDm();
     const parent = await made(call, "Fechar a folha");
     const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, parent.id);
@@ -214,9 +213,6 @@ describe("what still reads a private task", () => {
     });
     expect(await inside("update_issue", { issue: step.id, status: "in_progress" })).toMatchObject({
       output: { content: expect.not.stringContaining("Failed") },
-    });
-    expect(await (await toolsIn(f.general.id))("update_issue", { issue: step.id, status: "done" })).toMatchObject({
-      output: { isError: true },
     });
   });
 
@@ -259,7 +255,7 @@ describe("what still reads a private task", () => {
   });
 
   test("an approval card names a private task to nobody: an approver may be outside the conversation", async () => {
-    const { admin, call, dm } = await inDm();
+    const { call, dm } = await inDm();
     const hidden = await made(call, "Reajuste da Bia");
     const open = await made(await toolsIn(f.general.id), "Onboarding");
     const cardOf = async (issueId: string, channelId: string) => {
@@ -298,13 +294,14 @@ describe("what still reads a private task", () => {
     };
     const inDmCard = await cardOf(hidden.id, dm.id);
     const openCard = await cardOf(open.id, f.general.id);
-    const seen = await listApprovals(f.db, admin.id, f.org.id);
+    const approver = await addMember(f.db, f.org.id, "admin", "approver");
+    const seen = await listApprovals(f.db, approver.id, f.org.id);
     expect(seen.find((a) => a.id === inDmCard)?.issue).toBeNull();
     expect(seen.find((a) => a.id === openCard)?.issue).toMatchObject({ title: "Onboarding" });
   });
 
   test("the weekly card counts and names nothing it can't show: closed tasks, and steps under a task everyone sees", async () => {
-    const { admin, call, dm } = await inDm();
+    const { other, call, dm } = await inDm();
     const end = new Date(Date.now() + 60_000);
     const week = (userId: string) =>
       buildTeamWeek(f.db, {
@@ -347,7 +344,7 @@ describe("what still reads a private task", () => {
       .where(eq(schema.issues.id, steps[0]?.id ?? ""));
 
     const inside = await week(f.owner.id);
-    const outside = await week(admin.id);
+    const outside = await week(other.id);
     expect(inside?.worked.filter((h) => h.kind === "tasks")).toHaveLength(1);
     expect(inside?.rows.filter((r) => r.kind === "stalled")).toHaveLength(1);
     expect(outside?.worked.filter((h) => h.kind === "tasks") ?? []).toEqual([]);
@@ -356,14 +353,16 @@ describe("what still reads a private task", () => {
 });
 
 describe("Mostrar para todos", () => {
-  test("someone in the conversation shows an agent's task to everyone; it reaches the board and search; nobody outside can", async () => {
-    const { admin, call } = await inDm();
+  const everyone = { mode: "everyone" } as const;
+
+  test("someone in the conversation shows a task to everyone; it reaches the board and search; nobody outside can", async () => {
+    const { other, call } = await inDm();
     const task = await made(call, "Fechar a folha");
-    await expect(shareIssueWithEveryone(deps(), person(admin.id), f.org.id, task.id)).rejects.toBeInstanceOf(
+    await expect(setIssueAudience(deps(), person(other.id), f.org.id, task.id, everyone)).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await shareIssueWithEveryone(deps(), person(f.owner.id), f.org.id, task.id);
-    expect((await listIssues(f.db, person(admin.id), f.org.id)).map((i) => i.id)).toEqual([task.id]);
+    await setIssueAudience(deps(), person(f.owner.id), f.org.id, task.id, everyone);
+    expect((await listIssues(f.db, person(other.id), f.org.id)).map((i) => i.id)).toEqual([task.id]);
     await drainOutbox(f.db, f.handlers);
     const hits = await searchVisible(f.context, {
       orgId: f.org.id,
@@ -374,12 +373,14 @@ describe("Mostrar para todos", () => {
     expect(hits.map((h) => h.sourceId)).toEqual([task.id]);
   });
 
-  test("a task a person made from a private message keeps its channel", async () => {
+  test("a task a person made from a private message too: anyone who can edit it changes who sees it", async () => {
     f = await setup();
     const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
     const said = await postPersonMessage(deps(), f.owner.id, f.org.id, secret.id, { body: "Bug" });
     const task = await issueFromMessage(deps(), f.owner.id, f.org.id, said.id);
-    await expect(shareIssueWithEveryone(deps(), person(f.owner.id), f.org.id, task.id)).rejects.toThrow();
+    expect(task.audience).toMatchObject({ mode: "people", channelId: secret.id });
+    const open = await setIssueAudience(deps(), person(f.owner.id), f.org.id, task.id, everyone);
+    expect(open).toMatchObject({ channelId: null, audience: { mode: "everyone" } });
   });
 });
 
@@ -457,7 +458,7 @@ describe("the data migrations", () => {
   });
 
   test("an agent's task from a private conversation goes back to it, search included; one someone outside works on stays", async () => {
-    const { admin, call, dm } = await inDm();
+    const { other, call, dm } = await inDm();
     const tied = await made(call, "Fechar a folha");
     const assigned = await made(call, "Com alguém de fora");
     const commented = await made(call, "Comentada de fora");
@@ -473,9 +474,9 @@ describe("the data migrations", () => {
       .where(inArray(schema.searchDocuments.sourceId, ids));
     await f.db
       .update(schema.issues)
-      .set({ assigneeType: "person", assigneeId: admin.id })
+      .set({ assigneeType: "person", assigneeId: other.id })
       .where(eq(schema.issues.id, assigned.id));
-    await commentIssue(deps(), person(admin.id), f.org.id, commented.id, "Vi aqui");
+    await commentIssue(deps(), person(other.id), f.org.id, commented.id, "Vi aqui");
     await drainOutbox(f.db, f.handlers);
     await f.db.delete(schema.agentActions).where(eq(schema.agentActions.targetId, noReceipt.id));
 

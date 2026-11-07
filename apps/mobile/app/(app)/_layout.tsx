@@ -114,6 +114,7 @@ function AppStack() {
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="who-sees" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -132,6 +133,7 @@ function AppStack() {
       <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="team" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="proposals" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />
@@ -168,6 +170,7 @@ function AppStack() {
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/about" options={{ ...pushed, ...scrollUnder }} />
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
       <Stack.Screen name="settings/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />

@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { Page } from "../me/parts";
 import { useColors, useMeId } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
@@ -59,6 +60,7 @@ function InvitePeople() {
   const c = useColors();
   const toast = useToast();
   const sheet = useSheet();
+  const held = usePlanHold(orgId, org) !== null;
   const allowed = can(org, "invite_people");
   const byLink = !sendsEmail(useAuthConfig().data);
   const people = usePeople(orgId).data ?? [];
@@ -168,6 +170,17 @@ function InvitePeople() {
     return (
       <Page title={t("members.inviteTitle")}>
         <GroupedFooter>{t("common.notAllowed")}</GroupedFooter>
+      </Page>
+    );
+  if (held)
+    return (
+      <Page title={t("members.inviteTitle")}>
+        <GroupedFooter>
+          {t("common.joinSentences", {
+            a: t("standing.billing.invites"),
+            b: t(can(org, "manage_billing") ? "connectAi.billingWeb" : "standing.billing.askAdmin"),
+          })}
+        </GroupedFooter>
       </Page>
     );
   return (

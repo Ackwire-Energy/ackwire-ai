@@ -89,4 +89,19 @@ describe("transitionRun", () => {
       [2, "model_call"],
     ]);
   });
+
+  test("a step that loses the race for its number takes the next one instead of failing the run", async () => {
+    const run = { id: runId, orgId: f.org.id };
+    let lost = 0;
+    const racing = {
+      insert: (table: typeof schema.agentRunSteps) =>
+        lost++ === 0
+          ? { values: () => ({ onConflictDoNothing: () => ({ returning: async () => [] }) }) }
+          : f.db.insert(table),
+    } as unknown as typeof f.db;
+    await addRunStep(racing, run, "context", {});
+    expect(lost).toBe(2);
+    const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, runId));
+    expect(steps.map((s) => s.seq)).toEqual([1]);
+  });
 });

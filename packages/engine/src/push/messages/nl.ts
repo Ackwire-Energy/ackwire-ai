@@ -54,6 +54,7 @@ export const strings: Partial<PushStrings> = {
     failing: "Hij is meerdere keren achter elkaar mislukt en gestopt.",
   },
   widgetFailedBody: "Tik om te zien waarom.",
+  proposalWaitingTitle: (a) => `${a} stelt een verbetering voor`,
   dashboardProposalTitle: (a) => `${a} wil een dashboard publiceren`,
   dashboardProposalBody: (d) => (d ? `“${d}” · Tik om te beslissen.` : "Tik om te beslissen."),
   joinRequestTitle: (name, org) => `${name} wil lid worden van ${org}`,

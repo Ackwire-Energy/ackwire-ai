@@ -378,4 +378,19 @@ export const ptBR: Words = {
     button: "Abrir notificações",
     why: (org) => `Você recebeu este e-mail porque alguém na ${org} conectou o seu plano a um agente.`,
   },
+  planWaiting: {
+    subject: "Seu time está esperando",
+    preheader: "Seu workspace está pronto. Falta um plano do agentes.chat para ele começar.",
+    headline: "Seu time está esperando",
+    body: (agents, channels, routines) => {
+      const a = plural("pt-BR", agents, { one: `1 agente`, other: `${agents} agentes` });
+      const c = plural("pt-BR", channels, { one: `1 canal`, other: `${channels} canais` });
+      const r = plural("pt-BR", routines, { one: `1 rotina`, other: `${routines} rotinas` });
+      return routines > 0
+        ? `${a}, ${c} e ${r} estão prontos. Falta um plano do agentes.chat para eles começarem.`
+        : `${a} e ${c} estão prontos. Falta um plano do agentes.chat para eles começarem.`;
+    },
+    button: "Ver planos do agentes.chat",
+    why: (org) => `Você recebeu este e-mail porque administra ${org} no agentes.chat. São só dois avisos como este.`,
+  },
 };

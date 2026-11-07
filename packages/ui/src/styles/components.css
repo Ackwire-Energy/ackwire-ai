@@ -468,8 +468,25 @@ html:not([data-pointer]) .ac-link:focus-visible {
 .ac-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--field-gap);
   min-width: 0;
+}
+/* A form's fields, notes and groups (`FormStack`). `Locked` has no box, so what it holds is the form's own child. */
+.ac-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-gap);
+  min-width: 0;
+}
+/* A paragraph among fields takes the form's gap, not its browser margins on top. */
+:where(.ac-form, .ac-field, .ac-dialog__body) > p {
+  margin: 0;
+}
+.ac-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 .ac-field__label {
   font-size: 13px;
@@ -587,7 +604,7 @@ html:not([data-pointer]) .ac-link:focus-visible {
 }
 textarea.ac-input {
   height: auto;
-  padding: 10px 12px;
+  padding: 10px var(--control-px-md);
   line-height: 22px;
   resize: vertical;
 }
@@ -611,6 +628,9 @@ textarea.ac-input {
 .ac-input-affix:hover {
   border-color: var(--line-strong);
 }
+.ac-input-affix:has(input[aria-invalid="true"]) {
+  border-color: var(--danger);
+}
 .ac-input-affix:focus-within {
   background: var(--raised);
   border-color: var(--field-line);
@@ -629,6 +649,18 @@ textarea.ac-input {
   font: inherit;
   color: var(--ink);
   background: transparent;
+}
+.ac-input-affix input:first-child {
+  padding-inline-start: var(--control-px-md);
+}
+.ac-input-affix input::placeholder {
+  color: var(--faint);
+}
+/* A small button inside the field's end, as far from its top, bottom and end. */
+.ac-input-affix__action {
+  flex: none;
+  display: flex;
+  padding-inline-end: calc((var(--control-h-md) - 2px - var(--control-h-sm)) / 2);
 }
 /* A code typed one character per box (CodeInput, ADR 0144): fields of the ruler's large height and its radius, as wide
    as they fit up to a square-ish 44, the character centred in tabular figures. Twelve boxes still fit a chat card on a
@@ -1002,6 +1034,22 @@ textarea.ac-input {
   margin-left: 0;
 }
 
+/*
+ * A conversation's one vertical rhythm: `--msg-part-gap` between what stacks inside one group (a message's parts, the
+ * next row of the same turn), `--msg-turn-gap` between groups. Measured from what shows to what shows, whatever the two
+ * are, so no part sets a vertical margin of its own. A look sets its pair (`chat/looks.css`), the list and the body
+ * below spend them. `--msg-card-gap` is a card under a message, in its row or in one of its own, in every look. The
+ * numbers are `CHAT_RHYTHM` (packages/client/src/lib/chat-look.ts), which the phone reads.
+ * `--msg-block` is the row's plate past its content. It takes no room between rows: the list pays it back.
+ */
+:root {
+  --msg-part-gap: 8px;
+  --msg-turn-gap: 20px;
+  --msg-card-gap: 12px;
+  --msg-block: 4px;
+  /* The avatar column and its gap: how far a body stands in from its row. */
+  --msg-lead: calc(36px + var(--space-3));
+}
 /* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
    `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
@@ -1009,10 +1057,7 @@ textarea.ac-input {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 6px var(--msg-inline);
-}
-.ac-msg--grouped {
-  padding-top: 2px;
+  padding: var(--msg-block) var(--msg-inline);
 }
 /*
  * The row's chrome never selects: a double or triple click on a message's text, copied, gives that text and nothing
@@ -1101,6 +1146,10 @@ textarea.ac-input {
   display: flex;
   justify-content: center;
 }
+/* No height of its own: the time's 26px line would stand under a shorter row's one line and open its gap. */
+.ac-msg__gutter {
+  height: 0;
+}
 .ac-msg__avatar {
   /* Top of the avatar on the author line, never centered on a long message. */
   align-self: flex-start;
@@ -1127,6 +1176,28 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
 .ac-msg__body {
   min-width: 0;
   flex: 1;
+}
+/* Doubled to outrank a card's own margin where it also stands outside a message (`.rq`, `.brw-ac`, `.mi-card`, `.ag-rcs`). */
+.ac-msg .ac-msg__body > * {
+  margin-block: 0;
+}
+/* Out of the flow or unseen: they neither take the gap nor make the next part take it. */
+.ac-msg
+  .ac-msg__body
+  > :not(.ac-visually-hidden, .ac-msg__actions, .ac-msg__aside--floating)
+  ~ :not(.ac-visually-hidden, .ac-msg__actions, .ac-msg__aside--floating) {
+  margin-top: var(--msg-part-gap);
+}
+/* A card stands apart from the words above it. */
+.ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__text, .ac-msg-media) ~ :is(.rq, .mi-card, .iw-card, .brw-ac) {
+  margin-top: var(--msg-card-gap);
+}
+/* The name stays on its words, and a line's caption on its bubble. */
+.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open) {
+  margin-top: 2px;
+}
+.ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__own-foot, .ac-msg__foot) {
+  margin-top: calc(var(--msg-part-gap) / 2);
 }
 /*
  * Name and time on a 20px line whose box starts at the face's top: capitals flush with the face's edge read as a face
@@ -1244,7 +1315,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   }
 }
 .ac-msg__text {
-  margin: 2px 0 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -1274,7 +1344,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
    as the 8px between text and the other lines' icons. */
 .ac-msg__error {
   gap: 6px;
-  margin: 2px 0 0;
   color: var(--danger);
   font-size: 14px;
   line-height: 20px;
@@ -1288,7 +1357,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin: 2px 0 0;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
@@ -1522,6 +1590,112 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   color: var(--ink-muted);
 }
 
+/*
+ * EventPill: an automatic event of a conversation as one object, a hairline frame (no fill) holding the sentence and
+ * its actions, each after a hairline; the cut corner of the ruler's controls. What "Show" opens goes under it.
+ */
+.ac-eventpill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.ac-eventpill__frame {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  border-radius: var(--control-r-sm) var(--control-r-sm) var(--control-r-sm) 3px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  font-size: 13.5px;
+  line-height: 18px;
+  color: var(--ink2);
+}
+.ac-eventpill__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px 6px 10px;
+}
+.ac-eventpill__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--faint);
+}
+.ac-eventpill__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ac-eventpill__time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+}
+/* The chevron drawn at 12px, a step under the action's words. */
+.ac-eventpill__chev {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--faint);
+  transition: transform 0.15s;
+}
+.ac-eventpill__more[aria-expanded="true"] .ac-eventpill__chev {
+  transform: rotate(90deg);
+}
+.ac-eventpill__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+}
+.ac-eventpill__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ac-eventpill__action:last-child {
+  border-radius: 0 var(--control-r-sm) var(--control-r-sm) 0;
+}
+.ac-eventpill__action:hover:not(:disabled) {
+  background: var(--plate);
+  color: var(--ink);
+}
+/* A request waiting for someone: its words in ink, what it asks for in a soft tint (no colored border). */
+.ac-eventpill--waiting .ac-eventpill__text {
+  color: var(--ink);
+}
+.ac-eventpill__action--primary {
+  background: color-mix(in srgb, var(--attention) 10%, transparent);
+  color: var(--ink);
+}
+.ac-eventpill__action--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--attention) 18%, transparent);
+}
+.ac-eventpill__action:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+html:not([data-pointer]) .ac-eventpill__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-eventpill__chev {
+    transition: none;
+  }
+}
+
 /* Chip */
 .ac-chip {
   display: inline-flex;
@@ -1719,6 +1893,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   display: flex;
   align-items: center;
   min-width: 0;
+}
+.ac-select__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ac-select__trigger[data-placeholder] .ac-select__value {
   color: var(--ink-muted);
@@ -2253,7 +2432,7 @@ html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
 .ac-tabpanel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--form-gap);
 }
 .ac-tabpanel[hidden] {
   display: none;
@@ -2398,10 +2577,14 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   padding: 4px var(--dialog-pad);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--form-gap);
 }
 .ac-dialog__body > * {
   flex: none;
+}
+/* A dialog's form has no box: its body and footer are the dialog's own, so the body scrolls and the footer stays. */
+.ac-dialog > form {
+  display: contents;
 }
 /* With no footer under it, the body or the list keeps the dialog's own edge below its last item. */
 :is(.ac-dialog__body, .ac-dialog__list):last-child:not(.ac-locked:not(:last-child) > *) {
@@ -2409,7 +2592,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 .ac-dialog__list {
   flex: 1 1 auto;
-  min-height: min(120px, 30vh);
+  min-height: min(120px, 15vh);
   overflow-y: auto;
   /* As the body's: room for the first and last rows' focus rings, which the scroll area would clip. */
   padding: 4px var(--dialog-pad);
@@ -2441,6 +2624,18 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex: 1;
   font-size: 13px;
   color: var(--ink-muted);
+}
+/* A ghost at the footer's start or end, or in its note: its words on the dialog's edge, as `.ac-acts` does in a row. */
+.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):is(:first-child, :last-child),
+.ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
+  padding-inline: var(--ghost-plate);
+}
+.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):first-child,
+.ac-dialog__foot-note > .ac-btn--ghost:not(.ac-btn--icon):first-child {
+  margin-inline-start: calc(-1 * var(--ghost-plate));
+}
+.ac-dialog__foot > .ac-btn--ghost:not(.ac-btn--icon):last-child {
+  margin-inline-end: calc(-1 * var(--ghost-plate));
 }
 
 /* Meter */
@@ -3262,7 +3457,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin-top: var(--space-1);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
@@ -3564,7 +3758,6 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
 }
 /* Under a reply being written: what the agent is doing now ("consultando o GitHub…") */
 .ac-msg__activity {
-  margin: var(--space-1) 0 0;
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
@@ -3629,13 +3822,13 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 }
 /*
  * A grouped message's check ends its first line, its middle on the line's capitals as an `.ac-iconline` lead's, so
- * it takes the text's type (`.ac-msg__text`) and top margin. The line wraps before it, never under it.
+ * it takes the text's type (`.ac-msg__text`). The line wraps before it, never under it.
  */
 .ac-msg__aside--floating {
   float: right;
   /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
   align-self: flex-end;
-  margin: 2px 0 0 8px;
+  margin-left: 8px;
   font-size: 15.5px;
   line-height: 1.7;
   /* Browsers without the lh unit: the text's 26.35px line. */
@@ -3645,14 +3838,6 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
   .ac-msg__aside--floating {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
-}
-.ac-msg__aside .ac-receipt {
-  margin-top: 0;
-}
-/* A receipt with words: a line of its own under the message, from the text's start, the same on a first and a
-   grouped message, so the text still follows the name and the words come and go without moving it. */
-.ac-msg__foot > .ac-receipt {
-  margin-top: 2px;
 }
 /* A receipt part with nothing to show (a message no agent was asked about) takes no room, in a stacked body too. */
 .ac-msg__aside:empty,
@@ -4600,6 +4785,45 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-seg::-webkit-scrollbar {
   display: none;
 }
+/* In a form it fills its column, its options sharing the track evenly while each still fits on its line. */
+.ac-seg--block,
+.ac-field > .ac-seg,
+.ac-form > .ac-seg,
+.ac-dialog__body > .ac-seg {
+  display: flex;
+}
+.ac-seg--block {
+  flex: 1 1 auto;
+  width: 100%;
+}
+.ac-seg--block > .ac-seg__item,
+.ac-field > .ac-seg > .ac-seg__item,
+.ac-form > .ac-seg > .ac-seg__item,
+.ac-dialog__body > .ac-seg > .ac-seg__item {
+  flex: 1 1 0;
+  min-width: max-content;
+}
+/* A phone's column can't hold every choice on one line: a choice takes two lines, none runs past the track. */
+@media (max-width: 640px) {
+  .ac-seg--block,
+  .ac-field > .ac-seg,
+  .ac-form > .ac-seg,
+  .ac-dialog__body > .ac-seg {
+    height: auto;
+    min-height: var(--seg-h);
+  }
+  .ac-seg--block > .ac-seg__item,
+  .ac-field > .ac-seg > .ac-seg__item,
+  .ac-form > .ac-seg > .ac-seg__item,
+  .ac-dialog__body > .ac-seg > .ac-seg__item {
+    height: auto;
+    min-height: calc(var(--seg-h) - 2 * var(--seg-in));
+    min-width: min-content;
+    padding: var(--space-1) 6px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+}
 .ac-seg__item {
   position: relative;
   z-index: var(--z-raised);
@@ -5319,8 +5543,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   border-radius: 14px;
   transition: background-color 0.12s;
 }
-.ac-msg:hover {
-  background: var(--plate-soft);
+@media (hover: hover) {
+  .ac-msg:hover {
+    background: var(--plate-soft);
+  }
 }
 /* The row a menu is open for (a tap on touch), a step brighter than a hover. */
 .ac-msg[data-menu-open="true"] {
@@ -5404,7 +5630,9 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   padding-left: 96px;
 }
 .ac-msg--own:hover,
-.ac-msg--own[data-menu-open="true"] {
+.ac-msg--own[data-menu-open="true"],
+.ac-msg[data-own]:hover,
+.ac-msg[data-own][data-menu-open="true"] {
   background: none;
 }
 /* 70% of the row where it is wide; in a narrow column (a thread or a task's conversation beside the chat, ~250px
@@ -5441,7 +5669,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 }
 .ac-msg--own .ac-msg__text {
   max-width: 100%;
-  margin-top: 0;
   padding: 7px 14px;
   border-radius: 18px;
   background: var(--own-bubble);
@@ -5495,16 +5722,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg--own.ac-msg--failed .ac-msg__text {
   box-shadow: inset 0 0 0 1px var(--danger);
 }
-/* A run's rows sit 2px apart; a new turn keeps the usual gap. */
-.ac-msg--own:is([data-run="start"], [data-run="mid"]) {
-  padding-bottom: 1px;
-}
-.ac-msg--own:is([data-run="mid"], [data-run="end"]) {
-  padding-top: 1px;
-}
 .ac-msg--own .ac-reacts {
   justify-content: flex-end;
-  margin-top: 4px;
 }
 /* The "+" that shows on hover goes first, so the pills at rest end on the bubble's edge. */
 .ac-msg--own .ac-react--add {
@@ -5519,7 +5738,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__own-time {
   position: relative;
   min-height: 16px;
-  margin-top: 4px;
   font-size: 11px;
   line-height: 16px;
   color: var(--faint);
@@ -5609,16 +5827,10 @@ html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .a
 }
 /*
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
- * the usual gap under it, its corner round, and the next bubble's top corner round too.
+ * its corner round, and the next bubble's top corner round too.
  */
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) {
-  padding-bottom: 6px;
-}
 .ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) .ac-msg__text {
   border-bottom-right-radius: var(--own-cut);
-}
-.ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty)) + .ac-msg--own {
-  padding-top: 6px;
 }
 .ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-foot, :empty))
   + .ac-msg--own
@@ -5881,7 +6093,6 @@ html:not([data-pointer]) .ac-workline__action:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
 }
 .ac-react {
   height: 32px;
@@ -7338,10 +7549,6 @@ html:not([data-pointer]) .ac-stickers__cell:focus-visible {
   flex: none;
   image-rendering: pixelated;
 }
-/* In a message: under the name, as a picture is, a little apart from any words above it. */
-.ac-sticker.ac-msg-media {
-  margin-top: 4px;
-}
 /*
  * A GIF in a message: the picture in the cut-corner frame, as wide as it is up to 300px (`--gif-w`), its shape
  * held before it loads (`--gif-ar`); a small "GIF" mark on its corner and where it comes from on hover.
@@ -7578,7 +7785,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
  * does now, the steps, the orbit), opening into every call. Flat like every card: the hairline and the cut corner.
  */
 .ac-tools {
-  margin: 10px 0 12px;
   max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);
@@ -8979,6 +9185,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   }
   .ac-details__body {
     padding-top: 12px;
+  }
+  /* Its head's buttons wrap under each other rather than run past the sheet's edge. */
+  .ac-details__actions {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
   }
 }
 /* Their entrance on phones: up from the bottom edge (the centered one would jump sideways). */

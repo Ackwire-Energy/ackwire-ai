@@ -216,6 +216,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
         .where(
           and(
             inArray(issues.id, issueIds),
+            eq(issues.restricted, false),
             or(isNull(issues.channelId), and(eq(channels.kind, "channel"), eq(channels.visibility, "public"))),
           ),
         )

@@ -23,10 +23,11 @@ import { Button, Chip, DiffView, haptics, Icon, LineIcon, Text, ToggleSwitch, us
 import { boldRuns } from "../chat/actions";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
+import { useCardTop } from "../chat/look";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
-import { useDirectory } from "../shared/hooks";
+import { useDirectory, useWhen } from "../shared/hooks";
 
 /** The proposal cards an agent's message carries (`meta.memoryUpdates`, or an older `meta.proposalId`). */
 export function InstructionProposals({ message: m }: { message: Message }) {
@@ -44,11 +45,13 @@ export function InstructionProposals({ message: m }: { message: Message }) {
  * context): each change once, a row per agent and kind of change with its switch when there are several, and
  * Aceitar and Recusar for the rows you may decide. Each row applies on its own. No Editar on the phone.
  */
-function InstructionProposalCard({ ids }: { ids: string[] }) {
+export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
+  const when = useWhen();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const toast = useToast();
   const failed = useFailed();
   const rows = useCardProposals(orgId, ids);
@@ -211,7 +214,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
       />
     );
   const card = (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
       <View style={styles.head}>
         <LineIcon variant="subhead" name="doc" size={16} color={colors.ink2} />
         <Text variant="subhead" tone="ink2" style={styles.fill}>
@@ -235,16 +238,21 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
     </View>
   );
   if (rows.some(isOpen)) return card;
-  // Decided: one line like a decided approval, the card when asked for.
+  // Decided: one pill like a decided approval, with the last decision's time; the card when asked for.
   const outcome = cardOutcome(t, rows);
+  const decidedAt = rows.reduce<string | null>(
+    (at, r) => (r.decidedAt && (!at || r.decidedAt > at) ? r.decidedAt : at),
+    null,
+  );
   const what = many
     ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
     : markName(proposalTitle(t, first, orgName, agentName));
   return (
     <AskDone
       done={outcome.accepted}
-      words={`${outcome.label} · ${what}`}
-      more={{ label: t("ask.seeChange"), content: card }}
+      words={`${outcome.label}: ${what}`}
+      time={decidedAt ? when.short(decidedAt) : undefined}
+      more={{ label: t("ask.seeChange"), content: card, card: true }}
     />
   );
 }
@@ -286,7 +294,7 @@ function SettingChange({ p }: { p: Proposal }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
+  card: { borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   section: { gap: 8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

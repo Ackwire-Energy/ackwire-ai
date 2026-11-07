@@ -175,6 +175,19 @@ describe("a new workspace's first steps", () => {
     expect(startingOut([])).toBe(false);
   });
 
+  test("on a billing hold the plan comes first for who pays, and an AI and invitations wait for it", () => {
+    const all = { createAgents: true, connectAi: true, talk: true, invite: true, routines: true };
+    const held = { ...none, agents: 1, held: true };
+    expect(firstSteps({ ...held, may: { ...all, pay: true } }).map((s) => s.id)).toEqual([
+      "plan",
+      "agent",
+      "ask",
+      "routine",
+    ]);
+    expect(firstSteps({ ...held, may: { ...all, pay: false } }).map((s) => s.id)).toEqual(["agent", "ask", "routine"]);
+    expect(firstSteps({ ...none, agents: 1, may: { ...all, pay: true } }).map((s) => s.id)).not.toContain("plan");
+  });
+
   test("who may take each step: their permissions, and an AI for the workspace's key or an agent of their own", () => {
     const agents = [{ ownerUserId: "u-joao" }, { ownerUserId: null }];
     expect(stepPermissions({ permissions: ["read", "talk_to_agents"] }, "u-ana", agents)).toEqual({
@@ -183,6 +196,7 @@ describe("a new workspace's first steps", () => {
       talk: true,
       invite: false,
       routines: false,
+      pay: false,
     });
     expect(stepPermissions({ permissions: ["read"] }, "u-joao", agents).connectAi).toBe(true);
     expect(stepPermissions({ permissions: ["manage_credentials"] }, "u-ana", agents).connectAi).toBe(true);

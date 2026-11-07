@@ -857,6 +857,8 @@ export const agentQuestions = pgTable(
     toolUseId: text().notNull(),
     text: text().notNull(),
     choices: text().array(),
+    /** The one person it is for: only they answer it, and it waits on nobody else. Null: anyone in the conversation. */
+    requestedForUserId: text(),
     status: agentQuestionStatusEnum().notNull().default("open"),
     answer: text(),
     answeredByUserId: text(),

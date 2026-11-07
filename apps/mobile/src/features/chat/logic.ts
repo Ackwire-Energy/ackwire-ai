@@ -51,9 +51,16 @@ export const MSG_AVATAR = 34;
 export const MSG_GAP = 12;
 /** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
 export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
-/** An event line's mark (its "small" words' size) and the gap to them: what unfolds under it starts there. */
-export const LINE_MARK = 15;
-export const LINE_GAP = 8;
+
+/**
+ * A row in the list, `gap` under what shows above it. Its plate (a mention, a press) reaches past its content, and it
+ * gives that room back, so the next row counts from what shows too.
+ */
+export const rowFrame = (block: number, gap: number) => ({
+  paddingVertical: block,
+  marginTop: gap - block,
+  marginBottom: -block,
+});
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
 
@@ -168,8 +175,10 @@ export interface EventLineView {
   icon: "clock" | "agent" | "chat" | "check" | "bell";
   key: string;
   values: Record<string, string>;
-  /** Shown on "Ver": the message's text, else the notice's. */
+  /** Shown on "Show": the message's text, else the notice's. */
   text: string;
+  /** A follow-up still to come: it can be canceled ("Cancel"). */
+  pending?: boolean;
 }
 
 const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
@@ -219,7 +228,7 @@ export function eventLineOf(
       });
     case "follow_up": {
       const followUp = followUpLine(notice, names.author, when);
-      return followUp ? line(followUp.key, followUp.values) : null;
+      return followUp ? { ...line(followUp.key, followUp.values), pending: followUp.pending } : null;
     }
     default:
       return line("chat.notice.other", { name: names.author });
@@ -320,6 +329,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
     status: q.status === "answered" ? "answered" : "open",
     answer: str(q.answer) || null,
     answeredByUserId: str(q.answeredByUserId) || null,
+    ...(str(q.requestedForUserId) ? { requestedForUserId: str(q.requestedForUserId) } : {}),
     ...(q.withdrawn === true ? { withdrawn: true as const } : {}),
     ...(q.dismissed === true ? { dismissed: true as const } : {}),
   };
@@ -725,6 +735,16 @@ function trimUrl(url: string) {
   return url.slice(0, end);
 }
 
+/** Words under a mark, with their bare addresses still links (`**https://…**`), as on the web. */
+function marked(text: string, out: Inline[], kind: "bold" | "italic") {
+  const parts = text.split(/(\bhttps?:\/\/[^\s<>`]+)/);
+  for (const [i, part] of parts.entries()) {
+    const url = i % 2 ? trimUrl(part) : "";
+    if (url) out.push({ kind: "link", text: url, href: url });
+    mentions(part.slice(url.length), out, kind);
+  }
+}
+
 /** Inline marks: `code`, [links](https://…) and bare https:// addresses, **bold**, *italic* / _italic_, @mentions. */
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
@@ -744,8 +764,8 @@ export function parseInline(text: string): Inline[] {
       if (!tok.startsWith("!") && SAFE_HREF.test(href)) out.push({ kind: "link", text: label || href, href });
       else mentions(label, out, "text");
     } else if (m[5]) out.push({ kind: "link", text: tok, href: tok });
-    else if (m[6]) mentions(tok.slice(2, -2), out, "bold");
-    else mentions(tok.slice(1, -1), out, "italic");
+    else if (m[6]) marked(tok.slice(2, -2), out, "bold");
+    else marked(tok.slice(1, -1), out, "italic");
     last = at + tok.length;
   }
   if (last < text.length) mentions(text.slice(last), out, "text");

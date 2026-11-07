@@ -2,6 +2,7 @@
 
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { AudienceChoice } from "../lib/who-sees";
 
 /** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
 export type Role = "owner" | "member";
@@ -166,6 +167,8 @@ export interface Instance {
   minApi: number;
   /** The server's own address (`PUBLIC_URL`), the only one its realtime accepts. */
   url: string;
+  /** Where to get the server's source code (AGPL-3.0 section 13; absent: an older server). */
+  sourceUrl?: string;
   signIn: { email: boolean; google: boolean; github: boolean; apple: boolean };
   signup: "open" | "invite";
   /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
@@ -882,6 +885,8 @@ export interface TeamPlan {
   /** People named as working there, invited after. */
   invite: string[];
   template?: string;
+  /** On a billing hold, from a template: what its first agent delivers, shown labelled and never posted. */
+  example?: string;
 }
 
 /** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
@@ -1000,6 +1005,8 @@ export interface Channel {
   /** Private and limited to these roles (departments, ADR 0125): their people see it and may join. Empty or absent: public or invite only. */
   audienceRoleIds?: string[];
   isMember: boolean;
+  /** Listed only because I'm an administrator (ADR 0151): off the sidebar until I open or join it. */
+  seenAsAdmin?: boolean;
   createdAt: string;
   /** Who created it: may change it and its members, like admins. */
   createdByUserId?: string | null;
@@ -1190,6 +1197,8 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** With `noAi`: it came in on a billing hold, to be answered after the plan. */
+  kept?: boolean;
   /** Nobody was asked: the workspace used up its platform AI for the month, so only @mentions start agents. */
   platformCap?: boolean;
   /** Who picked the agents for it (ADR 0074); absent on a decision from before. */
@@ -1911,6 +1920,12 @@ export interface GitHubRepositories {
   truncated: boolean;
 }
 
+/** The organizations the GitHub connection reaches now (`null`: GitHub didn't answer) and GitHub's page to grant more. */
+export interface GitHubOrgAccess {
+  orgs: string[] | null;
+  manageUrl: string | null;
+}
+
 /** One permission of an agent: a built-in scope (`connectionId: null`) or a connection's scope. */
 export interface ScopeGrant {
   connectionId: string | null;
@@ -1925,6 +1940,8 @@ export interface Memory {
   agentId: string;
   kind: MemoryKind;
   text: string;
+  /** A lesson from something a person refused or corrected: `text` is what it is about (`memoryLine`). */
+  how?: "refused" | "corrected" | null;
   /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
   origin?: {
@@ -2026,6 +2043,8 @@ export interface Proposal {
   undoActionId?: string | null;
   title: string;
   why: string;
+  /** How it came, said by `proposalWhy` in the person's language; `why` holds the words it is about, if any. */
+  whyCode?: "refused" | "corrected" | "seen" | "skill" | "asked" | "budget" | "no_channel" | null;
   /** `type` names the source for translation; `where` is the server's English text. */
   evidence: {
     where: string;
@@ -2098,6 +2117,8 @@ export interface OrgOverview {
   /** What the workspace's agents spent this month over the sum of their budgets, in %. */
   budgetUsedPercent: number;
   approvalsWaitingForMe: number;
+  /** Open proposals the viewer can see and decide. */
+  proposalsWaitingForMe?: number;
 }
 
 export interface Person {
@@ -2218,8 +2239,8 @@ export interface WorkView {
   finishedAt: string | null;
   nextUpdateAt: string | null;
   lastUpdate: { text: string; at: string; seq: number } | null;
-  /** Waiting on an answer: what its run asked, and the message that holds the card. */
-  question?: { text: string; messageId: string | null } | null;
+  /** Waiting on an answer: what its run asked, the message that holds the card, and who it is for. */
+  question?: { text: string; messageId: string | null; requestedForUserId?: string | null } | null;
   plan: { id: string; text: string; state: "todo" | "doing" | "done" }[];
   issue: { id: string; number: number } | null;
   resultMessageId: string | null;
@@ -2859,7 +2880,7 @@ export interface AgentQuestion {
   id: string;
   agentId: string;
   channelId: string;
-  /** The person message the agent's run answers (receipts: "esperando sua resposta"). */
+  /** The person message the agent's run answers (receipts: "esperando uma resposta"). */
   threadId: string | null;
   messageId: string | null;
   /** The run that asked: the receipt finds the message it answers (a channel question has no thread). */
@@ -2867,6 +2888,8 @@ export interface AgentQuestion {
   text: string;
   /** Buttons to answer with; null = free answer in the composer. */
   choices: string[] | null;
+  /** The one person who may answer it; null or absent (an older server): anyone in the conversation. */
+  requestedForUserId?: string | null;
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
@@ -3230,7 +3253,14 @@ export interface Issue {
     | { type: "webhook"; provider: string };
   /** The channel it lives in (from a message, or chosen). */
   channelId: string | null;
+  /**
+   * Who sees it besides administrators (ADR 0151). `channelId`: those people are whoever is in that conversation now.
+   * Absent on an older server: as `everyone`.
+   */
+  audience?: { mode: "everyone" | "people"; userIds: string[]; channelId: string | null };
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
+  /** The GitHub issue or pull request it is about: only a link, nothing syncs. */
+  githubUrl: string | null;
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
   /** Background work stopped on something (ADR 0121): a badge, the card stays in its stage. */
@@ -3288,12 +3318,18 @@ export interface IssueInput {
   priority?: IssuePriority;
   dueDate?: string | null;
   labels?: string[];
+  githubUrl?: string | null;
   /** Drive files uploaded from the new-issue box (only on create): linked to the issue. */
   attachmentIds?: string[];
+  /** Who sees it (ADR 0151). Left out: the whole workspace. */
+  audience?: AudienceChoice;
 }
 
 export type IssuePatch = Partial<
-  Pick<Issue, "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels" | "boardRank">
+  Pick<
+    Issue,
+    "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels" | "boardRank" | "githubUrl"
+  >
 > & {
   /** Move to a board column: the issue takes that column's stage. */
   columnId?: string;
@@ -4686,6 +4722,8 @@ export interface WikiPageInput {
   folder?: string;
   tags?: string[];
   body: string;
+  /** Who sees it (ADR 0151), inside its folder's audience. */
+  audience?: AudienceChoice;
 }
 
 /** `PUT …/wiki/pages/{slug}`: `baseVersion` is the version edited (409 `version_conflict` if it moved). */
@@ -5822,6 +5860,7 @@ export type NotificationKind =
    * `latest.text` why. Done once someone decides.
    */
   | "change_request"
+  | "proposal_waiting"
   /**
    * ADR 0141: a person's monthly AI limit, `source.userId` the person, `latest.statusTo`: `warning` (80%, the
    * person), `reached` (who decides; `reached_notify` to the person when the limit only notifies), `request` (who
@@ -6117,7 +6156,18 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "team";
+export type SidebarItem =
+  | "approvals"
+  | "proposals"
+  | "threads"
+  | "issues"
+  | "wiki"
+  | "drive"
+  | "routines"
+  | "calendar"
+  | "team"
+  | "dashboards"
+  | "taskManager";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */

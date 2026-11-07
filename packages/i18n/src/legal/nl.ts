@@ -219,7 +219,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Werkruimte-inhoud, verwerkt namens werkruimten",
         blocks: [
           "Werkruimte-inhoud omvat berichten in kanalen, threads en directe berichten, bestanden in de Drive en wikipagina's. Daarnaast omvat deze taken, routines, agenda-items en goedkeuringen, de instructies, instellingen en het geheugen van agents, wat agents schrijven en doen, en de gegevens die agents lezen via de connectoren, databases en computers die de werkruimte koppelt. Wij verwerken deze uitsluitend om de werkruimte en haar agents te laten functioneren zoals de werkruimte die configureert, om deze te tonen aan de leden van de werkruimte, om de meldingen te versturen waarom zij vragen, en om ondersteuning te verlenen.",
-          "Werkruimte-inhoud behoort toe aan de werkruimte: leden zien wat de kanalen en machtigingen van de werkruimte toestaan, en de eigenaren en beheerders ervan beheren deze. Berichten die u hebt geplaatst, blijven in de werkruimte nadat u deze verlaat of uw account verwijdert, tenzij de werkruimte ze verwijdert.",
+          "Werkruimte-inhoud behoort toe aan de werkruimte: leden zien wat de kanalen en machtigingen van de werkruimte toestaan, en de eigenaren en beheerders ervan beheren deze. Eigenaren en beheerders van de werkruimte kunnen elk kanaal, elke taak en elke wikipagina zien, ook als die privé zijn. Directe berichten tussen andere mensen kunnen ze niet lezen. Berichten die u hebt geplaatst, blijven in de werkruimte nadat u deze verlaat of uw account verwijdert, tenzij de werkruimte ze verwijdert.",
         ],
       },
       {

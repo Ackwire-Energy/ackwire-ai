@@ -40,6 +40,7 @@ import { dayAndTime } from "./format";
 import { adminIds } from "./gateway";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "./net-guard";
 import { enqueue, PermanentJobError } from "./outbox";
+import { billingHold } from "./standing";
 import { isAgentesCloud } from "./telemetry";
 import { budgetPercent } from "./usage";
 
@@ -232,6 +233,17 @@ export type EmailTemplate =
       plan: string;
       url: string;
     }
+  /** A team or a kept message waits for the workspace's first plan (ADR 0079 §6), to whoever can pay. */
+  | {
+      kind: "plan_waiting";
+      locale: EmailLocale;
+      orgName: string;
+      agents: number;
+      channels: number;
+      routines: number;
+      crew?: Look[];
+      url: string;
+    }
   /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
   | { kind: "app_connected"; locale: EmailLocale; appName: string; orgName: string; url: string }
   /**
@@ -277,6 +289,8 @@ export type EmailTemplate =
       crew?: Look[];
       /** The workspace in the app; the button adds its step's path. */
       url: string;
+      /** A message kept on a billing hold: the conversation it waits in, which the AI step opens instead. */
+      keptUrl?: string;
     }
   /**
    * The daily stall-and-noise report to the people who run the server (`OPS_REPORT_EMAIL`, `autonomy-report.ts`):
@@ -567,7 +581,9 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         : ["create", ...(t.needsAi ? (["ai"] as const) : [])];
       // `url` is the workspace in every job, however old: the button's address follows its step.
       const home = t.url.replace(/[?#].*$/, "").replace(/\/$/, "");
-      const url = { ai: `${home}?connect=ai`, task: home, create: `${home}/agents/new` }[first];
+      const url = { ai: `${t.keptUrl ?? home}?connect=ai`, task: t.keptUrl ?? home, create: `${home}/agents/new` }[
+        first
+      ];
       const num = (v: number) => v.toLocaleString(lang, { maximumFractionDigits: 1 });
       return doc(
         c.subject,
@@ -812,6 +828,18 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.why(inertText(t.orgName)),
       );
     }
+    case "plan_waiting": {
+      const c = w.planWaiting;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(t.agents, t.channels, t.routines) }, { button: c.button, url: t.url }],
+        c.why(org),
+        { crew: crewOr(t.crew) },
+      );
+    }
     case "account_deleting": {
       const c = w.accountDeleting;
       const names = new Intl.ListFormat(lang, { type: "conjunction" })
@@ -931,13 +959,86 @@ export async function queueEmail(
   });
 }
 
+export const PLAN_WAITING_JOB = "plan.waiting";
+/** An hour after the first team or kept message, then on the third day: two, then silence. */
+const PLAN_WAITING_AFTER_MS = [3600_000, 3 * 24 * 3600_000];
+
+/** Queues both reminders, in the caller's transaction: only the first team or kept message of a workspace counts. */
+export async function queuePlanWaiting(db: Executor, orgId: string) {
+  for (const [step, after] of PLAN_WAITING_AFTER_MS.entries()) {
+    await enqueue(db, {
+      orgId,
+      kind: PLAN_WAITING_JOB,
+      payload: { step },
+      dedupeKey: `${PLAN_WAITING_JOB}:${orgId}:${step}`,
+      runAt: new Date(Date.now() + after),
+    });
+  }
+}
+
+/**
+ * Job `plan.waiting`: while the workspace still waits for its first plan, what is ready for it, to whoever can pay at
+ * a confirmed address. The link is the billing page, which no phone app claims: a phone opens the website, the one
+ * place it can pay (ADR 0079 §6).
+ */
+export async function sendPlanWaitingEmail(db: Database, publicUrl: string, orgId: string, step: unknown) {
+  if ((await billingHold(db, orgId)) !== "payment") return;
+  const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
+  if (!org) return;
+  const payers = await adminIds(db, orgId, "manage_billing");
+  if (payers.length === 0) return;
+  const people = await db
+    .select({ email: users.email, locale: users.locale })
+    .from(users)
+    .where(and(inArray(users.id, payers), eq(users.emailVerified, true)));
+  const count = sql<number>`count(*)::int`;
+  const [[agentCount], [channelCount], [routineCount], crew] = await Promise.all([
+    db
+      .select({ n: count })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt))),
+    db
+      .select({ n: count })
+      .from(schema.channels)
+      .where(
+        and(eq(schema.channels.orgId, orgId), eq(schema.channels.kind, "channel"), isNull(schema.channels.archivedAt)),
+      ),
+    db
+      .select({ n: count })
+      .from(schema.routines)
+      .where(and(eq(schema.routines.orgId, orgId), isNull(schema.routines.deletedAt))),
+    emailCrew(db, orgId),
+  ]);
+  const groups = emailsByLocale(
+    people.map((p) => ({ email: p.email, locale: emailLocale(p.locale) })),
+    `plan-waiting:${orgId}:${String(step)}`,
+  );
+  for (const group of groups) {
+    await queueEmail(db, {
+      orgId,
+      key: group.key,
+      to: group.to,
+      template: {
+        kind: "plan_waiting",
+        locale: group.locale,
+        orgName: org.name,
+        agents: agentCount?.n ?? 0,
+        channels: channelCount?.n ?? 0,
+        routines: routineCount?.n ?? 0,
+        crew,
+        url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/settings/billing`,
+      },
+    });
+  }
+}
+
 /** Job `email.send`. Retries on transient provider errors; permanent ones fail the job. */
 export async function sendQueuedEmail(sender: EmailSender, payload: Record<string, unknown>, art?: EmailArt) {
   const to = Array.isArray(payload.to) ? payload.to.map(String) : [];
   if (to.length === 0) throw new PermanentJobError("email without recipients");
   const { subject, html, text, inline } = renderEmail(payload.template as EmailTemplate, art);
-  try {
-    await sender.send({
+  await sender
+    .send({
       subject,
       html,
       text,
@@ -945,11 +1046,14 @@ export async function sendQueuedEmail(sender: EmailSender, payload: Record<strin
       to,
       idempotencyKey: String(payload.key),
       tags: [{ name: "kind", value: (payload.template as EmailTemplate).kind }],
-    });
-  } catch (error) {
-    if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
-    throw error;
-  }
+    })
+    .catch(rethrowEmailError);
+}
+
+/** A provider's refusal that a retry won't change fails the job for good; anything else is retried. */
+export function rethrowEmailError(error: unknown): never {
+  if (error instanceof EmailError && !error.retryable) throw new PermanentJobError(error.message);
+  throw error;
 }
 
 /** The 80%/100% budget email to the agent's owner, or the admins without one (once per agent, month and level). */

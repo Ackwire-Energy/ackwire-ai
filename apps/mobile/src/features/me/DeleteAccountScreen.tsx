@@ -317,12 +317,7 @@ export function DeleteAccountScreen() {
                 <Button variant="ghost" label={t("mobile.common.retry")} onPress={() => void meQuery.refetch()} />
               </View>
             ) : null}
-            <HoldButton
-              label={t("mobile.delete.hold")}
-              holdLabel={t("mobile.delete.holding")}
-              disabled={!ready || busy}
-              onConfirm={() => void confirm()}
-            />
+            <HoldButton label={t("mobile.delete.hold")} disabled={!ready || busy} onConfirm={() => void confirm()} />
           </>
         )}
       </ScrollView>

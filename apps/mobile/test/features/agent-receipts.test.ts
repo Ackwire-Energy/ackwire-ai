@@ -12,6 +12,7 @@ import {
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import {
   keepsLine,
+  keptLine,
   markLabel,
   markOf,
   phaseKey,
@@ -551,7 +552,7 @@ describe("a receipt never adds a line to its row", () => {
     const marks = src("features/chat/AgentReceipts.tsx");
     // The time's line holds the tallest mark, and the mark sits in it, after the time.
     expect(num(marks, /mark: \{[^}]*height: (\d+)/)).toBe(num(row, /meTime: \{[^}]*height: (\d+)/));
-    const line = row.slice(row.indexOf("<View style={styles.meTime}>"));
+    const line = row.slice(row.indexOf("<View style={[styles.meTime, "));
     expect(line.indexOf("when.time(m.createdAt)")).toBeLessThan(line.indexOf("<ReceiptMark message={m} mine"));
     expect(line).toContain("<ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />");
     // The turn's last bubble ends on the cut corner, on the side it stands.
@@ -565,4 +566,21 @@ describe("a receipt never adds a line to its row", () => {
     expect(row).not.toContain("SteerLine");
     expect(src("features/chat/ChatScreen.tsx")).not.toContain('t("mobile.chat.seen")');
   });
+});
+
+test("on a billing hold a no-AI line reads as kept, with no alert and nothing to connect", () => {
+  const line = (faces: string[]) =>
+    keptLine({
+      faces,
+      more: 0,
+      mark: "none",
+      words: { key: "noAi.receipt", agents: [] },
+      label: { key: "noAi.receipt", agents: [] },
+      action: "connect",
+      alert: true,
+    });
+  expect(line(["ada"])).toMatchObject({ words: { key: "noAi.kept.receipt" }, action: null, alert: false });
+  expect(line([])).toMatchObject({ words: { key: "noAi.kept.channel" } });
+  expect(keptLine(null)).toBeNull();
+  expect(phaseKey("no_ai", true)).toBe("noAi.kept.receipt");
 });

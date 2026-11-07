@@ -2,7 +2,7 @@ import { type ComposioClient, composioFile, FileTooLargeError, type PubSub } fro
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact } from "../artifacts";
+import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact, fileReach } from "../artifacts";
 import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
 import { cutText } from "../format";
@@ -496,9 +496,10 @@ export async function keepComposioFiles(
           runId: ctx.runId,
         },
         ctx.orgId,
-        { title: name, name, bytes: bytes.data, contentType: type || null, note: `From ${from}` },
+        { title: name, name, bytes: bytes.data, contentType: type || null, note: `From ${from}`, byProduct: true },
       );
-      return { file: name, savedAs: `file ${saved.id} in the Drive (untrusted content)` };
+      const reach = await fileReach(ctx.db, ctx.orgId, saved.id);
+      return { file: name, savedAs: `file ${saved.id} (untrusted content). ${reach}` };
     } catch (error) {
       return { file: name, error: `The file couldn't be kept: ${error instanceof Error ? error.message : "failed"}` };
     }

@@ -5,6 +5,7 @@
  */
 
 import { isFeminineName } from "@agenteschat/client/lib/grammar";
+import { plainLine } from "@agenteschat/client/lib/markdown";
 import { type AgentColorName, isHexColor } from "@agenteschat/ui/agent/engine";
 
 /** The preset colors; a custom "#rrggbb" ("Personalizar") is a color too. */
@@ -120,11 +121,4 @@ export { firstName } from "@agenteschat/client/lib/format";
 export const isSafeId = (id: unknown): id is string => typeof id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(id);
 
 /** One line of text for previews: no Markdown marks, spaces collapsed. */
-export function previewOf(text: string) {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`#>~|]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export const previewOf = plainLine;

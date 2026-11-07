@@ -234,6 +234,7 @@ export function createMockPlanning(
       source: { type: "manual" },
       channelId: null,
       pullRequests: [],
+      githubUrl: null,
       artifacts: [],
       createdAt: minutesAgo(now, 3000 - n),
       updatedAt: minutesAgo(now, 600 - n),
@@ -508,6 +509,7 @@ export function createMockPlanning(
           source: { type: "manual" },
           channelId: null,
           pullRequests: [],
+          githubUrl: null,
           // Files from the new-task box: linked, and kept on the "created" event (their Drive titles stand in as ids).
           artifacts: (input.attachmentIds ?? []).map((id) => ({ id, title: id, createdBy: author })),
           createdAt: at,
@@ -587,6 +589,15 @@ export function createMockPlanning(
       share: async (orgId, id) => {
         const i = await findIssue(orgId, id);
         i.channelId = null;
+        return clone(i);
+      },
+      setAudience: async (orgId, id, audience) => {
+        const i = await findIssue(orgId, id);
+        i.channelId = null;
+        i.audience =
+          audience.mode === "everyone"
+            ? { mode: "everyone", userIds: [], channelId: null }
+            : { mode: "people", userIds: audience.userIds, channelId: null };
         return clone(i);
       },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
@@ -673,6 +684,11 @@ export function createMockPlanning(
           s.columns = boardOrder(s.columns);
         }
         return clone(s.columns);
+      },
+      delete: async (orgId, id) => {
+        record("issues.delete", orgId, id);
+        const s = await store(orgId);
+        s.issues = s.issues.filter((i) => i.id !== id);
       },
       deleteColumn: async (orgId, columnId, moveTo) => {
         record("issues.deleteColumn", columnId, moveTo);

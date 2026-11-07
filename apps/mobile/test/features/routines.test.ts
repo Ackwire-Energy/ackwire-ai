@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Routine, RoutineRun } from "@agenteschat/client";
 import {
   cleanFilter,
@@ -542,4 +544,10 @@ describe("the rule in words (the web's sentence, on the phone)", () => {
     expect(one).toEqual({ freq: "once", interval: 1, times: ["09:00"], timezone: SP, start: "2026-11-02" });
     expect(onceAt(one)).toBe("2026-11-02T12:00:00.000Z");
   });
+});
+
+test("a run's Abrir na conversa keeps off the Mostrar mais right above it: no slop on top", () => {
+  const screen = readFileSync(join(import.meta.dir, "../../src/features/routines/RoutineScreen.tsx"), "utf8");
+  const open = screen.slice(0, screen.indexOf(`t("routines.openInChat")`));
+  expect(open.slice(open.lastIndexOf("<Pressable"))).toContain("hitSlop={{ bottom: 13, left: 13, right: 13 }}");
 });

@@ -1,40 +1,45 @@
-import type { Message } from "@agenteschat/client";
+import { type Message, useApi } from "@agenteschat/client";
 import { type ConsultNoticeFold, pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { consultationOfNotice, stoppedNoticeOf } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { LineIcon, Text } from "@/ui";
-import { useColors, useDirectory, useWhen } from "../shared/hooks";
+import { EventPill, EventPillAction, EventPillText } from "@/ui";
+import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { ConsultPairRow } from "./ConsultGroup";
-import { eventLineOf, LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
+import { eventLineOf, MSG_TEXT } from "./logic";
 import { MessageText } from "./MessageText";
 import { StoppedLine } from "./StoppedLine";
 
 /**
  * An automatic line of the conversation, not a voice (the web's `NoticeLine`): what reached an agent's
  * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "Infra
- * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
- * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
+ * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"), as one pill (`EventPill`) with its time; the
+ * text opens under it on "Show", a follow-up still to come has "Cancel". The agent's own reply, if it has one,
+ * follows as a normal message.
  * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, the two agents'
  * pair row when it is farther up (a tap opens their conversation).
- * A task a person stopped has its own line (`StoppedLine`).
+ * A task a person stopped has its own pill (`StoppedLine`), drawn in the stopped reply's when that reply is here.
  */
-export function EventLine({ message, fold }: { message: Message; fold?: ConsultNoticeFold }) {
+export function EventLine({ message, fold, gap }: { message: Message; fold?: ConsultNoticeFold; gap: number }) {
   const { t } = useTranslation();
-  const c = useColors();
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
   // A person stopped one of the agent's tasks (ADR 0128): its own line, with the reason, or a way to give one.
   const stopped = stoppedNoticeOf(message.meta);
-  if (stopped) return <StoppedLine message={message} notice={stopped} />;
+  if (stopped) return <StoppedLine message={message} notice={stopped} gap={gap} />;
   if (fold?.fold === "hide") return null;
   // Farther up than the reply that asked: the same pair row where the answer arrived, opening their conversation.
   if (fold?.fold === "line")
     return (
-      <ConsultPairRow askerId={fold.consultation.agentId} channelId={message.channelId} items={[fold.consultation]} />
+      <ConsultPairRow
+        askerId={fold.consultation.agentId}
+        channelId={message.channelId}
+        items={[fold.consultation]}
+        gap={gap}
+      />
     );
   // An answer from another agent that carries the consultation, its reply not here: the same pair row a reply
   // has (who asked whom), never the text written for the agent; a tap opens what they said.
@@ -53,49 +58,62 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
         askerId={consulted.askerId}
         channelId={message.channelId}
         items={[pairItemOf(consulted.consultation)]}
+        gap={gap}
       />
     );
   if (!line) return null;
   return (
-    <View style={styles.line}>
-      <View style={styles.head}>
-        <LineIcon name={line.icon} size={LINE_MARK} color={c.faint} variant="small" />
-        <Text variant="small" tone="faint" style={styles.grow}>
-          {t(line.key, line.values)} · {when.time(message.createdAt)}
-          {line.text ? (
-            <>
-              {" · "}
-              <Text
-                variant="small"
-                tone="muted"
-                style={styles.toggle}
-                onPress={() => setOpen((o) => !o)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: open }}
-                suppressHighlighting
-              >
-                {open ? t("chat.notice.hide") : t("chat.notice.show")}
-              </Text>
-            </>
-          ) : null}
-        </Text>
-      </View>
-      {open && line.text ? (
-        <View style={[styles.body, { borderLeftColor: c.line }]}>
-          <MessageText body={line.text} />
-        </View>
-      ) : null}
+    <View style={[styles.line, { marginTop: gap }]}>
+      <EventPill
+        mark={line.icon}
+        time={when.time(message.createdAt)}
+        actions={[
+          line.pending ? <CancelFollowUp key="cancel" messageId={message.id} /> : null,
+          line.text ? (
+            <EventPillAction
+              key="show"
+              label={open ? t("chat.notice.hide") : t("chat.notice.show")}
+              expanded={open}
+              onPress={() => setOpen((o) => !o)}
+            />
+          ) : null,
+        ]}
+        below={
+          open && line.text ? (
+            <EventPillText>
+              <MessageText body={line.text} />
+            </EventPillText>
+          ) : null
+        }
+      >
+        {t(line.key, line.values)}
+      </EventPill>
     </View>
   );
 }
 
+/** "Cancel" on a follow-up still to come: the pill changes in place once the server has it. */
+function CancelFollowUp({ messageId }: { messageId: string }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const orgId = useOrgId();
+  const [busy, setBusy] = useState(false);
+  return (
+    <EventPillAction
+      label={t("chat.notice.followUpCancel")}
+      loading={busy}
+      onPress={() => {
+        setBusy(true);
+        void api.chat
+          .cancelFollowUp(orgId, messageId)
+          .catch(() => {})
+          .finally(() => setBusy(false));
+      }}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
-  // Aligned with the messages' words, like `IssueTakenLine`; an event line as a decided request's (`AskDone`): the
-  // mark on the first line, the words in 15/20.
-  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
-  grow: { flex: 1, flexShrink: 1 },
-  toggle: { fontWeight: "600" },
-  // The text itself, under the line, aligned with the words (not the icon).
-  body: { marginTop: 4, marginLeft: LINE_MARK + LINE_GAP, paddingLeft: 10, borderLeftWidth: 2 },
+  // Aligned with the messages' words, like `IssueTakenLine`; left aligned, never centered. The list sets its top.
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
 });

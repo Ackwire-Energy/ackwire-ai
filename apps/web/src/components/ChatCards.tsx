@@ -7,6 +7,7 @@ import {
   useModelLabel,
   useSaveSecretToVault,
 } from "@agenteschat/client";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { messagePath } from "@agenteschat/client/lib/message-links";
@@ -30,6 +31,7 @@ import {
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
 import {
   latestSecret,
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretValueProblem,
@@ -42,6 +44,7 @@ import {
   CodeInput,
   Diff,
   diffLines,
+  EventPillAction,
   Field,
   Icon,
   Input,
@@ -358,9 +361,13 @@ function ProposalDone({
     .sort()
     .at(-1);
   return (
-    <RequestDone done={outcome.accepted} label={label} more={{ label: t("ask.seeChange"), content: children }}>
+    <RequestDone
+      done={outcome.accepted}
+      label={label}
+      more={{ label: t("ask.seeChange"), content: children }}
+      time={at ? whenAt(t, i18n.language, at) : undefined}
+    >
       {outcome.label}: {what}
-      {at && ` · ${whenAt(t, i18n.language, at)}`}
     </RequestDone>
   );
 }
@@ -598,8 +605,10 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
-  // Open: a request card, the choices in its footer and "Outra resposta" opening a field to write one.
+  // Open: a request card, the choices in its footer and "Outra resposta" opening a field to write one. For someone
+  // else, it says who it waits for and nothing else.
   if (!done) {
+    const mine = questionWaitsOn(current, me.user.id);
     const choices = current.choices ?? [];
     const send = () => {
       if (text.trim() && !busy) answer.mutate({ text: text.trim() });
@@ -615,7 +624,10 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         kind="question"
         agent={agent}
         label={t("question.group", { agent: name })}
-        mine
+        mine={mine}
+        waitingFor={t("ask.waitingFor", {
+          name: dir.memberById.get(current.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson"),
+        })}
         lead={current.text}
         body={
           writing ? (
@@ -644,61 +656,65 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
           )
         }
         actions={
-          <>
-            {choices.map((choice) => (
-              <Button
-                key={choice}
-                size="sm"
-                data-choice=""
-                disabled={busy}
-                loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
-                onClick={() => answer.mutate({ choice })}
-              >
-                {choice}
-              </Button>
-            ))}
-            {writing ? (
-              <>
+          mine && (
+            <>
+              {choices.map((choice) => (
                 <Button
-                  type="submit"
-                  variant="primary"
+                  key={choice}
                   size="sm"
-                  disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
-                  loading={answer.isPending && "text" in answer.variables}
-                >
-                  {t("channel.send")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  data-choice=""
                   disabled={busy}
-                  onClick={() => {
-                    setWriting(false);
-                    setText("");
-                    setError(null);
-                    // The button leaves with the field: focus goes back to the one that opened it.
-                    requestAnimationFrame(() => reopen.current?.focus());
-                  }}
+                  loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
+                  onClick={() => answer.mutate({ choice })}
                 >
-                  {t("common.cancel")}
+                  {choice}
                 </Button>
-              </>
-            ) : (
-              <Button
-                ref={reopen}
-                variant={choices.length > 0 ? "ghost" : "primary"}
-                size="sm"
-                onClick={() => setWriting(true)}
-              >
-                {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
-              </Button>
-            )}
-          </>
+              ))}
+              {writing ? (
+                <>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
+                    loading={answer.isPending && "text" in answer.variables}
+                  >
+                    {t("channel.send")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setWriting(false);
+                      setText("");
+                      setError(null);
+                      // The button leaves with the field: focus goes back to the one that opened it.
+                      requestAnimationFrame(() => reopen.current?.focus());
+                    }}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  ref={reopen}
+                  variant={choices.length > 0 ? "ghost" : "primary"}
+                  size="sm"
+                  onClick={() => setWriting(true)}
+                >
+                  {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
+                </Button>
+              )}
+            </>
+          )
         }
         end={
-          <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
-            {t("question.skip")}
-          </Button>
+          mine && (
+            <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
+              {t("question.skip")}
+            </Button>
+          )
         }
         what={current.text}
         onSubmit={writing ? send : undefined}
@@ -800,9 +816,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, current.expiresAt) }));
     if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
     const fresh = await api.secrets.get(org.id, current.id).catch(() => null);
-    live.secretAnswered(
-      fresh && fresh.status !== "pending" ? fresh : { ...current, status: "canceled", publicKey: null },
-    );
+    const closed = secretClosedBy(err, current, fresh);
+    if (closed) return live.secretAnswered(closed);
+    if (fresh) live.secretAnswered(fresh);
+    setError(t(fresh ? "secret.changed" : "secret.failed"));
   };
   // The newer card, when this conversation shows it; else where it is.
   const showNewer = async () => {
@@ -1000,14 +1017,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
         action={
           current.supersededBy ? (
-            <Button size="sm" variant="ghost" onClick={() => void showNewer()}>
-              {t("secret.seeNewer")}
-            </Button>
+            <EventPillAction onClick={() => void showNewer()}>{t("secret.seeNewer")}</EventPillAction>
           ) : undefined
         }
+        time={ended ? whenAt(t, i18n.language, ended) : undefined}
       >
         <b>{label}</b> · {secretOutcome(t, current, mine, person, agentName)}
-        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
         {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
       </RequestDone>
       {(vaultSave === "failed" || vaultSave === "dropped") && (

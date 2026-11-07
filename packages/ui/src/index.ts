@@ -160,11 +160,20 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
+export {
+  EventPill,
+  EventPillAction,
+  type EventPillActionProps,
+  EventPillMore,
+  type EventPillProps,
+} from "./components/EventPill";
 export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,
   Field,
   type FieldProps,
+  FormActions,
+  FormStack,
   Input,
   Locked,
   PickerHeading,

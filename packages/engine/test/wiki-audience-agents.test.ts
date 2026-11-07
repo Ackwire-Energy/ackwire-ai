@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import {
   createAgent,
+  createRole,
   createWikiPage,
   deleteWikiPage,
   getWikiFolderAudience,
@@ -12,6 +13,7 @@ import {
   removeMember,
   retrieveWikiForRun,
   searchWiki,
+  setMemberRoles,
   setWikiFolderAudience,
   setWikiPageAudience,
   updateWikiPage,
@@ -52,6 +54,17 @@ async function workspace() {
     body: "Margem mínima de 40% nos contratos.",
   });
   return { deps, other, ana, bia, admin, page };
+}
+
+/** Someone who manages roles and edits the wiki, and is no administrator: an administrator may leave themselves out. */
+async function rolesManager() {
+  const role = await createRole(f.db, f.owner.id, f.org.id, {
+    name: "Gestão",
+    permissions: ["manage_roles", "edit_wiki"],
+  });
+  const manager = await addMember(f.db, f.org.id, "member", "gestor");
+  await setMemberRoles(f.db, f.owner.id, f.org.id, manager.id, [role.id]);
+  return manager;
 }
 
 describe("wiki pages limited to some agents", () => {
@@ -234,10 +247,10 @@ describe("wiki folders with an audience", () => {
   });
 
   test("the setter stays in it, a limited folder is only for its audience, and leavers are removed", async () => {
-    const { deps, admin, ana, bia } = await workspace();
+    const { deps, admin, bia } = await workspace();
     const out = await setWikiFolderAudience(
       deps,
-      ana.id,
+      (await rolesManager()).id,
       f.org.id,
       "Financeiro",
       {
@@ -312,8 +325,8 @@ describe("who edits a wiki page", () => {
   });
 
   test("whoever sets the editors stays among them", async () => {
-    const { deps, ana, page } = await workspace();
-    const out = await setWikiPageAudience(deps, ana.id, f.org.id, page.id, null, null, {
+    const { deps, page } = await workspace();
+    const out = await setWikiPageAudience(deps, (await rolesManager()).id, f.org.id, page.id, null, null, {
       editors: nobody,
       agentEditorIds: null,
     }).catch((e) => e);

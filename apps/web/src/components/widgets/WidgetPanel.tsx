@@ -2,6 +2,7 @@ import type { WidgetDetail, WidgetSchedule, WidgetUpdate } from "@agenteschat/cl
 import { useAskWidgetChange, useRefreshWidget, useUpdateWidget, useWidget } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
+import { plainInline } from "@agenteschat/client/lib/markdown";
 import {
   Button,
   Composer,
@@ -412,7 +413,7 @@ function HistoryRow({ update, name, now }: { update: WidgetUpdate; name: string;
       <div className="wd__row">
         <time dateTime={update.at}>{whenAt(t, i18n.language, update.at, new Date(now))}</time>
         <span className="wd__grow" data-tone={failed ? "warn" : undefined}>
-          {failed ? historyFailure(t, update, name) : update.summary || t("widgets.panel.updated")}
+          {failed ? historyFailure(t, update, name) : plainInline(update.summary ?? "") || t("widgets.panel.updated")}
           {update.alert && <small>{t("widgets.panel.alerted", { text: update.alert })}</small>}
           {update.change && <small>{t("widgets.panel.changed", { text: update.change })}</small>}
         </span>
@@ -423,7 +424,7 @@ function HistoryRow({ update, name, now }: { update: WidgetUpdate; name: string;
 
 const historyFailure = (t: TFunction, u: WidgetUpdate, name: string) =>
   u.failureCode === "agent_reported" && u.summary
-    ? u.summary
+    ? plainInline(u.summary)
     : failureText(t, { code: u.failureCode ?? "error", detail: u.summary || null }, name);
 
 /** "Ask for a change": the words go to the agent, who redoes the widget with them. */

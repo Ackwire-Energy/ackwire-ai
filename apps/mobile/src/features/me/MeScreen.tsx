@@ -1,4 +1,4 @@
-import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
+import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe, useOverview } from "@agenteschat/client";
 import {
   accountTitle,
   groupPlans,
@@ -28,6 +28,7 @@ import {
   WithPresence,
 } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
+import { usePlanHold } from "../ai/parts";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
@@ -50,7 +51,7 @@ const open = (href: string) => router.push(href as never);
  * computers' own sign-ins, each with its usage in pixels);
  * "Do workspace" (the workspace itself first, opening its settings: `app/(app)/settings/*`) and the preferences
  * as loose rows; Sair and the version. Each row pushes its screen (Conta, Workspaces, Membros, Notificações, Sons,
- * Aparência, Idioma: `app/(app)/me/*`) or one of the app's.
+ * Aparência, Idioma, Sobre: `app/(app)/me/*`) or one of the app's.
  */
 export function MeScreen() {
   const { t, i18n } = useTranslation();
@@ -69,11 +70,13 @@ export function MeScreen() {
   const own = ownSignIns(ai.data);
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
+  const held = usePlanHold(org.orgId, org.org) !== null;
   // On which computer, as "Contas de IA" says it: only where the accounts sit on more than one.
   const several = onSeveralComputers(ai.data?.accounts ?? []);
   const c = useColors();
   const requests = useJoinRequests(org.orgId, can(org.org, "invite_people"));
   const waiting = requests.data?.length ?? 0;
+  const proposals = useOverview(org.orgId).data?.proposalsWaitingForMe ?? 0;
   const push = usePushSwitch().on;
 
   const mine = meId ? dir.memberById.get(meId) : undefined;
@@ -104,6 +107,12 @@ export function MeScreen() {
       label: t("mobile.me.issues"),
       ...(withMe > 0 ? { value: t("mobile.me.issuesWithMe", { count: withMe }) } : {}),
       href: "/issues",
+    },
+    {
+      icon: "flag",
+      label: t("shell.proposals"),
+      ...(proposals > 0 ? { value: t("mobile.me.proposalsWaiting", { count: proposals }) } : {}),
+      href: "/proposals",
     },
     { icon: "clock", label: t("routines.title"), href: "/routines" },
     { icon: "file", label: t("wiki.title"), href: "/wiki" },
@@ -185,6 +194,7 @@ export function MeScreen() {
       value: isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language,
       href: "/me/language",
     },
+    { icon: "info", label: t("settings.section.about"), href: "/me/about" },
   ];
   return (
     // The page is white like Conversas; its screens sit on the grouped gray, as settings do.
@@ -297,7 +307,7 @@ export function MeScreen() {
           />
         );
       })}
-      {plans === 0 ? (
+      {plans === 0 && !held ? (
         <PageRow icon="plus" label={t("aiAccounts.page.connect")} onPress={() => openConnectAi()} />
       ) : null}
 

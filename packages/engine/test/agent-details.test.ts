@@ -11,6 +11,7 @@ import {
   listProposals,
   searchForUser,
   setMemberRoles,
+  sha256,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -117,7 +118,7 @@ test("reviewing memory without configuring the workspace neither lists nor decid
       orgId: f.org.id,
       target: "org_context",
       agentId: null,
-      baseHash: "x",
+      baseHash: sha256(f.org.context),
       proposedText: "Answer briefly.",
       diff: "+ Answer briefly.",
       rationale: "Seen 2×.",

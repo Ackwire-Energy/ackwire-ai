@@ -7,7 +7,7 @@ export interface ChannelAccess {
   roleIds: string[];
 }
 
-type Visible = { visibility: string; audienceRoleIds?: readonly string[] };
+type Visible = { visibility: string; audienceRoleIds?: readonly string[]; seenAsAdmin?: boolean };
 
 const limited = (c: Visible) => c.visibility === "private" && (c.audienceRoleIds?.length ?? 0) > 0;
 
@@ -26,8 +26,8 @@ export const accessInput = (a: ChannelAccess): Pick<ChannelInput, "visibility" |
     : { visibility: "private", audienceRoleIds: a.mode === "roles" ? a.roleIds : [] };
 
 /**
- * Whether I may join a channel I see and am not in: public, or limited to roles, which the server shows only to
- * their people.
+ * Whether I may join a channel I see and am not in: public, limited to roles, which the server shows only to their
+ * people, or any for an administrator (ADR 0151).
  */
 export const joinable = (c: Visible & { isMember: boolean }) =>
-  !c.isMember && (c.visibility === "public" || limited(c));
+  !c.isMember && (c.visibility === "public" || limited(c) || c.seenAsAdmin === true);

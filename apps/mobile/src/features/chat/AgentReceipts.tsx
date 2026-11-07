@@ -3,6 +3,8 @@ import {
   type Message,
   type MessageReceipt,
   receiptView,
+  useAiStatus,
+  useApi,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
@@ -12,7 +14,7 @@ import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { helpUrl } from "@agenteschat/client/lib/server";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -31,12 +33,13 @@ import {
 } from "@/ui";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { Note, OpenPage } from "../ai/parts";
+import { Note, OpenPage, usePlanHold } from "../ai/parts";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import {
+  keptLine,
   markLabel,
   markOf,
   phaseKey,
@@ -75,7 +78,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const reduced = useReducedMotion();
   const sheet = useSheet();
   const steer = useSteerState(orgId, m.channelId, m.id);
-  const line = receiptLine(receipt);
+  const held = usePlanHold(orgId, org) !== null;
+  const line = held ? keptLine(receiptLine(receipt)) : receiptLine(receipt);
   if (!receiptShows(line, Boolean(steer))) return null;
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const say = (w: ReceiptLine["label"]) =>
@@ -89,7 +93,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const fix =
     failedAgent && failure
       ? failedRunFix(failure.code, {
-          keys: can(org, "manage_credentials"),
+          keys: can(org, "manage_credentials") && !held,
           admin: can(org, "manage_agents"),
           owner: meId !== null && dir.agentById.get(failedAgent)?.ownerUserId === meId,
         })
@@ -184,10 +188,30 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
           }
         />
       ) : null}
+      {mine && !held && receipt?.noAi && receipt.server?.kept ? <KeptAnswer messageId={m.id} /> : null}
     </Animated.View>
   );
   return plain;
 });
+
+/** What this run of the app already asked to be answered (`KeptAnswer`). */
+const keptAsked = new Set<string>();
+
+/**
+ * A channel message kept on a hold, once the plan and an AI are here: its author opening the conversation routes it,
+ * as on the web. Until then the line above says what's left.
+ */
+function KeptAnswer({ messageId }: { messageId: string }) {
+  const api = useApi();
+  const orgId = useOrgId();
+  const ready = useAiStatus(orgId).data?.any === true;
+  useEffect(() => {
+    if (!ready || keptAsked.has(messageId)) return;
+    keptAsked.add(messageId);
+    api.chat.answerNow(orgId, messageId).catch(() => undefined);
+  }, [api, orgId, ready, messageId]);
+  return null;
+}
 
 /**
  * A person's message's receipt in a line its row already has, never one of its own (`markOf`): after the time under
@@ -300,9 +324,10 @@ function ReceiptsSheet({
   onAction: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const dir = useDirectory();
   const sheet = useSheet();
+  const held = usePlanHold(orgId, org) !== null;
   const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;
   const rows = receiptRows(
     receipt,
@@ -329,7 +354,7 @@ function ReceiptsSheet({
             key={r.agentId}
             leading={<AgentFace agentId={r.agentId} size={30} live={false} />}
             title={name(r.agentId)}
-            subtitle={t(phaseKey(r.phase))}
+            subtitle={t(phaseKey(r.phase, held))}
           />
         ))}
       </Card>
@@ -380,7 +405,7 @@ function ReceiptsSheet({
 
 const styles = StyleSheet.create({
   // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text.
-  line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: -4, marginBottom: 4, minHeight: 20 },
+  line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minHeight: 20 },
   end: { alignSelf: "flex-end", paddingRight: 16, paddingLeft: 64 },
   start: { alignSelf: "flex-start", paddingLeft: MSG_TEXT, paddingRight: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },

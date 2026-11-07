@@ -154,6 +154,10 @@ html:not([data-pointer]) .wiki-row:focus-visible {
 .wiki-folder-row {
   position: relative;
 }
+/* The name stops short of the button's place, shown or not; the button sits between it and the count. */
+.wiki-folder-row .wiki-row__t {
+  margin-right: 30px;
+}
 .wiki-folder-row__act {
   position: absolute;
   top: 5px;
@@ -1395,7 +1399,7 @@ p.wiki-rich__raw {
 .wiki-ask {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--form-gap);
 }
 .wiki-ask__quote {
   margin: 0;

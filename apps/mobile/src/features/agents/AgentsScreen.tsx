@@ -20,6 +20,7 @@ import { RefreshControl, StyleSheet, View } from "react-native";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { usePlanHold } from "../ai/parts";
 import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
 import { usePins } from "../chats/pins";
 import { mayCreate } from "../new/logic";
@@ -223,9 +224,12 @@ function AgentRow({
   const when = useWhen();
   const now = useNow();
   const { agent: a, work: w, approval, computer } = l;
-  const ai = useAiStatus(useOrgId());
+  const { orgId, org } = useOrg();
+  const ai = useAiStatus(orgId);
+  // On a billing hold an AI comes after the plan: no "Sem IA" on a team just made.
+  const held = usePlanHold(orgId, org) !== null;
   // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
-  const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
+  const noAi = !held && !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
   const line = usePresenceOf().agent(a.id)?.line ?? null;
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;

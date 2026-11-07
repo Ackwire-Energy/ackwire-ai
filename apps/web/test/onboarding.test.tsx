@@ -4,7 +4,16 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, type FakeState, GENERAL_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
+import {
+  createFakeApi,
+  type FakeState,
+  GENERAL_ID,
+  LODI_ID,
+  ORG_ID,
+  seedDm,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /** A new workspace opens in its right hand's DM (ADR 0137): the greeting and the first cards come from the app. */
@@ -119,7 +128,7 @@ describe("the top of Lodi's DM", () => {
     for (const name of ["Agência", "Loja online", "Software e apps", "Outra coisa"])
       expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
     expect(card?.textContent).toContain("Ou escreva do seu jeito aqui embaixo, numa frase.");
-    for (const name of ["Ver modelos de time", "Agentes prontos", "Importar meus agentes", "Preencher o formulário"])
+    for (const name of ["Ver modelos de time", "Agentes prontos", "Importar meus agentes"])
       expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
     // The ready-made agents wait behind their button.
     expect(within(card as HTMLElement).queryByRole("button", { name: /^Criar / })).toBeNull();
@@ -129,6 +138,18 @@ describe("the top of Lodi's DM", () => {
       .map((b) => b.textContent);
     expect(tiles).toEqual(["TheoPM", "AdaDev", "LiaPesquisa", "AtlasOps"]);
     expect(screen().queryByText("Conectar uma IA para o time")).toBeNull();
+  });
+
+  test("the other ways in are text links: a wrapped line starts on the row's edge, with no padding of a button", async () => {
+    await openDm(fresh());
+    const foot = document.querySelector(".tp-start__foot") as HTMLElement;
+    const links = [...foot.querySelectorAll("button")];
+    expect(links.map((b) => b.textContent)).toEqual([
+      "Ver modelos de time",
+      "Agentes prontos",
+      "Importar meus agentes",
+    ]);
+    for (const link of links) expect(link.className).toBe("ac-link");
   });
 
   test("a business type is my own message to Lodi, and the card reads answered with it checked", async () => {
@@ -186,14 +207,22 @@ describe("the top of Lodi's DM", () => {
     expect(calls(state, "chat.addMember")).toHaveLength(4);
   });
 
-  test("the other ways in: the form opens Criar agente, the import opens Settings › Importar", async () => {
+  test("the other ways in: the import opens Settings › Importar", async () => {
     const { router } = await openDm(fresh());
-    await click(button("Preencher o formulário"));
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/new`);
-    cleanup();
-    const again = await openDm(fresh());
     await click(button("Importar meus agentes"));
-    expect(again.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/import`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/import`);
+  });
+
+  test("one question at a time: how agents talk waits for the start card; a greeting leaves it asking, with no second offer", async () => {
+    const state = fresh();
+    if (state.me?.organizations[0]) state.me.organizations[0].agentStyle = null;
+    seedDm(state, { type: "agent", id: LODI_ID }, { body: "oi" });
+    await openDm(state);
+    expect(screen().queryByText("Como prefere que eu fale com você?")).toBeNull();
+    const card = startCard() as HTMLElement;
+    expect(card.textContent).toContain("esperando você");
+    expect((within(card).getByRole("button", { name: "Agência" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen().queryByRole("button", { name: "Montar o time" })).toBeNull();
   });
 
   test("Outra coisa puts the cursor in Lodi's composer instead of sending", async () => {

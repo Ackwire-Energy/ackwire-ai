@@ -1535,9 +1535,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
-    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
-      "already answered",
-    );
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toMatchObject({
+      code: "secret.closed",
+      params: { status: "declined", endReason: null },
+    });
     expect(stagedWhilePending).toBe(true);
     expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
     expect(runner.staged.has(row.id)).toBe(false);
@@ -1559,9 +1560,10 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
     const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
-    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
-      "already answered or expired",
-    );
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toMatchObject({
+      code: "secret.closed",
+      params: { status: "expired" },
+    });
     const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
     expect(closed?.status).toBe("pending");
     expect(closed?.deliveredAt).toBeNull();

@@ -83,7 +83,7 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[styles.wrap, align === "end" && styles.end]}>
       {images.length > 1 ? <ImageStack images={images} width={blockWidth} /> : null}
       {only && images.length === 1 ? (
-        <View style={[styles.images, { width: blockWidth }]}>
+        <View style={{ width: blockWidth }}>
           <InlineImage
             file={only.file}
             detail={only.detail}
@@ -199,7 +199,7 @@ function InlineVideo({
     });
   };
   return (
-    <View style={styles.images}>
+    <View>
       {source ? (
         <VideoPlayer
           key={source.uri}
@@ -314,9 +314,8 @@ function RemovedCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignSelf: "stretch" },
+  wrap: { alignSelf: "stretch", gap: 8 },
   end: { alignItems: "flex-end" },
-  images: { marginTop: 8 },
   shot: { borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   center: {
     position: "absolute",
@@ -329,7 +328,6 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
   card: {
-    marginTop: 8,
     maxWidth: MAX_WIDTH,
     flexDirection: "row",
     alignItems: "center",

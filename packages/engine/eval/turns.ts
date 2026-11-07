@@ -189,7 +189,9 @@ const deploys: ToolSource = {
 };
 
 /** Every built-in tool source a production agent has, tools on demand, one teammate, the made-up deploy connector. */
-export async function turnsWorld(options: Pick<NonNullable<Parameters<typeof setup>[0]>, "reply" | "judge"> = {}) {
+export async function turnsWorld(
+  options: Pick<NonNullable<Parameters<typeof setup>[0]>, "reply" | "judge" | "workspaceComputer"> = {},
+) {
   const f = await setup({
     contextTools: true,
     askUser: true,

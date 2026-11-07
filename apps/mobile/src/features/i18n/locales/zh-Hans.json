@@ -111,7 +111,6 @@
     "refuse": "拒绝",
     "approve": "批准",
     "hold": "长按以批准",
-    "holding": "继续按住…",
     "holdNote": "高风险：按住按钮一秒。",
     "tapNote": "批准后会立即执行。",
     "tapNoteAhead": "现在批准将覆盖{{when}}。",
@@ -314,9 +313,9 @@
       "wellNow": "停下来读了你的留言"
     },
     "stopped": {
-      "byYou": "由你停止",
-      "by": "由 {{name}} 停止",
-      "plain": "已停止",
+      "byYou": "在这里停止",
+      "by": "{{name}} 在这里停止了",
+      "plain": "在这里停止",
       "limit": "已达步骤上限",
       "stuck": "卡住了，已停止",
       "continue": "继续",
@@ -642,6 +641,10 @@
     "freeSection": "空闲",
     "noGroupSection": "无部门"
   },
+  "team": {
+    "entry": "列表、组织架构图和地图",
+    "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
+  },
   "agentEdit": {
     "missing": "此智能体已不存在。",
     "saved": "更改已保存",
@@ -712,6 +715,7 @@
       "older": "更早"
     },
     "kind": {
+      "proposal_waiting_other": "{{names}} 提议改进",
       "mention_other": "{{names}} 提及了你",
       "thread_reply_other": "{{names}} 在话题中回复了",
       "agent_reply_other": "{{names}} 回复了",
@@ -757,12 +761,12 @@
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "desktop_taken_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
       "desktop_taken_female_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
+      "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
+      "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
-      "app_created_other": "一个 AI 应用为你创建了内容",
-      "plan_lent_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}",
-      "plan_lent_female_other": "{{names}} 把你的 {{plan}} 套餐连接到了 {{agent}}"
+      "app_created_other": "一个 AI 应用为你创建了内容"
     },
     "markRead": "标为已读",
     "markUnread": "标为未读",
@@ -850,6 +854,7 @@
     "fromWorkspace": "来自工作区",
     "issues": "任务",
     "issuesWithMe_other": "{{count}} 个与你有关",
+    "proposalsWaiting_other": "{{count}} 条待处理",
     "drive": "Drive",
     "connectors": "连接器和 MCP",
     "usage": "用量",
@@ -917,8 +922,7 @@
     "addPasswordFirst": "请先在网站上为你的账号添加密码，然后在这里输入。",
     "addPasswordWeb": "在网站上添加密码",
     "otherAccount": "你登录了另一个账号。没有删除任何内容。",
-    "hold": "长按以删除",
-    "holding": "继续按住…"
+    "hold": "长按以删除"
   },
   "files": {
     "type": {
@@ -1921,10 +1925,6 @@
         "proposal": "仪表盘"
       }
     }
-  },
-  "team": {
-    "entry": "列表、组织架构图和地图",
-    "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
   },
   "empty": {
     "agents": {

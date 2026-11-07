@@ -194,7 +194,6 @@ html:not([data-pointer]) .brw-site button:focus-visible {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
-  margin-top: 4px;
   max-width: var(--msg-card-w);
   box-sizing: border-box;
 }

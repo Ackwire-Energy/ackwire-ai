@@ -70,7 +70,7 @@ export interface ToolOutput {
   /** Ground truth this call produced (tests passed, PR merged…), recorded by the gateway. */
   outcome?: { kind: OutcomeKind; subject?: string; summary?: string; details?: Record<string, unknown> };
   /** Built-in `ask_user` only: suspend the run until a person answers this question (its `why` is the gateway's). */
-  waitForAnswer?: { text: string; choices: string[] | null };
+  waitForAnswer?: { text: string; choices: string[] | null; requestedForUserId: string | null };
   /** `request_secret` only: suspend the run until the person answers this request (ADR 0027). */
   waitForSecret?: { requestId: string };
   /** `schedule_action` only: suspend the run until a person decides this approval (`prepareAhead` made it). */

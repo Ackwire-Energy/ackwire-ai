@@ -333,6 +333,7 @@ const TeamProposalCard = z
       approvals: z.string(),
       invite: z.array(z.string()),
       template: z.string().optional(),
+      example: z.string().optional(),
     }),
     state: z.enum(["pending", "creating", "created", "denied", "superseded", "undone"]),
     decidedByUserId: z.string().nullable(),
@@ -1232,22 +1233,27 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Post a template's team as the right hand's card in your DM with it (\"Usar este modelo\")",
       description:
-        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn.",
+        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn. On a billing hold, no question, and `tap` (what the person tapped) is kept as their message with no run.",
       request: {
         params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
-        body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
+        body: {
+          ...body(z.object({ locale: z.string().max(20).optional(), tap: z.string().min(1).max(200).optional() })),
+          required: false,
+        },
       },
       responses: { 200: json(z.object({ channelId: z.uuid(), messageId: z.uuid() })), ...errors },
     }),
     async (c) => {
       const { orgId, templateId } = c.req.valid("param");
       const context = deps.extras?.context;
+      const input = c.req.valid("json");
       const out = await useTeamTemplate(
         { db, pubsub: adapters.pubsub, context },
         c.get("user").id,
         orgId,
         templateId,
-        c.req.valid("json")?.locale,
+        input?.locale,
+        input?.tap,
       );
       return c.json(out, 200);
     },

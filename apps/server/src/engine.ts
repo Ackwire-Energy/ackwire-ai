@@ -289,9 +289,12 @@ export function buildEngine(o: EngineOptions) {
     readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
     errors: o.errors,
   });
+  const workspaceComputer =
+    config.MACHINE_PROVISIONING === "external" ? { billing: Boolean(config.BILLING_URL) } : undefined;
   const sandbox: SandboxDeps = {
     db,
     machines: { hub: machineHub },
+    workspaceComputer,
     // Git through our proxy (ADR 0024): the computer never gets a GitHub token.
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
@@ -686,6 +689,7 @@ export function buildEngine(o: EngineOptions) {
     brains,
     prepareCode,
     machines: machineHub,
+    workspaceComputer,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,

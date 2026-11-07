@@ -25,6 +25,7 @@ import {
   computerEdition,
   computerName,
   etaLine,
+  managedNamed,
   setupView,
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
@@ -56,7 +57,6 @@ import {
   planPickText,
   planTitle,
   signsInOnce,
-  uncheckedKeyLine,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
@@ -212,7 +212,7 @@ export function AiPicker({
     <div className="ai-picker" role="group" aria-label={t("onboarding.keyStep.title")}>
       {have?.(choice === null && panel)}
       <Segmented
-        className="ai-picker__pay"
+        block
         label={t("connectAi.pay.label")}
         disabled={busy}
         value={choice === "key" ? "key" : "plan"}
@@ -321,7 +321,6 @@ export function ExistingRows({
   const toast = useToast();
   const dir = useDirectory(org.id);
   const models = useModels();
-  const held = usePlanHold() !== null;
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
   const view = gates.view;
@@ -371,7 +370,8 @@ export function ExistingRows({
   const pickKey = (key: Credential) =>
     save(async () => {
       const { check } = await api.agents.checkCredential(org.id, key.id);
-      if (check === "unchecked") toast.show(uncheckedKeyLine(t, providerLabel(key.provider), held), "info");
+      if (check === "unchecked")
+        toast.show(t("connectAi.key.savedUnchecked", { provider: providerLabel(key.provider) }), "info");
       const row = dir.agentById.get(agent.id);
       // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
       if (view.scope === "mine" && row) {
@@ -395,7 +395,7 @@ export function ExistingRows({
     dimmedLine(t, dimmed.gate, {
       ...dimmed,
       edition: gates.edition,
-      computer: view.computer?.name ?? computerName(t, org.name, null),
+      computer: computerName(t, org.name, managedNamed(view.computer)),
     });
   const items = rows.map((r) => {
     if (r.kind === "key") {
@@ -460,9 +460,9 @@ export function ExistingRows({
       {items}
       {dimmedWhy && <SettingNote icon="alert">{dimmedWhy}</SettingNote>}
       {refused && <KeyRefused refusal={refused} />}
-      {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
+      {lends && <p className="ai-picker__or ai-picker__or--note">{t("agentPage.work.brain.accountOthers")}</p>}
       {onManageKeys && rows.some((r) => r.kind === "key") && (
-        <p className="ai-picker__or">
+        <p className="ai-picker__or ai-picker__or--note">
           <button type="button" className="ac-link ac-link--muted" onClick={onManageKeys}>
             {t("connectAi.have.manageKeys")}
           </button>
@@ -1233,33 +1233,26 @@ export function usePlanHold() {
 }
 
 /**
- * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, the way to that plan for
- * whoever pays (anyone else reads who can), and an API key for whoever may add one. A hold stops the Model Gateway too,
- * so the key's panel says it starts with the plan (`KeyPanel`).
+ * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, and the way to that
+ * plan for whoever pays (anyone else reads who can). A hold stops the Model Gateway for keys too, so no key is offered
+ * as a way around it.
  */
-export function PlanHold({ hold, onKey }: { hold: BillingHold; onKey?: () => void }) {
+export function PlanHold({ hold }: { hold: BillingHold }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
   const canPay = can(org, "manage_billing") && Boolean(billingUrl);
-  const key = can(org, "manage_credentials") ? onKey : undefined;
   return (
     <>
       <SettingNote icon="alert">{t("connectAi.billing")}</SettingNote>
-      {!canPay && <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>}
-      {(canPay || key) && (
+      {canPay ? (
         <span className="ac-acts">
-          {canPay && (
-            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-              {t(`standing.billing.cta.${hold}`)}
-            </BillingLinkButton>
-          )}
-          {key && (
-            <Button size="sm" onClick={key}>
-              {t("noAi.rightHand.useKey")}
-            </Button>
-          )}
+          <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+            {t(`standing.billing.cta.${hold}`)}
+          </BillingLinkButton>
         </span>
+      ) : (
+        <SettingNote icon="lock">{t("standing.billing.askAdmin")}</SettingNote>
       )}
     </>
   );
@@ -1328,7 +1321,7 @@ function GateWait({
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "billing") {
-    wait = <PlanHold hold={gate.hold} onKey={onKey} />;
+    wait = <PlanHold hold={gate.hold} />;
   } else if (gate.state === "preparing") {
     // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
     // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
@@ -1426,7 +1419,6 @@ export function KeyPanel({
   savedNote,
   refused,
   saving,
-  held,
   onSave,
   endpoint,
 }: {
@@ -1442,8 +1434,6 @@ export function KeyPanel({
   /** The provider refused the key on its test call: nothing was kept. */
   refused?: ReturnType<typeof keyRefusal>;
   saving?: boolean;
-  /** A billing hold stops every model call: the key starts with the plan (`planHoldOf`). */
-  held?: boolean;
   onSave?: () => void;
 }) {
   const { t } = useTranslation();
@@ -1468,7 +1458,7 @@ export function KeyPanel({
         <SettingNote icon="lock">{t("connectAi.keyLocked")}</SettingNote>
       ) : saved ? (
         <SettingNote icon="check" live>
-          {held ? t("connectAi.key.savedHeld") : (savedNote ?? t("connectAi.key.saved"))}
+          {savedNote ?? t("connectAi.key.saved")}
         </SettingNote>
       ) : provider === CUSTOM_PROVIDER ? (
         <>
@@ -1476,7 +1466,6 @@ export function KeyPanel({
             {t("endpoint.optionSub")}
           </p>
           {endpoint}
-          {held && <SettingNote icon="clock">{t("connectAi.key.held")}</SettingNote>}
         </>
       ) : keyOf && maker && site ? (
         <>
@@ -1514,7 +1503,7 @@ export function KeyPanel({
                   }}
                 />
               </Locked>
-              {onSave && (
+              {onSave && apiKey.trim() && (
                 <Button variant="primary" loading={saving} disabled={!valid} onClick={onSave}>
                   {t("settings.saveKey")}
                 </Button>
@@ -1527,9 +1516,7 @@ export function KeyPanel({
             )}
             {refused && <KeyRefused refusal={refused} />}
           </Step>
-          <SettingNote icon={held ? "clock" : "agent"}>
-            {t(held ? "connectAi.key.held" : "connectAi.key.forAll")}
-          </SettingNote>
+          <SettingNote icon="agent">{t("connectAi.key.forAll")}</SettingNote>
         </>
       ) : null}
     </Card>
