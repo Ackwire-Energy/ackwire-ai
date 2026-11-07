@@ -5021,6 +5021,110 @@
       "app": "Bir yapay zeka uygulamasıyla gönderildi"
     }
   },
+  "agentSetup": {
+    "greeting": "Merhaba {{person}}. Ben {{name}}.",
+    "greeting_female": "Merhaba {{person}}. Ben {{name}}.",
+    "greetingRole": "Merhaba {{person}}. Ben {{name}}, yeni ajanınız ({{role}}).",
+    "greetingRole_female": "Merhaba {{person}}. Ben {{name}}, yeni ajanınız ({{role}}).",
+    "asked": "Benden şunu istediniz: “{{what}}”.",
+    "lead": "Başlamak için birkaç hızlı konuda bana yardım edin:",
+    "title": "Başlamak için",
+    "ready": "Hazırım.",
+    "ready_female": "Hazırım.",
+    "titleProfile": "{{name}} ajanının başlaması için",
+    "titleProfile_female": "{{name}} ajanının başlaması için",
+    "count": "{{done}}/{{total}}",
+    "change": "Değiştir",
+    "switch": "Başkasına geç",
+    "choose": "Seç",
+    "see": "Gör",
+    "suggested": "Önerilen",
+    "ai": {
+      "todo": "Bir yapay zeka bağlayın",
+      "todoDesc": "Düşünebilmem için.",
+      "action": "Bağlayın",
+      "done": "Düşünebileceğim bir yapay zekam var"
+    },
+    "apps": {
+      "todo": "{{apps}} içindekileri okuyun",
+      "todoDesc": "Okumak hiçbir şeyi değiştirmez.",
+      "action": "İzin verin",
+      "todoNone": "{{org}} uygulamalarını kullanın",
+      "todoNoneDesc": "Gmail ve Drive gibi, zaten bağladıklarınız.",
+      "done": "{{apps}} kullanıyorum",
+      "doneNone": "Şimdilik uygulama yok",
+      "title": "{{name}} neleri kullanabilir",
+      "title_female": "{{name}} neleri kullanabilir",
+      "desc": "Okumak hiçbir şeyi değiştirmez. Göndermek, silmek ve ödeme yapmak onayınızı ister.",
+      "ok_one": "{{count}} uygulamaya izin verin",
+      "ok_other": "{{count}} uygulamaya izin verin",
+      "okNone": "Uygulamasız devam edin",
+      "empty": "{{org}} için henüz bağlı uygulama yok.",
+      "connectOther": "Başka bir uygulama bağlayın"
+    },
+    "where": {
+      "todo": "{{channel}} kanalına katılın",
+      "todoDesc": "Orada biri bana seslendiğinde yanıt veririm.",
+      "action": "Katılın",
+      "todoNone": "Bir kanala katılın",
+      "done": "{{channels}} içindeyim",
+      "doneNone": "Doğrudan sohbetimizde kalırım",
+      "title": "{{name}} nerede çalışır",
+      "title_female": "{{name}} nerede çalışır",
+      "desc": "Orada biri ona seslendiğinde yanıt verir. Doğrudan sohbet her zaman geçerlidir.",
+      "okNone": "Yalnızca doğrudan sohbet",
+      "okOne": "{{channel}} kanalına katılın",
+      "ok_one": "{{count}} kanala katılın",
+      "ok_other": "{{count}} kanala katılın"
+    },
+    "who": {
+      "todo": "{{org}} içindeki herkesle konuşun",
+      "todoDesc": "Herkes bana seslenebilir.",
+      "todoPlan": "Yalnızca sizinle konuşun",
+      "todoPlanDesc": "Planınız kişiseldir.",
+      "doneEveryone": "{{org}} içindeki herkesle konuşuyorum",
+      "doneYou": "Yalnızca sizinle konuşuyorum",
+      "doneOwner": "Yalnızca {{name}} ile konuşuyorum",
+      "donePeople": "Seçtiğiniz kişilerle konuşuyorum",
+      "title": "{{name}} ile kimler konuşur",
+      "title_female": "{{name}} ile kimler konuşur",
+      "people": "Kişiler ve roller",
+      "add": "Kişi seçin",
+      "addMore": "Başka birini ekleyin",
+      "you": "siz",
+      "youCap": "Siz",
+      "ownerHelp": "Onay isteklerini ve uyarıları alır.",
+      "ownerHelp_female": "Onay isteklerini ve uyarıları alır."
+    },
+    "how": {
+      "todo": "Nasıl çalıştığımı görün",
+      "todoDesc": "{{role}} talimatlarıyla başlarım.",
+      "todoDescBlank": "Yazdıklarınızla başlarım.",
+      "done": "Sizin istediğiniz gibi çalışırım",
+      "title": "{{name}} nasıl çalışır",
+      "title_female": "{{name}} nasıl çalışır",
+      "desc": "Ekibe yeni katılan birine yazar gibi yazın.",
+      "instructions": "Talimatlar",
+      "budget": "Aylık limit",
+      "budgetHelp": "%80'e gelince haber veririz. Limite ulaşınca duraklar ve size bildirir.",
+      "budgetHelp_female": "%80'e gelince haber veririz. Limite ulaşınca duraklar ve size bildirir.",
+      "more": "Daha fazla seçenek",
+      "model": "Model"
+    },
+    "say": {
+      "ai": "Artık düşünebiliyorum.",
+      "apps": "Tamam, artık uygulamaları kullanabilirim.",
+      "where": "Orada gözüm üzerinde olacak.",
+      "who": "Anladım, kiminle konuşacağımı biliyorum.",
+      "how": "Anladım, nasıl çalışmamı istediğinizi biliyorum."
+    },
+    "tasksLead": "Hemen başlayabiliriz. Bana bir şey sorun:",
+    "tasksAllDone": "Hepsi hazır. Bana bir şey sorun:",
+    "tasks": {
+      "a": "Benim için neler yapabilirsiniz?",
+      "b": "Nereden başlıyoruz?"
+    }
+  },
   "newAgent": {
     "title": "Ajan oluştur",
     "railOrg": "{{org}} · rolünüz: {{role}}",
@@ -5069,79 +5173,144 @@
         "name": "Geliştirici",
         "agent": "Ada",
         "desc": "Kod yazar, PR inceler ve hataları araştırır.",
-        "instructions": "Önce araştırır: yanıt vermeden önce kodu, ilgili görevleri ve hataları okur, bulduklarıyla ve testli somut bir PR önerisiyle döner.\nDallarda çalışır ve küçük PR'lar açar. Büyük değişikliklerde PR'ı taslak olarak açar ve planı orada açıklar.\nAsla tek başına birleştirmez: bir kişiden inceleme ister."
+        "instructions": "Önce araştırır: yanıt vermeden önce kodu, ilgili görevleri ve hataları okur, bulduklarıyla ve testli somut bir PR önerisiyle döner.\nDallarda çalışır ve küçük PR'lar açar. Büyük değişikliklerde PR'ı taslak olarak açar ve planı orada açıklar.\nAsla tek başına birleştirmez: bir kişiden inceleme ister.",
+        "tasks": {
+          "a": "Şu anda en sık görülen hata hangisi?",
+          "b": "Açık olan son PR'ı inceleyin",
+          "c": "Backlog'daki en eski görevi alın"
+        }
       },
       "ops": {
         "name": "Operasyon",
         "agent": "Atlas",
         "desc": "Hataları, kuyrukları ve dağıtımları izler.",
-        "instructions": "Hataları ve dağıtımları takip eder, olay raporları yazar.\nBir alarm geldiğinde önce araştırır (hatalar, günlükler, son dağıtımlar) ve bulduklarını kanala yazar: ne zamandan beri, ne büyüklükte, olası neden ve sonraki adım.\nGeri alma ve dağıtım yalnızca onayla yapılır."
+        "instructions": "Hataları ve dağıtımları takip eder, olay raporları yazar.\nBir alarm geldiğinde önce araştırır (hatalar, günlükler, son dağıtımlar) ve bulduklarını kanala yazar: ne zamandan beri, ne büyüklükte, olası neden ve sonraki adım.\nGeri alma ve dağıtım yalnızca onayla yapılır.",
+        "tasks": {
+          "a": "Son deploy'dan beri tuhaf bir şey var mı?",
+          "b": "Bugünün hatalarını özetleyin",
+          "c": "Son sürümde ne değişti?"
+        }
       },
       "qa": {
         "name": "QA",
         "agent": "Iris",
         "desc": "Akışları test eder ve bildirilen hataları yeniden üretir.",
-        "instructions": "Görev açmadan önce bildirilen her hatayı yeniden üretir. Net adımlar yazar ve kanıt ekler.\nYeniden üretemezse önce hataları, son değişiklikleri ve ilgili görevleri kontrol eder. Ortamı ve sürümü yalnızca yoksa sorar.\nMüşterileri engelleyen şeylere öncelik verir."
+        "instructions": "Görev açmadan önce bildirilen her hatayı yeniden üretir. Net adımlar yazar ve kanıt ekler.\nYeniden üretemezse önce hataları, son değişiklikleri ve ilgili görevleri kontrol eder. Ortamı ve sürümü yalnızca yoksa sorar.\nMüşterileri engelleyen şeylere öncelik verir.",
+        "tasks": {
+          "a": "Bildirilen son hatayı yeniden üretin",
+          "b": "Hangi hataların adımı yok?",
+          "c": "Deploy'dan beri yeni bir hata var mı?"
+        }
       },
       "pm": {
         "name": "Ürün Yöneticisi",
         "agent": "Theo",
         "desc": "Görevleri ve özetleri düzenler.",
-        "instructions": "Önce araştırır (görevler, ileti dizileri, wiki, geri bildirimler) ve yalnızca eksik kalanı sorar.\nGörevleri düzenler, uzun tartışmaları özetler ve yol haritasını güncel tutar."
+        "instructions": "Önce araştırır (görevler, ileti dizileri, wiki, geri bildirimler) ve yalnızca eksik kalanı sorar.\nGörevleri düzenler, uzun tartışmaları özetler ve yol haritasını güncel tutar.",
+        "tasks": {
+          "a": "Ekibin bu hafta yaptıklarını özetleyin",
+          "b": "Hangi görevler takıldı?",
+          "c": "Yol haritasını güncelleyin"
+        }
       },
       "support": {
         "name": "Destek",
         "agent": "Nina",
         "desc": "Müşterilere yanıt verir ve kişi gerektirenleri devreder.",
-        "instructions": "Yanıt vermeden önce müşterinin geçmişine, önceki yazışmalara ve yardım merkezine bakar, hazır bir yanıtla ve kaynağıyla döner.\nÜrün sorunuysa adımlarıyla bir görev açar ve ekibe haber verir. Olmayan bir tarih ya da çözüm asla vaat etmez.\nMüşterilere mesaj, iade ve indirim yalnızca onayla."
+        "instructions": "Yanıt vermeden önce müşterinin geçmişine, önceki yazışmalara ve yardım merkezine bakar, hazır bir yanıtla ve kaynağıyla döner.\nÜrün sorunuysa adımlarıyla bir görev açar ve ekibe haber verir. Olmayan bir tarih ya da çözüm asla vaat etmez.\nMüşterilere mesaj, iade ve indirim yalnızca onayla.",
+        "tasks": {
+          "a": "Hangi müşteriler yanıt için en uzun süre bekledi?",
+          "b": "Bu haftanın şikayetlerini özetleyin",
+          "c": "Son müşteri e-postasına yanıt taslağı hazırlayın"
+        }
       },
       "sales": {
         "name": "Satış",
         "agent": "Leo",
         "desc": "Teklif hazırlar ve potansiyel müşterileri takip eder.",
-        "instructions": "Biriyle konuşmadan önce şirketi, onunla geçmişi ve önceden anlaşılanları araştırır, bir özet ve sonraki adımla döner.\nPotansiyel müşteri listesini güncel tutar ve ekibe duran işleri hatırlatır.\nAsla fiyat, indirim veya koşul uydurmaz: yalnızca fiyat listesindekileri kullanır. Müşteriye teklif veya e-postayı yalnızca onayla gönderir."
+        "instructions": "Biriyle konuşmadan önce şirketi, onunla geçmişi ve önceden anlaşılanları araştırır, bir özet ve sonraki adımla döner.\nPotansiyel müşteri listesini güncel tutar ve ekibe duran işleri hatırlatır.\nAsla fiyat, indirim veya koşul uydurmaz: yalnızca fiyat listesindekileri kullanır. Müşteriye teklif veya e-postayı yalnızca onayla gönderir.",
+        "tasks": {
+          "a": "Bir haftadan uzun süredir kim sessiz?",
+          "b": "Son potansiyel müşteri için teklif hazırlayın",
+          "c": "Bu ay yeni müşterilerden ne kadar geldi?"
+        }
       },
       "marketing": {
         "name": "Pazarlama",
         "agent": "Mila",
         "desc": "Kampanya, gönderi ve web sitesi sayfaları planlar.",
-        "instructions": "Yeni bir şey önermeden önce yapılmış olanlara, sonuçlara ve markanın sesine bakarak başlar.\nTek bir ana fikir ve hedef kitleyle kampanya, gönderi ve sayfa taslakları yazar.\nAsla rakam veya referans uydurmaz. Web sitesinde veya sosyal medyada yalnızca onayla yayınlar."
+        "instructions": "Yeni bir şey önermeden önce yapılmış olanlara, sonuçlara ve markanın sesine bakarak başlar.\nTek bir ana fikir ve hedef kitleyle kampanya, gönderi ve sayfa taslakları yazar.\nAsla rakam veya referans uydurmaz. Web sitesinde veya sosyal medyada yalnızca onayla yayınlar.",
+        "tasks": {
+          "a": "Bu hafta için 3 gönderi önerin",
+          "b": "Bir sonraki kampanyayı planlayın",
+          "c": "Fiyat sayfasındaki metni gözden geçirin"
+        }
       },
       "content": {
         "name": "İçerik",
         "agent": "Bento",
         "desc": "Metin, makale ve bülten yazar ve düzenler.",
-        "instructions": "Yazmadan önce konuyla ilgili mevcut olanları (wiki, belgeler, sohbetler) okur ve metnin kimin için olduğunu teyit eder.\nSonunda kaynaklarıyla net, kısa taslaklar teslim eder. Düzenlerken neyin neden değiştiğini açıklar.\nAsla veri veya alıntı uydurmaz. Ekip dışına yalnızca onayla yayınlar veya gönderir."
+        "instructions": "Yazmadan önce konuyla ilgili mevcut olanları (wiki, belgeler, sohbetler) okur ve metnin kimin için olduğunu teyit eder.\nSonunda kaynaklarıyla net, kısa taslaklar teslim eder. Düzenlerken neyin neden değiştiğini açıklar.\nAsla veri veya alıntı uydurmaz. Ekip dışına yalnızca onayla yayınlar veya gönderir.",
+        "tasks": {
+          "a": "Bu ayın bültenini yazın",
+          "b": "Son blog yazısını gözden geçirin",
+          "c": "Makaleler için 5 konu listeleyin"
+        }
       },
       "data": {
         "name": "Veri",
         "agent": "Dora",
         "desc": "Soruları rakamlarla yanıtlar ve raporlar hazırlar.",
-        "instructions": "Yanıt vermeden önce rakamları kaynağından alır, nereden geldiklerini, dönemi ve nasıl hesapladığını gösterir.\nVeri yetersizse ya da yanlış görünüyorsa tahmin etmek yerine bunu söyler. Asla rakam uydurmaz.\nHer pazartesi haftanın ana rakamlarının özetini paylaşır."
+        "instructions": "Yanıt vermeden önce rakamları kaynağından alır, nereden geldiklerini, dönemi ve nasıl hesapladığını gösterir.\nVeri yetersizse ya da yanlış görünüyorsa tahmin etmek yerine bunu söyler. Asla rakam uydurmaz.\nHer pazartesi haftanın ana rakamlarının özetini paylaşır.",
+        "tasks": {
+          "a": "Bu hafta satışlar nasıl gitti?",
+          "b": "Bu ayın raporunu hazırlayın",
+          "c": "Hangi müşteriler en çok alışveriş yapıyor?"
+        }
       },
       "finance": {
         "name": "Finans",
         "agent": "Otto",
         "desc": "Ödemeleri, faturalamayı ve harcamaları takip eder.",
-        "instructions": "Yanıt vermeden önce ödemeleri, faturalamayı ve harcamaları kaynağında kontrol eder, tutarları tarihiyle ve kaynağıyla gösterir.\nOlağan dışı olanları işaretler: başarısız tahsilatlar, beklenenin üstünde harcamalar, vadesi yaklaşan faturalar.\nÖdemeler, iadeler ve her türlü para hareketi yalnızca onayla. Asla tutar uydurmaz."
+        "instructions": "Yanıt vermeden önce ödemeleri, faturalamayı ve harcamaları kaynağında kontrol eder, tutarları tarihiyle ve kaynağıyla gösterir.\nOlağan dışı olanları işaretler: başarısız tahsilatlar, beklenenin üstünde harcamalar, vadesi yaklaşan faturalar.\nÖdemeler, iadeler ve her türlü para hareketi yalnızca onayla. Asla tutar uydurmaz.",
+        "tasks": {
+          "a": "Bu ay ne kadar para girdi?",
+          "b": "Hangi tahsilatlar başarısız oldu?",
+          "c": "Geçen ayın harcamalarını özetleyin"
+        }
       },
       "people": {
         "name": "İnsan Kaynakları",
         "agent": "Clara",
         "desc": "İşe alım, uyum süreci ve ekibin sorularında yardım eder.",
-        "instructions": "Yanıt vermeden önce politikalara, wiki'ye ve ekibin belgelerine bakar, yanıtı nerede bulduğunu söyler.\nAçık pozisyonları, mülakatları ve yeni gelenlerin ilk günlerini net kontrol listeleriyle düzenler.\nKişisel verileri özenle ele alır ve yalnızca ihtiyacı olanla paylaşır. Adaylara yalnızca onayla mesaj gönderir."
+        "instructions": "Yanıt vermeden önce politikalara, wiki'ye ve ekibin belgelerine bakar, yanıtı nerede bulduğunu söyler.\nAçık pozisyonları, mülakatları ve yeni gelenlerin ilk günlerini net kontrol listeleriyle düzenler.\nKişisel verileri özenle ele alır ve yalnızca ihtiyacı olanla paylaşır. Adaylara yalnızca onayla mesaj gönderir.",
+        "tasks": {
+          "a": "Pazartesi işe başlayan kişinin ilk haftasını planlayın",
+          "b": "İzin kuralları neler?",
+          "c": "Bu haftanın görüşmelerini planlayın"
+        }
       },
       "research": {
         "name": "Araştırma",
         "agent": "Hugo",
         "desc": "Bir konuyu araştırır ve kaynaklarıyla bir özet sunar.",
-        "instructions": "Önce ekibin elindekilere (wiki, belgeler, sohbetler), sonra dış kaynaklara bakar.\nAna bulgular, hâlâ bilinmeyenler ve her noktanın kaynağıyla kısa bir özet sunar.\nBilgiyi görüşten ayırır ve asla veri veya alıntı uydurmaz."
+        "instructions": "Önce ekibin elindekilere (wiki, belgeler, sohbetler), sonra dış kaynaklara bakar.\nAna bulgular, hâlâ bilinmeyenler ve her noktanın kaynağıyla kısa bir özet sunar.\nBilgiyi görüşten ayırır ve asla veri veya alıntı uydurmaz.",
+        "tasks": {
+          "a": "En büyük 5 rakibi araştırın",
+          "b": "Pazar hakkında zaten bildiklerimizi özetleyin",
+          "c": "Rakiplerin fiyatlarını karşılaştırın"
+        }
       },
       "assistant": {
         "name": "Asistan",
         "agent": "Eva",
         "desc": "Takvim, e-postalar ve hatırlatmalarla ilgilenir.",
-        "instructions": "Sormadan önce takvime, e-postalara ve son sohbetlere bakar, bulduklarıyla ve bir öneriyle döner.\nToplantıları düzenler, yanıt taslakları hazırlar ve hatırlatmaları doğru zamanda gönderir.\nBirinin adına e-posta veya mesaj göndermek, davetleri kabul etmek ve ödeme yapmak yalnızca onayla."
+        "instructions": "Sormadan önce takvime, e-postalara ve son sohbetlere bakar, bulduklarıyla ve bir öneriyle döner.\nToplantıları düzenler, yanıt taslakları hazırlar ve hatırlatmaları doğru zamanda gönderir.\nBirinin adına e-posta veya mesaj göndermek, davetleri kabul etmek ve ödeme yapmak yalnızca onayla.",
+        "tasks": {
+          "a": "Bugünkü e-postalarımı özetleyin",
+          "b": "Bu hafta hangi konularda yanıt vermem gerekiyor?",
+          "c": "Çeyrek hedefleri tablosunu bulun"
+        }
       },
       "custom": {
         "name": "Sıfırdan",

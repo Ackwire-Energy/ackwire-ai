@@ -166,6 +166,11 @@ export const agents = pgTable(
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**
+     * The setup checklist at the top of its chat (ADR 0152 §2): the ready-made role it started from (null: from
+     * scratch or made elsewhere) and the steps a person confirmed. Null = made before the checklist: none shows.
+     */
+    setup: jsonb().$type<{ role: string | null; done: string[] }>(),
+    /**
      * Its computer (ADR 0025): the connected machine it works on; null = none yet (the workspace's own computer
      * takes the agents with none once it connects).
      */

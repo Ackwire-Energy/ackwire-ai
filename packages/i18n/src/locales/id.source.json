@@ -12360,6 +12360,240 @@
   "proposals.evidence.app": {
     "value": "Sent through an AI app"
   },
+  "agentSetup.greeting": {
+    "value": "Hi, {{person}}. I'm {{name}}."
+  },
+  "agentSetup.greetingRole": {
+    "value": "Hi, {{person}}. I'm {{name}}, the new {{role}} agent."
+  },
+  "agentSetup.asked": {
+    "value": "You asked me: “{{what}}”."
+  },
+  "agentSetup.lead": {
+    "value": "To get started, help me with a few quick things:"
+  },
+  "agentSetup.title": {
+    "value": "To get started"
+  },
+  "agentSetup.ready": {
+    "value": "I'm ready."
+  },
+  "agentSetup.titleProfile": {
+    "value": "For {{name}} to get started"
+  },
+  "agentSetup.count": {
+    "value": "{{done}} of {{total}}"
+  },
+  "agentSetup.change": {
+    "value": "Change"
+  },
+  "agentSetup.switch": {
+    "value": "Switch"
+  },
+  "agentSetup.choose": {
+    "value": "Choose"
+  },
+  "agentSetup.see": {
+    "value": "See"
+  },
+  "agentSetup.suggested": {
+    "value": "Suggested"
+  },
+  "agentSetup.ai.todo": {
+    "value": "Connect an AI"
+  },
+  "agentSetup.ai.todoDesc": {
+    "value": "So I can think."
+  },
+  "agentSetup.ai.action": {
+    "value": "Connect"
+  },
+  "agentSetup.ai.done": {
+    "value": "I have an AI to think with"
+  },
+  "agentSetup.apps.todo": {
+    "value": "Read {{apps}}"
+  },
+  "agentSetup.apps.todoDesc": {
+    "value": "Reading never changes anything."
+  },
+  "agentSetup.apps.action": {
+    "value": "Allow"
+  },
+  "agentSetup.apps.todoNone": {
+    "value": "Use the apps of {{org}}"
+  },
+  "agentSetup.apps.todoNoneDesc": {
+    "value": "The ones you already connected, like Gmail and Drive."
+  },
+  "agentSetup.apps.done": {
+    "value": "I use {{apps}}"
+  },
+  "agentSetup.apps.doneNone": {
+    "value": "No apps for now"
+  },
+  "agentSetup.apps.title": {
+    "value": "What {{name}} can use"
+  },
+  "agentSetup.apps.desc": {
+    "value": "Reading never changes anything. Sending, deleting and paying ask for your approval."
+  },
+  "agentSetup.apps.ok": {
+    "value": {
+      "one": "Allow {{count}} app",
+      "other": "Allow {{count}} apps"
+    }
+  },
+  "agentSetup.apps.okNone": {
+    "value": "Continue without apps"
+  },
+  "agentSetup.apps.empty": {
+    "value": "{{org}} has no apps connected yet."
+  },
+  "agentSetup.apps.connectOther": {
+    "value": "Connect another app"
+  },
+  "agentSetup.where.todo": {
+    "value": "Join {{channel}}"
+  },
+  "agentSetup.where.todoDesc": {
+    "value": "I answer when someone calls me there."
+  },
+  "agentSetup.where.action": {
+    "value": "Join"
+  },
+  "agentSetup.where.todoNone": {
+    "value": "Join a channel"
+  },
+  "agentSetup.where.done": {
+    "value": "I'm in {{channels}}"
+  },
+  "agentSetup.where.doneNone": {
+    "value": "I stay in our direct chat"
+  },
+  "agentSetup.where.title": {
+    "value": "Where {{name}} works"
+  },
+  "agentSetup.where.desc": {
+    "value": "It answers when someone calls it there. The direct chat always counts."
+  },
+  "agentSetup.where.okNone": {
+    "value": "Direct chat only"
+  },
+  "agentSetup.where.okOne": {
+    "value": "Join {{channel}}"
+  },
+  "agentSetup.where.ok": {
+    "value": {
+      "one": "Join {{count}} channel",
+      "other": "Join {{count}} channels"
+    }
+  },
+  "agentSetup.who.todo": {
+    "value": "Talk to everyone at {{org}}"
+  },
+  "agentSetup.who.todoDesc": {
+    "value": "Anyone can call me."
+  },
+  "agentSetup.who.todoPlan": {
+    "value": "Talk only to you"
+  },
+  "agentSetup.who.todoPlanDesc": {
+    "value": "Your plan is personal."
+  },
+  "agentSetup.who.doneEveryone": {
+    "value": "I talk to everyone at {{org}}"
+  },
+  "agentSetup.who.doneYou": {
+    "value": "I talk only to you"
+  },
+  "agentSetup.who.doneOwner": {
+    "value": "I talk only to {{name}}"
+  },
+  "agentSetup.who.donePeople": {
+    "value": "I talk to the people you picked"
+  },
+  "agentSetup.who.title": {
+    "value": "Who talks to {{name}}"
+  },
+  "agentSetup.who.people": {
+    "value": "People and roles"
+  },
+  "agentSetup.who.add": {
+    "value": "Choose people"
+  },
+  "agentSetup.who.addMore": {
+    "value": "Add someone else"
+  },
+  "agentSetup.who.you": {
+    "value": "you"
+  },
+  "agentSetup.who.youCap": {
+    "value": "You"
+  },
+  "agentSetup.who.ownerHelp": {
+    "value": "Gets its approval requests and alerts."
+  },
+  "agentSetup.how.todo": {
+    "value": "See how I work"
+  },
+  "agentSetup.how.todoDesc": {
+    "value": "I start from the {{role}} instructions."
+  },
+  "agentSetup.how.todoDescBlank": {
+    "value": "I start from what you wrote."
+  },
+  "agentSetup.how.done": {
+    "value": "I work your way"
+  },
+  "agentSetup.how.title": {
+    "value": "How {{name}} works"
+  },
+  "agentSetup.how.desc": {
+    "value": "Write as you would to someone new on the team."
+  },
+  "agentSetup.how.instructions": {
+    "value": "Instructions"
+  },
+  "agentSetup.how.budget": {
+    "value": "Monthly limit"
+  },
+  "agentSetup.how.budgetHelp": {
+    "value": "We let you know at 80%. At the limit, it pauses and tells you."
+  },
+  "agentSetup.how.more": {
+    "value": "More options"
+  },
+  "agentSetup.how.model": {
+    "value": "Model"
+  },
+  "agentSetup.say.ai": {
+    "value": "Now I can think."
+  },
+  "agentSetup.say.apps": {
+    "value": "Done, I can use the apps now."
+  },
+  "agentSetup.say.where": {
+    "value": "I'll keep an eye on it there."
+  },
+  "agentSetup.say.who": {
+    "value": "Got it, I know who to talk to."
+  },
+  "agentSetup.say.how": {
+    "value": "Got it, I know how you want me to work."
+  },
+  "agentSetup.tasksLead": {
+    "value": "We can start already. Ask me something:"
+  },
+  "agentSetup.tasksAllDone": {
+    "value": "All set. Ask me something:"
+  },
+  "agentSetup.tasks.a": {
+    "value": "What can you do for me?"
+  },
+  "agentSetup.tasks.b": {
+    "value": "Where do we start?"
+  },
   "newAgent.title": {
     "value": "Create agent"
   },
@@ -12450,6 +12684,15 @@
   "newAgent.roles.dev.instructions": {
     "value": "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs. For big changes, opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review."
   },
+  "newAgent.roles.dev.tasks.a": {
+    "value": "What's the most frequent error right now?"
+  },
+  "newAgent.roles.dev.tasks.b": {
+    "value": "Review the latest open PR"
+  },
+  "newAgent.roles.dev.tasks.c": {
+    "value": "Pick up the oldest task in the backlog"
+  },
   "newAgent.roles.ops.name": {
     "value": "Ops"
   },
@@ -12461,6 +12704,15 @@
   },
   "newAgent.roles.ops.instructions": {
     "value": "Follows errors and deploys and writes incident reports.\nWhen an alert fires, investigates first (errors, logs, recent deploys) and posts in the channel what it found: since when, how big, the likely cause and the next step.\nRollback and deploy only with approval."
+  },
+  "newAgent.roles.ops.tasks.a": {
+    "value": "Anything odd since the last deploy?"
+  },
+  "newAgent.roles.ops.tasks.b": {
+    "value": "Summarize today's errors"
+  },
+  "newAgent.roles.ops.tasks.c": {
+    "value": "What changed in the latest release?"
   },
   "newAgent.roles.qa.name": {
     "value": "QA"
@@ -12474,6 +12726,15 @@
   "newAgent.roles.qa.instructions": {
     "value": "Reproduces every reported bug before opening a task. Writes clear steps and attaches evidence.\nIf it can't reproduce, first checks the errors, recent changes and related tasks. Asks for the environment and version only if they aren't there.\nPrioritizes what blocks customers."
   },
+  "newAgent.roles.qa.tasks.a": {
+    "value": "Reproduce the latest reported bug"
+  },
+  "newAgent.roles.qa.tasks.b": {
+    "value": "Which bugs have no steps?"
+  },
+  "newAgent.roles.qa.tasks.c": {
+    "value": "Any new error since the deploy?"
+  },
   "newAgent.roles.pm.name": {
     "value": "PM"
   },
@@ -12485,6 +12746,15 @@
   },
   "newAgent.roles.pm.instructions": {
     "value": "Looks things up first (tasks, threads, wiki, feedback) and only asks what's left.\nOrganizes tasks, summarizes long discussions and keeps the roadmap up to date."
+  },
+  "newAgent.roles.pm.tasks.a": {
+    "value": "Summarize what the team did this week"
+  },
+  "newAgent.roles.pm.tasks.b": {
+    "value": "Which tasks are stuck?"
+  },
+  "newAgent.roles.pm.tasks.c": {
+    "value": "Update the roadmap"
   },
   "newAgent.roles.support.name": {
     "value": "Support"
@@ -12498,6 +12768,15 @@
   "newAgent.roles.support.instructions": {
     "value": "Before answering, looks up the customer's history, past conversations and the help center, and comes back with a ready reply and where it came from.\nIf it's a product problem, opens a task with the steps and tells the team. Never promises a date or a fix that doesn't exist.\nMessages to customers, refunds and discounts only with approval."
   },
+  "newAgent.roles.support.tasks.a": {
+    "value": "Which customers have waited longest for an answer?"
+  },
+  "newAgent.roles.support.tasks.b": {
+    "value": "Summarize this week's complaints"
+  },
+  "newAgent.roles.support.tasks.c": {
+    "value": "Draft a reply to the latest customer email"
+  },
   "newAgent.roles.sales.name": {
     "value": "Sales"
   },
@@ -12509,6 +12788,15 @@
   },
   "newAgent.roles.sales.instructions": {
     "value": "Before talking to anyone, researches the company, the history with it and what was already agreed, and comes back with a summary and the next step.\nKeeps the list of leads up to date and reminds the team of what's stalled.\nNever makes up prices, discounts or terms: uses only what's in the price list. Sends a proposal or email to a customer only with approval."
+  },
+  "newAgent.roles.sales.tasks.a": {
+    "value": "Who has been quiet for over a week?"
+  },
+  "newAgent.roles.sales.tasks.b": {
+    "value": "Prepare a proposal for the latest lead"
+  },
+  "newAgent.roles.sales.tasks.c": {
+    "value": "How much came in from new customers this month?"
   },
   "newAgent.roles.marketing.name": {
     "value": "Marketing"
@@ -12522,6 +12810,15 @@
   "newAgent.roles.marketing.instructions": {
     "value": "Starts by looking at what was already done, the results and the brand's voice before suggesting something new.\nWrites drafts of campaigns, posts and pages, with one main idea and who it's for.\nNever makes up numbers or testimonials. Publishes on the website or social media only with approval."
   },
+  "newAgent.roles.marketing.tasks.a": {
+    "value": "Suggest 3 posts for this week"
+  },
+  "newAgent.roles.marketing.tasks.b": {
+    "value": "Plan the next campaign"
+  },
+  "newAgent.roles.marketing.tasks.c": {
+    "value": "Review the copy on the pricing page"
+  },
   "newAgent.roles.content.name": {
     "value": "Content"
   },
@@ -12533,6 +12830,15 @@
   },
   "newAgent.roles.content.instructions": {
     "value": "Before writing, reads what already exists on the subject (wiki, documents, conversations) and confirms who the text is for.\nDelivers clear, short drafts with the sources at the end. When editing, explains what changed and why.\nNever makes up data or quotes. Publishes or sends outside the team only with approval."
+  },
+  "newAgent.roles.content.tasks.a": {
+    "value": "Write this month's newsletter"
+  },
+  "newAgent.roles.content.tasks.b": {
+    "value": "Review the latest blog post"
+  },
+  "newAgent.roles.content.tasks.c": {
+    "value": "List 5 topics for articles"
   },
   "newAgent.roles.data.name": {
     "value": "Data"
@@ -12546,6 +12852,15 @@
   "newAgent.roles.data.instructions": {
     "value": "Gets the numbers from the source before answering and shows where they came from, the period and how it calculated them.\nIf the data isn't enough or looks wrong, says so instead of guessing. Never makes up a number.\nEvery Monday, posts a summary of the week's main numbers."
   },
+  "newAgent.roles.data.tasks.a": {
+    "value": "How did sales go this week?"
+  },
+  "newAgent.roles.data.tasks.b": {
+    "value": "Build this month's report"
+  },
+  "newAgent.roles.data.tasks.c": {
+    "value": "Which customers buy the most?"
+  },
   "newAgent.roles.finance.name": {
     "value": "Finance"
   },
@@ -12557,6 +12872,15 @@
   },
   "newAgent.roles.finance.instructions": {
     "value": "Checks payments, billing and spending at the source before answering and shows amounts with the date and where they came from.\nFlags what's out of the ordinary: failing charges, spending above what's expected, invoices coming due.\nPayments, refunds and any money movement only with approval. Never makes up amounts."
+  },
+  "newAgent.roles.finance.tasks.a": {
+    "value": "How much came in this month?"
+  },
+  "newAgent.roles.finance.tasks.b": {
+    "value": "Which charges failed?"
+  },
+  "newAgent.roles.finance.tasks.c": {
+    "value": "Summarize last month's spending"
   },
   "newAgent.roles.people.name": {
     "value": "People"
@@ -12570,6 +12894,15 @@
   "newAgent.roles.people.instructions": {
     "value": "Before answering, looks in the policies, the wiki and the team's documents, and says where it found the answer.\nOrganizes openings, interviews and new joiners' first days, with clear checklists.\nHandles personal data with care and shares it only with who needs it. Messages candidates only with approval."
   },
+  "newAgent.roles.people.tasks.a": {
+    "value": "Plan the first week of whoever starts Monday"
+  },
+  "newAgent.roles.people.tasks.b": {
+    "value": "What are the vacation rules?"
+  },
+  "newAgent.roles.people.tasks.c": {
+    "value": "Schedule this week's interviews"
+  },
   "newAgent.roles.research.name": {
     "value": "Research"
   },
@@ -12582,6 +12915,15 @@
   "newAgent.roles.research.instructions": {
     "value": "Looks first at what the team already has (wiki, documents, conversations), then at outside sources.\nDelivers a short summary with the main findings, what's still unknown and the sources for each point.\nKeeps facts apart from opinions and never makes up data or quotes."
   },
+  "newAgent.roles.research.tasks.a": {
+    "value": "Research the 5 biggest competitors"
+  },
+  "newAgent.roles.research.tasks.b": {
+    "value": "Summarize what we already know about the market"
+  },
+  "newAgent.roles.research.tasks.c": {
+    "value": "Compare the competitors' prices"
+  },
   "newAgent.roles.assistant.name": {
     "value": "Assistant"
   },
@@ -12593,6 +12935,15 @@
   },
   "newAgent.roles.assistant.instructions": {
     "value": "Before asking, checks the calendar, the emails and recent conversations, and comes back with what it found and a suggestion.\nOrganizes meetings, drafts replies and sends reminders at the right time.\nSending emails or messages on someone's behalf, accepting invites and making payments only with approval."
+  },
+  "newAgent.roles.assistant.tasks.a": {
+    "value": "Summarize my emails from today"
+  },
+  "newAgent.roles.assistant.tasks.b": {
+    "value": "What did I promise to answer this week?"
+  },
+  "newAgent.roles.assistant.tasks.c": {
+    "value": "Find the quarter's goals spreadsheet"
   },
   "newAgent.roles.custom.name": {
     "value": "From scratch"

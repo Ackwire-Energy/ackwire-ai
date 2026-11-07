@@ -61,6 +61,7 @@ import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
 import type {
+  Agent,
   AgentAction,
   AgentAudience,
   AgentComputer,
@@ -149,6 +150,7 @@ import type {
   SearchFilterInput,
   SearchKind,
   SeriesScope,
+  SetupStep,
   SidebarItem,
   SidebarItems,
   SidebarPlace,
@@ -830,6 +832,21 @@ export function useUpdateAgent(orgId: string, agentId: string) {
   });
 }
 
+/** Confirms a step of a new agent's setup checklist (ADR 0152 §2); the agent lists show it at once. */
+export function useConfirmSetup(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (step: SetupStep) => api.agents.confirmSetup(orgId, agentId, step),
+    onSuccess: (saved) => {
+      qc.setQueryData<Agent[]>(keys.agents(orgId), (list) =>
+        list?.map((a) => (a.id === agentId ? { ...a, setup: saved.setup } : a)),
+      );
+      agentChanged(qc, orgId, agentId);
+    },
+  });
+}
+
 /**
  * Lets more people talk to the agent. `ask` gets the mailboxes saving `audience` would take from it (only a mailbox's
  * owner gives an agent access to it), maybe none, and nothing is saved without its yes: it asks when they are some or
@@ -871,7 +888,10 @@ export function useWidenAudience(orgId: string, agentId: string) {
     ask: (mailboxes: ForeignMailbox[]) => Promise<boolean>,
     onSaved?: () => void,
   ) => save.mutate({ audience, ask }, { onSuccess: (saved) => saved && onSaved?.() });
-  return { widen, busy: save.isPending, done: save.isSuccess && save.data !== null };
+  /** The same save, awaited: the agent saved, or null when `ask` said no. */
+  const saveAsync = (audience: AgentAudience, ask: (mailboxes: ForeignMailbox[]) => Promise<boolean>) =>
+    save.mutateAsync({ audience, ask });
+  return { widen, saveAsync, busy: save.isPending, done: save.isSuccess && save.data !== null };
 }
 
 /** `silent`: the caller shows a failure itself (a refused key, in its dialog with the way to fix it). */

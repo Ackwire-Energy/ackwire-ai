@@ -352,6 +352,18 @@ export const FormerAgent = z
   })
   .openapi("FormerAgent");
 
+/** The steps of a new agent's setup checklist (ADR 0152 §2). */
+export const SetupStep = z.enum(["ai", "apps", "where", "who", "how"]).openapi("SetupStep");
+
+export const AgentSetupChecklist = z
+  .object({
+    role: z.string().nullable().openapi({
+      description: "The ready-made role it started from (`support`); null: from scratch or made elsewhere.",
+    }),
+    done: z.array(SetupStep).openapi({ description: "The steps a person confirmed (chose or skipped)." }),
+  })
+  .openapi("AgentSetupChecklist");
+
 export const Agent = z
   .object({
     id: z.uuid(),
@@ -393,6 +405,10 @@ export const Agent = z
         "A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand, one per workspace, never archived, deleted or exported. Null for the agents people make.",
     }),
     brakes: AgentBrakes,
+    setup: AgentSetupChecklist.nullable().openapi({
+      description:
+        "Its setup checklist at the top of its chat (ADR 0152 §2): the ready-made role it started from and the steps a person confirmed. Null for agents made before it (none shows).",
+    }),
     brain: z
       .object({
         kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),

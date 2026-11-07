@@ -2126,6 +2126,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           createdAt: NOW.toISOString(),
           audience: input.audience ?? { mode: "everyone", userIds: [] },
           ...(input.appearance ? { appearance: input.appearance } : {}),
+          // As the backend: every new agent starts with its setup checklist (ADR 0152 §2).
+          setup: { role: input.setup?.role ?? null, done: [] },
         };
         state.agents.push(agent);
         if (input.proposal) Object.assign(proposalCard(input.proposal).card, { state: "created", agentId: agent.id });
@@ -2288,6 +2290,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
         }
         Object.assign(agent, fields);
+        return { ...agent };
+      },
+      confirmSetup: async (orgId, agentId, step) => {
+        log("agents.confirmSetup", orgId, agentId, step);
+        const agent = state.agents.find((a) => a.id === agentId);
+        if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        if (agent.setup && !agent.setup.done.includes(step)) {
+          agent.setup = { ...agent.setup, done: [...agent.setup.done, step] };
+        }
         return { ...agent };
       },
       mailLoss: async (orgId, agentId, audience) => {

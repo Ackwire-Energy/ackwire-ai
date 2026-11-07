@@ -1,6 +1,7 @@
 /** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
 import type { ChatPrefs } from "../lib/chat-look";
+import type { RoleId } from "../lib/new-agent";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { AudienceChoice } from "../lib/who-sees";
 
@@ -638,6 +639,22 @@ export interface Agent {
   mediaReplies?: boolean;
   /** Its autonomy brakes (ADR 0131); absent from an older server (the defaults). */
   brakes?: AgentBrakes;
+  /**
+   * Its setup checklist at the top of its chat (ADR 0152 §2): the ready-made role it started from and the steps a
+   * person confirmed. Null or absent: an agent made before it (none shows).
+   */
+  setup?: AgentSetupChecklist | null;
+}
+
+/** A step of a new agent's setup checklist (ADR 0152 §2); their order is `SETUP_STEPS` (lib/setup-checklist). */
+export type SetupStep = "ai" | "apps" | "where" | "who" | "how";
+
+/** A new agent's setup checklist (ADR 0152 §2). */
+export interface AgentSetupChecklist {
+  /** The ready-made role it started from (a `RoleId`, "support"); null: from scratch or made elsewhere. */
+  role: string | null;
+  /** The steps a person confirmed (chose in its dialog, or skipped). */
+  done: SetupStep[];
 }
 
 /** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
@@ -788,6 +805,8 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
+  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0152 §2). */
+  setup?: { role: RoleId | null };
 }
 
 /** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */

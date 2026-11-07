@@ -18,6 +18,7 @@ import {
   canViewCost,
   checkCredential,
   checkEndpoint,
+  confirmSetupStep,
   createAgent,
   createAgentFromProposal,
   createAgentGroup,
@@ -115,6 +116,7 @@ import {
   NewAgentSetup,
   PlanModelOut,
   ProviderId,
+  SetupStep,
   Usage,
 } from "./schemas";
 
@@ -910,6 +912,18 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "The Autonomia it starts with (ADR 0094, the last setup's). Default: low_risk_auto. Whoever may create it may set it: an admin, or its owner (without Manage agents, only your own agent).",
             }),
+            setup: z
+              .object({
+                role: z
+                  .string()
+                  .regex(/^[a-z][a-z_-]{0,31}$/)
+                  .nullable(),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0152 §2). Every new agent gets the checklist; without it, no role.",
+              }),
           }),
         ),
       },
@@ -1451,6 +1465,40 @@ export function agentRoutes(deps: AppDeps) {
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
+      const [seesCost, brains, viewer, old] = await Promise.all([
+        canViewCost(db, actor, orgId),
+        agentBrainSummaries(db, actor, orgId, [agent]),
+        getMembership(db, actor, orgId),
+        oldHandlesByAgent(db, orgId),
+      ]);
+      return c.json(
+        {
+          ...toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), viewer),
+          previousHandles: old.get(agent.id) ?? [],
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/setup/{step}",
+      tags,
+      security,
+      summary: "Confirm a step of a new agent's setup checklist",
+      description:
+        "Its owner or whoever manages agents chose (or skipped) one step of the checklist at the top of its chat (ADR 0152 §2). Confirming twice changes nothing; an agent with no checklist keeps none.",
+      request: { params: AgentParams.extend({ step: SetupStep }) },
+      responses: { 200: json(Agent), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId, step } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await confirmSetupStep(db, actor, orgId, agentId, step);
+      const agent = await getAgent(db, orgId, agentId);
+      if (!agent) throw new NotFoundError("Agent not found");
       const [seesCost, brains, viewer, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
