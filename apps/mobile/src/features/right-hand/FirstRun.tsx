@@ -1,6 +1,7 @@
 import type { Agent } from "@agenteschat/client";
 import {
   useAiStatus,
+  useCatalog,
   useConfirmSetup,
   useConnections,
   useMembers,
@@ -8,12 +9,14 @@ import {
   useSettings,
 } from "@agenteschat/client";
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import type { FirstRunState } from "@agenteschat/client/lib/right-hand";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   type FirstRunStep,
   firstRunAsks,
@@ -24,7 +27,7 @@ import {
 } from "@agenteschat/client/lib/setup-checklist";
 import { firstTasks, teamStatus } from "@agenteschat/client/lib/team-plan";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import type { IconName } from "@/ui";
@@ -105,7 +108,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     state,
     ready: status.isSuccess && members.isSuccess && settings.isSuccess,
     members: members.data?.length ?? 1,
-    apps: live.length,
+    connections: live,
     teamCard: cards.some((c) => teamStatus(c) === "open"),
     created: cards.filter((c) => c.state === "created").at(-1) ?? null,
   };
@@ -118,20 +121,32 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const send = useSendAnswer(channelId);
   const confirm = useConfirmSetup(orgId, agent.id);
   const run = useFirstRun(agent, channelId);
+  const catalog = useCatalog();
   const [templates, setTemplates] = useState<{ initial?: string } | null>(null);
+  const { steps, done, held, team } = run;
+  // Once, while the team row is still open for this person.
+  const teamOpen = useRef(false);
+  teamOpen.current = steps.includes("team") && !done.has("team");
   useEffect(() => {
-    templatesAfterAbout = (initial) => setTemplates(initial ? { initial } : {});
+    templatesAfterAbout = (initial) => {
+      if (teamOpen.current) setTemplates(initial ? { initial } : {});
+    };
     return () => {
       templatesAfterAbout = null;
     };
   }, []);
-  const { steps, done, held, team } = run;
   const doneHere = steps.filter((s) => done.has(s));
   const said = useDoneSay(run.ready, doneHere, (step) =>
     t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)),
   );
   if (run.state === "none") return null;
 
+  // The apps it reads, by name, as on the web ("Leio GitHub e Linear").
+  const names = run.connections.flatMap((c) => {
+    const def = catalog.data?.connectors.find((d) => d.id === c.connector);
+    return def ? [connectorName(t, def)] : [];
+  });
+  const appNames = names.length ? joinNames(names, t) : null;
   const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held, teamCard: run.teamCard });
   const next = steps.find((s) => stateOf(s) === "open");
   const act: Record<FirstRunStep, () => void> = {
@@ -147,7 +162,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       t,
       s,
       state,
-      { org: org?.name ?? "", agents: team.length, label: null, apps: null, members: run.members },
+      { org: org?.name ?? "", agents: team.length, label: null, apps: appNames, members: run.members },
       agent.setup?.done.includes(s) ?? false,
     );
     return {

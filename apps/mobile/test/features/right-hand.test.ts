@@ -100,6 +100,8 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
   expect(src("chats/FirstRunLine.tsx")).toContain('t("home.firstRun"');
+  // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected.
+  expect(src("right-hand/FirstRun.tsx")).toContain("apps: appNames, members: run.members");
 });
 
 test("Configurações has its section for who manages agents, at its own screen", () => {

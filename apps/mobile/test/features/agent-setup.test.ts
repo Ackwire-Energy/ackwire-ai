@@ -39,7 +39,8 @@ test("who sees it on the phone: who manages agents every step, its owner theirs,
 test("the DM draws the checklist on top for whoever sets it up, not the first day nor the no-AI line", () => {
   const chat = src("chat/ChatScreen.tsx");
   expect(chat).toContain("const setupIntro = useSetupSteps(dmAgent).length > 0 && !rightHand && !isThread;");
-  expect(chat).toContain("member && !rightHand && !setupIntro");
+  // No no-AI line over it (nor over the plan hold's).
+  expect(chat).toContain("member && !rightHand && !planHeld && !setupIntro");
   expect(chat.match(/<AgentSetupIntro agent=\{dmAgent\} channelId=\{channelId\} \/>/g)?.length).toBe(2);
   // Its screen shows the same card while something is left.
   expect(src("agents/AgentProfileScreen.tsx")).toContain('<AgentSetupCard agent={agent} place="profile" />');
