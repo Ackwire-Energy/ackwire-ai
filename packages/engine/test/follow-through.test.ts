@@ -451,8 +451,10 @@ test("at its time, an agent no longer in the conversation, or for a person who l
   const forPerson = await setFollowUp(f, run.id, 10);
   const forAgent = await setFollowUp(f, run.id, 20);
 
-  // The person who asked left the channel.
-  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: f.owner.id });
+  // The person who asked is no longer in the channel (nobody leaves #general on their own: their row goes).
+  await f.db
+    .delete(schema.channelMembers)
+    .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, f.owner.id)));
   expect(await wakeFollowUp({ db: f.db, pubsub: f.pubsub }, f.org.id, forPerson)).toBeNull();
   expect(await lineState(f, forPerson)).toBe("canceled");
 
