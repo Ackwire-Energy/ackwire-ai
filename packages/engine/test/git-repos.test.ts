@@ -186,7 +186,8 @@ describe('"Pode fazer merge sem perguntar": who chooses, and what', () => {
       .select()
       .from(schema.auditLog)
       .where(eq(schema.auditLog.action, "agent.merge_repositories_changed"))
-      .orderBy(desc(schema.auditLog.createdAt));
+      // By id (UUIDv7): two audits in the same millisecond share a createdAt.
+      .orderBy(desc(schema.auditLog.id));
     expect(audit?.details).toEqual({ repositories: [], reason: "owner_changed" });
   });
 });
