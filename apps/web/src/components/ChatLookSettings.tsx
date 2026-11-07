@@ -1,10 +1,14 @@
 import { useSetChatPrefs } from "@agenteschat/client";
 import {
   CHAT_STYLES,
+  CHAT_TEXT_SIZES,
   type ChatOpenAt,
   type ChatStyle,
+  type ChatTextSize,
   type ChatTone,
   chatLookOf,
+  DEFAULT_TEXT_SIZE,
+  textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
 import {
   type AgentColor,
@@ -72,9 +76,20 @@ function SampleRows({ lines, children }: { lines: Line[]; children?: (line: Line
   });
 }
 
-function Mini({ className, look, children }: { className?: string; look: ChatStyle; children: ReactNode }) {
+function Mini({
+  className,
+  look,
+  size,
+  children,
+}: {
+  className?: string;
+  look: ChatStyle;
+  /** Its own Tamanho do texto: the looks' small pictures stay at the default, the size's preview shows the choice. */
+  size: ChatTextSize;
+  children: ReactNode;
+}) {
   return (
-    <span className={cx("chat-look__mini", className)} aria-hidden="true" inert>
+    <span className={cx("chat-look__mini", className)} data-text-size={size} aria-hidden="true" inert>
       <span className="channel__messages" data-look={look}>
         {children}
       </span>
@@ -109,7 +124,8 @@ function Choice({
 
 /**
  * Sua conta › Conversa: how conversations look to me, on every device. Channels and DMs each have their own style (a
- * DM has two speakers, so bubbles say who spoke), Bolhas its Clara or Forte, and where a conversation opens.
+ * DM has two speakers, so bubbles say who spoke), Bolhas its Clara or Forte, the size of the words in all of them, and
+ * where a conversation opens.
  */
 export function ChatLookSettings() {
   const { t } = useTranslation();
@@ -120,6 +136,7 @@ export function ChatLookSettings() {
   const dm = kind === "dms";
   const prefs = org.chatPrefs;
   const { style, tone } = chatLookOf(prefs, dm);
+  const textSize = textSizeOf(prefs);
   const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
@@ -145,6 +162,13 @@ export function ChatLookSettings() {
     left: t("settings.account.chat.left"),
     bubbles: t("settings.account.chat.bubbles"),
     compact: t("settings.account.chat.compact"),
+  };
+  const sizes: Record<ChatTextSize, string> = {
+    xs: t("settings.account.chat.textXs"),
+    sm: t("settings.account.chat.textSm"),
+    md: t("settings.account.chat.textMd"),
+    lg: t("settings.account.chat.textLg"),
+    xl: t("settings.account.chat.textXl"),
   };
   return (
     <Card aria-labelledby="account-chat">
@@ -176,7 +200,7 @@ export function ChatLookSettings() {
             {CHAT_STYLES.map((s) => (
               <Choice key={s} id={`chat-look-${s}`} value={s} checked={s === style} title={names[s]}>
                 <MessageLookContext.Provider value={lookOf(s)}>
-                  <Mini look={s}>
+                  <Mini look={s} size={DEFAULT_TEXT_SIZE}>
                     <SampleRows lines={talk} />
                   </Mini>
                 </MessageLookContext.Provider>
@@ -210,6 +234,37 @@ export function ChatLookSettings() {
         )}
         <div className="chat-look__group">
           <span className="settings-row__text">
+            <span className="settings-row__label">{t("settings.account.chat.textSize")}</span>
+            <span className="settings-row__help">{t("settings.account.chat.textSizeHelp")}</span>
+          </span>
+          <Segmented
+            size="sm"
+            block
+            label={t("settings.account.chat.textSize")}
+            value={textSize}
+            onValueChange={(v) => save({ textSize: v })}
+            options={CHAT_TEXT_SIZES.map((s) => ({
+              value: s,
+              // An A in the step's own size; the default also says its name, the others to screen readers only.
+              label: (
+                <>
+                  <span className="chat-look__a" data-text-size={s} aria-hidden="true">
+                    A
+                  </span>
+                  {s === DEFAULT_TEXT_SIZE ? sizes[s] : <span className="ac-visually-hidden">{sizes[s]}</span>}
+                </>
+              ),
+              title: sizes[s],
+            }))}
+          />
+          <MessageLookContext.Provider value={lookOf(style)}>
+            <Mini className="chat-look__mini--real" look={style} size={textSize}>
+              <SampleRows lines={talk.slice(0, 2)} />
+            </Mini>
+          </MessageLookContext.Provider>
+        </div>
+        <div className="chat-look__group">
+          <span className="settings-row__text">
             <span className="settings-row__label">{t("settings.account.chat.openAt")}</span>
           </span>
           <RadioGroup
@@ -225,7 +280,7 @@ export function ChatLookSettings() {
                 checked={openAt === "read"}
                 title={t("settings.account.chat.openRead")}
               >
-                <Mini className="chat-look__mini--read" look={style}>
+                <Mini className="chat-look__mini--read" look={style} size={DEFAULT_TEXT_SIZE}>
                   <SampleRows lines={before.slice(1)} />
                   <div className="channel__unread">{t("channel.unreadDivider")}</div>
                   <SampleRows lines={fresh} />
@@ -240,7 +295,7 @@ export function ChatLookSettings() {
                 checked={openAt === "latest"}
                 title={t("settings.account.chat.openLatest")}
               >
-                <Mini className="chat-look__mini--end" look={style}>
+                <Mini className="chat-look__mini--end" look={style} size={DEFAULT_TEXT_SIZE}>
                   <SampleRows lines={fresh} />
                 </Mini>
                 <span className="chat-look__composer" aria-hidden="true">

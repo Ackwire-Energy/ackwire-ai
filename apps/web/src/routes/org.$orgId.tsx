@@ -6,6 +6,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } 
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
+import { usePageTextSize } from "@/chat/look";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
@@ -66,6 +67,7 @@ function OrgLayout() {
   useServerLocale(me.user);
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
+  usePageTextSize(membership?.chatPrefs);
   useEffect(() => {
     if (!membership) return;
     storage.set(STORAGE_KEYS.lastOrg, membership.id);

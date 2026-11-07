@@ -15,6 +15,7 @@ import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
 import { LinkPillText } from "./LinkPillText";
 import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
+import { useRowLook } from "./look";
 import { MessageRefText } from "./MessageRefText";
 
 /**
@@ -42,6 +43,9 @@ export function Spans({
   const { i18n } = useTranslation();
   const { agents } = useDirectory();
   const { scheme } = useTheme();
+  // The mono face runs wide: a step under the words, in a conversation the person's size.
+  const sized = useRowLook().text;
+  const codeSize = sized ? { fontSize: Math.round(sized.fontSize * 0.88) } : undefined;
   return (
     <>
       {inline.map((s, i) => {
@@ -61,7 +65,7 @@ export function Spans({
             );
           case "code":
             return (
-              <RNText key={key} style={[styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }]}>
+              <RNText key={key} style={[styles.inlineCode, codeSize, { backgroundColor: c.sunken, color: c.ink2 }]}>
                 {s.text}
               </RNText>
             );

@@ -1065,6 +1065,40 @@ textarea.ac-input {
   /* The avatar column and its gap: how far a body stands in from its row. */
   --msg-lead: calc(36px + var(--space-3));
 }
+/*
+ * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
+ * (`--msg-text`) on their reading line (`--msg-line`), and the tighter line (`--msg-line-tight`) of the name over them,
+ * which Bolhas and Compacta also give their words. The page carries the person's step (`html[data-text-size]`), a
+ * preview its own. The words' and lines' ratios are the ones before the setting, at a smaller default; the gaps
+ * between parts and turns stay the same at every step.
+ */
+:root,
+[data-text-size="md"] {
+  --msg-text: 14px;
+  --msg-line: 24px;
+  --msg-line-tight: 20px;
+}
+/* 18px at the least: a reader's face (`.ac-avatar--xs`) and Compacta's face stand on that line. */
+[data-text-size="xs"] {
+  --msg-text: 12px;
+  --msg-line: 20px;
+  --msg-line-tight: 18px;
+}
+[data-text-size="sm"] {
+  --msg-text: 13px;
+  --msg-line: 22px;
+  --msg-line-tight: 19px;
+}
+[data-text-size="lg"] {
+  --msg-text: 16px;
+  --msg-line: 27px;
+  --msg-line-tight: 23px;
+}
+[data-text-size="xl"] {
+  --msg-text: 18px;
+  --msg-line: 31px;
+  --msg-line-tight: 26px;
+}
 /* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
    `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
@@ -1176,9 +1210,10 @@ textarea.ac-input {
   width: 36px;
   height: 36px;
 }
+/* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
-  font-size: 11px;
-  line-height: 26px;
+  font-size: max(11px, calc(var(--msg-text) - 3px));
+  line-height: var(--msg-line);
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1215,17 +1250,17 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   margin-top: calc(var(--msg-part-gap) / 2);
 }
 /*
- * Name and time on a 20px line whose box starts at the face's top: capitals flush with the face's edge read as a face
- * hanging under the name, so the name sits a little in, as the text beside a picture does. Turns are told apart by
- * space, name and face only.
+ * Name and time on a line (20px by default) whose box starts at the face's top: capitals flush with the face's edge
+ * read as a face hanging under the name, so the name sits a little in, as the text beside a picture does. Turns are
+ * told apart by space, name and face only. The name is the words' size, its weight sets it apart.
  */
 .ac-msg__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  font-size: 14.5px;
-  line-height: 20px;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line-tight);
 }
 .ac-msg__author {
   font-weight: 650;
@@ -1235,7 +1270,7 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   align-self: center;
 }
 .ac-msg__time {
-  font-size: 12px;
+  font-size: max(11px, calc(var(--msg-text) - 2px));
   color: var(--faint);
 }
 .ac-msg__meta {
@@ -1333,10 +1368,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* Inline code on a plate (mono only for code). */
+/* Inline code on a plate (mono only for code), a step under the words: the mono face runs wide. */
 .ac-msg__text code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 0.84em;
   background: var(--plate);
   color: var(--ink2);
   padding: 2px 6px;
@@ -3862,10 +3897,10 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
   /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
   align-self: flex-end;
   margin-left: 8px;
-  font-size: 15.5px;
-  line-height: 1.7;
-  /* Browsers without the lh unit: the text's 26.35px line. */
-  translate: 0 calc(13.175px - var(--cap-mid) - 50%);
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
+  /* Browsers without the lh unit: the same, from the text's line. */
+  translate: 0 calc(var(--msg-line) / 2 - var(--cap-mid) - 50%);
 }
 @supports (top: 1lh) {
   .ac-msg__aside--floating {
@@ -5696,10 +5731,13 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
-/* Reading: 15.5px / 1.7 in the ink color, across the whole column (a code block or a table scrolls in its own box). */
+/*
+ * Reading: the person's Tamanho do texto (14px on a 24px line by default) in the ink color, across the whole column
+ * (a code block or a table scrolls in its own box).
+ */
 .ac-msg__text {
-  font-size: 15.5px;
-  line-height: 1.7;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
   color: var(--ink);
 }
 
@@ -5870,12 +5908,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
  * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
  * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
- * 15.5px / 1.7 line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
+ * words' line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
  */
 @media not ((hover: none) or (pointer: coarse)) {
   .ac-msg--own > .ac-msg__body > .ac-msg__actions,
   .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px);
+    top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 15px);
     right: calc(100% + 2px);
     flex-direction: row-reverse;
     padding: 0;

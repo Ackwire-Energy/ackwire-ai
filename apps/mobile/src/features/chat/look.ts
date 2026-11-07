@@ -1,10 +1,10 @@
-import { CHAT_RHYTHM, type ChatStyle, type ChatTone, chatLookOf } from "@agenteschat/client/lib/chat-look";
+import { CHAT_RHYTHM, type ChatStyle, type ChatTone, chatLookOf, textSizeOf } from "@agenteschat/client/lib/chat-look";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { createContext, useContext, useMemo } from "react";
 import { StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { useTheme } from "@/ui";
-import { bubbleFill, MSG_TEXT } from "./logic";
+import { bubbleFill, CHAT_TEXT, MSG_TEXT } from "./logic";
 
 /** How this conversation's rows are drawn (`chatLookOf`, as on the web's `MessageLook`). */
 export interface RowLook {
@@ -14,9 +14,11 @@ export interface RowLook {
   fill: string | null;
   /** False where the name says nothing (a DM's two speakers). */
   names: boolean;
+  /** The words per the person's Tamanho do texto (`CHAT_TEXT`); null outside a conversation: the page's own body. */
+  text: { fontSize: number; lineHeight: number } | null;
 }
 
-export const ROW_LOOK_DEFAULT: RowLook = { style: "comfortable", tone: "light", fill: null, names: true };
+export const ROW_LOOK_DEFAULT: RowLook = { style: "comfortable", tone: "light", fill: null, names: true, text: null };
 export const RowLookContext = createContext<RowLook>(ROW_LOOK_DEFAULT);
 export const useRowLook = () => useContext(RowLookContext);
 
@@ -25,8 +27,9 @@ export function useConversationLook(dm: boolean, agentColor?: AgentColorName): R
   const { org } = useOrg();
   const { colors, scheme } = useTheme();
   const { style, tone } = chatLookOf(org?.chatPrefs, dm);
+  const text = CHAT_TEXT[textSizeOf(org?.chatPrefs)];
   const fill = bubbleFill(agentColor ?? "sky", tone, colors.bg, scheme === "dark");
-  return useMemo(() => ({ style, tone, fill, names: !dm }), [style, tone, fill, dm]);
+  return useMemo(() => ({ style, tone, fill, names: !dm, text }), [style, tone, fill, dm, text]);
 }
 
 /** This conversation's rhythm: every row and line of its list takes its room from here. */

@@ -7,7 +7,8 @@ import { useColors } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { ChartCard, ChartPending } from "./ChartCard";
 import { CodeCard } from "./CodeCard";
-import { type Inline, parseBlocks } from "./logic";
+import { CHAT_TEXT_MAX_SCALE, type Inline, parseBlocks } from "./logic";
+import { useRowLook } from "./look";
 import { Spans, Table } from "./MessageSpans";
 
 /**
@@ -49,10 +50,14 @@ export const MessageText = memo(function MessageText({
   small?: boolean;
 }) {
   const c = useColors();
+  const look = useRowLook();
   const blocks = useMemo(() => parseBlocks(body), [body]);
   const inked = ink ? { color: ink } : undefined;
   const variant = small ? "footnote" : "body";
-  const line = small ? undefined : styles.line;
+  // In a conversation, the person's Tamanho do texto, which the system's text size grows up to its cap.
+  const sized = small ? null : look.text;
+  const line = small ? undefined : (sized ?? styles.line);
+  const fit = sized ? { maxFontSizeMultiplier: CHAT_TEXT_MAX_SCALE } : {};
   const spans = (inline: Inline[]) => (
     <Spans inline={inline} channelRefs={channelRefs} everyone={everyone} ink={ink} live={streaming} />
   );
@@ -76,7 +81,11 @@ export const MessageText = memo(function MessageText({
               <View key={i}>
                 <Fenced lang={b.lang} text={b.text} accent={accent} open={b.open === true} />
                 {/* A block still being written takes no fading tail or caret: its card grows instead. */}
-                {end && !b.open ? <Text variant="body">{end}</Text> : null}
+                {end && !b.open ? (
+                  <Text variant="body" style={line} {...fit}>
+                    {end}
+                  </Text>
+                ) : null}
               </View>
             );
           case "table":
@@ -86,13 +95,17 @@ export const MessageText = memo(function MessageText({
                 <View style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
                   <Table header={b.header} rows={b.rows} align={b.align} />
                 </View>
-                {end ? <Text variant="body">{end}</Text> : null}
+                {end ? (
+                  <Text variant="body" style={line} {...fit}>
+                    {end}
+                  </Text>
+                ) : null}
               </View>
             );
           case "heading":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant={variant} tone="ink" style={[line, styles.heading, inked]}>
+              <Text key={i} variant={variant} tone="ink" style={[line, styles.heading, inked]} {...fit}>
                 {spans(b.inline)}
                 {end}
               </Text>
@@ -101,10 +114,10 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={styles.bullet}>
-                <Text variant={variant} tone="faint" style={[line, styles.mark, inked]}>
+                <Text variant={variant} tone="faint" style={[line, styles.mark, inked]} {...fit}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
-                <Text variant={variant} tone={tone} style={[line, styles.flex, inked]}>
+                <Text variant={variant} tone={tone} style={[line, styles.flex, inked]} {...fit}>
                   {spans(b.inline)}
                   {end}
                 </Text>
@@ -115,14 +128,18 @@ export const MessageText = memo(function MessageText({
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
                 <Details summary={b.summary} body={b.body} muted={muted} accent={accent} channelRefs={channelRefs} />
-                {end ? <Text variant="body">{end}</Text> : null}
+                {end ? (
+                  <Text variant="body" style={line} {...fit}>
+                    {end}
+                  </Text>
+                ) : null}
               </View>
             );
           case "quote":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={[styles.quote, { borderLeftColor: ink ?? c.line2 ?? c.line }]}>
-                <Text variant={variant} tone="muted" style={[line, inked]}>
+                <Text variant={variant} tone="muted" style={[line, inked]} {...fit}>
                   {spans(b.inline)}
                   {end}
                 </Text>
@@ -131,14 +148,18 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant={variant} tone={tone} style={[line, inked]} selectable={selectable}>
+              <Text key={i} variant={variant} tone={tone} style={[line, inked]} selectable={selectable} {...fit}>
                 {spans(b.inline)}
                 {end}
               </Text>
             );
         }
       })}
-      {blocks.length === 0 && caret ? <Text variant="body">{caret}</Text> : null}
+      {blocks.length === 0 && caret ? (
+        <Text variant="body" style={line} {...fit}>
+          {caret}
+        </Text>
+      ) : null}
     </View>
   );
 });
@@ -170,6 +191,7 @@ function Details({
   channelRefs?: Record<string, string>;
 }) {
   const c = useColors();
+  const sized = useRowLook().text;
   const [open, setOpen] = useState(false);
   return (
     <View style={[styles.details, { borderColor: c.line }]}>
@@ -182,7 +204,12 @@ function Details({
         }}
         style={({ pressed }) => [styles.summary, pressed && styles.pressed]}
       >
-        <Text variant="body" tone="muted" style={[styles.line, styles.flex, styles.heading]}>
+        <Text
+          variant="body"
+          tone="muted"
+          style={[sized ?? styles.line, styles.flex, styles.heading]}
+          {...(sized ? { maxFontSizeMultiplier: CHAT_TEXT_MAX_SCALE } : {})}
+        >
           {summary.length > 0 ? <Spans inline={summary} channelRefs={channelRefs} /> : "…"}
         </Text>
         <View style={open ? styles.flip : undefined}>
@@ -219,7 +246,7 @@ function Caret() {
 
 const styles = StyleSheet.create({
   wrap: { gap: 8, marginTop: 1 },
-  /** Readable turns: 17 with a line-height of ~1.42. */
+  /** Outside a conversation (a task's text, a document): the body's size on a line of ~1.42. */
   line: { lineHeight: 24 },
   flex: { flex: 1 },
   heading: { fontWeight: "700" },

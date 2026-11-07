@@ -94,6 +94,8 @@ import { cacheContinued } from "./live";
 import {
   approvalIdOf,
   artifactsOf,
+  CHAT_TEXT_MAX_SCALE,
+  chatNameOf,
   consultationsOf,
   hangsUnder,
   hidesBody,
@@ -337,6 +339,8 @@ export const MessageRow = memo(function MessageRow({
   // like anyone's.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
   const look = useRowLook();
+  // The name over the words follows the person's Tamanho do texto, as the words do.
+  const nameSize = look.text ? chatNameOf(look.text) : undefined;
   const onRight = mine && mineOnRight(look.style);
   const bubbled = look.style === "bubbles";
   const compact = look.style === "compact";
@@ -523,8 +527,9 @@ export const MessageRow = memo(function MessageRow({
         <Text
           variant="footnote"
           tone="ink2"
-          style={[styles.name, nameColor ? { color: nameColor } : undefined]}
+          style={[styles.name, nameSize, nameColor ? { color: nameColor } : undefined]}
           numberOfLines={1}
+          maxFontSizeMultiplier={nameSize ? CHAT_TEXT_MAX_SCALE : undefined}
         >
           {name}
         </Text>

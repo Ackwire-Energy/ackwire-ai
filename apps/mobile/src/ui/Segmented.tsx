@@ -45,6 +45,7 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            accessibilityLabel={item.accessibilityLabel}
             style={({ pressed }) => [
               wide === "fit" ? { flexGrow: 1 } : wide ? { flex: 1 } : null,
               pressed && !on ? { opacity: 0.6 } : null,

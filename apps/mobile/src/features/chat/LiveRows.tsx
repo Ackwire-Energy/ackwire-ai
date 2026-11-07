@@ -58,6 +58,8 @@ import type { Measurable } from "./ask-store";
 import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import {
   awayRun,
+  CHAT_TEXT_MAX_SCALE,
+  chatNameOf,
   type LineDrawn,
   type LineWords,
   leavingWords,
@@ -265,8 +267,13 @@ export const TurnRow = memo(function TurnRow({
                 <Text
                   variant="footnote"
                   tone="ink2"
-                  style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
+                  style={[
+                    styles.name,
+                    look.text ? chatNameOf(look.text) : undefined,
+                    bubbled ? { color: nameInk(color, scheme === "dark") } : undefined,
+                  ]}
                   numberOfLines={1}
+                  maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
                 >
                   {agent?.name ?? ""}
                 </Text>
