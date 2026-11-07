@@ -204,9 +204,16 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
  * conversations from another. A routine's room (ADR 0053 §4) is read only by
  * that routine's own runs: never by another routine's run or a conversation's.
  * A routine's run also reads the conversation it reports to, private or a DM,
- * while its creator is still in it (`routineReportChannel`).
+ * while its creator is still in it (`routineReportChannel`); `files: true` leaves that conversation out, since a
+ * routine never holds its creator's files (ADR 0053 §2).
  */
-export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
+export async function agentSearchChannels(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  currentChannelId: string,
+  { files = false }: { files?: boolean } = {},
+) {
   const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
     db
       .select({
@@ -220,7 +227,7 @@ export async function agentSearchChannels(db: Database, orgId: string, agentId: 
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
   )) as { id: string; visibility: string; kind: string; dmKey: string | null }[];
   const room = rows.find((r) => r.id === currentChannelId && isRoutineRoomKey(r.dmKey));
-  const reports = room?.dmKey ? await routineReportChannel(db, orgId, agentId, room.dmKey) : null;
+  const reports = room?.dmKey && !files ? await routineReportChannel(db, orgId, agentId, room.dmKey) : null;
   return rows
     .filter(
       (r) =>
