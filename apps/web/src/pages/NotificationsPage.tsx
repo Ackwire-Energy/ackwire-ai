@@ -92,7 +92,6 @@ import { colorOf, prepareBurst } from "@/components/Sky";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
-import { useWraps } from "@/hooks/useWraps";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
@@ -1105,8 +1104,9 @@ function WaitApproval({
 }
 
 /**
- * A waiting item that only points somewhere, on one line: its face, its words, Open, Remind me later and Done. A click
- * anywhere on it opens it, as Open does.
+ * A waiting item that only points somewhere, on a card of the requests' shape: where it is from and when on top, its
+ * words and what it is about, then Open, Remind me later and Done in the footer. A click anywhere on it opens it, as
+ * Open does.
  */
 function WaitRow({
   n,
@@ -1141,8 +1141,8 @@ function WaitRow({
         : n.kind === "usage_limit"
           ? usageLimitLine(t, n)
           : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
-  const l1 = useRef<HTMLDivElement>(null);
-  const wraps = useWraps(l1);
+  const source = sourceOf(t, n, channelName);
+  const when = whenText(t, i18n.language, n.createdAt);
   return (
     <article
       className={cx(
@@ -1163,25 +1163,31 @@ function WaitRow({
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
-      <div className="nt-wr__main">
-        <div className="nt-wr__text">
-          <div ref={l1} className={cx("nt-wr__l1", (sub || wraps) && "ac-captop")}>
-            <span className="nt-what">
-              <Headline n={n} dir={dir} channelName={channelName} />
-            </span>{" "}
-            <SourceChip n={n} channelName={channelName} className="nt-wr__src" />{" "}
-            <span className="nt-wr__tm">{whenText(t, i18n.language, n.createdAt)}</span>{" "}
-            <LeftChip n={n} className="nt-wr__left" />
-          </div>
-          {sub && <p className="nt-wr__sub">{sub}</p>}
+      <div className="rq nt-wr__main">
+        <div className="rq__head">
+          <span className="rq__kind">
+            {source ? (
+              <>
+                <span className="nt-wr__src">{source[1]}</span>
+                <span className="rq__source nt-wr__tm"> · {when}</span>
+              </>
+            ) : (
+              <span className="nt-wr__tm">{when}</span>
+            )}
+          </span>
+          <LeftChip n={n} className="nt-wr__left" />
         </div>
-        <div className="nt-wr__acts ac-acts">
+        <p className="rq__lead nt-what">
+          <Headline n={n} dir={dir} channelName={channelName} />
+        </p>
+        {sub && <p className="nt-wr__sub">{sub}</p>}
+        <div className="rq__foot nt-wr__acts">
           {/* A board's notice is decided or resolved right here (ADR 0135). */}
           <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
           <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
             {t("notifications.open")}
           </Button>
-          {tail}
+          <span className="rq__end">{tail}</span>
         </div>
       </div>
       {children}
