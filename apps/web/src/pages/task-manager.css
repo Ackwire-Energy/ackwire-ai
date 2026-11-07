@@ -487,6 +487,21 @@ html:not([data-pointer]) .tm-more:focus-visible {
   }
 }
 
+/* On a phone the buttons' column beside the stacked cells left their words a few characters a line: the buttons go
+   under them, at the row's end, as the kit's `.ac-actrow` puts an action. */
+@container tm (max-width: 480px) {
+  .tm-row:not(.tm-row--ended) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tm-row:not(.tm-row--ended) > .tm-cell--act {
+    grid-row: 5;
+    grid-column: 1;
+  }
+  .tm-cell--act:empty {
+    display: none;
+  }
+}
+
 /* "Computadores" (ADR 0128): the computers with work, whether each has room, and "Ver fila". No memory figure. */
 .tm-computers {
   display: flex;

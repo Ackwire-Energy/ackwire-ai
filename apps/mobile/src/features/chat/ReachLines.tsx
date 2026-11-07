@@ -22,7 +22,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
+import { ACT_ROW, Button, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -94,11 +94,11 @@ function Row({
       />
     );
   return (
-    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+    <View style={[styles.one, ACT_ROW.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
         <LineIcon name={handed ? "chat" : "info"} size={15} color={colors.muted} variant="small" />
       </View>
-      <View style={[styles.grow, styles.tx]}>
+      <View style={[ACT_ROW.text, styles.tx]}>
         <Text variant="small" tone="ink2" numberOfLines={3}>
           {runs.map((r, i) =>
             r.bold ? (
@@ -244,7 +244,6 @@ const styles = StyleSheet.create({
   list: { gap: LIST_GAP },
   locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
   lockedText: { textAlign: "center" },
-  grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   // As the team checks' line (TeamChecks): the icon, the first line and the action (32, in a 50 row) share one middle,
   // also when the words take three lines.

@@ -85,9 +85,9 @@ function AccessRow({
   removeLabel?: string;
 }) {
   return (
-    <div className="ac-access__row">
+    <div className="ac-access__row ac-actrow">
       <span className="ac-access__lead">{subject.lead}</span>
-      <span className="ac-access__who">
+      <span className="ac-access__who ac-actrow__text">
         <span className="ac-access__name">{subject.name}</span>
         {subject.detail && <span className="ac-access__detail">{subject.detail}</span>}
       </span>

@@ -259,7 +259,7 @@ function Receipt({
   const hadButton = useRef(false);
   if (button) hadButton.current = true;
   return (
-    <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>
+    <div className={cx(single ? "ag-rc" : "ag-rcg__it", "ac-actrow", struck && "is-undone")} data-phase={phase}>
       {single ? (
         <span className="ag-rc__ic" aria-hidden="true">
           <Icon name={iconOf(a)} size={16} />
@@ -267,7 +267,7 @@ function Receipt({
       ) : (
         <Icon name={iconOf(a)} size={14} className="ag-rcg__ic" />
       )}
-      <span className="ag-rc__tx">
+      <span className="ag-rc__tx ac-actrow__text">
         <span className="ag-rc__sentence">
           <Trans
             // i18next contexts: `issue.assigned_self`, `routine.updated_paused`…

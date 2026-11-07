@@ -996,6 +996,10 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .ac-details__bar:has(.issue-bartitle) {
   align-items: flex-start;
 }
+/* The title in the eyebrow's place: the 24 characters it keeps beside the buttons (`.ac-actrow`) are the title's. */
+.ac-details__eyebrow:has(> .issue-bartitle) {
+  font-size: 20px;
+}
 .issue-bartitle {
   flex: 1;
   min-width: 0;

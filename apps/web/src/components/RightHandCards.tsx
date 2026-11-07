@@ -256,9 +256,9 @@ function RemovalCard({
               const name = nameOf(p);
               const status = rowStatus(t, p);
               return (
-                <li key={p.id} className="proposal-row">
+                <li key={p.id} className="proposal-row ac-actrow">
                   <AgentAvatar agentId={p.agentId} size="sm" name={name} />
-                  <span className="proposal-row__what">
+                  <span className="proposal-row__what ac-actrow__text">
                     <span className="proposal-row__name">{name}</span>
                     {agent && <span>{[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}</span>}
                   </span>
@@ -630,9 +630,9 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
         body={
           <ul className="proposal-rows">
             {card.rows.map((r) => (
-              <li key={`${r.userId}:${what(r)}`} className="proposal-row">
+              <li key={`${r.userId}:${what(r)}`} className="proposal-row ac-actrow">
                 <PersonAvatar id={r.userId} name={r.name} size="sm" />
-                <span className="proposal-row__what">
+                <span className="proposal-row__what ac-actrow__text">
                   {/* Their email too: a display name alone can be anyone's (the card may follow what someone else wrote). */}
                   <span className="proposal-row__name">
                     {r.name} <span className="muted">{people.find((p) => p.userId === r.userId)?.email}</span>

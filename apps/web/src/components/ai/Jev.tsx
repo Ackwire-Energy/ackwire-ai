@@ -337,9 +337,9 @@ function JevCard({ routing }: { routing?: AiRouting["by"] }) {
   return (
     <section id="jev" ref={box} tabIndex={-1} className="jev" aria-labelledby="jev-title">
       <List>
-        <div className="ac-list__row jev__head">
+        <div className="ac-list__row jev__head ac-actrow">
           <ProviderLogo id="typesafe" size="sm" />
-          <span className="list-col">
+          <span className="list-col ac-actrow__text">
             <span className="ac-hintline ac-captop">
               <h3 id="jev-title" className="jev__title">
                 {t("jev.title")}

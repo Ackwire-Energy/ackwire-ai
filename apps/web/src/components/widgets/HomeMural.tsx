@@ -58,9 +58,11 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
   };
   return (
     <section className="home-sec home-mural" aria-label={title}>
-      <div className="list-group-head">
-        <h2>{title}</h2>
-        {count > 0 && <span className="list-group-head__count">{count}</span>}
+      <div className="list-group-head ac-actrow">
+        <span className="list-group-head__title ac-actrow__text">
+          <h2>{title}</h2>
+          {count > 0 && <span className="list-group-head__count">{count}</span>}
+        </span>
         <span className="home-sec__acts">
           <Link className="home-sec__more" to="/org/$orgId/dashboards" params={{ orgId }}>
             {t("dashboards.seeAll")}

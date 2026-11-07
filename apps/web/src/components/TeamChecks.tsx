@@ -52,11 +52,11 @@ function TeamCheckRow({ check, selfId }: { check: TeamCheck; selfId: string | nu
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="ag-rc">
+    <div className="ag-rc ac-actrow">
       <span className="ag-rc__ic" aria-hidden="true">
         <Icon name={ICONS[targetKind(target)]} size={16} />
       </span>
-      <span className="ag-rc__tx">
+      <span className="ag-rc__tx ac-actrow__text">
         <span className="ag-rc__sentence" title={check.targets.join(", ")}>
           <Trans i18nKey={key as "teamChecks.teammate"} values={values} components={{ b: <b /> }} />
         </span>

@@ -42,11 +42,11 @@ export function OverviewTab() {
         {(approvals > 0 || pending.length > 0) && (
           <div className="agp-attns">
             {approvals > 0 && (
-              <div className="agp-attn ac-faceline">
+              <div className="agp-attn ac-faceline ac-actrow">
                 <span className="agp-ib agp-ib--warn">
                   <Icon name="lock" size={16} />
                 </span>
-                <span className="agp-attn__t">
+                <span className="agp-attn__t ac-actrow__text">
                   <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
                   <span>{decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}</span>
                 </span>
@@ -60,11 +60,11 @@ export function OverviewTab() {
               </div>
             )}
             {pending.map((p) => (
-              <div key={p.id} className="agp-attn ac-faceline">
+              <div key={p.id} className="agp-attn ac-faceline ac-actrow">
                 <span className="agp-ib agp-ib--warn">
                   <Icon name="document" size={16} />
                 </span>
-                <span className="agp-attn__t">
+                <span className="agp-attn__t ac-actrow__text">
                   <b className="ac-captop">{t("agentPage.overview.proposes", g)}</b>
                   <span>
                     {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}

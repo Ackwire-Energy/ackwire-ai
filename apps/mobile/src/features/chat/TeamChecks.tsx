@@ -3,7 +3,7 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
+import { ACT_ROW, type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -52,11 +52,11 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
     .join(" · ");
   const channelId = match.channelId;
   return (
-    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+    <View style={[styles.one, ACT_ROW.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
         <LineIcon name={ICONS[targetKind(target)]} size={15} color={colors.muted} variant="small" />
       </View>
-      <View style={[styles.grow, styles.tx]}>
+      <View style={[ACT_ROW.text, styles.tx]}>
         <Text variant="small" tone="ink2">
           {runs.map((r, i) =>
             r.bold ? (
@@ -87,7 +87,6 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
 
 const styles = StyleSheet.create({
   list: { gap: 8 },
-  grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   // The receipts' card: a hairline, the cut corner; the icon (as the conversation's event lines), the first line and
   // the action (32, in a 50 row) share one middle.

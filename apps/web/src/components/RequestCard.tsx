@@ -221,9 +221,9 @@ export function RequestCard({
       </div>
       <p className="rq__lead">{lead}</p>
       {object && (
-        <div className="rq__well">
+        <div className="rq__well ac-actrow">
           <span className="rq__logo">{object.logo}</span>
-          <span className="rq__wt">
+          <span className="rq__wt ac-actrow__text">
             <b>{object.title}</b>
             {object.detail && <small>{object.detail}</small>}
           </span>

@@ -19,7 +19,7 @@
   const sig = (el) => {
     const classes = (typeof el.className === "string" ? el.className : (el.className?.baseVal ?? ""))
       .split(/\s+/)
-      .filter((c) => c && !/^(ac-captop|ac-iconline|is-|has-)/.test(c))
+      .filter((c) => c && !/^(ac-captop|ac-iconline|ac-actrow|is-|has-)/.test(c))
       .slice(0, 3);
     return el.tagName.toLowerCase() + classes.map((c) => `.${c}`).join("");
   };
@@ -462,22 +462,48 @@
         }
       }
     },
+    /**
+     * Words squeezed to a sliver beside something that keeps its width (an action, a time): a block of text on 3 lines
+     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line. A block
+     * is what its words lay out in: a `<b>` or a link inside a sentence is the sentence's.
+     */
     wordwrap(out) {
-      for (const el of document.body.querySelectorAll("*")) {
-        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table")) continue;
+      const blocks = new Map();
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.textContent.trim()) continue;
+        let block = n.parentElement;
+        while (block && block !== document.body && ["inline", "contents"].includes(style(block).display))
+          block = block.parentElement;
+        if (!block || block === document.body) continue;
+        const b = blocks.get(block) ?? { tops: [], text: "" };
+        for (const r of textRange(n).getClientRects()) if (r.width > 0) b.tops.push(r.top);
+        b.text += n.textContent;
+        blocks.set(block, b);
+      }
+      for (const [el, { tops, text }] of blocks) {
+        if (!seen(el) || el.closest("svg,pre,code,table")) continue;
+        const s = style(el);
+        if (s.whiteSpace.startsWith("pre") || s.whiteSpace === "break-spaces") continue;
+        // Lines by their tops: words of another size on the same line sit a few pixels off.
+        const step = parseFloat(s.fontSize) * 0.6;
+        let lines = 0;
+        let last = -Infinity;
+        for (const top of tops.sort((a, b) => a - b)) {
+          if (top - last <= step) continue;
+          lines += 1;
+          last = top;
+        }
+        if (lines < 3) continue;
+        const words = text.trim().replace(/\s+/g, " ");
         const parent = el.parentElement;
         const ps = style(parent);
         const row =
-          (ps.display.includes("flex") && !ps.flexDirection.startsWith("column")) ||
-          (ps.display.includes("grid") && ps.gridTemplateColumns.split(" ").length > 1);
-        if (!row || flow(parent).length < 2) continue;
-        const count = (el.textContent ?? "").trim().split(/\s+/).length;
-        if (count < 3) continue;
-        const tops = new Set();
-        for (const n of el.childNodes)
-          if (n.nodeType === 3) for (const r of textRange(n).getClientRects()) tops.add(Math.round(r.top));
-        if (tops.size >= 3 && count / tops.size < 1.6)
-          out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines: tops.size, text: words(el) });
+          ((ps.display.includes("flex") && !ps.flexDirection.startsWith("column")) ||
+            (ps.display.includes("grid") && ps.gridTemplateColumns.split(" ").length > 1)) &&
+          flow(parent).length >= 2;
+        if (words.length / lines < 12 || (row && words.split(" ").length / lines < 1.6))
+          out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines, text: words.slice(0, 60) });
       }
     },
     /**

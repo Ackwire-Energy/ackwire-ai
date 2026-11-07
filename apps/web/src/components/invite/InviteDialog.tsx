@@ -850,13 +850,13 @@ function LinkRequests({ requests, onOpen }: { requests: readonly { id: string; n
   const { org } = useOrg();
   if (requests.length === 0) return null;
   return (
-    <div className="invite-waiting">
+    <div className="invite-waiting ac-actrow">
       <AvatarStack aria-hidden="true">
         {requests.slice(0, 3).map((r) => (
           <Avatar key={r.id} name={r.name} size="sm" />
         ))}
       </AvatarStack>
-      <span className="invite-waiting__text">
+      <span className="invite-waiting__text ac-actrow__text">
         <b>{t("members.dialog.linkStep.waiting", { count: requests.length })}</b>
         <span>
           {namesText(

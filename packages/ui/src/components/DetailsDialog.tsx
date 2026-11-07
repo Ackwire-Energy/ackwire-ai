@@ -98,7 +98,7 @@ export function DetailsDialog({
   const heading = titleHidden ? (
     <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
   ) : (
-    <div className="ac-details__heading">
+    <div className="ac-details__heading ac-actrow__text">
       {icon && <span className="ac-details__icon">{icon}</span>}
       <div className="ac-details__titles">
         <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
@@ -112,8 +112,8 @@ export function DetailsDialog({
     <>
       <div className="ac-details__head">
         {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
-        <div className={cx("ac-details__bar", inline && "ac-details__bar--titled")}>
-          {inline ? heading : <div className="ac-details__eyebrow">{eyebrow}</div>}
+        <div className={cx("ac-details__bar ac-actrow", inline && "ac-details__bar--titled")}>
+          {inline ? heading : <div className="ac-details__eyebrow ac-actrow__text">{eyebrow}</div>}
           <div className="ac-details__actions ac-acts">
             {actions}
             {page &&

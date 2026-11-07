@@ -107,11 +107,11 @@ export function InstructionsTab() {
             </Card>
           )}
           {pending.length > 0 && (
-            <div className="agp-attn ac-faceline">
+            <div className="agp-attn ac-faceline ac-actrow">
               <span className="agp-ib agp-ib--warn">
                 <Icon name="document" size={16} />
               </span>
-              <span className="agp-attn__t">
+              <span className="agp-attn__t ac-actrow__text">
                 <b className="ac-captop">{t("agentPage.instructions.proposals", { count: pending.length })}</b>
                 <span>{t("agentPage.overview.proposes", g)}</span>
               </span>
