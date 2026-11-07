@@ -107,9 +107,15 @@ export const ONBOARDING_CREW = [
  */
 export const WHOLE = { width: 36, height: 46, x: 2, y: 16, body: 28 } as const;
 export const wholeFile = (look: Required<Look>) => `agent-${look.color}-${look.eyes}-${look.accessory}.png`;
+/**
+ * The ink logo with its wordmark on a rounded tile of the page's colour: unseen on our light page, and the wordmark
+ * still reads where a client darkens the page but not the picture (the Gmail apps, Gmail with other accounts, classic
+ * Outlook), or inverts the picture too. `logo-ink.png`, without the tile, stays for the emails already sent.
+ */
+const LOGO_INK = "logo-ink-tile.png";
 /** Every picture an email may show, as the web app serves them (`apps/web/public/email/`). */
 export const EMAIL_PICTURES = [
-  "logo-ink.png",
+  LOGO_INK,
   "logo-bone.png",
   COMPUTER.file,
   "sky-band.png",
@@ -167,7 +173,8 @@ const END = { text: 2, box: 4, button: 6 };
 /**
  * The dark design, by class. The media query reaches Apple Mail, the Outlook apps, Samsung and Thunderbird;
  * the same rules under `[data-ogsc]`/`[data-ogsb]` reach Outlook.com and new Outlook, which stamp what
- * they recolour. No rule uses #ffffff: Apple Mail ignores it in dark rules.
+ * they recolour. No rule uses #ffffff: Apple Mail ignores it in dark rules. The Gmail apps read no media query and
+ * darken the light design themselves, so nothing in it may depend on a colour they leave alone (`EMAIL_DARK_HEAD`).
  */
 const DARK = [
   `.bg{background:${D.page}!important}`,
@@ -179,7 +186,7 @@ const DARK = [
   `.well{background:${D.well}!important}`,
   `.wh{border-color:${D.wellHair}!important}`,
   `.num{background:${D.card}!important;border-color:${D.border}!important;color:${D.muted}!important}`,
-  `.btn{background:${D.action}!important;color:${D.onAction}!important}`,
+  `.btn{background:${D.action}!important;color:${D.onAction}!important;border-color:${D.action}!important}`,
   `.btn span{color:${D.onAction}!important}`,
   `.ln{color:${D.ink}!important;text-decoration-color:${D.border}!important}`,
   `.avp{background:${D.well}!important;color:${D.text}!important;border-color:${D.border}!important}`,
@@ -343,9 +350,11 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
 <td class="ink" align="center" style="padding:16px 16px 16px 24px;${P};font-size:32px;line-height:40px;font-weight:700;letter-spacing:8px;font-variant-numeric:tabular-nums;color:${L.ink};text-align:center">${esc(b.code)}</td></tr></table>`;
   if ("button" in b) {
     // A link button, clickable everywhere; classic Outlook gets its own spacers, in em at the 15 px label, and draws
-    // it square and flat. The colour comes before the shorthand: a client without gradients keeps the colour, and
-    // Gmail for Android breaks a gradient in an inline background-image.
-    const btn = `<a class="btn" href="${esc(b.url)}" target="_blank" style="display:inline-block;background-color:${L.action};background:${L.action} linear-gradient(180deg,${L.actionTop} 0%,${L.action} 100%);border-radius:14px;box-shadow:${LIFT};color:${L.onAction};${PB};font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:14px 16px;mso-padding-alt:0;text-underline-color:${L.action}"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:${L.onAction}">${esc(b.button)}</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a>`;
+    // it square and flat. Its gradient comes only from the colour-scheme blocks in the head: the Gmail apps darken a
+    // fill and its label but leave a gradient as drawn, which would put a darkened label on the light design's ink.
+    // The border in the fill's colour is unseen in light; Gmail for Android lightens it as a line, so the button keeps
+    // an edge on its darkened card. It takes 1 px of the padding: still 48 tall.
+    const btn = `<a class="btn" href="${esc(b.url)}" target="_blank" style="display:inline-block;background-color:${L.action};border:1px solid ${L.action};border-radius:14px;box-shadow:${LIFT};color:${L.onAction};${PB};font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:13px 15px;mso-padding-alt:0;text-underline-color:${L.action}"><!--[if mso]><i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:93%;color:${L.onAction}">${esc(b.button)}</span><!--[if mso]><i style="mso-font-width:107%" hidden>&emsp;&#8203;</i><![endif]--></a>`;
     // Four spaces too: classic Outlook ignores the span's width. The second label has no colour of its own, so the
     // dark rules reach it through the link, and classic Outlook raises it like the button's.
     const also = b.also
@@ -403,12 +412,37 @@ function text(b: Block): string {
   return "";
 }
 
+/**
+ * Light and dark, in every email: both schemes declared, our dark design by media query and again under Outlook.com's
+ * hooks, and the button's gradients. Declaring dark lets the Gmail apps darken the light design themselves, the only
+ * dark they draw (`light only` would keep them light inside their dark UI). Risky rules sit in blocks of their own, so a
+ * client that drops one keeps the rest. Each gradient comes after the flat fill it paints over: a client that rejects
+ * it keeps the flat fill, and Outlook.com's hooks outrank the light one.
+ */
+export const EMAIL_DARK_HEAD = `<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+</style>
+<style>
+@media (prefers-color-scheme:dark){${DARK.join("")}}
+</style>
+<style>
+${DARK.map((r) => `[data-ogsc] ${r}[data-ogsb] ${r}`).join("\n")}
+</style>
+<style>
+@media (prefers-color-scheme:light){.btn{background-image:linear-gradient(180deg,${L.actionTop} 0%,${L.action} 100%)!important}}
+</style>
+<style>
+@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,${D.actionTop} 0%,${D.action} 100%)!important}}
+</style>`;
+
 /** After the preheader, so the body's first words don't trail into the inbox preview (iOS and Yahoo need the last two). */
 const FILLER = "&#847;&zwnj;&nbsp;&#8199;&shy;".repeat(60);
 
 /**
  * One email in our look: the light design inline, our dark design for the clients that apply an email's
- * own, the Gmail apps kept light, and a plain-text part with the same words.
+ * own (`EMAIL_DARK_HEAD`), and a plain-text part with the same words.
  */
 export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: string; inline: InlinePart[] } {
   const { src, inline } = pictures(art);
@@ -421,10 +455,6 @@ export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: s
   const body = doc.blocks.map((b, i) => block(b, src, i === doc.blocks.length - 1)).join("\n");
   const logo = (file: string, cls: string, display: string, color: string) =>
     `<img class="${cls}" src="${esc(src(file))}" width="${LOGO.width}" height="${LOGO.height}" alt="${LOGO.alt}" style="display:${display};border:0;outline:none;width:${LOGO.width}px;height:${LOGO.height}px;font-family:${SANS};font-size:20px;font-weight:600;line-height:${LOGO.height}px;color:${color}">`;
-  // `light only` keeps the Gmail apps from converting it; `:root{color-scheme:light dark}` keeps Apple Mail
-  // applying our dark design. Risky rules sit in blocks of their own, so a client that drops one keeps the rest.
-  // The dark button's gradient comes after the flat fill it paints over (the same specificity, so the later wins):
-  // a client that rejects it keeps the flat fill.
   const page = `<!doctype html>
 <html lang="${lang}" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -432,24 +462,13 @@ export function renderDoc(doc: EmailDoc, art: EmailArt): { html: string; text: s
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="x-apple-disable-message-reformatting">
 <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
-<meta name="color-scheme" content="light only">
-<meta name="supported-color-schemes" content="light dark">
+${EMAIL_DARK_HEAD}
 <title>${esc(doc.subject)}</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>body,table,td,p,a,span,b,h1,h2{font-family:'Segoe UI',Arial,sans-serif!important}</style><![endif]-->
 <style>
-:root{color-scheme:light dark;supported-color-schemes:light dark}
 body{margin:0!important;padding:0!important;width:100%!important}
 a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
 @media (max-width:620px){${PHONE.join("")}}
-</style>
-<style>
-@media (prefers-color-scheme:dark){${DARK.join("")}}
-</style>
-<style>
-${DARK.map((r) => `[data-ogsc] ${r}[data-ogsb] ${r}`).join("\n")}
-</style>
-<style>
-@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,${D.actionTop} 0%,${D.action} 100%)!important}}
 </style>
 ${fonts ? `<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;size-adjust:107%;src:url('${esc(`${fonts}${FONT}`)}') format('woff2')}</style><!--<![endif]-->` : ""}
 </head>
@@ -462,7 +481,7 @@ ${fonts ? `<!--[if !mso]><!--><style>@font-face{font-family:'Source Sans 3';font
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:552px;margin:0 auto">
 <tr><td style="padding:32px 0 20px">
 <a href="${esc(art.home)}" target="_blank" style="display:inline-block;text-decoration:none">
-${logo("logo-ink.png", "logo-ink", "block", L.ink)}
+${logo(LOGO_INK, "logo-ink", "block", L.ink)}
 <!--[if !mso]><!-->${logo("logo-bone.png", "logo-bone", "none", D.ink)}<!--<![endif]-->
 </a>
 </td></tr>
