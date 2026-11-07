@@ -20,6 +20,7 @@ import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { plainLine } from "@agenteschat/client/lib/markdown";
 import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
 import {
   allItems,
@@ -402,7 +403,7 @@ function ThreadReplies({
                 <small>{whenText(t, i18n.language, m.createdAt)}</small>
               </div>
               <p>
-                <Snippet text={textOrMedia(t, m.body, m.meta)} mine={mine} />
+                <Snippet text={plainLine(textOrMedia(t, m.body, m.meta))} mine={mine} />
               </p>
             </div>
           </div>

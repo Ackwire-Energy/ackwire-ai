@@ -25,6 +25,7 @@ const ASK = "Quem administra o workspace pode resolver isso.";
 const PAY = "Ver planos do agentes.chat";
 const KEY = "Usar uma chave de API";
 const HELD = "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.";
+const CLOSED = "As chaves de API abrem com o plano do agentes.chat do workspace.";
 
 const COMPUTER: AiComputer = {
   machineId: "machine_1",
@@ -106,28 +107,21 @@ const disabledButtons = (box: HTMLElement) => Array.from(box.querySelectorAll("b
 const buttonNamed = (box: HTMLElement, name: string) => within(box).queryByRole("button", { name });
 
 describe("a plan with no agentes.chat plan in force", () => {
-  test("whoever pays: every plan says why where its button was, with the plans page and a key, and nothing off", async () => {
+  test("whoever pays: Connect says why with the plans page, and no plan, key or sign-in to pick", async () => {
     const { dialog } = await connect("owner");
-    for (const choice of PLAN_CHOICES) {
-      const panel = await planPanel(dialog, choice);
-      expect(shownText(panel)).toContain(WHY);
-      expect(buttonNamed(panel, PAY)).not.toBeNull();
-      expect(buttonNamed(panel, KEY)).not.toBeNull();
-      expect(disabledButtons(panel)).toEqual([]);
-      expect(panel.querySelector(".agp-addacct")).toBeNull();
-    }
+    expect(shownText(dialog)).toContain(WHY);
+    expect(buttonNamed(dialog, PAY)).not.toBeNull();
+    expect(buttonNamed(dialog, KEY)).toBeNull();
+    expect(within(dialog).queryByRole("combobox", { name: "Plano" })).toBeNull();
+    expect(dialog.querySelector(".ai-picker")).toBeNull();
   });
 
-  test("a member: every plan says why and who can sort it out, with nothing to press", async () => {
+  test("a member: Connect says why and who can sort it out, with nothing to press", async () => {
     const { dialog } = await connect("member");
-    for (const choice of PLAN_CHOICES) {
-      const panel = await planPanel(dialog, choice);
-      expect(shownText(panel)).toContain(WHY);
-      expect(shownText(panel)).toContain(ASK);
-      expect(buttonNamed(panel, PAY)).toBeNull();
-      expect(buttonNamed(panel, KEY)).toBeNull();
-      expect(disabledButtons(panel)).toEqual([]);
-    }
+    expect(shownText(dialog)).toContain(WHY);
+    expect(shownText(dialog)).toContain(ASK);
+    expect(buttonNamed(dialog, PAY)).toBeNull();
+    expect(buttonNamed(dialog, KEY)).toBeNull();
   });
 
   test("with the plan in force: every plan signs in, no word of billing", async () => {
@@ -155,24 +149,8 @@ describe("a plan with no agentes.chat plan in force", () => {
 
   test("Ver planos goes to the real billing page, minted on the click", async () => {
     const { dialog, state } = await connect("owner");
-    const panel = await planPanel(dialog, "chatgpt");
-    await click(buttonNamed(panel, PAY) as HTMLElement);
+    await click(buttonNamed(dialog, PAY) as HTMLElement);
     expect(state.calls.filter((c) => c.method === "orgs.billingLink")).toHaveLength(1);
-  });
-
-  test("the key: reached from the plan, it says it waits for the plan, and saved it never blames the provider", async () => {
-    const { dialog } = await connect("owner");
-    const panel = await planPanel(dialog, "gemini");
-    await click(buttonNamed(panel, KEY) as HTMLElement);
-    expect(shownText(dialog)).toContain(HELD);
-    expect(shownText(dialog)).not.toContain("Todo agente sem plano pensa com ela.");
-    await act(async () =>
-      fireEvent.change(within(dialog).getByLabelText("Cole aqui"), { target: { value: `sk-ant-${"a".repeat(40)}` } }),
-    );
-    await click(within(dialog).getByRole("button", { name: "Salvar chave" }));
-    await settle(4);
-    expect(shownText(dialog)).toContain(`Salva. ${HELD}`);
-    expect(shownText(dialog)).not.toContain("não respondeu");
   });
 
   test("no view of the computer and no hold: the steps it turns off say what they wait for, on every plan", async () => {
@@ -197,38 +175,15 @@ describe("a plan with no agentes.chat plan in force", () => {
       expect(panel.querySelector(".ai-panel__wait")?.textContent).toMatch(/assim que o computador ficar pronto/);
     }
   });
-
-  test("a row of what the person has, off for the same reason, says it under the rows", async () => {
-    const account = {
-      id: "acct_max",
-      kind: "claude_code",
-      label: "Claude Max",
-      email: null,
-      plan: null,
-      status: "active",
-      ownerId: "u-owner",
-      ownerName: "Ana",
-      mine: true,
-      usedBy: [],
-      usage: null,
-      provider: null,
-      keyHint: null,
-    } as unknown as AiAccounts["accounts"][number];
-    const { dialog } = await connect("owner", [account]);
-    const row = within(dialog).getByRole("button", { name: /Claude Max/ }) as HTMLButtonElement;
-    expect(row.disabled).toBe(true);
-    expect(row.parentElement?.querySelector(":scope > .ac-setnote")?.textContent).toContain(WHY);
-  });
 });
 
 describe("the other places a plan is chosen", () => {
-  test("Contas de IA: why, the plans page and a key, at the head of the section", async () => {
+  test("Contas de IA: why and the plans page at the head of the section, no key", async () => {
     await open("owner", `/org/${ORG_ID}/settings/keys`);
     const card = screen().getByRole("region", { name: "Seus planos" });
     expect(shownText(card)).toContain(WHY);
     expect(buttonNamed(card, PAY)).not.toBeNull();
-    await click(buttonNamed(card, KEY) as HTMLElement);
-    expect(shownText(screen().getByRole("dialog", { name: /Conectar uma IA/ }))).toContain(HELD);
+    expect(buttonNamed(card, KEY)).toBeNull();
     // No plan yet: the hold's lines stand alone, no invitation to connect one.
     expect(screen().queryByText("Use o plano de IA que você já paga")).toBeNull();
   });
@@ -275,7 +230,7 @@ describe("the other places a plan is chosen", () => {
     const body = document.querySelector(".settings__body") as HTMLElement;
     expect(shownText(body)).toContain(WHY);
     expect(buttonNamed(body, PAY)).not.toBeNull();
-    expect(buttonNamed(body, KEY)).not.toBeNull();
+    expect(buttonNamed(body, KEY)).toBeNull();
     expect(shownText(body)).not.toContain("Conecte um plano em Sua IA para usar aqui.");
   });
 });
@@ -347,19 +302,16 @@ describe("what a plan's panel never says on the Cloud", () => {
   });
 });
 
-describe("a key kept on a billing hold", () => {
-  test("Settings says when it starts, never that its maker didn't answer", async () => {
-    const { api } = await open("owner", `/org/${ORG_ID}/settings/keys`);
-    const addKey = api.agents.addCredential;
-    api.agents.addCredential = async (orgId, input) => ({ ...(await addKey(orgId, input)), check: "unchecked" });
-    await click(screen().getByRole("button", { name: "Adicionar chave" }));
-    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
-    await act(async () =>
-      fireEvent.change(within(add).getByLabelText("Chave da API"), { target: { value: `sk-ant-${"a".repeat(40)}` } }),
-    );
-    await click(within(add).getByRole("button", { name: "Salvar chave" }));
-    await settle(4);
-    expect(document.body.textContent).toContain(`Salva. ${HELD}`);
-    expect(document.body.textContent).not.toContain("não respondeu");
+describe("a key on a billing hold", () => {
+  test("Settings says keys open with the plan, in place of adding one", async () => {
+    await open("owner", `/org/${ORG_ID}/settings/keys`);
+    expect(document.body.textContent).toContain(CLOSED);
+    expect(screen().queryByRole("button", { name: "Adicionar chave" })).toBeNull();
+  });
+
+  test("self-hosted keeps the form", async () => {
+    await open("selfhost", `/org/${ORG_ID}/settings/keys`);
+    expect(document.body.textContent).not.toContain(CLOSED);
+    expect(screen().getAllByRole("button", { name: "Adicionar chave" }).length).toBeGreaterThan(0);
   });
 });

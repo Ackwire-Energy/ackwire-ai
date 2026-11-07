@@ -27,6 +27,8 @@ import {
   getMissionFiles,
   getTaskOutput,
   grantScopes,
+  indexSource,
+  insertContextItem,
   LOW_RISK_THRESHOLD,
   listJoinRequests,
   listMissionCommands,
@@ -295,6 +297,28 @@ const notices = async (threadId: string) =>
     .map((x) => x.text ?? "");
 
 describe("missions (ADR 0029)", () => {
+  test("get_context: its owner's preferences come in, nobody else's", async () => {
+    await proposed();
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    for (const [userId, content] of [
+      [bob.id, "Relatórios secretos do bob vão por fora."],
+      [f.owner.id, "Relatórios secretos do dono vão às sextas."],
+    ] as const) {
+      const item = await insertContextItem(f.db, {
+        orgId: f.org.id,
+        kind: "preference",
+        scopeType: "person",
+        scopeId: userId,
+        agentId: f.agent.id,
+        content,
+      });
+      await indexSource(f.context, { orgId: f.org.id, kind: "context_item", sourceId: item.id });
+    }
+    const found = JSON.stringify(await mainCall("get_context", { query: "relatórios secretos" }));
+    expect(found).toContain("do dono");
+    expect(found).not.toContain("do bob");
+  });
+
   test("proposed from a flat DM: its home is a new thread and the agent's reply in the DM carries the link card", async () => {
     f = await setup({
       machines: true,

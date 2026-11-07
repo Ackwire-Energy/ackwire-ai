@@ -39,6 +39,7 @@ import {
   decidersOf,
   isOpen,
   onlyKey,
+  proposalWhy,
   removalOf,
   rowStatus,
   sentToText,
@@ -247,7 +248,7 @@ function RemovalCard({
         label={label}
         mine={decides}
         waitingFor={state}
-        lead={del ? `${first.why} ${t("rightHand.remove.deleteHelp")}` : first.why}
+        lead={del ? `${proposalWhy(t, first)} ${t("rightHand.remove.deleteHelp")}` : proposalWhy(t, first)}
         body={
           <ul className="proposal-rows">
             {rows.map((p) => {
@@ -453,7 +454,7 @@ function SettingsRow({
       label={label}
       mine={p.canDecide && !p.stale}
       waitingFor={state}
-      lead={p.stale ? t("rightHand.card.staleHelp", g) : p.why}
+      lead={p.stale ? t("rightHand.card.staleHelp", g) : proposalWhy(t, p)}
       object={{
         logo: <AgentAvatar agentId={p.agentId} name={name} size="md" />,
         title: t("rightHand.card.settings", { name }),

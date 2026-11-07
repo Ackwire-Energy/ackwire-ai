@@ -278,9 +278,6 @@
   "approval.hold": {
     "value": "Hold to approve"
   },
-  "approval.holding": {
-    "value": "Keep holding…"
-  },
   "approval.holdNote": {
     "value": "High risk: hold the button for a second."
   },
@@ -1589,6 +1586,12 @@
   "agents.noGroupSection": {
     "value": "No department"
   },
+  "team.entry": {
+    "value": "List, org chart and map"
+  },
+  "team.mapHint": {
+    "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
+  },
   "agentEdit.missing": {
     "value": "This agent no longer exists."
   },
@@ -1753,6 +1756,12 @@
   },
   "activity.day.older": {
     "value": "Older"
+  },
+  "activity.kind.proposal_waiting": {
+    "value": {
+      "one": "{{names}} proposes an improvement",
+      "other": "{{names}} propose improvements"
+    }
   },
   "activity.kind.mention": {
     "value": {
@@ -2004,6 +2013,16 @@
       "other": "{{names}} took control of the screen of {{agent}}'s computer"
     }
   },
+  "activity.kind.plan_lent": {
+    "value": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    },
+    "female": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
+  },
   "activity.kind.connector_tool_changed": {
     "value": {
       "one": "A connected server changed tools you approved",
@@ -2250,6 +2269,12 @@
       "other": "{{count}} with you"
     }
   },
+  "me.proposalsWaiting": {
+    "value": {
+      "one": "{{count}} waiting",
+      "other": "{{count}} waiting"
+    }
+  },
   "me.drive": {
     "value": "Drive"
   },
@@ -2429,9 +2454,6 @@
   },
   "delete.hold": {
     "value": "Hold to delete"
-  },
-  "delete.holding": {
-    "value": "Keep holding…"
   },
   "files.type.image": {
     "value": "Image"
@@ -4894,22 +4916,6 @@
   },
   "dashboards.notice.card.proposal": {
     "value": "Dashboard"
-  },
-  "activity.kind.plan_lent": {
-    "value": {
-      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
-      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
-    },
-    "female": {
-      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
-      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
-    }
-  },
-  "team.entry": {
-    "value": "List, org chart and map"
-  },
-  "team.mapHint": {
-    "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
   },
   "empty.agents.title": {
     "value": "Build your team of agents"

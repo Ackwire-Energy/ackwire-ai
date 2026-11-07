@@ -143,7 +143,9 @@ export function OverviewTab() {
                 <li key={r.id} className="agp-li ac-faceline">
                   <RunIcon run={r} />
                   <span className="agp-li__t">
-                    <b className="ac-captop">{r.private ? t("agent.runPrivate") : r.what || t("agent.runNoText")}</b>
+                    <b className="ac-captop">
+                      {r.private ? t("agent.runPrivate") : excerpt(r.what, 200) || t("agent.runNoText")}
+                    </b>
                     <span>
                       {runWhere(t, r, channels.data ?? [])}
                       {r.repo ? ` · ${r.repo}` : ""}

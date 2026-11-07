@@ -432,12 +432,14 @@ function NewAgentForm({
       if (from) {
         // From its card: back to that conversation as it was, Connect over it when it has nothing to think with.
         router.back();
-        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+        if (ai?.kind === "none" && !held) openConnectAi({ agentId: agent.id });
         return;
       }
       // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
       // when it has nothing to think with yet (ADR 0061 §6).
       void openDm({ agentId: agent.id }).then(() => {
+        // On a billing hold nothing connects before the plan.
+        if (held) return;
         if (thinks.connect) openConnectAi({ agentId: agent.id, plan: thinks.connect });
         else if (ai?.kind === "none" || (!thinks.plan && usable.size === 0)) openConnectAi({ agentId: agent.id });
       });
@@ -739,14 +741,16 @@ function NewAgentForm({
                     : setPicking(true)
                 }
               />
-              <GroupedRow
-                icon="plus"
-                label={t("aiAccounts.page.connect")}
-                onPress={() => {
-                  setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
-                  openConnectAi({ forNew: "1" });
-                }}
-              />
+              {held ? null : (
+                <GroupedRow
+                  icon="plus"
+                  label={t("aiAccounts.page.connect")}
+                  onPress={() => {
+                    setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
+                    openConnectAi({ forNew: "1" });
+                  }}
+                />
+              )}
             </GroupedList>
             {picked?.pick.kind === "connect" && picked.description ? (
               <GroupedFooter>{picked.description}</GroupedFooter>

@@ -38,6 +38,8 @@ export interface RoutineBrief {
   creatorUserId: string | null;
   /** The routine's conversation: where `hand_off` posts (or wakes the agent) and where its approval cards go. */
   deliverTo: { channelId: string; threadId: string | null };
+  /** "Um documento no Drive" (target `artifact`): its files go to the shared Drive, whatever `deliverTo` is. */
+  toDrive?: boolean;
   access: RoutineAccess;
   report: RoutineReport;
   /** How it fired: `schedule`, `manual` or `event`. */
@@ -64,6 +66,7 @@ export function routineBriefOf(meta: Record<string, unknown> | null | undefined)
     name: typeof b.name === "string" ? b.name : "",
     creatorUserId: typeof b.creatorUserId === "string" ? b.creatorUserId : null,
     deliverTo: { channelId: to.channelId, threadId: typeof to.threadId === "string" ? to.threadId : null },
+    ...(b.toDrive === true ? { toDrive: true } : {}),
     access: routineAccessOf(b.access),
     report: routineReportOf(b.report),
     trigger: typeof b.trigger === "string" ? b.trigger : "schedule",

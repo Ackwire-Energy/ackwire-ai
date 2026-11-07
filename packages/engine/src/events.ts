@@ -516,6 +516,7 @@ export type ChannelEvent =
     }
   /** An issue of this channel was created or changed, or got a comment. */
   | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }
+  | { type: "issue.deleted"; channelId: string; issueId: string; number: number }
   | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
   /** An event of this channel's calendar was created. */
   | { type: "calendar.event_created" | "calendar.event_updated"; channelId: string; event: CalendarEventView }

@@ -8,7 +8,7 @@ import {
   useRestoreAccount,
   useRestoreWorkspace,
 } from "@agenteschat/client";
-import { billingHoldOf, isPaidReturn } from "@agenteschat/client/lib/billing";
+import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import {
   accountDeletingText,
   accountOutOfReach,
@@ -22,14 +22,17 @@ import {
 } from "@agenteschat/client/lib/deletion";
 import { errorText, holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Button, Card, CardHeader, EmptyState, Icon, Spinner } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
+import { usePaidReturn } from "@/lib/paid-return";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -66,8 +69,9 @@ export function HoldBanner() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
-  const paid = isPaidReturn(useSearch({ strict: false }));
+  const dir = useDirectory(org.id);
   const billing = billingHoldOf(org.standing);
+  const paid = usePaidReturn(org.id, billing !== null);
   // Back from paying, the billing service lifts the hold on its next pass: until `org.standing` says so, that's all.
   // An `org.standing` sent before this tab's socket opened is gone, so `/me` is asked again meanwhile.
   useQuery({ ...meQuery(useApi()), refetchInterval: billing && paid ? PAID_POLL_MS : false });
@@ -87,6 +91,27 @@ export function HoldBanner() {
   }
   const admin = can(org, "manage_billing");
   const fix = admin && billingUrl ? billing : null;
+  if (billing === "payment") {
+    // Waiting for its first plan, nothing is lost: with only the right hand here, its own words say it.
+    if (dir.loading || dir.agents.every(isRightHand)) return null;
+    return (
+      <section className="outages" aria-label={t("standing.label")}>
+        <div className="outage hold-banner" role="status">
+          <span className="outage__text">
+            <b>{t("standing.billing.teamReady")}</b>
+            {!admin && <span>{t("standing.billing.askAdmin")}</span>}
+          </span>
+          {fix && (
+            <span className="outage__acts">
+              <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+                {t(`standing.billing.cta.${fix}`)}
+              </BillingLinkButton>
+            </span>
+          )}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="outages" aria-label={t("standing.label")}>
       <div className="outage hold-banner" role="status">

@@ -111,7 +111,6 @@
     "refuse": "거절",
     "approve": "승인",
     "hold": "길게 눌러 승인",
-    "holding": "계속 누르고 있어요…",
     "holdNote": "위험도 높음: 버튼을 1초 동안 누르고 있어 주세요.",
     "tapNote": "승인하면 바로 실행돼요.",
     "tapNoteAhead": "지금 승인하면 {{when}}에 실행돼요.",
@@ -642,6 +641,10 @@
     "freeSection": "대기 중",
     "noGroupSection": "부서 없음"
   },
+  "team": {
+    "entry": "목록, 조직도, 지도",
+    "mapHint": "에이전트를 다른 채널로 옮기려면 웹의 지도를 쓰거나 {{name}}과(와) 대화하세요."
+  },
   "agentEdit": {
     "missing": "이 에이전트는 더 이상 없어요.",
     "saved": "변경 사항을 저장했어요",
@@ -712,6 +715,7 @@
       "older": "이전"
     },
     "kind": {
+      "proposal_waiting_other": "{{names}}이(가) 개선을 제안해요",
       "mention_other": "{{names}}이(가) 나를 멘션했어요",
       "thread_reply_other": "{{names}}이(가) 스레드에 답장했어요",
       "agent_reply_other": "{{names}}이(가) 답했어요",
@@ -757,12 +761,12 @@
       "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
       "desktop_taken_other": "{{names}} 님이 {{agent}}의 컴퓨터 화면 제어를 넘겨받았어요",
       "desktop_taken_female_other": "{{names}} 님이 {{agent}}의 컴퓨터 화면 제어를 넘겨받았어요",
+      "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
+      "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
-      "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요",
-      "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
-      "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요"
+      "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요"
     },
     "markRead": "읽음으로 표시",
     "markUnread": "안 읽음으로 표시",
@@ -850,6 +854,7 @@
     "fromWorkspace": "워크스페이스에서",
     "issues": "작업",
     "issuesWithMe_other": "나와 관련된 작업 {{count}}개",
+    "proposalsWaiting_other": "{{count}}개 대기 중",
     "drive": "Drive",
     "connectors": "커넥터와 MCP",
     "usage": "사용량",
@@ -917,8 +922,7 @@
     "addPasswordFirst": "먼저 웹사이트에서 계정에 비밀번호를 추가한 다음 여기에 입력하세요.",
     "addPasswordWeb": "웹사이트에서 비밀번호 추가",
     "otherAccount": "다른 계정으로 로그인했어요. 아무것도 삭제되지 않았어요.",
-    "hold": "길게 눌러 삭제",
-    "holding": "계속 누르고 있어요…"
+    "hold": "길게 눌러 삭제"
   },
   "files": {
     "type": {
@@ -1921,10 +1925,6 @@
         "proposal": "대시보드"
       }
     }
-  },
-  "team": {
-    "entry": "목록, 조직도, 지도",
-    "mapHint": "에이전트를 다른 채널로 옮기려면 웹의 지도를 쓰거나 {{name}}과(와) 대화하세요."
   },
   "empty": {
     "agents": {

@@ -1174,7 +1174,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   min-width: 0;
 }
 .issue-prop .ac-select__trigger,
-.issue-prop .ac-date__trigger {
+.issue-prop .ac-date__trigger,
+.issue-prop .who-sees__button {
   width: auto;
   max-width: 240px;
   height: 30px;
@@ -1188,7 +1189,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   font-weight: 550;
 }
 .issue-prop .ac-select__trigger:hover,
-.issue-prop .ac-date__trigger:hover {
+.issue-prop .ac-date__trigger:hover,
+.issue-prop .who-sees__button:hover {
   background: var(--plate);
 }
 .issue-prop .ac-select__chev {
@@ -1220,6 +1222,9 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   height: 18px;
   margin: 0 4px;
   background: var(--line2);
+}
+.issue-props .issue-github__chip {
+  font-size: 13.5px;
 }
 .issue-props .issue-link {
   font-size: 13.5px;
@@ -1261,6 +1266,23 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 }
 .issue-link:hover {
   text-decoration: underline;
+}
+
+.issue-github {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.issue-github__field {
+  margin-top: 12px;
+}
+.issue-github__chip {
+  max-width: 100%;
+  color: var(--ink);
+  text-decoration: none;
+}
+.issue-github__chip:hover {
+  background: var(--sunken);
 }
 
 /* The agent's work: live steps, or stalled. */
@@ -2015,6 +2037,11 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   justify-content: space-between;
   gap: 8px;
 }
+.issue-page__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* "Tasks" and "Conversation" sit a step above the details, never on the fields card. */
 .issue-page__main {
   display: flex;
@@ -2110,14 +2137,4 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   gap: 6px;
   font-size: 12.5px;
   color: var(--muted);
-}
-
-.issue-private {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 16px;
-  color: var(--text-muted);
-  font-size: 13px;
 }

@@ -179,6 +179,7 @@ type WhatKey =
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
+  | "proposalWaiting"
   | "changeRequest"
   | "changeRequestAgent"
   | "usageLimitWarning"
@@ -325,6 +326,8 @@ export function Headline({
         : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":
       return k("reaction", { names, count });
+    case "proposal_waiting":
+      return k("proposalWaiting", { names });
     case "change_request":
       return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
     case "usage_limit": {

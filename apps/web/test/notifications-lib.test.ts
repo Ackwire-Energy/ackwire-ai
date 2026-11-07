@@ -311,6 +311,10 @@ describe("a board's notices (ADR 0135)", () => {
     expect(openTarget(notification({ id: "b", kind: "dashboard_proposal" }))).toEqual({ to: "/org/$orgId/dashboards" });
   });
 
+  test("proposals waiting open their tab in Aprovações", () => {
+    expect(openTarget(notification({ id: "p", kind: "proposal_waiting" }))).toEqual({ to: "/org/$orgId/proposals" });
+  });
+
   test("what each says and offers: an alert's words, a failure's reason, a request's audience", () => {
     expect(widgetNoticeOf(alert)).toMatchObject({ kind: "alert", widgetId: "w1", agentId: "ada", text: "Caiu 24%." });
     expect(

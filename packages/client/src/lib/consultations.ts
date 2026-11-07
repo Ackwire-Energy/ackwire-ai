@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ConsultationStatus, MessageConsultation } from "../api/types";
+import { plainLine } from "./markdown";
 import { formatLineTime } from "./work";
 
 /** How long an agent waits for another one's answer (the server's `CONSULTATION_TTL_MS`). */
@@ -62,11 +63,4 @@ export function forPeople<C extends { question: string }, M extends { body: stri
 }
 
 /** One line of an answer for the folded card: no Markdown marks, spaces collapsed. */
-export function previewOf(text: string) {
-  return withoutRelayLine(text)
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`#>~|]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export const previewOf = (text: string) => plainLine(withoutRelayLine(text));

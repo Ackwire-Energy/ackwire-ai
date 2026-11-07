@@ -118,14 +118,14 @@ export function StopPill({
  * The `run_stopped` notice a person's stop leaves in the agent's conversation: nothing while the stopped reply is
  * here (its own pill says it, `stoppedRunsOf`), else its pill alone, as when a queued task is stopped before it wrote.
  */
-export function StoppedLine({ message, notice }: { message: Message; notice: StoppedNotice }) {
+export function StoppedLine({ message, notice, gap }: { message: Message; notice: StoppedNotice; gap: number }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const inReply = useStoppedRun(notice.runId);
   if (inReply) return null;
   const agent = dir.nameOf(message.author) || t("channel.unknownAgent");
   return (
-    <View style={styles.line}>
+    <View style={[styles.line, { marginTop: gap }]}>
       <StopPill agent={agent} notice={notice} at={message.createdAt} fallback={t("mobile.chat.stopped.plain")} />
     </View>
   );
@@ -139,7 +139,6 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
   return (
     <EventPill
       mark="info"
-      style={styles.inRow}
       actions={
         agent && seesDetails(agent) ? (
           <EventPillAction label={t("chat.speedFallback.action")} onPress={() => openAgentAi(agent.id)} />
@@ -152,9 +151,8 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  // Aligned with the messages' words, as the other automatic events (`EventLine`).
-  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
-  inRow: { marginTop: 6 },
+  // Aligned with the messages' words, as the other automatic events (`EventLine`). The list sets its top.
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
   grow: { flex: 1, minWidth: 0 },
   // Under the pill, the field and Send on one row.
   form: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", marginTop: 4 },

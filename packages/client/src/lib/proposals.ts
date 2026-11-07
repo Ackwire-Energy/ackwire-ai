@@ -1,5 +1,13 @@
 import type { TFunction } from "i18next";
-import type { MemoryUpdate, OrgRole, Person, Proposal, ProposalAccessLine, ProposalSettingLine } from "../api/types";
+import type {
+  Memory,
+  MemoryUpdate,
+  OrgRole,
+  Person,
+  Proposal,
+  ProposalAccessLine,
+  ProposalSettingLine,
+} from "../api/types";
 import { formatTime, formatUsd, joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { holdersOf } from "./roles";
@@ -27,6 +35,13 @@ export const proposerOf = (p: Pick<Proposal, "agentId" | "proposedByAgentId">) =
 
 /** Still waiting for a decision. */
 export const isOpen = (p: Pick<Proposal, "status" | "stale">) => p.status === "pending" && !p.stale;
+
+const place = (p: Proposal) => (isOpen(p) ? (p.canDecide ? 0 : 1) : 2);
+
+/** What waits on me first, then what waits on someone else, then what was decided: newest first inside each. */
+export function sortProposals(list: Proposal[]) {
+  return [...list].sort((a, b) => place(a) - place(b) || (a.createdAt < b.createdAt ? 1 : -1));
+}
 
 export interface ChangedLine {
   kind: "add" | "del";
@@ -168,6 +183,35 @@ export function cardHead(
   }
   const target = t("proposals.targetChanges", agentGrammar(agentName(agents[0] ?? "")));
   return { key: "proposals.proposes", values: { agent: proposer, target } };
+}
+
+/** Why it is proposed, in the person's language: the server's own reasons are codes, an agent's are its words. */
+export function proposalWhy(t: TFunction, p: Pick<Proposal, "why" | "whyCode">): string {
+  switch (p.whyCode) {
+    case "refused":
+      return t("proposals.whyCode.refused", { text: p.why });
+    case "corrected":
+      return t("proposals.whyCode.corrected", { text: p.why });
+    case "seen":
+      return t("proposals.whyCode.seen");
+    case "skill":
+      return t("proposals.whyCode.skill");
+    case "asked":
+      return t("proposals.whyCode.asked");
+    case "budget":
+      return t("proposals.whyCode.budget");
+    case "no_channel":
+      return t("proposals.whyCode.noChannel");
+    default:
+      return p.why;
+  }
+}
+
+/** A memory's line: a lesson from a refusal or a correction says so, in the person's language. */
+export function memoryLine(t: TFunction, m: Pick<Memory, "text" | "how">): string {
+  if (m.how === "refused") return t("memory.fromRefusal", { text: m.text });
+  if (m.how === "corrected") return t("memory.fromCorrection", { text: m.text });
+  return m.text;
 }
 
 const TITLE_KEY = {

@@ -173,6 +173,19 @@ export function outcomeText(t: TFunction, outcome: ConnectOutcome, item: Connect
     : t("connectors.outcome.already", { name });
 }
 
+/** What changed in the GitHub organizations we reach since `before`, in a sentence; it says so when nothing did. */
+export function orgAccessChange(t: TFunction, before: readonly string[], now: readonly string[]) {
+  const added = now.filter((o) => !before.includes(o));
+  const removed = before.filter((o) => !now.includes(o));
+  if (added.length === 0 && removed.length === 0) return t("connectFlow.githubOrgs.same");
+  return [
+    added.length > 0 ? t("connectFlow.githubOrgs.added", { names: added.join(", ") }) : "",
+    removed.length > 0 ? t("connectFlow.githubOrgs.removed", { names: removed.join(", ") }) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * Whether a server's sign-in can't be told apart by account: none of its accounts here was named by the provider
  * (ADR 0099). Then Reconectar can't refuse another account and a new connect can't spot one already here, so the

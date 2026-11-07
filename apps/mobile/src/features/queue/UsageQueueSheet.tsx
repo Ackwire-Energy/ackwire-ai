@@ -115,6 +115,7 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
       />
       {waiting > 0 && skipped > 0 ? (
         <Segmented
+          wide
           value={tab}
           onChange={(key) => setChosen(key as UsageQueueTab)}
           items={[

@@ -2,6 +2,7 @@ import type { Agent, Memory, MemoryKind } from "@agenteschat/client";
 import { useMemory, useMemoryAction, useProposals } from "@agenteschat/client";
 import { daysBetween, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import {
   Button,
   Chip,
@@ -208,7 +209,11 @@ function MemoryView({ agent }: { agent: Agent }) {
 
       <List role="tabpanel" aria-label={t(`memory.tabs.${tab}`)}>
         {items.map((m) => (
-          <article key={m.id} className="memory-item" aria-label={`${t(`memory.kinds.${m.kind}`)}: ${m.text}`}>
+          <article
+            key={m.id}
+            className="memory-item"
+            aria-label={`${t(`memory.kinds.${m.kind}`)}: ${memoryLine(t, m)}`}
+          >
             <div className="row">
               <Chip icon={KIND_ICON[m.kind]}>{t(`memory.kinds.${m.kind}`)}</Chip>
               {m.pinned && <Chip icon="pin">{t("memory.pinned")}</Chip>}
@@ -228,7 +233,7 @@ function MemoryView({ agent }: { agent: Agent }) {
               )}
               <span className="memory-item__used">{usageLabel(t, m)}</span>
             </div>
-            <p className="memory-item__text">{m.text}</p>
+            <p className="memory-item__text">{memoryLine(t, m)}</p>
             {m.supersedes && (
               <p className="small muted" style={{ margin: 0 }}>
                 {t("memory.supersedes")} <span className="struck">{m.supersedes}</span>

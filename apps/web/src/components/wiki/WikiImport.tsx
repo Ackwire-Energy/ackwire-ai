@@ -478,7 +478,7 @@ export function WikiImportDialog({
           </header>
           <div className="vault-row">
             <Segmented
-              size="sm"
+              block
               label={t("wiki.import.where")}
               value={dest}
               onValueChange={setDest}

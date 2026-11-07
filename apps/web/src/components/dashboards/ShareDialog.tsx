@@ -122,9 +122,7 @@ function ShareBody({ board, onClose }: { board: DashboardSummary; onClose: () =>
           {t("dashboards.share.copyLink")}
         </Button>
         <span className="db-grow" />
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={share.isPending} disabled={!audienceReady(draft)} onClick={save}>
           {t("dashboards.share.save")}
         </Button>

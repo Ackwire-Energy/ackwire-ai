@@ -8,6 +8,7 @@ import { StateChip } from "../issues/parts";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { MSG_TEXT } from "./logic";
+import { useCardTop } from "./look";
 
 /**
  * "Ask Ada to implement" (as on the web): the root of the work thread in the
@@ -17,6 +18,7 @@ import { MSG_TEXT } from "./logic";
 export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId: string | null }) {
   const { t } = useTranslation();
   const c = useColors();
+  const cardTop = useCardTop();
   const surface = useSurface();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -30,7 +32,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
       accessibilityRole="button"
       accessibilityLabel={`${t("chat.issueWork.label")}: #${work.number} ${current?.title ?? work.title}`}
       accessibilityHint={t("chat.issueWork.view")}
-      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, surface, cardTop, pressed && styles.pressed]}
     >
       <View style={styles.head}>
         {/* The icon alone: no tile inside the card. */}
@@ -54,7 +56,7 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
 }
 
 /** Where the issue came from: one event pill, "Ada took task #24 · its title", the issue a tap on it away. */
-export function IssueTakenLine({ message }: { message: Message }) {
+export function IssueTakenLine({ message, gap }: { message: Message; gap: number }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const when = useWhen();
@@ -62,7 +64,7 @@ export function IssueTakenLine({ message }: { message: Message }) {
   if (!taken) return null;
   const name = dir.nameOf(message.author);
   return (
-    <View style={styles.line}>
+    <View style={[styles.line, { marginTop: gap }]}>
       <EventPill mark="issue" time={when.time(message.createdAt)}>
         {t("chat.issueWork.taken", { name })}{" "}
         <Text
@@ -81,15 +83,15 @@ export function IssueTakenLine({ message }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 8, padding: 14, borderRadius: 20, gap: 8 },
+  card: { padding: 14, borderRadius: 20, gap: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },
   title: { fontWeight: "600" },
   foot: { flexDirection: "row", alignItems: "center", gap: 4 },
   bold: { fontWeight: "600" },
   pressed: { opacity: 0.85 },
-  // An event pill at the messages' words, left aligned.
-  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
+  // An event pill at the messages' words, left aligned; the list sets its top.
+  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
   // The pill's words' size (its sentence sets it; a nested text keeps the variant's own otherwise).
   link: { fontSize: 14, lineHeight: 19 },
 });

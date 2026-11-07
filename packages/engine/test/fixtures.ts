@@ -62,6 +62,7 @@ import {
   type StorageDeps,
   type ToolGateway,
   type ToolSource,
+  type WorkspaceComputer,
   zonedParts,
 } from "../src";
 import { listenLiveSteering } from "../src/live-steer";
@@ -204,6 +205,8 @@ export async function setup(
     scheduleTools?: boolean;
     /** Keep the workspace's right hand (ADR 0137). Off: its only agent is `@dev`. */
     rightHand?: boolean;
+    /** Each workspace gets its own computer (`MACHINE_PROVISIONING=external`). */
+    workspaceComputer?: WorkspaceComputer;
     /** Add the wiki tools (search_wiki, read_wiki_page, create_wiki_page…). */
     wikiTools?: boolean;
     /** Add the sandbox tools with connected machines (a machine hub on this db). */
@@ -386,6 +389,7 @@ export async function setup(
     pubsub,
     maxOutputTokens: 1000,
     contextMessages: 30,
+    workspaceComputer: options.workspaceComputer,
     maxHops: 100,
     deltaFlushMs: 0,
     tools,

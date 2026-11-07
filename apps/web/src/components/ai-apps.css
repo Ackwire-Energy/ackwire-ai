@@ -120,7 +120,7 @@ html:not([data-pointer]) .apps-client:focus-visible {
 .apps-connect__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--form-gap);
 }
 .apps-lead {
   margin: 0;
@@ -171,7 +171,7 @@ html:not([data-pointer]) .apps-client:focus-visible {
 .apps-token {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--form-gap);
 }
 
 /* The consent page. */

@@ -30,8 +30,9 @@ const { agentRuns } = schema;
  *    message may end the wait ("pronto, loguei") or wake the run (the wait
  *    stays open; its result comes later as a notice). Parked waiting for its
  *    computer: look again now. Waiting on something the message can't move
- *    (a secret, a mission's decision; `holdsMessages`): the message leaves it
- *    for a run of its own; an approval never takes it at all.
+ *    (a secret, a mission's decision, a question for someone else;
+ *    `holdsMessages`): the message leaves it for a run of its own; an approval
+ *    never takes it at all.
  * 4. The fast reply (`talker.ts`): when the run can't answer soon (waiting, or
  *    deep in a long turn), the agent's conversation layer may answer in a
  *    second or two, or pass.
@@ -140,11 +141,11 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
       !active.waitingMachineId &&
       !brainWait &&
       (active.status === "waiting_input" || active.status === "waiting_approval");
-    // Waiting on something the message can't move (a secret, a mission's decision; an approval never takes
-    // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own. Gone from the
+    // Waiting on something the message can't move (a secret, a mission's decision, a question for someone else; an
+    // approval never takes it): the agent doesn't keep it waiting behind that, it answers in a run of its own. Gone from the
     // inbox already (the run handed it on as it paused, or read it first): the run that has it answers, so
     // nothing here speaks for this one either.
-    const holds = waiting && (await holdsMessages(deps.db, active));
+    const holds = waiting && (await holdsMessages(deps.db, active, userId));
     if (holds) await handOnMessages(deps.db, deps.pubsub, active, [message.id]).catch(() => null);
     else if (waiting || (deps.talker && !now)) {
       const followUp = async () => {

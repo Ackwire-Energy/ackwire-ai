@@ -132,7 +132,8 @@ function PlanRows({
   dir: Directory;
 }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
+  const held = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
@@ -158,7 +159,9 @@ function PlanRows({
           label={signIn?.label ?? t(`aiAccounts.connect.${kind}`)}
           {...(owner && signIn?.ownerId !== meId ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
         />
-        <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
+        {held ? null : (
+          <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
+        )}
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.planHelp")}</GroupedFooter>
       {view ? (

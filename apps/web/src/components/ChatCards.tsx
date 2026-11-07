@@ -7,6 +7,7 @@ import {
   useModelLabel,
   useSaveSecretToVault,
 } from "@agenteschat/client";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { messagePath } from "@agenteschat/client/lib/message-links";
@@ -30,6 +31,7 @@ import {
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
 import {
   latestSecret,
+  secretClosedBy,
   secretLabel,
   secretRefusalKey,
   secretValueProblem,
@@ -612,8 +614,9 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
   // Open: a request card, the choices a list in its body, each with its number key, and "Outra resposta" the list's
-  // last line, opening a field to write one.
+  // last line, opening a field to write one. For someone else, it says who it waits for and nothing else.
   if (!done) {
+    const mine = questionWaitsOn(current, me.user.id);
     const choices = current.choices ?? [];
     const send = () => {
       if (text.trim() && !busy) answer.mutate({ text: text.trim() });
@@ -653,12 +656,15 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         kind="question"
         agent={agent}
         label={t("question.group", { agent: name })}
-        mine
+        mine={mine}
+        waitingFor={t("ask.waitingFor", {
+          name: dir.memberById.get(current.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson"),
+        })}
         lead={current.text}
         body={
-          choices.length > 0 || field || errorLine ? (
+          (mine && choices.length > 0) || field || errorLine ? (
             <>
-              {choices.length > 0 && (
+              {mine && choices.length > 0 && (
                 <RequestChoices
                   choices={choices.map((label) => ({ label, busy: picking(label) }))}
                   onPick={(i) => pick(choices[i])}
@@ -674,7 +680,8 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
           ) : undefined
         }
         actions={
-          writing ? (
+          mine &&
+          (writing ? (
             <>
               <Button
                 type="submit"
@@ -706,12 +713,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
               {t("question.answer")}
             </Button>
-          ) : undefined
+          ) : undefined)
         }
         end={
-          <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
-            {t("question.skip")}
-          </Button>
+          mine && (
+            <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
+              {t("question.skip")}
+            </Button>
+          )
         }
         what={current.text}
         onSubmit={writing ? send : undefined}
@@ -813,9 +822,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     if (away) return setError(t(away, { agent: agentName, time: formatTime(i18n.language, current.expiresAt) }));
     if ((err as { status?: number }).status !== 409) return setError(t("secret.failed"));
     const fresh = await api.secrets.get(org.id, current.id).catch(() => null);
-    live.secretAnswered(
-      fresh && fresh.status !== "pending" ? fresh : { ...current, status: "canceled", publicKey: null },
-    );
+    const closed = secretClosedBy(err, current, fresh);
+    if (closed) return live.secretAnswered(closed);
+    if (fresh) live.secretAnswered(fresh);
+    setError(t(fresh ? "secret.changed" : "secret.failed"));
   };
   // The newer card, when this conversation shows it; else where it is.
   const showNewer = async () => {

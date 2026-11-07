@@ -15,8 +15,10 @@ import {
   consultationsIn,
   createAgent,
   createAgentRuns,
+  createIssue,
   decideApproval,
   deleteAgent,
+  deleteIssue,
   deliverSecret,
   drainOutbox,
   enqueue,
@@ -1128,6 +1130,20 @@ describe("stopping a chain, at its edges (ADR 0128)", () => {
     if (!target || !asker) throw new Error("no runs");
     return { infra, handlers, target, asker };
   }
+
+  test("the task a run asked of an agent was on is deleted: who asked hears it now, not when the question expires", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const issue = await createIssue({ db: f.db }, { type: "person", userId: f.owner.id }, f.org.id, {
+      title: "Deploy",
+    });
+    await f.db.update(schema.agentRuns).set({ issueId: issue.id }).where(eq(schema.agentRuns.id, target.id));
+
+    await deleteIssue({ db: f.db, pubsub: f.pubsub, hub: null } as never, f.owner.id, f.org.id, issue.id);
+
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("canceled");
+    expect((await consultations())[0]).toMatchObject({ status: "failed" });
+  });
 
   test("the run asked ended as the stop came: what it asked still stops, and its agent reads that", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });

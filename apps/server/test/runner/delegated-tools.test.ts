@@ -139,6 +139,8 @@ test("a tool's result never goes past what the CLI takes inline", async () => {
   const { call } = setup({}, { rg: fake.rg });
   const out = textOf(await call("Grep", { pattern: "x", output_mode: "content", head_limit: 0 }));
   expect(out.length).toBeLessThan(DELEGATED_RESULT_TOKENS * 4 + 100);
+  // Claude Code 2.1.308 saves an MCP result over 50,000 characters to its own store, out of every tool's reach.
+  expect(out.length).toBeLessThanOrEqual(50_000);
   expect(out).toEndWith("[Cut here: ask for less, with offset, limit or a narrower search.]");
 });
 
@@ -535,7 +537,7 @@ test("Read stops at 2000 lines and at the size limits, and offset and limit get 
   expect(textOf(await call("Read", { file_path: big, offset: 3999, limit: 1 }))).toStartWith("3999\txxx");
   const wide = path.join(folder, "wide.txt");
   writeFileSync(wide, `${"y".repeat(DELEGATED_RESULT_TOKENS * 4 + 10)}\n`);
-  expect(textOf(await call("Read", { file_path: wide }))).toContain("exceeds maximum allowed tokens (25000)");
+  expect(textOf(await call("Read", { file_path: wide }))).toContain("exceeds maximum allowed tokens (12000)");
 });
 
 test("Read says what's wrong with a path", async () => {

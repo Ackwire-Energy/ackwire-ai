@@ -86,6 +86,7 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
   const opened: { use: string; value: string }[] = [];
   const s = {
     protocol: VAULT_PASSWORD_PROTOCOL as number,
+    kind: undefined as string | undefined,
     url: "https://acme.example/login",
     /** The next password `vault.password` makes (each call takes a new one). */
     made: [] as string[],
@@ -131,6 +132,7 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
         execAllowed: true,
         os: "linux",
         protocol: s.protocol,
+        kind: s.kind,
         executors: { browser: { available: true, version: "0.39.1" } },
         paused: null,
         access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
@@ -826,6 +828,14 @@ test("in a shared browser profile, a login is typed only when every agent grante
     (c) => (c.op === "browser.batch" || c.op === "browser.act") && c.profile?.id === profile.id,
   );
   expect(inProfile).toBeDefined();
+  // Too old for the Vault, in a profile as in its own browser: the workspace's own computer updates by itself.
+  v.computer.s.protocol = VAULT_PROTOCOL - 1;
+  v.computer.s.kind = "managed";
+  const waits = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(waits.content).toContain("It updates by itself");
+  expect(waits.content).not.toContain("agentes-runner update");
+  v.computer.s.protocol = VAULT_PROTOCOL;
+  v.computer.s.kind = undefined;
   // Back in its own browser, the personal login is typed.
   await f.db.update(schema.agents).set({ browserProfileId: null }).where(eq(schema.agents.id, f.agent.id));
   const own = await v.runFor(f.owner.id);

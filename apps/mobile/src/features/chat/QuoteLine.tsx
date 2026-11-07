@@ -57,16 +57,19 @@ export function QuoteAbove({
   look,
   reply,
   onJump,
+  gap,
 }: {
   look: RowLook;
   reply: ReplyRef;
+  /** It stands for its row: the row's gap goes above it. */
+  gap: number;
   onJump?: (reply: ReplyRef) => void;
 }) {
   const c = useColors();
   const middle = FACE_MIDDLE[look.style];
   const start = WORDS_START[look.style];
   return (
-    <View style={[styles.above, { paddingLeft: start }]}>
+    <View style={[styles.above, { paddingLeft: start, marginTop: gap }]}>
       <View style={[styles.curve, { left: middle - 1, width: start - middle - 4, borderColor: c.line2 }]} />
       <QuoteLine reply={reply} onJump={onJump} />
     </View>
@@ -120,7 +123,7 @@ const styles = StyleSheet.create({
   who: { flexShrink: 0, maxWidth: "50%", fontWeight: "600" },
   words: { flexShrink: 1 },
   gone: { fontStyle: "italic", lineHeight: 20 },
-  above: { paddingRight: 16, marginTop: 8 },
+  above: { paddingRight: 16 },
   curve: {
     position: "absolute",
     top: 10,

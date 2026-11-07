@@ -1,5 +1,6 @@
 import type { Database } from "@agenteschat/db";
 import { activeConnections, type ConnectorDeps } from "../connectors/connections";
+import { NotFoundError } from "../errors";
 import { requirePermission } from "../organizations";
 import { connectionToken } from "./branches";
 import { boundInstallations, type GitHubAppConfig, type GitHubHttp, installationReadToken } from "./github-app";
@@ -155,4 +156,46 @@ export async function listOrgRepositories(
   };
   cache.set(orgId, { at: now, connectionId, value });
   return value;
+}
+
+/** What GitHub shows as the organizations this OAuth sign-in may reach. */
+export interface GitHubOrgAccess {
+  /** Their logins; null when GitHub didn't answer. */
+  orgs: string[] | null;
+  /**
+   * GitHub's page of our app, where a person grants or requests each organization: its sign-in asks only the first
+   * time, so going through it again never brings that choice back. Null on an API key, which isn't our app's.
+   */
+  manageUrl: string | null;
+}
+
+/**
+ * `GET …/github/access`: the organizations the GitHub connection reaches now. GitHub lists only those the
+ * authorization allows, so a grant shows here as soon as it is made, on the token we already hold.
+ */
+export async function githubOrgAccess(deps: RepoListingDeps, actorId: string, orgId: string): Promise<GitHubOrgAccess> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const connection = (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
+  if (!connection) throw new NotFoundError("GitHub isn't connected");
+  // Read as a person comes back from granting one: its repositories show now, not when the listing expires.
+  forgetOrgRepositories(orgId);
+  const clientId = connection.authType === "oauth" ? deps.connectors.oauthApps?.github?.clientId : undefined;
+  const manageUrl = clientId
+    ? `https://github.com/settings/connections/applications/${encodeURIComponent(clientId)}`
+    : null;
+  const token = await connectionToken(deps.connectors, connection).catch(() => null);
+  if (!token) return { orgs: null, manageUrl };
+  const github = deps.github ?? { apiUrl: "https://api.github.com", fetch };
+  const res = await github
+    .fetch(`${github.apiUrl}/user/orgs?per_page=100`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/vnd.github+json",
+        "user-agent": "agentes.chat",
+      },
+    })
+    .catch(() => null);
+  const body = res?.ok ? ((await res.json().catch(() => null)) as { login?: unknown }[] | null) : null;
+  if (!Array.isArray(body)) return { orgs: null, manageUrl };
+  return { orgs: body.flatMap((o) => (typeof o.login === "string" ? [o.login] : [])), manageUrl };
 }

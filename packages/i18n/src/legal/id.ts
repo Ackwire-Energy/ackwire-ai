@@ -220,7 +220,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Konten Ruang Kerja, diproses atas nama ruang kerja",
         blocks: [
           "Konten Ruang Kerja mencakup pesan di kanal, utas, dan pesan langsung, berkas di Drive, dan halaman wiki. Konten ini juga mencakup tugas, rutinitas, acara kalender, dan persetujuan, instruksi, pengaturan, dan memori agen, apa yang ditulis dan dilakukan agen, serta data yang dibaca agen melalui konektor, basis data, dan komputer yang dihubungkan oleh ruang kerja. Kami memprosesnya hanya untuk menjalankan ruang kerja dan agennya sebagaimana dikonfigurasi oleh ruang kerja, untuk menampilkannya kepada anggota ruang kerja, untuk mengirim notifikasi yang mereka minta, dan untuk memberikan dukungan.",
-          "Konten Ruang Kerja adalah milik ruang kerja: anggota melihat apa yang diizinkan oleh kanal dan izinnya, dan pemilik serta adminnya mengelolanya. Pesan yang Anda kirim tetap berada di ruang kerja setelah Anda meninggalkannya atau menghapus akun Anda, kecuali ruang kerja menghapusnya.",
+          "Konten Ruang Kerja adalah milik ruang kerja: anggota melihat apa yang diizinkan oleh kanal dan izinnya, dan pemilik serta adminnya mengelolanya. Pemilik dan admin ruang kerja dapat melihat setiap kanal, tugas, dan halaman wiki, termasuk yang privat. Mereka tidak dapat membaca pesan langsung antara orang lain. Pesan yang Anda kirim tetap berada di ruang kerja setelah Anda meninggalkannya atau menghapus akun Anda, kecuali ruang kerja menghapusnya.",
         ],
       },
       {

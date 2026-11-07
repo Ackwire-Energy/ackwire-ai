@@ -16,6 +16,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { plainLine } from "@agenteschat/ui/markdown";
 import { decidableBySql } from "./approvals";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
@@ -198,6 +199,11 @@ export const NOTIFICATION_KINDS = [
    * Waiting; done once someone decides it.
    */
   "change_request",
+  /**
+   * Proposals wait on this person (`proposals-waiting`, one row per person): the agents that made them as actors.
+   * Waiting; done once none is left for them to decide.
+   */
+  "proposal_waiting",
   /**
    * A person's monthly AI limit (ADR 0141), `source.userId` the person, `latest.statusTo` what happened: `warning`
    * (the person, at 80%), `reached` (who decides, with `limitUsd`, `limitFrom`, `runs` and the agent most used in
@@ -391,6 +397,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "catch_up_closed",
   // The day's decisions the right hand made for the person, one row while unread.
   "right_hand_decided",
+  // One per person, read or not, until nothing waits on them.
+  "proposal_waiting",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -409,22 +417,10 @@ const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
 /** How many people a merged row names (`latest.names`); the rest are counted. */
 const MAX_NAMES = 2;
 
-/**
- * Plain text for a card: code fences, markdown marks and links reduced to
- * their words, whitespace collapsed, at most `max` chars. `@mentions` stay.
- */
+/** Plain text for a card (`plainLine`), at most `max` chars. `@mentions` stay. */
 export function notificationSnippet(text: string | null | undefined, max = SNIPPET_LENGTH): string {
   if (!text) return "";
-  const plain = text
-    .replace(/```[\w+-]*/g, " ")
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/\[\[([^\]|]+)(\|[^\]]*)?\]\]/g, "$1")
-    .replace(/(^|\s)#{1,6}\s+/g, "$1")
-    .replace(/(\*\*|__|~~|`)/g, "")
-    .replace(/(^|\s)[>*-]\s+/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
+  const plain = plainLine(text, max);
   return plain.length > max ? `${cutText(plain, max - 1).trimEnd()}…` : plain;
 }
 
@@ -573,7 +569,7 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
         and(
           sameGroup,
           isNull(notifications.doneAt),
-          input.kind === "approval"
+          input.kind === "approval" || input.kind === "proposal_waiting"
             ? undefined
             : reaction
               ? or(
@@ -821,6 +817,18 @@ export async function clearChannelNotifications(
   for (const r of rows) await publishUserEvent(deps.pubsub, orgId, userId, { type: "notification.removed", id: r.id });
   if (rows.length) await publishCounts(deps, orgId, userId);
   return rows.length;
+}
+
+/** A task is gone: everyone's notifications about it go too, live. */
+export async function clearIssueNotifications(deps: NotificationDeps, orgId: string, issueIds: readonly string[]) {
+  if (issueIds.length === 0) return;
+  const rows = await deps.db
+    .delete(notifications)
+    .where(and(eq(notifications.orgId, orgId), inArray(sql`${notifications.source}->>'issueId'`, issueIds)))
+    .returning({ id: notifications.id, userId: notifications.userId });
+  for (const r of rows)
+    await publishUserEvent(deps.pubsub, orgId, r.userId, { type: "notification.removed", id: r.id });
+  for (const userId of new Set(rows.map((r) => r.userId))) await publishCounts(deps, orgId, userId);
 }
 
 /**

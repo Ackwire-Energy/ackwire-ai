@@ -363,6 +363,28 @@ describe("git proxy", () => {
     expect((await w.call("acme/app.git/info/refs", { query: "?service=git-receive-pack" })).status).toBe(403);
   });
 
+  test("a connection dropped mid-transfer answers git with a 503, and anything else still throws", async () => {
+    const w = await world(["github:git.read"]);
+    const fails = (error: Error) => ({
+      ...w.deps,
+      upstream: { ...w.github, fetch: (async () => Promise.reject(error)) as unknown as typeof fetch },
+    });
+    const ask = (deps: GitProxyDeps) =>
+      handleGitProxy(
+        deps,
+        new Request(
+          `${PUBLIC_URL}/api/git/${f.org.id}/${w.connection.id}/acme/app.git/info/refs?service=git-upload-pack`,
+          { headers: { authorization: `Basic ${Buffer.from(`agentes:${w.token}`).toString("base64")}` } },
+        ),
+        { orgId: f.org.id, connectionId: w.connection.id, path: "acme/app.git/info/refs" },
+      );
+    const reset = await ask(fails(new TypeError("ECONNRESET: The socket connection was closed unexpectedly.")));
+    expect(reset.status).toBe(503);
+    const aborted = await ask(fails(Object.assign(new Error("The connection was closed."), { name: "AbortError" })));
+    expect(aborted.status).toBe(503);
+    expect(ask(fails(new Error("a bug of ours")))).rejects.toThrow("a bug of ours");
+  });
+
   test("push: only agentes/{handle}/*, fast-forward, no tags; refused pushes never reach GitHub", async () => {
     const w = await world();
     const a = commitObject([], "base");

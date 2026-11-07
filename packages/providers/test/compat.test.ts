@@ -88,13 +88,30 @@ describe("Anthropic-compatible providers (scripted transport)", () => {
     const body = requests[0]?.body;
     expect(body?.tools).toEqual([{ name: "structured_output", description: expect.any(String), input_schema: schema }]);
     expect(body?.tool_choice).toEqual({ type: "any" });
-    expect(body?.output_config).toEqual({ effort: "low" });
+    expect(body?.thinking).toEqual({ type: "disabled" });
+    expect(body?.output_config).toBeUndefined();
     expect(result.text).toBe('{"needs_agent":1}');
     expect(result.stopReason).toBe("end_turn");
     expect(result.content).toEqual([
       { type: "opaque", provider: "deepseek", data: { type: "thinking", thinking: "Hmm.", signature: "sig-ds" } },
       { type: "text", text: '{"needs_agent":1}' },
     ]);
+  });
+
+  test("a model that always thinks is never forced: thinking refuses tool_choice, and the tool is only offered", async () => {
+    for (const [id, model] of [
+      ["deepseek", "deepseek-v4-pro"],
+      ["moonshot", "kimi-k3"],
+    ] as const) {
+      const { provider, requests } = compat(
+        id,
+        sse([start(model), ...toolUse(0, "structured_output", '{"ok":1}'), ...end("tool_use", { output_tokens: 3 })]),
+      );
+      const result = await provider.stream(request({ model, outputSchema: { type: "object" }, effort: "low" }), quiet);
+      expect(requests[0]?.body).not.toHaveProperty("tool_choice");
+      expect(requests[0]?.body).not.toHaveProperty("thinking");
+      expect(result.text).toBe('{"ok":1}');
+    }
   });
 
   test("Z.ai and MiniMax take only tool_choice auto: the tool is offered, not forced, and a reply in text stays the text", async () => {

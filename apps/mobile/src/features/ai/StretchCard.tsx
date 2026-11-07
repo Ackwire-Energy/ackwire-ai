@@ -4,7 +4,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EventPillAction } from "@/ui";
 import { AskDone, AskWaiting } from "../chat/asks";
@@ -44,7 +44,7 @@ export function StretchCard({ message: m }: { message: Message }) {
   };
   if (continued) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone
           done
           words={
@@ -78,7 +78,3 @@ export function StretchCard({ message: m }: { message: Message }) {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-});

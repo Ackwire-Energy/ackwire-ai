@@ -13,6 +13,10 @@ const AgentQuestion = z
     messageId: z.uuid().nullable(),
     text: z.string(),
     choices: z.array(z.string()).nullable(),
+    requestedForUserId: z
+      .string()
+      .nullable()
+      .openapi({ description: "The one person who may answer it; null: anyone in the conversation." }),
     status: z.enum(["open", "answered"]),
     answer: z.string().nullable(),
     answeredByUserId: z.string().nullable(),

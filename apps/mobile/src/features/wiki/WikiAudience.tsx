@@ -30,7 +30,7 @@ import { PushedHeader, successHaptic, Tile } from "../shared/parts";
 
 /**
  * "Acesso" to a wiki page or folder (ADR 0023 addenda), the web's dialog as a screen on the shared `AccessList`: a level
- * for everyone and one per role, person and agent. Owners always read and edit. Inside a limited folder it can only be
+ * for everyone and one per role, person and agent. Administrators always read and edit. Inside a limited folder it can only be
  * narrower.
  */
 export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: string }) {

@@ -93,6 +93,18 @@ export const extraIcons = {
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M10 6.5v4M10 13.5v.01" }],
   ],
+  /** A pull request of a code host, beside its number: two branches, the way code hosts draw it. */
+  gitPull: [
+    ["circle", { cx: "5.5", cy: "4.5", r: "1.9" }],
+    ["circle", { cx: "5.5", cy: "15.5", r: "1.9" }],
+    ["circle", { cx: "14.5", cy: "15.5", r: "1.9" }],
+    ["path", { d: "M5.5 6.4v7.2M14.5 13.6V8A2.5 2.5 0 0 0 12 5.5H9.5m2-2-2 2 2 2" }],
+  ],
+  /** An issue of a code host, beside its number. */
+  issue: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["circle", { cx: "10", cy: "10", r: "1.8", fill: "currentColor" }],
+  ],
   /** Channel: pull request attachment. */
   pullRequest: [["path", { d: "M6 3v14M14 9v8M6 7a3 3 0 0 0 3 3h2a3 3 0 0 1 3 3" }]],
   /** Organization settings (sliders). Not in the screens yet; drawn on the same grid. */

@@ -13,6 +13,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { frontmatter } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  AffixInput,
   Alert,
   Button,
   Card,
@@ -26,7 +27,6 @@ import {
   Icon,
   type IconName,
   InfoHint,
-  Input,
   isIdHandle,
   normalizeAppearance,
   OptionCard,
@@ -554,32 +554,32 @@ function Picker({ flow, orgId }: { flow: ImportFlowState; orgId: string }) {
       />
 
       <Field label={t("onboarding.import.paste")} id="import-paste">
-        <div className="imp-paste">
-          <Input
-            value={text}
-            placeholder={t("onboarding.import.pastePlaceholder")}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={(e) => {
-              // A pasted reply is read right away, line breaks and all (a one-line field would drop them).
-              const pasted = e.clipboardData.getData("text");
-              if (!pasted.trim() || /^\s*https?:\/\//i.test(pasted)) return;
-              e.preventDefault();
-              setText("");
-              submit(pasted);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              submit(text);
-            }}
-          />
-          <Button onClick={() => submit(text)} disabled={!text.trim() || busy}>
-            {t("onboarding.import.readPasted")}
-          </Button>
-        </div>
+        <AffixInput
+          value={text}
+          placeholder={t("onboarding.import.pastePlaceholder")}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={busy}
+          onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => {
+            // A pasted reply is read right away, line breaks and all (a one-line field would drop them).
+            const pasted = e.clipboardData.getData("text");
+            if (!pasted.trim() || /^\s*https?:\/\//i.test(pasted)) return;
+            e.preventDefault();
+            setText("");
+            submit(pasted);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            submit(text);
+          }}
+          action={
+            <Button variant="ghost" size="sm" onClick={() => submit(text)} disabled={!text.trim() || busy}>
+              {t("onboarding.import.readPasted")}
+            </Button>
+          }
+        />
       </Field>
 
       {flow.failure && (

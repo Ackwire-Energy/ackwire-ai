@@ -704,7 +704,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   link.onReclaim = async ({ spare, peek }) => {
     if (!peek) return { closed: await brains.reclaimIdle(spare) };
     const idle = brains.idleCandidate(spare);
-    return idle ? { closed: false, idle } : { closed: false };
+    return { closed: false, ...(idle ? { idle } : {}), ...(spare && brains.warm(spare) ? { warm: true } : {}) };
   };
   link.onBrowserRoom = (agentId, view) => {
     if (view) viewed.add(agentId);

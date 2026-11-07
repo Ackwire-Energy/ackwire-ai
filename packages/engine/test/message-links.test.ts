@@ -110,7 +110,8 @@ describe("where an agent was asked", () => {
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
     const { asked, dm, sent, where, seen } = await theExchange(f.general.id, bia, requests);
     const origin = (sent?.meta as { agentDm?: Record<string, unknown> } | undefined)?.agentDm;
-    expect(origin).toMatchObject({ requesterUserId: bia.id, fromChannelId: f.general.id, fromMessageId: asked.id });
+    expect(origin).toMatchObject({ fromChannelId: f.general.id, fromMessageId: asked.id });
+    expect(origin).not.toHaveProperty("requesterUserId");
     const link = messageLink(f.org.id, asked);
     expect(link).toMatch(LINK);
     expect(seen).toContain(
@@ -143,6 +144,15 @@ describe("where an agent was asked", () => {
     expect(later.content).toContain("manda os acessos de hoje");
     // Still not the rest of the channel.
     expect(await read(ctx, { channel: "diretoria" })).toMatchObject({ isError: true });
+  });
+
+  test("asked in a DM: who asked stays in that DM too", async () => {
+    const { bia, requests } = await askedElsewhere();
+    const biaDm = await openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id });
+    const { asked, seen } = await theExchange(biaDm.id, bia, requests);
+    expect(seen).toContain("[Why you sent it]: Someone asked in a conversation not everyone here is in.");
+    expect(seen).not.toContain("bia asked");
+    expect(seen).not.toContain(asked.id);
   });
 
   test("asked in a private channel to post in a public one: never quoted there, someone outside it reads the reply", async () => {

@@ -172,6 +172,8 @@ export {
   AffixInput,
   Field,
   type FieldProps,
+  FormActions,
+  FormStack,
   Input,
   Locked,
   PickerHeading,

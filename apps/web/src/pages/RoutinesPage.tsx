@@ -116,6 +116,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FoldedBody } from "@/chat/FoldedBody";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
 import { AskAgentButton } from "@/components/AskAgentButton";
@@ -1868,7 +1869,7 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
       <span className={`routine-runs__node routine-runs__node--${pixel ?? "running"}`}>
         <Icon name={pixel ? RUN_NODE_ICON[pixel] : isRunAtWork(x.status) ? "play" : "dash"} size={14} />
       </span>
-      <span>
+      <div>
         {x.status === "waiting" && x.approvalId ? (
           <DetailsLink item={{ kind: "approval", id: x.approvalId }} className="routine-runs__link">
             {outcome}
@@ -1876,9 +1877,13 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
         ) : (
           <b>{outcome}</b>
         )}
-        {words && <small>{words}</small>}
+        {words && (
+          <div className="routine-runs__words">
+            <FoldedBody body={words} />
+          </div>
+        )}
         <RunChatLink run={x} />
-      </span>
+      </div>
       <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
     </li>
   );
@@ -2574,8 +2579,7 @@ function RoutineDialog({
             )}
             {shows("when") && (
               <>
-                <div className="routine-kind">
-                  <span className="ac-field__label">{t("routines.form.when")}</span>
+                <Field label={t("routines.form.when")} group>
                   <Segmented
                     label={t("routines.form.when")}
                     value={kind}
@@ -2590,7 +2594,7 @@ function RoutineDialog({
                       { value: "webhook" as const, label: t("routines.form.kind.webhook") },
                     ]}
                   />
-                </div>
+                </Field>
                 {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
                 {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
                 {kind === "webhook" &&
@@ -2694,13 +2698,14 @@ function RoutineDialog({
             )}
             {!part && (
               <>
-                <div className="routine-kind">
-                  <span className="ac-hintline">
-                    <span className="ac-field__label">{t("routines.form.report")}</span>
-                    <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
-                      {t("routines.report.hint")}
-                    </InfoHint>
-                  </span>
+                <Field
+                  label={t("routines.form.report")}
+                  group
+                  hint={{
+                    name: t("common.about", { label: t("routines.form.report") }),
+                    text: t("routines.report.hint"),
+                  }}
+                >
                   <Segmented
                     label={t("routines.form.report")}
                     value={report}
@@ -2710,8 +2715,8 @@ function RoutineDialog({
                       label: t(`routines.report.${v}`),
                     }))}
                   />
-                </div>
-                <div className="routine-own-actions">
+                </Field>
+                <div className="ac-field">
                   <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
                   <OwnActions routine={routine} />
                 </div>

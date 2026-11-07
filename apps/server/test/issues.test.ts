@@ -24,6 +24,13 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   ).toMatchObject({
     status: "in_progress",
   });
+  const githubUrl = "https://github.com/acme/app/issues/12";
+  const linked = await api(`/issues/${issue.id}`, { method: "PATCH", json: { githubUrl } });
+  expect(await linked.json()).toMatchObject({ githubUrl });
+  const notGithub = { githubUrl: "https://example.org/a/b/issues/1" };
+  expect((await api(`/issues/${issue.id}`, { method: "PATCH", json: notGithub })).status).toBe(400);
+  const unlinked = await api(`/issues/${issue.id}`, { method: "PATCH", json: { githubUrl: null } });
+  expect(await unlinked.json()).toMatchObject({ githubUrl: null });
   const criterion = await api(`/issues/${issue.id}/criteria/${issue.criteria[0]?.id}`, {
     method: "PUT",
     json: { done: true },
@@ -41,6 +48,8 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   expect(activity.activity.map((a) => a.event ?? a.kind)).toEqual([
     "created",
     "status_changed",
+    "github_link",
+    "github_link",
     "criterion_checked",
     "assigned",
     "agent_asked",
@@ -108,4 +117,18 @@ test("board columns API: list, add, rename, move a task, delete with a destinati
   const deleted = await api(`/issue-columns/${qa.id}?moveTo=${done?.id}`, { method: "DELETE" });
   expect(deleted.status).toBe(200);
   expect(await (await api(`/issues/${issue.id}`)).json()).toMatchObject({ status: "done", columnId: done?.id });
+});
+
+test("deleting a task: 204, gone from the list and its address; a member who didn't create it is refused", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = (await (await api("/issues", { json: { title: "Sobrou" } })).json()) as { id: string };
+  const deleted = await api(`/issues/${created.id}`, { method: "DELETE" });
+  expect(deleted.status).toBe(204);
+  expect((await api("/issues/by-number/1")).status).toBe(404);
+  expect(await (await api("/issues")).json()).toMatchObject({ issues: [] });
+  expect((await api(`/issues/${created.id}`, { method: "DELETE" })).status).toBe(404);
 });

@@ -32,9 +32,7 @@ export function SeriesPrompt({
         ))}
       </DialogBody>
       <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onCancel}>{t("common.cancel")}</Button>
       </DialogFooter>
     </Dialog>
   );

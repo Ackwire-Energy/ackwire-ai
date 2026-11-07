@@ -220,7 +220,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Il Contenuto del Workspace, trattato per conto dei workspace",
         blocks: [
           "Il Contenuto del Workspace comprende i messaggi nei canali, nei thread e nei messaggi diretti, i file nel Drive e le pagine wiki. Comprende inoltre le attività, le routine, gli eventi del calendario e le approvazioni, le istruzioni, le impostazioni e la memoria degli agenti, ciò che gli agenti scrivono e fanno, e i dati che gli agenti leggono tramite i connettori, i database e i computer collegati dal workspace. Lo trattiamo esclusivamente per far funzionare il workspace e i suoi agenti secondo la configurazione stabilita dal workspace, per mostrarlo ai membri del workspace, per inviare le notifiche da loro richieste e per fornire assistenza.",
-          "Il Contenuto del Workspace appartiene al workspace: i membri vedono ciò che i suoi canali e le sue autorizzazioni consentono, e i suoi proprietari e amministratori lo gestiscono. I messaggi che hai pubblicato restano nel workspace dopo che lo hai lasciato o hai eliminato il tuo account, a meno che il workspace non li elimini.",
+          "Il Contenuto del Workspace appartiene al workspace: i membri vedono ciò che i suoi canali e le sue autorizzazioni consentono, e i suoi proprietari e amministratori lo gestiscono. I proprietari e gli amministratori del workspace possono vedere tutti i canali, le attività e le pagine wiki, compresi quelli privati. Non possono leggere i messaggi diretti tra altre persone. I messaggi che hai pubblicato restano nel workspace dopo che lo hai lasciato o hai eliminato il tuo account, a meno che il workspace non li elimini.",
         ],
       },
       {

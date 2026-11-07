@@ -377,8 +377,8 @@ function WikiPage({ slug }: { slug: string }) {
   const writes = can(org, "edit_wiki") && page.data?.canEdit !== false;
   const look = useEmptyLook();
   const admin = can(org, "configure");
-  // Who sees a page: people who write the wiki and manage roles (the server checks the same).
-  const choosesAudience = writes && can(org, "manage_roles");
+  // Who sees a page: anyone who edits it (the server checks the same); agents and editors, who manages roles too.
+  const choosesAudience = writes;
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
   const graph = useWikiGraph(orgId, true);
@@ -472,7 +472,7 @@ function WikiPage({ slug }: { slug: string }) {
         key: "audience",
         icon: "eye",
         label: t("wiki.audience"),
-        run: () => router.push({ pathname: "/wiki-audience", params: { slug: p.slug } }),
+        run: () => router.push({ pathname: "/who-sees", params: { slug: p.slug } }),
       });
     if (admin)
       items.push({

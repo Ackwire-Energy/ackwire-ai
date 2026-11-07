@@ -380,4 +380,19 @@ export const words: EmailWords = {
     button: "通知を開く",
     why: (org) => `${org} の誰かがあなたのプランをエージェントに接続したため、このメールが送られました。`,
   },
+  planWaiting: {
+    subject: "チームが待っています",
+    preheader: "ワークスペースの準備ができました。開始にはagentes.chatのプランが必要です。",
+    headline: "チームが待っています",
+    body: (agents, channels, routines) => {
+      const a = `エージェント${agents}体`;
+      const c = `チャンネル${channels}件`;
+      const r = `ルーティン${routines}件`;
+      return routines > 0
+        ? `${a}、${c}、${r}の準備ができています。開始にはagentes.chatのプランが必要です。`
+        : `${a}、${c}の準備ができています。開始にはagentes.chatのプランが必要です。`;
+    },
+    button: "agentes.chatのプランを見る",
+    why: (org) => `agentes.chatで${org}を管理しているため、このメールをお送りしています。このお知らせは2回だけです。`,
+  },
 };

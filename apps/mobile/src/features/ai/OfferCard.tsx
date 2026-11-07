@@ -25,7 +25,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { EventPillAction, EventPillText, type IconName, Text } from "@/ui";
@@ -252,7 +252,7 @@ function Shell({
 }) {
   if (done) {
     return (
-      <View style={styles.done}>
+      <View>
         <AskDone done words={done} />
       </View>
     );
@@ -284,7 +284,3 @@ function Shell({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  done: { marginTop: 6 },
-});

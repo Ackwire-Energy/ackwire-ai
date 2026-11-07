@@ -12,6 +12,8 @@ import { can, requireActiveMembership, requirePermission } from "./organizations
 import { calendarReminders, routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 import { replyThreadOf } from "./runs";
+import { userVisibleChannels } from "./search";
+import { taskSeenSql } from "./task-access";
 
 const {
   calendarEvents,
@@ -851,7 +853,7 @@ export async function respondToEvent(
   return view(event, await attendeesOf(db, [eventId]));
 }
 
-/** Events a person sees: theirs (invited or created) and those of channels they're in. */
+/** Events a person sees: theirs (invited or created) and those of channels they read. */
 async function visibleEvents(db: Database, userId: string, orgId: string, from: Date, to: Date) {
   const invited = db
     .select({ id: calendarAttendees.eventId })
@@ -863,10 +865,7 @@ async function visibleEvents(db: Database, userId: string, orgId: string, from: 
         eq(calendarAttendees.attendeeId, userId),
       ),
     );
-  const myChannels = db
-    .select({ id: channelMembers.channelId })
-    .from(channelMembers)
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)));
+  const myChannels = await userVisibleChannels(db, orgId, userId, { archived: true });
   return db
     .select()
     .from(calendarEvents)
@@ -933,7 +932,6 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
       number: issues.number,
       title: issues.title,
       date: issues.dueDate,
-      channelId: issues.channelId,
     })
     .from(issues)
     .where(
@@ -942,19 +940,10 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         sql`${issues.dueDate} >= ${fromDay}::date`,
         sql`${issues.dueDate} <= ${toDay}::date`,
         sql`${issues.status} not in ('done', 'canceled')`,
+        taskSeenSql("issues", sql`${userId}::text`),
       ),
     );
-  const mine = new Set(
-    (
-      await db
-        .select({ id: channelMembers.channelId })
-        .from(channelMembers)
-        .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)))
-    ).map((r) => r.id),
-  );
-  const deadlines = due
-    .filter((d) => !d.channelId || mine.has(d.channelId))
-    .map((d) => ({ issueId: d.id, number: d.number, title: d.title, date: d.date ?? "" }));
+  const deadlines = due.map((d) => ({ issueId: d.id, number: d.number, title: d.title, date: d.date ?? "" }));
 
   const proposals = (
     await db
@@ -968,6 +957,7 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         ),
       )
   ).map(proposalView);
+  const mine = new Set(await userVisibleChannels(db, orgId, userId, { archived: true }));
   const reminders = await calendarReminders(db, userId, orgId, from, to, mine, sees);
   return { events, routines: routineRuns, reminders, deadlines, proposals };
 }

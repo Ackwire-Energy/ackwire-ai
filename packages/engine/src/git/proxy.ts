@@ -203,6 +203,24 @@ export async function handleGitProxy(
   req: Request,
   params: { orgId: string; connectionId: string; path: string },
 ): Promise<Response> {
+  try {
+    return await proxyGit(deps, req, params);
+  } catch (error) {
+    if (connectionDropped(error)) return text(503, "agentes: the connection dropped. Try again.");
+    throw error;
+  }
+}
+
+/** The computer or GitHub hung up mid-transfer: nothing broke here, and git only needs to try again. */
+const connectionDropped = (error: unknown) =>
+  error instanceof Error &&
+  (error.name === "AbortError" || /\bECONNRESET\b/.test(`${(error as { code?: string }).code} ${error.message}`));
+
+async function proxyGit(
+  deps: GitProxyDeps,
+  req: Request,
+  params: { orgId: string; connectionId: string; path: string },
+): Promise<Response> {
   const limits = { ...GIT_LIMITS, ...deps.limits };
   const parsed = parseGitPath(params.path);
   if (!parsed) return text(404, "agentes: not a git repository path");

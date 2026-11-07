@@ -421,7 +421,6 @@ a.mi-ref:hover code {
   flex-wrap: wrap;
   gap: 12px;
   max-width: 640px;
-  margin-top: 8px;
   padding: 10px 12px;
   border-radius: 16px;
   background: var(--raised);
@@ -826,7 +825,8 @@ a.mi-pr:hover {
   line-height: 1.3;
   letter-spacing: -0.015em;
 }
-.mi-q p {
+.mi-q p,
+.mi-q .folded-body {
   margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
@@ -881,7 +881,7 @@ a.mi-pr:hover {
 /* One event pill (`EventPill`) in the messages' text column: its words wrap inside the frame, its actions ("Ver
    plano", "Revogar") in it, what it opens (commands, a request's command) under it. */
 .mi-evt {
-  margin: 4px 12px 6px var(--thread-indent, 64px);
+  margin-inline: var(--thread-indent, 64px) 12px;
   animation: mi-fade 0.35s var(--out) both;
 }
 /* A command allowed without a card: quiet, the command in mono. */
@@ -912,7 +912,6 @@ a.mi-pr:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
   font-size: 12px;
   color: var(--faint);
 }
@@ -921,7 +920,6 @@ a.mi-pr:hover {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 8px;
-  margin-top: 6px;
   font-size: 12.5px;
   color: var(--muted);
 }
@@ -1171,7 +1169,6 @@ a.mi-pr:hover {
   color: var(--faint);
 }
 .mi-notes {
-  margin-top: 12px;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--sunken);
@@ -1179,17 +1176,6 @@ a.mi-pr:hover {
   color: var(--ink2);
 }
 .mi-notes .ac-icon {
-  color: var(--faint);
-}
-.mi-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
-}
-.mi-field__label {
-  font-size: 12.5px;
-  font-weight: 650;
   color: var(--faint);
 }
 .mi-grid2 {
@@ -1454,7 +1440,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 .mi-blocked {
   display: grid;
   gap: 8px;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--sunken);
@@ -1609,13 +1595,10 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* A mission's card in place of its thread's start marker (threads proposed before the link card). */
 .mi-linkrow {
-  margin: 6px 12px 6px var(--thread-indent, 64px);
+  margin-inline: var(--thread-indent, 64px) 12px;
 }
 
 /* ── Delivery card: the mission's end (like an approval) ─────────────────── */
-.mi-delivery__summary {
-  white-space: pre-wrap;
-}
 .mi-delivery .artifact-cards {
   margin-top: 12px;
 }
@@ -1707,8 +1690,9 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 .mi-cfg__body {
   padding-bottom: 8px;
 }
+.mi-cfg__body .ac-setsec > .ac-field,
 .mi-cfg__computer {
-  margin-top: 8px;
+  margin-top: var(--form-gap);
 }
 .mi-cfg__foot {
   display: flex;

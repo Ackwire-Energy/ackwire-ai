@@ -56,9 +56,20 @@ export function ChannelAccessChoice({
   const [choosing, setChoosing] = useState(false);
   const pickedRoles = candidates.filter((r) => value.roleIds.includes(r.id));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="channel-access">
       {/* A dropdown, as "Categoria" above it: three cards side by side broke their words in a narrow dialog. */}
-      <Field label={t("newChannel.visibility")} id={`${idPrefix}-vis`} help={t(`newChannel.${value.mode}Desc`)}>
+      <Field
+        label={t("newChannel.visibility")}
+        id={`${idPrefix}-vis`}
+        help={t(`newChannel.${value.mode}Desc`)}
+        labelAside={
+          value.mode === "roles" && (
+            <button type="button" className="ac-link ac-link--muted small" onClick={() => setChoosing(true)}>
+              {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
+            </button>
+          )
+        }
+      >
         <Select
           value={value.mode}
           onValueChange={(mode) => {
@@ -86,18 +97,6 @@ export function ChannelAccessChoice({
             </li>
           ))}
         </TokenList>
-      )}
-      {value.mode === "roles" && (
-        <span>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={pickedRoles.length > 0 ? "edit" : "plus"}
-            onClick={() => setChoosing(true)}
-          >
-            {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
-          </Button>
-        </span>
       )}
       {value.mode === "roles" && (
         <span className={`small ${showError && !accessValid(value) ? "ac-field__error" : "muted"}`}>

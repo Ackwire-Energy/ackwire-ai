@@ -32,6 +32,7 @@ import {
   gateDims,
   gateLine,
   gateRechecks,
+  keptCardState,
   kindOf,
   mayConnectAi,
   type NoAiCard,
@@ -54,7 +55,6 @@ import {
   signInAgainPlan,
   signsInOnce,
   signsInPerAgent,
-  uncheckedKeyLine,
 } from "../src/lib/no-ai";
 import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, providerFitsChoice, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
 
@@ -276,6 +276,9 @@ describe("the Cloud's plan gate tells the truth", () => {
     expect(planHoldOf("selfhost", { state: "hold", reason: "payment" })).toBeNull();
     expect(planHoldOf("cloud", { state: "hold", reason: "ended" })).toBe("ended");
     expect(planHoldOf("cloud", { state: "active", reason: null })).toBeNull();
+    // Before the edition is known a hold counts: no moment of Connect, and no answer started on a saved key.
+    expect(planHoldOf(null, { state: "hold", reason: "payment" })).toBe("payment");
+    expect(planHoldOf(null, { state: "active", reason: null })).toBeNull();
   });
 
   test("the phone's words for a hold: where to pay for whoever pays, who can for anyone else, never a link", () => {
@@ -284,9 +287,18 @@ describe("the Cloud's plan gate tells the truth", () => {
     expect(planHoldPhoneLine(t, false)).toBe("connectAi.billing standing.billing.askAdmin");
   });
 
-  test("a key kept on a billing hold says when it starts: nobody was asked, so it can't read as no answer", () => {
-    expect(uncheckedKeyLine(enT, "OpenAI", true)).toBe(enT("connectAi.key.savedHeld"));
-    expect(uncheckedKeyLine(enT, "OpenAI", false)).toBe(enT("connectAi.key.savedUnchecked", { provider: "OpenAI" }));
+  test("a kept message follows the hold first: a key saved earlier reads as ready and changes nothing", () => {
+    expect(noAiCardOf({ noAi: { agentId: "a", reason: "plan_hold" } })?.held).toBe(true);
+    expect(noAiCardOf({ noAi: { agentId: "a", reason: "no_key" } })?.held).toBeUndefined();
+    expect(keptCardState({ hold: "payment", paid: false, ready: true })).toBe("held");
+    expect(keptCardState({ hold: "payment", paid: true, ready: false })).toBe("paid");
+    expect(keptCardState({ hold: null, paid: true, ready: false })).toBe("connect");
+    expect(keptCardState({ hold: null, paid: false, ready: true })).toBe("answer");
+  });
+
+  test("on the phone a hold closes keys in words, with the same way out", () => {
+    const t = ((key: string, o?: { a: string; b: string }) => (o ? `${o.a} ${o.b}` : key)) as unknown as TFunction;
+    expect(planHoldPhoneLine(t, true, true)).toBe("connectAi.key.closed connectAi.billingWeb");
   });
 
   test("a dimmed plan's rows always have words: the hold's, the computer's, or that it has none", () => {

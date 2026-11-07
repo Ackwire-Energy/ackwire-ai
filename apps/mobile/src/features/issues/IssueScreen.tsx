@@ -1,5 +1,6 @@
 import {
   type Actor,
+  ApiError,
   type Issue,
   type IssueColumn,
   type IssuePriority,
@@ -13,9 +14,17 @@ import {
   useIssueColumns,
 } from "@agenteschat/client";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
+import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
-import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
+import {
+  canDeleteIssue,
+  conversationLine,
+  deleteIssueText,
+  isOpen,
+  PRIORITIES,
+  STATUSES,
+} from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -32,6 +41,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   Chip,
@@ -39,18 +49,22 @@ import {
   IconButton,
   type IconName,
   LineIcon,
+  Locked,
   PixelOrbit,
   Text,
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { SocialMark } from "@/ui/auth/SocialMarks";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
+import { confirmAction } from "../settings/parts";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { SheetTitle } from "../shared/PromptForm";
 import {
   type ActionItem,
   ActionList,
@@ -62,6 +76,8 @@ import {
   useSurface,
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { TextArea } from "../shared/TextArea";
+import { useWhoSeesLabel } from "../shared/WhoSees";
 import { IssueActivityFeed } from "./IssueActivity";
 import {
   columnChoices,
@@ -73,7 +89,7 @@ import {
   taskConversationHref,
   workLines,
 } from "./logic";
-import { StateChip, useColumnLabel, useStepText } from "./parts";
+import { GithubChip, StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
  * One task (called "tarefa" in the app): where it came from, the big title, its state, priority
@@ -104,7 +120,8 @@ function IssueView({ number, focusId }: { number: number; focusId: string | null
     ]),
   );
   const sheet = useSheet();
-  const i = issue.data;
+  // Out of reach since it opened (someone changed who sees it): what's on screen goes.
+  const i = issue.error instanceof ApiError && issue.error.status === 404 ? undefined : issue.data;
   const openConversation = useOpenConversation();
   // A notice or a link named a message of its conversation: straight there, once.
   const focused = useRef(false);
@@ -261,6 +278,7 @@ function Head({ issue: i }: { issue: Issue }) {
     i18n.language,
   );
   const assignee = i.assignee;
+  const whoSees = useWhoSeesLabel();
   return (
     <View style={styles.head}>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
@@ -277,13 +295,91 @@ function Head({ issue: i }: { issue: Issue }) {
       <View style={styles.chips}>
         <StateChip issue={i} />
         {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
+        {i.audience?.mode === "people" ? <Chip icon="lock" label={whoSees(i.audience)} /> : null}
         {assignee ? (
           <Chip label={dir.nameOf(assignee)} leading={<Face who={assignee} size={14} live={false} />} />
         ) : (
           <Chip icon="circle" label={t("issues.noAssignee")} />
         )}
+        {i.githubUrl ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={i.githubUrl}
+            onPress={() => {
+              const url = webUrl(i.githubUrl);
+              if (url) void Linking.openURL(url).catch(() => undefined);
+            }}
+          >
+            <GithubChip url={i.githubUrl} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
+  );
+}
+
+/** Pastes, changes or removes the task's GitHub link. */
+function GithubLinkForm({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const sheet = useSheet();
+  const action = useIssueAction(useOrgId());
+  const toast = useToast();
+  const [text, setText] = useState(i.githubUrl ?? "");
+  const [invalid, setInvalid] = useState(false);
+  const save = (githubUrl: string | null) =>
+    action.mutate(
+      { type: "update", id: i.id, patch: { githubUrl } },
+      {
+        onSuccess: () => {
+          sheet.close();
+          toast({ title: t("mobile.issues.changed") });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
+  const submit = () => {
+    const url = text.trim();
+    if (url && !isGithubLink(url)) return setInvalid(true);
+    save(url || null);
+  };
+  return (
+    <>
+      <SheetTitle title={t("issues.github.label")} />
+      <Locked when={action.isPending}>
+        <TextArea
+          multiline={false}
+          minHeight={44}
+          value={text}
+          onChangeText={(v) => {
+            setText(v);
+            setInvalid(false);
+          }}
+          onSubmitEditing={submit}
+          placeholder={t("issues.github.placeholder")}
+          accessibilityLabel={t("issues.github.label")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          autoFocus
+        />
+      </Locked>
+      {invalid ? (
+        <Text variant="small" style={{ color: c.warn }}>
+          {t("issues.github.invalid")}
+        </Text>
+      ) : null}
+      <Button variant="primary" wide label={t("common.save")} loading={action.isPending} onPress={submit} />
+      {i.githubUrl ? (
+        <Button
+          variant="ghost"
+          wide
+          label={t("issues.github.remove")}
+          disabled={action.isPending}
+          onPress={() => save(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -687,12 +783,14 @@ function ColumnPicker({
 /** "…": its column, priority, who does it (an agent is asked and starts), stop the agent, cancel. */
 function IssueMenu({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
+  const c = useColors();
   const sheet = useSheet();
   const orgId = useOrgId();
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory();
   const meId = useMeId();
+  const { org } = useOrg();
   const action = useIssueAction(orgId);
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
@@ -723,6 +821,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       );
     } else update({ type: "update", id: i.id, patch: { assignee: who } });
   };
+  const whoSees = useWhoSeesLabel();
   const same = (a: Actor | null, b: Actor | null) => (a?.type ?? null) === (b?.type ?? null) && a?.id === b?.id;
   const pick = (items: ActionItem[]) => sheet.open(<ActionList items={items} />);
   const statusItems = (): ActionItem[] =>
@@ -809,6 +908,23 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
       onPress: () => pick(assigneeItems()),
     },
+    {
+      key: "github",
+      leading: <SocialMark provider="github" color={c.ink} size={18} />,
+      label: t("issues.github.label"),
+      ...(i.githubUrl ? { hint: githubLinkLabel(i.githubUrl) } : {}),
+      onPress: () => sheet.open(<GithubLinkForm issue={i} />),
+    },
+    {
+      key: "audience",
+      icon: i.audience?.mode === "people" ? "lock" : "globe",
+      label: t("whoSees.label"),
+      hint: whoSees(i.audience ?? { mode: "everyone" }),
+      onPress: () => {
+        sheet.close();
+        router.push({ pathname: "/who-sees", params: { number: i.number } });
+      },
+    },
   ];
   if (w?.state === "running" && w.runId) {
     const runId = w.runId;
@@ -833,6 +949,34 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
           { type: "update", id: i.id, patch: { status: "canceled" } },
           t("mobile.issues.actions.canceled", { number: i.number }),
         ),
+    });
+  if (canDeleteIssue(org, i, meId))
+    items.push({
+      key: "delete",
+      icon: "trash",
+      danger: true,
+      label: t("issues.delete.action"),
+      onPress: () => {
+        sheet.close();
+        const working = i.work && i.work.state !== "stalled" && i.assignee ? dir.nameOf(i.assignee) : null;
+        confirmAction({
+          title: t("issues.delete.title", { number: i.number }),
+          text: deleteIssueText(t, i, working),
+          action: t("issues.delete.confirm"),
+          cancel: t("common.cancel"),
+          onConfirm: () =>
+            action.mutate(
+              { type: "delete", id: i.id },
+              {
+                onSuccess: () => {
+                  toast({ title: t("issues.delete.done", { number: i.number }) });
+                  router.back();
+                },
+                onError: failed,
+              },
+            ),
+        });
+      },
     });
   return <ActionList items={items} />;
 }

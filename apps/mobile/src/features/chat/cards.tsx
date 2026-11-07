@@ -9,6 +9,7 @@ import {
   useDecideApproval,
   useDecideApprovals,
 } from "@agenteschat/client";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import {
   approvalCardItems,
   approvalRuns,
@@ -259,12 +260,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       <>
         <View style={styles.itemActs}>
           {high ? (
-            <HoldButton
-              size="card"
-              label={label}
-              holdLabel={t("mobile.approval.holding")}
-              onConfirm={() => decideMany(scope, "approve")}
-            />
+            <HoldButton size="card" label={label} onConfirm={() => decideMany(scope, "approve")} />
           ) : (
             <Button
               variant="primary"
@@ -449,12 +445,7 @@ function ApprovalGroupItem({
           <>
             <View style={styles.itemActs}>
               {approvalRisk(a) === "high" ? (
-                <HoldButton
-                  size="card"
-                  label={t("mobile.approval.hold")}
-                  holdLabel={t("mobile.approval.holding")}
-                  onConfirm={onApprove}
-                />
+                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={onApprove} />
               ) : (
                 <Button
                   variant="primary"
@@ -579,12 +570,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
             <>
               <View style={styles.itemActs}>
                 {high ? (
-                  <HoldButton
-                    size="card"
-                    label={t("mobile.approval.hold")}
-                    holdLabel={t("mobile.approval.holding")}
-                    onConfirm={() => approve()}
-                  />
+                  <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
                 ) : (
                   <Button
                     variant="primary"
@@ -621,7 +607,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
 /**
  * An agent's question (`ask_user`, `meta.question`) as the request card: the question, then the choices as
  * full-width rows and "Outra resposta" for a free answer beside them; with no choices, just Responder. Once
- * answered, one line with the answer. Anyone in the conversation may answer.
+ * answered, one line with the answer. Anyone in the conversation may answer, unless it is for one person: then
+ * everyone else reads who it waits for, and nothing to press.
  */
 export function QuestionCard({ question }: { question: AgentQuestion }) {
   const { t } = useTranslation();
@@ -704,6 +691,18 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         onSubmit={(text) => answer({ text }).then(() => sheet.close())}
       />,
     );
+  if (!questionWaitsOn(q, meId)) {
+    const person = dir.memberById.get(q.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson");
+    return (
+      <AskCard
+        id={q.id}
+        kind="question"
+        agentId={q.agentId}
+        waitsFor={t("ask.waitingFor", { name: person })}
+        lead={q.text}
+      />
+    );
+  }
   return (
     <AskCard
       id={q.id}
@@ -859,7 +858,6 @@ const styles = StyleSheet.create({
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
   tlink: {
-    marginTop: 8,
     alignSelf: "flex-start",
     maxWidth: "100%",
     flexDirection: "row",

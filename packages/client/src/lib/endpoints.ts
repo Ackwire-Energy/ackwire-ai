@@ -55,6 +55,11 @@ export function withTypedModel(draft: EndpointDraft, typed: string): EndpointDra
   return { ...draft, models: [...draft.models, { id, on: true, input: "", output: "" }] };
 }
 
+export const withoutModel = (draft: EndpointDraft, id: string): EndpointDraft => ({
+  ...draft,
+  models: draft.models.filter((m) => m.id !== id),
+});
+
 /** A typed price: empty is none, a comma reads as the decimal point; null when it isn't a price. */
 export function parsePrice(text: string): number | undefined | null {
   const t = text.trim().replace(",", ".");

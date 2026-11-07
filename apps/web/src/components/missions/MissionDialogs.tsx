@@ -12,6 +12,7 @@ import {
   useMissionParticipants,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
@@ -164,6 +165,12 @@ export function NewMissionDialog({
       },
     );
   };
+  const approvalsNote = (
+    <span className="ac-iconline">
+      <Icon name="shield" size={14} />
+      <span>{t("missions.new.approvals")}</span>
+    </span>
+  );
   return (
     <Dialog
       open={open}
@@ -174,8 +181,8 @@ export function NewMissionDialog({
     >
       <Locked when={create.isPending}>
         <DialogBody>
-          <div className="mi-field">
-            <label className="mi-field__label" htmlFor={goalId}>
+          <div className="ac-field">
+            <label className="ac-field__label" htmlFor={goalId}>
               {t("missions.new.goal")}
             </label>
             <Textarea
@@ -211,8 +218,8 @@ export function NewMissionDialog({
             </div>
           ) : (
             <div className={names ? "mi-grid2" : undefined}>
-              <div className="mi-field">
-                <span className="mi-field__label">{t("missions.new.agent")}</span>
+              <div className="ac-field">
+                <span className="ac-field__label">{t("missions.new.agent")}</span>
                 <Select
                   aria-label={t("missions.new.agent")}
                   value={agent?.id}
@@ -226,7 +233,7 @@ export function NewMissionDialog({
                       a.eligible && a.machine
                         ? names
                           ? t("missions.new.agentOn", {
-                              computer: a.machine.name,
+                              computer: computerNameOf(t, org.name, a.machine.name),
                               state: a.machine.online ? t("missions.online") : t("missions.offline"),
                             })
                           : a.machine.online
@@ -234,14 +241,16 @@ export function NewMissionDialog({
                             : t("missions.computerOffline")
                         : cloud && (a.reason ?? "no_computer") === "no_computer"
                           ? waitWords
-                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            }),
                     leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
                   }))}
                 />
               </div>
               {names && (
-                <div className="mi-field">
-                  <span className="mi-field__label">{t("missions.new.computer")}</span>
+                <div className="ac-field">
+                  <span className="ac-field__label">{t("missions.new.computer")}</span>
                   <span className="mi-pill mi-pill--field">
                     <MachineIcon machineId={machine?.id} />
                     {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
@@ -263,7 +272,9 @@ export function NewMissionDialog({
                       <span>
                         {cloud && (a.reason ?? "no_computer") === "no_computer"
                           ? waitWords
-                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
+                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                            })}
                       </span>
                     </span>
                     {!cloud && (
@@ -282,8 +293,8 @@ export function NewMissionDialog({
             </ul>
           )}
           {agent && agent.executors.length > 0 && (
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.new.who")}</span>
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.new.who")}</span>
               <Select
                 aria-label={t("missions.new.who")}
                 value={executor}
@@ -293,19 +304,19 @@ export function NewMissionDialog({
               {agent.codexTooOld && (
                 <span className="mi-hint ac-iconline">
                   <Icon name="info" size={14} />
-                  {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
+                  {t("missions.new.codexOld", { computer: computerNameOf(t, org.name, agent.machine?.name ?? "") })}
                 </span>
               )}
             </div>
           )}
           {!none && (
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.commandApproval.label")}</span>
+            <div className="ac-field">
+              <span className="ac-field__label">{t("missions.commandApproval.label")}</span>
               <CommandApprovalSelect value={approval} onChange={setApproval} />
             </div>
           )}
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.new.home")}</span>
+          <div className="ac-field">
+            <span className="ac-field__label">{t("missions.new.home")}</span>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <Segmented
                 size="sm"
@@ -350,19 +361,13 @@ export function NewMissionDialog({
             </span>
           </div>
           {error && (
-            <p className="ac-field__error" role="alert" style={{ marginTop: 12 }}>
+            <p className="ac-field__error" role="alert">
               {error}
             </p>
           )}
         </DialogBody>
       </Locked>
-      <DialogFooter
-        note={
-          <>
-            <Icon name="shield" size={14} /> {t("missions.new.approvals")}
-          </>
-        }
-      >
+      <DialogFooter note={approvalsNote}>
         <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
@@ -492,7 +497,10 @@ export function CloseMissionDialog({
               <Icon name="stop" size={14} />
               <span>
                 {names
-                  ? t("missions.close.running", { count: mission.runningTasks, computer: mission.machine?.name ?? "" })
+                  ? t("missions.close.running", {
+                      count: mission.runningTasks,
+                      computer: computerNameOf(t, org.name, mission.machine?.name ?? ""),
+                    })
                   : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
               </span>
             </div>
@@ -753,7 +761,9 @@ export function ShareMissionDialog({
             {mission.machine && (
               <div className="mi-optrow">
                 <div>
-                  <label htmlFor={lendId}>{t("missions.share.lend", { computer: mission.machine.name })}</label>
+                  <label htmlFor={lendId}>
+                    {t("missions.share.lend", { computer: computerNameOf(t, org.name, mission.machine.name) })}
+                  </label>
                   <small>{t("missions.share.lendText", { name: handing?.name ?? "" })}</small>
                 </div>
                 <Switch id={lendId} checked={lend} onCheckedChange={setLend} />

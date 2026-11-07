@@ -223,6 +223,8 @@ export interface HandlerContext {
    * holding the agent's work; false when none could close.
    */
   reclaimBrains?: (spare: string) => Promise<boolean>;
+  /** Whether the session `spare` (`brainKey`) has an open CLI: a turn on it takes no new process's memory. */
+  warmBrain?: (spare: string) => Promise<boolean>;
   /**
    * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
    * scratch), how Codex starts our MCP server, and the live Codex runs the
@@ -1549,6 +1551,11 @@ export class RequestRunner {
     return true;
   }
 
+  private floorHolds(locked: boolean) {
+    const free = this.memAvailable();
+    return free !== null && free >= (locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES);
+  }
+
   private memAvailable() {
     return (this.admission.memAvailable ?? hostMemAvailable)();
   }
@@ -1601,13 +1608,21 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      return this.reclaim(() => close(spare), controller.signal, locked, person).then((room) => {
-        if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
-          return this.run(id, req, controller);
-        this.inflight.delete(id);
-        if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
-        else this.full(id);
-      });
+      // A turn on its session's open CLI starts no process: the turns still settling don't count against it, the floor does.
+      const warm = this.ctx.warmBrain ? this.ctx.warmBrain(spare).catch(() => false) : Promise.resolve(false);
+      return warm
+        .then(
+          (open) =>
+            (open && this.floorHolds(locked)) || this.reclaim(() => close(spare), controller.signal, locked, person),
+        )
+        .then((room) => {
+          if (!this.closed && (room || (!controller.signal.aborted && this.reserve(id, person))))
+            return this.run(id, req, controller);
+          this.inflight.delete(id);
+          if (controller.signal.aborted)
+            this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });
+          else this.full(id);
+        });
     }
     return this.run(id, req, controller);
   }

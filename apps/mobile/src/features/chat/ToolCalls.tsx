@@ -858,8 +858,6 @@ const PHRASE_AT = ROW_PAD + LOGO + ROW_GAP;
 const styles = StyleSheet.create({
   // Flat: a hairline and the cut corner (the app's "tato com canto"), no shadow.
   block: {
-    marginTop: 6,
-    marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
@@ -889,7 +887,7 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   lines: { borderTopWidth: StyleSheet.hairlineWidth, padding: 4 },
   // A task's steps (`RunSteps`): the block's open lines, without its head.
-  steps: { marginTop: 0, marginBottom: 0, padding: 4 },
+  steps: { padding: 4 },
   line: { borderRadius: 10 },
   // Its 20px first line in the middle of 40: the logo's height; the phrase's 18px line, the time's 16px and the
   // mark's 16px are brought down onto it (`firstLine`, `level`).
@@ -920,7 +918,7 @@ const styles = StyleSheet.create({
   // What it said between calls: under the phrases, muted.
   note: { marginTop: 2, marginBottom: 4, marginLeft: PHRASE_AT, marginRight: 8 },
   loading: { flexDirection: "row", alignItems: "center", gap: 8 },
-  loose: { marginTop: 2, marginBottom: 4, gap: 2 },
+  loose: { gap: 2 },
   say: { marginVertical: 2 },
   // "Leu seu recado": a sunken well with the "tato com canto" corner.
   well: {

@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
 import { entriesOffScreen } from "@agenteschat/client/lib/activity";
+import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
@@ -76,6 +77,7 @@ import {
 } from "./ask-store";
 import { LineStop, useRowsInView } from "./LiveRows";
 import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
+import { useCardTop, useOwnTop } from "./look";
 import type { RowSight } from "./row-sight";
 
 /**
@@ -138,6 +140,7 @@ export function AskProbes({ messages }: { messages: Message[] }) {
 }
 
 const AskProbe = memo(function AskProbe({ message: m, order }: { message: Message; order: number }) {
+  const meId = useMeId();
   const approvalId = approvalIdOf(m.meta);
   const question = questionOf(m.meta);
   const secret = secretRequestOf(m.meta);
@@ -145,7 +148,7 @@ const AskProbe = memo(function AskProbe({ message: m, order }: { message: Messag
   const proposal = agentProposalOf(m.meta);
   const changes = messageProposalCards(m.meta);
   const asked: PendingAsk | null =
-    question?.status === "open"
+    question?.status === "open" && questionWaitsOn(question, meId)
       ? { id: question.id, kind: "question", agentId: question.agentId, what: question.text, messageId: m.id, order }
       : null;
   return (
@@ -440,6 +443,7 @@ export function AskCard({
   expiry?: ReactNode;
   foot?: ReactNode;
 }) {
+  const ownTop = useCardTop(12);
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
@@ -483,7 +487,7 @@ export function AskCard({
     ) : null;
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
-    <View ref={slot} collapsable={false} style={styles.slot}>
+    <View ref={slot} collapsable={false} style={ownTop}>
       <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
         <View style={styles.clip}>
           <View style={styles.head}>
@@ -610,12 +614,13 @@ export function AskDone({
   more?: { label: string; content: ReactNode; card?: boolean } | null;
   actions?: ReactNode;
 }) {
+  const ownTop = useOwnTop(8);
   const c = useColors();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
   // A card turning into this pill fades into it (an old one fades as it scrolls in, as the cards do).
   return (
-    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.done}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.done, ownTop]}>
       <EventPill
         mark={done ? "check" : "x"}
         markColor={done ? c.ok : c.faint}
@@ -661,10 +666,11 @@ export function AskWaiting({
   actions?: ReactNode;
   below?: ReactNode;
 }) {
+  const ownTop = useOwnTop(8);
   const c = useColors();
   const reduced = useReducedMotion();
   return (
-    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.done}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.done, ownTop]}>
       <EventPill
         waiting
         mark={
@@ -816,7 +822,6 @@ export function AskBar({
 }
 
 const styles = StyleSheet.create({
-  slot: { marginTop: 12 },
   // The app's card (`useSurface`) with its cut corner at the bottom left, as the waiting cards.
   card: { borderRadius: 20, borderBottomLeftRadius: 6 },
   clip: {
@@ -849,8 +854,8 @@ const styles = StyleSheet.create({
   expiry: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   fuse: { width: 44 },
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
-  // A decided request: its pill on the conversation itself, from where the message's text starts.
-  done: { alignSelf: "stretch", marginTop: 8 },
+  // A decided request: its pill on the conversation itself, from where the message's text starts; the body sets its top.
+  done: { alignSelf: "stretch" },
   // The breathing square centered in the pill's 14-point mark.
   waitMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.

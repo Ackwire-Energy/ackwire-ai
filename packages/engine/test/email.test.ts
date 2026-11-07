@@ -135,6 +135,7 @@ describe("every email, in both languages", () => {
       app_connected: true,
       plan_opened: true,
       plan_lent: true,
+      plan_waiting: true,
       autonomy_report: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
@@ -500,6 +501,7 @@ describe("the picture over the headline", () => {
       "early_access_allowed.en": ONBOARDING,
       "join_answer-joined.en": [...faces("graphite"), "agent-rose-dots-flower.png 36×46"],
       "join_answer-invited.en": ONBOARDING,
+      "plan_waiting.pt-BR": ONBOARDING,
     };
     for (const [id, sample] of Object.entries(EMAIL_SAMPLES)) {
       const expected = id.startsWith("computer_ready")

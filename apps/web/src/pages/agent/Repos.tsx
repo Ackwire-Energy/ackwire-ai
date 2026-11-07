@@ -256,9 +256,7 @@ function MergeRepoDialog({ chosen, onClose }: { chosen: string[]; onClose: () =>
         </Locked>
       )}
       <DialogFooter bar>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(pick, { onSuccess: onClose })}>
           {t("common.save")}
         </Button>
@@ -449,9 +447,7 @@ export function RepoDialog({
         </DialogSearchList>
       )}
       <DialogFooter bar note={note}>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
           disabled={!all && chosen.length === 0}

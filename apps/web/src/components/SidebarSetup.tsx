@@ -38,6 +38,7 @@ import { sectionName, useSectionOrder } from "./SidebarOrder";
 /** The tools at the top of the sidebar: the page each opens and its icon. */
 export const SIDEBAR_TOOLS = {
   approvals: { to: "/org/$orgId/approvals", icon: "waiting" },
+  proposals: { to: "/org/$orgId/proposals", icon: "bulb" },
   threads: { to: "/org/$orgId/threads", icon: "thread" },
   issues: { to: "/org/$orgId/issues", icon: "issues" },
   wiki: { to: "/org/$orgId/wiki", icon: "book" },
@@ -45,6 +46,8 @@ export const SIDEBAR_TOOLS = {
   routines: { to: "/org/$orgId/routines", icon: "routines" },
   calendar: { to: "/org/$orgId/calendar", icon: "calendar" },
   team: { to: "/org/$orgId/team", icon: "agent" },
+  dashboards: { to: "/org/$orgId/dashboards", icon: "chart" },
+  taskManager: { to: "/org/$orgId/task-manager", icon: "stageProgress" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 
 /**
@@ -175,7 +178,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
       title={t("shell.customizeSidebar")}
       description={t("shell.sidebarSetup.description")}
       closeLabel={t("common.close")}
-      width={520}
+      width={640}
     >
       <DialogBody>
         <ul className="sidebar-setup">
@@ -186,6 +189,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
               </span>
               <span className="sidebar-setup__name">{t(`shell.${id}`)}</span>
               <Segmented
+                block
                 size="sm"
                 label={t(`shell.${id}`)}
                 value={sidebarPlace(items, id)}
@@ -215,7 +219,17 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
             </li>
           ))}
         </ul>
-        <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+        <div className="ac-field__label-row">
+          <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+          <button
+            type="button"
+            className="ac-link ac-link--muted small"
+            disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
+            onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+          >
+            {t("contextMenu.restoreOrder")}
+          </button>
+        </div>
         <p className="small muted sidebar-setup__hint">{t("shell.sidebarSetup.orderHint")}</p>
         <ol className="sidebar-setup sidebar-setup--order">
           {sections.order.map((id, i) => (
@@ -246,15 +260,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
           ))}
         </ol>
       </DialogBody>
-      <DialogFooter note={t("shell.sidebarSetup.instant")}>
-        <Button
-          variant="ghost"
-          icon="undo"
-          disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
-          onClick={() => sections.put([...SIDEBAR_SECTIONS])}
-        >
-          {t("contextMenu.restoreOrder")}
-        </Button>
+      <DialogFooter>
         <Button
           variant="ghost"
           icon="undo"

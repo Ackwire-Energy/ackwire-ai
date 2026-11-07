@@ -13,12 +13,13 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { Button, cx, Icon, InfoHint, Input, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import { openPopup, sendPopup } from "@/lib/popup";
+import { inDesktopApp } from "@/lib/desktop";
+import { openPopup, openWaitingPopup, sendPopup } from "@/lib/popup";
 
 /*
  * "Add account" (ADR 0041 §2, ADR 0059): the computer starts the
@@ -318,6 +319,7 @@ function AddAccountFlow({
         hint,
       });
       if (gone.current) {
+        popup?.close();
         void api.machines.cancelAccountLogin(org.id, machineId, l.loginId).catch(() => undefined);
         return null;
       }
@@ -536,12 +538,12 @@ function AddAccountFlow({
       </span>
     </p>
   );
-  // The field's buttons are its height (the ruler's default step), so the row reads as one line.
+  // Empty, the field offers Colar inside its end. Filled, Send comes up under it: no greyed button before there's a key.
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
         <Locked when={loading}>
-          <Input
+          <AffixInput
             ref={field}
             id={codeId}
             type={secret ? "password" : "text"}
@@ -558,16 +560,20 @@ function AddAccountFlow({
                 if (valid && ready && !loading) void send();
               }
             }}
+            action={
+              !code.trim() && (
+                <Button variant="ghost" size="sm" icon="copy" onClick={() => void paste()}>
+                  {t("aiAccounts.add.paste")}
+                </Button>
+              )
+            }
           />
-          {!code.trim() && (
-            <Button icon="copy" onClick={() => void paste()}>
-              {t("aiAccounts.add.paste")}
-            </Button>
-          )}
         </Locked>
-        <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
-          {t("agentPage.work.brain.add.send", { computer })}
-        </Button>
+        {(code.trim() || !ready) && (
+          <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
+            {t("agentPage.work.brain.add.send", { computer })}
+          </Button>
+        )}
       </span>
       {pasteFailed && <SettingNote icon="alert">{t("aiAccounts.add.pasteFailed")}</SettingNote>}
       {sendFailed && (
@@ -626,9 +632,12 @@ function AddAccountFlow({
 
   // Opened on the click itself, then sent to the provider's page once the computer has it.
   const start = () => {
-    const popup = openPopup();
+    const popup = openWaitingPopup(kind);
     setOpened(true);
-    void begin(popup);
+    // The desktop app has no popup: its page goes to the browser (main_window.rs).
+    void begin(popup).then((l) => {
+      if (l && inDesktopApp()) openPopup(l.url);
+    });
   };
   const openAgain = (url: string) => (
     <OpenPage href={url} onOpened={() => setOpened(true)}>
@@ -686,7 +695,7 @@ function AddAccountFlow({
         <Step
           n={1}
           side={
-            <OpenPage href={plan.site} primary={!opened} onOpened={() => setOpened(true)}>
+            <OpenPage href={plan.site} primary={!opened && !code.trim()} onOpened={() => setOpened(true)}>
               {t("aiAccounts.add.openKeys", { site: site.host })}
             </OpenPage>
           }

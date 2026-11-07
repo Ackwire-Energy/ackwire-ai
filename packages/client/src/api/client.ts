@@ -3,6 +3,7 @@ import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
+import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type {
   SecretToVaultInput,
@@ -126,6 +127,7 @@ import type {
   GifPage,
   GifQuery,
   GitHubAppInstallation,
+  GitHubOrgAccess,
   GitHubRepositories,
   Health,
   HostComputer,
@@ -616,6 +618,8 @@ export interface ApiClient {
       orgId: string,
       templateId: string,
       locale?: string,
+      /** On a billing hold: what the person tapped, kept as their message with no run. */
+      tap?: string,
     ): Promise<{ channelId: string; messageId: string }>;
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
@@ -902,6 +906,8 @@ export interface ApiClient {
     remove(orgId: string, id: string): Promise<void>;
     /** Repositories the organization's GitHub reaches, by account. */
     repositories(orgId: string): Promise<GitHubRepositories>;
+    /** The organizations the GitHub connection reaches now, and GitHub's page to grant more (admins). */
+    access(orgId: string): Promise<GitHubOrgAccess>;
   };
   search: {
     query(
@@ -1123,9 +1129,13 @@ export interface ApiClient {
     get(orgId: string, number: number): Promise<Issue>;
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
+    /** For good, with its steps and its conversation; what an agent is doing on it stops (`canDeleteIssue`). */
+    delete(orgId: string, id: string): Promise<void>;
     setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
     /** "Mostrar para todos" (ADR 0121): a card from a conversation, shared with the whole workspace. */
     share(orgId: string, id: string): Promise<Issue>;
+    /** Who sees it (ADR 0151): anyone who can edit it changes it. */
+    setAudience(orgId: string, id: string, audience: AudienceChoice): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts its work in the task's conversation. */
@@ -1355,7 +1365,12 @@ export interface ApiClient {
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
     /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
-    audience(orgId: string, slug: string, access: WikiAccess): Promise<WikiPage>;
+    /** `audience` alone is for anyone who edits the page; the rest takes managing roles. */
+    audience(
+      orgId: string,
+      slug: string,
+      access: Partial<WikiAccess> & Pick<WikiAccess, "audience">,
+    ): Promise<WikiPage>;
     /** A folder's audience, and the closest limited folder above it. */
     folderAudience(
       orgId: string,

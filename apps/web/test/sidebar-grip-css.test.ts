@@ -41,9 +41,9 @@ test("search results and floating panels", async () => {
     "src/components/threads/threads.css",
   );
   const shipped = topLevel(css);
-  // A hovered message row lifts above its neighbours; "Ir para" sits on that row and must stay above it.
-  expect(last(shipped, ".ac-msg:hover", "z-index")).toBe("var(--z-lifted)");
-  expect(last(shipped, ".search-result__jump.ac-btn", "z-index")).toBe("var(--z-lifted)");
+  // "Ir para" has a column of its own, beside the row, so no text runs under it at any width.
+  expect(last(shipped, ".search-result", "display")).toBe("grid");
+  expect(last(shipped, ".search-result__jump.ac-btn", "position")).toBeUndefined();
   // A floating panel's scrim dims the whole window, the sidebar too.
   expect(last(shipped, ".thread-panel__scrim", "position")).toBe("fixed");
   // `fixed` fills the page while its entrance holds a transform. The entrance only stops holding: taken away, it would

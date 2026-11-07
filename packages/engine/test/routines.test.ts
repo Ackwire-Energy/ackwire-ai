@@ -234,6 +234,13 @@ describe("routines", () => {
     await drainOutbox(f.db, f.handlers);
     // The run's record: its final text (nothing handed off, nothing posted).
     expect((await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id)).map((r) => r.summary)).toEqual(["ok"]);
+    // Its page reads the record as written, Markdown and all; the list only needs a line of it.
+    const record = `Conferi:\n\n- **PRs** abertos\n- ${"nada novo ".repeat(100)}`;
+    await f.db.update(schema.routineRuns).set({ summary: record }).where(eq(schema.routineRuns.routineId, routine.id));
+    expect((await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id))[0]?.summary).toBe(record);
+    const line = (await listRoutines(f.db, f.owner.id, f.org.id))[0]?.recentRuns[0]?.summary ?? "";
+    expect(line).not.toContain("\n");
+    expect(line.length).toBeLessThanOrEqual(500);
 
     const paused = await setRoutineActive(routineDeps(), f.owner.id, f.org.id, routine.id, false);
     expect(paused).toMatchObject({ active: false, nextRunAt: null });

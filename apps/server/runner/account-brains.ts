@@ -164,6 +164,11 @@ export class AccountBrains {
     for (const t of [...this.turns]) if (agentId === undefined || t.agentId === agentId) t.drop(err);
   }
 
+  /** Whether the session `key` (`brainKey`) has an open CLI here. */
+  warm(key: string) {
+    return this.brains.warm(key);
+  }
+
   /** The computer is short of memory: an idle CLI closes, here or a worker's, the waiting turn's own (`spare`) last. */
   async reclaim(spare: string) {
     const idle = this.brains.idleCandidate(spare);

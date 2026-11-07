@@ -230,7 +230,10 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.chart.workspace",
-      "files.video.volume"
+      "files.video.volume",
+      "linkPills.issue",
+      "linkPills.merge",
+      "linkPills.pull"
     ],
     "es": [
       "agent.builtinName",
@@ -417,7 +420,10 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "team.list.col.roles",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "fr": [
       "settings.about.version",
@@ -769,7 +775,11 @@
       "files.video.pause",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "linkPills.document",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "de": [
       "settings.about.version",
@@ -1099,7 +1109,7 @@
       "dashboards.create.name",
       "dashboards.groups.workspace",
       "dashboards.newWidget.place.channel",
-      "dashboards.sidebar",
+      "shell.dashboards",
       "dashboards.title",
       "notifications.source.dashboard",
       "widgets.add.short",
@@ -1132,7 +1142,8 @@
       "team.list.col.person",
       "approvals.review.state",
       "agentSide.label",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "linkPills.issue"
     ],
     "it": [
       "queue.fill.routine",
@@ -1423,7 +1434,11 @@
       "teamTemplates.channels.ada",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentPage.work.brain.speeds.standard"
+      "agentPage.work.brain.speeds.standard",
+      "linkPills.file",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "nl": [
       "deleteAccount.agentCount",
@@ -1880,7 +1895,7 @@
       "dashboards.back",
       "dashboards.meta.widgets",
       "dashboards.newWidget.place.channel",
-      "dashboards.sidebar",
+      "shell.dashboards",
       "dashboards.title",
       "notifications.source.dashboard",
       "widgets.add.short",
@@ -1923,7 +1938,12 @@
       "approvals.review.state",
       "files.video.volume",
       "taskManager.waitGroup.routines",
-      "agentSide.label"
+      "agentSide.label",
+      "linkPills.document",
+      "linkPills.spreadsheet",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "ja": [
       "access.area.vault",
@@ -2046,7 +2066,8 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "linkPills.issue"
     ],
     "ko": [
       "access.area.vault",
@@ -2496,7 +2517,14 @@
       "teamTemplates.channels.ada",
       "agentGroups.rename",
       "approvals.review.state",
-      "files.video.volume"
+      "files.video.volume",
+      "linkPills.spreadsheet",
+      "linkPills.file",
+      "linkPills.folder",
+      "linkPills.invoice",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "tr": [
       "agent.builtinName",
@@ -2627,7 +2655,10 @@
       "endpoint.styles.anthropic",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2849,7 +2880,11 @@
       "teamTemplates.channels.ada",
       "team.agents",
       "team.list.col.agent",
-      "connectAi.pick.plan"
+      "connectAi.pick.plan",
+      "linkPills.folder",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ],
     "ru": [
       "agent.builtinName",
@@ -2958,7 +2993,10 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "linkPills.pull",
+      "linkPills.merge",
+      "linkPills.issue"
     ]
   },
   "mobile-base": {

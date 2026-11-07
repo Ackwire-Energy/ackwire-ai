@@ -199,7 +199,19 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
   await owner(sidebar, { method: "PATCH", json: { item: "wiki", place: "always" } });
   await owner(`${sidebar}/order`, { method: "PUT", json: { order: ["people", "tools", "channels", "agents"] } });
 
-  const driveFirst = ["drive", "approvals", "threads", "issues", "wiki", "routines", "calendar", "team"];
+  const driveFirst = [
+    "drive",
+    "approvals",
+    "proposals",
+    "threads",
+    "issues",
+    "wiki",
+    "routines",
+    "calendar",
+    "team",
+    "dashboards",
+    "taskManager",
+  ];
   const saved = await put({ order: driveFirst });
   expect(saved.status).toBe(200);
   expect(await saved.json()).toEqual({ order: driveFirst });
@@ -216,9 +228,15 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
     "agents",
   ]);
 
-  // A tool missing, twice or unknown: refused, kept.
-  for (const bad of [driveFirst.slice(1), ["drive", ...driveFirst.slice(0, -1)], ["settings", ...driveFirst.slice(1)]])
-    expect((await put({ order: bad })).status).toBe(400);
+  // A tab left open across a deploy: a tool it never knew drops, one it lacks goes to the end, a repeat counts once.
+  const forgotten = [...driveFirst.slice(1), "drive"];
+  for (const stale of [driveFirst.slice(1), ["settings", ...driveFirst.slice(1)], [...forgotten, "drive"]]) {
+    const res = await put({ order: stale });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ order: forgotten });
+  }
+  expect((await put({ order: "drive" })).status).toBe(400);
+  await put({ order: driveFirst });
   expect(await order()).toEqual(driveFirst);
 
   // Someone else keeps their own.

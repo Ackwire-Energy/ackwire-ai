@@ -59,9 +59,13 @@ import { holdsSecretFile } from "./secrets";
 
 export const BASH_DEFAULT_TIMEOUT_MS = 2 * 60_000;
 export const BASH_MAX_TIMEOUT_MS = 10 * 60_000;
-/** What a call's result may carry. `MAX_MCP_OUTPUT_TOKENS` must be above this, or the CLI spills it to a file no tool here can read. */
-export const DELEGATED_RESULT_TOKENS = 25_000;
+/**
+ * What a call's result may carry. Claude Code 2.1.308 keeps an MCP tool's result inline up to 50,000 characters; past
+ * that it saves the result to a file in the sign-in's store, which no tool here can read.
+ */
+export const DELEGATED_RESULT_TOKENS = 12_000;
 const CHARS_PER_TOKEN = 4;
+export const DELEGATED_RESULT_CHARS = DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN;
 /** A command's output past this comes back as a preview and the file holding it. */
 const INLINE_OUTPUT_BYTES = 30_000;
 const PREVIEW_BYTES = 2048;
@@ -636,7 +640,7 @@ export class DelegatedTools {
 
   /** Every text a result carries, redacted, then cut to what the CLI takes inline. */
   private finished(out: McpToolResult, secrets: Secrets): McpToolResult {
-    const room = DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN;
+    const room = DELEGATED_RESULT_CHARS;
     const content = out.content.map((c) => {
       if (c.type !== "text") return c;
       const text = secrets ? secrets.redact(c.text) : c.text;
@@ -1038,9 +1042,9 @@ export class DelegatedTools {
       }
       shown.push(`${seen}\t${line}`);
       chars += line.length + 8;
-      if (chars > DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN) break;
+      if (chars > DELEGATED_RESULT_CHARS) break;
     }
-    if (chars > DELEGATED_RESULT_TOKENS * CHARS_PER_TOKEN) {
+    if (chars > DELEGATED_RESULT_CHARS) {
       return fail(
         `File content (over ${DELEGATED_RESULT_TOKENS} tokens) exceeds maximum allowed tokens (${DELEGATED_RESULT_TOKENS}). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.`,
       );

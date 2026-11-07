@@ -37,6 +37,7 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { requestComposerText } from "../chat/composer-request";
 import { markName } from "../chat/logic";
+import { useCardTop } from "../chat/look";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
@@ -81,6 +82,7 @@ export function AgentProposalView({
   const dir = useDirectory();
   const when = useWhen();
   const { colors } = useTheme();
+  const cardTop = useCardTop();
   const create = useCreateProposedAgent(orgId);
   const makeRoutine = useCreateProposedRoutine(orgId);
   const deny = useDenyAgentProposal(orgId);
@@ -296,7 +298,7 @@ export function AgentProposalView({
         card: true,
         label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
         content: (
-          <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+          <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
             <View style={styles.row}>
               <AgentAvatar agent={fullLook(draft.appearance)} size={40} name={draft.name} live={false} />
               <View style={styles.fill}>
@@ -432,7 +434,7 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "stretch" },
+  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "stretch" },
   // The 40-point face beside a name and a line that may wrap: at the top, level with the name.
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },

@@ -15,6 +15,10 @@
   box-shadow: 0 0 0 1px var(--line2);
   border-radius: 16px 16px 16px 4px;
 }
+/* Nothing left to decide, so no footer: the card closes on its own padding. */
+.rq:not(:has(.rq__foot)) {
+  padding-bottom: 14px;
+}
 .rq > :not(.ac-approval__sky),
 .rq > .ac-locked > *,
 .rq__form > .ac-locked > * {
@@ -222,7 +226,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  row-gap: 8px;
   margin: 16px -16px 0;
   padding: 12px 16px;
   min-height: 56px;
@@ -231,6 +235,16 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq__foot > .ac-btn {
   height: 32px;
+}
+/* As `.ac-acts`: a ghost's words stand on the row's edge, on every line when the row wraps. */
+.rq__foot,
+.rq__item-acts {
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.rq__foot > .ac-btn--ghost,
+.rq__item-acts > .ac-btn--ghost {
+  margin-inline: calc(-1 * var(--ghost-plate));
+  padding-inline: var(--ghost-plate);
 }
 /*
  * A question's choices: a list in the card's body, one a line, its number key on the left (1 to 9 answer while the
@@ -340,12 +354,6 @@ html:not([data-pointer]) .rq__choice:focus-visible {
  */
 .rq-done {
   max-width: var(--msg-card-w);
-  margin-top: 2px;
-}
-/* Right under the name: a message with a request stacks its body with the cards' 8px gap (`stacked`), which pulled
-   the pill away from the name; it sits 4px under it. */
-.ac-msg__head + .rq-done {
-  margin-top: -4px;
 }
 /* The mark: the pill's own, a pixel square or bar on its words' first line. */
 .rq-done__mark {
@@ -387,10 +395,6 @@ html:not([data-pointer]) .rq__choice:focus-visible {
  */
 .rq-open {
   max-width: var(--msg-card-w);
-  margin-top: 2px;
-}
-.ac-msg__head + .rq-open {
-  margin-top: -4px;
 }
 .rq-open .rq__details {
   align-self: stretch;
@@ -478,7 +482,7 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  row-gap: 8px;
   margin-top: 8px;
 }
 .rq__item-acts > .ac-btn {

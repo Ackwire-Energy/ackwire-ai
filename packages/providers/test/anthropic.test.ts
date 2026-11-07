@@ -153,6 +153,18 @@ describe("Anthropic adapter (scripted transport)", () => {
   });
 });
 
+test("a stream that fails with no words is the provider's own failure: it's retried, never \"rejected (?)\"", async () => {
+  const { fetcher } = scripted(sse([start(5)], "event: error\ndata: {}\n\n"));
+  const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+  const error = await provider
+    .stream(
+      { model: "claude-haiku-5-5", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 100 },
+      { apiKey: "k", onDelta: () => {} },
+    )
+    .catch((e: unknown) => e);
+  expect(error).toMatchObject({ message: "provider error", retryable: true });
+});
+
 test("effort none: Haiku 5.5 thinks not at all at low effort; a model that can't stop thinking gets low", async () => {
   const done = sse([
     start(1),

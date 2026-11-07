@@ -98,6 +98,8 @@ describe("restricted wiki pages", () => {
     expect(await titles(ana.id)).toEqual(["Margens", "Processos"]);
     expect(await titles(bia.id)).toEqual(["Processos"]);
     expect((await suggestWikiPages(f.db, person(bia.id), f.org.id, "Marg")).length).toBe(0);
+    // `[[` before any letter: the latest pages, not an error.
+    expect((await suggestWikiPages(f.db, person(f.owner.id), f.org.id, "")).length).toBeGreaterThan(0);
     const graph = await wikiGraph(f.db, person(bia.id), f.org.id);
     expect(graph.nodes.map((n) => n.title)).toEqual(["Processos"]);
     expect(graph.unresolved).toEqual([]);
@@ -166,21 +168,27 @@ describe("restricted wiki pages", () => {
 
   test("who may choose the audience, and only one they stay in", async () => {
     const { deps, ana, bia } = await restricted();
-    const forbidden = await setWikiPageAudience(deps, bia.id, f.org.id, "processos", {
-      roleIds: [],
-      userIds: [],
-    }).catch((e) => e);
+    // Agents and who edits take managing roles; who sees it, anyone who edits the page.
+    const forbidden = await setWikiPageAudience(
+      deps,
+      bia.id,
+      f.org.id,
+      "processos",
+      { roleIds: [], userIds: [] },
+      [],
+    ).catch((e) => e);
     expect(code(forbidden)).toBe("wiki.audience_forbidden");
-    const outside = await setWikiPageAudience(deps, ana.id, f.org.id, "processos", {
+    const outside = await setWikiPageAudience(deps, bia.id, f.org.id, "processos", {
       roleIds: [],
-      userIds: [bia.id],
+      userIds: [ana.id],
     }).catch((e) => e);
     expect(outside).toBeInstanceOf(ValidationError);
     expect(code(outside)).toBe("wiki.audience_excludes_you");
-    // Owners only: an owner may leave both lists empty.
+    // Administrators only: an administrator may leave both lists empty.
     const ownersOnly = await setWikiPageAudience(deps, f.owner.id, f.org.id, "processos", { roleIds: [], userIds: [] });
     expect(ownersOnly.audience).toEqual({ roleIds: [], userIds: [] });
-    expect(code(await getWikiPage(f.db, person(ana.id), f.org.id, "processos").catch((e) => e))).toBe("wiki.no_access");
+    expect(code(await getWikiPage(f.db, person(bia.id), f.org.id, "processos").catch((e) => e))).toBe("wiki.no_access");
+    expect((await getWikiPage(f.db, person(ana.id), f.org.id, "processos")).title).toBe("Processos");
     // A person named on the page sees it; opening it again shows it to everyone.
     await setWikiPageAudience(deps, f.owner.id, f.org.id, "processos", { roleIds: [], userIds: [bia.id, "nobody"] });
     expect((await getWikiPage(f.db, person(bia.id), f.org.id, "processos")).audience).toEqual({

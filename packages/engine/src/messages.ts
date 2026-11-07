@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/db";
 import { mentionsEveryone } from "@agenteschat/i18n/everyone";
 import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
+import { plainLine } from "@agenteschat/ui/markdown";
 import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
@@ -43,7 +44,7 @@ import { maySql } from "./permissions";
 import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
 import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
-import { computerWaitSql, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
+import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { admitTaskAgents } from "./task-access";
@@ -139,12 +140,9 @@ export interface ReplyRef {
 
 export const REPLY_EXCERPT_LENGTH = 200;
 
-/** One line of a message for a quote: whitespace collapsed, code fences dropped, ~200 chars. */
+/** One line of a message for a quote: its plain words, ~200 chars. */
 export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
-  const line = body
-    .replace(/```[\w+-]*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const line = plainLine(body, max);
   return line.length > max ? `${cutText(line, max - 1).trimEnd()}…` : line;
 }
 
@@ -327,6 +325,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
       ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...(strategyOf.get(m.id) === KEPT_ON_HOLD ? { kept: true as const } : {}),
       ...(capped.has(m.id) ? { platformCap: true as const } : {}),
       ...decisionOf(strategyOf.get(m.id), m.authorUserId),
     });
@@ -741,11 +740,16 @@ export async function insertMessageWithRuns(
         select id from named union all select id from everyone_agents
       ), mentioned_people as (
         select om.user_id from ${schema.organizationMembers} om
-        join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
+        left join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
         where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
-          and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone))
+          and ((pcm.id is not null and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone)))
+            -- Named, an administrator hears it from a channel they read without being in it (ADR 0151).
+            or (om.handle = any(${handles}::text[])
+              and exists (select 1 from ${channels} mc where mc.id = ${input.channelId}::uuid and mc.kind = 'channel')
+              and ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")}))
       ), answered as (
-        -- A person's reply where an agent asked something (same channel and thread) answers it.
+        -- A person's reply where an agent asked something (same channel and thread) answers it, unless it is for
+        -- someone else.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
         where ${deliver}::boolean and q.status = 'open' and not exists (select 1 from archived)
@@ -754,9 +758,10 @@ export async function insertMessageWithRuns(
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
-              -- In a channel's main timeline many talk at once: who asked the agent answers it, or
-              -- whoever addresses it.
-              and (${threadId}::uuid is not null
+              and (oq.requested_for_user_id is null or oq.requested_for_user_id = ${userId})
+              -- In a channel's main timeline many talk at once: who it is for or who asked the agent answers it,
+              -- or whoever addresses it.
+              and (${threadId}::uuid is not null or oq.requested_for_user_id = ${userId}
                 or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
                 -- Named: a mention of everyone is no answer to whatever each agent asked.
                 or oq.agent_id in (select id from named)

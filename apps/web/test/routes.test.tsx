@@ -137,7 +137,7 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Página não encontrada" })).toBeTruthy();
   });
 
-  test("the sidebar lists channels, DMs (people and agents) and the pending approvals count", async () => {
+  test("the sidebar lists channels, DMs (people and agents) and the pending approvals count, proposals in it", async () => {
     const state = seedState();
     for (const id of [ADA_ID, ATLAS_ID]) seedDm(state, { type: "agent", id });
     seedDm(state, { type: "person", id: "u-joao" });
@@ -146,7 +146,8 @@ describe("route guards", () => {
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.textContent).toContain("Acme");
     expect(nav.textContent).toContain("2 membros · 2 agentes");
-    expect(screen().getByLabelText("2 aprovações pendentes").textContent).toBe("2");
+    // Two approvals and the two proposals waiting: proposals count in Aprovações unless they have a row of their own.
+    expect(screen().getByLabelText("4 aprovações pendentes").textContent).toBe("4");
     for (const name of ["Canais", "eng", "general", "Mensagens diretas", "Ada", "Atlas", "João"]) {
       expect(nav.textContent).toContain(name);
     }

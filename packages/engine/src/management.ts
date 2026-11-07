@@ -14,6 +14,7 @@ import {
   placesAgentsIn,
   readableChannelIds,
 } from "./channels";
+import { proposalsWaitingFor } from "./context/proposals";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishChannelsChanged } from "./events";
@@ -263,7 +264,7 @@ function mergeAutoModels(
   return out;
 }
 
-/** Counts for the sidebar: people, agents, the workspace's budget use, approvals waiting for me. */
+/** Counts for the sidebar: people, agents, the workspace's budget use, approvals and proposals waiting for me. */
 export async function orgOverview(db: Database, actorId: string, orgId: string, now = new Date()) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const [people] = await db
@@ -287,6 +288,7 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     /** This month's spend of the workspace's agents over the sum of their budgets (no money). */
     budgetUsedPercent: await workspaceBudgetPercent(db, orgId, now),
     approvalsWaitingForMe: pending?.n ?? 0,
+    proposalsWaitingForMe: await proposalsWaitingFor(db, actorId, orgId),
   };
 }
 

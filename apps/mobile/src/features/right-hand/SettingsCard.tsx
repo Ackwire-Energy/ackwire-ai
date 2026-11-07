@@ -18,7 +18,14 @@ import {
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { delegateLine } from "@agenteschat/client/lib/approval-words";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { decidersOf, onlyKey, removalOf, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
+import {
+  decidersOf,
+  onlyKey,
+  proposalWhy,
+  removalOf,
+  sentToText,
+  settingLineText,
+} from "@agenteschat/client/lib/proposals";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -78,6 +85,9 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
     />
   );
 }
+
+/** A row with no card around it (Propostas de melhoria). */
+export const ChangeRequestRow = ({ p }: { p: Proposal }) => <SettingsRow p={p} />;
 
 /**
  * One row: the agent in the well, "Modelo: Haiku → Sonnet" a line each, and the decision. Who may decide it gets
@@ -268,7 +278,7 @@ function SettingsRow({
       kind="proposal"
       agentId={proposer}
       waitsFor={state}
-      lead={(p.stale ? t("rightHand.card.staleHelp", g) : p.why) || t("proposals.titleSettings", g)}
+      lead={(p.stale ? t("rightHand.card.staleHelp", g) : proposalWhy(t, p)) || t("proposals.titleSettings", g)}
       well={{
         tile: <AgentFace agentId={p.agentId} size={20} live={false} />,
         title: t("rightHand.card.settings", { name }),
