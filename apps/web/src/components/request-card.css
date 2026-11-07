@@ -84,11 +84,19 @@
  */
 .rq__well {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   margin: 12px -16px 0;
   padding: 10px 12px 10px 16px;
   border-top: 1px solid var(--line);
+}
+/* The mark and "Ver …" stand on the title's line (20px), never in the middle of a tall detail. */
+.rq__well > .rq__logo {
+  height: 20px;
+  align-items: center;
+}
+.rq__well > .rq__more {
+  margin-top: -2px;
 }
 .rq__preview + .rq__well {
   margin-top: 0;
@@ -104,7 +112,8 @@
   height: 22px;
   border-radius: 6px;
 }
-.rq__logo .ap-conn-mark {
+.rq__logo .ap-conn-mark,
+.rq__logo .ap-conn-mark .ap-conn__own {
   border-radius: 6px;
   box-shadow: none;
   background: none;
@@ -601,11 +610,8 @@ html:not([data-pointer]) .rq__choice:focus-visible {
 .rq__run > .rq__items {
   margin: 10px -12px -10px 16px;
 }
-/* An approval's values read whole across the card (the well's other kinds keep one line). */
+/* An approval's values read whole across the card, never cut mid-sentence (the line's other kinds keep one line). */
 .rq[data-ask-kind="approval"] .rq__wt small {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
   white-space: normal;
   overflow-wrap: anywhere;
 }
