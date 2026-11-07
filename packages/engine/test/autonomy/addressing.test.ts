@@ -322,36 +322,39 @@ scenario("S52", "a passing @ of an agent outside a public channel wakes nobody a
   await assertInvariants(w);
 });
 
-scenario("S43", "a mention dispatch can't wake is recorded and told to the agent that wrote it", async () => {
-  const w = await world({
-    agents: ["ada", "otto"],
-    people: ["bia"],
-    script: {
-      ada: [
-        { text: "@otto, roda o deploy 88 por favor" },
-        { text: "Ana, o Otto só atende a Bia: pede para ela passar o deploy 88 para ele." },
-      ],
-    },
-  });
-  // Otto answers only Bia, its owner: Ana, behind Ada's run, may not talk to it.
-  await w.db
-    .update(schema.agents)
-    .set({ ownerUserId: w.people.bia?.id ?? "", audienceMode: "people", audienceUserIds: [], consultable: false })
-    .where(eq(schema.agents.id, w.agents.otto?.id ?? ""));
-  await w.say("@ada pede pro otto rodar o deploy 88");
-  await w.settle();
-  expect(await w.runs("otto")).toEqual([]);
-  const [first] = await w.posts("ada");
-  const decision = (await w.decisions()).find((d) => d.messageId === first?.id);
-  expect(decision?.picked).toEqual(["otto"]);
-  expect(decision?.reason).toContain("audience: @otto");
-  const notices = (await w.db.select().from(schema.messages)).filter(
-    (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
-  );
-  expect(notices).toHaveLength(1);
-  expect((await w.posts("ada")).at(-1)?.body).toContain("Bia");
-  await assertInvariants(w);
-});
+scenario(
+  "S43",
+  "a mention dispatch can't wake is recorded and told once to the agent that wrote it, never as a run of its own",
+  async () => {
+    const w = await world({
+      agents: ["ada", "otto"],
+      people: ["bia"],
+      script: {
+        ada: [{ text: "@otto, roda o deploy 88 por favor" }],
+      },
+    });
+    // Otto answers only Bia, its owner: Ana, behind Ada's run, may not talk to it.
+    await w.db
+      .update(schema.agents)
+      .set({ ownerUserId: w.people.bia?.id ?? "", audienceMode: "people", audienceUserIds: [], consultable: false })
+      .where(eq(schema.agents.id, w.agents.otto?.id ?? ""));
+    await w.say("@ada pede pro otto rodar o deploy 88");
+    await w.settle();
+    expect(await w.runs("otto")).toEqual([]);
+    const [first] = await w.posts("ada");
+    const decision = (await w.decisions()).find((d) => d.messageId === first?.id);
+    expect(decision?.picked).toEqual(["otto"]);
+    expect(decision?.reason).toContain("audience: @otto");
+    const notices = (await w.db.select().from(schema.messages)).filter(
+      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
+    );
+    expect(notices).toHaveLength(1);
+    // Ada's run had ended: the notice waits for her next turn, the line under her message tells the people.
+    expect(await w.runs("ada")).toHaveLength(1);
+    expect((await w.posts("ada")).map((m) => m.body)).toEqual(["@otto, roda o deploy 88 por favor"]);
+    await assertInvariants(w);
+  },
+);
 
 /** Starts the outbox in the background and waits until a run is working (inside its quiet window, ADR 0112). */
 async function settleOnceRunning(w: Awaited<ReturnType<typeof world>>) {

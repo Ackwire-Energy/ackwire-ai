@@ -1,7 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
-import { getAgentCached } from "./agents";
+import { type Agent, getAgentCached } from "./agents";
+import { answersOthers, audienceOf } from "./audience";
 import { accountablePerson, runAuthority } from "./authority";
+import { isComputerBrain } from "./brains/types";
 import { endsAsking } from "./brakes";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
@@ -9,10 +11,12 @@ import { isAgentOnlyDm } from "./dms";
 import { decisionNudge, FOLLOW_THROUGH_NUDGE, FOLLOW_THROUGH_NUDGE_DM, MISSION_ASK_NUDGE } from "./follow-through";
 import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
+import type { NoticeKind } from "./notices";
 import { notifyRunFailed } from "./notification-producers";
 import { ANSWER_NUDGE } from "./reply-policy";
 import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
+import { runStretchOf } from "./stretch";
 import { HAND_OVER_STEP } from "./tools/directory";
 import { neutralizeUntrusted, untrustedBlock } from "./untrusted";
 
@@ -477,20 +481,30 @@ export async function reportRunFailure(
       .where(and(eq(schema.agentRuns.orgId, run.orgId), eq(schema.agentRuns.id, trigger.runId)));
     const agent = await getAgentCached(deps.db, run.orgId, run.agentId);
     if (!sender || sender.background || !agent) return;
+    // Its mention of the same agent failing again in the stretch is written, not woken for: a run that names it
+    // each time would wake itself each time.
+    const again = (await stretchNoticeRefs(deps.db, sender, "consult_reply")).some(
+      (r) => r.via === "mention" && r.agentId === run.agentId,
+    );
     const delivered = await deps.db.transaction((tx) =>
-      deliverNoticeToRun(tx, sender, {
-        kind: "consult_reply",
-        from: `@${agent.handle}`,
-        text: `It couldn't finish what your mention handed it (${reason.split(":")[0]}).`,
-        refs: {
-          kind: "note",
-          via: "mention",
-          wake: "1",
-          runId: run.id,
-          agentId: run.agentId,
-          askerAgentId: sender.agentId,
+      deliverNoticeToRun(
+        tx,
+        sender,
+        {
+          kind: "consult_reply",
+          from: `@${agent.handle}`,
+          text: `It couldn't finish what your mention handed it (${reason.split(":")[0]}).`,
+          refs: {
+            kind: "note",
+            via: "mention",
+            wake: "1",
+            runId: run.id,
+            agentId: run.agentId,
+            askerAgentId: sender.agentId,
+          },
         },
-      }),
+        again ? { wake: false } : {},
+      ),
     );
     await publishDelivery(deps.pubsub, delivered);
   } catch {
@@ -507,16 +521,80 @@ const handedOffRun = async (db: Database, run: AgentRun) =>
       .limit(1)
   ).length > 0;
 
+/** The `refs` of the `kind` notices `run`'s agent got in its stretch (ADR 0089), in its conversation. */
+async function stretchNoticeRefs(db: Database, run: AgentRun, kind: NoticeKind) {
+  const rows = await db
+    .select({ refs: sql<Record<string, string> | null>`${schema.messages.meta}->'notice'->'refs'` })
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.orgId, run.orgId),
+        eq(schema.messages.channelId, run.channelId),
+        eq(schema.messages.authorAgentId, run.agentId),
+        eq(schema.messages.stretchId, runStretchOf(run)),
+        sql`${schema.messages.meta}->'notice'->>'kind' = ${kind}`,
+      ),
+    );
+  return rows.map((r) => r.refs ?? {});
+}
+
+/**
+ * Tells the run behind `messageId` that its mention didn't wake `skipped` (each with why), once per agent and
+ * stretch: the same agent named again there adds nothing (a run that keeps naming it would hear it each time). A
+ * self-report (`SELF_REPORT_NOTICES`): it joins the run while live, else waits for the agent's next turn.
+ */
+export async function tellWakeSkipped(
+  deps: { db: Database; pubsub?: PubSub },
+  run: AgentRun,
+  messageId: string,
+  skipped: { handle: string; why: string }[],
+) {
+  if (run.background || skipped.length === 0) return;
+  const told = new Set(
+    (await stretchNoticeRefs(deps.db, run, "wake_skipped")).flatMap((r) => (r.agentHandles ?? "").split(",")),
+  );
+  const fresh = skipped.filter((s) => !told.has(s.handle));
+  if (fresh.length === 0) return;
+  const text = `${fresh.map((s) => `@${s.handle} wasn't woken by your mention: ${s.why}.`).join(" ")} ${WAKE_SKIPPED_STEP}`;
+  const delivered = await deps.db.transaction((tx) =>
+    deliverNoticeToRun(tx, run, {
+      kind: "wake_skipped",
+      text,
+      refs: { runId: run.id, messageId, agentHandles: fresh.map((s) => s.handle).join(",") },
+    }),
+  );
+  await publishDelivery(deps.pubsub, delivered);
+}
+
+/** What the author does about agents its mention didn't wake: hand it over once, in words, and stop. */
+export const WAKE_SKIPPED_STEP =
+  "The people here see that under your message. Don't mention it again for this: if the work still needs it, say once what it should do, without the @, so someone who can reach it hands it over, and leave it there.";
+
+/**
+ * Why an agent's mention couldn't reach `a` for the person behind it (`person`, null for nobody): the real cause, so
+ * the author says it right. Its owner's own plan answering only its owner (ADR 0059 §5) keeps everyone else out,
+ * consultations too.
+ */
+function unreachableWhy(a: Agent, person: string | null) {
+  if (isComputerBrain(a.brain) && !answersOthers({ ...audienceOf(a), consultable: false }, a.ownerUserId))
+    return "it thinks with its owner's own AI plan, which answers only its owner";
+  const who = person ? "the person you work for isn't one" : "nobody is behind this work";
+  return a.consultable
+    ? `only certain people may talk to it, and ${who}`
+    : `only certain people may talk to it, it takes no requests from other agents for anyone else, and ${who}`;
+}
+
 /**
  * Agents an agent's @mention selected that dispatch couldn't wake because only certain people may talk to them and
- * the person behind the message isn't one (nobody, for a run with no requester): the skip goes in the message's
- * routing decision (`settleReach` records the audience ones), and the author hears it once, as a line people see too, so it hands the work another way or
- * tells the person (I5, I7). Agents not in the conversation are told by `unreachedNote` already. Never throws.
+ * the person behind the message isn't one (nobody, for a run with no requester), and that no consultation reached
+ * (`settleReach` asks the ones that take them): the skip goes in the message's routing decision (`settleReach`
+ * records the audience ones), and the author hears it once per stretch (`tellWakeSkipped`). Agents not in the
+ * conversation are told by `unreachedNote` already. Never throws.
  */
 export async function reportDroppedMentions(
   deps: { db: Database; pubsub?: PubSub },
   message: { id: string; orgId: string; agentRunId: string | null },
-  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[],
+  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience"; noAi?: boolean }[],
 ) {
   if (dropped.length === 0) return;
   try {
@@ -539,15 +617,29 @@ export async function reportDroppedMentions(
       .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId)));
     if (!sender || sender.background) return;
     const person = (await runAuthority(deps.db, sender)).personId;
-    const names = audience.map((d) => `@${d.handle}`).join(", ");
-    const delivered = await deps.db.transaction((tx) =>
-      deliverNoticeToRun(tx, sender, {
-        kind: "wake_skipped",
-        text: `${names} ${audience.length === 1 ? "wasn't" : "weren't"} woken by your mention: only certain people may talk to ${audience.length === 1 ? "it" : "them"}, and ${person ? "the person you work for isn't one" : "nobody is behind this work"}. Tell the people here what still needs ${names}, so someone who may talk to ${audience.length === 1 ? "it" : "them"} hands it over.`,
-        refs: { runId: sender.id, messageId: message.id, agentHandles: audience.map((d) => d.handle).join(",") },
-      }),
+    const rows = await deps.db
+      .select()
+      .from(schema.agents)
+      .where(
+        and(
+          eq(schema.agents.orgId, message.orgId),
+          inArray(
+            schema.agents.id,
+            audience.map((d) => d.agentId),
+          ),
+        ),
+      );
+    await tellWakeSkipped(
+      deps,
+      sender,
+      message.id,
+      rows.map((a) => ({
+        handle: a.handle,
+        why: audience.find((d) => d.agentId === a.id)?.noAi
+          ? "it has no AI connected, so nothing could answer it"
+          : unreachableWhy(a, person),
+      })),
     );
-    await publishDelivery(deps.pubsub, delivered);
   } catch {
     // The run that mentioned them is unaffected; the decision row keeps what it had.
   }

@@ -8682,6 +8682,11 @@
     "consultable": "Otros agentes pueden consultar a {{name}}",
     "consultableHint": "Para las personas que no están en la lista, responde solo al agente que preguntó, nunca a ellas directamente. Las acciones sensibles siguen necesitando la aprobación de las personas a cargo de él.",
     "consultableHint_female": "Para las personas que no están en la lista, responde solo al agente que preguntó, nunca a ellas directamente. Las acciones sensibles siguen necesitando la aprobación de las personas a cargo de ella.",
+    "agents": {
+      "consulted": "Vale solo para personas. Otros agentes aún pueden consultar a {{name}} por quienes no están en la lista.",
+      "blocked": "Vale también para agentes. Ningún otro agente puede hablar con {{name}} por quienes no están en la lista.",
+      "plan": "Vale también para agentes. {{name}} usa el plan de IA de la persona responsable, que solo la atiende a ella, así que ningún otro agente puede hablar con {{name}} por quienes no están en la lista."
+    },
     "mode": {
       "everyone": "Todo el espacio de trabajo",
       "people": "Solo algunas personas o roles",

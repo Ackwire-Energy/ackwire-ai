@@ -1,9 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, speakerFor, viaAgent } from "./audience";
 import { fedByRoutine, personOfMessage, routinePostRun, runAuthorityById } from "./authority";
-import { chainOfRun, sendNote } from "./consultations";
+import { chainOfRun, NOTE_DEDUPE_MS, sendNote } from "./consultations";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMessage, type Message, messageView } from "./messages";
 import { notifyAgentUnreached } from "./notification-producers";
@@ -170,8 +170,8 @@ export async function settleReach(
           ),
         )
         .limit(1);
-      const sent = handed
-        ? { consultationId: handed.id }
+      const fresh = handed
+        ? null
         : await sendNote(db, {
             orgId: message.orgId,
             agentId: message.authorAgentId as string,
@@ -182,6 +182,25 @@ export async function settleReach(
             chain,
             fromMention: true,
           });
+      // `sendNote` drops the same note sent to it within the hour: that earlier one is the delivery.
+      const [earlier] =
+        handed || fresh
+          ? []
+          : await db
+              .select({ id: agentConsultations.id })
+              .from(agentConsultations)
+              .where(
+                and(
+                  eq(agentConsultations.orgId, message.orgId),
+                  eq(agentConsultations.askerAgentId, message.authorAgentId as string),
+                  eq(agentConsultations.targetAgentId, a.id),
+                  eq(agentConsultations.kind, "note"),
+                  gt(agentConsultations.createdAt, new Date(Date.now() - NOTE_DEDUPE_MS)),
+                ),
+              )
+              .orderBy(desc(agentConsultations.createdAt))
+              .limit(1);
+      const sent = handed ? { consultationId: handed.id } : (fresh ?? (earlier && { consultationId: earlier.id }));
       if (!sent) continue;
       entries.push({
         agentId: a.id,
@@ -189,7 +208,7 @@ export async function settleReach(
         reason: blockedReason,
         consultationId: sent.consultationId,
       });
-      if (!handed && deps.pubsub && runId) {
+      if (fresh && deps.pubsub && runId) {
         await publishChannelEvent(deps.pubsub, {
           type: "agent.consulting",
           channelId: message.channelId,

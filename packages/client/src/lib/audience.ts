@@ -109,6 +109,23 @@ export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUser
 export const offersConsultable = (a: AgentAudience, onPlan: boolean) =>
   a.mode !== "everyone" && !(onPlan && a.mode === "owner");
 
+/**
+ * Whether a narrowed audience holds for other agents too, as the line under it says (`audience.agents.*`): they still
+ * consult it for the rest, they don't, or its owner's plan keeps everyone else out. Null: everyone can talk to it.
+ */
+export const agentsReach = (
+  a: AgentAudience,
+  onPlan: boolean,
+  ownerUserId: string | null,
+): "consulted" | "blocked" | "plan" | null =>
+  a.mode === "everyone"
+    ? null
+    : onPlan && !answersOthers({ ...a, consultable: false }, ownerUserId)
+      ? "plan"
+      : a.consultable === false
+        ? "blocked"
+        : "consulted";
+
 /** On a plan only its owner turns the switch back on (ADR 0059 §5); anyone else may only turn it off. */
 export const consultableLocked = (saved: AgentAudience, viewer: { owner: boolean; onPlan: boolean }) =>
   viewer.onPlan && !viewer.owner && saved.consultable === false;

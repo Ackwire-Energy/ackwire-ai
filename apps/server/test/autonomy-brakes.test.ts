@@ -21,16 +21,16 @@ test("an agent's brakes: defaults on the agent, merged on PATCH, and a proposal 
     id: string;
     brakes: Brakes;
   };
-  expect(created.brakes).toMatchObject({ costly: "ask", maxUnrequested: 2, callAgents: "all" });
+  expect(created.brakes).toMatchObject({ costly: "go", maxUnrequested: 2, callAgents: "all" });
 
   const patched = await owner(`${org}/agents/${created.id}`, {
     method: "PATCH",
     json: { brakes: { callAgents: "none", maxUnrequested: 5 } },
   });
   expect(patched.status).toBe(200);
-  const again = await owner(`${org}/agents/${created.id}`, { method: "PATCH", json: { brakes: { costly: "go" } } });
+  const again = await owner(`${org}/agents/${created.id}`, { method: "PATCH", json: { brakes: { costly: "ask" } } });
   expect(((await again.json()) as { brakes: Brakes }).brakes).toMatchObject({
-    costly: "go",
+    costly: "ask",
     maxUnrequested: 5,
     callAgents: "none",
   });

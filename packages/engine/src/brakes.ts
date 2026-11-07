@@ -861,6 +861,10 @@ export async function callableAgents(
 export const notCallableText = (handles: string[]) =>
   `Your settings don't let you call ${handles.join(", ")} (another project, or not on your list of agents to call). Don't mention or hand work to ${handles.length === 1 ? "it" : "them"}; do it yourself or tell the person.`;
 
+/** Why an agent's mention didn't wake an agent its settings don't let it call (`tellWakeSkipped`). */
+export const notCallableWhy = (handle: string) =>
+  `your settings don't let you call @${handle} (another project, or not on your list of agents to call), so do that part yourself`;
+
 export type { AgentRun };
 
 /**

@@ -1,6 +1,6 @@
 import type { Agent, AgentAudience, AudienceMode } from "@agenteschat/client";
 import { useAgents, useAiStatus, useRoles } from "@agenteschat/client";
-import { audienceChip, offersConsultable } from "@agenteschat/client/lib/audience";
+import { agentsReach, audienceChip, offersConsultable } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
@@ -121,6 +121,7 @@ export function AudienceChoice({
     else next.delete(id);
     onChange({ ...value, [key]: [...next] });
   };
+  const reach = agentsReach(value, onPlan, ownerUserId);
   const modeText = (mode: AudienceMode) =>
     mode === "owner"
       ? owner
@@ -130,25 +131,22 @@ export function AudienceChoice({
   return (
     <div className="stack-4" style={{ gap: 12 }}>
       {compact ? (
-        <>
-          <OptionList
-            aria-label={t("audience.title", g)}
-            layout={layout}
-            value={value.mode}
-            onValueChange={(mode) => onChange({ ...value, mode })}
-            options={MODES.map((mode) => ({
-              value: mode,
-              leading: (
-                <span className="audience-card__icon">
-                  <Icon name={AUDIENCE_ICON[mode]} size={20} />
-                </span>
-              ),
-              title: t(`audience.mode.${mode}`),
-              description: modeText(mode),
-            }))}
-          />
-          {value.mode !== "everyone" && <span className="small muted">{t("audience.notListed")}</span>}
-        </>
+        <OptionList
+          aria-label={t("audience.title", g)}
+          layout={layout}
+          value={value.mode}
+          onValueChange={(mode) => onChange({ ...value, mode })}
+          options={MODES.map((mode) => ({
+            value: mode,
+            leading: (
+              <span className="audience-card__icon">
+                <Icon name={AUDIENCE_ICON[mode]} size={20} />
+              </span>
+            ),
+            title: t(`audience.mode.${mode}`),
+            description: modeText(mode),
+          }))}
+        />
       ) : (
         <RadioGroup
           value={value.mode}
@@ -263,6 +261,11 @@ export function AudienceChoice({
             )}
           </div>
         </div>
+      )}
+      {reach && (
+        <span className="small muted">
+          {t("audience.notListed")} {t(`audience.agents.${reach}`, g)}
+        </span>
       )}
       {offersConsultable(value, onPlan) && (
         <SettingRow

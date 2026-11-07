@@ -62,6 +62,19 @@ export const agentOnlyNoticeSql = (meta: SQL): SQL =>
  */
 export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped"];
 
+/**
+ * Notices that report on what the agent's own run did (its mention woke nobody, its work moved on, a person stopped
+ * it, it already answered). They join that run while it is live and otherwise wait for its next turn: never a run of
+ * their own, or a run whose every message draws such a notice wakes itself forever (`deliverNotice` holds this).
+ * Every other kind brings news from outside the run (an answer, a result, a decision, a timer it set).
+ */
+export const SELF_REPORT_NOTICES: readonly NoticeKind[] = [
+  "wake_skipped",
+  "work_check_in",
+  "run_stopped",
+  "talker_reply",
+];
+
 /** Agent-only or quiet, in SQL, on a message's `meta`: left out of previews, unread counts and thread activity. */
 export const quietNoticeSql = (meta: SQL): SQL =>
   sql`(${agentOnlyNoticeSql(meta)} or coalesce(${meta}->'notice'->>'kind', '') in (${sql.join(

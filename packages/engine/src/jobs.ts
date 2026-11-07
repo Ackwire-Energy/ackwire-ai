@@ -19,7 +19,7 @@ import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { PLAN_LENT_JOB } from "./brain-settings";
-import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
+import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableWhy } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { typingLogFor } from "./burst";
 import { CHANNEL_DELETE_JOB, purgeChannel } from "./channel-deletion";
@@ -32,8 +32,7 @@ import { applyReactionFeedback } from "./context/feedback";
 import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
-import { reportDroppedMentions } from "./continuation";
-import { publishDelivery } from "./delivery";
+import { reportDroppedMentions, tellWakeSkipped } from "./continuation";
 import {
   deferMentionReport,
   deliverParked,
@@ -101,7 +100,6 @@ import {
 import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
 import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
-import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
@@ -403,16 +401,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           .from(schema.agentRuns)
           .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId))),
       ]);
-      if (run && !run.background) {
-        const delivered = await deps.db.transaction((tx) =>
-          deliverNoticeToRun(tx, run, {
-            kind: "wake_skipped",
-            text: notCallableText(handles.map((h) => `@${h.handle}`)),
-            refs: { runId: run.id, messageId: message.id },
-          }),
-        );
-        await publishDelivery(deps.pubsub, delivered).catch(() => {});
-      }
+      if (run)
+        await tellWakeSkipped(
+          { db: deps.db, pubsub: deps.pubsub },
+          run,
+          message.id,
+          handles.map((h) => ({ handle: h.handle, why: notCallableWhy(h.handle) })),
+        ).catch(() => {});
     }
     return ids.filter((id) => ok.has(id));
   }
@@ -662,10 +657,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
           // A member consulted by note instead (it takes consultations) was reached: no "wasn't woken" notice.
           const consulted = new Set(reach.filter((e) => e.consultationId).map((e) => e.agentId));
+          const noAi = new Set(reach.filter((e) => e.noAi).map((e) => e.agentId));
           await reportDroppedMentions(
             { db: deps.db, pubsub: deps.pubsub },
             message,
-            dropped.filter((d) => !consulted.has(d.agentId)),
+            dropped
+              .filter((d) => !consulted.has(d.agentId))
+              .map((d) => (noAi.has(d.agentId) ? { ...d, noAi: true } : d)),
           );
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",

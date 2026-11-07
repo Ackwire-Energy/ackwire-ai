@@ -11,7 +11,7 @@ import {
   useTeamWeekPrefs,
   useUpdateAgent,
 } from "@agenteschat/client";
-import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
+import { agentsReach, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -274,6 +274,8 @@ function Form({ agent }: { agent: Agent }) {
     });
   };
   const everyone = audience.mode === "everyone";
+  // Whether the narrowed audience holds for other agents too, as the web says under it.
+  const reach = agentsReach(audience, false, agent.ownerUserId);
   return (
     <SettingsPage title={agent.name} subtitle={t("rightHand.label")}>
       <GroupedHeader>{t("rightHand.settings.name")}</GroupedHeader>
@@ -350,6 +352,7 @@ function Form({ agent }: { agent: Agent }) {
       </GroupedList>
       <GroupedFooter>
         {t("common.joinSentences", { a: t("rightHand.settings.audienceHelp", g), b: t("audience.rolesHint") })}
+        {reach ? ` ${t(`audience.agents.${reach}`, g)}` : ""}
       </GroupedFooter>
 
       <Gap />

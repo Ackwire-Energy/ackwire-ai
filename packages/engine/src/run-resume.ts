@@ -147,7 +147,7 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * A notice for one run (another agent's answer, a late result): while the
  * run is still active it reads it at its next step (queued on that run, in
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
- * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
+ * joins the agent's run there or starts one (a self-report about the run, `SELF_REPORT_NOTICES`, only waits for its next turn), in the run's stretch: past its limits the run is held for the pause
  * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
  * it where the routine reports, like its approval cards: nobody reads its room. `wake: false`: only written there,
  * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. `joinRun: false`:

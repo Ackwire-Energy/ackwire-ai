@@ -8335,6 +8335,12 @@ export const en = {
       "For people not on the list, he answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after him.",
     consultableHint_female:
       "For people not on the list, she answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after her.",
+    /** Under a narrowed audience: whether it holds for other agents too (`agentsReach`). */
+    agents: {
+      consulted: "This covers people only. Other agents can still consult {{name}} for anyone not on the list.",
+      blocked: "This covers agents too. No other agent can reach {{name}} for anyone not on the list.",
+      plan: "This covers agents too. {{name}} uses its owner's AI plan, which serves only its owner, so no other agent can reach {{name}} for anyone not on the list.",
+    },
     mode: { everyone: "Everyone in the workspace", people: "Only some people or roles", owner: "Only the owner" },
     modeText: {
       everyone: "Anyone in the workspace can call {{name}}.",

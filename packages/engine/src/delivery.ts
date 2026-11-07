@@ -3,7 +3,7 @@ import type { Executor } from "@agenteschat/db";
 import { createAgentRuns, type RunTrigger } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { insertMessage, type Message, messageView } from "./messages";
-import type { Notice } from "./notices";
+import { type Notice, SELF_REPORT_NOTICES } from "./notices";
 import { type AgentRun, replyThreadOf } from "./runs";
 
 export interface DeliverNoticeInput {
@@ -31,7 +31,8 @@ export interface DeliverNoticeInput {
  * (agent-authored, `meta.notice`) plus a run, in the caller's transaction.
  * Like a person's message, it joins the agent's active run in that
  * conversation (read at its next step) or starts one; nothing is ever
- * delivered to a run that already ended. Publish with `publishDelivery`
+ * delivered to a run that already ended. A self-report (`SELF_REPORT_NOTICES`)
+ * never starts one. Publish with `publishDelivery`
  * after the commit.
  */
 export async function deliverNotice(
@@ -46,8 +47,8 @@ export async function deliverNotice(
     body: input.body ?? input.notice.text,
     meta: { notice: input.notice, ...(input.readOutside ? { readOutside: true } : {}) },
   });
-  const runs =
-    input.wake === false ? [] : await createAgentRuns(tx, message, [input.agentId], input.trigger ?? "mention");
+  const wake = input.wake !== false && !SELF_REPORT_NOTICES.includes(input.notice.kind);
+  const runs = wake ? await createAgentRuns(tx, message, [input.agentId], input.trigger ?? "mention") : [];
   return { message, runs };
 }
 
