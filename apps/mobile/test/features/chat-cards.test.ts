@@ -319,7 +319,9 @@ describe("the secret card on the phone", () => {
   test('the name line reads whole (never cut mid-sentence), its mark and "Ver …" on the title\'s line, the deadline at the foot', () => {
     const asks = source("asks.tsx");
     const line = asks.slice(asks.indexOf("const line = well ? ("), asks.indexOf("const opened ="));
-    expect(line).not.toContain("numberOfLines");
+    // The title and the detail wrap whole ("Ver …" is one word on one line).
+    expect(line.slice(0, line.indexOf("{more ?"))).not.toContain("numberOfLines");
+    expect(line.slice(line.indexOf("{well.detail"))).not.toContain("numberOfLines");
     expect(asks).toContain('lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 }');
     // The detail spans the whole width under the title, never beside "Ver …".
     expect(asks).toContain("lineDetail: { marginLeft: 30, marginTop: 1 }");

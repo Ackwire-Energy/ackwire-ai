@@ -964,7 +964,9 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     // What only points somewhere is a request card itself: no corners or padding of its own, its face on the kind's
     // line as every waiting item's.
     expect(rule(".nt-wr__main")).not.toMatch(/border-radius|padding/);
-    expect(px(".nt-wi > .nt-face", "padding-top")).toBe(12);
+    // The face inside the card, at a day row's place: over the card's top left, on the kind's line.
+    expect(value(".nt-wi > .nt-face", "position")).toBe("absolute");
+    expect(px(".nt-wi > .nt-face", "top")).toBe(12);
     expect(value(".nt-wr .rq__lead.nt-what", "white-space")).toBe("normal");
     expect(value(".nt-wr__sub", "-webkit-line-clamp")).toBe("2");
     // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard. The faces
