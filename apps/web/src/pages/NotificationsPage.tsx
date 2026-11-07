@@ -1,4 +1,4 @@
-import type { Agent, AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
+import type { Agent, AppNotification, Member, NotificationActor, NotificationFilter } from "@agenteschat/client";
 import {
   dropNotification,
   keys,
@@ -6,7 +6,6 @@ import {
   useApi,
   useApproval,
   useApprovals,
-  useApprovalsDeciding,
   useChannels,
   useNotificationAction,
   useNotificationCount,
@@ -15,8 +14,8 @@ import {
   useTaskConversation,
   useThreadMessages,
 } from "@agenteschat/client";
-import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
-import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalCardItems } from "@agenteschat/client/lib/approval-card";
+import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
@@ -79,8 +78,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Trans, useTranslation } from "react-i18next";
-import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
+import { useTranslation } from "react-i18next";
+import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
@@ -88,16 +87,15 @@ import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from
 import { useOrg } from "@/components/org-context";
 import { UsageLimitActions } from "@/components/PeopleUsage";
 import { AllowTalkButton } from "@/components/ReachLines";
+import { RequestCard, RequestChoices, RequestKeys } from "@/components/RequestCard";
 import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
-import { useWraps } from "@/hooks/useWraps";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ApproveAll, ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -156,17 +154,8 @@ function Snippet({ text, mine }: { text: string; mine: string | null }) {
   );
 }
 
-/** Where it happened, as a chip, unless the headline says it. */
-function SourceChip({
-  n,
-  channelName,
-  className,
-}: {
-  n: AppNotification;
-  channelName: (id: string) => string;
-  className?: string;
-}) {
-  const { t } = useTranslation();
+/** Where it happened, its icon and words, unless the headline says it. */
+function sourceOf(t: TFunction, n: AppNotification, channelName: (id: string) => string): [IconName, string] | null {
   const s = n.source;
   const channel = channelOf(n);
   // Agents failing in many conversations: each says its own when the row opens. Several skipped catch-ups open
@@ -210,10 +199,25 @@ function SourceChip({
     ];
   } else if (channel && !headlineNames(n, channelName(channel)))
     [icon, label] = ["channel", t("notifications.source.channel", { name: channelName(channel) })];
-  if (!label) return null;
+  return label ? [icon, label] : null;
+}
+
+/** Where it happened, as a chip, unless the headline says it. */
+function SourceChip({
+  n,
+  channelName,
+  className,
+}: {
+  n: AppNotification;
+  channelName: (id: string) => string;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const source = sourceOf(t, n, channelName);
+  if (!source) return null;
   return (
-    <Chip icon={icon} className={className}>
-      {label}
+    <Chip icon={source[0]} className={className}>
+      {source[1]}
     </Chip>
   );
 }
@@ -839,167 +843,12 @@ function Row({
 }
 
 /**
- * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then the
- * connector's logo (its name in a tooltip), "Só lê", its values in words and the agent's why behind "Por quê?".
+ * A request waiting for me, as the conversation draws it (`RequestCard`): its kind and "esperando você" on top
+ * with where it was asked, the agent's words, the object in its well, and the decision in the footer with how long
+ * it has waited or has left, then Remind me later and Done. The agent's face beside it. An approval is the
+ * conversation's own card (`ApprovalAsk`), several on one card the group's; what only points somewhere is a
+ * `WaitRow`.
  */
-function ApprovalSay({
-  approvalId,
-  name,
-  why,
-  mine,
-  fallback,
-}: {
-  approvalId: string;
-  name: string;
-  /** The notification's text (the why), for an approval that doesn't carry its own. */
-  why?: string;
-  mine: string | null;
-  fallback: string;
-}) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId);
-  const approvals = useApprovals(org.id);
-  const [open, setOpen] = useState(false);
-  const a = approval.data;
-  if (!a) return <h3>{fallback}</h3>;
-  // One notification per card: how many on it still wait.
-  const waiting = a.messageId
-    ? approvalCardItems(approvals.data, a.messageId, a).filter((x) => x.status === "pending").length
-    : 0;
-  const reason = approvalWhy(a) ?? why;
-  const values = approvalValues(a, { max: 3 }).map(([label, value]) => `${label}: ${value}`);
-  return (
-    <>
-      <p className="nt-say">
-        <Trans
-          i18nKey="notifications.wait.wants"
-          values={{ name, action: approvalDoing(t, a, i18n.language) }}
-          components={{ b: <b /> }}
-        />
-      </p>
-      {(a.connector || a.email || approvalReadsOnly(a) || values.length > 0 || reason) && (
-        <div className="nt-facts">
-          {waiting > 1 && <Chip icon="clock">{t("approval.all.waitingCount", { count: waiting })}</Chip>}
-          {(a.connector || a.email) && <ConnectorMark approval={a} />}
-          {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
-          {values.map((v) => (
-            <Chip key={v}>{v}</Chip>
-          ))}
-          {reason && (
-            <button
-              type="button"
-              className="nt-why-btn"
-              aria-expanded={open}
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen((o) => !o);
-              }}
-            >
-              {open ? t("notifications.wait.hideWhy") : t("notifications.wait.why")}
-            </button>
-          )}
-        </div>
-      )}
-      {open && reason && (
-        <p className="nt-why">
-          <Snippet text={reason} mine={mine} />
-        </p>
-      )}
-    </>
-  );
-}
-
-/** Aprovar / Recusar right on the card (a hold for high risk, a reason on refusal); others open Aprovações. */
-function ApprovalActs({
-  approvalId,
-  agent,
-  onOpen,
-  tail,
-}: {
-  approvalId: string;
-  agent?: Agent;
-  onOpen: () => void;
-  tail: ReactNode;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const approval = useApproval(org.id, approvalId);
-  const approvals = useApprovals(org.id);
-  const [refusing, setRefusing] = useState(false);
-  const a = approval.data;
-  const items = a?.messageId ? approvalCardItems(approvals.data, a.messageId, a) : [];
-  const deciding = useApprovalsDeciding(org.id, [approvalId, ...items.map((i) => i.id)]);
-  // Several on its card: decided together here, one by one in the conversation or Aprovações.
-  if (approveAllScope(items).ids.length > 1) {
-    return (
-      <Locked when={deciding}>
-        <div className="nt-wacts ac-acts">
-          <ApproveAll items={items} />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-          >
-            {t("notifications.wait.openApprovals")}
-          </Button>
-          {tail}
-        </div>
-      </Locked>
-    );
-  }
-  if (a?.canDecide && a.status === "pending") {
-    if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
-    return (
-      <Locked when={deciding}>
-        <div className="nt-wacts ac-acts">
-          <ApproveButton approval={a} />
-          <Button
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setRefusing(true);
-            }}
-          >
-            {t("approval.refuse")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-          >
-            {t("notifications.wait.openApprovals")}
-          </Button>
-          {tail}
-        </div>
-      </Locked>
-    );
-  }
-  return (
-    <div className="nt-wacts ac-acts">
-      <Button
-        variant="primary"
-        size="sm"
-        icon="shield"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen();
-        }}
-      >
-        {t("notifications.wait.decide")}
-      </Button>
-      {tail}
-    </div>
-  );
-}
-
-/** An item in "Esperando você": a card for an agent's question or an approval, else a row. */
 function WaitCard({
   n,
   s,
@@ -1017,7 +866,7 @@ function WaitCard({
   resolving: boolean;
   channelName: (id: string) => string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const first = n.actors[0];
   const name = nameOf(t, dir, first);
   const g = agentGrammar(name);
@@ -1062,19 +911,21 @@ function WaitCard({
       ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
       : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   const face = first ? (
-    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av40" />
+    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av32" />
   ) : (
-    <SystemFace n={n} className="nt-av40" />
-  );
-  const fuse = n.kind === "approval" && l.expiresAt && (
-    <ExpiryFuse left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS} color={colorOf(agent)} />
+    <SystemFace n={n} className="nt-av32" />
   );
   const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
   // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.
   if (n.kind !== "agent_question" && !approvalId)
     return (
       <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
-        {fuse}
+        {n.kind === "approval" && l.expiresAt && (
+          <ExpiryFuse
+            left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS}
+            color={colorOf(agent)}
+          />
+        )}
         {n.kind === "change_request" && (
           <div className="nt-wr__card">
             <ChangeRequestCard n={n} />
@@ -1083,115 +934,118 @@ function WaitCard({
         {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
       </WaitRow>
     );
-  let meta: ReactNode;
-  let head: ReactNode;
-  let body: ReactNode;
-  if (n.kind === "agent_question") {
-    meta = (
-      <>
-        <b>{name}</b>
-        <span>{t("notifications.wait.asks")}</span>
-        <SourceChip n={n} channelName={channelName} />
-        <span>{whenText(t, i18n.language, n.createdAt)}</span>
-        <span className="nt-grow" />
-        <Chip icon="waiting" tone={waitedMs >= LATE_MS ? "waiting" : "neutral"}>
-          {t(feminine ? "notifications.wait.stoppedForF" : "notifications.wait.stoppedForM", {
-            time: durationText(t, waitedMs),
-          })}
-        </Chip>
-      </>
-    );
-    const title = l.title ?? l.text ?? "";
-    head = (
-      <>
-        <h3>{title}</h3>
-        {l.title && l.text && (
-          <p className="nt-ctx">
-            <Snippet text={l.text} mine={mine} />
-          </p>
-        )}
-      </>
-    );
-    body = resolving ? (
-      <div className="nt-resolved">
-        <Spinner size={14} />
-        {t("notifications.wait.resolved", { context: g.context, name })}
-      </div>
-    ) : s.replying ? (
-      <Composer
-        id={n.id}
-        placeholder={placeholderFor(t, n, dir, channelName)}
-        draft={s.draft}
-        sending={s.sending}
-        onDraft={(text) => h.onDraft(n, text)}
-        onSend={() => h.onSend(n, s.draft, (l.suggestions ?? []).includes(s.draft.trim()))}
-        onCancel={h.onCancel}
+  let card: ReactNode;
+  if (approvalId) {
+    card = (
+      <WaitApproval
+        approvalId={approvalId}
+        agent={agent}
+        members={dir.memberById}
+        fallback={l.title ?? l.text ?? label}
+        tail={tail}
       />
-    ) : (
-      <>
-        {(l.suggestions?.length ?? 0) > 0 && (
-          <div className="nt-sug">
-            {l.suggestions?.map((sug) => (
-              <button
-                key={sug}
-                type="button"
+    );
+  } else {
+    const title = l.title ?? l.text ?? "";
+    const source = sourceOf(t, n, channelName);
+    const suggestions = l.suggestions ?? [];
+    card = (
+      <RequestCard
+        id={n.id}
+        kind="question"
+        agent={agent}
+        label={label}
+        mine
+        source={source?.[1]}
+        lead={title}
+        body={
+          <>
+            {l.title && l.text && (
+              <p className="nt-ctx">
+                <Snippet text={l.text} mine={mine} />
+              </p>
+            )}
+            {resolving ? (
+              <div className="nt-resolved">
+                <Spinner size={14} />
+                {t("notifications.wait.resolved", { context: g.context, name })}
+              </div>
+            ) : (
+              <>
+                {/* The agent's suggested answers: one a line with its key; a pick answers. */}
+                {suggestions.length > 0 && (
+                  <RequestChoices
+                    choices={suggestions.map((label) => ({ label, busy: s.sending && s.draft === label }))}
+                    onPick={(i) => {
+                      const sug = suggestions[i];
+                      if (sug === undefined) return;
+                      h.onDraft(n, sug);
+                      h.onSend(n, sug, true);
+                    }}
+                    disabled={s.sending}
+                    other={s.replying ? undefined : { label: t("ask.otherAnswer"), onClick: () => h.onReply(n) }}
+                  />
+                )}
+                {s.replying && (
+                  <Composer
+                    id={n.id}
+                    placeholder={placeholderFor(t, n, dir, channelName)}
+                    draft={s.draft}
+                    sending={s.sending}
+                    onDraft={(text) => h.onDraft(n, text)}
+                    onSend={() => h.onSend(n, s.draft, suggestions.includes(s.draft.trim()))}
+                    onCancel={h.onCancel}
+                  />
+                )}
+              </>
+            )}
+          </>
+        }
+        actions={
+          resolving || s.replying ? undefined : (
+            <>
+              {suggestions.length > 0 ? (
+                <RequestKeys count={suggestions.length} />
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon="reply"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    h.onReply(n);
+                  }}
+                >
+                  {t("notifications.reply")}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  h.onDraft(n, sug);
-                  h.onReply(n);
+                  h.onOpen(n);
                 }}
               >
-                {sug}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="nt-wacts ac-acts">
-          <Button
-            variant="primary"
-            size="sm"
-            icon="reply"
-            onClick={(e) => {
-              e.stopPropagation();
-              h.onReply(n);
-            }}
-          >
-            {t("notifications.reply")}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              h.onOpen(n);
-            }}
-          >
-            {t("notifications.wait.openThread")}
-          </Button>
-          {tail}
-        </div>
-      </>
+                {t("notifications.wait.openThread")}
+              </Button>
+            </>
+          )
+        }
+        end={
+          <>
+            {/* Its agent stopped until I answer, in attention once it has waited a while. */}
+            <span className={cx(waitedMs >= LATE_MS && "nt-late")}>
+              {t(feminine ? "notifications.wait.stoppedForF" : "notifications.wait.stoppedForM", {
+                time: durationText(t, waitedMs),
+              })}
+            </span>
+            {tail}
+          </>
+        }
+        what={title}
+      />
     );
-  } else if (approvalId) {
-    // An approval says who asked while nobody watched, then the agent's why (ADR 0053 §8).
-    const origin = approvalOriginWords({ origin: l.origin });
-    const why = l.title ? l.text : undefined;
-    // An approval (AprovacaoConector B): the sentence says who and what; decided right here.
-    meta = (
-      <>
-        <span>{whenText(t, i18n.language, n.createdAt)}</span>
-        {origin && (
-          <span className="nt-origin">
-            <Icon name="routines" size={14} />
-            {sayWords(t, origin)}
-          </span>
-        )}
-        <span className="nt-grow" />
-        <LeftChip n={n} />
-      </>
-    );
-    head = <ApprovalSay approvalId={approvalId} name={name} why={why} mine={mine} fallback={l.title ?? l.text ?? ""} />;
-    body = <ApprovalActs approvalId={approvalId} agent={agent} onOpen={() => h.onOpen(n)} tail={tail} />;
   }
   return (
     <article
@@ -1207,17 +1061,58 @@ function WaitCard({
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
-      <div className="nt-meta">{meta}</div>
-      <div>{head}</div>
-      <div className="nt-body">{body}</div>
-      {fuse}
+      {card}
     </article>
   );
 }
 
 /**
- * A waiting item that only points somewhere, on one line: its face, its words, Open, Remind me later and Done. A click
- * anywhere on it opens it, as Open does.
+ * An approval waiting for me, decided right here as in its conversation: its own card, or its card's group while
+ * others on it still wait (decided together, one by one in the conversation or Aprovações).
+ */
+function WaitApproval({
+  approvalId,
+  agent,
+  members,
+  fallback,
+  tail,
+}: {
+  approvalId: string;
+  agent: Agent | undefined;
+  members: Map<string, Member>;
+  /** Its words before the request loads. */
+  fallback: string;
+  tail: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const approvals = useApprovals(org.id);
+  const listed = approvals.data?.find((a) => a.id === approvalId);
+  const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
+  const a = listed ?? one.data;
+  if (!a)
+    return (
+      <RequestCard
+        id={approvalId}
+        kind="approval"
+        agent={agent}
+        label={t("approval.group")}
+        mine
+        lead={fallback}
+        end={tail}
+        what={fallback}
+      />
+    );
+  const items = a.messageId ? approvalCardItems(approvals.data, a.messageId, a) : [a];
+  if (items.filter((x) => x.status === "pending").length > 1)
+    return <ApprovalGroupAsk items={items} agent={agent} members={members} tail={tail} />;
+  return <ApprovalAsk approval={a} agent={agent} members={members} tail={tail} />;
+}
+
+/**
+ * A waiting item that only points somewhere, on a card of the requests' shape: where it is from and when on top, its
+ * words and what it is about, then Open, Remind me later and Done in the footer. A click anywhere on it opens it, as
+ * Open does.
  */
 function WaitRow({
   n,
@@ -1252,8 +1147,8 @@ function WaitRow({
         : n.kind === "usage_limit"
           ? usageLimitLine(t, n)
           : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
-  const l1 = useRef<HTMLDivElement>(null);
-  const wraps = useWraps(l1);
+  const source = sourceOf(t, n, channelName);
+  const when = whenText(t, i18n.language, n.createdAt);
   return (
     <article
       className={cx(
@@ -1274,25 +1169,31 @@ function WaitRow({
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
-      <div className="nt-wr__main">
-        <div className="nt-wr__text">
-          <div ref={l1} className={cx("nt-wr__l1", (sub || wraps) && "ac-captop")}>
-            <span className="nt-what">
-              <Headline n={n} dir={dir} channelName={channelName} />
-            </span>{" "}
-            <SourceChip n={n} channelName={channelName} className="nt-wr__src" />{" "}
-            <span className="nt-wr__tm">{whenText(t, i18n.language, n.createdAt)}</span>{" "}
-            <LeftChip n={n} className="nt-wr__left" />
-          </div>
-          {sub && <p className="nt-wr__sub">{sub}</p>}
+      <div className="rq nt-wr__main">
+        <div className="rq__head">
+          <span className="rq__kind">
+            {source ? (
+              <>
+                <span className="nt-wr__src">{source[1]}</span>
+                <span className="rq__source nt-wr__tm"> · {when}</span>
+              </>
+            ) : (
+              <span className="nt-wr__tm">{when}</span>
+            )}
+          </span>
+          <LeftChip n={n} className="nt-wr__left" />
         </div>
-        <div className="nt-wr__acts ac-acts">
+        <p className="rq__lead nt-what">
+          <Headline n={n} dir={dir} channelName={channelName} />
+        </p>
+        {sub && <p className="nt-wr__sub">{sub}</p>}
+        <div className="rq__foot nt-wr__acts">
           {/* A board's notice is decided or resolved right here (ADR 0135). */}
           <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
           <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
             {t("notifications.open")}
           </Button>
-          {tail}
+          <span className="rq__end">{tail}</span>
         </div>
       </div>
       {children}
@@ -1665,10 +1566,6 @@ export function NotificationsPage() {
     leaving: leaving.has(n.id),
   });
 
-  const waiters = [
-    ...new Map(waiting.flatMap((n) => (n.actors[0]?.type === "agent" ? [[n.actors[0].id, n.actors[0]]] : []))).values(),
-  ];
-  const waiterNames = waiters.map((a) => nameOf(t, dir, a));
   const summary = nothing
     ? t("notifications.summaryNothing")
     : [
@@ -1778,32 +1675,9 @@ export function NotificationsPage() {
 
       {waiting.length > 0 && (
         <section className="nt-wait" aria-label={t("notifications.wait.title")}>
-          <div className="nt-wh">
-            {waiters.length > 0 && (
-              <span className="nt-faces">
-                {waiters.map((a) => (
-                  <Face key={a.id} actor={a} dir={dir} size="sm" state="waiting" className="nt-av30" />
-                ))}
-              </span>
-            )}
-            <div className="nt-wh__t">
-              <h2>
-                {t("notifications.wait.title")}
-                <span className="nt-n ac-num">{waiting.length}</span>
-              </h2>
-              {waiters.length > 0 && (
-                <small>
-                  {waiters.length > 1
-                    ? t("notifications.wait.stuckMany", { names: namesText(t, waiterNames, 3) })
-                    : t(
-                        isFeminineName(waiterNames[0] ?? "")
-                          ? "notifications.wait.stuckF"
-                          : "notifications.wait.stuckM",
-                        { names: waiterNames[0] },
-                      )}
-                </small>
-              )}
-            </div>
+          <div className="list-group-head">
+            <h2>{t("notifications.wait.title")}</h2>
+            <span className="list-group-head__count">{waiting.length}</span>
           </div>
           {waiting.map((n) => (
             <WaitCard

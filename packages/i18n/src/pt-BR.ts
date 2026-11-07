@@ -3506,6 +3506,7 @@ export const ptBR = {
     withdrawn: "O {{name}} não precisa mais da resposta.",
     withdrawn_female: "A {{name}} não precisa mais da resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
+    keysHint: "Tecle 1–{{count}} para responder",
     skip: "Pular",
     skipFailed: "Não foi possível pular a pergunta. Tente de novo.",
     dismissed: "{{name}} pulou esta pergunta.",
@@ -5878,8 +5879,6 @@ export const ptBR = {
     movedStage: "Agora está em {{stage}} · #{{number}}",
     movedDetail: "#{{number}} · {{title}}",
     column: "Coluna",
-    flowHint:
-      "A tarefa anda sozinha, para a primeira coluna de cada etapa: Em andamento quando um agente começa, Em revisão quando fica pronta para conferir, Feito quando você aprova.",
     moreOptions: "Mais opções",
     showCanceled: "Mostrar canceladas",
     filterButton: "Filtro",

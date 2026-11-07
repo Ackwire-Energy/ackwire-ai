@@ -49,10 +49,13 @@ export function ApprovalAsk({
   approval,
   agent,
   members,
+  tail,
 }: {
   approval: Approval;
   agent: Agent | undefined;
   members: Map<string, Member>;
+  /** After the fuse at the footer's end (the notifications' Remind me later and Done). */
+  tail?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -110,7 +113,16 @@ export function ApprovalAsk({
           </>
         )
       }
-      end={refusing ? undefined : <RequestFuse left={left} agent={agent} text={expiryText(t, approval)} />}
+      end={
+        refusing ? (
+          tail
+        ) : (
+          <>
+            <RequestFuse left={left} agent={agent} text={expiryText(t, approval)} />
+            {tail}
+          </>
+        )
+      }
       what={title}
       locked={deciding || expired}
     />
@@ -137,10 +149,13 @@ export function ApprovalGroupAsk({
   items,
   agent,
   members,
+  tail,
 }: {
   items: Approval[];
   agent: Agent | undefined;
   members: Map<string, Member>;
+  /** After the fuse at the footer's end (the notifications' Remind me later and Done). */
+  tail?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -237,7 +252,12 @@ export function ApprovalGroupAsk({
         ) : undefined
       }
       end={
-        deadline ? <RequestFuse left={left} agent={agent} text={expiryText(t, { expiresAt: deadline })} /> : undefined
+        deadline || tail ? (
+          <>
+            {deadline && <RequestFuse left={left} agent={agent} text={expiryText(t, { expiresAt: deadline })} />}
+            {tail}
+          </>
+        ) : undefined
       }
       what={one ? runHead(t, one, agent) : t("approval.askMany", { count: waiting.length })}
       locked={deciding}

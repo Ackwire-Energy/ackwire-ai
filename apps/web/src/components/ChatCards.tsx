@@ -66,7 +66,15 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
-import { RequestCard, RequestDone, RequestTile, showRequest, useExpired } from "./RequestCard";
+import {
+  RequestCard,
+  RequestChoices,
+  RequestDone,
+  RequestKeys,
+  RequestTile,
+  showRequest,
+  useExpired,
+} from "./RequestCard";
 import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
 
@@ -559,8 +567,8 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
 
 /**
  * An agent's question (`ask_user`): neutral card in the thread with the
- * choices as buttons, and "Responder" (or "Outra resposta") opening a field in
- * the card. The field answers this question wherever the card shows (a thread
+ * choices as a list, one a line with its number key, and "Outra resposta" (or
+ * "Responder" without choices) opening a field in the card. The field answers this question wherever the card shows (a thread
  * in the panel, a consultation, a channel whose composer posts elsewhere), so
  * it never depends on which composer is on screen.
  */
@@ -605,19 +613,43 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
-  // Open: a request card, the choices in its footer and "Outra resposta" opening a field to write one. For someone
-  // else, it says who it waits for and nothing else.
+  // Open: a request card, the choices a list in its body, each with its number key, and "Outra resposta" the list's
+  // last line, opening a field to write one. For someone else, it says who it waits for and nothing else.
   if (!done) {
     const mine = questionWaitsOn(current, me.user.id);
     const choices = current.choices ?? [];
     const send = () => {
       if (text.trim() && !busy) answer.mutate({ text: text.trim() });
     };
+    const pick = (choice: string | undefined) => {
+      if (choice !== undefined && !busy) answer.mutate({ choice });
+    };
+    const picking = (choice: string) =>
+      answer.isPending && "choice" in answer.variables && answer.variables.choice === choice;
     const errorLine = error ? (
       <p className="rq__error" role="alert">
         {error}
       </p>
     ) : null;
+    const field = writing && (
+      <div className="rq__field">
+        <Textarea
+          rows={2}
+          autoGrow
+          autoFocus
+          value={text}
+          placeholder={t("question.placeholder")}
+          aria-label={t("question.placeholder")}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+      </div>
+    );
     return (
       <RequestCard
         id={question.id}
@@ -630,84 +662,58 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         })}
         lead={current.text}
         body={
-          writing ? (
+          (mine && choices.length > 0) || field || errorLine ? (
             <>
-              <div className="rq__field">
-                <Textarea
-                  rows={2}
-                  autoGrow
-                  autoFocus
-                  value={text}
-                  placeholder={t("question.placeholder")}
-                  aria-label={t("question.placeholder")}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      send();
-                    }
-                  }}
+              {mine && choices.length > 0 && (
+                <RequestChoices
+                  choices={choices.map((label) => ({ label, busy: picking(label) }))}
+                  onPick={(i) => pick(choices[i])}
+                  disabled={busy}
+                  other={
+                    writing ? undefined : { label: t("ask.otherAnswer"), onClick: () => setWriting(true), ref: reopen }
+                  }
                 />
-              </div>
+              )}
+              {field}
               {errorLine}
             </>
-          ) : (
-            (errorLine ?? undefined)
-          )
+          ) : undefined
         }
         actions={
-          mine && (
+          mine &&
+          (writing ? (
             <>
-              {choices.map((choice) => (
-                <Button
-                  key={choice}
-                  size="sm"
-                  data-choice=""
-                  disabled={busy}
-                  loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
-                  onClick={() => answer.mutate({ choice })}
-                >
-                  {choice}
-                </Button>
-              ))}
-              {writing ? (
-                <>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
-                    loading={answer.isPending && "text" in answer.variables}
-                  >
-                    {t("channel.send")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => {
-                      setWriting(false);
-                      setText("");
-                      setError(null);
-                      // The button leaves with the field: focus goes back to the one that opened it.
-                      requestAnimationFrame(() => reopen.current?.focus());
-                    }}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  ref={reopen}
-                  variant={choices.length > 0 ? "ghost" : "primary"}
-                  size="sm"
-                  onClick={() => setWriting(true)}
-                >
-                  {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
-                </Button>
-              )}
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
+                loading={answer.isPending && "text" in answer.variables}
+              >
+                {t("channel.send")}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setWriting(false);
+                  setText("");
+                  setError(null);
+                  // The button leaves with the field: focus goes back to the one that opened it.
+                  requestAnimationFrame(() => reopen.current?.focus());
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
             </>
-          )
+          ) : choices.length > 1 ? (
+            <RequestKeys count={choices.length} />
+          ) : choices.length === 0 ? (
+            <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
+              {t("question.answer")}
+            </Button>
+          ) : undefined)
         }
         end={
           mine && (

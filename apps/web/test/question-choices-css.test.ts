@@ -2,12 +2,7 @@ import { expect, test } from "bun:test";
 import { builtCss, declarations, topLevel } from "./built-css";
 
 const css = topLevel(
-  await builtCss(
-    "src/styles.css",
-    "src/components/notice-island.css",
-    "src/components/request-card.css",
-    "src/pages/notifications.css",
-  ),
+  await builtCss("src/styles.css", "src/components/notice-island.css", "src/components/request-card.css"),
 );
 const last = (selector: string, property: string) =>
   declarations(css, selector)
@@ -24,7 +19,7 @@ test("a wiki folder's name stops short of the button beside its count", async ()
 });
 
 test("an agent's answer choices grow with their text and wrap: the island, the conversation's card, notifications", () => {
-  for (const choice of [".ni__choice", ".rq__foot > .ac-btn[data-choice]", ".nt-sug button"]) {
+  for (const choice of [".ni__choice", ".rq__choice"]) {
     const own = declarations(css, choice);
     // A fixed height let a two-line choice spill over the next one.
     expect([choice, own.filter(([p, v]) => p === "height" && v !== "auto")]).toEqual([choice, []]);

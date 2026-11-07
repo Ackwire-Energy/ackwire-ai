@@ -1087,7 +1087,7 @@ test("the admins' notice: who asks, a Members chip, and it opens Members, from A
   expect(row.getAttribute("aria-label")).toBe("Ana Souza e Bruno Lima pedem para entrar, não lida");
   expect(row.textContent).toContain("Ana Souza e Bruno Lima pedem para entrar");
   expect(row.querySelector(".nt-face")?.textContent).toBe("AS");
-  expect(row.querySelector(".ac-chip")?.textContent).toBe("Membros");
+  expect(row.querySelector(".nt-wr__src")?.textContent).toBe("Membros");
   await click(within(row).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
@@ -1119,7 +1119,7 @@ test("the admins' notice names the first two who asked and counts the rest", asy
     await settle(6);
     const notice = document.querySelector('[data-n="n-join"]') as HTMLElement;
     expect(notice.getAttribute("aria-label")).toBe(`${said}, não lida`);
-    expect(notice.querySelector(".nt-wr__l1")?.textContent).toContain(said);
+    expect(notice.querySelector(".nt-what")?.textContent).toContain(said);
     cleanup();
   }
 });

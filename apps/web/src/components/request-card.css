@@ -46,6 +46,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Where it was asked, after the kind, quieter (a card away from its conversation: Notificações). */
+.rq__source {
+  font-weight: 500;
+  color: var(--faint);
+}
 /* The state as words, no pill: waiting for you in the warning tone with its pulsing mark; someone else, muted. */
 .rq__state {
   display: inline-flex;
@@ -241,15 +246,87 @@ html:not([data-pointer]) .rq__more:focus-visible {
   margin-inline: calc(-1 * var(--ghost-plate));
   padding-inline: var(--ghost-plate);
 }
-/* Choices can be whole sentences: they wrap inside the card instead of running past it. */
-.rq__foot > .ac-btn[data-choice] {
+/*
+ * A question's choices: a list in the card's body, one a line, its number key on the left (1 to 9 answer while the
+ * focus is in the list), "Other answer" its last line. Whole sentences wrap inside their line.
+ */
+.rq__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rq__choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   max-width: 100%;
-  height: auto;
-  min-height: 32px;
-  padding-block: 6px;
-  white-space: normal;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 20px;
+  color: var(--ink);
   text-align: left;
+  white-space: normal;
   overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.rq__choice:hover:not(:disabled) {
+  background: var(--plate);
+}
+.rq__choice:disabled {
+  cursor: default;
+}
+html:not([data-pointer]) .rq__choice:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.rq__choice-text {
+  flex: 1;
+  min-width: 0;
+}
+.rq__key {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  background: var(--raised);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rq__choice--other {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line2);
+  color: var(--muted);
+}
+.rq__choice--other .rq__key {
+  box-shadow: none;
+  background: none;
+}
+/* "Tecle 1–4 para responder": only where there are keys. */
+.rq__keys {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+@media (hover: none) {
+  .rq__keys {
+    display: none;
+  }
 }
 .rq__foot > .ap-refuse {
   flex: 1 1 100%;
