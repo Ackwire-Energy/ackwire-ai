@@ -436,8 +436,13 @@ export function Composer({
 
   useAutoGrow(ref, value);
   // Once the text is in: the caret after an inserted mention, or a selection put back.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: whenever the text changes
   useLayoutEffect(() => {
+    // The box emptied without a keystroke (the message went out, a draft was cleared): no list stays open over it.
+    if (!value) {
+      setToken(null);
+      setLinkToken(null);
+      setChannelToken(null);
+    }
     const el = ref.current;
     if (!el) return;
     if (caretAfter.current !== null) {
@@ -637,10 +642,9 @@ export function Composer({
         return;
       }
       const item = items[current];
-      // Already typed in full ("oi @ada" + Enter): Enter sends; Tab still completes.
-      const typed = isChannel ? channelToken : token;
-      const typedInFull = !isLink && item && typed && item.insert.toLowerCase() === typed.query.toLowerCase();
-      if (e.key === "Tab" || (e.key === "Enter" && !typedInFull)) {
+      // The first Enter picks, even on a name typed in full ("oi @ada"): people press it to choose, and a message
+      // holding only the name went out by mistake. With the list closed by the pick, the next Enter sends.
+      if (e.key === "Tab" || e.key === "Enter") {
         e.preventDefault();
         if (item) pick(item);
         return;
