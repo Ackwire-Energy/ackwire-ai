@@ -25,9 +25,18 @@ export function voiceOf(meta: Record<string, unknown> | null | undefined): Messa
     : null;
 }
 
-/** A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0100). */
-export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) =>
-  voiceOf(meta) ? "" : body;
+/**
+ * A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0100).
+ * A notice's body is written for the agent, in English: only what people may read of it (a routine's report, a fast
+ * reply, another agent's own answer), else nothing, as the chat's `noticeView` does.
+ */
+export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) => {
+  if (voiceOf(meta)) return "";
+  const notice = meta?.notice as { kind?: unknown; refs?: { answer?: unknown } } | undefined;
+  if (!notice || typeof notice !== "object") return body;
+  if (notice.kind === "routine_handoff" || notice.kind === "talker_reply") return body;
+  return notice.kind === "consult_reply" && typeof notice.refs?.answer === "string" ? notice.refs.answer : "";
+};
 
 /** One line of at most `max` chars (a preview's text). */
 function oneLine(text: string, max = 200): string {

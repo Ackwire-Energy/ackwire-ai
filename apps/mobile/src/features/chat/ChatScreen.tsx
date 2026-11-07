@@ -572,6 +572,9 @@ function Chat({
   // ── Rows ──
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
   const superseded = useMemo(() => supersededBrainNotices(list), [list]);
+  const workingKey = runs.map((r) => r.agentId).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: new only when who is at work changes
+  const agentsAtWork = useMemo(() => new Set(runs.map((r) => r.agentId)), [workingKey]);
   const waitsNow = conversationWaits(isThread ? list : list.filter((m) => !m.threadId), live.receipts, (id) =>
     live.runs.some((r) => r.runId === id),
   );
@@ -629,7 +632,7 @@ function Chat({
           : [];
       return [
         ...head,
-        ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
+        ...asTurns(buildRows(replies, (m) => superseded.has(m.id), agentsAtWork)),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
         ...waitRows,
@@ -639,7 +642,7 @@ function Chat({
     // A thread's replies live in the thread; the channel shows its link.
     const hidden = (m: Message) => superseded.has(m.id) || Boolean(m.threadId);
     return [
-      ...asTurns(buildRows(list, hidden)),
+      ...asTurns(buildRows(list, hidden, agentsAtWork)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...waitRows,
@@ -657,6 +660,7 @@ function Chat({
     browsing,
     held,
     superseded,
+    agentsAtWork,
     t,
     waits,
   ]);

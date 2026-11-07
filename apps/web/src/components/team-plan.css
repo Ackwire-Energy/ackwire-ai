@@ -133,7 +133,7 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  gap: var(--icon-gap-sm);
   margin: 0;
   padding: 2px 10px;
   border-radius: 999px;

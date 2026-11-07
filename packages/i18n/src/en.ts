@@ -12932,6 +12932,14 @@ export const en = {
       followUpCancel: "Cancel",
       other: "Notice for {{name}}",
       wakeSkipped: "{{name}}'s mention didn't reach {{agents}}",
+      /** The same, on an older line that didn't keep whom. */
+      wakeSkippedAnon: "{{name}}'s mention didn't reach another agent",
+      /** What "Show" opens under it: why, for people (only some people may call those agents), and the way out. */
+      wakeSkippedAudience:
+        "Only some people may call {{agents}}, and this work of {{name}} didn't come from one of them. Someone who may call {{agents}} can pass the request on.",
+      /** The same when the agent's own settings don't let it call them. */
+      wakeSkippedCallable:
+        "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page.",
       show: "Show",
       hide: "Hide",
       talker: "while working",

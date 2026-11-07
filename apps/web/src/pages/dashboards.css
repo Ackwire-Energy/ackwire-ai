@@ -577,9 +577,9 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
 .nwc__stale {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--icon-gap);
   margin: 8px 12px 0;
-  padding: 8px 8px 8px 12px;
+  padding: 8px 12px;
   border-radius: 12px;
   background: var(--warn-soft);
   font-size: 13px;
@@ -794,6 +794,12 @@ html:not([data-pointer]) button.nwc-who:focus-visible {
 .nwc-bell[data-state="open"] {
   background: var(--plate);
   color: var(--ink);
+}
+/* Off, the bell alone: an icon button, square. */
+.nwc-bell:not(:has(> span)) {
+  justify-content: center;
+  width: 26px;
+  padding: 0;
 }
 html:not([data-pointer]) .nwc-bell:focus-visible {
   outline: none;

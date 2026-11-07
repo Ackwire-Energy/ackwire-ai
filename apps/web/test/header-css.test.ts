@@ -20,8 +20,10 @@ test("the channel header's icons never get a plate, sit 14px apart, and a phone 
   }
   expect(last(shipped, ".channel__icon.ac-btn", "color")).toBe("var(--muted)");
   expect(last(shipped, ".channel__icon.ac-btn:hover", "color")).toBe("var(--ink)");
-  expect(last(shipped, ".channel__icon.ac-btn", "width")).toBe("24px");
-  expect(last(shipped, ".channel__icon.ac-btn", "margin")).toBe("0 -6px");
+  // A square, one glyph every 26px (its 26 less the 7 it reaches into each side of the 14px gap).
+  expect(last(shipped, ".channel__icon.ac-btn", "width")).toBe("26px");
+  expect(last(shipped, ".channel__icon.ac-btn", "height")).toBe("26px");
+  expect(last(shipped, ".channel__icon.ac-btn", "margin")).toBe("0 -7px");
 
   // The threads count: an ink pill in either theme (the page's color on the ink), never the header's own gray.
   expect(last(shipped, ".channel__icon-count.ac-count", "background")).toBe("var(--ink2)");

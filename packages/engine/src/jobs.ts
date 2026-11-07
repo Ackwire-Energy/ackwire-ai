@@ -407,6 +407,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           run,
           message.id,
           handles.map((h) => ({ handle: h.handle, why: notCallableWhy(h.handle) })),
+          "callable",
         ).catch(() => {});
     }
     return ids.filter((id) => ok.has(id));

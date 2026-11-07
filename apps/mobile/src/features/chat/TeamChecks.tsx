@@ -3,7 +3,7 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { type IconName, LineIcon, RowAction, Text, useTheme } from "@/ui";
+import { type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -97,8 +97,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 50,
     paddingVertical: (50 - 32) / 2,
-    paddingLeft: 12,
-    paddingRight: 10,
+    ...ROW_CARD_INSET,
     borderWidth: StyleSheet.hairlineWidth,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,

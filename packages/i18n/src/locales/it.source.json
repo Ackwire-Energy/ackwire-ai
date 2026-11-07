@@ -32151,6 +32151,15 @@
   "chat.notice.wakeSkipped": {
     "value": "{{name}}'s mention didn't reach {{agents}}"
   },
+  "chat.notice.wakeSkippedAnon": {
+    "value": "{{name}}'s mention didn't reach another agent"
+  },
+  "chat.notice.wakeSkippedAudience": {
+    "value": "Only some people may call {{agents}}, and this work of {{name}} didn't come from one of them. Someone who may call {{agents}} can pass the request on."
+  },
+  "chat.notice.wakeSkippedCallable": {
+    "value": "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page."
+  },
   "chat.notice.show": {
     "value": "Show"
   },

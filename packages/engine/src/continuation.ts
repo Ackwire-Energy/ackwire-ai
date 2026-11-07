@@ -548,6 +548,7 @@ export async function tellWakeSkipped(
   run: AgentRun,
   messageId: string,
   skipped: { handle: string; why: string }[],
+  reason: "audience" | "callable" | "no_ai",
 ) {
   if (run.background || skipped.length === 0) return;
   const told = new Set(
@@ -560,7 +561,7 @@ export async function tellWakeSkipped(
     deliverNoticeToRun(tx, run, {
       kind: "wake_skipped",
       text,
-      refs: { runId: run.id, messageId, agentHandles: fresh.map((s) => s.handle).join(",") },
+      refs: { runId: run.id, messageId, agentHandles: fresh.map((s) => s.handle).join(","), reason },
     }),
   );
   await publishDelivery(deps.pubsub, delivered);
@@ -629,16 +630,23 @@ export async function reportDroppedMentions(
           ),
         ),
       );
+    const noAi = new Set(audience.filter((d) => d.noAi).map((d) => d.agentId));
+    // One notice per cause: the app words people read under it come from `refs.reason`.
     await tellWakeSkipped(
       deps,
       sender,
       message.id,
-      rows.map((a) => ({
-        handle: a.handle,
-        why: audience.find((d) => d.agentId === a.id)?.noAi
-          ? "it has no AI connected, so nothing could answer it"
-          : unreachableWhy(a, person),
-      })),
+      rows
+        .filter((a) => noAi.has(a.id))
+        .map((a) => ({ handle: a.handle, why: "it has no AI connected, so nothing could answer it" })),
+      "no_ai",
+    );
+    await tellWakeSkipped(
+      deps,
+      sender,
+      message.id,
+      rows.filter((a) => !noAi.has(a.id)).map((a) => ({ handle: a.handle, why: unreachableWhy(a, person) })),
+      "audience",
     );
   } catch {
     // The run that mentioned them is unaffected; the decision row keeps what it had.

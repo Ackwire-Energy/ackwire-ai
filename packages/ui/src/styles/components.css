@@ -318,7 +318,8 @@ html[data-pointer] :focus-visible {
 .ac-btn--ghost.ac-btn--glyph::before {
   content: "";
   position: absolute;
-  inset: 0 var(--glyph-air, 0px);
+  /* Square, as every icon button: set in by the glyph's air on all four sides. */
+  inset: var(--glyph-air, 0px);
   border-radius: inherit;
   transition: inherit;
 }
@@ -342,7 +343,7 @@ html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--icon-gap);
   height: 36px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
@@ -1634,9 +1635,9 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: inline-flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--icon-gap);
   min-width: 0;
-  padding: 6px 12px 6px 10px;
+  padding: 6px 12px;
 }
 .ac-eventpill__mark {
   display: inline-flex;
@@ -1673,7 +1674,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
 .ac-eventpill__action {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--icon-gap-sm);
   padding: 0 12px;
   border: 0;
   border-left: 1px solid var(--line);
@@ -3824,6 +3825,15 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
   width: 16px;
   height: 16px;
 }
+/* The check alone is an icon button: square, the line's height kept. */
+.ac-receipt__check:has(> .ac-icon:only-child) {
+  flex: none;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-block: -2px;
+  padding: 0;
+}
 .ac-receipt__check:hover {
   color: var(--ink);
 }
@@ -4678,7 +4688,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--sm {
   height: var(--control-h-sm);
   padding: 0 var(--control-px-sm);
-  gap: 6px;
+  gap: var(--icon-gap-sm);
   font-size: var(--control-fs-sm);
   border-radius: var(--control-r-sm);
 }
@@ -4689,7 +4699,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--lg {
   height: var(--control-h-lg);
   padding: 0 var(--control-px-lg);
-  gap: 10px;
+  gap: var(--icon-gap-lg);
   font-size: var(--control-fs-lg);
   border-radius: var(--control-r-lg);
 }
@@ -4707,8 +4717,10 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   margin-inline-start: calc(-1 * var(--lead-air));
   translate: 0 calc(-1 * var(--lead-rise));
 }
-/* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
+/* Icon buttons are square, same shape as the rest of the ruler (no round plates), and a crowded row never squeezes
+   one narrower than tall. */
 .ac-btn--icon {
+  flex-shrink: 0;
   width: var(--control-h-md);
   padding: 0;
 }
@@ -5174,15 +5186,20 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
  * tall as before and its first line runs through the buttons' middle.
  */
 .ac-toast {
-  --toast-line-pad: calc((var(--control-h-sm) - 20px) / 2);
+  --toast-button: var(--control-h-sm);
+  --toast-line-pad: calc((var(--toast-button) - 20px) / 2);
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px 12px 12px;
+  gap: var(--icon-gap);
+  padding: 12px;
 }
 @media (pointer: coarse) {
   .ac-toast {
-    --toast-line-pad: calc((var(--control-h-md) - 20px) / 2);
+    --toast-button: var(--control-h-md);
   }
+}
+/* The close's × stands as far from the right edge as the tone's icon from the left: it reaches out by its air. */
+.ac-toast > .ac-btn--icon:last-child {
+  margin-inline-end: calc((var(--control-icon-sm) - var(--toast-button)) / 2);
 }
 .ac-toast > :is(.ac-icon, .ac-toast__text) {
   margin-block: var(--toast-line-pad);
@@ -5870,12 +5887,13 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
  * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
  * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
- * 15.5px / 1.7 line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
+ * 15.5px / 1.7 line, minus half a 28px button (square, as every icon button). 84px wide, so the row's 96px left padding
+ * holds them at any width.
  */
 @media not ((hover: none) or (pointer: coarse)) {
   .ac-msg--own > .ac-msg__body > .ac-msg__actions,
   .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px);
+    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 14px);
     right: calc(100% + 2px);
     flex-direction: row-reverse;
     padding: 0;
@@ -5886,8 +5904,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm {
     min-width: 28px;
     width: 28px;
-    height: 30px;
-    border-radius: 15px;
+    height: 28px;
+    border-radius: 14px;
     color: var(--faint);
   }
   .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm:is(:hover, [aria-expanded="true"]) {

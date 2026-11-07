@@ -6272,8 +6272,9 @@ html:not([data-pointer]) .composer-reply__close:focus-visible {
 .composer-quote {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 4px 4px 10px;
+  gap: var(--icon-gap-sm);
+  /* Its close's × as far from the right edge as the icon from the left. */
+  padding: 4px 8px 4px 10px;
   border-radius: var(--radius-item);
   background: var(--sunken);
   font-size: 12.5px;
@@ -10096,7 +10097,7 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
 .agp-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--icon-gap-sm);
   height: 22px;
   padding: 0 8px;
   border-radius: 999px;

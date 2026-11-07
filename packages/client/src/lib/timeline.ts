@@ -1,7 +1,14 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
 import { messageMediaOf } from "./media";
-import { answeredNotices, isAgentOnlyNotice, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
+import {
+  answeredNotices,
+  isAgentOnlyNotice,
+  isAnsweredNotice,
+  isEventLine,
+  isTalkerReply,
+  settledNotices,
+} from "./notices";
 import { quoteExcerpt, replyOf } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
 import { voiceOf } from "./voice";
@@ -101,9 +108,15 @@ const dayKey = (iso: string) => {
 /**
  * The rows of the channel: day dividers, messages (grouped when the same
  * author writes again within 5 minutes), approval cards at the time they
- * were asked, and live agent runs at the end.
+ * were asked, and live agent runs at the end. `working`: the agents at work in this conversation (`settledNotices`),
+ * those of `runs` when not given.
  */
-export function buildTimeline(messages: Message[], approvals: Approval[], runs: LiveRun[]): TimelineItem[] {
+export function buildTimeline(
+  messages: Message[],
+  approvals: Approval[],
+  runs: LiveRun[],
+  working: ReadonlySet<string> = new Set(runs.map((r) => r.agentId)),
+): TimelineItem[] {
   type Entry = { at: string; id: string; item: TimelineItem };
   const entries: Entry[] = [
     ...messages.map((m) => ({
@@ -129,6 +142,8 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
   const byId = new Map(messages.map((m) => [m.id, m]));
   // Routine reports an agent's message already answers: they fold into it.
   const answered = answeredNotices(messages);
+  // Events over once they happened (a follow-up that came, a mention its message's own line explains).
+  const settled = settledNotices(messages, working);
   // The last message shown, across day dividers and cards (to tell a reply that lands far from its root).
   let lastShown: Message | null = null;
   for (const entry of entries) {
@@ -141,8 +156,8 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     if (entry.item.kind === "message") {
       const m = entry.item.message;
       // A routine's call written as its creator, a report the agent already told people about, a notice only its agent
-      // reads: not shown.
-      if (isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta)) continue;
+      // reads, an event that is over: not shown.
+      if (isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta) || settled.has(m.id)) continue;
       // A routine's answer (or an automatic line: a notice) always shows its own header, and nothing groups under it.
       const routine = Boolean(routineReplyOf(m)) || isEventLine(m.meta);
       const prevRoutine = Boolean(prev && (routineReplyOf(prev) || isEventLine(prev.meta)));
