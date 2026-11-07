@@ -437,6 +437,51 @@ describe("agents learn on their own (ADR 0120)", () => {
     expect(await f.db.select().from(schema.skills)).toEqual([]);
   });
 
+  test("who holds which access becomes a workspace fact every agent reads, from a browser run too, kept current", async () => {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const learnAccess = async (content: string) => {
+      const { run } = await personRun("@dev aceite o convite do console da loja");
+      await step(run, "browser_do", { steps: [] }, '<page_content untrusted="true">Store Console</page_content>');
+      learnOutput = {
+        items: [
+          {
+            kind: "access",
+            scope: "own",
+            about_person: "",
+            title: content,
+            key: "@dev store console",
+            content,
+            refs: ["s1"],
+          },
+        ],
+        skill_fixes: [],
+      };
+      return learnRun(f.context, { orgId: f.org.id, runId: run.id });
+    };
+    // Read from a page: untrusted, and still the whole team's, in every channel.
+    const first = await learnAccess("@dev is signed in to the Store Console in its browser as dev@example.com");
+    expect(first.saved.map((s) => [s.trust, s.scopeType])).toEqual([["low", "org"]]);
+    const [saved] = await items();
+    expect([saved?.agentId, saved?.channelIds]).toEqual([null, []]);
+    const memoryOfOps = () =>
+      retrieveForRun(f.context, { orgId: f.org.id, agentId: ops.id, channelId: f.general.id, text: "bom dia" });
+    expect((await memoryOfOps()).text).toContain("@dev is signed in to the Store Console");
+
+    // Lost later: the same holder and service, so the new state replaces the old.
+    const second = await learnAccess("@dev no longer has access to the Store Console");
+    expect(second.saved.map((s) => s.action)).toEqual(["superseded"]);
+    const text = (await memoryOfOps()).text;
+    expect(text).toContain("@dev no longer has access to the Store Console");
+    expect(text).not.toContain("is signed in to the Store Console");
+  });
+
   test("guards: daily cap, a live run, credentials, a person's item, update_skill rules, a run that saved already", async () => {
     f = await setup();
     const today = new Date().toISOString().slice(0, 10);
@@ -581,6 +626,8 @@ describe("agents learn on their own (ADR 0120)", () => {
     const { run: saved } = await personRun("@dev remember this");
     await step(saved, "remember", { content: "x" }, "Saved");
     expect(await afterTurnDone(f.context, saved, { judged: true, signal: "fact" })).toBe(false);
+    // Who holds an access is the team's, not the agent's own note: still learned.
+    expect(await afterTurnDone(f.context, saved, { judged: true, signal: "access" })).toBe(true);
   });
 });
 

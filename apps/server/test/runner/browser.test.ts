@@ -47,6 +47,7 @@ import {
   isWebPage,
   jpegSize,
   launchChrome,
+  NAME_CONTROLS,
   type OwnChrome,
   relayCommands,
   type StreamSocket,
@@ -1328,6 +1329,65 @@ test.if(posix)(
     expect(commands().filter((c) => c === "stream status")).toHaveLength(1);
   },
 );
+
+test.if(posix)("every snapshot names the page's unnamed icon buttons first", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  await t.act("snapshot", ["-i"]);
+  const tail = t.logged().map((c) => c.args.slice(-2));
+  expect(tail.at(-1)).toEqual(["snapshot", "-i"]);
+  expect(tail.at(-2)).toEqual(["eval", NAME_CONTROLS]);
+});
+
+test("NAME_CONTROLS labels an icon button from its tooltip, and leaves named ones alone", () => {
+  type Fake = {
+    attrs: Record<string, string>;
+    textContent: string;
+    icon?: boolean;
+    img?: boolean;
+    shadowRoot?: { querySelectorAll: (s: string) => Fake[]; getElementById: (id: string) => unknown };
+  };
+  const el = (attrs: Record<string, string>, textContent = "", more: Partial<Fake> = {}): Fake => ({
+    attrs,
+    textContent,
+    ...more,
+  });
+  const live = (e: Fake) =>
+    Object.assign(e, {
+      hasAttribute: (n: string) => n in e.attrs,
+      getAttribute: (n: string) => e.attrs[n] ?? null,
+      setAttribute: (n: string, v: string) => {
+        e.attrs[n] = v;
+      },
+      querySelector: (s: string) => (s.includes("icon") && e.icon ? {} : s.startsWith("img") && e.img ? {} : null),
+    });
+  const described = el({ "aria-describedby": "tip1" });
+  const ligature = el({ title: "Copy SHA-256" }, "content_copy", { icon: true });
+  const tooltip = el({ "data-tooltip": "Download" });
+  const words = el({ "data-tooltip": "Ignored" }, "Copy");
+  const labeled = el({ "aria-label": "Close" });
+  const picture = el({ title: "Ignored" }, "", { img: true });
+  const nothing = el({});
+  const inShadow = el({ mattooltip: "Settings" });
+  const host = el({}, "", {
+    shadowRoot: { querySelectorAll: (s) => (s === "*" ? [] : [live(inShadow)]), getElementById: () => null },
+  });
+  const controls = [described, ligature, tooltip, words, labeled, picture, nothing].map(live);
+  const document = {
+    querySelectorAll: (s: string) => (s === "*" ? [host] : controls),
+    getElementById: (id: string) => (id === "tip1" ? { textContent: " Copy  SHA-1 " } : null),
+  };
+  const named = new Function("document", `return ${NAME_CONTROLS}`)(document);
+  expect(named).toBe(4);
+  expect(described.attrs["aria-label"]).toBe("Copy SHA-1");
+  expect(ligature.attrs["aria-label"]).toBe("Copy SHA-256");
+  expect(tooltip.attrs["aria-label"]).toBe("Download");
+  expect(inShadow.attrs["aria-label"]).toBe("Settings");
+  expect(words.attrs["aria-label"]).toBeUndefined();
+  expect(labeled.attrs["aria-label"]).toBe("Close");
+  expect(picture.attrs["aria-label"]).toBeUndefined();
+  expect(nothing.attrs["aria-label"]).toBeUndefined();
+});
 
 test("jpegSize reads a JPEG's frame header; captureMarks keeps only well-formed marks", () => {
   // SOI, an APP0 segment to skip, then SOF0 with 800 × 1280.

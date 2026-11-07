@@ -782,6 +782,8 @@ export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []):
       "the Vault (`vault_list`): logins, keys and contact details people saved for you, used without ever seeing a password or a key",
     );
   if (names.has("find_tools")) out.push("the tool directory (`find_tools`): tools for apps and services");
+  if (names.has("search_context"))
+    out.push("the workspace (`search_context`): memory, past messages and steps, who holds which login");
   const handOver = HAND_OVER_TOOLS.filter((t) => names.has(t));
   if (handOver.length > 0)
     out.push(

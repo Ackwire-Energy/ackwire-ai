@@ -156,6 +156,17 @@ export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
 export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
   i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
 /**
+ * The word a workspace fact about who holds which access carries (an agent signed in somewhere, a login, a connector,
+ * a mailbox, a person who handles a service): every agent reads these in every run (`retrieveForRun`). One word no
+ * plain subject has, so "access control" never becomes one.
+ */
+export const ACCESS_WORD = "whoholds";
+export const accessSubject = (key: string) => `${ACCESS_WORD} ${key}`;
+export const isAccess = (i: Pick<ContextItem, "kind" | "agentId" | "subjectKey">) =>
+  i.kind === "fact" && !i.agentId && i.subjectKey.split(" ").includes(ACCESS_WORD);
+export const accessSql = () =>
+  sql`(${contextItems.kind} = 'fact' and ${contextItems.agentId} is null and ${ACCESS_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
+/**
  * Learning with no chat receipt (ADR 0120): the agent's playbook, and anything it found on its own (no person's words
  * among the evidence), like where a script lives. It stays in the Memory tab and in later runs.
  */

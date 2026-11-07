@@ -26,6 +26,7 @@ import { isRightHand } from "../right-hand";
 import { addRunStep } from "../runs";
 import type { ToolContext } from "../tools/types";
 import {
+  accessSubject,
   consolidateItem,
   type Evidence,
   howToSql,
@@ -37,8 +38,18 @@ import {
 import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
 
-const { agentQuestions, agentRuns, agentRunSteps, agentLearningDays, agents, contextItems, messages, skills, users } =
-  schema;
+const {
+  agentQuestions,
+  agentRuns,
+  agentRunSteps,
+  agentLearningDays,
+  agents,
+  channels,
+  contextItems,
+  messages,
+  skills,
+  users,
+} = schema;
 
 export const LEARN_DEFAULTS = { maxPerAgentDay: 20, minToolCalls: 6, skillAfter: 3 };
 export const learnConfig = (deps: Pick<ContextDeps, "learn">) => ({ ...LEARN_DEFAULTS, ...deps.learn });
@@ -211,7 +222,9 @@ export async function afterTurnDone(
         .where(inArray(contextItems.id, usedHowTos));
       await addRunStep(db, run, "context", { [HOW_TOS_COUNTED]: true });
     }
-    if (cfg.maxPerAgentDay <= 0 || calls.some((c) => WROTE_MEMORY.has(c.name))) return false;
+    // What it saved itself is its own; who holds an access is the team's, so that is still learned.
+    if (cfg.maxPerAgentDay <= 0 || (input.signal !== "access" && calls.some((c) => WROTE_MEMORY.has(c.name))))
+      return false;
     const learn = input.judged
       ? input.signal !== undefined && input.signal !== "none"
       : fixedAfterFailing(calls, cfg.minToolCalls) || (repeatedTask(calls) && usedHowTos.length === 0);
@@ -277,7 +290,7 @@ async function jobsToday(db: Executor, agentId: string) {
 
 const LEARN_SYSTEM = [
   "You keep the memory of an AI agent that works in a team of people and agents. Read one finished turn of its work and extract what is worth keeping for next time, as JSON.",
-  "Kinds: how_to (a way it worked out and will reuse: the exact address, command, parameters, script path; steps first), preference (how a person wants things done), fact (a lasting fact about the company, its business or its people), decision, lesson (what to do differently, or keep doing), term (a word or name the team uses, and what it means).",
+  'Kinds: how_to (a way it worked out and will reuse: the exact address, command, parameters, script path; steps first), preference (how a person wants things done), fact (a lasting fact about the company, its business or its people), decision, lesson (what to do differently, or keep doing), term (a word or name the team uses, and what it means), access (who in the team holds which access: an agent signed in to a service in its browser, given a login, a key, a connector or a mailbox, or a person or agent named as who handles a service; key: the holder\'s @handle or name, then the service, as in "@ana stripe dashboard"; content: who holds it and how, as in "@ana is signed in to the Stripe dashboard in its browser as ana@example.com"; one that was lost is an access too, saying so).',
   "How its systems work (where code lives, which file does what, how a tool behaves) is a how_to or a lesson, never a fact.",
   'title: one plain line a person who doesn\'t code understands, in the language the people in the conversation write, with no paths, code or ids ("Como gravar senhas no Supabase sem expô-las"); content holds the technical detail. key: a short stable name for what it is about, in English, technical words welcome ("supabase secrets storage"; for a term, the term itself): the same thing learned again gets the same key, two different things never share one.',
   "Scope: own (only this agent), team (how the team works), workspace (everyone should know), person (one person's own preference: give their name as it appears in the messages in about_person).",
@@ -298,7 +311,7 @@ const LEARN_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", enum: ["fact", "preference", "decision", "lesson", "how_to", "term"] },
+          kind: { type: "string", enum: ["fact", "preference", "decision", "lesson", "how_to", "term", "access"] },
           scope: { type: "string", enum: ["own", "team", "workspace", "person"] },
           about_person: { type: "string" },
           title: { type: "string" },
@@ -325,7 +338,7 @@ const LEARN_SCHEMA = {
 };
 
 interface LearnedItem {
-  kind: "fact" | "preference" | "decision" | "lesson" | "how_to" | "term";
+  kind: "fact" | "preference" | "decision" | "lesson" | "how_to" | "term" | "access";
   scope: "own" | "team" | "workspace" | "person";
   about_person: string;
   title: string;
@@ -509,6 +522,13 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
   }
   const parsed = parseLearnOutput(result.text);
   const now = new Date().toISOString();
+  // Who holds what reaches every channel, but what was said in a DM stays there.
+  const [where] = parsed.items.some((i) => i.kind === "access")
+    ? await db
+        .select({ kind: channels.kind })
+        .from(channels)
+        .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)))
+    : [];
   const judging = {
     ...memoryJudging(deps),
     mayReplace: (old: { createdByKind: string }) => old.createdByKind !== "person",
@@ -562,22 +582,39 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
               (conversation.names.get(m.id) ?? "").toLowerCase() === item.about_person.trim().toLowerCase(),
           )?.authorUserId ?? null)
         : null;
+    // Who holds which access is the whole team's to know, read from a page or not: it only points at the holder (it
+    // grants nothing, and an untrusted one is labeled so), and kept to one agent it can't stop another from saying
+    // nobody has it.
     const scope =
-      trust !== "high" || item.kind === "how_to" ? "own" : item.scope === "person" && !person ? "own" : item.scope;
+      item.kind === "access"
+        ? "workspace"
+        : trust !== "high" || item.kind === "how_to"
+          ? "own"
+          : item.scope === "person" && !person
+            ? "own"
+            : item.scope;
     const confidence = trust === "low" ? 0.5 : evidence.some((e) => e.type === "human") ? 0.7 : 0.8;
     const title = item.title.trim().slice(0, 200);
     const key = (typeof item.key === "string" ? item.key.trim().slice(0, 200) : "") || title;
     const base: NewContextItem = {
       orgId: run.orgId,
-      kind: item.kind === "how_to" ? "note" : item.kind === "term" ? "fact" : item.kind,
+      kind: item.kind === "how_to" ? "note" : item.kind === "term" || item.kind === "access" ? "fact" : item.kind,
       scopeType: scope === "own" ? "agent" : scope === "person" ? "person" : "org",
       scopeId: scope === "own" ? agent.id : scope === "person" ? person : run.orgId,
       agentId: scope === "own" ? agent.id : null,
       title,
-      subject: item.kind === "how_to" ? howToSubject(key) : item.kind === "term" ? `term ${key}` : key || undefined,
-      content: item.content.trim(),
+      subject:
+        item.kind === "how_to"
+          ? howToSubject(key)
+          : item.kind === "term"
+            ? `term ${key}`
+            : item.kind === "access"
+              ? accessSubject(key)
+              : key || undefined,
+      // A pointer, not a page's say: short.
+      content: item.kind === "access" ? cutText(item.content.trim(), 300) : item.content.trim(),
       sourceIds: [...new Set(cited.messages.map((m) => m.id))],
-      channelIds: [run.channelId],
+      channelIds: item.kind === "access" && where && where.kind !== "dm" ? [] : [run.channelId],
       trust,
       evidence,
       confidence,

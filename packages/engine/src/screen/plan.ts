@@ -227,6 +227,8 @@ export interface StepReport {
   ran?: boolean;
   /** What a `type_secret` typed, by name (the site a Vault login was typed for, ADR 0144): never a value. */
   typed?: string;
+  /** An `open` the site sent to another page than the one asked (a deep link it doesn't take). */
+  landedElsewhere?: boolean;
   /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
   found?: {
     question: string;
@@ -315,6 +317,24 @@ interface Targets {
   act: (at: ActTarget[]) => ScreenAction;
 }
 
+/**
+ * The page an `open` landed on is another one than asked: another site or path, past a `www.`, a trailing slash, the
+ * query and the fragment. Opening a site's front page never counts (it may send to a language's own).
+ */
+export function landedElsewhere(asked: string, landed: string): boolean {
+  const place = (u: string) => {
+    try {
+      const url = new URL(u);
+      return { host: url.host.replace(/^www\./, ""), path: url.pathname.replace(/\/+$/, "") };
+    } catch {
+      return null;
+    }
+  };
+  const a = place(asked);
+  const b = place(landed);
+  return Boolean(a && b && a.path !== "" && (a.host !== b.host || a.path !== b.path));
+}
+
 /** Runs `steps` in order on `deps.surface` (see the file's comment). */
 export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<PlanReport> {
   const now = deps.now ?? Date.now;
@@ -383,6 +403,7 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         }
         await settleOn({ kind: "open", url });
         report.note = url;
+        if (kind === "browser" && screen?.url && landedElsewhere(url, screen.url)) report.landedElsewhere = true;
         return;
       }
       case "back":
