@@ -151,7 +151,8 @@ describe("Notificações", () => {
     expect(card.querySelector(".rq__kind")?.textContent).toContain("Pergunta");
     // Who asks comes first: away from the conversation, the face alone doesn't say it.
     expect(card.querySelector(".rq__kind > .rq__who")?.textContent).toBeTruthy();
-    expect(card.querySelector(".rq__state")?.textContent).toBe("esperando você");
+    // Waiting for me needs no words on the card (its buttons say it).
+    expect(card.querySelector(".rq__state")).toBeNull();
     expect(card.querySelector(".rq__lead")?.textContent).toBe(question.text);
     expect(card.querySelector(".rq__end")?.textContent).toMatch(/^Parada há /);
     expect(within(waiting).getByRole("button", { name: "Usa o cupom antigo" })).toBeTruthy();

@@ -435,7 +435,9 @@ describe("a question for one person", () => {
     for (const asked of [seedState().me?.user.id ?? "", null]) {
       await openChannel(() => [card(asked)]);
       const rq = document.querySelector(".rq") as HTMLElement;
-      expect(rq.textContent).toContain("esperando você");
+      // It waits on them: no words for it on the card, its actions say it.
+      expect(rq.hasAttribute("data-ask-mine")).toBe(true);
+      expect(rq.textContent).not.toContain("esperando você");
       expect(within(rq).getByRole("button", { name: "9h" })).toBeTruthy();
       expect(within(rq).getByRole("button", { name: "Pular" })).toBeTruthy();
       cleanup();

@@ -106,9 +106,10 @@ export function useExpired(expiresAt: string | null | undefined) {
 
 /**
  * One card for every request an agent makes in the conversation, so each reads the same way and its decision
- * sits in the same place: a quiet header (what kind of request, and whether it waits for you), the agent's own
- * words, the object in a well of two lines with "Ver …" opening it whole, anything to fill in, and the footer
- * strip with the decision on the left and the time left on the right.
+ * sits in the same place: a quiet header (what kind of request, and who else it waits for), the agent's own
+ * words, what will happen drawn edge to edge (its preview, as an attachment's cover), the object on a line of its own between
+ * hairlines with "Ver …" opening it whole, anything to fill in, and the footer strip with the decision on the left and
+ * the time left on the right. One surface: nothing inside has a background of its own.
  *
  * While it waits for the viewer it registers with its conversation (`AskRegistryProvider`), so the bar above the
  * composer can say it waits while it is out of view; `data-ask-id` lets "Ver" find it and bring it back.
@@ -123,6 +124,7 @@ export function RequestCard({
   who,
   source,
   lead,
+  preview,
   object,
   details,
   open: openProp,
@@ -150,6 +152,11 @@ export function RequestCard({
   source?: ReactNode;
   /** The agent's own words: what it asks. */
   lead: ReactNode;
+  /**
+   * What will happen, drawn edge to edge between hairlines above the object's line (an email as it will go out, an
+   * action's values): its start, fading at the foot. "Ver …" replaces it with the whole thing.
+   */
+  preview?: ReactNode;
   /** The thing it is about, in two lines with a logo; `more` labels the button that opens `details`. */
   object?: { logo: ReactNode; title: ReactNode; detail?: ReactNode; more?: string };
   /** What "Ver …" opens: the whole action (an email as the email), the change, where it came from. */
@@ -219,16 +226,11 @@ export function RequestCard({
           {askKindWords(t, kind, Boolean(mine))}
           {source && <span className="rq__source"> · {source}</span>}
         </span>
-        {mine ? (
-          <span className="rq__state">
-            <WaitMark />
-            {t("ask.waitingYou")}
-          </span>
-        ) : (
-          waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>
-        )}
+        {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
+        {!mine && waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>}
       </div>
       <p className="rq__lead">{lead}</p>
+      {preview && !(open && details) && <div className="rq__preview">{preview}</div>}
       {object && (
         <div className="rq__well">
           <span className="rq__logo">{object.logo}</span>

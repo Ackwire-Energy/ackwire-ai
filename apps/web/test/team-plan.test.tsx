@@ -140,7 +140,7 @@ describe("the team card", () => {
   test("each agent with its channel (new ones marked), the routines, the skills and what waits", async () => {
     await openDm(lodiDm());
     const card = teamCard();
-    expect(card.textContent).toContain("esperando você");
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
     expect(card.textContent).toContain("3 agentes para a Acme, cada um no seu canal.");
     expect(card.textContent).toContain("Responde os clientes no WhatsApp e no e-mail.");
     expect(card.textContent).toContain("atendimentonovo");

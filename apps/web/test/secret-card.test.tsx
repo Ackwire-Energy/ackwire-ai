@@ -71,10 +71,10 @@ describe("secret requests (ADR 0027)", () => {
     const pair = await generateSecretKeyPair();
     const { state, secretRequest } = await withRequest("u-walter", pair.publicKey);
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    // The request card: what kind of request, that it waits for you, and the secret it names.
+    // The request card: what kind of request and the secret it names (waiting for me needs no words).
     expect(card.getAttribute("data-ask-kind")).toBe("secret");
     expect(card.textContent).toContain("Pede um segredo");
-    expect(card.textContent).toContain("esperando você");
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
     expect(card.textContent).toContain("publicar o pacote no npm");
     expect(card.textContent).not.toContain("NPM_TOKEN");
     expect(card.textContent).toContain("Chave para o computador de Ada");

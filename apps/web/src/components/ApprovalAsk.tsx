@@ -15,6 +15,7 @@ import {
   approvalGroupWaitsFor,
   approvalSummary,
   approvalTitle,
+  approvalValues,
   approvalWaitsFor,
   decisionOutcome,
   requesterDecidesLine,
@@ -41,8 +42,9 @@ import { RequestCard, RequestFuse, useExpired } from "./RequestCard";
 const DAY_MS = 24 * 3_600_000;
 
 /**
- * An approval waiting in the conversation, as a request card: the agent's words, the exact action in the well
- * with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it whole (with where it came from), then Approve
+ * An approval waiting in the conversation, as a request card: the agent's words, what will happen drawn as an
+ * attachment's cover (the email as it will go out, the action's values), the exact action on its line with the app's
+ * mark, "Ver o e-mail" / "Ver detalhes" opening it whole in the preview's place (with where it came from), then Approve
  * (held for high risk), "Aprovar sempre" where offered (what it covers on a line under the buttons) and "Agora não"
  * (which asks why, kept as a lesson), in one row under the text, and the fuse to its expiry. Who can't decide sees who it waits for.
  */
@@ -77,9 +79,12 @@ export function ApprovalAsk({
   const requester = requesterDecidesLine(t, approval);
   const title = approvalTitle(t, approval);
   const email = approval.email;
-  // A connector's detail is its raw call (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
-  const detail = email
-    ? [email.to.join(", "), email.subject].filter(Boolean).join(" · ")
+  const preview = <ApprovalPreview approval={approval} />;
+  const previewed = Boolean(email) || approvalValues(approval, { max: PREVIEW_VALUES }).length > 0;
+  // What the preview already shows isn't said again on the action's line. A connector's detail is its raw call
+  // (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
+  const detail = previewed
+    ? undefined
     : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
   return (
     <RequestCard
@@ -91,6 +96,7 @@ export function ApprovalAsk({
       mine={approval.canDecide}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
       lead={why ?? approvalAskLine(t, approval.canDecide)}
+      preview={previewed ? preview : undefined}
       object={{
         logo: <ConnectorMark approval={approval} />,
         title,
@@ -134,6 +140,38 @@ export function ApprovalAsk({
   );
 }
 
+/** At most this many of an action's values on its preview (all of them under "Ver detalhes"). */
+const PREVIEW_VALUES = 6;
+
+/**
+ * What an approval will do, drawn as an attachment's cover: an email as it will go out (its subject, to whom, its
+ * words), or the action's values, each label above its value (never beside it). Nothing to draw: null.
+ */
+function ApprovalPreview({ approval }: { approval: Approval }) {
+  const { t, i18n } = useTranslation();
+  const email = approval.email;
+  if (email)
+    return (
+      <div className="rq-mail">
+        <b className="rq-mail__subject">{email.subject || t("approval.email.noSubject")}</b>
+        <span className="rq-mail__to">{email.to.join(", ")}</span>
+        {email.body && <p className="rq-mail__body">{email.body}</p>}
+      </div>
+    );
+  const values = approvalValues(approval, { max: PREVIEW_VALUES, locale: i18n.language });
+  if (values.length === 0) return null;
+  return (
+    <dl className="rq-facts">
+      {values.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** "3 pedidos de Ada para Executar sql": a run of requests, said as one. */
 const runHead = (t: TFunction, run: Approval[], agent: Agent | undefined) =>
   t("approval.run.head", {
@@ -145,8 +183,8 @@ const runHead = (t: TFunction, run: Approval[], agent: Agent | undefined) =>
 /**
  * Several requests of one agent in one conversation, on one card (the server joins them: `openApprovalCard`).
  * Waiting requests of one kind in a row fold into one run (`approvalRuns`) with "Aprovar todos" and "Ver cada um";
- * a card that is one run is that run, its buttons in the footer. Otherwise each item (or run) has its values and its
- * own buttons in a row under them, decided ones folded into the list with how they ended, and "Aprovar tudo" /
+ * a card that is one run is that run, its buttons in the footer. Otherwise each item (or run) is one row: its values
+ * and its own buttons at the row's right end, decided ones folded into the list with how they ended, and "Aprovar tudo" /
  * "Agora não para todos" over the ones listed now in the footer, with the earliest deadline's fuse. Someone who may
  * decide only some reads that "Aprovar tudo" covers only those.
  */
@@ -324,10 +362,10 @@ function RunItem({
         </span>
         <span className="rq__wt">
           <b>{runHead(t, run, agent)}</b>
+          <button type="button" className="rq__more" aria-expanded={open} onClick={() => onOpenChange(!open)}>
+            {t("approval.run.show")}
+          </button>
         </span>
-        <button type="button" className="rq__more" aria-expanded={open} onClick={() => onOpenChange(!open)}>
-          {t("approval.run.show")}
-        </button>
       </div>
       <div className="rq__item-acts">
         <RunActions run={run} items={items} always={always} agent={agent} />
@@ -338,9 +376,9 @@ function RunItem({
 }
 
 /**
- * One request on a shared card: its values (and its own why and origin where they differ from the card's lead) across
- * the item, then its own decision in a row under them while it waits ("Aprovar sempre" on the first of its kind), or
- * how it ended once decided.
+ * One request on a shared card, one row: its values (and its own why and origin where they differ from the card's lead)
+ * with "Ver detalhes" under them, and its own decision at the row's right end while it waits ("Aprovar sempre" on the
+ * first of its kind), or how it ended once decided.
  */
 function GroupItem({
   approval,
@@ -386,10 +424,11 @@ function GroupItem({
               {t(ahead === "asking" ? "approval.ahead.line" : "approval.ahead.scheduled", { when: runAt })}
             </small>
           )}
+          {/* Under its words: the row's right end holds its decision. */}
+          <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {email ? t("approval.seeEmail") : t("approval.seeDetails")}
+          </button>
         </span>
-        <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {email ? t("approval.seeEmail") : t("approval.seeDetails")}
-        </button>
       </div>
       {pending ? (
         approval.canDecide &&
