@@ -750,6 +750,8 @@ const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
   "readingWiki",
   "consultingSkill",
   "openingSkill",
+  "readingConversation",
+  "readingDashboards",
 ]);
 
 /** A step running this long is no quick read: its card stays. */

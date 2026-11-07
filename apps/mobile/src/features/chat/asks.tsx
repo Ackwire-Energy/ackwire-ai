@@ -15,6 +15,7 @@ import {
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
 import { entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
+import { askKindWords } from "@agenteschat/client/lib/approval-words";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
@@ -493,7 +494,7 @@ export function AskCard({
           <View style={styles.head}>
             <Icon name={ASK_ICON[kind]} size={13} color={waitsFor === "you" ? c.amber : c.muted} />
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
-              {t(`ask.kind.${kind}`)}
+              {askKindWords(t, kind, waitsFor === "you")}
             </Text>
             {waitsFor === "you" ? (
               expiry

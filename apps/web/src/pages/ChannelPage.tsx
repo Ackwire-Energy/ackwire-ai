@@ -137,7 +137,7 @@ import {
 import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
-import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { can, leavesChannel, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
@@ -285,6 +285,7 @@ import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
 import { InviteOfferRow, useInviteDialog, useInviteOffer } from "@/components/invite/InviteDialog";
+import { useLeaveChannelWithUndo } from "@/components/LeaveChannelDialog";
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
@@ -4777,6 +4778,7 @@ function ChannelDetails({
   const categories = useChannelCategories(org.id);
   const place = usePlaceChannel(org.id);
   const archive = useArchiveChannelWithUndo();
+  const leaving = useLeaveChannelWithUndo();
   // Name: saved on blur or Enter, like the description.
   const [name, setName] = useState(channel.name);
   const [nameError, setNameError] = useState<string | undefined>();
@@ -5094,6 +5096,17 @@ function ChannelDetails({
               </ul>
               {channel.name !== "general" && (
                 <div className="channel-settings__danger">
+                  {channel.isMember && (
+                    <Button
+                      variant="ghost"
+                      icon="arrowRight"
+                      className="channel-details__archive"
+                      loading={leaving.pending}
+                      onClick={() => leaving.run(channel, () => onOpenChange(false))}
+                    >
+                      {t("channel.leave")}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     icon="archive"
@@ -5176,7 +5189,18 @@ function ChannelDetails({
         ) : (
           <>
             {membersList}
-            <DialogFooter note={t("channelMembers.readOnly")} />
+            <DialogFooter note={t("channelMembers.readOnly")}>
+              {leavesChannel(channel) && (
+                <Button
+                  variant="ghost"
+                  icon="arrowRight"
+                  loading={leaving.pending}
+                  onClick={() => leaving.run(channel, () => onOpenChange(false))}
+                >
+                  {t("channel.leave")}
+                </Button>
+              )}
+            </DialogFooter>
           </>
         )}
       </Dialog>

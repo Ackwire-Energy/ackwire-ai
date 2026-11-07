@@ -5996,6 +5996,8 @@ export interface NotificationLatest {
   text?: string;
   /** The latest message was a GIF or a sticker (ADR 0091): with no `text`, the card names what it was. */
   media?: MediaKind;
+  /** A body the server wrote: `text` in the reader's language by `latestText`. */
+  meta?: PreviewMeta;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
   /** Reactions: distinct emojis (≤ 5) and my message's snippet. */

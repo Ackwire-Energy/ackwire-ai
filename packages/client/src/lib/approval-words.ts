@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "../api/types";
+import { serviceKey } from "./activity";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
 import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
@@ -25,40 +26,104 @@ const OWN_TITLES = new Set([
   "request_permission",
   "delete_branches",
   BRANCH_PUSH,
+  "vault_make_password",
 ]);
 
+/** GitHub's actions whose server title says what they touch (engine `connectors/catalog.ts`), by their own name. */
+const GITHUB_TITLES = new Set(["merge_pull_request", "pull_request_review_write", "actions_run_trigger"]);
+
+/** What `request_approval` was asked for (mission tools): `approval.titles.request_approval.*`. */
+const ASKED_ACTIONS = new Set(["merge", "deploy", "rollback"]);
+
+/** A connection's tools start with its id, or its name in a word: "Slack (Acme): Send" → `slack`, `slack_2`. */
+function connectionPrefix(approval: Pick<Approval, "title"> & Partial<Pick<Approval, "connector">>) {
+  const named = serviceKey(approval.title.split(": ")[0] ?? "").replace(/[^a-z0-9_]/g, "");
+  return approval.connector && approval.connector !== "custom" ? approval.connector : named;
+}
+
+/** The tool's own name, without what its connection adds: `slack_2_SLACK_SEND_MESSAGE` → `SEND_MESSAGE`. */
+function ownToolName(approval: Pick<Approval, "tool" | "title"> & Partial<Pick<Approval, "connector">>) {
+  const prefix = connectionPrefix(approval);
+  return prefix ? approval.tool.replace(new RegExp(`^(?:${prefix}(?:_\\d+)?_)+`, "i"), "") : approval.tool;
+}
+
+const say = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+
 /**
- * The approval's title: in the person's language for the app's own tools, for email ("Salvar um
- * rascunho de resposta para…") and for a connector tool that runs another by name ("Ver stack trace do
- * evento", not "Sentry: Execute sentry tool"), else the server's (connector) title.
+ * The approval's title, in the person's language: the app's own tools, email ("Salvar um rascunho de resposta
+ * para…"), a connector tool that runs another by name ("Ver stack trace do evento", not "Sentry: Execute sentry
+ * tool"), GitHub's sensitive actions and what a mission asks by name, then the action or the tool in words. The server's
+ * title stays only for a tool whose name holds no verb: there it is the one name the tool has.
  */
-export function approvalTitle(
-  t: TFunction,
-  approval: Pick<Approval, "tool" | "title" | "params" | "email"> & Partial<Pick<Approval, "connector">>,
-): string {
+export const approvalTitle = (t: TFunction, approval: TitledApproval): string =>
+  wordedTitle(t, approval) ?? approval.title;
+
+type TitledApproval = Pick<Approval, "tool" | "title" | "params" | "email"> &
+  Partial<Pick<Approval, "connector" | "scope">>;
+
+function wordedTitle(t: TFunction, approval: TitledApproval): string | null {
   if (approval.email) {
     const words = emailTitleWords(approval.email);
     return (t as unknown as Tt)(words.key, words.values);
   }
   const inner = innerTool(approval);
   if (inner) return toolName(t, partsOf(inner), inner);
-  // A server title that is only the tool's own name ("GitHub: add_issue_comment") reads as the tool in words.
-  if (!OWN_TITLES.has(approval.tool))
-    return rawToolTitle(approval) ? toolName(t, partsOf(approval.tool), approval.tool) : approval.title;
   const p = approval.params ?? {};
-  const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
-  return t(`approval.titles.${approval.tool}`, {
-    language: s(p.language),
-    path: s(p.path),
-    skill: s(p.skill),
-    channel: s(p.channel).replace(/^#/, ""),
-    permission: permissionLabel(t, s(p.permission), approval.title),
-    repo: s(p.repo),
-    branch: s(p.branch),
-    ...(Array.isArray(p.branches) ? { count: p.branches.length } : {}),
-    defaultValue: approval.title,
-  });
+  if (OWN_TITLES.has(approval.tool))
+    return t(`approval.titles.${approval.tool}`, {
+      language: say(p.language),
+      path: say(p.path),
+      skill: say(p.skill),
+      channel: say(p.channel).replace(/^#/, ""),
+      permission: permissionLabel(t, say(p.permission), approval.title),
+      repo: say(p.repo),
+      branch: say(p.branch),
+      ...(Array.isArray(p.branches) ? { count: p.branches.length } : {}),
+      defaultValue: approval.title,
+    });
+  if (approval.tool === "request_approval") {
+    const action = ASKED_ACTIONS.has(say(p.action)) ? say(p.action) : "other";
+    return t(`approval.titles.request_approval.${action}`, { target: say(p.target), defaultValue: approval.title });
+  }
+  const own = ownToolName(approval);
+  if (GITHUB_TITLES.has(own) && p.owner && p.repo)
+    return t(`approval.titles.github.${own}`, {
+      number: say(p.pullNumber),
+      method: say(p.method),
+      repo: `${say(p.owner)}/${say(p.repo)}`,
+      defaultValue: approval.title,
+    });
+  // A database's question: the server's title is the connection's name after "Query".
+  if (/^pg_[a-z0-9_]+_query$/.test(approval.tool))
+    return t("approval.titles.pg_query", { target: approval.title.replace(/^Query /, "") });
+  // Composio's executor: the server's title lists the actions it would run ("Slack: SLACK_SEND_MESSAGE, …").
+  const said = approval.title.slice(approval.title.indexOf(": ") + 2);
+  if (/^[A-Z0-9_]+(, [A-Z0-9_]+)*$/.test(said))
+    return said
+      .split(", ")
+      .map((slug) => actionName(t, slug))
+      .join(", ");
+  const parts = partsOf(own);
+  // The action is guessed from any word of the name: a read that names one ("list_merge_requests") is still a read.
+  const action = approvalAction({ tool: approval.tool, scope: approval.scope ?? "" });
+  if (action !== "other" && !(parts.verb && READ_VERBS.has(parts.verb))) return t(`approval.titles.action.${action}`);
+  return parts.verb ? toolName(t, parts, own) : null;
 }
+
+/**
+ * A request card's kind line: what's waiting on this person says so, anyone else reads it in words with no "you"
+ * (`ask.kindOther`, where the kind's own words have one).
+ */
+export const askKindWords = (t: TFunction, kind: string, mine: boolean) =>
+  (t as unknown as (keys: string[]) => string)(
+    mine ? [`ask.kind.${kind}`] : [`ask.kindOther.${kind}`, `ask.kind.${kind}`],
+  );
+
+/** What a card with no why of its own leads with, as the agent asking: of this person only when it waits on them. */
+export const approvalAskLine = (t: TFunction, mine: boolean, count?: number) =>
+  count === undefined
+    ? t(mine ? "approval.askPlain" : "approval.askPlainOther")
+    : t(mine ? "approval.askMany" : "approval.askManyOther", { count });
 
 /** What `request_permission` asks to turn on: a built-in scope in the person's language, a connector by its name. */
 function permissionLabel(t: TFunction, permission: string, title: string) {
@@ -86,12 +151,6 @@ const READ_VERBS = new Set([
   "lookup",
 ]);
 
-/** The title is the tool's identifier, bare or after the connector's name ("GitHub: add_issue_comment"). */
-function rawToolTitle(approval: Pick<Approval, "tool" | "title">) {
-  const title = approval.title.trim();
-  return /^[a-z][a-z0-9_]*$/i.test(approval.tool) && (title === approval.tool || title.endsWith(`: ${approval.tool}`));
-}
-
 /** A connector tool that runs another one by name (`{ name, arguments }`): that tool's name, when it reads as one. */
 function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "connector">>): string | null {
   const name = approval.params?.name;
@@ -100,26 +159,16 @@ function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "
 }
 
 /**
- * What it will do, said after "Ada quer …", always in the person's language: the inner tool's readable name
- * ("ver stack trace do evento"), the app's own titles and an email's, the known actions ("fazer um deploy"), else the tool's
- * own name in words. The server's title (English, "Sentry: Execute sentry tool") stays out of the sentence.
+ * What it will do, said after "Ada quer …": the title's own words (`approvalTitle`) with a lower-case start, never the
+ * server's English: a tool with no verb in its name goes by that name.
  */
 export function approvalDoing(
   t: TFunction,
   approval: Pick<Approval, "tool" | "title" | "params" | "connector" | "scope" | "email">,
   locale: string,
 ) {
-  const inner = innerTool(approval);
-  const action = approvalAction(approval);
-  const text = inner
-    ? toolName(t, partsOf(inner), inner)
-    : approval.email || OWN_TITLES.has(approval.tool)
-      ? approvalTitle(t, approval)
-      : action !== "other"
-        ? t(`notifications.wait.doing.${action}`)
-        : toolName(t, partsOf(approval.tool), approval.tool);
   // "Ver …" → "ver …"; an acronym ("PR #42") stays.
-  return lowerFirst(text, locale);
+  return lowerFirst(wordedTitle(t, approval) ?? toolName(t, partsOf(approval.tool), approval.tool), locale);
 }
 
 /** It only looks: asked under a read scope, or its tool's name starts with a reading verb. */

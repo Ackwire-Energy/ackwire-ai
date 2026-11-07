@@ -66,7 +66,7 @@ describe("approvals waiting for you", () => {
     await go(state);
     const group = screen().getByRole("group", { name: "Aprovações esperando você" });
     expect(group.textContent).toContain("O merge da Ada espera você.");
-    expect(group.textContent).toContain("Merge PR #42 into main");
+    expect(group.textContent).toContain("Fazer um merge");
     await click(within(group).getByRole("button", { name: "Aprovar merge" }));
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args.slice(0, 2)).toEqual([ORG_ID, "ap-merge"]);
     expect(state.calls.find((c) => c.method === "via")?.args).toEqual(["m-card"]);

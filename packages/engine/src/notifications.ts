@@ -21,6 +21,7 @@ import { decidableBySql } from "./approvals";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { cutText } from "./format";
+import type { PreviewMeta } from "./message-preview";
 import { noticeOn, noticePrefsOf, readNoticePrefs } from "./notice-prefs";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
@@ -283,6 +284,8 @@ export interface NotificationLatest {
   text?: string;
   /** A message with only a GIF or a sticker (ADR 0091), or a voice message (ADR 0100): which one, so the apps say it in the person's language. */
   media?: "gif" | "sticker" | "voice";
+  /** A body the server wrote (`previewMeta`): `text` is its English, the apps say it in the reader's language. */
+  meta?: PreviewMeta;
   title?: string;
   emojis?: string[];
   quote?: string;

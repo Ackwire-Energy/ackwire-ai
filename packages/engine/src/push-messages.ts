@@ -78,9 +78,10 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // Asked by a routine while nobody watched: its name leads, so the person knows where it comes from.
       const routine = input.routine?.trim();
       const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);
-      if (input.highRisk)
-        return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(what || s.approvalBody, 120))));
-      return out(s.approvalTitle(actor), from(what || s.approvalBody));
+      // Its title is the tool's, in English: the apps word it (`approvalTitle`), a push in another language can't.
+      const asked = locale === "en" ? what : "";
+      if (input.highRisk && asked) return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(asked, 120))));
+      return out(s.approvalTitle(actor), from(asked || s.approvalBody));
     }
     case "agent_question":
       return out(s.questionTitle(actor), text || s.questionBody);

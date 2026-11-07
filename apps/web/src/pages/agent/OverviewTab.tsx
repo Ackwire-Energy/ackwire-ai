@@ -52,7 +52,7 @@ export function OverviewTab() {
                   <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
                   <span>{decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}</span>
                 </span>
-                <span className="agp-attn__tail ac-captop">
+                <span className="agp-attn__tail">
                   <Button asChild size="sm">
                     <Link to="/org/$orgId/approvals" params={{ orgId: org.id }}>
                       {t("agentPage.overview.seeApprovals")}
@@ -77,7 +77,7 @@ export function OverviewTab() {
                         : t("proposals.waitingAdmin")}
                   </span>
                 </span>
-                <span className="agp-attn__tail ac-captop">
+                <span className="agp-attn__tail">
                   <Button size="sm" onClick={() => goTo("memory")}>
                     {t("agentPage.overview.review")}
                   </Button>

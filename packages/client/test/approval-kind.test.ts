@@ -11,6 +11,8 @@ import {
   actionName,
   aheadEndLine,
   alwaysRoutineName,
+  approvalAskLine,
+  approvalDoing,
   approvalGroupWaitsFor,
   approvalRuleServer,
   approvalRuleWords,
@@ -21,6 +23,7 @@ import {
   approveAlwaysHint,
   approveAlwaysLabel,
   approveAlwaysWords,
+  askKindWords,
   ownActionName,
   requesterDecidesLine,
 } from "../src/lib/approval-words";
@@ -189,7 +192,7 @@ describe("an approval's values", () => {
 describe("an approval's title", () => {
   const lang = (lng: string) => {
     const instance = i18next.createInstance();
-    void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+    void instance.init({ lng, fallbackLng: "en", resources, initAsync: false, interpolation: { escapeValue: false } });
     return instance.t;
   };
   const pt = lang("pt-BR");
@@ -204,12 +207,56 @@ describe("an approval's title", () => {
     expect(approvalTitle(en, { ...comment, title: "GitHub: add_issue_comment" })).toBe("Add issue comments");
   });
 
-  test("a real title stays as the server wrote it", () => {
+  test("a catalog action says what it touches in the person's words", () => {
+    const merge = { tool: "github_merge_pull_request", connector: "github", email: null };
+    const params = { pullNumber: 42, owner: "acme", repo: "app" };
+    expect(approvalTitle(pt, { ...merge, title: "Merge PR #42 in acme/app", params })).toBe(
+      "Fazer merge do PR #42 em acme/app",
+    );
     expect(
-      approvalTitle(pt, { tool: "merge_pull_request", title: "Merge PR #42 into main", params: {}, email: null }),
-    ).toBe("Merge PR #42 into main");
-    // Another tool's name after the connector isn't this tool's identifier.
-    expect(approvalTitle(pt, { ...comment, title: "GitHub: comment" })).toBe("GitHub: comment");
+      approvalTitle(pt, {
+        tool: "github_actions_run_trigger",
+        connector: "github",
+        email: null,
+        title: "Run deploy in acme/app",
+        params: { method: "deploy", owner: "acme", repo: "app" },
+      }),
+    ).toBe("Rodar deploy em acme/app");
+  });
+
+  test("what the server named in English reads in the person's words", () => {
+    const title = (tool: string, title: string, params = {}, connector: string | null = null) =>
+      approvalTitle(pt, { tool, title, params, email: null, connector });
+    expect(title("request_approval", "Roll back prod", { action: "rollback", target: "prod" })).toBe("Reverter prod");
+    expect(title("vault_make_password", "Make a password")).toBe("Criar uma senha");
+    expect(title("pg_analytics_query", "Query Analytics · prod")).toBe("Consultar Analytics · prod");
+    expect(title("slack_send_message", "Slack: Send message", {}, "custom")).toBe("Enviar uma mensagem para fora");
+    expect(title("slack_2_list_channels", "Slack (Acme): List channels", {}, "custom")).toBe("Listar canais");
+    expect(
+      title("crm_COMPOSIO_MULTI_EXECUTE_TOOL", "CRM: GITHUB_CREATE_AN_ISSUE, SLACK_LIST_CHANNELS", {}, "custom"),
+    ).toBe("Criar issue (Github), Listar canais (Slack)");
+  });
+
+  test("a read that names an action reads as the read, never as doing it", () => {
+    const title = (tool: string, label: string) =>
+      approvalTitle(pt, { tool, title: label, params: {}, email: null, connector: "custom" });
+    expect(title("gitlab_list_merge_requests", "GitLab: List merge requests")).not.toBe("Fazer um merge");
+    expect(title("gitlab_list_merge_requests", "GitLab: List merge requests")).toStartWith("Listar");
+    expect(title("hubspot_get_email_stats", "HubSpot: Get email stats")).toStartWith("Ver");
+    expect(title("gitlab_merge_request_merge", "GitLab: Merge")).toBe("Fazer um merge");
+  });
+
+  test("a tool with no verb in its name keeps the one name it has, off the sentence", () => {
+    const quirky = {
+      tool: "acme_widgets",
+      title: "Acme: Widgets",
+      params: {},
+      email: null,
+      connector: "custom",
+      scope: "x",
+    };
+    expect(approvalTitle(pt, quirky)).toBe("Acme: Widgets");
+    expect(approvalDoing(pt, quirky as never, "pt-BR")).toBe("acme widgets");
   });
 });
 
@@ -335,5 +382,21 @@ describe('"Sempre nesta rotina" on a routine\'s card', () => {
     expect(approveAlwaysOffered({ ...card, status: "approved" })).toBe(false);
     // Plain "Aprovar sempre" keeps its rule: what is high risk is never approved for good.
     expect(approveAlwaysOffered({ ...card, approveAlways: { tool: "t", actions: [] } })).toBe(false);
+  });
+});
+
+describe("a request as someone it isn't waiting on reads it", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const t = instance.t;
+
+  test("its kind and lead have no 'you'; a kind with no 'you' in it keeps its words", () => {
+    expect(askKindWords(t, "approval", true)).toBe("Pede sua aprovação");
+    expect(askKindWords(t, "approval", false)).toBe("Pede aprovação");
+    expect(askKindWords(t, "browser", false)).toBe("Precisa de alguém no navegador");
+    expect(askKindWords(t, "secret", false)).toBe("Pede um segredo");
+    expect(approvalAskLine(t, true)).toBe("Preciso do seu ok para seguir:");
+    expect(approvalAskLine(t, false)).toBe("Preciso de um ok para seguir:");
+    expect(approvalAskLine(t, false, 3)).toBe("Preciso de um ok para seguir com estes 3:");
   });
 });

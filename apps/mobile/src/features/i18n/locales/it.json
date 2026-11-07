@@ -462,8 +462,6 @@
     "camera": "Fotocamera",
     "photos": "Foto",
     "file": "File",
-    "audio": "Audio",
-    "audioSoon": "L'audio arriva presto.",
     "noCamera": "Nessun accesso alla fotocamera. Consentilo nelle Impostazioni del telefono.",
     "mission": "Avvia una missione",
     "missionHint": "Un lavoro lungo, con un piano, dall'inizio alla fine",

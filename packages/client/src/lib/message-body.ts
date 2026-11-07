@@ -209,3 +209,7 @@ export function previewBody(t: TFunction, text: string, meta: Meta | null, media
   }
   return previewOf(meta ? serverBody(t, text, meta) : text);
 }
+
+/** A message notification's snippet: a body the server wrote in the reader's language, else its text as it came. */
+export const latestText = (t: TFunction, l: { text?: string; meta?: Meta | null }) =>
+  l.text && l.meta ? previewBody(t, l.text, l.meta) : l.text;

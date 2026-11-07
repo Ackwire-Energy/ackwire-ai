@@ -903,6 +903,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       place: (orgId, channelId, input) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      leave: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/leave`, { json: {} }),
       card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       messageCard: (orgId, messageId) => request<MessageCard>(`${org(orgId)}/messages/${enc(messageId)}/card`),
       update: (orgId, channelId, input) =>

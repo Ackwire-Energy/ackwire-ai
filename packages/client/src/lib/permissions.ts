@@ -110,3 +110,7 @@ export const undoesMemoryChange = (
 ) =>
   editsMemory(agent, meId, org) ||
   (!!meId && update.requestedByUserId === meId && (!sentAt || now - new Date(sentAt).getTime() < UNDO_WINDOW_MS));
+
+/** I may leave this channel: I'm in it, and it isn't #general, where everyone stays. */
+export const leavesChannel = (channel: { isMember?: boolean; name: string }) =>
+  channel.isMember === true && channel.name !== "general";

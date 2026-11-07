@@ -6,7 +6,7 @@ import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
-import { previewMediaKind, readableBody } from "./message-preview";
+import { previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { isAgentOnlyNotice } from "./notices";
 import {
   dropRunFailure,
@@ -160,10 +160,14 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (channel.kind === "task") return notifyTaskMessage(deps, message);
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
-  const text = notificationSnippet(readableBody(await quotedBody(deps, orgId, message), meta));
+  // A reminder's own words, without the English prefix the chat replaces with its own label.
+  const said = typeof meta.reminderText === "string" ? meta.reminderText : await quotedBody(deps, orgId, message);
+  const text = notificationSnippet(readableBody(said, meta));
   // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
   const media = previewMediaKind(message.body, meta);
-  const latest = media ? { text, media } : { text };
+  // A body the server wrote: the apps say it in the reader's language, as the conversation lists do.
+  const written = previewMeta(meta);
+  const latest = { text, ...(media ? { media } : {}), ...(written ? { meta: written } : {}) };
   const label = channel.kind === "channel" ? channel.name : undefined;
   const where: NotificationSource = {
     channelId: message.channelId,
@@ -224,10 +228,10 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   }
 
   // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself,
-  // answered above for the person behind them, except a message the agent started there on someone's behalf,
-  // `send_dm`).
+  // answered above for the person behind them, except what nobody is waiting on: a message the agent started there on
+  // someone's behalf, `send_dm`, and a reminder or a routine's report, which come while the app may be closed).
   if (channel.kind === "dm") {
-    if (message.authorType !== "person" && !meta.agentDm) return;
+    if (message.authorType !== "person" && !meta.agentDm && !meta.routine && !meta.viaRoutine) return;
     const others = await db
       .select({ userId: channelMembers.userId })
       .from(channelMembers)

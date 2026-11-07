@@ -447,8 +447,6 @@
     "camera": "Camera",
     "photos": "Foto's",
     "file": "Bestand",
-    "audio": "Audio",
-    "audioSoon": "Audio komt binnenkort.",
     "noCamera": "Geen toegang tot de camera. Sta het toe in de Instellingen van de telefoon.",
     "mission": "Een missie starten",
     "missionHint": "Lang werk, met een plan, van begin tot eind",

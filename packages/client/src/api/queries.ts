@@ -2926,6 +2926,16 @@ export function useArchiveChannel(orgId: string) {
   });
 }
 
+/** "Sair do canal": it leaves my list, or stays in it to join again when it is public. */
+export function useLeaveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.leave(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 /** "Apagar canal" (owners and admins): `name` as the person typed it. */
 export function useDeleteChannel(orgId: string) {
   const api = useApi();

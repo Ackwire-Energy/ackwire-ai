@@ -12,6 +12,7 @@ import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
+import { latestText } from "@agenteschat/client/lib/message-body";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -472,7 +473,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
   };
   // A GIF or a sticker with no words says which (ADR 0091).
-  const line = subtitleOf(n, say, (kind) => mediaWord(t, kind));
+  const line = subtitleOf(
+    n,
+    say,
+    (kind) => mediaWord(t, kind),
+    (l) => latestText(t, l),
+  );
   const sub = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
     : n.kind === "usage_limit"

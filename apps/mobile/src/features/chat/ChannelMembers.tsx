@@ -1,16 +1,19 @@
 import {
   type AiRouting,
+  type Channel,
   keys,
   type RosterMember,
   useAiStatus,
   useApi,
   useChannels,
+  useLeaveChannel,
+  useMuteChannel,
   useRoster,
 } from "@agenteschat/client";
 import { listsAgent, opensDetails } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { can, leavesChannel, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { joinsChannels } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -177,12 +180,81 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
           ]}
         />
       ) : null}
+      {channel?.isMember ? <ChannelOwnActions channel={channel} /> : null}
       {editable ? null : (
         <Text variant="caption" tone="faint" style={styles.note}>
           {t("channelMembers.readOnly")}
         </Text>
       )}
     </>
+  );
+}
+
+/**
+ * What I do about a channel for myself, as the web's channel menu: mute it, and leave it. A public one goes at once;
+ * a private one asks first, since only someone in it can bring me back, and the last person out archives it.
+ */
+function ChannelOwnActions({ channel }: { channel: Channel }) {
+  const { t, i18n } = useTranslation();
+  const orgId = useOrgId();
+  const sheet = useSheet();
+  const toast = useToast();
+  const mute = useMuteChannel(orgId);
+  const leave = useLeaveChannel(orgId);
+  const roster = useRoster(orgId, channel.id);
+  const failed = (e: unknown) => toast({ title: errorText(t, e, i18n.language), icon: "x" });
+  const go = () =>
+    leave.mutate(channel.id, {
+      onSuccess: () => {
+        successHaptic();
+        sheet.close();
+        toast({ title: t("channel.left", { channel: channel.name }), icon: "check" });
+        router.back();
+      },
+      onError: failed,
+    });
+  const ask = () => {
+    if (channel.visibility !== "private") return go();
+    const alone = (roster.data ?? []).filter((m) => m.type !== "agent").length === 1;
+    Alert.alert(
+      t("channel.leaveTitle", { channel: channel.name }),
+      t(alone ? "channel.leaveLast" : "channel.leavePrivate"),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t(alone ? "channel.leaveLastConfirm" : "channel.leaveConfirm"),
+          style: "destructive",
+          onPress: go,
+        },
+      ],
+    );
+  };
+  return (
+    <ActionList
+      items={[
+        {
+          key: "mute",
+          icon: channel.muted ? "sound" : "mute",
+          label: t(channel.muted ? "contextMenu.unmuteChannel" : "contextMenu.muteChannel"),
+          onPress: () => {
+            tapHaptic();
+            mute.mutate({ channelId: channel.id, muted: !channel.muted }, { onError: failed });
+          },
+        },
+        ...(leavesChannel(channel)
+          ? [
+              {
+                key: "leave",
+                icon: "out" as const,
+                label: t("channel.leave"),
+                danger: true,
+                disabled: leave.isPending,
+                onPress: ask,
+              },
+            ]
+          : []),
+      ]}
+    />
   );
 }
 

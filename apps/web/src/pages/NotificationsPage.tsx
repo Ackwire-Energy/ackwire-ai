@@ -23,6 +23,7 @@ import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import { plainLine } from "@agenteschat/client/lib/markdown";
 import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
+import { latestText } from "@agenteschat/client/lib/message-body";
 import {
   allItems,
   askersOf,
@@ -675,7 +676,7 @@ function Row({
           ? sayWords(t, why, l.text ?? "")
           : media === "voice"
             ? mediaWord(t, media)
-            : l.text || (media ? mediaWord(t, media) : l.text);
+            : latestText(t, l) || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -1473,7 +1474,7 @@ export function NotificationsPage() {
       title,
       "info",
       { label: t("notifications.toast.undo"), run: () => action.mutate({ type: "snooze", item: n, until: null }) },
-      n.latest.title ?? n.latest.text ?? n.latest.quote ?? "",
+      n.latest.title ?? latestText(t, n.latest) ?? n.latest.quote ?? "",
     );
   };
 

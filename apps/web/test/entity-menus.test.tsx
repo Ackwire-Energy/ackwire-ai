@@ -65,6 +65,7 @@ describe("a channel", () => {
       "Fixar no topo",
       "Nova categoria com este canal",
       "Copiar link",
+      "Sair do canal",
       "Arquivar canal",
     ]);
     await pick("Marcar como lida");
@@ -75,14 +76,48 @@ describe("a channel", () => {
     await go();
     await rightClick(sidebarLink("general"));
     expect(items()).not.toContain("Arquivar canal");
+    expect(items()).not.toContain("Sair do canal");
     await pick("Copiar link");
     expect(copied.at(-1)).toMatch(new RegExp(`/org/${ORG_ID}/c/`));
+  });
+
+  test("Sair do canal: a public channel goes at once, with Desfazer, and off its page", async () => {
+    const state = seedState();
+    const { router } = await go(`c/${ENG_ID}`, state);
+    await rightClick(sidebarLink("eng"));
+    await pick("Sair do canal");
+    expect(state.calls.some((c) => c.method === "chat.leave" && c.args[1] === ENG_ID)).toBe(true);
+    expect(router.state.location.pathname).not.toContain(ENG_ID);
+    expect(screen().getByRole("button", { name: "Desfazer" })).toBeTruthy();
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("Sair do canal: a private channel asks first, and the last person out reads that it archives", async () => {
+    const state = seedState();
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) eng.visibility = "private";
+    await go(`c/${ENG_ID}`, state);
+    await rightClick(sidebarLink("eng"));
+    await pick("Sair do canal");
+    const asked = screen().getByRole("dialog", { name: "Sair de #eng?" });
+    expect(asked.textContent).toContain("alguém de dentro precisa adicionar você");
+    expect(state.calls.some((c) => c.method === "chat.leave")).toBe(false);
+    await act(async () => fireEvent.click(within(asked).getByRole("button", { name: "Sair" })));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "chat.leave" && c.args[1] === ENG_ID)).toBe(true);
   });
 
   test("the channel's header has the same menu", async () => {
     await go();
     await rightClick(screen().getByRole("heading", { level: 1, name: "eng" }));
-    expect(items()).toEqual(["Silenciar canal", "Editar canal", "Fixar no topo", "Copiar link", "Arquivar canal"]);
+    expect(items()).toEqual([
+      "Silenciar canal",
+      "Editar canal",
+      "Fixar no topo",
+      "Copiar link",
+      "Sair do canal",
+      "Arquivar canal",
+    ]);
   });
 });
 

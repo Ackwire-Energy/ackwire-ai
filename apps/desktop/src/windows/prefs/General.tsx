@@ -152,7 +152,7 @@ export function General() {
               return (
                 <PrefRow
                   key={h.homeId}
-                  lead={<OrgTile name={orgName(h)} logo={h.logo} size="lg" />}
+                  lead={<OrgTile logo={h.logo} size="lg" />}
                   title={
                     <>
                       {orgName(h)} <ConnectionChip status={h.status} running={h.running} />

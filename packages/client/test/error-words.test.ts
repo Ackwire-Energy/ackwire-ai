@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { ptBR, resources } from "@agenteschat/i18n";
+import i18next, { type TFunction } from "i18next";
 import { ApiError, createFileRequester, createRequester, invitationQuery, NetworkError } from "../src/index";
-import { authErrorText, errorText, noAnswer, sendWaits, signInRefusalText } from "../src/lib/errors";
+import { authErrorText, errorText, hasWordsFor, noAnswer, sendWaits, signInRefusalText } from "../src/lib/errors";
 
 const failure = new TypeError("Failed to fetch");
 const unreachable = async () => {
@@ -130,14 +133,34 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(503, "machine.internal", "ENOENT: no such file"))).toBe("common.ourSide");
   });
 
-  test("a 4xx the app doesn't know: the server's own words, English being every language's fallback", () => {
+  test("a 4xx the app doesn't know: the server's own words in English, a plain line in any other language", () => {
     const error = new ApiError(409, "thing.busy", "That thing is busy right now.");
     expect(errorText(en, error)).toBe("That thing is busy right now.");
-    expect(errorText(pt, error)).toBe("That thing is busy right now.");
-    expect(errorText(en, error, "pt-BR")).toBe("That thing is busy right now.");
+    const lang = (lng: string) => {
+      const instance = i18next.createInstance();
+      void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+      return instance.t;
+    };
+    expect(errorText(lang("en"), error)).toBe("That thing is busy right now.");
+    expect(errorText(lang("pt-BR"), error)).toBe(ptBR.errors.said.conflict);
+    expect(errorText(lang("pt-BR"), new ApiError(400, "thing.bad", "Bad thing"))).toBe(ptBR.errors.said.input);
+    expect(errorText(lang("pt-BR"), new ApiError(404, "thing.gone", "No thing"))).toBe(ptBR.errors.said.gone);
+    expect(errorText(lang("pt-BR"), new ApiError(503, "machine.busy", "Busy computer"))).toBe(
+      ptBR.errors.said.computer,
+    );
     // Codes the app knows, 413 and 403 say what they always said.
     expect(errorText(pt, new ApiError(403, "forbidden", ""))).toBe("common.notAllowed");
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
+  });
+
+  test("Better Auth's refusals a person meets on sign-up say what happened, never the plain line", () => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+    const said = (status: number, code: string) => authErrorText(instance.t, { status, code, message: code });
+    expect(said(422, "USER_ALREADY_EXISTS")).toBe(ptBR.auth.refused.linked);
+    expect(said(422, "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL")).toBe(ptBR.auth.refused.linked);
+    expect(said(400, "PASSWORD_TOO_SHORT")).toBe(ptBR.auth.passwordHelp);
+    expect(said(400, "INVALID_PASSWORD")).toBe(ptBR.errors.reauth.password);
   });
 
   test("anything that isn't the server's answer: common.unknownError, never its own message", () => {
@@ -218,4 +241,158 @@ test("the right hand refused a place: its own line, never ask an admin", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");
   expect(errorText(t, refused)).toBe("errors.rightHand.permanent");
+});
+
+/**
+ * Codes that keep the plain line (`untranslatedText`) on purpose: what only an agent or an API client meets, what the
+ * form already prevents, or what `restrictionLine` and `limitRefusalText` say before `KNOWN`. A new code a person can
+ * hit goes in `KNOWN` instead.
+ */
+const PLAIN_LINE = new Set([
+  "account.invalid_code",
+  "account.invalid_kind",
+  "account.invalid_label",
+  "account.invalid_plan",
+  "agent_proposal.yours",
+  "analytics.connector",
+  "analytics.range",
+  "approval_cover.self",
+  "auth",
+  "brain.invalid",
+  "brain.invalid_context",
+  "brain.invalid_effort",
+  "brain.invalid_model",
+  "brain.invalid_speed",
+  "brain.right_hand_account",
+  "browser.not_allowed",
+  "browser_profile.machine",
+  "browser_profile.system_mode",
+  "canceled",
+  "channel.invalid_name",
+  "channel.leave_kind",
+  "channel.mute_dm",
+  "connector.key_too_short",
+  "connector.oauth_only",
+  "connector.sensitive_tool",
+  "context.changes_permissions",
+  "database.action",
+  "database.daily_cap",
+  "database.invalid_column",
+  "database.invalid_table",
+  "database.timeout",
+  "early_access.used",
+  "endpoint.model_id",
+  "endpoint.prices",
+  "endpoint.style",
+  "import.file_path",
+  "import.secret_file",
+  "import.too_many_items",
+  "invalid_cursor",
+  "invalid_request",
+  "invitation.channel",
+  "machine.access_nothing",
+  "machine.device_not_found",
+  "machine.host_none",
+  "machine.move_no_agents",
+  "mail.action",
+  "mail.daily_send_cap",
+  "mail.no_password",
+  "mail.not_reconnectable",
+  "mail.preset",
+  "mail.window_days",
+  "message.attachment_not_found",
+  "mission.bad_path",
+  "mission.invalid_command_approval",
+  "mission.invalid_decision",
+  "mission.invalid_delivery",
+  "mission.invalid_executor",
+  "mission.invalid_findings",
+  "mission.invalid_plan",
+  "mission.invalid_review",
+  "mission.not_started",
+  "mission.rate_limited",
+  "mission.too_many_decisions",
+  "mission.worktree_not_failed",
+  "not_member",
+  "notifications.bad_cursor",
+  "org.members_full",
+  "proposal.yours",
+  "provisioning.ready",
+  "query",
+  "request_expired",
+  "request_unknown",
+  "request_used",
+  "right_hand.missing",
+  "right_hand_approvals.budget",
+  "routine.action_always_asks",
+  "routine.action_invalid",
+  "routine.connector_hook",
+  "routine.unknown_event",
+  "routine.webhook_rate_limited",
+  "schedule.invalid_count",
+  "schedule.invalid_interval",
+  "schedule.invalid_month",
+  "schedule.invalid_month_day",
+  "schedule.invalid_position",
+  "schedule.invalid_weekday",
+  "schedule.position_needs_month",
+  "schedule.unknown_freq",
+  "schedule.unknown_timezone",
+  "setup.invalid",
+  "skill.auto_update_owner_gone",
+  "skill.duplicate_path",
+  "skill.no_dismissed_update",
+  "skill.nothing_to_undo",
+  "speech_key_invalid",
+  "stale_cursor",
+  "start.channel_unknown",
+  "storage.daily_full",
+  "storage.full",
+  "storage.invalid_bucket",
+  "team_week.own_path",
+  "timeout",
+  "tls",
+  "too_many",
+  "unknown",
+  "unreachable",
+  "upload.wrong_machine",
+  "voice.bad_type",
+  "voice.client_id_required",
+  "widget.already_updated",
+  "widget.failed_why",
+  "widget.not_this_run",
+  "wiki.no_free_slug",
+  "workspace_paused",
+]);
+
+/** Every code the server refuses with: `new XError(message, "code")`. */
+function serverCodes() {
+  const root = join(import.meta.dir, "../..");
+  const roots = [join(root, "engine/src"), join(root, "adapters/src"), join(root, "../apps/server/src")];
+  const coded =
+    /new\s+\w*Error\(\s*(?:"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[\w.]+(?:\([^)]*\))?)\s*,\s*"([a-z_][a-z_0-9.-]*)"/g;
+  const codes = new Set<string>();
+  for (const dir of roots)
+    for (const file of readdirSync(dir, { recursive: true }) as string[]) {
+      if (!file.endsWith(".ts")) continue;
+      for (const m of readFileSync(join(dir, file), "utf8").matchAll(coded)) codes.add(m[1] ?? "");
+    }
+  return [...codes].sort();
+}
+
+describe("every refusal has words", () => {
+  const codes = serverCodes();
+
+  test("the scan finds the server's codes", () => {
+    expect(codes.length).toBeGreaterThan(300);
+    expect(codes).toContain("mission.tasks_live");
+  });
+
+  test("a new code needs a line in KNOWN, or a place on the plain-line list", () => {
+    expect(codes.filter((code) => !hasWordsFor(code) && !PLAIN_LINE.has(code))).toEqual([]);
+  });
+
+  test("the plain-line list holds nothing gone or worded since", () => {
+    expect([...PLAIN_LINE].filter((code) => !codes.includes(code) || hasWordsFor(code))).toEqual([]);
+  });
 });

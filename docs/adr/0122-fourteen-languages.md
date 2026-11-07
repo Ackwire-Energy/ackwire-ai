@@ -60,8 +60,8 @@ AGPL and self-hostable) waits for human translators.
 6. **Server text.** Email words per language (`email/words/<code>.ts`, deep-merged over English, counts through
    `plural()`), push words per language over English, pushes in `users.locale` before the device's, the workspace
    computer's default name from the shared strings, dates and money through Intl and the registry, the CJK system
-   fonts in the email stack. Jobs queued without a language render in English. A refusal code the app has no words
-   for shows the server's English message in every language. A run's turn names the person's app language (for a file's
+   fonts in the email stack. Jobs queued without a language render in English. A refusal code the app has no line for shows the server's words in English and a plain line by kind of
+   refusal in every other language (`untranslatedText`); a guard test keeps new person-facing codes in `KNOWN`. A run's turn names the person's app language (for a file's
    title or a form's labels); replies still follow the language the person writes in.
 7. **Formatting.** `@agenteschat/i18n/format`: `plural`, `formatList`, `formatMoneyUsd`, `formatDate`, `formatTime`,
    `relativeTime`, `dayMonthOrder`. Lists of names go through `joinNames(names, t)`, i18next's `list` format in

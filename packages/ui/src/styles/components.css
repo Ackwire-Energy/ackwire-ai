@@ -4782,6 +4782,58 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   overflow-y: hidden;
   scrollbar-width: none;
 }
+/*
+ * A row that scrolls sideways fades at the side with more to see, as `.ac-carousel` does. The mask lives in the
+ * animation: a row that fits has no scroll timeline, so no mask to clip its focus ring or shadow. A browser without
+ * scroll timelines keeps the plain edge.
+ */
+@property --ac-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --ac-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes ac-scroll-fade {
+  0% {
+    --ac-fade-start: 0px;
+    --ac-fade-end: 40px;
+    mask-image: var(--ac-fade);
+  }
+  10%,
+  90% {
+    --ac-fade-start: 40px;
+    --ac-fade-end: 40px;
+    mask-image: var(--ac-fade);
+  }
+  100% {
+    --ac-fade-start: 40px;
+    --ac-fade-end: 0px;
+    mask-image: var(--ac-fade);
+  }
+}
+/* Only where scroll timelines exist: elsewhere the animation would run at once and keep its last frame, a fade on the
+   start edge of every row, scrolling or not. */
+@supports (animation-timeline: scroll()) {
+  .ac-seg,
+  .ac-toolbar__filters,
+  .ac-toolbar__filters > .ac-filterbar,
+  .agp-tabs .ac-tabs,
+  .level-matrix {
+    --ac-fade: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--ac-fade-start),
+      #000 calc(100% - var(--ac-fade-end)),
+      transparent
+    );
+    animation: ac-scroll-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
 .ac-seg::-webkit-scrollbar {
   display: none;
 }
@@ -8385,12 +8437,9 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-pagehead__meta {
   min-height: 20px;
   margin: -2px 0 0;
-  overflow: hidden;
   font-size: 14px;
   line-height: 20px;
   color: var(--muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .ac-pagehead__actions {
   display: flex;
@@ -10451,9 +10500,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   line-height: 18px;
   font-weight: 600;
   color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .ac-facts__item--waiting :is(.ac-facts__icon, .ac-facts__value) {
   color: var(--attention);

@@ -153,7 +153,7 @@ export function Advanced() {
         {homes.map((h) => (
           <PrefRow
             key={h.homeId}
-            lead={<OrgTile name={orgName(h)} logo={h.logo} size="md" />}
+            lead={<OrgTile logo={h.logo} size="md" />}
             title={orgName(h)}
             desc={h.status?.workspace && <span className="dk-path">{shortPath(h.status.workspace)}</span>}
             end={

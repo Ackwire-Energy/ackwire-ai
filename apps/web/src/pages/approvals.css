@@ -710,23 +710,21 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-size: 14px;
   line-height: 19px;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-li__line b {
   color: var(--ink);
   font-weight: 600;
 }
+/* Two lines when it says where: the place, then its time or decision. Neither is ever cut. */
 .ap-li__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   min-width: 0;
   font-size: 12px;
   line-height: 16px;
   color: var(--faint);
-  white-space: nowrap;
 }
 .ap-li__meta .connector-icon,
 .ap-li__meta .ap-conn__own {
@@ -737,9 +735,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
   background: none;
 }
 .ap-li__where {
+  flex: 1 1 calc(100% - 20px);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-li__left {
   flex: none;
@@ -811,9 +808,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin-inline: 0;
   margin-block-end: 0;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-review__by {
   font-size: 12.5px;
@@ -927,9 +921,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ap-bar__acts {
   display: flex;
@@ -984,8 +975,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
 }
 .ap-li__when {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* What became of it: one card among the review's, its state's color on the head's key. */

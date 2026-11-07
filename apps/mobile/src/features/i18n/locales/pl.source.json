@@ -1040,12 +1040,6 @@
   "plus.file": {
     "value": "File"
   },
-  "plus.audio": {
-    "value": "Audio"
-  },
-  "plus.audioSoon": {
-    "value": "Audio is coming soon."
-  },
   "plus.noCamera": {
     "value": "No camera access. Allow it in the phone's Settings."
   },
