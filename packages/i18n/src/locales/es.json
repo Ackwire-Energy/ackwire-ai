@@ -15372,7 +15372,8 @@
     "where": {
       "dm": "Conversación directa",
       "routine": "Rutina «{{name}}»",
-      "background": "En segundo plano"
+      "background": "En segundo plano",
+      "here": "Esta conversación"
     },
     "askedBy": "Lo pidió {{name}}",
     "askedByYou": "Lo pediste tú",

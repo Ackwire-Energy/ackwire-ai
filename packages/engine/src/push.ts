@@ -19,10 +19,11 @@ import { accountClosed } from "./standing";
 const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
 
 /**
- * Push to the phone app (ADR 0035) and to browsers (Web Push, ADR 0071). A
+ * Push to the phone app (ADR 0035, ADR 0152) and to browsers (Web Push, ADR 0071). A
  * notification that should reach the person's devices enqueues one
  * `push.send` job; the job renders the text per device language and sends
- * through the `PushSender` adapter (phones) and the `WebPushSender` (browsers).
+ * through the `PushSender` adapter (phones: Android straight to Firebase,
+ * iPhones through Expo) and the `WebPushSender` (browsers).
  *
  * What pushes: what the person chose in this workspace (`noticeOn`, ADR 0071 §8; by default everything in
  * "Esperando você", mentions, DMs from a person, an agent's answer to them, and missions or routines that
@@ -44,20 +45,26 @@ export const PUSH_ACTIVE_DELAY_MS = 45_000;
 /** How long a browser's push service keeps a push while the browser is away. */
 export const WEB_PUSH_TTL_SECONDS = 86_400;
 
-/** Phone platforms (Expo tokens). Browsers register as `web` with their subscription instead. */
+/**
+ * Phone platforms: Android with its FCM token, iOS with an Expo push token. Browsers register as `web` with
+ * their subscription instead.
+ */
 export const PUSH_PLATFORMS = ["ios", "android"] as const;
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 
 /**
- * A device as `POST /push/devices` registers it: a phone's Expo token, or a browser's Web Push subscription
+ * A device as `POST /push/devices` registers it: a phone's token, or a browser's Web Push subscription
  * with the session that turned it on (`sessionId`: it hears pushes only while that session lasts).
  */
 export type PushDeviceInput =
   | { token: string; platform: PushPlatform; locale: string }
   | { platform: "web"; endpoint: string; keys: WebPushKeys; locale: string; sessionId: string };
 
-/** An Expo push token as the app gets it from `getExpoPushTokenAsync`. */
+/** An Expo push token as the iPhone app gets it from `getExpoPushTokenAsync`. */
 export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,200}\]$/;
+
+/** An FCM registration token as the Android app gets it (ADR 0152): the shape the push relay also checks. */
+export { FCM_PUSH_TOKEN } from "@agenteschat/adapters";
 
 type NotificationRow = typeof notifications.$inferSelect;
 
@@ -212,7 +219,7 @@ async function pushTargets(db: Database, userId: string, now: Date) {
 
 export interface PushDeps {
   db: Database;
-  /** Phones (Expo); absent = no phone push. */
+  /** Phones (Android through FCM, iPhones through Expo: `createPhonePushSender`); absent = no phone push. */
   push?: PushSender | null;
   /** Browsers (Web Push, ADR 0071); absent = no browser push. */
   webPush?: WebPushSender | null;
@@ -320,7 +327,7 @@ async function isLooking(presence: PushDeps["presence"], orgId: string, userId: 
 
 /**
  * Sends the push of one notification to every device of its person, unless
- * it was read, done or snoozed meanwhile: phones through `push` (one request),
+ * it was read, done or snoozed meanwhile: phones through `push` (one call),
  * browsers whose session is still on through `webPush` (one per subscription).
  * Devices their push service reports as gone are deleted, and so are browsers
  * whose session ended. Accepted phone tickets are checked
@@ -412,6 +419,7 @@ export async function deliverPush(
   if (deps.push && phones.length > 0) {
     const messages: PushMessage[] = phones.map((d) => ({
       to: d.token,
+      platform: d.platform === "ios" ? "ios" : "android",
       ...renderPush(pushLocale(d.locale), text),
       data,
       priority: row.waiting ? "high" : "default",
@@ -420,6 +428,12 @@ export async function deliverPush(
       const results = await deps.push.send(messages);
       sent += results.filter((r) => r.ok).length;
       gone.push(...results.filter((r) => r.unregistered).map((r) => r.token));
+      // Android answers per phone (FCM): one that may take it later (429, 5xx) lets the outbox try again. A
+      // platform this server sends nothing to (`skipped`) is no failure: it would keep the others from a retry.
+      for (const r of results) {
+        if (r.ok || r.unregistered || r.skipped) continue;
+        failures.push({ retryable: r.retryable === true, error: r.error ?? "not sent" });
+      }
       const tickets = results.flatMap((r) => (r.ok && r.ticketId ? [{ id: r.ticketId, token: r.token }] : []));
       if (tickets.length > 0 && deps.push.receipts) {
         await enqueue(db, {

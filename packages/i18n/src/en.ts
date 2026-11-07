@@ -14714,7 +14714,13 @@ export const en = {
         "{{what}} waiting: {{model}} hit its limit and comes back {{when}}. The plan's other models keep working.",
       budgetOut: "{{what}} waiting: this month's budget ran out and comes back {{when}}.",
     },
-    where: { dm: "Direct conversation", routine: "Routine «{{name}}»", background: "In the background" },
+    /** A task asked in the conversation the list is read from ("here"), on its line. */
+    where: {
+      dm: "Direct conversation",
+      routine: "Routine «{{name}}»",
+      background: "In the background",
+      here: "This conversation",
+    },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",
     servers: "Our servers",

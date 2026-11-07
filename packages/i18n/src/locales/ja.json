@@ -14384,7 +14384,8 @@
     "where": {
       "dm": "ダイレクトメッセージ",
       "routine": "ルーティン「{{name}}」",
-      "background": "バックグラウンド"
+      "background": "バックグラウンド",
+      "here": "この会話"
     },
     "askedBy": "{{name}}が依頼",
     "askedByYou": "あなたが依頼",

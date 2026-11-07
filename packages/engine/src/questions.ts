@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gte, isNull, lt, ne, schema, sql } from "@agenteschat/db";
 import { runAuthorityById } from "./authority";
 import { readableChannelIds, requireChannelAccess } from "./channels";
 import { findMember, plainName } from "./chat-tools";
@@ -12,7 +12,7 @@ import { notifyQuestion, resolveQuestionNotifications } from "./notification-pro
 import { enqueue } from "./outbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentQuestions, channelMembers, messages, organizationMembers, users } = schema;
+const { agentQuestions, channelMembers, messages, notifications, organizationMembers, users } = schema;
 
 export type AgentQuestionRow = typeof agentQuestions.$inferSelect;
 
@@ -459,7 +459,31 @@ export async function expireQuestions(deps: { db: Database; pubsub?: PubSub }, n
     await publishQuestion(deps.pubsub, row, "question.answered");
     await resolveQuestionNotifications(deps, row.orgId, row.id).catch(() => {});
   }
+  await resolveStaleQuestionNotifications(deps).catch(() => {});
   return expired.length;
+}
+
+/**
+ * A question's notification left waiting after the question closed (a run stopped before this release resolved
+ * them, a crash between the close and the inbox): done, so nothing waits on a person for an answer nobody can give.
+ */
+export async function resolveStaleQuestionNotifications(deps: { db: Database; pubsub?: PubSub }) {
+  const stale = await deps.db
+    .select({ orgId: notifications.orgId, questionId: agentQuestions.id })
+    .from(notifications)
+    .innerJoin(
+      agentQuestions,
+      and(
+        eq(agentQuestions.orgId, notifications.orgId),
+        sql`${notifications.groupKey} = 'agent_question:' || ${agentQuestions.id}`,
+      ),
+    )
+    .where(
+      and(eq(notifications.kind, "agent_question"), isNull(notifications.doneAt), ne(agentQuestions.status, "open")),
+    )
+    .groupBy(notifications.orgId, agentQuestions.id);
+  for (const row of stale) await resolveQuestionNotifications(deps, row.orgId, row.questionId);
+  return stale.length;
 }
 
 export async function getQuestion(db: Database, actorId: string, orgId: string, questionId: string) {

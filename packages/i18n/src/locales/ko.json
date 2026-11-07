@@ -14376,7 +14376,8 @@
     "where": {
       "dm": "다이렉트 메시지",
       "routine": "루틴 «{{name}}»",
-      "background": "백그라운드"
+      "background": "백그라운드",
+      "here": "이 대화"
     },
     "askedBy": "{{name}}이(가) 요청함",
     "askedByYou": "내가 요청함",

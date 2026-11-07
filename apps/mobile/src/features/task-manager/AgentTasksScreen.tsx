@@ -4,6 +4,7 @@ import {
   helpersOf,
   hiddenCount,
   linePlace,
+  taskProgram,
   taskSince,
   taskTitle,
   taskWhere,
@@ -14,7 +15,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Chip, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
+import { Button, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
@@ -22,8 +23,8 @@ import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useAgentTasks, useStopper } from "./hooks";
-import { type Place, rowState, taskStateWords } from "./logic";
-import { StopButton, StopConfirm, TaskMark, UsingLine, useAgentColor, WaitLines } from "./parts";
+import { type Place, rowState, taskStateWords, usingNow } from "./logic";
+import { StopButton, StopConfirm, TaskMark, useAgentColor, WaitLines } from "./parts";
 
 /**
  * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: three wells (Agora, Esperam você,
@@ -175,9 +176,11 @@ function Well({ label, value }: { label: string; value: number }) {
 }
 
 /**
- * One of the agent's tasks: its mark, title ("aqui" for one asked in that conversation), a small line (what it waits
- * for, in amber, or where and for how long; its place when it waits for room on its computer, with when it should
- * start and "Ver fila"), what it uses now, and "Parar". It opens the task's screen.
+ * One of the agent's tasks, on two lines: its mark (which says its state: the agent's orbit working, amber waiting on
+ * a person, the clock in a line) on the title's first line, the title whole, and one quiet line under it: where
+ * (this conversation, a channel, a routine), the program it uses and for how long; waiting for room, a plan or a
+ * budget, that wait and what comes next, with "Ver fila" for a computer's line. "Parar" is the stop square at the
+ * row's right, on the title's line. It opens the task's screen.
  */
 function TaskRow({
   task,
@@ -202,14 +205,19 @@ function TaskRow({
   const words = taskStateWords(t, i18n.language, task, state, now);
   const title = taskTitle(t, task);
   const where = taskWhere(t, task);
-  const place = where === title ? null : where;
+  const place = here ? t("taskManager.where.here") : where === title ? null : where;
   const waits = state === "ok" || state === "answer";
+  const program = usingNow(t, taskProgram(task), { locale: i18n.language })?.name ?? null;
+  // Working, or waiting on a person (the mark says which): where, the program, how long. Held or in a line: that
+  // wait and what comes next, then where. Stopping: only that.
   const sub =
-    state === "working"
-      ? [place, formatDuration(t, now - taskSince(task))]
-      : [words.state, state === "stopping" ? null : place];
+    state === "working" || waits
+      ? [place, program, formatDuration(t, now - taskSince(task))]
+      : state === "stopping"
+        ? [words.state]
+        : [words.state, words.next, place];
   const line = sub.filter(Boolean).join(" · ");
-  const label = [title, here ? t("taskManager.strip.here") : null, line, words.next].filter(Boolean).join(", ");
+  const label = [title, waits ? words.state : null, line].filter(Boolean).join(", ");
   // What comes next shows under it; waiting for room on its computer, "Ver fila" opens the computer's line.
   const inLine = state === "stopping" ? null : linePlace(task);
   return (
@@ -224,21 +232,12 @@ function TaskRow({
         <TaskMark state={state} color={color} />
       </View>
       <View style={styles.text}>
-        <View style={styles.titleRow}>
-          <Text variant="subhead" numberOfLines={2} style={[styles.medium, styles.shrink]}>
-            {title}
-          </Text>
-          {here ? <Chip icon="chat" label={t("taskManager.strip.here")} /> : null}
-        </View>
-        <Text variant="footnote" style={[waits && styles.semibold, { color: waits ? c.amber : c.muted }]}>
+        <Text variant="subhead" style={styles.medium}>
+          {title}
+        </Text>
+        <Text variant="footnote" tone="faint">
           {line}
         </Text>
-        {words.next ? (
-          <Text variant="caption" tone="faint">
-            {words.next}
-          </Text>
-        ) : null}
-        {state === "stopping" ? null : <UsingLine task={task} />}
         {inLine ? (
           <Pressable
             onPress={() => openQueue(inLine.machineId)}
@@ -254,7 +253,9 @@ function TaskRow({
         ) : null}
       </View>
       {task.canStop ? (
-        <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} />
+        <View style={styles.stop}>
+          <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} compact />
+        </View>
       ) : null}
     </Pressable>
   );
@@ -278,12 +279,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     borderBottomLeftRadius: 6,
   },
+  // Everything on the title's first line (20 points): the mark (16) two points down, the stop square (32) six up.
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12, paddingHorizontal: 16 },
   divider: { position: "absolute", top: 0, left: TEXT_INSET, right: 0, height: StyleSheet.hairlineWidth },
   mark: { paddingTop: 2 },
-  text: { flex: 1, minWidth: 0, gap: 4 },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
-  shrink: { flexShrink: 1 },
+  text: { flex: 1, minWidth: 0, gap: 2 },
+  stop: { marginTop: -6 },
   medium: { fontWeight: weights.medium },
   semibold: { fontWeight: weights.semibold },
   free: { paddingHorizontal: 20, paddingVertical: 12 },

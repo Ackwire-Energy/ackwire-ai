@@ -21,12 +21,15 @@ export function ConnectorIcon({
   size = 44,
   check = false,
   image,
+  bare = false,
 }: {
   def: Pick<ConnectorDef, "iconUrl" | "brandColor"> | null;
   label: string;
   size?: number;
   check?: boolean;
   image?: string | null;
+  /** The mark alone, no tile around it (a request card's name line): a monogram keeps its color tile. */
+  bare?: boolean;
 }) {
   const c = useColors();
   const uri = def ? iconUri(serverUrl(), def.iconUrl) : null;
@@ -47,6 +50,9 @@ export function ConnectorIcon({
   const [light, deep] = gradientOf(monogramColor(label));
   const tile = lettered ? mixHex(c.raised, light, scheme === "dark" ? 0.28 : 0.4) : c.raised;
   const letter = scheme === "dark" ? light : deep;
+  const loose = bare && !lettered;
+  // Bare, the logo fills its box (no tile's margin around it).
+  const markScale = loose ? 1 : null;
   return (
     <View
       style={[
@@ -55,8 +61,8 @@ export function ConnectorIcon({
           width: size,
           height: size,
           borderRadius: radius,
-          backgroundColor: tile,
-          borderColor: lettered ? "transparent" : c.line,
+          backgroundColor: loose ? "transparent" : tile,
+          borderColor: lettered || loose ? "transparent" : c.line,
         },
       ]}
       accessible={false}
@@ -66,14 +72,14 @@ export function ConnectorIcon({
           source={{ uri }}
           tintColor={tint}
           contentFit="contain"
-          style={{ width: Math.round(size * 0.5), height: Math.round(size * 0.5) }}
+          style={{ width: Math.round(size * (markScale ?? 0.5)), height: Math.round(size * (markScale ?? 0.5)) }}
         />
       ) : own && own.uri !== failed ? (
         <Image
           source={own}
           onError={() => setFailed(own.uri)}
           contentFit="contain"
-          style={{ width: Math.round(size * 0.58), height: Math.round(size * 0.58) }}
+          style={{ width: Math.round(size * (markScale ?? 0.58)), height: Math.round(size * (markScale ?? 0.58)) }}
         />
       ) : (
         // Its line as tall as its letters: the body's taller line, in a small tile, set them low.
@@ -92,8 +98,15 @@ export function ConnectorIcon({
 }
 
 /** One of our own icons on the same tile (a built-in tool, a mailbox), where a service would show its mark. */
-export function IconTile({ name, size = 20 }: { name: IconName; size?: number }) {
+export function IconTile({ name, size = 20, bare = false }: { name: IconName; size?: number; bare?: boolean }) {
   const c = useColors();
+  // Bare: the icon alone, as a request card's name line draws a mark (no tile inside a card).
+  if (bare)
+    return (
+      <View style={[styles.tile, styles.bare, { width: size, height: size }]} accessible={false}>
+        <Icon name={name} size={Math.round(size * 0.85)} color={c.muted} />
+      </View>
+    );
   return (
     <View
       style={[
@@ -129,6 +142,7 @@ const monogramSize = (size: number) => {
 
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
+  bare: { borderWidth: 0 },
   mono: { fontWeight: "700", textAlign: "center", includeFontPadding: false },
   check: {
     position: "absolute",

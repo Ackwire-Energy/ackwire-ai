@@ -1,3 +1,4 @@
+import type { PushSender } from "@agenteschat/adapters";
 import type {
   ArtifactDeps,
   BrowserLive,
@@ -50,6 +51,11 @@ export interface AppExtras {
   talker?: Talker;
   /** The router of messages nobody mentioned ("Responder agora" routes one again); null/absent = routing off. */
   router?: RouterDeps | null;
+  /**
+   * The push relay's sender (ADR 0152, `PUSH_RELAY_SERVE`): Firebase; absent = one made from
+   * `FIREBASE_SERVICE_ACCOUNT`, null = no relay.
+   */
+  pushRelaySender?: PushSender | null;
   /** The installation's Jev key, for its owner's routes (ADR 0073); absent = those routes answer 404. */
   jevKey?: JevKey;
   /**

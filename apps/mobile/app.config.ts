@@ -4,7 +4,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
  * The app's Expo config. Builds: Android on the "Android build" workflow on GitHub Actions, or EAS (see
  * README.md). The native projects are made from this file by `expo prebuild` and never committed.
  * - `EXPO_PUBLIC_API_URL`: the server the app talks to by default (production); people can pick their own.
- * - `EAS_PROJECT_ID`: overrides the EAS project (push tokens need it); defaults to ours on expo.dev.
+ * - `EAS_PROJECT_ID`: overrides the EAS project (the iPhone's Expo push tokens need it); defaults to ours on expo.dev.
  * - `APP_VARIANT`: "development" | "preview" | "production" (from eas.json or the workflow), so the three install
  *   side by side.
  * - `GOOGLE_SERVICES_JSON`: path to Firebase's google-services.json, for push on Android (FCM).

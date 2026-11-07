@@ -15082,7 +15082,8 @@
     "where": {
       "dm": "Direct bericht",
       "routine": "Routine «{{name}}»",
-      "background": "Op de achtergrond"
+      "background": "Op de achtergrond",
+      "here": "Dit gesprek"
     },
     "askedBy": "{{name}} vroeg het",
     "askedByYou": "Jij vroeg het",

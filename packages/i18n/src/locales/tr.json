@@ -14837,7 +14837,8 @@
     "where": {
       "dm": "Doğrudan mesaj",
       "routine": "«{{name}}» rutini",
-      "background": "Arka planda"
+      "background": "Arka planda",
+      "here": "Bu konuşma"
     },
     "askedBy": "{{name}} istedi",
     "askedByYou": "Siz istediniz",
