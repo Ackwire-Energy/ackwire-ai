@@ -13985,6 +13985,8 @@
     "status": {
       "one": "Работает над: {{subject}}",
       "oneUntitled": "Работает в фоне",
+      "oneFor": "Работает {{duration}}: {{subject}}",
+      "oneUntitledFor": "Работает {{duration}} в фоне",
       "two": "Над 2 задачами: {{first}} и {{second}}",
       "many": "Над задачами ({{count}}): {{subject}} и ещё {{more}}",
       "manyUntitled": "В фоне над задачами: {{count}}",
@@ -14175,7 +14177,6 @@
       "autoApprovedNobody": "Одобрено автоматически",
       "error": "ошибка",
       "seconds": "{{n}} с",
-      "minutes": "{{n}} мин",
       "step": {
         "schedulingReminder": "Поставил напоминание",
         "creatingRoutine": "Создал регулярную задачу",

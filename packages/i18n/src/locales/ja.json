@@ -12620,6 +12620,8 @@
     "status": {
       "one": "作業中: {{subject}}",
       "oneUntitled": "バックグラウンドで作業中",
+      "oneFor": "{{duration}}作業中: {{subject}}",
+      "oneUntitledFor": "{{duration}}バックグラウンドで作業中",
       "two": "2件の作業中: {{first}}、{{second}}",
       "many": "{{count}}件の作業中: {{subject}}ほか{{more}}件",
       "manyUntitled": "バックグラウンドで{{count}}件の作業中",
@@ -12795,7 +12797,6 @@
       "autoApprovedNobody": "自動で承認",
       "error": "エラー",
       "seconds": "{{n}}秒",
-      "minutes": "{{n}}分",
       "step": {
         "schedulingReminder": "リマインダーを設定しました",
         "creatingRoutine": "ルーティンを作成しました",

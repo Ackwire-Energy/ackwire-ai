@@ -13576,6 +13576,8 @@
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",
+      "oneFor": "Travaille depuis {{duration}} : {{subject}}",
+      "oneUntitledFor": "Travaille depuis {{duration}} en arrière-plan",
       "two": "Sur 2 travaux : {{first}} et {{second}}",
       "many": "Sur {{count}} travaux : {{subject}} et {{more}} autres",
       "manyUntitled": "Sur {{count}} travaux en arrière-plan",
@@ -13772,7 +13774,6 @@
       "autoApprovedNobody": "Approuvé automatiquement",
       "error": "erreur",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "A programmé un rappel",
         "creatingRoutine": "A créé une routine",

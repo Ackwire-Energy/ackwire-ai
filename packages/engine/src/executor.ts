@@ -3740,8 +3740,8 @@ async function executeRunInner(
     if (autoTick) clearInterval(autoTick);
     const [current] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
     if (current?.status !== "running" || !(await workEligible(db, current))) return;
-    // No title given: the thread's, else the start of the ask.
-    const moved = await moveToBackground({ db, pubsub: deps.pubsub }, run.id, {
+    // No title given: a person's for its thread, else a short name the cheap model gives the conversation.
+    const moved = await moveToBackground({ db, pubsub: deps.pubsub, context: deps.context }, run.id, {
       how: "auto",
       title: "",
       nextUpdateMin: WORK_LIMITS.nextDefault,

@@ -12782,6 +12782,9 @@ export const en = {
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
+      /** With how long: the time leads, so a narrow line cuts the title, never the time. */
+      oneFor: "Working for {{duration}}: {{subject}}",
+      oneUntitledFor: "Working for {{duration}} in the background",
       two: "On 2 jobs: {{first}} and {{second}}",
       many: "On {{count}} jobs: {{subject}} and {{more}} more",
       manyUntitled: "On {{count}} jobs in the background",
@@ -12995,7 +12998,6 @@ export const en = {
       autoApprovedNobody: "Approved automatically",
       error: "error",
       seconds: "{{n}} s",
-      minutes: "{{n}} min",
       step: {
         schedulingReminder: "Scheduled a reminder",
         creatingRoutine: "Created a routine",

@@ -13047,6 +13047,8 @@
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
+      "oneFor": "{{duration}} süredir çalışıyor: {{subject}}",
+      "oneUntitledFor": "{{duration}} süredir arka planda çalışıyor",
       "two": "2 iş üzerinde: {{first}} ve {{second}}",
       "many": "{{count}} iş üzerinde: {{subject}} ve {{more}} tane daha",
       "manyUntitled": "Arka planda {{count}} iş üzerinde",
@@ -13227,7 +13229,6 @@
       "autoApprovedNobody": "Otomatik onaylandı",
       "error": "hata",
       "seconds": "{{n}} sn",
-      "minutes": "{{n}} dk",
       "step": {
         "schedulingReminder": "Bir hatırlatıcı planladı",
         "creatingRoutine": "Bir rutin oluşturdu",

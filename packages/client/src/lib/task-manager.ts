@@ -310,6 +310,17 @@ export function taskWhere(
   return `#${task.channelName ?? ""}`;
 }
 
+/** Where it is, unless its title already says it (a task with no title of its own is called by its place). */
+export function taskPlace(
+  t: TFunction,
+  task: Pick<ManagedTask, "label" | "routine" | "channelKind" | "channelName" | "betweenAgents"> & {
+    background?: boolean;
+  },
+) {
+  const where = taskWhere(t, task);
+  return where === taskTitle(t, task) ? null : where;
+}
+
 export interface AgentTasks {
   agentId: string;
   tasks: ManagedTask[];

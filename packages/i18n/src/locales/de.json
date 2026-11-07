@@ -13117,6 +13117,8 @@
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
+      "oneFor": "Arbeitet seit {{duration}}: {{subject}}",
+      "oneUntitledFor": "Arbeitet seit {{duration}} im Hintergrund",
       "two": "An 2 Arbeiten: {{first}} und {{second}}",
       "many": "An {{count}} Arbeiten: {{subject}} und {{more}} weitere",
       "manyUntitled": "An {{count}} Arbeiten im Hintergrund",
@@ -13297,7 +13299,6 @@
       "autoApprovedNobody": "Automatisch freigegeben",
       "error": "Fehler",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} Min.",
       "step": {
         "schedulingReminder": "Eine Erinnerung geplant",
         "creatingRoutine": "Eine Routine erstellt",

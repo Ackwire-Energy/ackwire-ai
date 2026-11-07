@@ -12886,6 +12886,9 @@ export const ptBR = {
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
+      /** Com o tempo: ele vem antes, então numa linha estreita quem é cortado é o título, nunca o tempo. */
+      oneFor: "Trabalhando há {{duration}}: {{subject}}",
+      oneUntitledFor: "Trabalhando há {{duration}} em segundo plano",
       two: "Em 2 trabalhos: {{first}} e {{second}}",
       many: "Em {{count}} trabalhos: {{subject}} e mais {{more}}",
       manyUntitled: "Em {{count}} trabalhos em segundo plano",
@@ -13112,7 +13115,6 @@ export const ptBR = {
       autoApprovedNobody: "Aprovado automaticamente",
       error: "erro",
       seconds: "{{n}} s",
-      minutes: "{{n}} min",
       step: {
         schedulingReminder: "Agendou um lembrete",
         creatingRoutine: "Criou uma rotina",

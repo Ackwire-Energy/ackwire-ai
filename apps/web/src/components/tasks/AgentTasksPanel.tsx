@@ -5,10 +5,10 @@ import {
   agentSummary,
   helpersOf,
   linePlace,
+  taskPlace,
   taskState,
   taskTitle,
   taskWaitWords,
-  taskWhere,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
@@ -214,14 +214,14 @@ function TaskCard({
   const working = taskState(task) === "working" && !stopping;
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
-  const where = taskWhere(t, task);
+  const where = taskPlace(t, task);
   const wait = taskWaitWords(t, i18n.language, task, now);
   const place = linePlace(task);
   const sub = wait
     ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
     : taskState(task) === "queued"
-      ? `${t("taskManager.state.queued")} · ${where}`
-      : `${where} · ${formatDuration(t, taskAge(task, now))}`;
+      ? [t("taskManager.state.queued"), where].filter(Boolean).join(" · ")
+      : [where, formatDuration(t, taskAge(task, now))].filter(Boolean).join(" · ");
   const name = dir.anyAgent(task.agentId)?.name ?? t("channel.unknownAgent");
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
   return (

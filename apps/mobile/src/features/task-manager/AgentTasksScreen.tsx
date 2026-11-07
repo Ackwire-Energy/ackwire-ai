@@ -4,9 +4,9 @@ import {
   helpersOf,
   hiddenCount,
   linePlace,
+  taskPlace,
   taskSince,
   taskTitle,
-  taskWhere,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
@@ -201,8 +201,7 @@ function TaskRow({
   const state = rowState(task, stopping);
   const words = taskStateWords(t, i18n.language, task, state, now);
   const title = taskTitle(t, task);
-  const where = taskWhere(t, task);
-  const place = where === title ? null : where;
+  const place = taskPlace(t, task);
   const waits = state === "ok" || state === "answer";
   const sub =
     state === "working"
