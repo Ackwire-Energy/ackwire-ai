@@ -40,7 +40,7 @@ export function Spans({
   const c = useColors();
   const myHandle = useMyHandle();
   const { i18n } = useTranslation();
-  const { agents } = useDirectory();
+  const { agents, memberByHandle } = useDirectory();
   const { scheme } = useTheme();
   return (
     <>
@@ -82,7 +82,10 @@ export function Spans({
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
           case "mention": {
-            const all = everyone && isEveryoneWord(s.text.slice(1));
+            const handle = s.text.slice(1);
+            const all = everyone && isEveryoneWord(handle);
+            const tint = mentionTint(handle, agents, scheme);
+            if (!all && !tint && !memberByHandle.has(handle.toLowerCase())) return <RNText key={key}>{s.text}</RNText>;
             return (
               <RNText
                 key={key}
@@ -90,9 +93,9 @@ export function Spans({
                   styles.bold,
                   ink
                     ? { color: ink, backgroundColor: "rgba(0,0,0,0.16)" }
-                    : all || s.text.slice(1).toLowerCase() === myHandle
+                    : all || handle.toLowerCase() === myHandle
                       ? { color: c.amber, backgroundColor: `${c.amber}2e` }
-                      : (mentionTint(s.text.slice(1), agents, scheme) ?? { color: c.ink }),
+                      : (tint ?? { color: c.ink }),
                 ]}
               >
                 {all ? `@${everyoneWord(i18n.language)}` : s.text}

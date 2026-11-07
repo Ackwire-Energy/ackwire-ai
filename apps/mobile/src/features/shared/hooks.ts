@@ -58,6 +58,8 @@ export interface Directory {
   /** The team's agent, or one no longer in it (archived or deleted): what it left still names it. */
   anyAgent: (id: string) => Agent | undefined;
   memberById: Map<string, Member>;
+  /** People by lower-cased @handle. */
+  memberByHandle: Map<string, Member>;
   loading: boolean;
   /** A person's or an agent's name ("" when unknown). */
   nameOf: (who: { type: string; id: string | null } | null | undefined) => string;
@@ -74,11 +76,15 @@ export function useDirectory(): Directory {
     const gone = formerById(former.data);
     const anyAgent = (id: string) => agentById.get(id) ?? gone.get(id);
     const memberById = new Map((members.data ?? []).map((m) => [m.userId, m]));
+    const memberByHandle = new Map(
+      (members.data ?? []).filter((m) => m.handle).map((m) => [m.handle.toLowerCase(), m]),
+    );
     return {
       agents: agents.data ?? [],
       agentById,
       anyAgent,
       memberById,
+      memberByHandle,
       loading: agents.isLoading || members.isLoading,
       nameOf: (who) => {
         if (!who?.id) return "";

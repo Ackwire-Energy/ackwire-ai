@@ -364,4 +364,24 @@ describe("profile card", () => {
     await settle(6);
     expect(card().textContent).toContain("Agente · Dev");
   });
+
+  test("a handle of no one in the workspace (an X username) stays plain text", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-outside",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-joao" },
+      body: "coloca no backlog o que o @fulano do X sugeriu, @ada",
+      mentionedAgentIds: [ADA_ID],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("coloca no backlog")) as HTMLElement;
+    expect([...row.querySelectorAll(".ac-mention")].map((m) => m.textContent)).toEqual(["@Ada"]);
+    expect(row.textContent).toContain("o que o @fulano do X sugeriu");
+  });
 });

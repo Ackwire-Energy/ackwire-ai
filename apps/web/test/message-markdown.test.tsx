@@ -71,6 +71,12 @@ describe("message Markdown", () => {
     expect(el.textContent).toContain("joao@acme.com");
   });
 
+  test("a handle of no one in the workspace stays plain text; @todos stays a mention", () => {
+    const el = body("o @fulano do X sugeriu, @ada e @todos", (h) => (h === "ada" ? "Ada" : null));
+    expect([...el.querySelectorAll(".ac-mention")].map((m) => m.textContent)).toEqual(["@Ada", "@todos"]);
+    expect(el.textContent).toBe("o @fulano do X sugeriu, @Ada e @todos");
+  });
+
   test("XSS attempts stay inert text", () => {
     const attacks = [
       '<img src=x onerror="alert(1)">',
