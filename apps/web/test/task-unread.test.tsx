@@ -91,3 +91,16 @@ test("what ships keeps every side pane flush with the area's top, right and bott
   expect(last(".issue-page--talk", "container")).toBe("channel-body/inline-size");
   expect(last(".issue-page--talk", "padding")).toBe("0");
 });
+
+test("an unread reply visibly changes Conversa: a ghost button is already 600 in the muted color", async () => {
+  const css = topLevel(await builtCss("src/styles.css", "src/pages/issues.css"));
+  const last = (selector: string, property: string) =>
+    declarations(css, selector)
+      .filter(([p]) => p === property)
+      .at(-1)?.[1];
+  expect(last(".ac-btn--ghost", "color")).toBe("var(--muted)");
+  expect(last(".task-talk__toggle[data-unread]", "color")).toBe("var(--ink)");
+  expect(Number(last(".task-talk__toggle[data-unread]", "font-weight"))).toBeGreaterThan(
+    Number(last(".ac-btn", "font-weight")),
+  );
+});

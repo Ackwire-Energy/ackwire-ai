@@ -304,6 +304,23 @@ describe("a task's conversation (ADR 0145)", () => {
     expect(await unreadTaskConversations(f.db, bia.id, f.org.id)).toEqual([]);
   });
 
+  test("an agent's mention of a person there counts like a person's", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await listMembers(f.db, f.org.id); // assigns their handles
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Texto da confirmação" });
+    const agent = { type: "agent" as const, agentId: f.agent.id, channelId: f.general.id };
+    await commentIssue(deps, agent, f.org.id, issue.id, "@bia pode revisar o texto?");
+    expect(await unreadTaskConversations(f.db, bia.id, f.org.id)).toEqual([
+      { issueId: issue.id, unread: 1, mentions: 1 },
+    ]);
+    // The task's creator follows its conversation: the agent's reply is unread for them, with no mention.
+    expect(await unreadTaskConversations(f.db, f.owner.id, f.org.id)).toEqual([
+      { issueId: issue.id, unread: 1, mentions: 0 },
+    ]);
+  });
+
   test("a task whose creator's account is gone still gets its conversation", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

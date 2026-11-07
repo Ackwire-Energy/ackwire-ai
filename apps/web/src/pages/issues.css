@@ -1956,9 +1956,11 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
 .task-talk__toggle .ac-countchip {
   margin-left: 2px;
 }
-/* A reply I haven't read in it: the label in full weight, as an unread channel's name. */
+/* A reply I haven't read in it: the label in ink and heavier, as an unread channel's name. A ghost button is already
+   600 in the muted color, so weight alone would change nothing. */
 .task-talk__toggle[data-unread] {
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 700;
 }
 /* Mentions of me not read there: the sidebar's red count (`.sidebar__unread`), on the button, a card and a row. */
 .task-talk__mentions {
@@ -1970,6 +1972,7 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   color: var(--raised);
   font-size: 11.5px;
   font-weight: 700;
+  font-variant-numeric: normal;
 }
 .issue-card__title > .task-talk__mentions {
   margin-left: 6px;
