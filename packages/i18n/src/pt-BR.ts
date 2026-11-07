@@ -14934,7 +14934,12 @@ export const ptBR = {
         "{{what}} esperando: {{model}} chegou ao limite e volta {{when}}. Os outros modelos do plano seguem funcionando.",
       budgetOut: "{{what}} esperando: o orçamento do mês acabou e volta {{when}}.",
     },
-    where: { dm: "Conversa direta", routine: "Rotina «{{name}}»", background: "Em segundo plano" },
+    where: {
+      dm: "Conversa direta",
+      routine: "Rotina «{{name}}»",
+      background: "Em segundo plano",
+      here: "Nesta conversa",
+    },
     askedBy: "{{name}} pediu",
     askedByYou: "Você pediu",
     servers: "Nossos servidores",

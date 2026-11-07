@@ -15947,7 +15947,8 @@
     "where": {
       "dm": "Wiadomość bezpośrednia",
       "routine": "Rutyna «{{name}}»",
-      "background": "W tle"
+      "background": "W tle",
+      "here": "Ta rozmowa"
     },
     "askedBy": "{{name}} poprosił(a)",
     "askedByYou": "Twoja prośba",

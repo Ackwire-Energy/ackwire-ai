@@ -15510,7 +15510,8 @@
     "where": {
       "dm": "Conversazione diretta",
       "routine": "Routine «{{name}}»",
-      "background": "In background"
+      "background": "In background",
+      "here": "Questa conversazione"
     },
     "askedBy": "L'ha chiesta {{name}}",
     "askedByYou": "L'hai chiesta tu",

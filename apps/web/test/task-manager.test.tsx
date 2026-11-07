@@ -582,11 +582,19 @@ describe("an agent's tasks beside its DM", () => {
       "Corrigir o link de cancelar",
       "Backups",
     ]);
-    expect(cards[0]?.querySelector(".tm-taskcard__label small")?.textContent).toBe(
-      "Espera seu ok · Segue quando alguém aprovar · #eng",
+    // A wait on a person is its mark's job: the line under the title stays quiet (where, the program, how long).
+    const sub = (i: number) => cards[i]?.querySelector(".tm-taskcard__label small")?.textContent ?? "";
+    expect(sub(0)).toMatch(/^#eng · /);
+    expect(sub(0)).not.toContain("Espera seu ok");
+    expect(cards[0]?.querySelector(".tm-taskcard__label small[data-wait]")).toBeNull();
+    // This conversation's says so on its line, with no chip beside the title.
+    expect(cards[1]?.querySelector(".tm-here")).toBeNull();
+    expect(sub(1)).toMatch(/^Nesta conversa · Claude Code · /);
+    expect(sub(2)).toMatch(/^Rotina «Backups» · /);
+    // Parar is the square alone, named for screen readers.
+    expect(within(cards[0] as HTMLElement).getByRole("button", { name: "Parar: Revisar o PR #231" }).textContent).toBe(
+      "",
     );
-    expect(cards[1]?.querySelector(".tm-here")?.textContent).toBe("aqui");
-    expect(cards[2]?.querySelector(".tm-taskcard__label small")?.textContent).toMatch(/^Rotina «Backups» · /);
     // Esc closes it, and stops nothing.
     await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
     expect(screen().queryByRole("complementary", { name: "Tarefas de Ada" })).toBeNull();
