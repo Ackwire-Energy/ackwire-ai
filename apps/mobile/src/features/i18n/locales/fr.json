@@ -1103,6 +1103,8 @@
     "openImage": "Ouvrir l'image",
     "imageOf": "Image {{index}} sur {{count}}",
     "place": "{{index}} sur {{count}}",
+    "previous": "Image précédente",
+    "next": "Image suivante",
     "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app.",
     "video": {
       "play": "Lire",

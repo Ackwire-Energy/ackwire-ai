@@ -1052,6 +1052,8 @@ export const featureKeysPtBR = {
     openImage: "Abrir imagem",
     imageOf: "Imagem {{index}} de {{count}}",
     place: "{{index}} de {{count}}",
+    previous: "Imagem anterior",
+    next: "Próxima imagem",
     noPreview: "Este arquivo não abre no app. Compartilhe para abrir em outro app.",
     video: {
       play: "Tocar",

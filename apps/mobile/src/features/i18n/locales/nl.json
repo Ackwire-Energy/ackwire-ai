@@ -1029,6 +1029,8 @@
     "openImage": "Afbeelding openen",
     "imageOf": "Afbeelding {{index}} van {{count}}",
     "place": "{{index}} van {{count}}",
+    "previous": "Vorige afbeelding",
+    "next": "Volgende afbeelding",
     "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen.",
     "video": {
       "play": "Afspelen",

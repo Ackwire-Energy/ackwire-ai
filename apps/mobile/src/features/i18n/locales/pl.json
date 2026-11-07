@@ -1177,6 +1177,8 @@
     "openImage": "Otwórz zdjęcie",
     "imageOf": "Zdjęcie {{index}} z {{count}}",
     "place": "{{index}} z {{count}}",
+    "previous": "Poprzednie zdjęcie",
+    "next": "Następne zdjęcie",
     "noPreview": "Ten plik nie otwiera się w aplikacji. Udostępnij go, żeby otworzyć go w innej aplikacji.",
     "video": {
       "play": "Odtwórz",

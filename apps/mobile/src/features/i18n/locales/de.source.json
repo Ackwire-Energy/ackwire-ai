@@ -2542,6 +2542,12 @@
   "files.place": {
     "value": "{{index}} of {{count}}"
   },
+  "files.previous": {
+    "value": "Previous picture"
+  },
+  "files.next": {
+    "value": "Next picture"
+  },
   "files.noPreview": {
     "value": "This file doesn't open in the app. Share it to open it in another app."
   },

@@ -1,11 +1,12 @@
 import { useArtifact } from "@agenteschat/client";
 import { StatusBar } from "expo-status-bar";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewInstance,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -13,19 +14,19 @@ import {
 import { ScrollView } from "react-native-gesture-handler";
 import Animated, { type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, type IconName, PressScale, Text, ToastHost } from "@/ui";
+import { Icon, type IconName, PressScale, Text, ToastHost, useReducedMotion } from "@/ui";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { goBack } from "../shared/parts";
 import { savedAt, useFileActions, useSavedWhen } from "./actions";
-import { decodeFileList, fileInfo } from "./logic";
+import { decodeFileList, fileInfo, pageStep } from "./logic";
 import { useRemoteFile } from "./source";
 import { tellViewerPlace } from "./viewer-place";
 import { ZoomableImage } from "./ZoomableImage";
 
 /**
- * A message's pictures, full screen: black, the name and who sent
- * it on top, pinch and double tap to zoom, swipe between the pictures (dots), drag down to close, and
- * Compartilhar, Salvar em Fotos, Ver no Drive at the bottom. A tap hides and shows the bars.
+ * A message's pictures, full screen: black, the name, "2 de 4" and who sent it on top, pinch and double tap to
+ * zoom, swipe or ‹ › on the sides between the pictures, drag down to close, and Compartilhar, Salvar em Fotos,
+ * Ver no Drive at the bottom. A tap hides and shows the bars.
  */
 export function ImageViewer({
   files: rawFiles,
@@ -48,6 +49,8 @@ export function ImageViewer({
 const WHITE = "#fff";
 const DIM = "rgba(255,255,255,0.6)";
 const PLATE = "rgba(255,255,255,0.14)";
+/** The round buttons over the picture. */
+const ROUND = 44;
 
 function Viewer({
   rawFiles,
@@ -64,6 +67,8 @@ function Viewer({
   const savedWhen = useSavedWhen();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const reduced = useReducedMotion();
+  const pager = useRef<ScrollViewInstance>(null);
   const files = decodeFileList(rawFiles);
   const first = Math.min(Math.max(Number(at) || 0, 0), Math.max(files.length - 1, 0));
   const [index, setIndex] = useState(first);
@@ -82,6 +87,14 @@ function Viewer({
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
     if (i !== index && i >= 0 && i < files.length) setIndex(i);
   };
+  const prev = pageStep(index, -1, files.length);
+  const next = pageStep(index, 1, files.length);
+  // The side buttons: the pager slides there (at once with reduced motion), as a swipe would.
+  const turn = (to: number | null) => {
+    if (to === null) return;
+    setIndex(to);
+    pager.current?.scrollTo({ x: to * width, y: 0, animated: !reduced });
+  };
 
   const backdrop = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(Math.abs(drag.value) / (height * 0.6), 0.85),
@@ -89,13 +102,15 @@ function Viewer({
 
   const info = detail ? fileInfo(detail) : null;
   const author = detail ? dir.nameOf(detail.createdBy) : "";
-  const sub = detail ? [author, savedWhen(savedAt(detail))].filter(Boolean).join(" · ") : "";
+  const place = files.length > 1 ? t("mobile.files.place", { index: index + 1, count: files.length }) : "";
+  const sub = detail ? [place, author, savedWhen(savedAt(detail))].filter(Boolean).join(" · ") : place;
 
   return (
     <View style={styles.screen}>
       <StatusBar style="light" hidden={!chrome} animated />
       <Animated.View style={[StyleSheet.absoluteFill, styles.black, backdrop]} />
       <ScrollView
+        ref={pager}
         horizontal
         pagingEnabled
         scrollEnabled={!zoomed && files.length > 1}
@@ -133,21 +148,23 @@ function Viewer({
         <Round icon="more" label={t("mobile.files.more")} onPress={() => actions.more(true)} disabled={!detail} />
       </Chrome>
 
+      {/* Gone while zoomed, as the swipe is: the fingers move the picture then. */}
+      {files.length > 1 ? (
+        <Chrome visible={chrome && !zoomed} drag={drag} style={[styles.sides, { top: height / 2 - ROUND / 2 }]}>
+          {prev !== null ? (
+            <View style={[styles.side, { left: insets.left + 12 }]}>
+              <Round icon="back" label={t("mobile.files.previous")} onPress={() => turn(prev)} />
+            </View>
+          ) : null}
+          {next !== null ? (
+            <View style={[styles.side, { right: insets.right + 12 }]}>
+              <Round icon="right" label={t("mobile.files.next")} onPress={() => turn(next)} />
+            </View>
+          ) : null}
+        </Chrome>
+      ) : null}
+
       <Chrome visible={chrome} drag={drag} style={[styles.bottom, { paddingBottom: insets.bottom + 14 }]}>
-        {files.length > 1 ? (
-          <View
-            style={styles.dots}
-            accessible
-            accessibilityLabel={t("mobile.files.imageOf", { index: index + 1, count: files.length })}
-          >
-            {files.map((f, i) => (
-              <View
-                key={`${f.id}@${f.version ?? ""}`}
-                style={[styles.dot, { backgroundColor: i === index ? WHITE : "rgba(255,255,255,0.35)" }]}
-              />
-            ))}
-          </View>
-        ) : null}
         <View style={styles.actions}>
           <Action
             icon="share"
@@ -320,11 +337,11 @@ const styles = StyleSheet.create({
   },
   title: { flex: 1, minWidth: 0, alignItems: "center" },
   bold: { fontWeight: "600" },
-  round: { width: 44, height: 44, borderRadius: 22 },
+  round: { width: ROUND, height: ROUND, borderRadius: ROUND / 2 },
   center: { alignItems: "center", justifyContent: "center" },
+  sides: { position: "absolute", left: 0, right: 0, height: ROUND },
+  side: { position: "absolute", top: 0 },
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 6 },
-  dots: { flexDirection: "row", justifyContent: "center", gap: 6, paddingVertical: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
   actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 20, paddingTop: 10 },
   action: { minWidth: 88 },
   actionIn: { alignItems: "center", gap: 6 },

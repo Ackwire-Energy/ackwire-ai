@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ArtifactDetail } from "@agenteschat/client";
 import {
   decodeFileList,
@@ -7,6 +9,7 @@ import {
   extensionOf,
   extLabel,
   fileInfo,
+  pageStep,
   resolveDownloadUrl,
   safeFileName,
   shareSource,
@@ -17,6 +20,8 @@ import {
   withExtension,
 } from "../../src/features/files/logic";
 import { clampZoomTranslate, containSize, doubleTapZoom, MAX_ZOOM, zoomAround } from "../../src/features/files/zoom";
+
+const src = (file: string) => readFileSync(join(import.meta.dir, "../../src", file), "utf8");
 
 type Input = Pick<ArtifactDetail, "kind" | "title" | "content">;
 const upload = (name: string, contentType: string, size = 1000, text?: string): Input => ({
@@ -170,6 +175,28 @@ describe("viewer", () => {
     expect(decodeFileList(encodeFileList(list))).toEqual(list);
     expect(decodeFileList("a@0,../x,b@x,c@3")).toEqual([{ id: "a" }, { id: "b" }, { id: "c", version: 3 }]);
     expect(decodeFileList(undefined)).toEqual([]);
+  });
+
+  test("‹ › go one picture at a time and never round past the first or the last", () => {
+    expect(pageStep(1, 1, 4)).toBe(2);
+    expect(pageStep(1, -1, 4)).toBe(0);
+    expect(pageStep(0, -1, 4)).toBeNull();
+    expect(pageStep(3, 1, 4)).toBeNull();
+    expect(pageStep(0, 1, 1)).toBeNull();
+  });
+
+  test("several pictures: 2 de 4 in the head, ‹ › on the sides (gone while zoomed) slide the pager as a swipe", () => {
+    const viewer = src("features/files/ImageViewer.tsx");
+    expect(viewer).toContain(
+      'files.length > 1 ? t("mobile.files.place", { index: index + 1, count: files.length }) : ""',
+    );
+    expect(viewer).toContain("[place, author, savedWhen(savedAt(detail))].filter(Boolean)");
+    expect(viewer).toContain('<Round icon="back" label={t("mobile.files.previous")} onPress={() => turn(prev)} />');
+    expect(viewer).toContain('<Round icon="right" label={t("mobile.files.next")} onPress={() => turn(next)} />');
+    expect(viewer).toContain("visible={chrome && !zoomed}");
+    expect(viewer).toContain("pager.current?.scrollTo({ x: to * width, y: 0, animated: !reduced })");
+    // The count took the dots' place: one place says where you are.
+    expect(viewer).not.toContain("styles.dots");
   });
 
   test("zoom keeps the point under the fingers still and stays inside the picture", () => {
