@@ -36614,7 +36614,7 @@
     "value": "<b>{{name}}</b> flagged “{{title}}”"
   },
   "widgets.notice.failed": {
-    "value": "“{{title}}” stopped updating"
+    "value": "<b>{{name}}</b> couldn't update “{{title}}”"
   },
   "widgets.notice.proposal": {
     "value": "<b>{{name}}</b> wants to publish a dashboard"

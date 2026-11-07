@@ -15145,7 +15145,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> hat „{{title}}“ markiert",
-      "failed": "„{{title}}“ wird nicht mehr aktualisiert",
+      "failed": "<b>{{name}}</b> konnte „{{title}}“ nicht aktualisieren",
       "proposal": "<b>{{name}}</b> möchte ein Dashboard veröffentlichen",
       "proposalWorkspace": "„{{title}}“ für den ganzen Workspace · heute siehst nur du es",
       "proposalRoles": "„{{title}}“ für {{roles}} · heute siehst nur du es",

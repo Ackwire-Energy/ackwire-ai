@@ -120,6 +120,7 @@ export function RequestCard({
   label,
   mine,
   waitingFor,
+  who,
   source,
   lead,
   object,
@@ -143,6 +144,8 @@ export function RequestCard({
   mine: boolean;
   /** Who it waits for when it isn't the viewer. */
   waitingFor?: string;
+  /** Who asks, before the kind ("Ada · Pergunta"), where the card stands away from its conversation. */
+  who?: ReactNode;
   /** Where it was asked, after the kind ("Thread · #eng"), where the card stands away from its conversation. */
   source?: ReactNode;
   /** The agent's own words: what it asks. */
@@ -207,6 +210,12 @@ export function RequestCard({
       <CardSky color={colorOf(agent)} />
       <div className="rq__head">
         <span className="rq__kind">
+          {who && (
+            <>
+              <span className="rq__who">{who}</span>
+              {" · "}
+            </>
+          )}
           {askKindWords(t, kind, Boolean(mine))}
           {source && <span className="rq__source"> · {source}</span>}
         </span>
