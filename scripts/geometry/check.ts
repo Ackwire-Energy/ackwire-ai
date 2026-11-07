@@ -22,6 +22,9 @@ const WIDTHS = [1280, 320, 390];
 const BROWSERS = 4;
 /** Fewer than this means the capture broke, and an empty run must not read as a clean one. */
 const MIN_STATES = 300;
+/** The window's height, and how much taller the second look at a `sliver` is. */
+const HEIGHT = 900;
+const TALLER = 40;
 
 export interface Finding {
   rule: string;
@@ -35,6 +38,15 @@ export interface Finding {
 
 export const keyOf = (f: Finding, width: number) =>
   `${f.rule}@${width} ${f.el}${f.box ? ` in ${f.box}` : ""}${f.at ? ` at ${f.at}` : ""}`;
+
+/**
+ * The findings, less each `sliver` gone in a window `TALLER` px taller (`taller`): content 1–3 px longer than the
+ * window, which a window of any other height shows whole or scrolls for real. One the layout makes stays.
+ */
+export function lasting(found: Finding[], taller: Finding[], width: number) {
+  const stays = new Set(taller.filter((f) => f.rule === "sliver").map((f) => keyOf(f, width)));
+  return found.filter((f) => f.rule !== "sliver" || stays.has(keyOf(f, width)));
+}
 
 /** Offenders the baseline doesn't know, and baseline entries nothing hit any more. */
 export function compare(found: Iterable<string>, baseline: string[]) {
@@ -212,12 +224,8 @@ export async function openTab(send: Send, url: string) {
   for (let i = 0; i < 200 && !(await run<boolean>("document.readyState === 'complete' && !!window.geometry")); i++) {
     await Bun.sleep(50);
   }
-  const resize = async (width: number) => {
-    await send(
-      "Emulation.setDeviceMetricsOverride",
-      { width, height: 900, deviceScaleFactor: 1, mobile: false },
-      sessionId,
-    );
+  const resize = async (width: number, height = HEIGHT) => {
+    await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, sessionId);
     // Below the desktop width a screen is on a phone, whose touch sizes the kit grows controls to.
     await send("Emulation.setTouchEmulationEnabled", { enabled: width < 640, maxTouchPoints: 1 }, sessionId);
   };
@@ -247,12 +255,22 @@ export const SELF_TESTED = [
   "floating",
 ];
 
-/** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
-async function selfTest(tab: Awaited<ReturnType<typeof openTab>>) {
-  const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
-  await tab.resize(1280);
-  await tab.run(`geometry.load(${JSON.stringify(fixture)})`);
+type Tab = Awaited<ReturnType<typeof openTab>>;
+
+/** What the rules find on the loaded screen at a width, a `sliver` only if it stays in a taller window (`lasting`). */
+async function findingsAt(tab: Tab, width: number) {
+  await tab.resize(width);
   const found = await tab.run<Finding[]>("geometry.detect()");
+  if (!found.some((f) => f.rule === "sliver")) return found;
+  await tab.resize(width, HEIGHT + TALLER);
+  return lasting(found, await tab.run<Finding[]>("geometry.detect()"), width);
+}
+
+/** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
+async function selfTest(tab: Tab) {
+  const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
+  await tab.run(`geometry.load(${JSON.stringify(fixture)})`);
+  const found = await findingsAt(tab, 1280);
   const hit = (rule: string, cls: string) => found.some((f) => f.rule === rule && (f.el + (f.box ?? "")).includes(cls));
   const wrong: string[] = [];
   for (const rule of SELF_TESTED) {
@@ -340,8 +358,7 @@ async function main() {
           const { screen } = JSON.parse(raw.slice(4, cut)) as { screen: string };
           await tab.run(`geometry.load(${JSON.stringify(raw.slice(cut + 4))})`);
           for (const width of WIDTHS) {
-            await tab.resize(width);
-            for (const finding of await tab.run<Finding[]>("geometry.detect()")) hits.push({ width, screen, finding });
+            for (const finding of await findingsAt(tab, width)) hits.push({ width, screen, finding });
           }
         }
       }),

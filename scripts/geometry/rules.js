@@ -720,7 +720,9 @@
     },
     /**
      * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
-     * nudge it) over content that, to the eye, fits.
+     * nudge it) over content that, to the eye, fits. The check keeps one only if it stays in a taller window
+     * (`lasting` in check.ts). A box with no class of its own is named by the nearest one with a class around it, so
+     * its baseline entry can't excuse every other nameless box.
      */
     sliver(out) {
       const SLIVER_MAX = 4;
@@ -728,7 +730,12 @@
         const y = style(el).overflowY;
         if ((y !== "auto" && y !== "scroll") || el.matches("textarea,input,select") || !seen(el)) continue;
         const px = el.scrollHeight - el.clientHeight;
-        if (px > 0 && px < SLIVER_MAX) out.push({ rule: "sliver", node: el, el: sig(el), px });
+        if (!(px > 0 && px < SLIVER_MAX)) continue;
+        let box;
+        if (sig(el) === el.tagName.toLowerCase())
+          for (let p = el.parentElement; !box && p && p !== document.body; p = p.parentElement)
+            if (sig(p) !== p.tagName.toLowerCase()) box = sig(p);
+        out.push({ rule: "sliver", node: el, el: sig(el), ...(box ? { box } : {}), px });
       }
     },
     /**

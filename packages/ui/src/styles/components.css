@@ -1184,10 +1184,14 @@ textarea.ac-input {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   visibility: hidden;
+  /* Unseen, it takes no room either: its line hangs past a row with nothing in it yet (a card still loading), and the
+     last row in the list would scroll the list by what hangs. */
+  content-visibility: hidden;
 }
 .ac-msg--grouped:hover .ac-msg__gutter-time,
 html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   visibility: visible;
+  content-visibility: visible;
 }
 .ac-msg__body {
   min-width: 0;
@@ -5708,6 +5712,11 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   width: 118.75%;
   height: 200%;
   pointer-events: none;
+}
+/* That room is drawn, never laid out (layout containment makes it ink overflow): a face by a scroll area's edge doesn't
+   scroll the area by its accessories' reach. */
+.ac-avatar--agent {
+  contain: layout;
 }
 .ac-avatar--running::after {
   inset: -4px;

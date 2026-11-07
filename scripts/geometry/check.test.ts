@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compare, coverage, edgesOf, keyOf, playwrightChromes, SELF_TESTED } from "./check";
+import { compare, coverage, edgesOf, keyOf, lasting, playwrightChromes, SELF_TESTED } from "./check";
 
 describe("geometry check", () => {
   test("a new offender is new at its width, and words or size never make one", () => {
@@ -18,6 +18,15 @@ describe("geometry check", () => {
       "edge@320 button.ac-btn.ac-btn--sm in section.ac-card at div.ai-panel",
     );
     expect(keyOf({ ...f, at: "div.home-row" }, 320)).not.toBe(keyOf({ ...f, at: "div.ai-panel" }, 320));
+  });
+
+  test("a sliver gone in a taller window was content as long as the window, not the layout: only one that stays fails", () => {
+    const sliver = (el: string, box?: string) => ({ rule: "sliver", el, ...(box ? { box } : {}), px: 2 });
+    const edge = { rule: "edge", el: "a.ac-btn", box: "li.home-row", px: 1 };
+    const found = [sliver("main.shell__main"), sliver("div", "div.ac-menu.ac-menu--select"), edge];
+    expect(lasting(found, [sliver("div", "div.ac-menu.ac-menu--select")], 1280)).toEqual([found[1], edge]);
+    // Named by the box around it, a nameless one excuses no other nameless box.
+    expect(keyOf(found[1] as (typeof found)[number], 320)).toBe("sliver@320 div in div.ac-menu.ac-menu--select");
   });
 
   test("only what the baseline doesn't know fails; what got fixed is listed", () => {
