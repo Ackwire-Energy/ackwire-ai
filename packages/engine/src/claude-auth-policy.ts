@@ -163,14 +163,16 @@ export async function operatorOrgClaudeAuth(db: Executor, orgId: string) {
       const system = m.executors?.mode === "system";
       const said = m.protocol >= CLAUDE_AUTH_PROTOCOL ? m.executors?.claudeLoginMethods : undefined;
       const claudeLoginMethods: AuthMethod[] = claudeLoginMethodsOf(said, system);
+      const supportsSelected = claudeLoginMethods.includes(claudeAuthMethodFor(policy, orgId, system));
+      // The runner keeps the reason until its next hello, which may not come after the method changes back.
       return {
         id: m.id,
         name: m.name,
         system,
         protocol: m.protocol,
         claudeLoginMethods,
-        supportsSelected: claudeLoginMethods.includes(claudeAuthMethodFor(policy, orgId, system)),
-        claudeLoginBlocked: m.executors?.claudeLoginBlocked ?? null,
+        supportsSelected,
+        claudeLoginBlocked: supportsSelected ? null : (m.executors?.claudeLoginBlocked ?? null),
       };
     }),
   };
