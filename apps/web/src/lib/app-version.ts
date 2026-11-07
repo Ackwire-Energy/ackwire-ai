@@ -103,6 +103,16 @@ export function reloadForNewVersion(now = Date.now()): boolean {
   return true;
 }
 
+/**
+ * A crash in a tab a deploy left behind is most likely its old code meeting the new server's data (a sidebar tool it
+ * has no page for): it reloads into the new version, at most once a minute, instead of staying on the error screen.
+ * True when it reloads.
+ */
+export async function reloadIfStale(): Promise<boolean> {
+  await checkAppVersion();
+  return current?.stale === true && reloadForNewVersion();
+}
+
 /** Not reloading: the page stayed, or a test starts. */
 export function resetVersionReload() {
   clearTimeout(stayed);

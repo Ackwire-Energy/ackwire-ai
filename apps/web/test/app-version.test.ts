@@ -7,8 +7,10 @@ import {
   createVersionWatch,
   entryOf,
   reloadForNewVersion,
+  reloadIfStale,
   reloadingForNewVersion,
   resetVersionReload,
+  startVersionWatch,
 } from "../src/lib/app-version";
 import { STORAGE_KEYS } from "../src/lib/storage";
 
@@ -95,6 +97,24 @@ describe("a page's file from before a deploy (vite:preloadError)", () => {
       expect(reloadingForNewVersion()).toBe(false);
     } finally {
       timers.mockRestore();
+      reload.mockRestore();
+    }
+  });
+
+  test("a crash in a tab a deploy left behind reloads into the new version; one in the current version stays", async () => {
+    const reload = spyOn(window.location, "reload").mockImplementation(() => {});
+    let html = page("/assets/index-abc.js");
+    startVersionWatch(
+      createVersionWatch({ loaded: "/assets/index-abc.js", fetchHtml: async () => html, onStale: () => {} }),
+    );
+    try {
+      expect(await reloadIfStale()).toBe(false);
+      expect(reload).not.toHaveBeenCalled();
+      html = page("/assets/index-def.js");
+      expect(await reloadIfStale()).toBe(true);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(reloadingForNewVersion()).toBe(true);
+    } finally {
       reload.mockRestore();
     }
   });
