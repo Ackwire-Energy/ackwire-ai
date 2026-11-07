@@ -172,7 +172,7 @@ function HandoffAsk({
       waitsFor={mine ? "you" : asked ? t("ask.waitingFor", { name: asked }) : null}
       lead={h.instructions}
       well={{
-        tile: <IconTile name={desktop ? "laptop" : "globe"} size={20} />,
+        tile: <IconTile name={desktop ? "laptop" : "globe"} size={20} bare />,
         title: name,
         detail: null,
         more: desktop ? null : { label: t("ask.seeScreen"), content: <ScreenPeek agentId={h.agentId} /> },

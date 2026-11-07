@@ -480,7 +480,9 @@ function fileContent(
   body: Uint8Array | null,
 ): FileContent {
   const name = v.fileName ?? "file";
-  const content: FileContent = { kind: "file", name, contentType: v.contentType, size: v.size, sha256: v.sha256 };
+  // By its name first (a picture stored as plain bytes before uploads were typed by name reads as a picture).
+  const contentType = fileContentType(name, v.contentType);
+  const content: FileContent = { kind: "file", name, contentType, size: v.size, sha256: v.sha256 };
   if (body && isTextFile(name, v.contentType)) {
     try {
       const text = new TextDecoder("utf-8", { fatal: true }).decode(body);
@@ -2145,7 +2147,8 @@ export async function artifactFile(
       throw new ValidationError(`${options.format.toUpperCase()} export is not available for uploaded files`);
     }
     const object = await readVersion(deps, a, v);
-    return { body: object.body, contentType: v.contentType, filename: v.fileName ?? fileName(a, v.version, "bin") };
+    const filename = v.fileName ?? fileName(a, v.version, "bin");
+    return { body: object.body, contentType: fileContentType(filename, v.contentType), filename };
   }
   const object = await readVersion(deps, a, v);
   const content = decode(a.kind, object.body);

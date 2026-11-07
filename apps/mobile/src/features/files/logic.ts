@@ -43,6 +43,8 @@ const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/x-m4v", "video/webm"]);
 /** Names that already say "video" while the file's details load (no jump from card to player). */
 export const VIDEO_EXT = new Set(["mp4", "mov", "m4v", "webm"]);
+/** Names that say "picture": while the details load, and when the stored type doesn't (an upload typed as bytes). */
+export const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"]);
 const MARKDOWN_EXT = new Set(["md", "markdown", "mdx"]);
 const TEXT_EXT = new Set(["txt", "log", "csv", "tsv", "json", "yml", "yaml", "toml", "xml", "ini", "env"]);
 
@@ -106,9 +108,11 @@ export function fileInfo(a: Pick<ArtifactDetail, "kind" | "title" | "content">):
     const name = c.name || a.title;
     const ext = extensionOf(name);
     const mime = previewType(c.contentType);
+    // The type says what it is; a file stored as plain bytes goes by its name.
+    const untyped = !mime || mime === "application/octet-stream";
     let view: FileView = "other";
-    if (IMAGE_TYPES.has(mime)) view = "image";
-    else if (VIDEO_TYPES.has(mime)) view = "video";
+    if (IMAGE_TYPES.has(mime) || (untyped && IMAGE_EXT.has(ext))) view = "image";
+    else if (VIDEO_TYPES.has(mime) || (untyped && VIDEO_EXT.has(ext))) view = "video";
     else if (mime === "application/pdf" || ext === "pdf") view = "pdf";
     else if (MARKDOWN_EXT.has(ext) || mime === "text/markdown") view = "markdown";
     else if (TEXT_EXT.has(ext) || mime.startsWith("text/")) view = "text";

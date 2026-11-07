@@ -9717,6 +9717,10 @@
     "moreRows_other": "+ {{count}} rijen",
     "moreFiles_one": "+ {{count}} bestand",
     "moreFiles_other": "+ {{count}} bestanden",
+    "rows_one": "{{count}} rij",
+    "rows_other": "{{count}} rijen",
+    "files_one": "{{count}} bestand",
+    "files_other": "{{count}} bestanden",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} regels toegevoegd, {{removed}} verwijderd",
     "htmlPreview": "Interactieve pagina. Open hem om te bekijken.",
@@ -15078,7 +15082,8 @@
     "where": {
       "dm": "Direct bericht",
       "routine": "Routine «{{name}}»",
-      "background": "Op de achtergrond"
+      "background": "Op de achtergrond",
+      "here": "Dit gesprek"
     },
     "askedBy": "{{name}} vroeg het",
     "askedByYou": "Jij vroeg het",

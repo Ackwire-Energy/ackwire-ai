@@ -12,7 +12,14 @@ import {
   serverDownOf,
 } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
-import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
+import {
+  createHolder,
+  deviceBody,
+  devicePath,
+  quietWhileOpen,
+  readPushData,
+  systemToken,
+} from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
 import { createSocketFactory } from "../src/lib/socket";
 import { ICON_NAMES } from "../src/ui/icons.data";
@@ -33,6 +40,14 @@ describe("push payload", () => {
     });
     expect(deviceBody("t", "android", "en").platform).toBe("android");
     expect(devicePath("ExponentPushToken[a b]")).toBe("/api/app/push/devices/ExponentPushToken%5Ba%20b%5D");
+  });
+  test("the system's push token is the FCM token string, nothing else", () => {
+    const fromAndroid = { type: "android", data: "fcm:APA91b-token" };
+    expect(systemToken(fromAndroid)).toBe("fcm:APA91b-token");
+    expect(systemToken({ data: "" })).toBeNull();
+    expect(systemToken({ data: { endpoint: "https://push.example" } })).toBeNull();
+    expect(systemToken({ data: "x".repeat(2049) })).toBeNull();
+    expect(systemToken(null)).toBeNull();
   });
   test("a push about the conversation on screen stays quiet", () => {
     const open = { orgId: "o1", channelId: "c1" };

@@ -12,7 +12,7 @@ import { callLogo } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import {
   Button,
@@ -171,8 +171,19 @@ export function UsingLine({ task }: { task: ManagedTask }) {
 
 /**
  * A task's "Parar": one tap, nothing asked (what it did stays, and the agent is told); a spinner while it stops.
+ * `compact`: only the stop square on a round plate (the agent's list, where the word crowds the title).
  */
-export function StopButton({ label, stopping, onPress }: { label: string; stopping: boolean; onPress: () => void }) {
+export function StopButton({
+  label,
+  stopping,
+  onPress,
+  compact = false,
+}: {
+  label: string;
+  stopping: boolean;
+  onPress: () => void;
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const reduced = useReducedMotion();
@@ -181,12 +192,24 @@ export function StopButton({ label, stopping, onPress }: { label: string; stoppi
     return (
       <Animated.View
         entering={reduced ? undefined : FadeIn.duration(160)}
-        style={styles.stopping}
+        style={compact ? styles.stoppingCompact : styles.stopping}
         accessible
         accessibilityLabel={t("taskManager.state.stopping")}
       >
         <ActivityIndicator size="small" color={c.muted} />
       </Animated.View>
+    );
+  if (compact)
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={8}
+        style={({ pressed }) => [styles.stopCompact, { backgroundColor: c.plate }, pressed && styles.pressed]}
+      >
+        <PixelStop size={10} color={c.ink} moving={false} />
+      </Pressable>
     );
   return (
     <Button
@@ -302,6 +325,9 @@ const styles = StyleSheet.create({
   },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  stopCompact: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  stoppingCompact: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.6 },
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },
   input: { paddingVertical: 8 },
   confirm: { gap: 10 },

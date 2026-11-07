@@ -9302,6 +9302,8 @@
     "notFound": "这个文件已不存在，或者你没有访问权限。",
     "moreRows_other": "+ {{count}} 行",
     "moreFiles_other": "+ {{count}} 个文件",
+    "rows_other": "{{count}} 行",
+    "files_other": "{{count}} 个文件",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "新增 {{added}} 行，删除 {{removed}} 行",
     "htmlPreview": "交互式页面，打开即可查看。",
@@ -14557,7 +14559,8 @@
     "where": {
       "dm": "私信",
       "routine": "例行工作“{{name}}”",
-      "background": "后台"
+      "background": "后台",
+      "here": "当前对话"
     },
     "askedBy": "由 {{name}} 提出",
     "askedByYou": "由你提出",
