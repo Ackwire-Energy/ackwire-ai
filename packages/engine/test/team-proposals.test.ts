@@ -359,6 +359,12 @@ describe("the team card", () => {
     const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
     expect((await denyTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).card.state).toBe("denied");
     await expect(createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).rejects.toThrow();
+    const told = await f.db
+      .select({ meta: schema.messages.meta })
+      .from(schema.messages)
+      .where(eq(schema.messages.channelId, ctx.channelId));
+    const notice = told.map((m) => (m.meta.notice as { text?: string } | undefined)?.text).find(Boolean);
+    expect(notice).toStartWith("ana dismissed it.");
   });
 });
 

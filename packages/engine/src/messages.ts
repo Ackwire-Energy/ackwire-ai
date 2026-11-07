@@ -683,13 +683,13 @@ export async function insertMessageWithRuns(
   const quoted = person ? (input.meta?.replyTo as ReplyRef | undefined)?.author : undefined;
   const quotedAgentId = quoted?.type === "agent" && quoted.id && UUID.test(quoted.id) ? quoted.id : null;
   /**
-   * SQL: the message is for another agent than `agent`: it mentions others and not it, or quotes another agent's
-   * message. Then no task in progress of `agent`, question of its, background work or held run takes it: it is routed.
+   * SQL: the message is for another agent than `agent`: it doesn't mention it, and mentions others or quotes another
+   * agent's message (a mention wins: "@dev see what Theo said" quoting Theo is for Dev). Then no task in progress of
+   * `agent`, question of its, background work or held run takes it: it is routed.
    */
-  const forAnother = (
-    agent: SQL,
-  ) => sql`((exists (select 1 from mentioned) and ${agent} not in (select id from mentioned))
-    or (${quotedAgentId}::uuid is not null and ${agent} <> ${quotedAgentId}::uuid))`;
+  const forAnother = (agent: SQL) => sql`(${agent} not in (select id from mentioned)
+    and (exists (select 1 from mentioned)
+      or (${quotedAgentId}::uuid is not null and ${agent} <> ${quotedAgentId}::uuid)))`;
   /**
    * SQL: a reply in a thread joins run `r` only when the person talks to its agent there: not for another agent, and
    * it quotes that agent, the run answers this person, or that agent spoke last in the thread. A run another agent
