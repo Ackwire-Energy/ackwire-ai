@@ -344,7 +344,7 @@ describe("the agent page's cards and the chat's", () => {
     // Only a head with a button (32px) reaches into the padding; a title alone (22px) stays 12px in.
     expect(declarations(css, ".agp-card>.ac-card__head:first-child")).toEqual([]);
     expect(value(css, ".agp-card>.ac-card__head:first-child:has(.ac-card__action .ac-btn)", "margin-block")).toBe(
-      "-6px -2px",
+      "calc(var(--action-clear) - var(--row-py)) -2px",
     );
     // The foot reaches the card's bottom edge (12px), not past it (--card-pad is 20px).
     expect(value(css, ".agp-card>.ac-card__foot", "margin-bottom")).toBe("-12px");
