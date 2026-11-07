@@ -27794,7 +27794,7 @@
     "value": "The computer's app is too old for this. Update it and try again."
   },
   "errors.said.offHere": {
-    "value": "This is turned off on this server."
+    "value": "This is turned off here."
   },
   "errors.said.notInConversation": {
     "value": "They aren't in this conversation."

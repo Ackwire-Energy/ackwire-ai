@@ -11893,7 +11893,7 @@
       "checkAddress": "Vérifiez l'adresse et réessayez.",
       "tooLong": "C'est trop long. Raccourcissez et réessayez.",
       "updateComputerApp": "L'application de l'ordinateur est trop ancienne pour ceci. Mettez-la à jour et réessayez.",
-      "offHere": "Ceci est désactivé sur ce serveur.",
+      "offHere": "Ceci est désactivé ici.",
       "notInConversation": "Absent de cette conversation.",
       "accountStart": "L'ordinateur n'a pas pu lancer la connexion. Vérifiez qu'il est allumé et réessayez.",
       "accountInUse": "Ce compte pense déjà pour un autre agent.",

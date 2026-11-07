@@ -11403,7 +11403,7 @@
       "checkAddress": "Adresi kontrol edip tekrar deneyin.",
       "tooLong": "Bu çok uzun. Kısaltıp tekrar deneyin.",
       "updateComputerApp": "Bilgisayardaki uygulama bunun için çok eski. Güncelleyip tekrar deneyin.",
-      "offHere": "Bu, bu sunucuda kapalı.",
+      "offHere": "Bu, burada kapalı.",
       "notInConversation": "Bu sohbette değil.",
       "accountStart": "Bilgisayar girişi başlatamadı. Açık olduğunu kontrol edip tekrar deneyin.",
       "accountInUse": "Bu hesap zaten başka bir ajan için düşünüyor.",
