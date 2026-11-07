@@ -10269,7 +10269,7 @@
   "storage": {
     "title": "Archiviazione",
     "options": "Dove conservare i file",
-    "agentes": "Archiviazione agentes",
+    "agentes": "Archiviazione agentes.chat",
     "agentesText": "I tuoi file restano nel nostro archivio, separati per spazio di lavoro.",
     "server": "Questo server",
     "serverText": {
@@ -10280,7 +10280,7 @@
     },
     "showFolder": "Mostra la cartella",
     "place": {
-      "agentes": "l'archiviazione agentes",
+      "agentes": "l'archiviazione agentes.chat",
       "server": "questo server"
     },
     "s3": "Il tuo bucket",

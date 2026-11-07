@@ -23,6 +23,7 @@ import {
   insertText,
   type TextEdit,
 } from "../format";
+import { useMatchMedia } from "../hooks/useMatchMedia";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { type EmojiPickerLabels, EmojiPickerPopover, type PickerTab } from "./EmojiPicker";
@@ -407,6 +408,10 @@ export function Composer({
 }: ComposerProps) {
   const locked = useLocked();
   const disabled = off || locked;
+  // On a phone a long placeholder doesn't fit, and a focused field never ends it in "…" (the browser drops the ellipsis
+  // while editing): it says what goes there, without the tip after its " · ".
+  const phone = useMatchMedia("(max-width: 640px)");
+  const shownPlaceholder = phone ? placeholder?.split(" · ")[0] : placeholder;
   const ref = useRef<HTMLTextAreaElement>(null);
   const wave = useRef<HTMLCanvasElement>(null);
   const rec = useVoiceRecorder(voice, wave);
@@ -697,7 +702,7 @@ export function Composer({
       rows={1}
       aria-label={label}
       data-esc-own={keepsEsc ? "" : undefined}
-      placeholder={placeholder}
+      placeholder={shownPlaceholder}
       value={value}
       disabled={disabled}
       onChange={(e) => {

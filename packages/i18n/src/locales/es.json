@@ -10187,7 +10187,7 @@
   "storage": {
     "title": "Almacenamiento",
     "options": "Dónde guardar los archivos",
-    "agentes": "Almacenamiento de agentes",
+    "agentes": "Almacenamiento de agentes.chat",
     "agentesText": "Tus archivos se quedan en nuestro almacenamiento, separados por espacio de trabajo.",
     "server": "Este servidor",
     "serverText": {
@@ -10198,7 +10198,7 @@
     },
     "showFolder": "Mostrar la carpeta",
     "place": {
-      "agentes": "almacenamiento de agentes",
+      "agentes": "almacenamiento de agentes.chat",
       "server": "este servidor"
     },
     "s3": "Tu propio bucket",

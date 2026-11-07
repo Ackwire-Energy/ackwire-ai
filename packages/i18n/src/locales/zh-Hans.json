@@ -9514,7 +9514,7 @@
   "storage": {
     "title": "存储",
     "options": "文件存放位置",
-    "agentes": "agentes 存储",
+    "agentes": "agentes.chat 存储",
     "agentesText": "你的文件保存在我们的存储中，每个工作区彼此隔离。",
     "server": "这台服务器",
     "serverText": {
@@ -9525,7 +9525,7 @@
     },
     "showFolder": "显示文件夹",
     "place": {
-      "agentes": "agentes 存储",
+      "agentes": "agentes.chat 存储",
       "server": "这台服务器"
     },
     "s3": "你自己的存储桶",

@@ -10647,7 +10647,7 @@
   "storage": {
     "title": "Miejsce na dane",
     "options": "Gdzie przechowywać pliki",
-    "agentes": "Przestrzeń dyskowa agentes",
+    "agentes": "Przestrzeń dyskowa agentes.chat",
     "agentesText": "Twoje pliki zostają w naszej przestrzeni dyskowej, oddzielnie dla każdej przestrzeni roboczej.",
     "server": "Ten serwer",
     "serverText": {
@@ -10658,7 +10658,7 @@
     },
     "showFolder": "Pokaż folder",
     "place": {
-      "agentes": "przestrzeń dyskowa agentes",
+      "agentes": "przestrzeń dyskowa agentes.chat",
       "server": "ten serwer"
     },
     "s3": "Twój własny bucket",

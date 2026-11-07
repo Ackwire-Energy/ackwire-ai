@@ -24091,7 +24091,7 @@
     "value": "Where to keep files"
   },
   "storage.agentes": {
-    "value": "agentes storage"
+    "value": "agentes.chat storage"
   },
   "storage.agentesText": {
     "value": "Your files stay in our storage, kept apart per workspace."
@@ -24115,7 +24115,7 @@
     "value": "Show the folder"
   },
   "storage.place.agentes": {
-    "value": "agentes storage"
+    "value": "agentes.chat storage"
   },
   "storage.place.server": {
     "value": "this server"

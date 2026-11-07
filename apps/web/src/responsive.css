@@ -253,9 +253,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Chrome draws that "…" only when the field has it as well. */
+  /* Chrome draws that "…" only when the field itself has it, on one line it doesn't wrap (empty, so nothing typed). */
   .ac-composer textarea:placeholder-shown {
+    overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 /* Agent page: one column below the desktop (the public card's cards; the overview is one column already). */

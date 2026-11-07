@@ -10255,7 +10255,7 @@
   "storage": {
     "title": "Stockage",
     "options": "Où conserver les fichiers",
-    "agentes": "Stockage agentes",
+    "agentes": "Stockage agentes.chat",
     "agentesText": "Vos fichiers restent dans notre stockage, séparés par espace de travail.",
     "server": "Ce serveur",
     "serverText": {
@@ -10266,7 +10266,7 @@
     },
     "showFolder": "Afficher le dossier",
     "place": {
-      "agentes": "le stockage agentes",
+      "agentes": "le stockage agentes.chat",
       "server": "ce serveur"
     },
     "s3": "Votre propre bucket",

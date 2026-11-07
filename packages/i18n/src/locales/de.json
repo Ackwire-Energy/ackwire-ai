@@ -9871,7 +9871,7 @@
   "storage": {
     "title": "Speicher",
     "options": "Wo Dateien liegen",
-    "agentes": "agentes-Speicher",
+    "agentes": "agentes.chat-Speicher",
     "agentesText": "Deine Dateien bleiben in unserem Speicher, pro Workspace getrennt.",
     "server": "Dieser Server",
     "serverText": {
@@ -9882,7 +9882,7 @@
     },
     "showFolder": "Ordner anzeigen",
     "place": {
-      "agentes": "agentes-Speicher",
+      "agentes": "agentes.chat-Speicher",
       "server": "dieser Server"
     },
     "s3": "Dein eigener Bucket",

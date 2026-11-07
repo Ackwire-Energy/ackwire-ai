@@ -32,6 +32,7 @@ import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agente
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   keyLooksValid,
+  keyNamedAfterProvider,
   type ProviderId,
   providerGuess,
   providerLabel,
@@ -779,7 +780,7 @@ function KeysSection() {
                   <span className="small muted">
                     {c.endpoint
                       ? `${c.endpoint.baseURL} · `
-                      : `${providerLabel(c.provider)} · ${t("settings.keyEndsIn", { hint: c.keyHint })} · `}
+                      : `${keyNamedAfterProvider(c) ? "" : `${providerLabel(c.provider)} · `}${t("settings.keyEndsIn", { hint: c.keyHint })} · `}
                     <span style={{ whiteSpace: "nowrap" }}>
                       {t("settings.keyAdded", { when: relativeTime(t, i18n.language, c.createdAt) })}
                     </span>

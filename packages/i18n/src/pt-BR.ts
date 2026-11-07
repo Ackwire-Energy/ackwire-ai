@@ -5917,7 +5917,7 @@ export const ptBR = {
     assigneeFilter: "Responsável",
     priorityFilter: "Prioridade",
     title: "Tarefas",
-    summary: "{{open}} abertas · {{agents}} com agentes",
+    summary: "{{open}} em aberto · {{agents}} com agentes",
     search: "Buscar tarefas",
     view: "Visualização",
     board: "Quadro",
@@ -9894,7 +9894,7 @@ export const ptBR = {
   storage: {
     title: "Armazenamento",
     options: "Onde guardar os arquivos",
-    agentes: "Armazenamento do agentes",
+    agentes: "Armazenamento do agentes.chat",
     agentesText: "Seus arquivos ficam no nosso armazenamento, separados por workspace.",
     server: "Este servidor",
     serverText: {
@@ -9906,7 +9906,7 @@ export const ptBR = {
     showFolder: "Mostrar a pasta",
     // `{{place}}` in the lines below: each is built so no preposition has to merge with it ("neste", "no").
     place: {
-      agentes: "o armazenamento do agentes",
+      agentes: "o armazenamento do agentes.chat",
       server: "este servidor",
     },
     s3: "Seu próprio bucket",

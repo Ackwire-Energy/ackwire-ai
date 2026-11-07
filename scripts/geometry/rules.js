@@ -57,7 +57,7 @@
         +s.opacity !== 0 &&
         r.width > 1 &&
         r.height > 1 &&
-        !el.closest(".sr-only,.ac-sr-only,.visually-hidden,[hidden],[inert]");
+        !el.closest(".sr-only,.ac-sr-only,.visually-hidden,.ac-visually-hidden,[hidden],[inert]");
       seenOf.set(el, on);
     }
     return on;
@@ -80,6 +80,18 @@
         return true;
     }
     return false;
+  };
+  /** The nearest box that clips the words of `el` sideways, unless its "…" reaches them (inline all the way down). */
+  const cutBy = (el) => {
+    let inline = style(el).display === "inline";
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const ps = style(p);
+      if (ps.overflowX === "hidden" || ps.overflowX === "clip")
+        return inline && ps.textOverflow === "ellipsis" ? null : p;
+      if (ps.overflowX !== "visible") return null;
+      inline = inline && ps.display === "inline";
+    }
+    return null;
   };
   const inFloat = (el) => el.closest("[data-radix-popper-content-wrapper],[data-radix-portal]");
   const textRange = (node) => {
@@ -395,6 +407,31 @@
             out.push({ rule: "clipped", node: el, el: sig(el), px: wide, text: words(el) });
           if (clips(s.overflowY) && tall > 2 && s.webkitLineClamp === "none" && s.textOverflow !== "ellipsis")
             out.push({ rule: "clipped", node: el, el: sig(el), px: tall, text: words(el) });
+          // Cut by a box around it instead: that box's "…" reaches only words on its own lines, not a block inside it
+          // (a picker's two lines, a flex column), so they stop mid-word at its edge.
+          const by = clips(s.overflowX) ? null : cutBy(el);
+          if (by) {
+            const edge = by.getBoundingClientRect().left + by.clientLeft + by.clientWidth;
+            let start = Infinity;
+            let end = -Infinity;
+            for (const n of el.childNodes) {
+              if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+              for (const r of textRange(n).getClientRects()) {
+                if (r.width <= 0) continue;
+                start = Math.min(start, r.left);
+                end = Math.max(end, r.right);
+              }
+            }
+            if (start < edge && end - edge > 1)
+              out.push({
+                rule: "clipped",
+                node: el,
+                el: sig(el),
+                box: placeOf(el),
+                px: Math.round(end - edge),
+                text: words(el),
+              });
+          }
         }
         if (el.children.length > 1 && s.display !== "inline") {
           // An inline box's rectangle spans every line it wraps on, and a float's words flow around it: neither overlaps.
@@ -441,6 +478,43 @@
           if (n.nodeType === 3) for (const r of textRange(n).getClientRects()) tops.add(Math.round(r.top));
         if (tops.size >= 3 && count / tops.size < 1.6)
           out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines: tops.size, text: words(el) });
+      }
+    },
+    /**
+     * Words broken inside themselves: more lines than words, so the box is narrower than its own words. `wordwrap` looks
+     * only at text right inside a row; this catches it however deep the row that squeezes it is (a title beside a bar's
+     * buttons, wrapped in a link or an edit-in-place).
+     */
+    midword(out) {
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table")) continue;
+        let count = 0;
+        const tops = new Set();
+        for (const n of el.childNodes) {
+          if (n.nodeType !== 3) continue;
+          count += n.textContent.trim().split(/\s+/).filter(Boolean).length;
+          for (const r of textRange(n).getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
+        }
+        if (count >= 2 && tops.size >= 3 && tops.size > count)
+          out.push({ rule: "midword", node: el, el: sig(el), box: placeOf(el), lines: tops.size, text: words(el) });
+      }
+    },
+    /** A line its "…" leaves a letter or two of ("O…" for an agent's name): it says nothing, the row gave it no room. */
+    stub(out) {
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table,textarea,input")) continue;
+        const s = style(el);
+        // An inline box has no width of its own (`clientWidth` 0) and draws no "…": its block does.
+        if (s.display === "inline" || s.textOverflow !== "ellipsis" || !["hidden", "clip"].includes(s.overflowX))
+          continue;
+        if (words(el).length <= 3 || el.clientWidth >= 2.5 * parseFloat(s.fontSize)) continue;
+        // Its words' own width: with an ellipsis `scrollWidth` can stay a pixel past the box however much it cut ("Otto" in
+        // 34px read "O…" with 35).
+        let natural = el.scrollWidth;
+        for (const n of el.childNodes)
+          if (n.nodeType === 3) natural = Math.max(natural, textRange(n).getBoundingClientRect().width);
+        if (natural - el.clientWidth > 0.5)
+          out.push({ rule: "stub", node: el, el: sig(el), box: placeOf(el), px: el.clientWidth, text: words(el) });
       }
     },
     viewport(out) {

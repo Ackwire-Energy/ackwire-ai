@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { Credential, Model } from "../api/types";
 
 interface ProviderEntry {
@@ -104,6 +105,17 @@ export type ProviderId = (typeof PROVIDERS)[number]["id"];
 export const providerOf = (id: string): ProviderEntry | undefined =>
   PROVIDERS.find((p) => p.id === id || p.label === id);
 export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
+/**
+ * A saved key's line under its name: "Claude · termina em 1a2b", or only "termina em 1a2b" when its name is already the
+ * provider's (a key named after nothing else, as most are), never "Claude" over "Claude · …".
+ */
+export const keyLine = (t: TFunction, key: Pick<Credential, "label" | "provider" | "keyHint">) =>
+  keyNamedAfterProvider(key)
+    ? t("vault.item.endsIn", { hint: key.keyHint })
+    : t("newAgent.otherKeyDesc", { provider: providerLabel(key.provider), hint: key.keyHint });
+/** A key whose name is only its provider's ("Claude"): a line under it needn't say the provider again. */
+export const keyNamedAfterProvider = (key: Pick<Credential, "label" | "provider">) =>
+  key.label.trim().toLocaleLowerCase() === providerLabel(key.provider).toLocaleLowerCase();
 export const isProviderId = (id: string): id is ProviderId => PROVIDERS.some((p) => p.id === id);
 export const keyLooksValid = (provider: ProviderId, key: string) =>
   (providerOf(provider)?.pattern ?? /.{8,}/).test(key.trim());

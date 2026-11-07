@@ -62,6 +62,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
+  keyLine,
   keyLooksValid,
   keyRuns,
   keyStepHint,
@@ -411,9 +412,7 @@ export function ExistingRows({
           <ProviderLogo id={k.provider} size="sm" />
           <span className="ac-option__text">
             <span className="ac-option__title">{k.label}</span>
-            <span className="ac-option__desc">
-              {t("newAgent.otherKeyDesc", { provider: providerLabel(k.provider), hint: k.keyHint })}
-            </span>
+            <span className="ac-option__desc">{keyLine(t, k)}</span>
             <span className="ac-option__desc">{t("agentPage.work.brain.modelText", g)}</span>
           </span>
         </OptionCard>

@@ -44,13 +44,33 @@ export function AgentTasksPill() {
   const { tasks, open, toggle } = control;
   const { waiting } = agentSummary(tasks);
   const working = tasks.find((task) => taskState(task) === "working");
+  const words = t("taskManager.tasks", { count: tasks.length });
+  const wait = waiting > 0 ? t("taskManager.waiting", { count: waiting }) : null;
+  // On a phone only the counts show, as the phone app's badge: the words took the agent's name down to "O…".
   return (
-    <Button size="sm" className="tm-pill" aria-expanded={open} onClick={toggle}>
+    <Button
+      size="sm"
+      className="tm-pill"
+      aria-label={wait ? `${words} · ${wait}` : words}
+      aria-expanded={open}
+      onClick={toggle}
+    >
       <span className="tm-pill__mark" aria-hidden="true">
         {working ? <AgentSpinner agentId={working.agentId} size={14} /> : <WaitMark />}
       </span>
-      {t("taskManager.tasks", { count: tasks.length })}
-      {waiting > 0 && <span className="tm-pill__wait">{` · ${t("taskManager.waiting", { count: waiting })}`}</span>}
+      <span className="tm-pill__words" aria-hidden="true">
+        {words}
+        {wait && <span className="tm-pill__wait">{` · ${wait}`}</span>}
+      </span>
+      <span className="tm-pill__count" aria-hidden="true">
+        {tasks.length}
+        {working && wait && (
+          <>
+            <WaitMark />
+            <span className="tm-pill__wait">{waiting}</span>
+          </>
+        )}
+      </span>
       <Icon name="chevronRight" size={14} className="tm-pill__chevron" />
     </Button>
   );

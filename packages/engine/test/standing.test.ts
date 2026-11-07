@@ -610,6 +610,21 @@ describe("billing hold", () => {
     ]);
   });
 
+  test("the first plan lifting the payment hold starts the workspace with no 'working again' notice", async () => {
+    f = await setup();
+    await billing("payment");
+    expect(await billing(null)).toMatchObject({ applied: true, standing: { state: "active" } });
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", billingHold: "payment" }]);
+    // A plan that ended or failed and came back is a return: told.
+    await billing("ended");
+    await billing(null);
+    expect((await standingNotices()).map((n) => n.latest)).toMatchObject([
+      { statusTo: "hold" },
+      { statusTo: "hold" },
+      { statusTo: "active" },
+    ]);
+  });
+
   test("never replaces nor lifts a hold set through the standing, shown or silent, or a suspension", async () => {
     f = await setup();
     await standing("hold");

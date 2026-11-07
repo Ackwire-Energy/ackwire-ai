@@ -47,7 +47,7 @@ describe("Issues (board and list)", () => {
   test("board by status with counts, summary, PR, priority and due date", async () => {
     await go("issues");
     expect(screen().getByRole("heading", { level: 1, name: "Tarefas" })).toBeTruthy();
-    expect(screen().getByText("5 abertas · 3 com agentes")).toBeTruthy();
+    expect(screen().getByText("5 em aberto · 3 com agentes")).toBeTruthy();
     expect(cardTitles(column("A fazer"))).toEqual([
       "Tabela de concorrentes atualizada",
       "Confirmação do agendamento por WhatsApp",

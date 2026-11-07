@@ -3280,6 +3280,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex-direction: column;
   gap: 4px;
   padding: var(--details-pad) var(--details-pad) 0;
+  container: ac-details-head / inline-size;
 }
 .ac-details__bar {
   display: flex;
@@ -3313,6 +3314,27 @@ html:not([data-pointer]) .ac-back:focus-visible {
 /* The buttons (32px, 40px on touch) centred on that first line (28px), not hung from its top. */
 .ac-details__bar--titled > .ac-details__actions {
   height: 28px;
+}
+/*
+ * A head too narrow for both (a phone, a narrow pane): the buttons keep their line at the top right and the title takes
+ * the whole line under them, instead of wrapping a letter or two at a time beside them. A title the caller puts in the
+ * eyebrow (a heading, or its field while edited in place, as a task's) is a title too.
+ */
+@container ac-details-head (max-width: 520px) {
+  .ac-details__bar--titled,
+  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .ac-details__bar--titled > .ac-details__actions,
+  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) > .ac-details__actions {
+    order: -1;
+    margin-left: auto;
+  }
+  .ac-details__bar--titled > .ac-details__heading,
+  .ac-details__bar > .ac-details__eyebrow:has(:is(h1, h2, [data-inplace])) {
+    flex-basis: 100%;
+  }
 }
 .ac-details__heading {
   display: flex;

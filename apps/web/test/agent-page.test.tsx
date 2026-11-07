@@ -269,6 +269,11 @@ describe("agent page: the budget on the overview", () => {
     const { router } = await go("?tab=overview");
     const work = screen().getByRole("region", { name: "Como trabalha" });
     const team = screen().getByRole("region", { name: "Com quem" });
+    // Its channels are names as written: no capital on the letter after the # (a sentence's value gets one).
+    const channels = within(team).getByRole("button", { name: "Canais" }).querySelector(".agp-cell__value");
+    expect(channels?.textContent).toMatch(/^#/);
+    expect(channels?.hasAttribute("data-name")).toBe(true);
+    expect(within(team).getByRole("button", { name: "Responsável" }).querySelector("[data-name]")).toBeNull();
     for (const [row, title] of [
       ["Responsável", "Responsável"],
       ["Quem pode falar", "Quem pode falar com a Ada"],
