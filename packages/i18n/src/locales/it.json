@@ -13572,6 +13572,8 @@
     "status": {
       "one": "Al lavoro su: {{subject}}",
       "oneUntitled": "Al lavoro in background",
+      "oneFor": "Al lavoro da {{duration}}: {{subject}}",
+      "oneUntitledFor": "Al lavoro da {{duration}} in background",
       "two": "Su 2 lavori: {{first}} e {{second}}",
       "many": "Su {{count}} lavori: {{subject}} e altri {{more}}",
       "manyUntitled": "Su {{count}} lavori in background",
@@ -13765,7 +13767,6 @@
       "autoApprovedNobody": "Approvato automaticamente",
       "error": "errore",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Ha programmato un promemoria",
         "creatingRoutine": "Ha creato una routine",

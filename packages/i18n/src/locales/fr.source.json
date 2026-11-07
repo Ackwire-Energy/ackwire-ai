@@ -31833,6 +31833,12 @@
   "work.status.oneUntitled": {
     "value": "Working in the background"
   },
+  "work.status.oneFor": {
+    "value": "Working for {{duration}}: {{subject}}"
+  },
+  "work.status.oneUntitledFor": {
+    "value": "Working for {{duration}} in the background"
+  },
   "work.status.two": {
     "value": "On 2 jobs: {{first}} and {{second}}"
   },
@@ -32263,9 +32269,6 @@
   },
   "chat.work.seconds": {
     "value": "{{n}} s"
-  },
-  "chat.work.minutes": {
-    "value": "{{n}} min"
   },
   "chat.work.step.schedulingReminder": {
     "value": "Scheduled a reminder"

@@ -13164,6 +13164,8 @@
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
+      "oneFor": "Al {{duration}} bezig: {{subject}}",
+      "oneUntitledFor": "Al {{duration}} bezig op de achtergrond",
       "two": "Met 2 klussen bezig: {{first}} en {{second}}",
       "many": "Met {{count}} klussen bezig: {{subject}} en nog {{more}}",
       "manyUntitled": "Met {{count}} klussen bezig op de achtergrond",
@@ -13352,7 +13354,6 @@
       "autoApprovedNobody": "Automatisch goedgekeurd",
       "error": "fout",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Een herinnering gepland",
         "creatingRoutine": "Een routine gemaakt",

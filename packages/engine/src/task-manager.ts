@@ -98,7 +98,7 @@ export interface ManagedTask {
   status: TaskStatus;
   startedAt: string | null;
   createdAt: string;
-  /** What it works on: the long work's title, the thread's title, else its first message (≤ 80, plain text). */
+  /** What it works on: the long work's title, else the thread's, never its first message's words (≤ 80, plain text). */
   label: string | null;
   /** A routine's background run. */
   background: boolean;
@@ -208,7 +208,6 @@ type Row = {
   name: string;
   dm_key: string | null;
   title: string | null;
-  root_body: string | null;
   pending: string[] | string | null;
   background: boolean | string;
   brain: string | null;
@@ -271,7 +270,7 @@ async function visibleRuns(
   const limit = which.active ? TASK_MANAGER_MAX : TASK_MANAGER_ENDED_MAX;
   return rowsOf<Row>(
     await db.execute(sql`select r.id, r.agent_id, r.channel_id, ${shownStatusSql} as status, r.thread_root_id, r.trigger_message_id,
-        r.started_at, r.created_at, r.finished_at, r.error, c.kind, c.name, c.dm_key, t.title, root.body as root_body,
+        r.started_at, r.created_at, r.finished_at, r.error, c.kind, c.name, c.dm_key, t.title,
         array_to_json(r.pending_message_ids) as pending, r.background, r.brain,
         a.owner_user_id, a.machine_id, mc.name as machine_name,
         trig.author_user_id as requester_id, ru.name as requester_name, trig.author_agent_id as asker_agent_id,
@@ -289,11 +288,6 @@ async function visibleRuns(
       left join ${machines} mc on mc.org_id = ${orgId}::uuid and mc.id = a.machine_id
       left join ${schema.agentWorks} w on w.id = r.work_id
       left join ${threads} t on t.org_id = ${orgId}::uuid and t.root_message_id = r.thread_root_id
-      left join lateral (
-        select m.body from ${messages} m
-        where m.org_id = ${orgId}::uuid and m.id = r.thread_root_id and m.deleted_at is null
-        limit 1
-      ) root on true
       left join lateral (
         select m.author_user_id, m.author_agent_id from ${messages} m
         where m.org_id = ${orgId}::uuid and m.id = r.trigger_message_id
@@ -449,7 +443,11 @@ const planOf = (raw: { state: string }[] | string | null) => {
 
 const betweenAgents = (r: Pick<Row, "kind" | "dm_key">) => isAgentOnlyDm({ kind: r.kind, dmKey: r.dm_key });
 
-const labelOf = (r: Row) => replyExcerpt(r.work_title?.trim() || r.title?.trim() || r.root_body || "", 80) || null;
+/**
+ * What a task is called: its work's title or its thread's, never the words of the message that started it (a raw
+ * ask, a link, a GIF). With neither, the apps say where it is ("#produto", "Conversa direta").
+ */
+const labelOf = (r: Row) => replyExcerpt(r.work_title?.trim() || r.title?.trim() || "", 80) || null;
 
 function nowOf(r: Row): TaskNow | null {
   const data = typeof r.last_data === "string" ? (JSON.parse(r.last_data) as Record<string, unknown>) : r.last_data;

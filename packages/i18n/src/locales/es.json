@@ -13500,6 +13500,8 @@
     "status": {
       "one": "Trabajando en: {{subject}}",
       "oneUntitled": "Trabajando en segundo plano",
+      "oneFor": "Trabajando desde hace {{duration}}: {{subject}}",
+      "oneUntitledFor": "Trabajando desde hace {{duration}} en segundo plano",
       "two": "En 2 trabajos: {{first}} y {{second}}",
       "many": "En {{count}} trabajos: {{subject}} y {{more}} más",
       "manyUntitled": "En {{count}} trabajos en segundo plano",
@@ -13682,7 +13684,6 @@
       "autoApprovedNobody": "Aprobado automáticamente",
       "error": "error",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Programó un recordatorio",
         "creatingRoutine": "Creó una rutina",

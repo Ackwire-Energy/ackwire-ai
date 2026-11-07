@@ -269,12 +269,6 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.tm-name__title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 /* A long prompt takes two lines at most: the row's state and place say what matters. */
 .tm-hit__text {
   display: -webkit-box;
@@ -420,8 +414,7 @@ html:not([data-pointer]) .tm-more:focus-visible {
 .tm-row--ended:first-child {
   border-top: 0;
 }
-.tm-row--ended .tm-name__title {
-  font-weight: 500;
+.tm-row--ended .tm-hit {
   color: var(--ink2);
 }
 

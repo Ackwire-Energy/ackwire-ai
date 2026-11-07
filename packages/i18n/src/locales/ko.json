@@ -12604,6 +12604,8 @@
     "status": {
       "one": "작업 중: {{subject}}",
       "oneUntitled": "백그라운드에서 작업 중",
+      "oneFor": "{{duration}}째 작업 중: {{subject}}",
+      "oneUntitledFor": "{{duration}}째 백그라운드에서 작업 중",
       "two": "작업 2개 진행 중: {{first}}, {{second}}",
       "many": "작업 {{count}}개 진행 중: {{subject}} 외 {{more}}개",
       "manyUntitled": "백그라운드에서 작업 {{count}}개 진행 중",
@@ -12776,7 +12778,6 @@
       "autoApprovedNobody": "자동 승인됨",
       "error": "오류",
       "seconds": "{{n}}초",
-      "minutes": "{{n}}분",
       "step": {
         "schedulingReminder": "리마인더를 예약했어요",
         "creatingRoutine": "루틴을 만들었어요",

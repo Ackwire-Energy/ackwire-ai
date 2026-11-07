@@ -157,11 +157,15 @@ describe("working now", () => {
     await post(owner, dmId, "summarize my week");
 
     const runs = async (b: Browser) =>
-      ((await (await fromApp(b, `${org}/active-runs`)).json()) as { runs: { channelId: string; label: string }[] })
-        .runs;
+      (
+        (await (await fromApp(b, `${org}/active-runs`)).json()) as {
+          runs: { channelId: string; label: string | null }[];
+        }
+      ).runs;
     const biaRuns = await runs(bia);
     expect(biaRuns.map((r) => r.channelId)).toEqual([channelId]);
-    expect(biaRuns[0]?.label).toBe("Dev, check the deploy?");
+    // Never the ask's own words: with no thread title the apps say where it is.
+    expect(biaRuns[0]?.label).toBeNull();
     expect((await runs(owner)).map((r) => r.channelId).sort()).toEqual([channelId, dmId].sort());
   });
 });

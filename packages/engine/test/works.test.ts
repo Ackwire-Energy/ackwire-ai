@@ -1,7 +1,7 @@
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { channelTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import type { ModelRequest } from "@agenteschat/providers";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   type AgentRun,
   addChannelMember,
@@ -27,6 +27,7 @@ import {
   STEER_WORK_TOOL,
   STOP_WORK_TOOL,
   type ToolSource,
+  taskManager,
   WORK_CHECK_IN_JOB,
   WORK_IN_BACKGROUND_TOOL,
   WORK_LIMITS,
@@ -598,8 +599,9 @@ test("cards: none for a quick run nor a short auto work; card: true makes one; a
   const quick = await working("@dev oi");
   await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, quick.id));
   const short = await working("@dev confere o build");
+  // No model to name it: no title, never the ask's own words.
   const auto = await moveToBackground(deps(), short.id, { how: "auto", title: "" });
-  expect(auto?.work.title).toBe("@dev confere o build");
+  expect(auto?.work.title).toBe("");
   expect(await listIssues(f.db, { type: "person", userId: f.owner.id }, f.org.id)).toHaveLength(0);
 
   const existing = await createIssue(deps(), { type: "person", userId: f.owner.id }, f.org.id, {
@@ -798,6 +800,42 @@ test("the sweep closes a work whose run is gone without stopping at it", async (
   expect(await reconcileWorks(deps())).toBe(2);
   const all = await works();
   expect(all.map((w) => w.status)).toEqual(["failed", "failed"]);
+});
+
+test("an automatic move is named by the cheap model in the conversation's words, never the ask's raw text", async () => {
+  let named = "Permissões no Play Console";
+  const assessing = (req: ModelRequest) => systemText(req.system).startsWith("You read a conversation thread");
+  f = await setup({
+    reply: (req) => ({ chunks: [assessing(req) ? JSON.stringify({ title: named, resolved: false }) : "ok"] }),
+  });
+  const root = await ask("@dev a versão 8 precisa do SHA-256 da Assinatura de apps");
+  const run = await working("@dev qual permissao vc precisa? https://media.giphy.com/media/x/giphy.gif", root.id);
+  const out = await moveToBackground({ ...deps(), context: f.context }, run.id, { how: "auto", title: "" });
+  expect(out?.work.title).toBe("Permissões no Play Console");
+  // The model read the whole conversation, the root included.
+  const prompt = JSON.stringify(f.provider.calls.find((c) => assessing(c.request))?.request.messages);
+  expect(prompt).toContain("SHA-256");
+  expect(prompt).toContain("qual permissao");
+  const status = (await loadAgentStatuses(f.db, f.org.id)).find((s) => s.agentId === f.agent.id)?.status;
+  expect(status).toMatchObject({ kind: "work", subject: "Permissões no Play Console" });
+  const view = await taskManager(f.db, f.owner.id, f.org.id);
+  expect(view.tasks.find((t) => t.runId === run.id)?.label).toBe("Permissões no Play Console");
+  expect(JSON.stringify(view)).not.toContain("qual permissao");
+
+  // The model fails: no title (the apps say "em segundo plano"), and no card until a name comes.
+  named = "";
+  const other = await working("@dev Boa noite, pessoal! https://media.giphy.com/media/y/giphy.gif");
+  const unnamed = await moveToBackground({ ...deps(), context: f.context }, other.id, { how: "auto", title: "" });
+  expect(unnamed?.work.title).toBe("");
+  expect(JSON.stringify(await loadAgentStatuses(f.db, f.org.id))).not.toContain("Boa noite");
+  const late = new Date(Date.now() + WORK_LIMITS.cardAfterMs + 60_000);
+  const card = { workId: unnamed?.work.id ?? "", seq: 0, phase: "card" as const };
+  await checkInWork({ ...deps(), context: f.context }, f.org.id, card, late);
+  expect(await listIssues(f.db, { type: "person", userId: f.owner.id }, f.org.id)).toHaveLength(0);
+  named = "Saudação da noite";
+  await checkInWork({ ...deps(), context: f.context }, f.org.id, card, late);
+  const issues = await listIssues(f.db, { type: "person", userId: f.owner.id }, f.org.id);
+  expect(issues.map((i) => i.title)).toEqual(["Saudação da noite"]);
 });
 
 test("the agent's status: one work, two, three, and one that waits", async () => {

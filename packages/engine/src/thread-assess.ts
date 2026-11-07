@@ -65,6 +65,92 @@ const parseJson = (text: string) => {
   }
 };
 
+type Row = typeof messages.$inferSelect;
+
+/** A root and its latest replies (oldest first), each a line the model reads: who said it and what. */
+async function conversationLines(db: ContextDeps["db"], orgId: string, root: Row) {
+  const replies = (
+    await db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, orgId),
+          eq(messages.threadId, root.id),
+          isNull(messages.deletedAt),
+          // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply, never a newer one.
+          sql`${messages.meta}->>'mediaAfter' is null`,
+        ),
+      )
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(ASSESS_MESSAGES)
+  ).reverse();
+  const all = [root, ...replies];
+  const userIds = [...new Set(all.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
+  const agentIds = [...new Set(all.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])))];
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    for (const u of await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)))
+      names.set(u.id, u.name);
+  }
+  if (agentIds.length > 0) {
+    for (const a of await db
+      .select({ id: agents.id, handle: agents.handle })
+      .from(agents)
+      .where(inArray(agents.id, agentIds)))
+      names.set(a.id, `agent ${a.handle}`);
+  }
+  const author = (m: Row) =>
+    m.authorUserId
+      ? (names.get(m.authorUserId) ?? "someone")
+      : m.authorAgentId
+        ? (names.get(m.authorAgentId) ?? "an agent")
+        : "system";
+  // A GIF or a sticker alone says what it was (never a GIF's title: outside text, ADR 0091).
+  const said = (m: Row) => {
+    const kind = mediaOf(m.meta)?.kind;
+    return replyExcerpt(m.body, ASSESS_EXCERPT) || (kind ? MEDIA_WORDS[kind] : "");
+  };
+  const lines = all.map(
+    (m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${neutralizeUntrusted(said(m))}`,
+  );
+  return { replies, lines };
+}
+
+/** The org's cheap model on these lines: its title and "resolved?", or null when it fails. */
+async function askAssessment(deps: ContextDeps, orgId: string, lines: string[]) {
+  try {
+    const result = await deps.gateway.complete({
+      orgId,
+      kind: "summary",
+      model: await resolveSummaryModel(deps, orgId),
+      system: SYSTEM,
+      messages: [{ role: "user", content: `<thread>\n${lines.join("\n")}\n</thread>` }],
+      maxTokens: 300,
+      effort: "low",
+      outputSchema: OUTPUT_SCHEMA,
+    });
+    return parseJson(result.text);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A short name for the work a conversation asks for, in its language, by the org's cheap model: what the apps say an
+ * agent works on and what its task is called, never a person's raw words. `rootId` is the conversation's root (a
+ * message of the main timeline is a root of its own). Null when the model can't say. Nothing is written.
+ */
+export async function nameConversation(deps: ContextDeps, input: { orgId: string; rootId: string }) {
+  const [root] = await deps.db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.orgId, input.orgId), eq(messages.id, input.rootId), isNull(messages.deletedAt)));
+  if (!root) return null;
+  const { lines } = await conversationLines(deps.db, input.orgId, root);
+  return cleanAssessedTitle((await askAssessment(deps, input.orgId, lines))?.title);
+}
+
 export async function assessThread(
   deps: ContextDeps,
   input: { orgId: string; threadRootId: string; messageId?: string },
@@ -84,73 +170,13 @@ export async function assessThread(
     .from(threads)
     .where(and(eq(threads.orgId, orgId), eq(threads.rootMessageId, root.id)));
   if (row && row.state !== "open") return null;
-  const replies = (
-    await db
-      .select()
-      .from(messages)
-      .where(
-        and(
-          eq(messages.orgId, orgId),
-          eq(messages.threadId, root.id),
-          isNull(messages.deletedAt),
-          // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply, never a newer one.
-          sql`${messages.meta}->>'mediaAfter' is null`,
-        ),
-      )
-      .orderBy(desc(messages.createdAt), desc(messages.id))
-      .limit(ASSESS_MESSAGES)
-  ).reverse();
+  const { replies, lines } = await conversationLines(db, orgId, root);
   const last = replies.at(-1);
   if (!last) return null;
   // A newer reply came after the one that asked: its own job assesses the thread later.
   if (input.messageId && last.id !== input.messageId) return null;
 
-  const all = [root, ...replies];
-  const userIds = [...new Set(all.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
-  const agentIds = [...new Set(all.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])))];
-  const names = new Map<string, string>();
-  if (userIds.length > 0) {
-    for (const u of await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)))
-      names.set(u.id, u.name);
-  }
-  if (agentIds.length > 0) {
-    for (const a of await db
-      .select({ id: agents.id, handle: agents.handle })
-      .from(agents)
-      .where(inArray(agents.id, agentIds)))
-      names.set(a.id, `agent ${a.handle}`);
-  }
-  const author = (m: (typeof all)[number]) =>
-    m.authorUserId
-      ? (names.get(m.authorUserId) ?? "someone")
-      : m.authorAgentId
-        ? (names.get(m.authorAgentId) ?? "an agent")
-        : "system";
-  // A GIF or a sticker alone says what it was (never a GIF's title: outside text, ADR 0091).
-  const said = (m: (typeof all)[number]) => {
-    const kind = mediaOf(m.meta)?.kind;
-    return replyExcerpt(m.body, ASSESS_EXCERPT) || (kind ? MEDIA_WORDS[kind] : "");
-  };
-  const lines = all.map(
-    (m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${neutralizeUntrusted(said(m))}`,
-  );
-
-  let answer: Record<string, unknown> | null;
-  try {
-    const result = await deps.gateway.complete({
-      orgId,
-      kind: "summary",
-      model: await resolveSummaryModel(deps, orgId),
-      system: SYSTEM,
-      messages: [{ role: "user", content: `<thread>\n${lines.join("\n")}\n</thread>` }],
-      maxTokens: 300,
-      effort: "low",
-      outputSchema: OUTPUT_SCHEMA,
-    });
-    answer = parseJson(result.text);
-  } catch {
-    return null;
-  }
+  const answer = await askAssessment(deps, orgId, lines);
   if (!answer) return null;
   const title = cleanAssessedTitle(answer.title);
   const resolved = answer.resolved === true;

@@ -14026,6 +14026,8 @@
     "status": {
       "one": "Pracuje nad: {{subject}}",
       "oneUntitled": "Pracuje w tle",
+      "oneFor": "Pracuje od {{duration}}: {{subject}}",
+      "oneUntitledFor": "Pracuje od {{duration}} w tle",
       "two": "Przy 2 pracach: {{first}} i {{second}}",
       "many": "Przy {{count}} pracach: {{subject}} i jeszcze {{more}}",
       "manyUntitled": "Przy {{count}} pracach w tle",
@@ -14224,7 +14226,6 @@
       "autoApprovedNobody": "Zatwierdzono automatycznie",
       "error": "błąd",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Zaplanowano przypomnienie",
         "creatingRoutine": "Utworzono rutynę",

@@ -6339,7 +6339,7 @@ export interface WorkingRun {
   status: "queued" | "running" | "waiting_approval" | "waiting_input";
   startedAt: string | null;
   createdAt: string;
-  /** What it works on: the thread's title, else its first message (≤ 80 chars). */
+  /** What it works on: the thread's title (≤ 80 chars), never its first message's words; null: say where. */
   label: string | null;
   /** Messages sent to it while it works that it hasn't read yet. */
   pendingMessageIds?: string[];
@@ -6380,7 +6380,7 @@ export interface ManagedTask {
   status: "queued" | "running" | "waiting_approval" | "waiting_input";
   startedAt: string | null;
   createdAt: string;
-  /** What it works on (≤ 80): the long work's title, the thread's title, else its first message. */
+  /** What it works on (≤ 80): its work's title, else its thread's, never its first message's words; null: say where. */
   label: string | null;
   /** A routine's background run. */
   background: boolean;

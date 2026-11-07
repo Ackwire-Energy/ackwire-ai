@@ -12666,6 +12666,8 @@
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
+      "oneFor": "Bekerja selama {{duration}}: {{subject}}",
+      "oneUntitledFor": "Selama {{duration}} bekerja di latar belakang",
       "two": "Mengerjakan 2 pekerjaan: {{first}} dan {{second}}",
       "many": "Mengerjakan {{count}} pekerjaan: {{subject}} dan {{more}} lainnya",
       "manyUntitled": "Mengerjakan {{count}} pekerjaan di latar belakang",
@@ -12838,7 +12840,6 @@
       "autoApprovedNobody": "Disetujui otomatis",
       "error": "gagal",
       "seconds": "{{n}} dtk",
-      "minutes": "{{n}} mnt",
       "step": {
         "schedulingReminder": "Menjadwalkan pengingat",
         "creatingRoutine": "Membuat rutinitas",

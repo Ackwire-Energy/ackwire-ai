@@ -507,6 +507,31 @@ describe("the task manager page", () => {
     expect(rows[1]).toContain("João parou");
   });
 
+  test("a finished row opens its panel like one still on: how it ended, how long as people say it, its message", async () => {
+    const view = busy();
+    view.ended = [
+      ended({
+        runId: "r-night",
+        agentId: ATLAS_ID,
+        status: "done",
+        label: "Relatório das lojas",
+        startedAt: ago(1315 + 5),
+        finishedAt: ago(5),
+      }),
+    ];
+    const { router } = await open(seedState({ taskManager: view }), "task-manager");
+    await click(screen().getByRole("button", { name: /Terminadas hoje/ }));
+    const row = document.querySelector(".tm-row--ended") as HTMLElement;
+    expect(row.querySelector(".tm-cell--time")?.textContent).toBe("21 h 55 min");
+    await click(within(row).getByRole("button", { name: "Relatório das lojas" }));
+    await settle(4);
+    const panel = screen().getByRole("complementary", { name: "Relatório das lojas" });
+    expect(panel.textContent).toContain("Terminou");
+    await click(within(panel).getByRole("button", { name: "Abrir na conversa" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+  });
+
   test("the search finds a task by its title, its agent or the program it uses", async () => {
     await open(seedState({ taskManager: busy() }), "task-manager");
     const search = screen().getByRole("searchbox", { name: "Buscar tarefa, agente ou programa" });

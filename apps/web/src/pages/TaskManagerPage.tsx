@@ -523,7 +523,14 @@ export function TaskManagerPage({
             (ended.length > 0 ? (
               <ul className="tm-list tm-list--ended ac-card">
                 {ended.map((e) => (
-                  <EndedRow key={e.runId} task={e} agentName={nameOf(e.agentId)} meId={me.user.id} />
+                  <EndedRow
+                    key={e.runId}
+                    task={e}
+                    agentName={nameOf(e.agentId)}
+                    meId={me.user.id}
+                    selected={panel === e.runId}
+                    onOpen={() => setPanel(e.runId)}
+                  />
                 ))}
               </ul>
             ) : (
@@ -866,8 +873,23 @@ const ENDED_ICON: Record<"done" | "stopped" | "failed", IconName> = {
   failed: "alert",
 };
 
-/** What ended today: the task, its agent and where, how it ended (and who stopped it), how long it took. */
-function EndedRow({ task, agentName, meId }: { task: EndedTask; agentName: string; meId: string }) {
+/**
+ * What ended today: the task, its agent and where, how it ended (and who stopped it), how long it took. The row opens
+ * its panel, as a task still on does: its steps and "Abrir na conversa".
+ */
+function EndedRow({
+  task,
+  agentName,
+  meId,
+  selected,
+  onOpen,
+}: {
+  task: EndedTask;
+  agentName: string;
+  meId: string;
+  selected: boolean;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
   const state = endedState(task);
   const word =
@@ -878,13 +900,15 @@ function EndedRow({ task, agentName, meId }: { task: EndedTask; agentName: strin
       : t(state === "done" ? "taskManager.ended.done" : "taskManager.ended.failed");
   const took = Date.parse(task.finishedAt) - Date.parse(task.startedAt ?? task.finishedAt);
   return (
-    <li className="tm-row tm-row--ended">
+    <li className="tm-row tm-row--ended" data-selected={selected || undefined}>
       <span className="tm-cell tm-cell--name">
         <OpensAgent agentId={task.agentId}>
           <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />
         </OpensAgent>
         <span className="tm-name">
-          <span className="tm-name__title">{taskTitle(t, task)}</span>
+          <button type="button" className="tm-hit" aria-pressed={selected} onClick={onOpen}>
+            <span className="tm-hit__text">{taskTitle(t, task)}</span>
+          </button>
           <small>{`${agentName} · ${taskWhere(t, task)}`}</small>
         </span>
       </span>
