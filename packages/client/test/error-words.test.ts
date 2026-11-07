@@ -105,6 +105,9 @@ describe("a failed request in the person's words (errorText)", () => {
 
   test("a workspace on hold says so and where to bring it back, never a plain 'not now'", () => {
     expect(errorText(pt, new ApiError(409, "workspace_paused", "This workspace is paused"))).toBe("errors.org.paused");
+    // The phone has no hold banner, so the line itself says who brings it back.
+    expect(ptBR.errors.org.paused).toContain("Quem administra o workspace pode reativá-lo");
+    expect(ptBR.errors.org.paused).not.toMatch(/aviso|banner|suporte|[;"“”]/);
   });
 
   test("a budget or a missing key in the person's words, naming the provider when the server does", () => {
@@ -275,6 +278,8 @@ const PLAIN_LINE = new Set([
   "channel.invalid_name",
   "channel.leave_kind",
   "channel.mute_dm",
+  "claude_auth.invalid",
+  "claude_auth.unknown_org",
   "connector.key_too_short",
   "connector.oauth_only",
   "connector.sensitive_tool",
@@ -366,7 +371,6 @@ const PLAIN_LINE = new Set([
   "widget.failed_why",
   "widget.not_this_run",
   "wiki.no_free_slug",
-  "workspace_paused",
 ]);
 
 /** Every code the server refuses with: `new XError(message, "code")`. */

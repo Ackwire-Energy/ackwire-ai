@@ -12454,7 +12454,7 @@
       "membersFull": "Wszystkie miejsca w tej przestrzeni roboczej są teraz zajęte. Poproś osobę, która cię zaprosiła, o zwolnienie miejsca.",
       "deleting": "Ta przestrzeń robocza jest usuwana.",
       "notRestorable": "Tej przestrzeni roboczej nie da się już przywrócić.",
-      "paused": "Ta przestrzeń robocza jest wstrzymana, więc teraz nie połączy aplikacji. Komunikat na górze przestrzeni roboczej mówi, jak ją wznowić."
+      "paused": "Ta przestrzeń robocza jest wstrzymana, więc teraz nie połączy aplikacji. Osoba, która nią zarządza, może ją wznowić."
     },
     "reauth": {
       "code": "Wpisz kod, który wysłaliśmy ci e-mailem.",

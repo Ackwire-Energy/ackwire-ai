@@ -11534,7 +11534,7 @@
       "membersFull": "Bu çalışma alanındaki tüm yerler şu anda dolu. Sizi davet eden kişiden bir yer açmasını isteyin.",
       "deleting": "Bu çalışma alanı siliniyor.",
       "notRestorable": "Bu çalışma alanı artık geri yüklenemez.",
-      "paused": "Bu çalışma alanı duraklatıldı, bu yüzden şu an uygulama bağlayamaz. Çalışma alanının üstündeki bildirim onu nasıl yeniden etkinleştireceğinizi söyler."
+      "paused": "Bu çalışma alanı duraklatıldı, bu yüzden şu an uygulama bağlayamaz. Çalışma alanını yöneten kişi onu yeniden etkinleştirebilir."
     },
     "reauth": {
       "code": "Size e-postayla gönderdiğimiz kodu yazın.",
