@@ -11138,6 +11138,7 @@ export const en = {
       noAiYet: "There's still no AI connected.",
       filePurged: "This file was deleted more than 30 days ago and can't come back.",
       looksSecret: "That looks like a password or a key, and everyone here would see it.",
+      blockSpec: "This block has a mistake in its parts or formulas, so it can't be shown. Fix it and try again.",
       takeControl: "Take control of the profile first.",
       profileBusy: "Someone else is using this profile.",
       nameTaken: "That name is already in use. Pick another one.",

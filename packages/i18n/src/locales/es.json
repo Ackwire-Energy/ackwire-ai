@@ -11835,6 +11835,7 @@
       "noAiYet": "Todavía no hay IA conectada.",
       "filePurged": "Este archivo se borró hace más de 30 días y no puede volver.",
       "looksSecret": "Eso parece una contraseña o una clave, y todos aquí la verían.",
+      "blockSpec": "Este bloque tiene un error en sus partes o fórmulas, así que no se puede mostrar. Corrígelo e inténtalo de nuevo.",
       "takeControl": "Toma primero el control del perfil.",
       "profileBusy": "Otra persona está usando este perfil.",
       "nameTaken": "Ese nombre ya está en uso. Elige otro.",

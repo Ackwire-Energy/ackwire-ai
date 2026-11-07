@@ -27823,6 +27823,9 @@
   "errors.said.looksSecret": {
     "value": "That looks like a password or a key, and everyone here would see it."
   },
+  "errors.said.blockSpec": {
+    "value": "This block has a mistake in its parts or formulas, so it can't be shown. Fix it and try again."
+  },
   "errors.said.takeControl": {
     "value": "Take control of the profile first."
   },

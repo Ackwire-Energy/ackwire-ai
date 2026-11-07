@@ -11913,6 +11913,7 @@
       "noAiYet": "Non c'è ancora nessuna IA collegata.",
       "filePurged": "Questo file è stato eliminato più di 30 giorni fa e non può tornare.",
       "looksSecret": "Sembra una password o una chiave, e tutti qui la vedrebbero.",
+      "blockSpec": "Questo blocco ha un errore nelle parti o nelle formule, quindi non può essere mostrato. Correggilo e riprova.",
       "takeControl": "Prendi prima il controllo del profilo.",
       "profileBusy": "Qualcun altro sta usando questo profilo.",
       "nameTaken": "Questo nome è già in uso. Scegline un altro.",

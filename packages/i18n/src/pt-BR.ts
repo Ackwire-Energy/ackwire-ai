@@ -11238,6 +11238,8 @@ export const ptBR = {
       noAiYet: "Ainda não há IA conectada.",
       filePurged: "Este arquivo foi apagado há mais de 30 dias e não pode voltar.",
       looksSecret: "Isso parece uma senha ou uma chave, e todo mundo aqui veria.",
+      blockSpec:
+        "Este bloco tem um erro nas partes ou nas fórmulas, então não pode ser mostrado. Corrija e tente de novo.",
       takeControl: "Assuma o controle do perfil primeiro.",
       profileBusy: "Outra pessoa está usando este perfil.",
       nameTaken: "Esse nome já está em uso. Escolha outro.",
