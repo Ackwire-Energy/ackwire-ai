@@ -1018,6 +1018,16 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__messages > .ac-msg + .ac-msg--grouped:not(:has(.ac-msg__text)):has(.rq, .mi-card, .iw-card, .brw-ac) {
   --row-gap: var(--msg-card-gap);
 }
+/* A message that ends on the agents' line (`.ag-rc--talk`) already holds part of the turn's gap under it. */
+.channel__messages
+  > .ac-msg:has(
+    > .ac-msg__body
+      > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden, .ac-msg__aside--floating))
+      > .ag-rc--talk:last-child
+  )
+  + * {
+  --row-gap: var(--msg-part-gap);
+}
 .channel__messages > .ac-msg {
   margin-block: calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block));
 }

@@ -47,6 +47,13 @@ describe("the rows follow the same choice as the web", () => {
     expect(chat).toContain('Boolean(dm) || thread.data?.channelKind === "dm"');
   });
 
+  test("a DM drops the name only where a bubble stands: a card alone keeps it ahead of its time", async () => {
+    const row = await read("chat/MessageRow.tsx");
+    expect(row).toContain("{!inBubble || look.names ? (");
+    expect(row).not.toContain("{!bubbled || look.names ? (");
+    expect(await read("chat/LiveRows.tsx")).toContain("{!bubbled || look.names || !(said || run.text) ? (");
+  });
+
   test("opening at the last read message goes to the line, once, with no glide", async () => {
     const chat = await read("chat/ChatScreen.tsx");
     expect(chat).toContain("firstUnreadId(list, from.at, meId)");

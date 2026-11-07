@@ -80,7 +80,12 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       const from = (body: string) => (routine ? `${s.approvalFromRoutine(routine)}: ${body}` : body);
       // Its title is the tool's, in English: the apps word it (`approvalTitle`), a push in another language can't.
       const asked = locale === "en" ? what : "";
-      if (input.highRisk && asked) return out(s.approvalTitle(actor), from(s.approvalHighRisk(clip(asked, 120))));
+      // High risk and no title to show: the warning alone.
+      if (input.highRisk)
+        return out(
+          s.approvalTitle(actor),
+          from(asked ? s.approvalHighRisk(clip(asked, 120)) : s.approvalHighRiskBody),
+        );
       return out(s.approvalTitle(actor), from(asked || s.approvalBody));
     }
     case "agent_question":

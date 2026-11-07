@@ -260,7 +260,8 @@ export const TurnRow = memo(function TurnRow({
         <View style={[styles.body, { gap: rhythm.part }]}>
           <View>
             <View style={styles.who}>
-              {!bubbled || look.names ? (
+              {/* A DM drops the name only where a bubble stands under it, as on a saved row. */}
+              {!bubbled || look.names || !(said || run.text) ? (
                 <Text
                   variant="footnote"
                   tone="ink2"

@@ -11187,7 +11187,8 @@
       "createInviteOnly": "Untuk saat ini, ruang kerja baru membutuhkan undangan.",
       "membersFull": "Semua kursi di ruang kerja ini sedang terisi. Minta orang yang mengundangmu untuk membuka kursi.",
       "deleting": "Ruang kerja ini sedang dihapus.",
-      "notRestorable": "Ruang kerja ini sudah tidak bisa dipulihkan."
+      "notRestorable": "Ruang kerja ini sudah tidak bisa dipulihkan.",
+      "paused": "Ruang kerja ini sedang dijeda, jadi belum bisa menghubungkan aplikasi. Pemberitahuan di bagian atas ruang kerja menjelaskan cara mengaktifkannya lagi."
     },
     "reauth": {
       "code": "Ketik kode yang kami kirim lewat email.",

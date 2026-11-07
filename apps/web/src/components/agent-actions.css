@@ -192,6 +192,17 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   gap: 6px;
   margin-left: calc(-1 * var(--msg-lead));
 }
+/* A line across the conversation stands between turns, as the list's own pair line does: the turn's gap on both sides,
+   of which the body's part gap is one. */
+.ag-rcs .ag-rc--talk {
+  padding-block: calc(var(--msg-turn-gap) - var(--msg-part-gap));
+}
+/* Two lines in a row stack as one group, as the list's quiet lines do: the part gap between them, past the room the
+   one above keeps under it and the stack's 6px. */
+.ag-rcs .ag-rc--talk + .ag-rc--talk {
+  padding-top: 0;
+  margin-top: calc(2 * var(--msg-part-gap) - var(--msg-turn-gap) - 6px);
+}
 .ag-rc--talk > .ag-rc__btn {
   min-height: 26px;
   font-size: 13px;

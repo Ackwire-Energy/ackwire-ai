@@ -56,7 +56,10 @@ export interface MessageLook {
   tone: "light" | "strong";
   /** The color of my bubbles in `bubbles`. */
   mine: string;
-  /** False where the name says nothing (a DM's two speakers): `bubbles` leaves it to screen readers. */
+  /**
+   * False where the name says nothing (a DM's two speakers): `bubbles` leaves it to screen readers. A row with no bubble
+   * (a card alone) keeps it, ahead of its time, as anywhere else: a time alone beside a face reads as a broken line.
+   */
   names: boolean;
 }
 export const MessageLookContext = createContext<MessageLook | null>(null);
@@ -293,7 +296,7 @@ export function Message({
       data-look={look ? drawn : undefined}
       data-own={own && !mine ? "true" : undefined}
       data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
-      data-names={drawn === "bubbles" && look?.names === false ? "false" : undefined}
+      data-names={inBubble && look?.names === false ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}
       data-menu-open={menuOpen ? "true" : undefined}
       onClick={(e) => {

@@ -98,6 +98,8 @@ const KNOWN = {
   "mission.closed": "errors.mission.closed",
   "mission.wrong_status": "errors.mission.wrongStatus",
   "mission.paused": "errors.mission.paused",
+  // Apps can't connect to a workspace on hold (`apps/grants.ts`, `apps/oauth.ts`).
+  workspace_paused: "errors.org.paused",
   "mission.invalid": "errors.mission.invalid",
   "mission.bad_folder": "errors.mission.badFolder",
   "mission.bad_option": "errors.mission.badOption",

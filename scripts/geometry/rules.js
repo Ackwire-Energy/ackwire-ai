@@ -4,6 +4,8 @@
  */
 (() => {
   const EDGE_MIN = 8;
+  /** A quiet line (the agents' pair, a date, "Novas") and a bubble: closer than this reads as touching. */
+  const QUIET_MIN = 4;
   const PAD_DIFF = 2;
   const PLATE_DIFF = 1;
   const GAP_DIFF = 1.5;
@@ -332,6 +334,34 @@
               want,
               text: words(kids[i]),
             });
+        }
+      }
+    },
+    /** A message's head that shows its time with no name beside it: a face over a bare time reads as a broken line. */
+    nameless(out) {
+      for (const head of document.querySelectorAll(".ac-msg__head")) {
+        if (!seen(head)) continue;
+        const time = head.querySelector(".ac-msg__time");
+        const name = head.querySelector(".ac-msg__author");
+        if (!time || !seen(time)) continue;
+        if (name && seen(name) && contentRect(name)) continue;
+        out.push({ rule: "nameless", node: head, el: sig(head), box: placeOf(head), text: words(time) });
+      }
+    },
+    /** A quiet line across the conversation sitting on a bubble above or under it, with no gap between them. */
+    quiet(out) {
+      const bubbles = [...document.querySelectorAll(".ac-msg__text")].filter(
+        (b) => seen(b) && painted(style(b).backgroundColor),
+      );
+      for (const line of document.querySelectorAll(".consult-pair,.ac-divider,.channel__unread")) {
+        if (!seen(line)) continue;
+        const l = line.getBoundingClientRect();
+        for (const b of bubbles) {
+          const r = b.getBoundingClientRect();
+          if (Math.min(l.right, r.right) - Math.max(l.left, r.left) <= 0) continue;
+          const gap = Math.max(r.top - l.bottom, l.top - r.bottom);
+          if (gap < QUIET_MIN)
+            out.push({ rule: "quiet", node: line, el: sig(line), box: sig(b), px: +gap.toFixed(1), text: words(line) });
         }
       }
     },

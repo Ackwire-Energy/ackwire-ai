@@ -138,8 +138,16 @@ describe("push text", () => {
       highRisk: true,
     });
     expect(risky.title).toBe("Dev precisa da sua aprovação");
-    // The title is the tool's, in English: only the apps word it in other languages.
-    expect(risky.body).toBe("Toque para ver o pedido.");
+    // The title is the tool's, in English: in another language the warning stands alone, never "Toque para ver".
+    expect(risky.body).toBe("Pedido de alto risco. Abra o app para revisar com calma.");
+    for (const locale of ["es", "de", "ja", "zh-Hans"] as const)
+      expect(renderPush(locale, { kind: "approval", waiting: true, actorName: "Dev", highRisk: true }).body).toBe(
+        pushStrings(locale).approvalHighRiskBody,
+      );
+    expect(
+      renderPush("pt-BR", { kind: "approval", waiting: true, actorName: "Dev", highRisk: true, routine: "Deploys" })
+        .body,
+    ).toBe("Rotina «Deploys»: Pedido de alto risco. Abra o app para revisar com calma.");
     // Asked by a routine while nobody watched: the push names it.
     const fromRoutine = renderPush("en", {
       kind: "approval",

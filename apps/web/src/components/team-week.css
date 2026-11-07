@@ -3,9 +3,6 @@
   max-width: var(--msg-card-w);
   container-type: inline-size;
 }
-.tw__intro {
-  margin: 0 0 4px;
-}
 .tw__card {
   max-width: none;
 }

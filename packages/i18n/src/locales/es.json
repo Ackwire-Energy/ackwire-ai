@@ -11955,7 +11955,8 @@
       "createInviteOnly": "Por ahora, los espacios de trabajo nuevos necesitan una invitación.",
       "membersFull": "Todos los lugares de este espacio de trabajo están ocupados ahora. Pide a quien te invitó que libere un lugar.",
       "deleting": "Este espacio de trabajo se está eliminando.",
-      "notRestorable": "Este espacio de trabajo ya no se puede restaurar."
+      "notRestorable": "Este espacio de trabajo ya no se puede restaurar.",
+      "paused": "Este espacio de trabajo está en pausa y ahora no puede conectar apps. El aviso de arriba del espacio de trabajo dice cómo reactivarlo."
     },
     "reauth": {
       "code": "Escribe el código que te enviamos por correo.",

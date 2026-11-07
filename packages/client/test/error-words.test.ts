@@ -103,6 +103,10 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(503, "machine.not_allowed", own))).toBe(own);
   });
 
+  test("a workspace on hold says so and where to bring it back, never a plain 'not now'", () => {
+    expect(errorText(pt, new ApiError(409, "workspace_paused", "This workspace is paused"))).toBe("errors.org.paused");
+  });
+
   test("a budget or a missing key in the person's words, naming the provider when the server does", () => {
     expect(errorText(pt, new ApiError(402, "budget_exceeded", "This agent has used its monthly budget"))).toBe(
       "agentPage.activity.errors.budget_exceeded",

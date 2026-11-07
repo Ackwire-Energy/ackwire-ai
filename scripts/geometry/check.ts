@@ -231,7 +231,18 @@ async function selfTest(tab: Awaited<ReturnType<typeof openTab>>) {
   const found = await tab.run<Finding[]>("geometry.detect()");
   const hit = (rule: string, cls: string) => found.some((f) => f.rule === rule && (f.el + (f.box ?? "")).includes(cls));
   const wrong: string[] = [];
-  for (const rule of ["edge", "pad", "clipped", "overlap", "wordwrap", "viewport", "plate", "stack"]) {
+  for (const rule of [
+    "edge",
+    "pad",
+    "clipped",
+    "overlap",
+    "wordwrap",
+    "viewport",
+    "plate",
+    "stack",
+    "nameless",
+    "quiet",
+  ]) {
     if (!hit(rule, `bad-${rule}`)) wrong.push(`${rule} missed its offender`);
     if (hit(rule, `good-${rule}`)) wrong.push(`${rule} flagged a sound element`);
   }

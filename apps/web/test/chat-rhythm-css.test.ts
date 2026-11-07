@@ -205,4 +205,19 @@ test("the agents' line is the conversation's width, the pair on its middle, and 
   expect(last(".ag-rcs .ag-rc--talk > .consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
   expect(last(".consult-pair", "padding-inline")).toBe("16px");
   expect(last('.ac-msg[data-look="compact"]', "--msg-inline")).toBe("12px");
+  // Between turns there too: the turn's gap on both sides, the body's part gap and the line's own room.
+  expect(last(".ag-rcs .ag-rc--talk", "padding-block")).toBe("calc(var(--msg-turn-gap) - var(--msg-part-gap))");
+  // A message that ends on it: what follows takes the part gap, which the line's room makes a turn's.
+  const after = rules(css).find((r) =>
+    r.selectors.some((s) => s.includes(".ag-rc--talk:last-child") && s.endsWith("+*")),
+  );
+  expect(after?.declarations).toContainEqual(["--row-gap", "var(--msg-part-gap)"]);
+  // Two in a row stack at the part gap: the room under the first, the stack's 6px and this margin add up to it.
+  expect(last(".ag-rcs--stack", "gap")).toBe("6px");
+  const next = rules(css).find((r) => r.selectors.some((s) => s.endsWith(".ag-rc--talk+.ag-rc--talk")));
+  expect(next?.declarations).toContainEqual(["padding-top", "0"]);
+  expect(next?.declarations).toContainEqual([
+    "margin-top",
+    "calc(2 * var(--msg-part-gap) - var(--msg-turn-gap) - 6px)",
+  ]);
 });
