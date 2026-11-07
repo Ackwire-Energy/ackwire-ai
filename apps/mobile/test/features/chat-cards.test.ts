@@ -320,7 +320,9 @@ describe("the secret card on the phone", () => {
     const asks = source("asks.tsx");
     const line = asks.slice(asks.indexOf("const line = well ? ("), asks.indexOf("const opened ="));
     expect(line).not.toContain("numberOfLines");
-    expect(asks).toContain('alignItems: "flex-start",\n    gap: 10,\n    paddingVertical: 10,');
+    expect(asks).toContain('lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 }');
+    // The detail spans the whole width under the title, never beside "Ver …".
+    expect(asks).toContain("lineDetail: { marginLeft: 30, marginTop: 1 }");
     expect(asks).toContain("lineMark: { flexShrink: 0, width: 20, height: 20,");
     // The fuse and the time left under the decision, never on the card's top line.
     expect(asks).toContain('{waitsFor === "you" && expiry ? <View style={styles.expiryRow}>{expiry}</View> : null}');

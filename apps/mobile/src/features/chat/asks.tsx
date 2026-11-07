@@ -469,29 +469,30 @@ export function AskCard({
     return store.register(id, card);
   }, [store, id]);
   const more = well?.more;
-  // The thing it is about, on one line edge to edge: its mark, its title and details, "Ver …" at the right.
+  // The thing it is about, edge to edge: its mark, its title and "Ver …" on one line, its details under them across
+  // the whole width (from the title's column to the card's edge).
   const line = well ? (
     <>
-      <View style={styles.lineMark}>{well.tile}</View>
-      <View style={styles.grow}>
-        <Text variant="subhead" tone="ink" style={styles.semibold}>
+      <View style={styles.lineTop}>
+        <View style={styles.lineMark}>{well.tile}</View>
+        <Text variant="subhead" tone="ink" style={[styles.semibold, styles.grow]}>
           {well.title}
         </Text>
-        {well.detail ? (
-          <Text variant="footnote" tone="faint">
-            {well.detail}
-          </Text>
+        {more ? (
+          <View style={styles.lineMore}>
+            <Text variant="footnote" tone="muted" style={styles.semibold} numberOfLines={1}>
+              {more.label}
+            </Text>
+            <View style={open ? styles.flip : undefined}>
+              <Icon name="chev" size={13} color={c.faint} />
+            </View>
+          </View>
         ) : null}
       </View>
-      {more ? (
-        <View style={styles.lineMore}>
-          <Text variant="footnote" tone="muted" style={styles.semibold} numberOfLines={1}>
-            {more.label}
-          </Text>
-          <View style={open ? styles.flip : undefined}>
-            <Icon name="chev" size={13} color={c.faint} />
-          </View>
-        </View>
+      {well.detail ? (
+        <Text variant="footnote" tone="faint" style={styles.lineDetail}>
+          {well.detail}
+        </Text>
       ) : null}
     </>
   ) : null;
@@ -862,15 +863,12 @@ const styles = StyleSheet.create({
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 40 },
   // The name line: its mark, its title and details, "Ver …"; a hairline under it too, over the decision. The mark
   // and "Ver …" stand on the title's line (20 points), not in the middle of a tall detail.
-  line: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  line: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   lineMark: { flexShrink: 0, width: 20, height: 20, alignItems: "center", justifyContent: "center" },
   lineMore: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0, maxWidth: "40%", height: 20 },
+  // Under the title, on its column (the mark and its gap), to the card's edge.
+  lineDetail: { marginLeft: 30, marginTop: 1 },
   // The deadline at the foot's end, right-aligned under the decision.
   expiryRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10 },
   pressed: { opacity: 0.7 },
