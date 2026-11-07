@@ -4821,9 +4821,9 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   scrollbar-width: none;
 }
 /*
- * A row that scrolls sideways fades at the side with more to see, as `.ac-carousel` does. The mask lives in the
- * animation: a row that fits has no scroll timeline, so no mask to clip its focus ring or shadow. A browser without
- * scroll timelines keeps the plain edge.
+ * A row that scrolls sideways fades at the side with more to see, as `.ac-carousel` does. The mask is drawn by a
+ * scroll-driven animation, so a row that fits has no scroll timeline and no mask to clip its focus ring or shadow. A
+ * browser without scroll timelines keeps the plain edge.
  */
 @property --ac-fade-start {
   syntax: "<length>";
@@ -4854,22 +4854,24 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   }
 }
 /* Only where scroll timelines exist: elsewhere the animation would run at once and keep its last frame, a fade on the
-   start edge of every row, scrolling or not. */
-@supports (animation-timeline: scroll()) {
-  .ac-seg,
-  .ac-toolbar__filters,
-  .ac-toolbar__filters > .ac-filterbar,
-  .agp-tabs .ac-tabs,
-  .level-matrix {
-    --ac-fade: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--ac-fade-start),
-      #000 calc(100% - var(--ac-fade-end)),
-      transparent
-    );
-    animation: ac-scroll-fade linear both;
-    animation-timeline: scroll(self inline);
+   start edge of every row, scrolling or not. With reduced motion the row keeps its plain edge, as such a browser's. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .ac-seg,
+    .ac-toolbar__filters,
+    .ac-toolbar__filters > .ac-filterbar,
+    .agp-tabs .ac-tabs,
+    .level-matrix {
+      --ac-fade: linear-gradient(
+        to right,
+        transparent,
+        #000 var(--ac-fade-start),
+        #000 calc(100% - var(--ac-fade-end)),
+        transparent
+      );
+      animation: ac-scroll-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
   }
 }
 .ac-seg::-webkit-scrollbar {

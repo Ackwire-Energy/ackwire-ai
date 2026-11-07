@@ -11256,7 +11256,6 @@ export const ptBR = {
       soleOwner:
         "Você é a única pessoa dona de um workspace com outros membros. Passe a posse a alguém, ou apague o workspace, antes.",
       testFirst: "Teste a conexão com estes dados antes de ligar.",
-      pageAddressTaken: "Outra página usa este endereço. Renomeie antes.",
       voiceLength: "A gravação está longa ou curta demais.",
       sendAgain: "O arquivo não chegou inteiro. Envie de novo.",
       serverKey: "Esta chave está definida nas configurações do servidor.",

@@ -11154,7 +11154,6 @@ export const en = {
       soleOwner:
         "You're the only owner of a workspace with other members. Make someone else an owner, or delete the workspace, first.",
       testFirst: "Test the connection with these settings before turning it on.",
-      pageAddressTaken: "Another page uses this address. Rename it first.",
       voiceLength: "The recording is too long or too short.",
       sendAgain: "The file didn't arrive whole. Send it again.",
       serverKey: "This key is set in the server's settings.",

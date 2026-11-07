@@ -222,7 +222,8 @@ describe("a channel someone else makes while my app is open", () => {
     const { id } = (await (await w.as.admin("/channels", { json: { name: "humans" } })).json()) as { id: string };
     await live();
     await click(link("humans"));
-    expect(memberNames()).toEqual([]);
+    // I own the workspace, so I read the channel and its members before I'm in it.
+    expect(memberNames()).toEqual([w.names.admin]);
     await w.as.admin(`/channels/${id}/members`, { json: { userId: w.ids.me } });
     await live();
     expect(memberNames()).toEqual([w.names.admin, w.names.me].sort());

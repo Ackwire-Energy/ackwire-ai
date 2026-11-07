@@ -13,6 +13,8 @@ afterEach(() => cleanup());
 
 const EXEC = "composio_COMPOSIO_MULTI_EXECUTE_TOOL";
 const TITLE = "Composio: LINKEDIN_PUBLISH_POST";
+/** The same action in the person's words, as the app shows it. */
+const SHOWN = "Publicar post (Linkedin)";
 const RUN_AT = new Date(Date.now() + 26 * 3_600_000).toISOString();
 const WHEN = nextLabel("pt-BR", RUN_AT);
 
@@ -128,7 +130,7 @@ describe("an action approved ahead, on Aprovações", () => {
   const review = async (state: ReturnType<typeof seedState>) => {
     await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
     await settle(8);
-    const pane = screen().getByRole("region", { name: TITLE });
+    const pane = screen().getByRole("region", { name: SHOWN });
     expect(pane.classList.contains("ap-review")).toBe(true);
     return pane;
   };
@@ -226,7 +228,7 @@ describe("an action approved ahead, on its routine's page", () => {
     );
     const panel = screen().getByRole("dialog", { name: "Post de lançamento" });
     const section = within(panel).getByText("Preparado para depois").closest("section") as HTMLElement;
-    expect(section.textContent).toContain(TITLE);
+    expect(section.textContent).toContain(SHOWN);
     expect(section.textContent).toContain(`Aprovada · roda ${WHEN}`);
     // A ghost at the row's end, in an actions row: its word on the box's padding line, as the tile's on the left.
     const cancel = within(section).getByRole("button", { name: "Cancelar" });

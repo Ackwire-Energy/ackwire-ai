@@ -241,7 +241,7 @@ const SLUG_ARTICLES = new Set(["a", "an", "the"]);
 export function actionName(t: TFunction, slug: string) {
   const [app = "", ...rest] = slug.toLowerCase().split("_");
   const name = rest.filter((w) => !SLUG_ARTICLES.has(w)).join("_");
-  return name ? `${toolName(t, partsOf(name), name)} (${humanize(app)})` : humanize(slug);
+  return name ? `${toolName(t, partsOf(name, null, true), name)} (${humanize(app)})` : humanize(slug);
 }
 
 /** One of a routine's own actions (`Routine.ownActions`) in words: a Composio slug (upper case) by its app, else the tool's name. */

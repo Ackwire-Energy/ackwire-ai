@@ -11429,7 +11429,6 @@
       "neverHappens": "Bu zamanlama hiç gerçekleşmiyor.",
       "soleOwner": "Başka üyeleri olan bir çalışma alanının tek sahibi sizsiniz. Önce başka birini sahip yapın veya çalışma alanını silin.",
       "testFirst": "Açmadan önce bağlantıyı bu ayarlarla test edin.",
-      "pageAddressTaken": "Başka bir sayfa bu adresi kullanıyor. Önce onu yeniden adlandırın.",
       "voiceLength": "Kayıt çok uzun veya çok kısa.",
       "sendAgain": "Dosya tam olarak ulaşmadı. Yeniden gönderin.",
       "serverKey": "Bu anahtar sunucunun ayarlarında tanımlı.",

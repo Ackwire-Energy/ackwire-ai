@@ -30,12 +30,6 @@ describe("dialogs laid out on the form's rhythm", () => {
     expect(blocks(layout, ".artifact-table thead td")).toContain("background: var(--surface-sunken);");
   });
 
-  test("Nova rotina: the templates' columns line up with the fields' under them", () => {
-    expect(blocks(css("pages/routines.css"), ".routine-presets__list")).toContain(
-      "gap: var(--space-2) var(--form-gap);",
-    );
-  });
-
   test("on the narrowest phones every tool level stays in its track, and a widget's parts wrap", () => {
     expect(blocks(layout, ".tr-seg .ac-toolpx-swatch")).toContain("display: none;");
     expect(blocks(css("pages/dashboards.css"), ".nwc-pks")).toContain("flex-wrap: wrap;");

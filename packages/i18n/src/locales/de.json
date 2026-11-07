@@ -11493,7 +11493,6 @@
       "neverHappens": "Dieser Zeitplan tritt nie ein.",
       "soleOwner": "Du bist die einzige Person mit Inhaberrechten in einem Workspace mit weiteren Mitgliedern. Mach zuerst jemand anderen zum Inhaber oder lösch den Workspace.",
       "testFirst": "Teste die Verbindung mit diesen Einstellungen, bevor du sie einschaltest.",
-      "pageAddressTaken": "Eine andere Seite nutzt diese Adresse. Benenn sie zuerst um.",
       "voiceLength": "Die Aufnahme ist zu lang oder zu kurz.",
       "sendAgain": "Die Datei kam nicht vollständig an. Schick sie noch einmal.",
       "serverKey": "Dieser Schlüssel steht in den Einstellungen des Servers.",
