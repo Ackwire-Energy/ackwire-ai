@@ -920,15 +920,25 @@ function WaitCard({
       ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
       : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   const face = first ? (
-    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av32" />
+    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av28" />
   ) : (
-    <SystemFace n={n} className="nt-av32" />
+    <SystemFace n={n} className="nt-av28" />
   );
   const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
   // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.
   if (n.kind !== "agent_question" && !approvalId)
     return (
-      <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
+      <WaitRow
+        n={n}
+        s={s}
+        h={h}
+        dir={dir}
+        channelName={channelName}
+        label={label}
+        who={first && !asked ? name : undefined}
+        face={face}
+        tail={tail}
+      >
         {n.kind === "approval" && l.expiresAt && (
           <ExpiryFuse
             left={Math.max(0, new Date(l.expiresAt).getTime() - Date.now()) / TTL_MS}
@@ -951,6 +961,7 @@ function WaitCard({
         agent={agent}
         members={dir.memberById}
         fallback={l.title ?? l.text ?? label}
+        who={first ? name : undefined}
         tail={tail}
       />
     );
@@ -964,6 +975,7 @@ function WaitCard({
         kind="question"
         agent={agent}
         label={label}
+        who={first ? name : undefined}
         mine
         source={source?.[1]}
         lead={title}
@@ -1084,11 +1096,14 @@ function WaitApproval({
   agent,
   members,
   fallback,
+  who,
   tail,
 }: {
   approvalId: string;
   agent: Agent | undefined;
   members: Map<string, Member>;
+  /** Who asks, before the kind. */
+  who?: string;
   /** Its words before the request loads. */
   fallback: string;
   tail: ReactNode;
@@ -1106,6 +1121,7 @@ function WaitApproval({
         kind="approval"
         agent={agent}
         label={t("approval.group")}
+        who={who}
         mine
         lead={fallback}
         end={tail}
@@ -1114,8 +1130,8 @@ function WaitApproval({
     );
   const items = a.messageId ? approvalCardItems(approvals.data, a.messageId, a) : [a];
   if (items.filter((x) => x.status === "pending").length > 1)
-    return <ApprovalGroupAsk items={items} agent={agent} members={members} tail={tail} />;
-  return <ApprovalAsk approval={a} agent={agent} members={members} tail={tail} />;
+    return <ApprovalGroupAsk items={items} agent={agent} members={members} who={who} tail={tail} />;
+  return <ApprovalAsk approval={a} agent={agent} members={members} who={who} tail={tail} />;
 }
 
 /**
@@ -1130,6 +1146,7 @@ function WaitRow({
   dir,
   channelName,
   label,
+  who,
   face,
   tail,
   children,
@@ -1140,6 +1157,8 @@ function WaitRow({
   dir: Dir;
   channelName: (id: string) => string;
   label: string;
+  /** Who it is from, before where (a request to join names its people in the headline). */
+  who?: string;
   face: ReactNode;
   tail: ReactNode;
   children?: ReactNode;
@@ -1181,6 +1200,12 @@ function WaitRow({
       <div className="rq nt-wr__main">
         <div className="rq__head">
           <span className="rq__kind">
+            {who && (
+              <>
+                <span className="rq__who">{who}</span>
+                {" · "}
+              </>
+            )}
             {source ? (
               <>
                 <span className="nt-wr__src">{source[1]}</span>

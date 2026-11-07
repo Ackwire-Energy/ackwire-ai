@@ -149,6 +149,8 @@ describe("Notificações", () => {
     // The question as the conversation's request card, stopped until I answer.
     const card = waiting.querySelector(".rq") as HTMLElement;
     expect(card.querySelector(".rq__kind")?.textContent).toContain("Pergunta");
+    // Who asks comes first: away from the conversation, the face alone doesn't say it.
+    expect(card.querySelector(".rq__kind > .rq__who")?.textContent).toBeTruthy();
     expect(card.querySelector(".rq__state")?.textContent).toBe("esperando você");
     expect(card.querySelector(".rq__lead")?.textContent).toBe(question.text);
     expect(card.querySelector(".rq__end")?.textContent).toMatch(/^Parada há /);
@@ -196,7 +198,7 @@ describe("Notificações", () => {
     const region = screen().getByRole("region", { name: "Esperando você" });
     const card = region.querySelector(".rq") as HTMLElement;
     expect(card.getAttribute("data-ask-kind")).toBe("approval");
-    expect(card.querySelector(".rq__kind")?.textContent).toBe("Pede sua aprovação");
+    expect(card.querySelector(".rq__kind")?.textContent).toBe("Atlas · Pede sua aprovação");
     expect(card.querySelector(".rq__well")).toBeTruthy();
     // Decided right here: a deploy takes a hold, and Agora não asks for the reason. Remind me later and Done end it.
     expect(within(card).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();

@@ -15764,7 +15764,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> a signalé « {{title}} »",
-      "failed": "« {{title}} » ne se met plus à jour",
+      "failed": "<b>{{name}}</b> n’a pas pu mettre à jour « {{title}} »",
       "proposal": "<b>{{name}}</b> veut publier un tableau de bord",
       "proposalWorkspace": "« {{title}} » pour tout l'espace de travail · vous seul le voyez aujourd'hui",
       "proposalRoles": "« {{title}} » pour {{roles}} · vous seul le voyez aujourd'hui",

@@ -14728,7 +14728,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> menandai “{{title}}”",
-      "failed": "“{{title}}” berhenti diperbarui",
+      "failed": "<b>{{name}}</b> gagal memperbarui “{{title}}”",
       "proposal": "<b>{{name}}</b> ingin memublikasikan dasbor",
       "proposalWorkspace": "“{{title}}” untuk seluruh ruang kerja · saat ini hanya kamu yang melihatnya",
       "proposalRoles": "“{{title}}” untuk {{roles}} · saat ini hanya kamu yang melihatnya",

@@ -16212,7 +16212,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> zgłasza alert: „{{title}}”",
-      "failed": "„{{title}}” nie aktualizuje się już",
+      "failed": "<b>{{name}}</b>: „{{title}}” nie aktualizuje się już",
       "proposal": "<b>{{name}}</b> chce opublikować dashboard",
       "proposalWorkspace": "„{{title}}” dla całej przestrzeni roboczej · dziś widzisz go tylko ty",
       "proposalRoles": "„{{title}}” dla: {{roles}} · dziś widzisz go tylko ty",

@@ -15172,7 +15172,7 @@ export const ptBR = {
     },
     notice: {
       alert: "<b>{{name}}</b> avisou sobre “{{title}}”",
-      failed: "“{{title}}” parou de atualizar",
+      failed: "<b>{{name}}</b> não conseguiu atualizar “{{title}}”",
       proposal: "<b>{{name}}</b> quer publicar um painel",
       proposalWorkspace: "“{{title}}” para todo o workspace · hoje só você vê",
       proposalRoles: "“{{title}}” para {{roles}} · hoje só você vê",

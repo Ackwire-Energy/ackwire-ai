@@ -15624,7 +15624,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> marcó “{{title}}”",
-      "failed": "“{{title}}” dejó de actualizarse",
+      "failed": "<b>{{name}}</b> no pudo actualizar “{{title}}”",
       "proposal": "<b>{{name}}</b> quiere publicar un panel",
       "proposalWorkspace": "“{{title}}” para todo el espacio de trabajo · hoy solo tú lo ves",
       "proposalRoles": "“{{title}}” para {{roles}} · hoy solo tú lo ves",

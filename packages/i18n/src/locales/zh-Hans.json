@@ -14801,7 +14801,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> 对“{{title}}”发出了提醒",
-      "failed": "“{{title}}”已停止更新",
+      "failed": "<b>{{name}}</b> 未能更新“{{title}}”",
       "proposal": "<b>{{name}}</b> 想发布一个仪表盘",
       "proposalWorkspace": "“{{title}}”面向整个工作区 · 目前只有你能看到",
       "proposalRoles": "“{{title}}”面向{{roles}} · 目前只有你能看到",

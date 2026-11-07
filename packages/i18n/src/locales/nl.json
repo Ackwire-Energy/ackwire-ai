@@ -15329,7 +15329,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> heeft “{{title}}” gemarkeerd",
-      "failed": "“{{title}}” wordt niet meer bijgewerkt",
+      "failed": "<b>{{name}}</b> kon “{{title}}” niet bijwerken",
       "proposal": "<b>{{name}}</b> wil een dashboard publiceren",
       "proposalWorkspace": "“{{title}}” voor de hele werkruimte · vandaag zie alleen jij het",
       "proposalRoles": "“{{title}}” voor {{roles}} · vandaag zie alleen jij het",

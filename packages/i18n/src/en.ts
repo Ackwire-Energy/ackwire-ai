@@ -14942,7 +14942,7 @@ export const en = {
     },
     notice: {
       alert: "<b>{{name}}</b> flagged “{{title}}”",
-      failed: "“{{title}}” stopped updating",
+      failed: "<b>{{name}}</b> couldn't update “{{title}}”",
       proposal: "<b>{{name}}</b> wants to publish a dashboard",
       proposalWorkspace: "“{{title}}” for the whole workspace · only you see it today",
       proposalRoles: "“{{title}}” for {{roles}} · only you see it today",

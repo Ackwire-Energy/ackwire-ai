@@ -9,9 +9,11 @@ const last = (selector: string, property: string) =>
     .filter(([p]) => p === property)
     .at(-1)?.[1];
 
-test("the inbox's words keep clear of the hover bar at rest too, so hovering a row never moves them", async () => {
+test("the inbox's times end at the card's edge on every row, the hover bar floating over the time", async () => {
   const inbox = await builtCss("src/pages/notifications.css");
-  expect(inbox).toContain(".nt-item>.nt-c{padding-right:var(--nt-acts-room,48px)}");
+  // Room kept per row for its buttons put each row's time somewhere else.
+  expect(inbox).not.toContain("--nt-acts-room");
+  expect(inbox).toMatch(/\.nt-item:is\([^{]*\.is-cur[^{]*\.nt-tm\{visibility:hidden\}/);
 });
 
 test("a wiki folder's name stops short of the button beside its count", async () => {

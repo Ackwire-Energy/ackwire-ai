@@ -15084,7 +15084,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> “{{title}}” için uyardı",
-      "failed": "“{{title}}” artık güncellenmiyor",
+      "failed": "<b>{{name}}</b> “{{title}}” güncelleyemedi",
       "proposal": "<b>{{name}}</b> bir pano yayımlamak istiyor",
       "proposalWorkspace": "“{{title}}” tüm çalışma alanı için · bugün yalnızca siz görüyorsunuz",
       "proposalRoles": "“{{title}}” {{roles}} için · bugün yalnızca siz görüyorsunuz",
