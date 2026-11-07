@@ -239,6 +239,7 @@ export const SELF_TESTED = [
   "inset",
   "icongap",
   "square",
+  "touch",
 ];
 
 /** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
