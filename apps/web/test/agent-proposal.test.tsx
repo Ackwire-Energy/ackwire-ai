@@ -89,8 +89,9 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     // Waiting for who may create agents, like every other request (the bar can bring it back).
     expect(card.getAttribute("data-ask-kind")).toBe("agent");
     expect(card.hasAttribute("data-ask-mine")).toBe(true);
+    // Waiting for me needs no words on the card (its buttons say it).
+    expect(card.textContent).not.toContain("esperando você");
     for (const shown of [
-      "esperando você",
       "Você pediu alguém para o design.",
       "Nina",
       "@nina · Designer · Pensa pela API",

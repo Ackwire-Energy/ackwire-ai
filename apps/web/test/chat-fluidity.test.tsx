@@ -239,7 +239,7 @@ describe("an image in a message", () => {
     });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const thumb = document.querySelector(".file-thumb") as HTMLElement;
+    const thumb = document.querySelector(".artifact-tile__picture") as HTMLElement;
     const img = thumb.querySelector("img") as HTMLImageElement;
     expect(img.getAttribute("src")).toStartWith("blob:");
     expect(thumb.dataset.loading).toBe("true");

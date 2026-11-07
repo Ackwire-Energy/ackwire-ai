@@ -1,30 +1,44 @@
-import type { ArtifactContent, ArtifactRef } from "@agenteschat/client";
+import type { Artifact, ArtifactContent, ArtifactFileContent, ArtifactRef } from "@agenteschat/client";
 import { useArtifact } from "@agenteschat/client";
-import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib/artifacts";
-import { Icon } from "@agenteschat/ui";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { documentStart, KIND_ICON, parseDelimited, patchCounts } from "@agenteschat/client/lib/artifacts";
+import { fileIcon, formatBytes, previewKind } from "@agenteschat/client/lib/files";
+import { Button, Icon, type IconName, Menu } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChoicesCard } from "@/components/blocks/ChoicesCard";
 import { LiveBlockCard } from "@/components/blocks/LiveBlock";
 import { PollCard } from "@/components/blocks/PollCard";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { useOrg } from "@/components/org-context";
-import { contextMenuHandler, copyText } from "@/lib/context-menu";
+import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu";
+import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
-import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
-import { FileCardPreview } from "./FileView";
+import { artifactLink, useArtifactViewer } from "./ArtifactViewer";
+import { FileVideo, MAX_THUMB_BYTES, usePreviewUrl } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
 import { MermaidDiagram } from "./Mermaid";
 
-const PREVIEW_ROWS = 3;
-const PREVIEW_FILES = 3;
+/** What a cover shows of a table, a code change or a text file: the rest is in the viewer. */
+const COVER_ROWS = 5;
+const COVER_COLUMNS = 3;
+const COVER_FILES = 4;
+const COVER_LINES = 12;
+/** The start of a document drawn on its cover (cut at a line, never mid-word). */
+const COVER_CHARS = 1200;
 
-/** Compact neutral card on an agent message: kind, title, version, author and a short preview. */
+/**
+ * An attachment on a message as a tile of one size, so several sit side by side: what it holds drawn small on top
+ * (its cover: the start of a document, a table's first rows, a change's files, a diagram, a page, a picture) and its
+ * name with its kind and size under it. A click opens the viewer; Download and More show over the cover on hover,
+ * and the desktop app's right click has the same actions. A picture alone on its message shows whole, with no name
+ * under it (CSS: `.artifact-cards > :only-child`); a video is its player.
+ */
 export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const viewer = useArtifactViewer();
-  const authorName = useAuthorName();
   const download = useArtifactDownload();
   const toast = useToast();
   const remove = useDeleteArtifact();
@@ -46,23 +60,17 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       </div>
     );
   }
-  if (!a) return <div className="artifact-card artifact-card--loading" aria-busy="true" />;
-  // What lives in the conversation isn't a file: the thing itself, not a card that opens it (ADR 0113).
+  if (!a) return <div className="artifact-tile artifact-tile--loading" aria-busy="true" />;
+  // What lives in the conversation isn't a file: the thing itself, not a tile that opens it (ADR 0113).
   if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
   if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
   if (a.kind === "choices") return <ChoicesCard id={a.id} version={a.shownVersion} />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
-  // The desktop app's right click: open, download, its link, and the trash for who may delete it.
-  const onContextMenu = contextMenuHandler(() => [
-    { kind: "header", label: a.title },
+  const save = () => void download.save(a, undefined, a.shownVersion, a.content);
+  // Open, download, its link, and the trash for who may delete it: the right click and the More menu.
+  const actions = (): MenuEntry[] => [
     { kind: "item", id: "open", label: t("contextMenu.open"), icon: "eye", run: open },
-    {
-      kind: "item",
-      id: "download",
-      label: t("contextMenu.download"),
-      icon: "download",
-      run: () => void download.save(a, undefined, a.shownVersion, a.content),
-    },
+    { kind: "item", id: "download", label: t("contextMenu.download"), icon: "download", run: save },
     {
       kind: "item",
       id: "copy-link",
@@ -86,126 +94,208 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           },
         ] as const)
       : []),
-  ]);
-  // Files are tiles that sit side by side (images as their thumbnail).
-  if (a.content.kind === "file") {
+  ];
+  const tile = (props: Pick<TileProps, "icon" | "meta" | "cover" | "media">) => (
+    <>
+      <Tile artifact={a} actions={actions} onOpen={open} onDownload={save} {...props} />
+      {remove.dialog}
+    </>
+  );
+  const content = a.content;
+  if (content.kind !== "file")
+    return tile({
+      icon: KIND_ICON[a.kind],
+      meta: metaOf(t, content, a.shownVersion),
+      cover: <Cover content={content} title={a.title} />,
+    });
+  const meta = fileMeta(content, formatBytes(i18n.language, content.size));
+  const icon = fileIcon(content.name, content.contentType);
+  const kind = previewKind(content.contentType);
+  if (kind === "video")
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
-      <div className="artifact-tile" data-kind="file" onContextMenu={onContextMenu}>
-        <FileCardPreview content={a.content} artifactId={a.id} version={a.shownVersion} title={a.title} onOpen={open} />
+      <>
+        <FileVideo
+          content={content}
+          artifactId={a.id}
+          version={a.shownVersion}
+          onOpen={open}
+          actions={<TileActions title={a.title} actions={actions} onDownload={save} />}
+          // A video this browser can't play is a file's tile.
+          fallback={
+            <Tile
+              artifact={a}
+              actions={actions}
+              onOpen={open}
+              onDownload={save}
+              icon={icon}
+              meta={meta}
+              cover={<TypeCover content={content} />}
+            />
+          }
+        />
         {remove.dialog}
-      </div>
+      </>
     );
+  if (kind === "image" && content.size <= MAX_THUMB_BYTES)
+    return tile({
+      media: true,
+      icon: "image",
+      meta,
+      cover: <PictureCover content={content} artifactId={a.id} version={a.shownVersion} title={a.title} />,
+    });
+  return tile({ icon, meta, cover: <FileCover content={content} /> });
+}
+
+const extOf = (name: string) => /\.([a-z0-9]{1,8})$/i.exec(name.trim())?.[1]?.toLowerCase() ?? "";
+
+/** "PDF · 1,2 MB": the file's extension stands for its kind (no word to translate), then its size. */
+function fileMeta(content: ArtifactFileContent, size: string) {
+  const ext = extOf(content.name).toUpperCase();
+  return ext ? `${ext} · ${size}` : size;
+}
+
+/** Under a tile's name: its kind and how big it is ("Tabela · 15 linhas", "5 arquivos · +58 −31", "Documento · v2"). */
+function metaOf(t: TFunction, content: ArtifactContent, version: number) {
+  const kind = t(`artifacts.kind.${content.kind}`);
+  switch (content.kind) {
+    case "table":
+      return `${kind} · ${t("artifacts.rows", { count: content.rows.length })}`;
+    case "diff": {
+      const total = { added: 0, removed: 0 };
+      for (const f of content.files) {
+        const c = patchCounts(f.patch);
+        total.added += c.added;
+        total.removed += c.removed;
+      }
+      return `${t("artifacts.files", { count: content.files.length })} · ${t("artifacts.counts", total)}`;
+    }
+    default:
+      return `${kind} · ${t("artifacts.version", { version })}`;
   }
+}
+
+interface TileProps {
+  artifact: Artifact;
+  icon: IconName;
+  meta: string;
+  cover: ReactNode;
+  /** A picture: alone on its message it shows whole, with no name under it. */
+  media?: boolean;
+  actions: () => MenuEntry[];
+  onOpen: () => void;
+  onDownload: () => void;
+}
+
+function Tile({ artifact: a, icon, meta, cover, media, actions, onOpen, onDownload }: TileProps) {
+  const { t } = useTranslation();
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: right click only; the open button inside is the accessible way
-    <div className="artifact-card" data-kind={a.kind} onContextMenu={onContextMenu}>
+    <div
+      className="artifact-tile"
+      data-kind={a.kind}
+      data-media={media || undefined}
+      onContextMenu={contextMenuHandler(() => [{ kind: "header", label: a.title }, ...actions()])}
+    >
+      {/* The whole tile opens the viewer (its ::after covers the tile); the actions sit above it. */}
       <button
         type="button"
-        className="artifact-card__open"
+        className="artifact-tile__open"
         aria-label={t("artifacts.open", { title: a.title })}
-        onClick={open}
-      >
-        {/* A tiny page for documents; the kind's icon for the rest. */}
-        {a.kind === "document" ? (
-          <span className="artifact-thumb" aria-hidden="true">
-            <span style={{ width: "70%" }} />
-            <span />
-            <span style={{ width: "85%" }} />
-            <span style={{ width: "55%" }} />
+        onClick={onOpen}
+      />
+      <div className="artifact-tile__cover">{cover}</div>
+      <div className="artifact-tile__foot" aria-hidden="true">
+        <Icon name={icon} size={16} />
+        <span className="artifact-tile__name">
+          <span className="artifact-tile__title" title={a.title}>
+            {a.title}
           </span>
-        ) : (
-          <span className="artifact-card__icon">
-            <Icon name={KIND_ICON[a.kind]} />
-          </span>
-        )}
-        <span className="artifact-card__meta">
-          <span className="artifact-card__title">{a.title}</span>
-          <span className="small muted">
-            {t("artifacts.createdBy", { kind: t(`artifacts.kind.${a.kind}`), name: authorName(a.createdBy) })}
-          </span>
+          <span className="artifact-tile__meta tabular">{meta}</span>
         </span>
-      </button>
-      <span className="artifact-card__version small muted tabular">
-        {t("artifacts.version", { version: a.shownVersion })}
-      </span>
-      <div className="artifact-card__preview">
-        <Preview content={a.content} title={a.title} />
       </div>
-      {remove.dialog}
+      <span className="artifact-tile__acts">
+        <TileActions title={a.title} actions={actions} onDownload={onDownload} />
+      </span>
     </div>
   );
 }
 
-function Preview({ content, title }: { content: ArtifactContent; title: string }) {
+/** Download, then More (the right click's other actions), as small ghost buttons. */
+function TileActions({
+  title,
+  actions,
+  onDownload,
+}: {
+  title: string;
+  actions: () => MenuEntry[];
+  onDownload: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = t("artifacts.more", { title });
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        iconOnly
+        icon="download"
+        aria-label={t("artifacts.download")}
+        title={t("artifacts.download")}
+        onClick={onDownload}
+      />
+      <Menu
+        align="end"
+        label={label}
+        trigger={
+          <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        }
+      >
+        <MenuEntries entries={actions().filter((e) => !(e.kind === "item" && e.id === "download"))} />
+      </Menu>
+    </>
+  );
+}
+
+/** A document, table, code change, diagram or page, drawn small. */
+function Cover({ content, title }: { content: ArtifactContent; title: string }) {
   const { t } = useTranslation();
   switch (content.kind) {
     case "document":
+      // Its own headings, paragraphs and lists, smaller, fading at the foot; a first heading equal to the title isn't
+      // drawn again.
       return (
-        <div className="artifact-card__doc">
-          {documentPreview(content.markdown).map((l, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static preview
-            <p key={i}>{l}</p>
-          ))}
-        </div>
+        <Markdown
+          source={documentStart(content.markdown, COVER_CHARS)}
+          title={title}
+          excerpt
+          className="artifact-tile__doc"
+        />
       );
-    case "table": {
-      const more = content.rows.length - PREVIEW_ROWS;
+    case "table":
+      return <CoverTable columns={content.columns} rows={content.rows} />;
+    case "diff":
       return (
-        <>
-          <table className="artifact-card__table">
-            <thead>
-              <tr>
-                {content.columns.map((c, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: static preview
-                  <th key={i} scope="col">
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {content.rows.slice(0, PREVIEW_ROWS).map((r, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static preview
-                <tr key={i}>
-                  {content.columns.map((_, j) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: static preview
-                    <td key={j}>{r[j] ?? ""}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {more > 0 && <span className="small muted">{t("artifacts.moreRows", { count: more })}</span>}
-        </>
+        <ul className="artifact-tile__files">
+          {content.files.slice(0, COVER_FILES).map((f) => {
+            const c = patchCounts(f.patch);
+            return (
+              <li key={f.path}>
+                <code>
+                  {f.path.includes("/") && (
+                    <span className="artifact-tile__dir">{f.path.slice(0, f.path.lastIndexOf("/") + 1)}</span>
+                  )}
+                  <span>{f.path.slice(f.path.lastIndexOf("/") + 1)}</span>
+                </code>
+                <span className="artifact-tile__added tabular">+{c.added}</span>
+                <span className="artifact-tile__removed tabular">−{c.removed}</span>
+              </li>
+            );
+          })}
+        </ul>
       );
-    }
-    case "diff": {
-      const more = content.files.length - PREVIEW_FILES;
-      return (
-        <>
-          <ul className="artifact-card__files">
-            {content.files.slice(0, PREVIEW_FILES).map((f) => {
-              const c = patchCounts(f.patch);
-              return (
-                <li key={f.path}>
-                  <code>{f.path}</code>
-                  <span className="small muted tabular">
-                    <span aria-hidden="true">{t("artifacts.counts", c)}</span>
-                    <span className="ac-visually-hidden">{t("artifacts.countsLabel", c)}</span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          {more > 0 && <span className="small muted">{t("artifacts.moreFiles", { count: more })}</span>}
-        </>
-      );
-    }
     case "diagram":
       return <MermaidDiagram source={content.mermaid} label={t("artifacts.diagramLabel", { title })} compact />;
     case "html":
-      // A small live picture of the page; clicks go to the card's open button.
       return (
         <PageThumbnail
           html={content.html}
@@ -213,16 +303,125 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
           title={t("artifacts.htmlFrame", { title })}
         />
       );
-    case "file":
-    case "block":
-    case "poll":
-    case "choices":
-      // Files render as tiles and blocks and votes as themselves (`ArtifactCard`), never inside a card.
+    default:
       return null;
   }
 }
 
-/** The page drawn at `PAGE_WIDTH` and scaled to the card's width. */
+/** A signed percentage ("+12%", "−3%"): its cell takes the up or down tone. */
+const SIGNED = /^([+\-−])\s?\d[\d.,]*\s?%$/;
+/** A column of numbers, amounts or percentages lines up on the right. */
+const NUMBER = /^[+\-−]?\s?(?:[A-Z]{0,3}\$|€|£)?\s?\d[\d.,\s]*%?$/;
+
+function CoverTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
+  const cols = columns.slice(0, COVER_COLUMNS);
+  const shown = rows.slice(0, COVER_ROWS);
+  const numeric = cols.map((_, j) => {
+    const cells = shown.map((r) => (r[j] ?? "").trim()).filter(Boolean);
+    return cells.length > 0 && cells.every((c) => NUMBER.test(c));
+  });
+  return (
+    <table className="artifact-tile__table">
+      <thead>
+        <tr>
+          {cols.map((c, j) => (
+            <th key={c} className={numeric[j] ? "is-num" : undefined}>
+              {c}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {shown.map((r) => (
+          // A static drawing of a few rows: the row's own text is its key.
+          <tr key={r.join("\u001f")}>
+            {cols.map((_, j) => {
+              const cell = (r[j] ?? "").trim();
+              const sign = SIGNED.exec(cell)?.[1];
+              const tone = sign ? (sign === "+" ? "is-up" : "is-down") : "";
+              return (
+                <td key={cols[j]} className={[numeric[j] ? "is-num" : "", tone].filter(Boolean).join(" ") || undefined}>
+                  {cell}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** A picture's cover; it keeps its loading size until decoded, so the tile changes size once. */
+function PictureCover({
+  content,
+  artifactId,
+  version,
+  title,
+}: {
+  content: ArtifactFileContent;
+  artifactId: string;
+  version: number;
+  title: string;
+}) {
+  const { t } = useTranslation();
+  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, true);
+  const [decoded, setDecoded] = useState<string | null>(null);
+  if (failed) return <TypeCover content={content} />;
+  return (
+    <span className="artifact-tile__picture" data-loading={url && decoded === url ? undefined : "true"}>
+      {url && (
+        <img
+          src={url}
+          alt={t("files.imageAlt", { title })}
+          onLoad={() => setDecoded(url)}
+          onError={() => setDecoded(url)}
+        />
+      )}
+    </span>
+  );
+}
+
+/** Code files read in the code font; any other text in the app's. */
+const CODE_EXT = new Set(
+  "ts tsx js jsx mjs cjs json py rb go rs java kt swift c h cc cpp hpp cs php sh bash zsh yml yaml toml sql css scss html xml vue svelte lua dart".split(
+    " ",
+  ),
+);
+
+/** An uploaded file's cover: a CSV as its table, a small text file as its first lines, anything else its type. */
+function FileCover({ content }: { content: ArtifactFileContent }) {
+  const ext = extOf(content.name);
+  const text = content.text;
+  if (text === undefined || !text.trim()) return <TypeCover content={content} />;
+  if (ext === "csv" || ext === "tsv") {
+    const [head = [], ...rows] = parseDelimited(text, ext === "tsv" ? "\t" : ",", COVER_ROWS + 1);
+    return <CoverTable columns={head} rows={rows} />;
+  }
+  if (ext === "md" || ext === "markdown")
+    return <Markdown source={documentStart(text, COVER_CHARS)} excerpt className="artifact-tile__doc" />;
+  const lines = text.split("\n").slice(0, COVER_LINES).join("\n");
+  return CODE_EXT.has(ext) ? (
+    <pre className="artifact-tile__code">
+      <code>{lines}</code>
+    </pre>
+  ) : (
+    <p className="artifact-tile__text">{lines}</p>
+  );
+}
+
+/** No preview: the type's icon and its extension, quiet in the middle. */
+function TypeCover({ content }: { content: ArtifactFileContent }) {
+  const ext = extOf(content.name).toUpperCase();
+  return (
+    <span className="artifact-tile__type">
+      <Icon name={fileIcon(content.name, content.contentType)} size={28} />
+      {ext && <span>{ext}</span>}
+    </span>
+  );
+}
+
+/** The page drawn at `PAGE_WIDTH` and scaled to the tile's width. */
 const PAGE_WIDTH = 1000;
 function PageThumbnail({ html, label, title }: { html: string; label: string; title: string }) {
   const box = useRef<HTMLDivElement>(null);
@@ -241,12 +440,12 @@ function PageThumbnail({ html, label, title }: { html: string; label: string; ti
   return (
     <div
       ref={box}
-      className="artifact-card__page"
+      className="artifact-tile__page"
       role="img"
       aria-label={label}
       style={{ "--page-scale": scale } as CSSProperties}
     >
-      <HtmlFrame html={html} title={title} className="artifact-card__page-frame" thumbnail />
+      <HtmlFrame html={html} title={title} className="artifact-tile__page-frame" thumbnail />
     </div>
   );
 }

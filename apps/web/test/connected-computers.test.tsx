@@ -115,20 +115,21 @@ describe("uploaded files in the Drive", () => {
     });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    // Both are tiles side by side in the message, not full cards.
-    expect(document.querySelectorAll(".artifact-cards > .artifact-tile")).toHaveLength(2);
-    const thumb = document.querySelector(".file-thumb") as HTMLElement;
-    expect(thumb).not.toBeNull();
-    expect(within(thumb).getByRole("img").getAttribute("src")).toMatch(/^blob:preview-/);
-    expect(thumb.textContent).toContain("contato.jpg");
-    const row = document.querySelector(".file-row") as HTMLElement;
-    expect(row.textContent).toContain("carrossel.zip");
+    // Both are tiles of one size side by side in the message: the picture as its cover, the zip its type.
+    const tiles = Array.from(document.querySelectorAll<HTMLElement>(".artifact-cards > .artifact-tile"));
+    expect(tiles).toHaveLength(2);
+    const [thumb, row] = tiles as [HTMLElement, HTMLElement];
+    expect(thumb.querySelector(".artifact-tile__picture img")?.getAttribute("src")).toMatch(/^blob:preview-/);
+    expect(thumb.querySelector(".artifact-tile__title")?.textContent).toBe("contato.jpg");
+    expect(row.querySelector(".artifact-tile__title")?.textContent).toBe("carrossel.zip");
+    expect(row.querySelector(".artifact-tile__type")?.textContent).toBe("ZIP");
+    expect(row.querySelector(".artifact-tile__meta")?.textContent).toMatch(/^ZIP · /);
     await click(within(row).getByRole("button", { name: "Baixar" }));
     expect(saved.at(-1)).toEqual({
       url: `/api/app/organizations/${ORG_ID}/artifacts/${zip.id}/file?version=1`,
       name: "carrossel.zip",
     });
-    await click(thumb);
+    await click(within(thumb).getByRole("button", { name: "Abrir contato.jpg" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "contato.jpg" })).toBeTruthy();
   });

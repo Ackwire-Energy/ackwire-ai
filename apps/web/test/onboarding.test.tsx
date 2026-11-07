@@ -123,7 +123,7 @@ describe("the top of Lodi's DM", () => {
     await openDm(fresh());
     const card = startCard();
     expect(card).toBeTruthy();
-    expect(card?.textContent).toContain("esperando você");
+    expect(card?.hasAttribute("data-ask-mine")).toBe(true);
     expect(card?.textContent).toContain("Com isso eu monto um time pronto, e você só confere.");
     for (const name of ["Agência", "Loja online", "Software e apps", "Outra coisa"])
       expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
@@ -220,7 +220,7 @@ describe("the top of Lodi's DM", () => {
     await openDm(state);
     expect(screen().queryByText("Como prefere que eu fale com você?")).toBeNull();
     const card = startCard() as HTMLElement;
-    expect(card.textContent).toContain("esperando você");
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
     expect((within(card).getByRole("button", { name: "Agência" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen().queryByRole("button", { name: "Montar o time" })).toBeNull();
   });

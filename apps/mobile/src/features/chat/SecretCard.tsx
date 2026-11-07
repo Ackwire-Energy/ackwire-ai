@@ -256,7 +256,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       agentId={r.agentId}
       waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
       lead={r.purpose}
-      well={{ tile: <IconTile name="lock" size={20} />, title: label, detail: where }}
+      well={{ tile: <IconTile name="lock" size={20} bare />, title: label, detail: where }}
       body={
         mine ? (
           <Locked when={busy !== null} style={styles.body}>
