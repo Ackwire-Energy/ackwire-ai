@@ -1616,8 +1616,11 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   gap: 4px;
   min-width: 0;
 }
+/* Its actions keep their one line: where they and the sentence don't fit side by side, they go under the sentence
+   instead of squeezing it to a word a line. */
 .ac-eventpill__frame {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: stretch;
   max-width: 100%;
   min-height: var(--control-h-sm);
@@ -1629,6 +1632,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
 }
 .ac-eventpill__main {
   display: inline-flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -1663,6 +1667,8 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: inline-flex;
   flex: none;
   align-items: stretch;
+  /* Under the sentence, still the frame's height. */
+  min-height: inherit;
 }
 .ac-eventpill__action {
   display: inline-flex;
@@ -9758,6 +9764,10 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 }
 .ac-setnote + .ac-setnote {
   margin-top: 8px;
+}
+/* In a stack (a form, a field, a dialog's body) the stack's gap is the room above it, as for any paragraph there. */
+:is(.ac-form, .ac-field, .ac-dialog__body) > .ac-setnote {
+  margin: 0;
 }
 .ac-setnote .ac-icon {
   color: var(--faint);

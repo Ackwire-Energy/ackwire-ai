@@ -404,6 +404,7 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
           <Button
             size="sm"
             variant="ghost"
+            className="izoom__actual"
             aria-label={t("files.zoom.actual")}
             title={t("files.zoom.actual")}
             disabled={Math.abs((view?.scale ?? 1) - 1) < 1e-3}

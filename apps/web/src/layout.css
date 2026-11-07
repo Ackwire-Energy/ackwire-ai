@@ -7367,9 +7367,15 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. */
+/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. A phone's stage (under 440px)
+   can't hold them all either: actual size goes, + and − still reach it. */
 @container (max-width: 900px) {
   .izoom__hint {
+    display: none;
+  }
+}
+@container (max-width: 439px) {
+  .izoom__actual {
     display: none;
   }
 }
@@ -7858,9 +7864,6 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   justify-content: flex-end;
   gap: 2px;
   margin-right: 10px;
-}
-.ac-dialog__body > .ac-setnote {
-  margin: 0;
 }
 .machine-page__agent {
   flex: 1;

@@ -561,11 +561,12 @@ html:not([data-pointer]) .ap-link:focus-visible {
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: start;
   }
-  /* Open on the title's first line (its 22px line, with the same rise), not centred on the wrapped title. */
+  /* Open on the title's first line, as `.ac-captail` holds a button with a plate: a box as tall as that line, and the
+     button, taller than it (40px on touch), kept `--action-clear` inside the row's 8px padding instead of past it. */
   .ap-mi__row .ap-row__end {
     grid-column: auto;
     height: 22px;
-    margin-block-start: calc(var(--cap-top) - 11px);
+    margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 16px) / 2);
     font-size: 14px;
   }
   .ap-mi__row .ap-row__end > .ac-chip {
@@ -577,6 +578,11 @@ html:not([data-pointer]) .ap-link:focus-visible {
     -webkit-box-orient: vertical;
     white-space: normal;
     margin-block-start: calc(var(--cap-top) - 11px);
+  }
+}
+@media (max-width: 720px) and (pointer: coarse) {
+  .ap-mi__row .ap-row__end {
+    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 16px) / 2);
   }
 }
 @media (prefers-reduced-motion: reduce) {
