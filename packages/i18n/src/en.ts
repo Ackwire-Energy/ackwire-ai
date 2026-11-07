@@ -3538,6 +3538,8 @@ export const en = {
     failed: "Couldn't send the answer. Try again.",
     withdrawn: "{{name}} no longer needs an answer.",
     /** Closes the question without an answer: the agent goes on with its own judgement. */
+    /** Under a question's choices: their number keys answer it. */
+    keysHint: "Press 1–{{count}} to answer",
     skip: "Skip",
     skipFailed: "Couldn't skip the question. Try again.",
     dismissed: "{{name}} skipped this question.",
@@ -5871,8 +5873,6 @@ export const en = {
     movedStage: "Now in {{stage}} · #{{number}}",
     movedDetail: "#{{number}} · {{title}}",
     column: "Column",
-    flowHint:
-      "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve.",
     moreOptions: "More options",
     showCanceled: "Show canceled",
     filterButton: "Filter",
@@ -9625,6 +9625,10 @@ export const en = {
     brokenBody: "The answer is above. You can ask for it again.",
     retry: "Ask again",
     retryText: "That block didn't open here. Can you send it again?",
+    /** A block that is the agent's own page runs only when the person asks (ADR 0113). */
+    pageTitle: "A block with its own code",
+    pageBody: "It runs apart from the app, with no access to your account or the internet.",
+    runPage: "Open block",
     someone: "Someone",
     pollCloses: "Closes {{time}}",
     pollClosed: "Voting closed",

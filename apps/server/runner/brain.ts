@@ -58,7 +58,7 @@ import {
   yieldRoute,
 } from "./accounts";
 import { ownBranches } from "./command-gate";
-import { DELEGATED_RESULT_TOKENS, type DelegatedBridge } from "./delegated-tools";
+import { DELEGATED_RESULT_CHARS, type DelegatedBridge } from "./delegated-tools";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { HARDENED_GIT_ARGS } from "./git-guard";
@@ -620,14 +620,16 @@ export class ClaudeStreamParser {
           },
         };
       }
+      const cause = said.cause ?? this.failure.cause ?? "unknown";
       return {
         events,
         final: {
           type: "error",
           code: "claude_failed",
           message: (text || `Claude Code ended with ${str(ev.subtype) || "an error"}`).slice(0, BRAIN_LIMITS.message),
-          retryable: false,
-          cause: said.cause ?? this.failure.cause ?? "unknown",
+          // The CLI already retried its own calls; a network or provider outage may pass, so the server tries later.
+          retryable: cause === "network" || cause === "provider_transient",
+          cause,
           ...http,
         },
       };
@@ -1747,6 +1749,12 @@ export class BrainManager {
     ).length;
   }
 
+  /** Whether the session `key` (`brainKey`) has an open process: its next turn starts no new CLI. */
+  warm(key: string) {
+    const l = this.live.get(key);
+    return l !== undefined && !l.proc.exited;
+  }
+
   /** The live process of a session, if any (tests). */
   process(agentId: string, session: string): ClaudeProcess | undefined {
     return this.live.get(brainKey(agentId, session))?.proc;
@@ -2198,8 +2206,10 @@ export class BrainManager {
       ? {
           ...launched.env,
           ENABLE_CLAUDEAI_MCP_SERVERS: "false",
-          // Above what a delegated tool answers: past this limit the CLI spills to a file no tool here can read.
-          MAX_MCP_OUTPUT_TOKENS: String(DELEGATED_RESULT_TOKENS * 2),
+          // Past this the CLI saves a result to a file no tool here can read. Once its estimate (characters / 4) passes
+          // half of it, the CLI counts real tokens, and dense text runs near one token a character: at twice the cap in
+          // characters, no capped result is ever counted.
+          MAX_MCP_OUTPUT_TOKENS: String(DELEGATED_RESULT_CHARS * 2),
         }
       : ctx.accountHome
         ? accountEnv("claude_code", ctx.accountHome, base)

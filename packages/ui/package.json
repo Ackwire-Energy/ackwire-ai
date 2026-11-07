@@ -43,6 +43,8 @@
     "./search": "./src/search.ts",
     "./timezones": "./src/timezones.ts",
     "./brand/flags": "./src/brand/flags.ts",
+    "./blocks/expr": "./src/blocks/expr.ts",
+    "./blocks/spec": "./src/blocks/spec.ts",
     "./widgets/spec": "./src/widgets/spec.ts"
   },
   "scripts": {

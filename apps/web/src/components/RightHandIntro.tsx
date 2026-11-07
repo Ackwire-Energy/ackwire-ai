@@ -43,7 +43,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
-import { RequestCard, RequestOpen } from "@/components/RequestCard";
+import { RequestCard, RequestChoices, RequestKeys, RequestOpen } from "@/components/RequestCard";
 import { AnswerChips, TeamTemplatesDialog } from "@/components/TeamPlan";
 import { TextAction } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -351,6 +351,8 @@ function NextCard({ agent, first, held }: { agent: Agent; first: Agent; held: bo
   );
 }
 
+const STYLES = ["simple", "technical"] as const;
+
 /** "Como prefere que eu fale com você?": two answers, saved for every agent here; gone once the person picks. */
 function StyleCard({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -370,17 +372,23 @@ function StyleCard({ agent }: { agent: Agent }) {
       lead={question}
       what={question}
       locked={save.isPending}
-      body={<p>{t("rightHand.intro.style.text")}</p>}
-      actions={
+      body={
         <>
-          <Button size="sm" variant="primary" disabled={save.isPending} onClick={() => pick("simple")}>
-            {t("rightHand.intro.style.simple")}
-          </Button>
-          <Button size="sm" disabled={save.isPending} onClick={() => pick("technical")}>
-            {t("rightHand.intro.style.technical")}
-          </Button>
+          <p>{t("rightHand.intro.style.text")}</p>
+          <RequestChoices
+            choices={STYLES.map((style) => ({
+              label: t(`rightHand.intro.style.${style}`),
+              busy: save.isPending && save.variables === style,
+            }))}
+            onPick={(i) => {
+              const style = STYLES[i];
+              if (style) pick(style);
+            }}
+            disabled={save.isPending}
+          />
         </>
       }
+      actions={<RequestKeys count={STYLES.length} />}
     />
   );
 }

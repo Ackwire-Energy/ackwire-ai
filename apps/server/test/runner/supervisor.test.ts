@@ -18,7 +18,7 @@ import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { AccountBrains, type AccountBrainsOptions, SHARED_LOGIN_OFF } from "../../runner/account-brains";
-import type { AccountManager } from "../../runner/accounts";
+import { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrainManager, PERSONAL_MCP_REFUSED } from "../../runner/brain";
 import { BrowserManager } from "../../runner/browser";
@@ -2663,7 +2663,7 @@ test.if(posix)(
 test.if(posix)(
   "a system-mode runner lists Claude's own login only once its switch is on and its self-check passed",
   async () => {
-    const run = async (claudeSharedLogin: unknown, verdict: string | null) => {
+    const run = async (claudeSharedLogin: unknown, verdict: string | null, retried?: string | null) => {
       const home = newHome();
       const ws = tempDir("root-ws-");
       dirs.push(ws);
@@ -2714,8 +2714,9 @@ test.if(posix)(
         },
         selfCheck: async () => {
           checks++;
-          return verdict;
+          return checks > 1 && retried !== undefined ? retried : verdict;
         },
+        ...(retried !== undefined ? { selfCheckRetryMs: 50 } : {}),
       });
       daemon.start();
       return { daemon, sockets, swept: () => swept, checks: () => checks };
@@ -2747,6 +2748,15 @@ test.if(posix)(
     await waitFor(() => hellos(failed.sockets).at(-1)?.claudeLoginBlocked !== undefined, 8000);
     expect(hellos(failed.sockets).at(-1)?.claudeLoginBlocked).toContain("Bash");
     await failed.daemon.stop();
+
+    // A failure at a busy moment (boot, a relay starting) is tried again soon, not only at the next 6-hourly run.
+    const recovered = await run(on, "The Claude CLI didn't start as the sign-in's user", null);
+    await waitFor(
+      () => hellos(recovered.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
+      8000,
+    );
+    expect(recovered.checks()).toBe(2);
+    await recovered.daemon.stop();
   },
   20_000,
 );
@@ -2820,13 +2830,17 @@ test.if(posix)(
   async () => {
     const d = sharedLoginDaemon();
     const keep = spyOn(BrainManager.prototype, "keepAccount");
+    const invalidate = spyOn(AccountManager.prototype, "invalidate");
     const { config, claudeSharedLogin, home, daemon, checks } = d;
     const methods = () => daemon.accounts.claudeLoginMethods();
     daemon.start();
     try {
       await waitFor(() => checks.length === 1);
+      expect(invalidate).not.toHaveBeenCalled();
       checks[0]?.(null);
       await d.lists(true);
+      // The looks before the pass said "status unknown" for every Claude login: the next list asks again.
+      expect(invalidate).toHaveBeenCalledTimes(1);
       d.online().frame({ type: "agents", agents: [{ ...ANA, account: SHARED_LOGIN }] });
       expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
 
@@ -2861,6 +2875,7 @@ test.if(posix)(
       expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
     } finally {
       keep.mockRestore();
+      invalidate.mockRestore();
       await daemon.stop();
     }
   },

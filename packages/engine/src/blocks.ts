@@ -1,6 +1,8 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, count, type Database, eq, inArray, isNotNull, isNull, lt, schema } from "@agenteschat/db";
+import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
+  type ArtifactContent,
   type ArtifactDeps,
   type ChoiceQuestion,
   createConversationArtifact,
@@ -43,59 +45,51 @@ const MAX_POLL_HOURS = 7 * 24;
 /** What a block can send back: the person reads it before it goes. */
 export const BLOCK_REPLY_CHARS = 2000;
 
-/** The manual an agent writes blocks from: every part of the kit (`packages/client/src/lib/block-kit.ts`). */
-export const BLOCK_MANUAL = `A live block is a small interactive thing inside your reply: something the person uses now (a simulator, a filterable view, options to see side by side, a short form). Reports and documents are files, not blocks; a question with plain choices is ask_user.
+/**
+ * The manual an agent writes blocks from: the parts and the formula language of `@agenteschat/ui/blocks/spec` and
+ * `expr`, which the apps draw with their own components. The agent's own page (`html`, over the kit in
+ * `packages/client/src/lib/block-kit.ts`) is the way out for what no part shows, and runs only when a person asks.
+ */
+export const BLOCK_MANUAL = `A live block is a small interactive thing inside your reply: something the person uses now (a simulator, a filterable view, options to see side by side, a short form). Reports and documents are files, not blocks; a question with plain choices is ask_choices.
 
-Write short HTML, with no <html>, <head> or <body>. There is no network: no fetch, no CDN, no outside images. Put the data in the block. Everyone in the conversation sees what is typed in a block, so never ask for passwords, keys or card numbers in one: use request_secret.
+Describe it in spec, as JSON. The app draws it with its own parts, in its look and in both themes: you write no HTML, CSS or colors. There is no network: put the data in the block. Everyone in the conversation sees what is typed in a block, so never ask for passwords, keys or card numbers in one: use request_secret. Every word on it is in the person's language.
 
-It must look like part of the app, in both light and dark:
-- Build from the parts below. Plain HTML (headings, text, lists, links, inputs, selects, checkboxes, tables, progress) is already styled: leave it.
-- Write CSS only for layout and for drawings the parts can't do. Never set a font, a shadow or a border radius.
-- Never write a color. Use the variables below; a color written by hand breaks in the other theme.
-- No tinted boxes, colored badges or status dots: a caveat is <ac-note>, and the option you recommend is <ac-card selected>.
-- In a drawing, text stays upright at rest and sits inside its shape.
-- Every word on it is in the person's language.
+spec: {data, state, compute, parts, send}, all but parts optional.
+- data: fixed values the formulas read (prices, lists of records).
+- state: starting values that no input holds (a step, a pick).
+- compute: name: formula, in order; each reads the values above it. What the block shows follows from these.
+- parts: what it shows, top to bottom. Any part takes "when": a formula, to show it only then.
 
-Parts (every input has a name; its value is in the state under that name):
-- <ac-slider name label min max step value unit format>; format: brl (1200 is R$ 1.200), mil (12 is R$ 12 mil, so the value is in thousands), pct, int
-- <ac-choice name label options="A|B|C" value> buttons, one choice; the first is chosen unless value="", which leaves none, as a quiz needs
-- <ac-field name label type="text|number|date|textarea" placeholder>
-- <ac-check name label checked> a switch
-- <ac-stat label bind format unit sub sub-bind tone-bind> a big number; value for a fixed one; tone-bind reads "up" or "down"
-- <ac-chart type="bar|line" bind label format unit select all> bind is an array of {label, value}; on bars, select="name" makes a click set that input (all is the value that clears it)
-- <ac-table bind columns="Title:key:format|Title:key"> bind is an array of objects
-- <ac-text bind format> a value inside text; {name} works only in <ac-send>
-- <ac-note> small text; <ac-more label> text that opens
-- <ac-card label sub selected> a card around anything; with name and value it becomes a choice: a click sets name to value and marks it
-- <ac-result label bind format unit> the answer the block gives, large and centered; value for a fixed one
-- <ac-actions align="center|start"> a row of buttons, with the right space around it; every button goes in one, and the only button showing is drawn as the main action
-- <ac-row> side by side, also for cards; <ac-stats> a row of stats
-- Any element: when="name=value" or when="name!=value" shows it only then
+Inputs (each has a name; its value is the same for everyone, and you read it):
+- {"type":"slider","name","label","min","max","step","value","format","unit"}
+- {"type":"choice","name","label","options":["A","B"],"value"} buttons, one pick; "value":null starts with none, as a quiz needs
+- {"type":"field","name","label","input":"text|number|date|textarea","placeholder"}
+- {"type":"switch","name","label","value":false}
+Showing:
+- {"type":"heading|text|note","text"} and {"type":"list","items":[...]}; {name} or {name:format} in the text fills in a value
+- {"type":"stat","label","value","format","unit","sub","tone"} a big number; {"type":"stats","items":[stats]} a row of them; tone is a formula giving "up" or "down"
+- {"type":"result","label","value","format","unit"} the answer the block gives, large and centered
+- {"type":"progress","label","value","max","format"}
+- {"type":"chart","chart":"bar|line|pie","label","items":[{"label","value"}],"unit"}, or "data": a formula giving [{label, value}]
+- {"type":"table","columns":[{"label","key","format"}],"rows"}: the records, or a formula giving them
+Layout: {"type":"row","parts"} side by side; {"type":"card","label","sub","parts"}, and with "name" and "value" a card is a choice (a click sets name to value); {"type":"more","label","parts"} details that open; {"type":"actions","buttons":[{"label","set":{"name":"formula"}} or {"label","draw":{"name","options":[...]}}]}.
+format: brl (1200 is R$ 1.200), mil (12 is R$ 12 mil: the value is in thousands), pct, int. A chart takes unit ("R$", "%", "h").
 
-Everyone in the conversation sees the same block: what one person sets reaches the others at once, and you read it in the conversation. So whatever the block shows lives in the state, never only in the page: a result written straight into the page is seen by one person, and you never see it.
+A value, a "set" and a "when" are formulas, written as text: + - * / % ^, == != < > <= >=, && || !, a ? b : c, 'text', [lists], {label: 'A', value: x}, row.field, list[0]. Functions: min max abs round(x, digits) floor ceil sqrt clamp(x, lo, hi) sum avg count len map filter find sort reverse slice first last range join includes lower upper text number fmt(x, 'brl') if. List functions take a step: sum(items, x => x.price * x.qty), map(range(12), m => {label: 'M' + (m + 1), value: saldo * (1 + taxa / 100) ^ m}), filter(lojas, l => cidade == 'Todas' || l.cidade == cidade).
 
-Script:
-- agentes.compute(s => ({ ... })) derives values from the state s; they can be bound like inputs. It runs on every change.
-- agentes.on(s => { ... }) runs on every change, for your own drawing; it runs once at the start too. Never agentes.set in it: a value that follows from others is agentes.compute.
-- agentes.set(name, value) changes the state, for everyone.
-- agentes.draw(name, ["A", "B"]) draws one option at random on the server, for a draw, a wheel, dice or a shuffle: the pick reaches everyone as name in the state, the same for all. Never Math.random for anything people see: each would see a different result. Show the result from agentes.on when name changes (animate it there, so everyone sees it land).
-- agentes.who(name) is who set it last: {name, at, drawn}.
-- Values come from people: put them in the page with textContent or the parts, never innerHTML.
-- CSS variables: --ink, --muted, --faint for text; --raised, --well, --sunken for surfaces; --line, --line2 for lines; --s1 to --s6 for categories, your own tones in order, with --on-s for text on them.
+A random pick (a draw, a wheel, dice, a shuffle) is a button with draw: the server picks once among the options, the same for everyone, and a result showing that name rolls into it. Never make anything random yourself.
 
-You see what people set even without a send. To get an answer, add <ac-send label="Use this" text="Text with {name} or {name:format}" needs="a,b" hint="Why it's disabled">. The app shows the text and the button outside the block and the person decides; it reaches you as their message. needs lists values that must be filled or true. Add it only when your next step depends on the answer.
+To get an answer, add send: {"label":"Usar este preço","text":"Usar {preco:brl}.","needs":["a"],"hint":"Why it waits"}. The app shows the text and the button outside the block and the person decides; it reaches you as their message. needs lists values that must be filled or true. Add it only when your next step depends on the answer: you read what people set even without it.
 
-When a number comes from your own formula, show how in <ac-more> and call it an estimate.
+When a number comes from your own formula, show how in a "more" part and call it an estimate. If the block is refused, the error says where (parts[2].value: ...): fix that and call again.
 
 Example:
-<ac-slider name="preco" label="Preço" min="50" max="200" step="10" value="100" format="brl"></ac-slider>
-<ac-stat label="Margem" bind="margem" format="pct"></ac-stat>
-<ac-send label="Usar este preço" text="Usar {preco:brl}."></ac-send>
-<script>agentes.compute(s => ({ margem: (s.preco - 40) / s.preco * 100 }));</script>
+{"data":{"custo":40},"compute":{"margem":"(preco - custo) / preco * 100"},"parts":[{"type":"slider","name":"preco","label":"Preço","min":50,"max":200,"step":10,"value":100,"format":"brl"},{"type":"stat","label":"Margem","value":"margem","format":"pct"}],"send":{"label":"Usar este preço","text":"Usar {preco:brl}."}}
 
 A draw:
-<ac-result label="Sorteado" bind="nome"></ac-result>
-<ac-actions><button onclick="agentes.draw('nome', ['Ana', 'Bia'])">Sortear</button></ac-actions>`;
+{"parts":[{"type":"result","label":"Sorteado","value":"nome"},{"type":"actions","align":"center","buttons":[{"label":"Sortear","draw":{"name":"nome","options":["Ana","Bia"]}}]}]}
+
+Only when no part can show it (a game, a free drawing, an animation), send html instead of spec: short HTML with an inline script and canvas, no <html> or <body>, no network, colors only from the CSS variables --ink, --muted, --raised, --line and --s1 to --s6. agentes.set(name, value), agentes.on(s => ...) and agentes.draw(name, options) share its state like the parts do. It shows as a card that runs only when a person presses it, so a spec is always better when the parts reach.`;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const failed = (error: unknown): ToolOutput => ({
@@ -409,14 +403,18 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
     name: SHOW_BLOCK_TOOL,
     // The manual comes on first use (a call without html), not in every request (token-trim B2).
     description:
-      "Show a live block in your reply: a small interactive thing the person uses now (a what-if simulator, options to see side by side, a filterable view, a short form); what they pick comes back to you. Use it on your own whenever using something beats reading about it; nobody needs to ask for one, and it needs no approval: it runs apart from the app and can't reach anything. Reports and documents are files; a question with plain choices is ask_user. Call it first with only `title` to get the manual (the parts, colors and script a block is built from), then with `html`. To change a block you showed, send its block_id.",
+      "Show a live block in your reply: a small interactive thing the person uses now (a what-if simulator, options to see side by side, a filterable view, a short form); what they pick comes back to you. Use it on your own whenever using something beats reading about it; nobody needs to ask for one, and it needs no approval: the app draws it from your description and it can't reach anything. Reports and documents are files; a question with plain choices is ask_choices. Call it first with only `title` to get the manual (the parts and formulas a block is described with), then with `spec`. To change a block you showed, send its block_id.",
     scope: "",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", minLength: 1, maxLength: 200, description: "What it is, in the person's language" },
         subtitle: { type: "string", maxLength: 120, description: "A short line: where the data comes from and when" },
-        html: { type: "string", description: "The block; without it, the manual to write one" },
+        spec: { type: "object", description: "The block: data, state, compute, parts and send (see the manual)" },
+        html: {
+          type: "string",
+          description: "Only when no part can show it: your own page, which runs only when a person presses it",
+        },
         block_id: { type: "string", minLength: 36, maxLength: 36, description: "A block of yours to replace" },
       },
       required: ["title"],
@@ -424,23 +422,22 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
     },
     describe: (input) => ({ title: `Show ${str(input.title)}` }),
     async execute(input, ctx) {
-      if (!str(input.html).trim()) return { content: BLOCK_MANUAL };
+      const spec = input.spec;
+      const html = str(input.html);
+      const hasSpec = spec !== undefined && spec !== null;
+      if (!hasSpec && !html.trim()) return { content: BLOCK_MANUAL };
       try {
         const actor = actorOf(ctx);
-        const html = str(input.html);
         const title = str(input.title);
         const subtitle = str(input.subtitle).trim() || undefined;
         const blockId = str(input.block_id);
+        // A spec when there is one: a page runs only on a click, so the parts win when the agent sent both.
+        const content: Extract<ArtifactContent, { kind: "block" }> = hasSpec
+          ? { kind: "block", spec: spec as BlockSpec, subtitle }
+          : { kind: "block", html, subtitle };
         const a = blockId
-          ? await updateArtifact(deps, actor, ctx.orgId, blockId, {
-              content: { kind: "block", html, subtitle },
-              note: "updated",
-              title,
-            })
-          : await createConversationArtifact(deps, actor, ctx.orgId, {
-              title,
-              content: { kind: "block", html, subtitle },
-            });
+          ? await updateArtifact(deps, actor, ctx.orgId, blockId, { content, note: "updated", title })
+          : await createConversationArtifact(deps, actor, ctx.orgId, { title, content });
         return {
           content: `Showing "${a.title}" in your reply as block ${a.id}. Write a line or two around it, and don't repeat what it shows.`,
           data: { artifact: { id: a.id, version: a.version, title: a.title } },

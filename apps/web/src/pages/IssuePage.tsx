@@ -1,4 +1,4 @@
-import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
+import type { Issue, IssueActivity, IssuePatch, IssuePriority } from "@agenteschat/client";
 import {
   ApiError,
   keys,
@@ -31,14 +31,16 @@ import {
   Locked,
   SavedNote,
   Select,
+  type SelectOption,
   TabPanel,
   Tabs,
   useAutoGrow,
+  useElementWidth,
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -245,8 +247,12 @@ export function IssueDetails({
   const [saved, flashSaved] = useSavedFlash();
   // The files it was created with show under the description (prints, logs): the rest are in "Anexos".
   const createdFiles = list.find((a) => a.event === "created")?.attachments ?? [];
+  // Too narrow for the fields beside the task (its conversation open beside it, a small window): they go on one line
+  // at its top instead of a card under everything. Unmeasured (0) keeps the aside.
+  const [layout, width] = useElementWidth<HTMLDivElement>();
+  const narrow = width > 0 && width <= NARROW_LAYOUT;
   return (
-    <div className="issue-layout">
+    <div className="issue-layout" ref={layout}>
       <div className="issue-details issue-layout__main">
         <header className="issue-details__head">
           <span className="small muted tabular">
@@ -258,6 +264,7 @@ export function IssueDetails({
           </span>
           {variant === "page" && <IssueTitle issue={i} onSaved={flashSaved} />}
         </header>
+        {narrow && <PropsLine issue={i} />}
         <Tabs
           value={tab}
           onValueChange={setTab}
@@ -296,10 +303,12 @@ export function IssueDetails({
           </TabPanel>
         </Tabs>
       </div>
-      <aside aria-label={t("issues.details")} className="issue-aside">
-        <Details issue={i} />
-        <Links issue={i} />
-      </aside>
+      {!narrow && (
+        <aside aria-label={t("issues.details")} className="issue-aside">
+          <Details issue={i} />
+          <Links issue={i} />
+        </aside>
+      )}
     </div>
   );
 }
@@ -776,80 +785,172 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
   );
 }
 
-/** Column, who, priority and due date, at the top of the aside (on the page and in the dialog). */
-function Details({ issue: i }: { issue: Issue }) {
+/** The details' width under which its fields leave the side for the line at the top (the old container query's). */
+const NARROW_LAYOUT = 803;
+
+/** What a task's four fields offer and how each changes it, for the aside and for the line at the top. */
+function useIssueFields(i: Issue) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const [choosing, setChoosing] = useState(false);
   const actors = useActors();
   const action = useIssueAction(org.id);
   const columns = useIssueColumns(org.id).data ?? [];
   const title = useColumnTitle();
   const stageName = useStageName();
-  // The column picker: every column, grouped by stage (also the keyboard way to move a card).
-  const columnOptions = STATUSES.flatMap((s) =>
-    columnsOf(columns, s).map((c) => ({
-      value: c.id,
-      label: title(c),
-      group: stageName(s),
-      leading: <Icon name={STATUS_ICON[s]} size={16} />,
-    })),
-  );
+  const update = (patch: IssuePatch) => action.mutate({ type: "update", id: i.id, patch });
+  return {
+    column: {
+      value: columnIdOf(i, columns) ?? undefined,
+      // Every column, grouped by stage (also the keyboard way to move a card).
+      options: STATUSES.flatMap((s) =>
+        columnsOf(columns, s).map((c) => ({
+          value: c.id,
+          label: title(c),
+          group: stageName(s),
+          leading: <Icon name={STATUS_ICON[s]} size={16} />,
+        })),
+      ),
+      onChange: (v: string) => update({ columnId: v, boardRank: -Date.now() }),
+    },
+    who: {
+      value: actorKey(i.assignee),
+      options: actors.options(true, actorKey(i.assignee)),
+      onChange: (v: string) => update({ assignee: actorFromKey(v) }),
+    },
+    priority: {
+      value: i.priority,
+      options: PRIORITIES.map((p) => ({ value: p, label: t(`issues.priority.${p}`) })),
+      onChange: (v: string) => update({ priority: v as IssuePriority }),
+    },
+    due: {
+      value: i.dueDate,
+      onChange: (v: string) => update({ dueDate: v }),
+      onClear: () => update({ dueDate: null }),
+      placeholder: t("issues.noDue"),
+      locale: i18n.language,
+      labels: {
+        previousMonth: t("common.previousMonth"),
+        nextMonth: t("common.nextMonth"),
+        choose: t("common.chooseDate"),
+        clear: t("issues.removeDue"),
+      },
+    },
+  };
+}
+
+/** Column, who, priority and due date, at the top of the aside (on the page and in the dialog). */
+function Details({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const f = useIssueFields(i);
+  const [choosing, setChoosing] = useState(false);
   return (
     <>
       <Field label={t("issues.column")} id={`is-col-${i.id}`}>
-        <Select
-          size="sm"
-          value={columnIdOf(i, columns) ?? undefined}
-          onValueChange={(v) =>
-            action.mutate({ type: "update", id: i.id, patch: { columnId: v, boardRank: -Date.now() } })
-          }
-          options={columnOptions}
-        />
+        <Select size="sm" value={f.column.value} onValueChange={f.column.onChange} options={f.column.options} />
       </Field>
       <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
-        <Select
-          size="sm"
-          value={actorKey(i.assignee)}
-          onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { assignee: actorFromKey(v) } })}
-          options={actors.options(true, actorKey(i.assignee))}
-        />
+        <Select size="sm" value={f.who.value} onValueChange={f.who.onChange} options={f.who.options} />
       </Field>
       <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
         <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
         {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
-        <Select
-          size="sm"
-          value={i.priority}
-          onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { priority: v as IssuePriority } })}
-          options={PRIORITIES.map((p) => ({ value: p, label: t(`issues.priority.${p}`) }))}
-        />
+        <Select size="sm" value={f.priority.value} onValueChange={f.priority.onChange} options={f.priority.options} />
       </Field>
       <Field label={t("issues.due")} id={`is-due-${i.id}`}>
-        <DatePicker
-          size="sm"
-          value={i.dueDate}
-          onChange={(v) => action.mutate({ type: "update", id: i.id, patch: { dueDate: v } })}
-          onClear={() => action.mutate({ type: "update", id: i.id, patch: { dueDate: null } })}
-          placeholder={t("issues.noDue")}
-          locale={i18n.language}
-          labels={{
-            previousMonth: t("common.previousMonth"),
-            nextMonth: t("common.nextMonth"),
-            choose: t("common.chooseDate"),
-            clear: t("issues.removeDue"),
-          }}
-        />
+        <DatePicker size="sm" {...f.due} />
         {i.dueDate && (
           <Link to="/org/$orgId/calendar" params={{ orgId: org.id }} className="ac-link small issue-due__link">
             {t("issues.seeCalendar")}
           </Link>
         )}
       </Field>
-      <p className="issue-flow-hint">{t("issues.flowHint")}</p>
     </>
+  );
+}
+
+/**
+ * The same four fields where the aside doesn't fit beside the task (its conversation open beside it, a small
+ * window): one line of compact buttons at the top, each its icon and value (its name on hover and to a screen
+ * reader), then the task's GitHub link, pull requests and labels. With no link yet, pasting one is the aside's.
+ */
+function PropsLine({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const actors = useActors();
+  const f = useIssueFields(i);
+  const [choosing, setChoosing] = useState(false);
+  const withLeading = (o: SelectOption) => (
+    <span className="issue-prop__value">
+      {o.leading}
+      {o.label}
+    </span>
+  );
+  const prop = (label: string, control: ReactNode) => (
+    <span className="issue-prop" title={label}>
+      {control}
+    </span>
+  );
+  return (
+    <div className="issue-props">
+      {prop(
+        t("issues.column"),
+        <Select
+          size="sm"
+          aria-label={t("issues.column")}
+          value={f.column.value}
+          onValueChange={f.column.onChange}
+          options={f.column.options}
+          renderValue={withLeading}
+        />,
+      )}
+      {prop(
+        t("issues.form.assignee"),
+        <Select
+          size="sm"
+          aria-label={t("issues.form.assignee")}
+          value={f.who.value}
+          onValueChange={f.who.onChange}
+          options={f.who.options}
+          renderValue={withLeading}
+        />,
+      )}
+      {prop(
+        t("issues.form.priority"),
+        <Select
+          size="sm"
+          aria-label={t("issues.form.priority")}
+          value={f.priority.value}
+          onValueChange={f.priority.onChange}
+          options={f.priority.options}
+          renderValue={(o) => withLeading({ ...o, leading: <Icon name="flag" size={16} /> })}
+        />,
+      )}
+      {prop(t("issues.due"), <DatePicker size="sm" short aria-label={t("issues.due")} {...f.due} />)}
+      {prop(
+        t("whoSees.label"),
+        <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
+      )}
+      {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
+      {(i.pullRequests.length > 0 || i.labels.length > 0 || i.githubUrl) && (
+        <span className="issue-props__sep" aria-hidden="true" />
+      )}
+      {i.githubUrl && <GithubLink issue={i} />}
+      {i.pullRequests.map((pr) => (
+        <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
+          <Icon name="pullRequest" size={16} />
+          {pr.openedBy
+            ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) })
+            : t("issues.pr", { number: pr.number })}
+        </a>
+      ))}
+      {i.labels.map((l) => (
+        <span key={l} className="ac-chip issue-label">
+          {l}
+        </span>
+      ))}
+    </div>
   );
 }
 

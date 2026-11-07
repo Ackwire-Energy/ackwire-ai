@@ -35,6 +35,10 @@ export const featureKeysEn = {
     keep: "Keep in Drive",
     kept: "Kept in Drive",
     wake: "Tap to open",
+    /** A block that is the agent's own page runs only when the person asks (ADR 0113). */
+    pageTitle: "A block with its own code",
+    pageBody: "It runs apart from the app, with no access to your account or the internet.",
+    runPage: "Open block",
     goesTo: "Goes to {{name}}:",
     sentAt: "You sent this at {{time}}",
     sendFailed: "That didn't work. Try again.",

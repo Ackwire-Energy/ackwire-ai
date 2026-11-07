@@ -8430,6 +8430,9 @@
   "question.withdrawn": {
     "value": "{{name}} no longer needs an answer."
   },
+  "question.keysHint": {
+    "value": "Press 1–{{count}} to answer"
+  },
   "question.skip": {
     "value": "Skip"
   },
@@ -14128,9 +14131,6 @@
   },
   "issues.column": {
     "value": "Column"
-  },
-  "issues.flowHint": {
-    "value": "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve."
   },
   "issues.moreOptions": {
     "value": "More options"
@@ -23675,6 +23675,15 @@
   },
   "blocks.retryText": {
     "value": "That block didn't open here. Can you send it again?"
+  },
+  "blocks.pageTitle": {
+    "value": "A block with its own code"
+  },
+  "blocks.pageBody": {
+    "value": "It runs apart from the app, with no access to your account or the internet."
+  },
+  "blocks.runPage": {
+    "value": "Open block"
   },
   "blocks.someone": {
     "value": "Someone"

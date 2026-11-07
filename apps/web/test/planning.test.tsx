@@ -322,6 +322,27 @@ describe("Issue detail", () => {
     expect(aside.textContent).toContain("agendamento");
   });
 
+  test("too narrow for the aside (its conversation open, a small window): the fields are one line at the top", async () => {
+    // Every element measures 600px: the details are under the 803px the aside needs beside them.
+    const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 600 });
+    try {
+      await go("issues/131");
+      expect(screen().queryByRole("complementary", { name: "Detalhes da tarefa" })).toBeNull();
+      const line = document.querySelector(".issue-props") as HTMLElement;
+      expect(within(line).getByRole("combobox", { name: "Coluna" }).textContent).toContain("A fazer");
+      expect(within(line).getByRole("combobox", { name: "Prioridade" }).textContent).toContain("Alta");
+      expect(within(line).getByRole("button", { name: "Prazo" })).toBeTruthy();
+      expect(line.textContent).toContain("agendamento");
+      // Each field says its name on hover, with no label over it.
+      const who = within(line).getByRole("combobox", { name: "Responsável" });
+      expect(who.closest(".issue-prop")?.getAttribute("title")).toBe("Responsável");
+    } finally {
+      if (own) Object.defineProperty(HTMLElement.prototype, "clientWidth", own);
+      else Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
+    }
+  });
+
   test("title, description and criteria are edited where they are; leaving the field saves (Salvo)", async () => {
     const { api } = await go("issues/131");
     await click(screen().getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }));

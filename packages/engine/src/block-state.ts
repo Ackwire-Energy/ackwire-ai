@@ -1,5 +1,6 @@
 import { redactCommon } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { type BlockSpec, compileBlock, type Value, viewBlock } from "@agenteschat/ui/blocks/spec";
 import { type ArtifactDeps, getArtifact } from "./artifacts";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -198,6 +199,27 @@ export async function drawBlock(
 
 /** Longest state a model reads per block. */
 const STATE_FOR_MODEL = 2000;
+/** Longest text of one result the agent reads. */
+const SHOWN_TEXT = 200;
+
+/** A block's parts at a version, for what it shows (`blockSpecAt`). */
+export type BlockSpecReader = (orgId: string, artifactId: string, version: number) => Promise<BlockSpec | null>;
+
+/**
+ * What a block shows from its state: the values its formulas give (a margin, a total), the way everyone sees them.
+ * Only plain values: lists (a chart's points) follow from the state and the block the agent wrote.
+ */
+export function blockShows(spec: BlockSpec, state: Record<string, unknown>): Record<string, Value> {
+  const { values } = viewBlock(compileBlock(spec), state, { locale: "en", thousand: "k" });
+  const out: Record<string, Value> = {};
+  for (const name of Object.keys(spec.compute ?? {})) {
+    const v = values[name];
+    if (typeof v === "number") out[name] = Number.isFinite(v) ? Math.round(v * 1e6) / 1e6 : null;
+    else if (typeof v === "string") out[name] = v.slice(0, SHOWN_TEXT);
+    else if (typeof v === "boolean" || v === null) out[name] = v ?? null;
+  }
+  return out;
+}
 
 /**
  * What people left in the blocks of a conversation, by the message that showed each (`meta.artifacts`): one line the
@@ -208,6 +230,7 @@ export async function blockStateNotes(
   orgId: string,
   history: { id: string; meta?: Record<string, unknown> | null }[],
   zone?: string,
+  specAt?: BlockSpecReader,
 ): Promise<Map<string, string>> {
   const shown = new Map<string, { messageId: string; version: number }[]>();
   for (const m of history) {
@@ -245,7 +268,8 @@ export async function blockStateNotes(
       ),
       rev: row.rev,
     };
-    const text = blockStateText(title, view, zone);
+    const spec = specAt ? await specAt(orgId, row.artifactId, row.version).catch(() => null) : null;
+    const text = blockStateText(title, view, zone, spec ? blockShows(spec, row.state) : undefined);
     notes.set(where.messageId, notes.has(where.messageId) ? `${notes.get(where.messageId)}\n${text}` : text);
   }
   return notes;
@@ -255,7 +279,12 @@ export async function blockStateNotes(
  * How the agent reads a block's state. Everything people could have written (values, their names, who set them) sits
  * inside the outside-data envelope; only our own words and the block's title, which the agent wrote, are outside it.
  */
-export function blockStateText(title: string, block: BlockStateView, zone?: string): string {
+export function blockStateText(
+  title: string,
+  block: BlockStateView,
+  zone?: string,
+  shows?: Record<string, Value>,
+): string {
   const time = (iso: string) =>
     new Date(iso).toLocaleString("en-GB", { timeZone: zone, dateStyle: "short", timeStyle: "short" });
   const set = Object.fromEntries(
@@ -264,9 +293,10 @@ export function blockStateText(title: string, block: BlockStateView, zone?: stri
       { by: c.name || "someone", at: time(c.at), ...(c.drawn ? { drawnAmong: c.drawn } : {}) },
     ]),
   );
-  return `[Block "${neutralizeUntrusted(title)}" (block ${block.id}) as it is now, the same for everyone who opens it. "values" is what it holds; "set" is who set each value last, and "drawnAmong" marks a value the app drew at random on the server among that many options: fair, and the same for everyone.]\n${untrustedBlock(
+  const computed = shows && Object.keys(shows).length > 0;
+  return `[Block "${neutralizeUntrusted(title)}" (block ${block.id}) as it is now, the same for everyone who opens it. "values" is what it holds; ${computed ? '"shows" is what your formulas give from them, as everyone sees it; ' : ""}"set" is who set each value last, and "drawnAmong" marks a value the app drew at random on the server among that many options: fair, and the same for everyone.]\n${untrustedBlock(
     `block ${title}`,
-    JSON.stringify({ values: block.state, set }),
+    JSON.stringify(computed ? { values: block.state, shows, set } : { values: block.state, set }),
     STATE_FOR_MODEL,
   )}`;
 }

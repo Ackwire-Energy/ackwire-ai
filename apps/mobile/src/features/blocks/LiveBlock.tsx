@@ -7,13 +7,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { Button, IconButton, Sky, Text, useTheme, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader, tapHaptic } from "../shared/parts";
 import { blockMayLoad, hostScript, INLINE_HEIGHT, themeScript, withLiveBlock } from "./logic";
+import { SpecBlock } from "./SpecBlock";
 
 const SYSTEM_FONT = '-apple-system,BlinkMacSystemFont,"SF Pro Text",Roboto,system-ui,sans-serif';
 
@@ -21,6 +22,8 @@ interface Kept {
   height?: number;
   open?: boolean;
   sent?: { text: string; at: string };
+  /** The person asked this page to run (ADR 0113): it doesn't by itself. */
+  run?: boolean;
 }
 
 /** What a running page is told: everyone's state, without what this person is still changing. */
@@ -181,7 +184,10 @@ function BlockWebView({
   );
 }
 
-/** The frame and, outside it, what would go back to the agent and the button that sends it: the page only proposes. */
+/**
+ * A block that is the agent's own page (what no part of ours shows): it runs only when the person asks. Then the frame
+ * and, outside it, what would go back to the agent and the button that sends it: the page only proposes.
+ */
 export function LiveBlock({
   id,
   version,
@@ -214,6 +220,7 @@ export function LiveBlock({
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
   const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
+  const [run, setRun] = useState(screen || (keptOf(blockKey).run ?? false));
   const changedAt = useRef(0);
   // Taller than the card: cut with a fade, "Show all" under it.
   const tall = !screen && height > INLINE_HEIGHT;
@@ -224,10 +231,10 @@ export function LiveBlock({
   };
 
   useEffect(() => {
-    if (screen) return;
+    if (screen || !run) return;
     liveStore.claim(blockKey);
     return () => liveStore.release(blockKey);
-  }, [screen, blockKey]);
+  }, [screen, run, blockKey]);
 
   const onEvent = useCallback(
     (e: BlockEvent) => {
@@ -261,6 +268,29 @@ export function LiveBlock({
       },
     );
   };
+
+  if (!run) {
+    return (
+      <View style={styles.gate}>
+        <Text variant="subhead" style={styles.bold}>
+          {t("mobile.blocks.pageTitle")}
+        </Text>
+        <Text variant="footnote" tone="muted">
+          {t("mobile.blocks.pageBody")}
+        </Text>
+        <Button
+          variant="secondary"
+          wide
+          label={t("mobile.blocks.runPage")}
+          onPress={() => {
+            tapHaptic();
+            keptOf(blockKey).run = true;
+            setRun(true);
+          }}
+        />
+      </View>
+    );
+  }
 
   const same = sent !== null && sent.text === draft?.text;
   const time = sent
@@ -387,7 +417,11 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
           <IconButton icon="expand" label={t("mobile.blocks.openBig")} onPress={open} />
         </View>
       </View>
-      <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html} agentId={agentId} />
+      {a.content.spec ? (
+        <SpecBlock id={a.id} version={a.shownVersion} spec={a.content.spec} agentId={agentId} />
+      ) : (
+        <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html ?? ""} agentId={agentId} />
+      )}
     </View>
   );
 }
@@ -417,7 +451,13 @@ export function BlockScreen({ id, version }: { id: string; version?: number }) {
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader title={a.title} />
-      <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html} agentId={a.createdBy.id} screen />
+      {a.content.spec ? (
+        <ScrollView style={styles.fill} contentContainerStyle={styles.screenBody}>
+          <SpecBlock id={a.id} version={a.shownVersion} spec={a.content.spec} agentId={a.createdBy.id} screen />
+        </ScrollView>
+      ) : (
+        <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html ?? ""} agentId={a.createdBy.id} screen />
+      )}
       {a.inDrive ? null : (
         <View style={styles.keep}>
           <Button
@@ -467,4 +507,6 @@ const styles = StyleSheet.create({
   sent: { flexDirection: "row", alignItems: "center", gap: 8 },
   mark: { width: 5, height: 5 },
   keep: { paddingHorizontal: 16, paddingVertical: 12 },
+  gate: { gap: 8, padding: 14 },
+  screenBody: { paddingVertical: 8 },
 });

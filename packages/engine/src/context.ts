@@ -23,7 +23,7 @@ import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
 import { NO_PERSON, speakerFor } from "./audience";
 import { runAuthority, UUID } from "./authority";
-import { blockStateNotes } from "./block-state";
+import { type BlockSpecReader, blockStateNotes } from "./block-state";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
@@ -481,6 +481,8 @@ export async function buildRunContext(
     work?: boolean;
     /** `show_block` and `start_poll` are available: when to use them (a routine's run is refused them). */
     blocks?: boolean;
+    /** Reads a block's parts, so the agent reads what its blocks show and not only what people set in them. */
+    blockSpec?: BlockSpecReader;
     /** `ask_choices` is available (ADR 0124): a short decision goes on a card instead of a numbered list. */
     choices?: boolean;
     /**
@@ -1138,7 +1140,7 @@ export async function buildRunContext(
       origins,
       canAddAgents: channel.kind === "channel",
       cutOld: options.expand === true,
-      blocks: await blockStateNotes(db, run.orgId, history, zone),
+      blocks: await blockStateNotes(db, run.orgId, history, zone, options.blockSpec),
     }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId:

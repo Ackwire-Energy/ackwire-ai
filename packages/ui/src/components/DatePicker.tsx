@@ -52,6 +52,8 @@ export interface DatePickerProps {
   disabled?: boolean;
   "aria-label"?: string;
   className?: string;
+  /** The chosen day without its weekday, and its year only when it isn't this one ("10 de nov."): a compact trigger. */
+  short?: boolean;
 }
 
 /**
@@ -73,6 +75,7 @@ export function DatePicker({
   id,
   disabled,
   className,
+  short = false,
   ...rest
 }: DatePickerProps) {
   const wiring = useFieldControl({ id });
@@ -98,9 +101,16 @@ export function DatePicker({
   }, [open, focusKey]);
 
   const label = selected
-    ? new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(
-        selected,
-      )
+    ? new Intl.DateTimeFormat(
+        locale,
+        short
+          ? {
+              day: "numeric",
+              month: "short",
+              ...(selected.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+            }
+          : { weekday: "short", day: "numeric", month: "short", year: "numeric" },
+      ).format(selected)
     : (placeholder ?? "");
   const monthTitle = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(focus);
   // The week starts where the reader's language starts it (CLDR: Sunday in the US, Brazil, Japan…; else Monday).

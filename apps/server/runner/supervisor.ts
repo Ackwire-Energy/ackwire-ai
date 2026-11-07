@@ -207,6 +207,8 @@ function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
 export interface BrainReclaimed {
   closed: boolean;
   idle?: { since: number; spare: boolean };
+  /** A peek: `spare` has an open CLI. */
+  warm?: boolean;
 }
 
 export type WorkerLinkFrame =
@@ -827,6 +829,13 @@ export class Supervisor {
       .sort((a, b) => Number(a.idle.spare) - Number(b.idle.spare) || a.idle.since - b.idle.since);
     for (const { w } of order) if ((await this.askBrains(w, { spare }))?.closed) return true;
     return false;
+  }
+
+  /** Whether the session `key` (`brainKey`) has an open CLI in its agent's worker. */
+  async warmBrain(key: string): Promise<boolean> {
+    const w = this.workers.get(key.split(":")[0] ?? "");
+    if (!w?.ready) return false;
+    return (await this.askBrains(w, { spare: key, peek: true }))?.warm === true;
   }
 
   private askBrains(w: Worker, ask: { spare?: string; peek?: boolean }): Promise<BrainReclaimed | null> {
@@ -1469,6 +1478,7 @@ export class Supervisor {
       w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.({
         closed: f.closed === true,
         ...(valid ? { idle: { since: idle.since as number, spare: idle.spare as boolean } } : {}),
+        ...(f.warm === true ? { warm: true } : {}),
       });
       return;
     }
