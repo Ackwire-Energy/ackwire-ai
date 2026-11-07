@@ -173,6 +173,15 @@ test("an event pill is a part: the body sets its top, and a bubble's tab stands 
   );
 });
 
+test("in Compacta a pill's time stays one line in the clock's column, however long", () => {
+  const time = '.channel__messages[data-look="compact"] .ac-eventpill__time';
+  expect(last(time, "white-space")).toBe("nowrap");
+  // Overflow goes left, into the row's inset, so its clock still ends where the rows' clocks end.
+  expect(last(time, "display")).toBe("flex");
+  expect(last(time, "justify-content")).toBe("flex-end");
+  expect(last(time, "width")).toBe("40px");
+});
+
 test("a card that also stands alone is outranked in a message", () => {
   // `.ac-msg .ac-msg__body>*` is two classes: a part's own rule has one.
   for (const cls of OUTSIDE_TOO) {

@@ -470,14 +470,18 @@
   align-items: center;
   justify-content: center;
 }
+/* A decision's time can carry its day ("hoje 13:57"): one line, ending on the clock's edge and reaching into the
+   row's inset, never a second line over the next row's clock. */
 .channel__messages[data-look="compact"] .ac-eventpill__time {
   position: absolute;
   top: 2px;
   left: -74px;
+  display: flex;
+  justify-content: flex-end;
   width: 40px;
   font-size: 11px;
   line-height: 17px;
-  text-align: right;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .channel__messages[data-look="compact"] .ac-eventpill__actions {
