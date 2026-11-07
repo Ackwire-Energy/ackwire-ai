@@ -6182,28 +6182,152 @@
     },
     "presets": {
       "title": "Mulai dari templat",
+      "placeholder": "Pilih templat",
+      "search": "Cari templat",
+      "searchPlaceholder": "Nama, bidang, atau aplikasi",
+      "noResults": "Templat tidak ditemukan",
+      "list": "Templat",
+      "needsApp": "Butuh aplikasi ini: {{app}}",
+      "needsApps": "Butuh salah satu aplikasi ini: {{apps}}",
+      "needsMailbox": "Butuh kotak surat yang terhubung",
+      "connectFirst": "Hubungkan agar rutinitas berjalan.",
+      "fillBlank": "Ganti dulu teks di dalam tanda kurung.",
+      "replaceTitle": "Ganti tulisan Anda dengan templat ini?",
+      "replaceConfirm": "Ganti",
+      "areas": {
+        "team": "Tim dan rutinitas harian",
+        "sales": "Penjualan dan pelanggan",
+        "support": "Layanan pelanggan",
+        "marketing": "Pemasaran dan konten",
+        "finance": "Keuangan",
+        "ops": "Operasional",
+        "people": "Orang dan SDM",
+        "tech": "Teknologi"
+      },
+      "dayPlan": {
+        "name": "Rencana hari ini",
+        "text": "Hari kerja pukul 8.30, tugas dan rapat hari ini.",
+        "prompt": "Daftarkan tugas terbuka yang jatuh tempo hari ini dan rapat hari ini. Katakan mana yang perlu perhatian lebih dulu."
+      },
+      "late": {
+        "name": "Tugas terlambat",
+        "text": "Hari kerja pukul 10, yang melewati tenggat.",
+        "prompt": "Cari tugas terbuka yang melewati tenggat. Untuk masing-masing, sebutkan penanggung jawabnya dan berapa hari terlambat."
+      },
+      "unanswered": {
+        "name": "Pertanyaan belum dijawab",
+        "text": "Hari kerja pukul 4 sore, yang belum dijawab hari ini.",
+        "prompt": "Cari di kanal pertanyaan dan permintaan hari ini yang belum dijawab. Daftarkan masing-masing dengan siapa yang bertanya."
+      },
+      "leads": {
+        "name": "Kontak CRM baru",
+        "text": "Hari kerja pukul 9, siapa yang masuk dan mulai dari siapa.",
+        "prompt": "Periksa di CRM kontak yang masuk sejak terakhir kali. Katakan siapa yang paling menjanjikan dan sarankan langkah berikutnya untuk masing-masing."
+      },
+      "stalled": {
+        "name": "Kesepakatan macet",
+        "text": "Senin pukul 9, kesepakatan tanpa aktivitas terbaru.",
+        "prompt": "Periksa di CRM kesepakatan terbuka tanpa aktivitas lebih dari 7 hari. Sarankan langkah berikutnya untuk masing-masing."
+      },
+      "prospects": {
+        "name": "Cari pelanggan baru",
+        "text": "Senin pukul 8, lima perusahaan untuk dihubungi.",
+        "prompt": "Cari di internet 5 perusahaan yang cocok dengan pelanggan ideal kita. Untuk masing-masing, katakan bidangnya dan mengapa layak dihubungi."
+      },
+      "newEmail": {
+        "name": "Siapkan balasan email",
+        "text": "Saat email masuk, agen menyiapkan balasan.",
+        "prompt": "Baca email yang masuk dan katakan isinya serta seberapa mendesak. Tulis saran balasan, tetapi jangan dikirim."
+      },
+      "tickets": {
+        "name": "Tiket belum dibalas",
+        "text": "Hari kerja pukul 9 dan pukul 2 siang, siapa yang masih menunggu.",
+        "prompt": "Periksa tiket terbuka yang belum dibalas lebih dari 4 jam. Daftarkan yang paling mendesak lebih dulu dan sarankan balasan untuk masing-masing."
+      },
+      "themes": {
+        "name": "Permintaan terbanyak",
+        "text": "Jumat pukul 4 sore, yang paling banyak diminta pelanggan.",
+        "prompt": "Baca tiket minggu ini dan kelompokkan menurut topik. Sebutkan 5 yang paling umum dan apa yang bisa mencegah masing-masing."
+      },
+      "mentions": {
+        "name": "Sebutan tentang perusahaan",
+        "text": "Hari kerja pukul 9, apa yang dibicarakan tentang kita.",
+        "prompt": "Cari di internet berita dan sebutan terbaru tentang perusahaan kita. Katakan di mana munculnya, apakah positif atau negatif, dan apakah perlu dibalas."
+      },
+      "rivals": {
+        "name": "Pantau pesaing",
+        "text": "Senin pukul 9, apa yang diubah pesaing.",
+        "prompt": "Teliti apa yang diluncurkan atau diubah pesaing kita minggu lalu, seperti harga, produk, dan kampanye. Katakan mana yang penting bagi kita."
+      },
+      "ideas": {
+        "name": "Ide konten",
+        "text": "Senin pukul 10, lima ide untuk minggu ini.",
+        "prompt": "Sarankan 5 ide konten untuk minggu ini, berdasarkan pertanyaan pelanggan dan yang terjadi di pasar kita. Beri masing-masing judul dan format."
+      },
+      "traffic": {
+        "name": "Angka situs",
+        "text": "Senin pukul 8.30, minggu ini dibanding sebelumnya.",
+        "prompt": "Periksa angka minggu lalu: kunjungan, pendaftaran, dan halaman teratas. Bandingkan dengan minggu sebelumnya dan katakan apa yang berubah."
+      },
+      "revenue": {
+        "name": "Penjualan kemarin",
+        "text": "Setiap hari pukul 8, penjualan dibanding rata-rata mingguan.",
+        "prompt": "Periksa berapa penjualan kemarin dan bandingkan dengan rata-rata 7 hari terakhir. Katakan jika ada yang tidak biasa."
+      },
+      "failed": {
+        "name": "Masalah pembayaran",
+        "text": "Hari kerja pukul 10, penolakan dan sengketa.",
+        "prompt": "Periksa pembayaran yang ditolak, pengembalian dana, dan sengketa sejak terakhir kali. Daftarkan masing-masing dengan jumlah dan pelanggannya."
+      },
+      "monthClose": {
+        "name": "Tutup bulan",
+        "text": "Tanggal 1 pukul 9, uang bulan lalu.",
+        "prompt": "Susun ringkasan bulan lalu: pendapatan, pengembalian dana, dan sengketa. Bandingkan dengan bulan sebelumnya."
+      },
+      "sheet": {
+        "name": "Periksa spreadsheet",
+        "text": "Hari kerja pukul 11, celah dan angka aneh.",
+        "prompt": "Periksa spreadsheet ini: (sebutkan yang mana). Tunjukkan kolom kosong, nilai tidak biasa, dan yang berubah sejak terakhir kali."
+      },
+      "page": {
+        "name": "Pantau halaman web",
+        "text": "Setiap hari pukul 9, hanya saat berubah.",
+        "prompt": "Buka halaman ini: (tempel alamatnya di sini). Jika ada hal penting yang berubah sejak terakhir kali, katakan apa."
+      },
+      "newTask": {
+        "name": "Rapikan tugas baru",
+        "text": "Saat tugas dibuat, agen memeriksanya.",
+        "prompt": "Baca tugas baru itu. Katakan apa yang kurang untuk mulai, dan sarankan penanggung jawab serta tenggatnya."
+      },
+      "pulse": {
+        "name": "Pertanyaan minggu ini",
+        "text": "Kamis pukul 4 sore, satu pertanyaan untuk tim.",
+        "prompt": "Ringkas jawaban atas pertanyaan minggu lalu tanpa menyebut nama. Lalu kirim di kanal satu pertanyaan singkat baru tentang bagaimana minggu ini berjalan."
+      },
+      "away": {
+        "name": "Siapa yang tidak masuk minggu ini",
+        "text": "Senin pukul 8.30, cuti dan perjalanan.",
+        "prompt": "Periksa di kalender cuti dan perjalanan minggu ini. Daftarkan per hari dan katakan apa yang perlu digantikan."
+      },
       "digest": {
         "name": "Ringkasan harian kanal",
         "text": "Hari kerja pukul 9 pagi, apa yang terjadi kemarin.",
-        "prompt": "Ringkas apa yang terjadi kemarin di kanal: permintaan, apa yang sudah selesai, dan apa yang belum dijawab.",
-        "phrase": "hari kerja pukul 9 pagi"
+        "prompt": "Ringkas apa yang terjadi di kanal sejak ringkasan terakhir: permintaan, apa yang sudah selesai, dan apa yang belum dijawab."
       },
       "errors": {
         "name": "Pantau error baru",
         "text": "Setiap jam, hanya kalau ada error baru.",
-        "prompt": "Periksa error Sentry baru sejak jalan terakhir. Kalau ada, ringkas dan sebutkan di bagian kode mana error itu terjadi. Kalau tidak ada yang baru, jangan kirim pesan.",
-        "phrase": "setiap jam"
+        "prompt": "Periksa error Sentry baru sejak jalan terakhir. Kalau ada, ringkas dan sebutkan di bagian kode mana error itu terjadi. Kalau tidak ada yang baru, jangan kirim pesan."
       },
       "prs": {
         "name": "Tinjau PR baru",
-        "text": "Saat PR dibuka, agen membacanya dan memberi komentar.",
-        "prompt": "Baca diff PR baru, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
+        "text": "Hari kerja pukul 9 dan pukul 2 siang, agen membaca PR baru dan menunjukkan risikonya.",
+        "prompt": "Periksa PR yang dibuka sejak terakhir kali. Baca setiap diff, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
       },
       "week": {
         "name": "Rangkuman minggu ini",
         "text": "Jumat pukul 5 sore: keputusan dan hal yang masih terbuka.",
-        "prompt": "Ringkas minggu ini: keputusan, tugas yang selesai, dan apa yang masih terbuka.",
-        "phrase": "setiap jumat pukul 5 sore"
+        "prompt": "Ringkas minggu ini: keputusan, tugas yang selesai, dan apa yang masih terbuka."
       }
     },
     "close": "Tutup",

@@ -6377,28 +6377,152 @@
     },
     "presets": {
       "title": "Mit einer Vorlage beginnen",
+      "placeholder": "Vorlage wählen",
+      "search": "Vorlagen suchen",
+      "searchPlaceholder": "Name, Bereich oder App",
+      "noResults": "Keine Vorlage gefunden",
+      "list": "Vorlagen",
+      "needsApp": "Braucht diese App: {{app}}",
+      "needsApps": "Braucht eine dieser Apps: {{apps}}",
+      "needsMailbox": "Braucht ein verbundenes Postfach",
+      "connectFirst": "Verbinde sie, damit die Routine funktioniert.",
+      "fillBlank": "Ersetze zuerst den Text in Klammern.",
+      "replaceTitle": "Deinen Text durch diese Vorlage ersetzen?",
+      "replaceConfirm": "Ersetzen",
+      "areas": {
+        "team": "Team und Tagesablauf",
+        "sales": "Vertrieb und Kunden",
+        "support": "Kundenservice",
+        "marketing": "Marketing und Inhalte",
+        "finance": "Finanzen",
+        "ops": "Betrieb",
+        "people": "Personal",
+        "tech": "Technologie"
+      },
+      "dayPlan": {
+        "name": "Tagesplan",
+        "text": "Werktags um 8:30 Uhr, heutige Aufgaben und Termine.",
+        "prompt": "Liste die offenen Aufgaben auf, die heute fällig sind, und die Termine des Tages. Sag, was zuerst Aufmerksamkeit braucht."
+      },
+      "late": {
+        "name": "Überfällige Aufgaben",
+        "text": "Werktags um 10 Uhr, was über der Frist ist.",
+        "prompt": "Suche offene Aufgaben mit abgelaufener Frist. Sag bei jeder, wer zuständig ist und wie viele Tage sie überfällig ist."
+      },
+      "unanswered": {
+        "name": "Unbeantwortete Fragen",
+        "text": "Werktags um 16 Uhr, was heute niemand beantwortet hat.",
+        "prompt": "Suche im Kanal die Fragen und Anfragen von heute, die keine Antwort bekommen haben. Liste jede mit der Person auf, die gefragt hat."
+      },
+      "leads": {
+        "name": "Neue CRM-Kontakte",
+        "text": "Werktags um 9 Uhr, wer dazukam und mit wem du anfängst.",
+        "prompt": "Sieh im CRM nach den Kontakten, die seit dem letzten Mal dazugekommen sind. Sag, wer am vielversprechendsten wirkt, und schlage für jeden den nächsten Schritt vor."
+      },
+      "stalled": {
+        "name": "Festgefahrene Deals",
+        "text": "Montags um 9 Uhr, Deals ohne aktuelle Aktivität.",
+        "prompt": "Sieh im CRM nach offenen Deals ohne Aktivität seit mehr als 7 Tagen. Schlage für jeden den nächsten Schritt vor."
+      },
+      "prospects": {
+        "name": "Neue Kunden finden",
+        "text": "Montags um 8 Uhr, fünf Firmen zum Ansprechen.",
+        "prompt": "Suche im Web 5 Firmen, die zu unserem idealen Kunden passen. Sag bei jeder, was sie macht und warum sich der Kontakt lohnt."
+      },
+      "newEmail": {
+        "name": "E-Mail-Antworten vorbereiten",
+        "text": "Wenn eine E-Mail kommt, bereitet der Agent die Antwort vor.",
+        "prompt": "Lies die eingegangene E-Mail und sag, worum es geht und wie dringend sie ist. Schreib einen Antwortvorschlag, ohne ihn zu senden."
+      },
+      "tickets": {
+        "name": "Unbeantwortete Tickets",
+        "text": "Werktags um 9 und 14 Uhr, wer noch wartet.",
+        "prompt": "Sieh nach offenen Tickets, die seit mehr als 4 Stunden keine Antwort haben. Liste die dringendsten zuerst auf und schlage für jedes eine Antwort vor."
+      },
+      "themes": {
+        "name": "Häufigste Anliegen",
+        "text": "Freitags um 16 Uhr, was Kunden am meisten wollten.",
+        "prompt": "Lies die Tickets der Woche und gruppiere sie nach Thema. Nenne die 5 häufigsten und was jedes verhindern würde."
+      },
+      "mentions": {
+        "name": "Erwähnungen der Firma",
+        "text": "Werktags um 9 Uhr, was über uns gesagt wird.",
+        "prompt": "Suche im Web nach aktuellen Nachrichten und Erwähnungen unserer Firma. Sag, wo es erschien, ob es positiv oder negativ ist und ob es eine Antwort braucht."
+      },
+      "rivals": {
+        "name": "Wettbewerb im Blick",
+        "text": "Montags um 9 Uhr, was die Konkurrenz geändert hat.",
+        "prompt": "Recherchiere, was unsere Konkurrenten letzte Woche gestartet oder geändert haben, etwa Preise, Produkte und Kampagnen. Sag, was für uns wichtig ist."
+      },
+      "ideas": {
+        "name": "Content-Ideen",
+        "text": "Montags um 10 Uhr, fünf Ideen für die Woche.",
+        "prompt": "Schlage 5 Content-Ideen für diese Woche vor, je nachdem, was Kunden fragen und was in unserem Markt passiert. Gib jeder einen Titel und ein Format."
+      },
+      "traffic": {
+        "name": "Website-Zahlen",
+        "text": "Montags um 8:30 Uhr, die Woche im Vergleich zur vorigen.",
+        "prompt": "Sieh dir die Zahlen der letzten Woche an: Besuche, Anmeldungen und meistgesehene Seiten. Vergleiche sie mit der Woche davor und sag, was sich geändert hat."
+      },
+      "revenue": {
+        "name": "Verkäufe von gestern",
+        "text": "Täglich um 8 Uhr, die Verkäufe gegen den Wochenschnitt.",
+        "prompt": "Sieh nach, wie viel wir gestern verkauft haben, und vergleiche es mit dem Schnitt der letzten 7 Tage. Sag, ob etwas ungewöhnlich ist."
+      },
+      "failed": {
+        "name": "Zahlungsprobleme",
+        "text": "Werktags um 10 Uhr, Ablehnungen und Streitfälle.",
+        "prompt": "Sieh nach abgelehnten Zahlungen, Erstattungen und Streitfällen seit dem letzten Mal. Liste jede mit Betrag und Kunde auf."
+      },
+      "monthClose": {
+        "name": "Monatsabschluss",
+        "text": "Am 1. um 9 Uhr, das Geld des letzten Monats.",
+        "prompt": "Erstelle eine Zusammenfassung des letzten Monats: Umsatz, Erstattungen und Streitfälle. Vergleiche sie mit dem Monat davor."
+      },
+      "sheet": {
+        "name": "Tabelle prüfen",
+        "text": "Werktags um 11 Uhr, Lücken und seltsame Zahlen.",
+        "prompt": "Prüfe diese Tabelle: (sag, welche). Weise auf leere Felder, ungewöhnliche Werte und Änderungen seit dem letzten Mal hin."
+      },
+      "page": {
+        "name": "Seite beobachten",
+        "text": "Täglich um 9 Uhr, nur wenn sie sich ändert.",
+        "prompt": "Öffne diese Seite: (Adresse hier einfügen). Wenn sich seit dem letzten Mal etwas Wichtiges geändert hat, sag, was."
+      },
+      "newTask": {
+        "name": "Neue Aufgaben sortieren",
+        "text": "Wenn eine Aufgabe entsteht, prüft der Agent sie.",
+        "prompt": "Lies die neue Aufgabe. Sag, was zum Start fehlt, und schlage eine zuständige Person und eine Frist vor."
+      },
+      "pulse": {
+        "name": "Frage der Woche",
+        "text": "Donnerstags um 16 Uhr, eine Frage ans Team.",
+        "prompt": "Fasse die Antworten auf die Frage der letzten Woche zusammen, ohne Namen zu nennen. Stelle dann im Kanal eine kurze neue Frage dazu, wie die Woche lief."
+      },
+      "away": {
+        "name": "Wer diese Woche fehlt",
+        "text": "Montags um 8:30 Uhr, freie Tage und Reisen.",
+        "prompt": "Sieh im Kalender nach freien Tagen und Reisen dieser Woche. Liste sie nach Tag auf und sag, was Vertretung braucht."
+      },
       "digest": {
         "name": "Tägliche Kanal-Zusammenfassung",
         "text": "Werktags um 9 Uhr, was gestern passiert ist.",
-        "prompt": "Fasse zusammen, was gestern im Kanal passiert ist: Anfragen, was gelöst wurde und was unbeantwortet blieb.",
-        "phrase": "werktags um 9 Uhr"
+        "prompt": "Fasse zusammen, was seit der letzten Zusammenfassung im Kanal passiert ist: Anfragen, was gelöst wurde und was unbeantwortet blieb."
       },
       "errors": {
         "name": "Neue Fehler beobachten",
         "text": "Jede Stunde, nur wenn es einen neuen Fehler gibt.",
-        "prompt": "Prüfe die neuen Sentry-Fehler seit der letzten Ausführung. Wenn es welche gibt, fasse sie zusammen und sag, wo im Code sie auftreten. Wenn es nichts Neues gibt, sende keine Nachricht.",
-        "phrase": "jede Stunde"
+        "prompt": "Prüfe die neuen Sentry-Fehler seit der letzten Ausführung. Wenn es welche gibt, fasse sie zusammen und sag, wo im Code sie auftreten. Wenn es nichts Neues gibt, sende keine Nachricht."
       },
       "prs": {
         "name": "Neue PRs prüfen",
-        "text": "Wenn ein PR geöffnet wird, liest der Agent ihn und kommentiert.",
-        "prompt": "Lies den Diff des neuen PRs, weise auf Risiken hin und sag, was von Hand getestet werden sollte."
+        "text": "Werktags um 9 und 14 Uhr liest der Agent neue PRs und weist auf Risiken hin.",
+        "prompt": "Sieh dir die seit dem letzten Mal geöffneten PRs an. Lies jeden Diff, weise auf Risiken hin und sag, was von Hand getestet werden sollte."
       },
       "week": {
         "name": "Wochenrückblick",
         "text": "Freitag um 17 Uhr: Entscheidungen und offene Punkte.",
-        "prompt": "Fasse die Woche zusammen: Entscheidungen, abgeschlossene Aufgaben und was noch offen ist.",
-        "phrase": "jeden Freitag um 17 Uhr"
+        "prompt": "Fasse die Woche zusammen: Entscheidungen, abgeschlossene Aufgaben und was noch offen ist."
       }
     },
     "close": "Schließen",

@@ -15445,6 +15445,255 @@
   "routines.presets.title": {
     "value": "Start from a template"
   },
+  "routines.presets.placeholder": {
+    "value": "Choose a template"
+  },
+  "routines.presets.search": {
+    "value": "Search templates"
+  },
+  "routines.presets.searchPlaceholder": {
+    "value": "Name, area or app"
+  },
+  "routines.presets.noResults": {
+    "value": "No template found"
+  },
+  "routines.presets.list": {
+    "value": "Templates"
+  },
+  "routines.presets.needsApp": {
+    "value": "Needs this app: {{app}}"
+  },
+  "routines.presets.needsApps": {
+    "value": "Needs one of these apps: {{apps}}"
+  },
+  "routines.presets.needsMailbox": {
+    "value": "Needs a connected mailbox"
+  },
+  "routines.presets.connectFirst": {
+    "value": "Connect it so the routine can work."
+  },
+  "routines.presets.fillBlank": {
+    "value": "Replace the text in brackets first."
+  },
+  "routines.presets.replaceTitle": {
+    "value": "Replace what you wrote with this template?"
+  },
+  "routines.presets.replaceConfirm": {
+    "value": "Replace"
+  },
+  "routines.presets.areas.team": {
+    "value": "Team and daily routine"
+  },
+  "routines.presets.areas.sales": {
+    "value": "Sales and customers"
+  },
+  "routines.presets.areas.support": {
+    "value": "Customer service"
+  },
+  "routines.presets.areas.marketing": {
+    "value": "Marketing and content"
+  },
+  "routines.presets.areas.finance": {
+    "value": "Finance"
+  },
+  "routines.presets.areas.ops": {
+    "value": "Operations"
+  },
+  "routines.presets.areas.people": {
+    "value": "People and HR"
+  },
+  "routines.presets.areas.tech": {
+    "value": "Technology"
+  },
+  "routines.presets.dayPlan.name": {
+    "value": "Plan for the day"
+  },
+  "routines.presets.dayPlan.text": {
+    "value": "Weekdays at 8:30am, today's tasks and meetings."
+  },
+  "routines.presets.dayPlan.prompt": {
+    "value": "List the open tasks due today and today's meetings. Say what needs attention first."
+  },
+  "routines.presets.late.name": {
+    "value": "Overdue tasks"
+  },
+  "routines.presets.late.text": {
+    "value": "Weekdays at 10am, what's past its due date."
+  },
+  "routines.presets.late.prompt": {
+    "value": "Look for open tasks past their due date. For each one, say who owns it and how many days late it is."
+  },
+  "routines.presets.unanswered.name": {
+    "value": "Unanswered questions"
+  },
+  "routines.presets.unanswered.text": {
+    "value": "Weekdays at 4pm, what nobody answered today."
+  },
+  "routines.presets.unanswered.prompt": {
+    "value": "Look in the channel for today's questions and requests that got no answer. List each one with who asked."
+  },
+  "routines.presets.leads.name": {
+    "value": "New CRM contacts"
+  },
+  "routines.presets.leads.text": {
+    "value": "Weekdays at 9am, who came in and who to call first."
+  },
+  "routines.presets.leads.prompt": {
+    "value": "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each."
+  },
+  "routines.presets.stalled.name": {
+    "value": "Stalled deals"
+  },
+  "routines.presets.stalled.text": {
+    "value": "Mondays at 9am, deals with no recent activity."
+  },
+  "routines.presets.stalled.prompt": {
+    "value": "Check the CRM for open deals with no activity for over 7 days. Suggest the next step for each."
+  },
+  "routines.presets.prospects.name": {
+    "value": "Find new customers"
+  },
+  "routines.presets.prospects.text": {
+    "value": "Mondays at 8am, five companies worth contacting."
+  },
+  "routines.presets.prospects.prompt": {
+    "value": "Search the web for 5 companies that fit our ideal customer. For each one, say what it does and why it's worth contacting."
+  },
+  "routines.presets.newEmail.name": {
+    "value": "Draft email replies"
+  },
+  "routines.presets.newEmail.text": {
+    "value": "When an email arrives, the agent drafts a reply."
+  },
+  "routines.presets.newEmail.prompt": {
+    "value": "Read the email that arrived and say what it's about and how urgent it is. Draft a reply, but don't send it."
+  },
+  "routines.presets.tickets.name": {
+    "value": "Unanswered tickets"
+  },
+  "routines.presets.tickets.text": {
+    "value": "Weekdays at 9am and 2pm, who's still waiting."
+  },
+  "routines.presets.tickets.prompt": {
+    "value": "Check the open tickets with no reply for over 4 hours. List the most urgent first and suggest a reply for each."
+  },
+  "routines.presets.themes.name": {
+    "value": "Most common requests"
+  },
+  "routines.presets.themes.text": {
+    "value": "Fridays at 4pm, what customers asked for most."
+  },
+  "routines.presets.themes.prompt": {
+    "value": "Read this week's tickets and group them by subject. Say which 5 came up most and what would prevent each one."
+  },
+  "routines.presets.mentions.name": {
+    "value": "Company mentions"
+  },
+  "routines.presets.mentions.text": {
+    "value": "Weekdays at 9am, what's being said about us."
+  },
+  "routines.presets.mentions.prompt": {
+    "value": "Search the web for recent news and mentions of our company. Say where it appeared, whether it's positive or negative, and whether it needs a reply."
+  },
+  "routines.presets.rivals.name": {
+    "value": "Watch competitors"
+  },
+  "routines.presets.rivals.text": {
+    "value": "Mondays at 9am, what competitors changed."
+  },
+  "routines.presets.rivals.prompt": {
+    "value": "Research what our competitors launched or changed last week, such as prices, products and campaigns. Say what matters to us."
+  },
+  "routines.presets.ideas.name": {
+    "value": "Content ideas"
+  },
+  "routines.presets.ideas.text": {
+    "value": "Mondays at 10am, five ideas for the week."
+  },
+  "routines.presets.ideas.prompt": {
+    "value": "Suggest 5 content ideas for this week, based on what customers ask and what's happening in our market. Give each one a title and a format."
+  },
+  "routines.presets.traffic.name": {
+    "value": "Website numbers"
+  },
+  "routines.presets.traffic.text": {
+    "value": "Mondays at 8:30am, the week against the one before."
+  },
+  "routines.presets.traffic.prompt": {
+    "value": "Check last week's numbers: visits, sign-ups and top pages. Compare them with the week before and say what changed."
+  },
+  "routines.presets.revenue.name": {
+    "value": "Yesterday's sales"
+  },
+  "routines.presets.revenue.text": {
+    "value": "Every day at 8am, sales against the weekly average."
+  },
+  "routines.presets.revenue.prompt": {
+    "value": "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual."
+  },
+  "routines.presets.failed.name": {
+    "value": "Payment problems"
+  },
+  "routines.presets.failed.text": {
+    "value": "Weekdays at 10am, declined charges and disputes."
+  },
+  "routines.presets.failed.prompt": {
+    "value": "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer."
+  },
+  "routines.presets.monthClose.name": {
+    "value": "Month-end summary"
+  },
+  "routines.presets.monthClose.text": {
+    "value": "On the 1st at 9am, last month's money."
+  },
+  "routines.presets.monthClose.prompt": {
+    "value": "Put together a summary of last month: revenue, refunds and disputes. Compare it with the month before."
+  },
+  "routines.presets.sheet.name": {
+    "value": "Check a spreadsheet"
+  },
+  "routines.presets.sheet.text": {
+    "value": "Weekdays at 11am, gaps and odd numbers."
+  },
+  "routines.presets.sheet.prompt": {
+    "value": "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time."
+  },
+  "routines.presets.page.name": {
+    "value": "Watch a web page"
+  },
+  "routines.presets.page.text": {
+    "value": "Every day at 9am, only when it changes."
+  },
+  "routines.presets.page.prompt": {
+    "value": "Open this page: (paste the address here). If something important changed since last time, say what changed."
+  },
+  "routines.presets.newTask.name": {
+    "value": "Sort new tasks"
+  },
+  "routines.presets.newTask.text": {
+    "value": "When a task is created, the agent reviews it."
+  },
+  "routines.presets.newTask.prompt": {
+    "value": "Read the new task. Say what's missing to start it, and suggest who should own it and a due date."
+  },
+  "routines.presets.pulse.name": {
+    "value": "Question of the week"
+  },
+  "routines.presets.pulse.text": {
+    "value": "Thursdays at 4pm, one question for the team."
+  },
+  "routines.presets.pulse.prompt": {
+    "value": "Summarize the answers to last week's question without naming anyone. Then post a short new question in the channel about how the week went."
+  },
+  "routines.presets.away.name": {
+    "value": "Who's out this week"
+  },
+  "routines.presets.away.text": {
+    "value": "Mondays at 8:30am, time off and trips."
+  },
+  "routines.presets.away.prompt": {
+    "value": "Check the calendar for time off and trips this week. List them by day and say what needs covering."
+  },
   "routines.presets.digest.name": {
     "value": "Daily channel digest"
   },
@@ -15452,10 +15701,7 @@
     "value": "Weekdays at 9am, what happened yesterday."
   },
   "routines.presets.digest.prompt": {
-    "value": "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered."
-  },
-  "routines.presets.digest.phrase": {
-    "value": "weekdays at 9am"
+    "value": "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered."
   },
   "routines.presets.errors.name": {
     "value": "Watch for new errors"
@@ -15466,17 +15712,14 @@
   "routines.presets.errors.prompt": {
     "value": "Check the new Sentry errors since the last run. If there are any, summarize them and say where in the code they happen. If there's nothing new, don't send a message."
   },
-  "routines.presets.errors.phrase": {
-    "value": "every hour"
-  },
   "routines.presets.prs.name": {
     "value": "Review new PRs"
   },
   "routines.presets.prs.text": {
-    "value": "When a PR opens, the agent reads it and comments."
+    "value": "Weekdays at 9am and 2pm, the agent reads new PRs and points out risks."
   },
   "routines.presets.prs.prompt": {
-    "value": "Read the new PR's diff, point out risks and say what to test by hand."
+    "value": "Check the PRs opened since last time. Read each diff, point out risks and say what to test by hand."
   },
   "routines.presets.week.name": {
     "value": "Week wrap-up"
@@ -15486,9 +15729,6 @@
   },
   "routines.presets.week.prompt": {
     "value": "Summarize the week: decisions, closed tasks and what's still open."
-  },
-  "routines.presets.week.phrase": {
-    "value": "every friday at 5pm"
   },
   "routines.close": {
     "value": "Close"
