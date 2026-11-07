@@ -358,7 +358,7 @@ describe("unread marks, Discord's way", () => {
     return state;
   };
 
-  test("something new lights the row with no number, only a mention of me gets the red count, muted never lights", async () => {
+  test("something new lights the row with how many wait in a quiet count, a mention of me gets the red one, muted never lights", async () => {
     const state = withRandom();
     for (const c of state.channels) {
       if (c.id === ENG_ID) Object.assign(c, { unreadCount: 4, mentionCount: 0 });
@@ -368,13 +368,17 @@ describe("unread marks, Discord's way", () => {
     const link = (name: string) => nav().querySelector(`a.sidebar__item[title="#${name}"]`) as HTMLElement;
     expect(link("eng").dataset.kind).toBe("channel");
     expect(link("eng").dataset.unread).toBe("true");
-    expect(link("eng").querySelector(".sidebar__unread")).toBeNull();
-    // No number, so screen readers hear it.
-    expect(link("eng").querySelector(".ac-visually-hidden")?.textContent).toBe("Não lida");
+    // A group conversation says how many messages wait, like a DM, in the neutral count: red stays for mentions.
+    const quiet = link("eng").querySelector(".sidebar__unread") as HTMLElement;
+    expect(quiet.textContent).toBe("4");
+    expect(quiet.classList.contains("sidebar__unread--quiet")).toBe(true);
+    expect(quiet.getAttribute("aria-label")).toBe("4 mensagens não lidas");
     const count = link("random").querySelector(".sidebar__unread") as HTMLElement;
     expect(count.textContent).toBe("2");
+    expect(count.classList.contains("sidebar__unread--quiet")).toBe(false);
     expect(count.getAttribute("aria-label")).toBe("2 menções a você");
     expect(link("general").dataset.unread).toBe("false");
+    expect(link("general").querySelector(".sidebar__unread")).toBeNull();
     cleanup();
 
     // Muted: it rests gray whatever comes, but a mention of me still shows.
@@ -385,6 +389,13 @@ describe("unread marks, Discord's way", () => {
     expect(link("random").dataset.unread).toBe("false");
     expect(link("random").dataset.muted).toBe("true");
     expect(link("random").querySelector(".sidebar__unread")?.textContent).toBe("1");
+    cleanup();
+
+    const mutedQuiet = withRandom();
+    for (const c of mutedQuiet.channels)
+      if (c.id === RANDOM) Object.assign(c, { unreadCount: 3, mentionCount: 0, muted: true });
+    await go(mutedQuiet);
+    expect(link("random").querySelector(".sidebar__unread")).toBeNull();
   });
 
   test("the open channel keeps its own buttons, the cog for its settings", async () => {

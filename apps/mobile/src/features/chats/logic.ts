@@ -236,6 +236,12 @@ export function rowPlace(
 export const rowName = (r: ConversationRow) =>
   r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
 
+/** A channel's or DM's number: mentions of me in a channel (red, as on the web, even while muted), else its unread. */
+export function rowBadge(r: ConversationRow): { count: number; mention: boolean } {
+  const mentions = r.kind === "channel" ? r.mentions : 0;
+  return mentions > 0 ? { count: mentions, mention: true } : { count: r.unread, mention: false };
+}
+
 /** The "Não lidas" count: conversations with something unread. */
 export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) => r.unread > 0).length;
 
