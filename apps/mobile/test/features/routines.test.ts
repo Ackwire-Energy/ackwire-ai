@@ -568,3 +568,15 @@ test("Nova rotina's templates: one row opens the search, by area, and picking on
   // An app not connected yet has its way there, as a mailbox does.
   expect(picker).toContain('router.push("/connectors")');
 });
+
+test('a routine\'s row and its runs line show their words whole: they wrap, never end in a "…" that hides them', async () => {
+  // The screens are components the tests can't render: what they hold back, as text.
+  const read = (f: string) => Bun.file(new URL(`../../src/features/routines/${f}`, import.meta.url).pathname).text();
+  const [parts, screen] = await Promise.all([read("parts.tsx"), read("RoutineScreen.tsx")]);
+  const row = parts.slice(parts.indexOf("export const RoutineRow"), parts.indexOf("const styles = StyleSheet.create"));
+  expect(row).toContain("{title}");
+  expect(row).not.toContain("numberOfLines");
+  // Where it delivers keeps its icon on its first line as it wraps.
+  expect(row).toContain('<LineIcon variant="footnote" name={targetIcon(r.target)}');
+  expect(screen.slice(screen.indexOf("<RunStrip"))).not.toMatch(/numberOfLines=\{1\}[^>]*>\s*\{words\.caption/);
+});

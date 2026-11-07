@@ -334,7 +334,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                   running={running}
                   label={words.label(r)}
                 />
-                <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+                <Text variant="caption" tone="faint" style={styles.shrink}>
                   {words.caption(r, at)}
                 </Text>
               </View>
