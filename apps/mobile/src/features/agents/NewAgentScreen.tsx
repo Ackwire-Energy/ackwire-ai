@@ -267,13 +267,14 @@ function NewAgentForm({
     [connections.data, servers.data, catalog.data],
   );
   const levels = useMemo(
-    () => (proposed ? proposedLevels : managesAgents ? presetLevels(role ?? "custom", items) : {}),
-    [proposed, proposedLevels, role, items, managesAgents],
+    // A proposal's levels (the reviewer's, in Revisar) over the role's; the apps it doesn't name open as any role's.
+    () => (managesAgents ? { ...presetLevels(role ?? "custom", items), ...proposedLevels } : {}),
+    [proposedLevels, role, items, managesAgents],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
-  const listedApps = proposed ? items.filter((i) => i.id in proposedLevels) : granted;
+  const listedApps = proposed ? items.filter((i) => i.id in proposedLevels || granted.includes(i)) : granted;
   // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(() => {
     const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));

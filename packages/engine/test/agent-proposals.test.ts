@@ -632,6 +632,33 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     );
   });
 
+  test("Criar: an app the proposal doesn't name starts at Ler e escrever, as every agent has it; the agent hears it", async () => {
+    f = await setup();
+    const github = await connect(f, "github", "GitHub");
+    const linear = await connect(f, "linear", "Linear");
+    const ctx = await runFor(f, f.owner.id, "cria um agente que lê o GitHub");
+    const out = await propose(f, ctx, { ...CAIO, access: [{ connector: "github", level: "read" }] });
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      id,
+    );
+    const scopes = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, made.agent.id));
+    // What it named keeps its level: read stays read.
+    expect(scopes.some((s) => s.connectionId === github.id && s.scope === "connector:*")).toBe(false);
+    expect(scopes.some((s) => s.connectionId === github.id && s.scope === "github:repo.read")).toBe(true);
+    expect(scopes.filter((s) => s.connectionId === linear.id).map((s) => s.scope)).toEqual(["connector:*"]);
+    const [notice] = (
+      await f.db
+        .select()
+        .from(schema.messages)
+        .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'proposal_result'`)
+    ).map((m) => m.meta.notice as { text: string });
+    expect(notice?.text).toContain("reads GitHub, reads and writes Linear");
+  });
+
   test("an admin who doesn't own the mailbox, a member who can't give apps: what waits, and for whom", async () => {
     f = await setup();
     const github = await connect(f, "github", "GitHub");

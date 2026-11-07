@@ -888,8 +888,18 @@ const readScopesOf = (c: Awaited<ReturnType<typeof orgToolCatalog>>[number]) =>
     ? [customScope(c.connectionId, "read")]
     : c.scopes.filter((s) => /[.:]read$/.test(s.scope) && !s.tools.some((t) => t.sensitive)).map((s) => s.scope);
 
-/** The new agent's apps at their levels, in one save through the access API's own rule (giving access: an admin). */
-async function giveApps(db: Database, userId: string, orgId: string, agentId: string, lines: AgentDraft["access"]) {
+/**
+ * The new agent's apps at their levels, in one save through the access API's own rule (giving access: an admin). An
+ * app the lines don't name starts at "Ler e escrever", as every agent got it when it was connected
+ * (`grantToEveryAgent`); a custom server's account starts with none, as on the new-agent page (`presetLevels`).
+ */
+export async function giveApps(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  lines: AgentDraft["access"],
+) {
   const [catalog, own] = await Promise.all([
     orgToolCatalog(db, orgId),
     db
@@ -911,8 +921,13 @@ async function giveApps(db: Database, userId: string, orgId: string, agentId: st
     else for (const scope of readScopesOf(c)) input.scopes.push({ connectionId: c.connectionId, scope });
     given.push(c.connectionId);
   }
+  const opened = catalog.filter((c) => !c.custom && !given.includes(c.connectionId));
+  for (const c of opened) {
+    input.connectors[c.connectionId] = true;
+    given.push(c.connectionId);
+  }
   if (given.length > 0) await setAgentAccess(db, userId, orgId, agentId, input);
-  return given;
+  return { given, opened: opened.map((c) => c.label) };
 }
 
 /**
@@ -964,9 +979,8 @@ async function giveLines(
         )
       : null;
   const channelIds = joined?.ok ? draft.channelIds : [];
-  const apps =
-    draft.access.length > 0 ? await attempt(() => giveApps(db, userId, orgId, agent.id, draft.access)) : null;
-  const connectionIds = apps?.ok ? apps.value : [];
+  const apps = await attempt(() => giveApps(db, userId, orgId, agent.id, draft.access));
+  const connectionIds = apps.ok ? apps.value.given : [];
   const mailAccountIds: string[] = [];
   // Only a mailbox's owner gives an agent access to it.
   for (const box of draft.mail ?? []) {
@@ -1031,6 +1045,7 @@ async function giveLines(
     ...draft.access
       .filter((a) => connectionIds.includes(a.connectionId))
       .map((a) => `${reads(a.level)} ${appName(a.connectionId)}`),
+    ...(apps.ok ? apps.value.opened.map((label) => `reads and writes ${label}`) : []),
     ...mail
       .filter((m) => mailAccountIds.includes(m.accountId))
       .map((m) => `${reads(m.level)} the mailbox ${m.address}`),

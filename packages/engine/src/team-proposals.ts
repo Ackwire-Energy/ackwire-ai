@@ -2,7 +2,7 @@ import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
-import { checkRoutine, type DraftPlace, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
+import { checkRoutine, type DraftPlace, giveApps, type ProposedRoutine, suggestAgentAi } from "./agent-proposals";
 import {
   type Agent,
   archiveAgent,
@@ -581,6 +581,8 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
             { via: found.proposedBy, pubsub: events.pubsub },
           );
           if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance, events);
+          // An admin's team gets the apps every agent has; anyone else's starts without access (ADR 0085 §5).
+          if (admin) await giveApps(tx, userId, orgId, row.id, []);
           const channelId = channelOf.get(a.channel) as string;
           await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
           for (const r of a.routines) {

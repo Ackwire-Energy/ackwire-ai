@@ -289,6 +289,51 @@ describe("the team card", () => {
     expect(gone?.archivedAt).not.toBeNull();
   });
 
+  test("an admin's team gets every connected app at Ler e escrever, as every agent has it; a member's gets none", async () => {
+    f = await setup({ rightHand: true });
+    const [github] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "github",
+        label: "GitHub",
+        toolPrefix: "github",
+        serverUrl: "https://github.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const grants = async (handle: string) => {
+      const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.handle, handle));
+      return (
+        await f.db
+          .select()
+          .from(schema.agentScopes)
+          .where(eq(schema.agentScopes.agentId, agent?.id ?? ""))
+      )
+        .filter((s) => s.connectionId === github?.id)
+        .map((s) => s.scope);
+    };
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    expect((await createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).card.state).toBe("created");
+    expect(await grants("iara")).toEqual(["connector:*"]);
+    await undoTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+
+    const member = await addMember(f.db, f.org.id, "member");
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [makers.id]);
+    const theirs = await call(f, await lodiRun(f, member.id, "monta o time"), PROPOSE_TEAM_TOOL, {
+      ...TEAM,
+      weekly_check: false,
+      agents: TEAM.agents.map((a) => ({ ...a, handle: `${a.handle}2` })),
+      skills: [],
+    });
+    const theirId = (theirs.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    expect((await createTeam({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id, theirId)).card.state).toBe("created");
+    expect(await grants("iara2")).toEqual([]);
+  });
+
   test("a step that fails creates nothing: the card stays open and says which step", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f, f.owner.id, "monta o time");
