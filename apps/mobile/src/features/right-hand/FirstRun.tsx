@@ -6,14 +6,17 @@ import {
   useConnections,
   useMembers,
   useMessages,
+  useModelLabel,
   useSettings,
 } from "@agenteschat/client";
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { brainLine } from "@agenteschat/client/lib/brain";
+import { firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import type { FirstRunState } from "@agenteschat/client/lib/right-hand";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -25,7 +28,7 @@ import {
   firstRunRowState,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
-import { firstTasks, teamStatus } from "@agenteschat/client/lib/team-plan";
+import { answerAfter, firstTasks, teamStatus } from "@agenteschat/client/lib/team-plan";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,8 +45,8 @@ import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /*
  * The right hand's first run on the phone (ADR 0152 §6), as on the web: one checklist card inside its greeting for
- * the workspace's owners, five rows, each a pushed screen (what the workspace does), a sheet (the team's templates),
- * Connect AI, Settings › Apps or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1).
+ * the workspace's owners, five rows, each a pushed screen (what the workspace does, the apps), a sheet (the team's
+ * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1).
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
@@ -111,6 +114,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     connections: live,
     teamCard: cards.some((c) => teamStatus(c) === "open"),
     created: cards.filter((c) => c.state === "created").at(-1) ?? null,
+    typed: answerAfter(messages, null),
   };
 }
 
@@ -122,6 +126,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const confirm = useConfirmSetup(orgId, agent.id);
   const run = useFirstRun(agent, channelId);
   const catalog = useCatalog();
+  const dir = useDirectory();
+  const modelLabel = useModelLabel();
   const [templates, setTemplates] = useState<{ initial?: string } | null>(null);
   const { steps, done, held, team } = run;
   // Once, while the team row is still open for this person.
@@ -147,13 +153,22 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     return def ? [connectorName(t, def)] : [];
   });
   const appNames = names.length ? joinNames(names, t) : null;
+  // What it thinks with, as the web names it ("Penso com Sonnet pelo plano do Claude").
+  const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
+  const label = brainLine(
+    t,
+    agent.brain,
+    isAuto(agent.model) ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
+    { owner: ownerName ? firstName(ownerName) : undefined, agents: dir.agents },
+  ).text;
   const stateOf = (s: FirstRunStep) => firstRunRowState(s, { done, held, teamCard: run.teamCard });
   const next = steps.find((s) => stateOf(s) === "open");
   const act: Record<FirstRunStep, () => void> = {
-    about: () => openSetupStep(agent.id, "about"),
+    about: () => openSetupStep(agent.id, "about", run.typed),
     team: () => (done.has("team") ? router.push("/team" as never) : setTemplates({})),
-    ai: () => openConnectAi({ agentId: agent.id }),
-    apps: () => router.push("/connectors"),
+    // For the whole team, as the web's row: with agents besides it, every agent of the person's is chosen.
+    ai: () => openConnectAi(team.length > 0 ? {} : { agentId: agent.id }),
+    apps: () => openSetupStep(agent.id, "apps"),
     people: () => router.push("/invite-people"),
   };
   const rows = steps.map((s) => {
@@ -162,7 +177,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       t,
       s,
       state,
-      { org: org?.name ?? "", agents: team.length, label: null, apps: appNames, members: run.members },
+      { org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members },
       agent.setup?.done.includes(s) ?? false,
     );
     return {

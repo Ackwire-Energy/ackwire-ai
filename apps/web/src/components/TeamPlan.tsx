@@ -677,11 +677,6 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
 }
 
 /**
- * "Ver modelos de time": six business types, each team previewed as its card would propose it. "Usar este modelo"
- * posts it in the person's DM with the right hand, which then asks two questions to fit it; "Nenhum desses" goes back
- * to writing what they do.
- */
-/**
  * "Modelos de time": the templates by business type, one picked (`initial`: the business row 1 saved), and "Criar o
  * time" makes it at once (ADR 0152 §6). Under the list, the other ways in: an import, or one agent from scratch.
  */

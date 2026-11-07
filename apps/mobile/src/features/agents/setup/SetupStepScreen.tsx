@@ -5,7 +5,9 @@ import {
   useAgentBrain,
   useAgentDetail,
   useApi,
+  useCatalog,
   useConfirmSetup,
+  useConnections,
   useModelLabel,
   useRoles,
   useSettings,
@@ -31,7 +33,13 @@ import { planOf } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
-import { setupRole, suggestedChannels, suggestedLevels } from "@agenteschat/client/lib/setup-checklist";
+import { connectorName } from "@agenteschat/client/lib/scopes";
+import {
+  firstRunAppList,
+  setupRole,
+  suggestedChannels,
+  suggestedLevels,
+} from "@agenteschat/client/lib/setup-checklist";
 import { BUSINESS_TYPES, type BusinessType, isTemplateBusiness } from "@agenteschat/client/lib/team-plan";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -61,18 +69,32 @@ import { useAgentChannels } from "./useAgentChannels";
 
 const STEPS: readonly SetupStep[] = ["apps", "where", "who", "how", "about"];
 
-/** Opens one step's screen (`ai` is Connect AI, not a screen of this). */
-export const openSetupStep = (agentId: string, step: SetupStep) =>
-  router.push({ pathname: "/agent-step/[id]", params: { id: agentId, step } });
+/** Opens one step's screen (`ai` is Connect AI, not a screen of this); `text` fills row 1's sentence. */
+export const openSetupStep = (agentId: string, step: SetupStep, text?: string | null) =>
+  router.push({
+    pathname: "/agent-step/[id]",
+    params: { id: agentId, step, ...(text ? { text: text.slice(0, 500) } : {}) },
+  });
 
-export function SetupStepScreen({ agentId, step }: { agentId: string; step: string | undefined }) {
+/** The right hand's first run has its own screens for these (ADR 0152 §6); a new agent's checklist, the rest. */
+const FIRST_RUN_SCREENS: ReadonlySet<SetupStep> = new Set<SetupStep>(["about", "apps"]);
+
+export function SetupStepScreen({
+  agentId,
+  step,
+  text,
+}: {
+  agentId: string;
+  step: string | undefined;
+  text?: string | undefined;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const agent = dir.agentById.get(agentId);
   const known = STEPS.find((s) => s === step);
-  // "about" is the right hand's first run (ADR 0152 §6); the rest, a new agent's.
-  if (!agent?.setup || !known || (known === "about") !== isRightHand(agent)) {
+  const firstRun = isRightHand(agent);
+  if (!agent?.setup || !known || (firstRun ? !FIRST_RUN_SCREENS.has(known) : known === "about")) {
     return (
       <View style={[styles.fill, { backgroundColor: c.bg }]}>
         <PushedHeader title={t("agentSetup.title")} solid={false} />
@@ -82,9 +104,9 @@ export function SetupStepScreen({ agentId, step }: { agentId: string; step: stri
   }
   switch (known) {
     case "about":
-      return <AboutStep />;
+      return <AboutStep typed={text ?? null} />;
     case "apps":
-      return <AppsStep agent={agent} />;
+      return firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />;
     case "where":
       return <WhereStep agent={agent} />;
     case "who":
@@ -99,7 +121,7 @@ export function SetupStepScreen({ agentId, step }: { agentId: string; step: stri
  * context, which every agent reads ("Outra coisa" asks for the sentence). Saved, it goes back and the card opens the
  * team's templates with that business's picked.
  */
-function AboutStep() {
+function AboutStep({ typed }: { typed: string | null }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const settings = useSettings(orgId);
@@ -107,7 +129,7 @@ function AboutStep() {
   const failed = useFailed();
   const [business, setBusiness] = useState<BusinessType | null>(null);
   const [line, setLine] = useState<string | null>(null);
-  const shown = line ?? settings.data?.context ?? "";
+  const shown = line ?? (settings.data?.context || typed || "");
   const other = business === "other";
   const text = shown.trim() || (business && !other ? t(`teamPlan.business.${business}`) : "");
   return (
@@ -156,6 +178,57 @@ function AboutStep() {
         editable={!save.isPending}
       />
       {other ? null : <GroupedFooter>{t("agentSetup.firstRun.about.optional")}</GroupedFooter>}
+    </SettingsPage>
+  );
+}
+
+/**
+ * The first run's row 4, as the web's dialog: the apps the team just made would use, plug-and-play ones only, each
+ * opening the same connect sheet as Apps (whose last step says which agents use it), and the whole list under them.
+ */
+function FirstRunAppsStep() {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const c = useColors();
+  const dir = useDirectory();
+  const catalog = useCatalog();
+  const connections = useConnections(orgId);
+  const connected = new Set((connections.data ?? []).filter((x) => !x.revokedAt).map((x) => x.connector));
+  const list = firstRunAppList(
+    catalog.data?.connectors ?? [],
+    connected,
+    dir.agents.filter((a) => !isRightHand(a)),
+  );
+  return (
+    <SettingsPage title={t("agentSetup.firstRun.apps.title")}>
+      <GroupedFooter>{t("agentSetup.firstRun.apps.desc")}</GroupedFooter>
+      {catalog.isPending || connections.isPending ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
+      {list.length > 0 ? (
+        <GroupedList>
+          {list.map(({ def, suggested }) => (
+            <GroupedRow
+              key={def.id}
+              leading={<ConnectorIcon def={def} label={connectorName(t, def)} size={30} />}
+              label={connectorName(t, def)}
+              {...(suggested ? { sub: t("agentSetup.suggested") } : {})}
+              value={t("agentSetup.firstRun.apps.connect")}
+              chevron
+              onPress={() => {
+                tapHaptic();
+                router.push({ pathname: "/connectors", params: { connect: def.id } });
+              }}
+            />
+          ))}
+        </GroupedList>
+      ) : null}
+      <GroupedList>
+        <GroupedRow
+          icon="plus"
+          label={t("agentSetup.firstRun.apps.all")}
+          chevron
+          onPress={() => router.push("/connectors")}
+        />
+      </GroupedList>
     </SettingsPage>
   );
 }

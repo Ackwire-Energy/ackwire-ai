@@ -21,7 +21,7 @@ import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   type FirstRunStep,
-  firstRunApps,
+  firstRunAppList,
   firstRunAsks,
   firstRunDone,
   firstRunRow,
@@ -341,12 +341,7 @@ function AppsDialog({ team, onClose }: { team: Agent[]; onClose: () => void }) {
   const connections = useConnections(org.id);
   const [flow, setFlow] = useState<FlowState | null>(null);
   const connected = new Set((connections.data ?? []).filter((c) => !c.revokedAt).map((c) => c.connector));
-  const oneClick = (catalog.data?.connectors ?? []).filter(
-    (d) => d.auth.includes("oauth") && d.oauthConfigured && !connected.has(d.id),
-  );
-  const order = firstRunApps(team);
-  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
-  const list = [...oneClick].sort((a, b) => rank(a.id) - rank(b.id)).slice(0, 6);
+  const list = firstRunAppList(catalog.data?.connectors ?? [], connected, team);
   return (
     <>
       <StepDialog
@@ -370,11 +365,11 @@ function AppsDialog({ team, onClose }: { team: Agent[]; onClose: () => void }) {
         }
       >
         <ul className="setup-apps">
-          {list.map((def) => (
+          {list.map(({ def, suggested }) => (
             <li key={def.id} className="setup-apps__row">
               <ConnectorIcon def={def} label={connectorName(t, def)} />
               <b>{connectorName(t, def)}</b>
-              {order.includes(def.id) && <small>{t("agentSetup.suggested")}</small>}
+              {suggested && <small>{t("agentSetup.suggested")}</small>}
               <Button size="sm" onClick={() => setFlow({ step: 0, def })}>
                 {t("agentSetup.firstRun.apps.connect")}
               </Button>

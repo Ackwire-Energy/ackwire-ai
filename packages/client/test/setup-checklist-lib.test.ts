@@ -6,6 +6,7 @@ import {
   FIRST_RUN_STEPS,
   type FirstRunFacts,
   type FirstRunPowers,
+  firstRunAppList,
   firstRunApps,
   firstRunAsks,
   firstRunDone,
@@ -202,5 +203,44 @@ describe("the right hand's first run (ADR 0152 §6)", () => {
     expect(teamRole(a("zed"))).toBeNull();
     expect(firstRunApps([a("iara"), a("bia")]).slice(0, 1)).toEqual(["intercom"]);
     expect(firstRunApps([a("zed")])).toEqual([]);
+  });
+
+  test("row 4 lists the apps that connect in one click here, not connected yet, the team's first", () => {
+    const def = (
+      id: string,
+      more: Partial<{
+        auth: ("oauth" | "api_key")[];
+        oauthConfigured: boolean;
+        available: boolean;
+        soon: boolean;
+      }> = {},
+    ) => ({
+      id,
+      auth: ["oauth" as const],
+      oauthConfigured: true,
+      available: true,
+      ...more,
+    });
+    const defs = [
+      def("gmail"),
+      def("intercom"),
+      def("apikey", { auth: ["api_key"] }),
+      def("off", { oauthConfigured: false }),
+      def("later", { available: false }),
+      def("vendor", { soon: true }),
+      def("notion"),
+    ];
+    const list = firstRunAppList(defs, new Set(["notion"]), [{ handle: "iara", setup: null }]);
+    expect(list.map((x) => [x.def.id, x.suggested])).toEqual([
+      ["intercom", true],
+      ["gmail", false],
+    ]);
+    expect(
+      firstRunAppList(
+        Array.from({ length: 9 }, (_, i) => def(`app${i}`)),
+        new Set(),
+        [],
+      ),
+    ).toHaveLength(6);
   });
 });

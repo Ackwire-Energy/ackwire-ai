@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, SetupStep } from "../api/types";
+import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, ConnectorDef, SetupStep } from "../api/types";
 import type { Level } from "./access-levels";
 import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
 
@@ -351,4 +351,25 @@ export function firstRunApps(team: readonly Pick<Agent, "handle" | "setup">[]): 
     if (role) for (const id of Object.keys(ROLE_DEFAULTS[role].levels)) count.set(id, (count.get(id) ?? 0) + 1);
   }
   return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+/**
+ * Row 4's list (web dialog, phone screen): the plug-and-play apps that connect here and aren't connected yet, the
+ * team's suggestions first, at most six.
+ */
+export function firstRunAppList<D extends Pick<ConnectorDef, "id" | "auth" | "oauthConfigured" | "available" | "soon">>(
+  defs: readonly D[],
+  connected: ReadonlySet<string>,
+  team: readonly Pick<Agent, "handle" | "setup">[],
+): { def: D; suggested: boolean }[] {
+  const order = firstRunApps(team);
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  return (
+    defs
+      // "Em breve" and an app the vendor hasn't approved yet open nothing: left out.
+      .filter((d) => d.available && !d.soon && d.auth.includes("oauth") && d.oauthConfigured && !connected.has(d.id))
+      .sort((a, b) => rank(a.id) - rank(b.id))
+      .slice(0, 6)
+      .map((def) => ({ def, suggested: order.includes(def.id) }))
+  );
 }
