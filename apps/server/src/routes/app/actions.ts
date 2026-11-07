@@ -52,6 +52,14 @@ const WorkspaceActionCard = z
       words: z.record(z.string(), z.string()).openapi({ description: "Values for its sentence." }),
       needs: z.string().nullable().openapi({ description: "The key its screen asks for; null: anyone." }),
       why: z.string(),
+      refused: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Its screen refused the person it was for: they send it on (`ask`)." }),
+      self: z
+        .boolean()
+        .optional()
+        .openapi({ description: "It changes whoever applies it (their status…): only the person it was for may." }),
     }),
     state: z.enum(["pending", "applied", "dismissed"]),
     decidedByUserId: z.string().nullable(),
@@ -134,10 +142,13 @@ export function actionRoutes(deps: AppDeps) {
   );
 
   const CardParams = OrgParams.extend({ messageId: z.uuid() });
+  // What the screens' own routes pass: a channel deleted from a card stops its missions and mail triggers too.
   const cardDeps = {
     db,
     pubsub: deps.adapters.pubsub,
     server: { publicUrl: deps.config.PUBLIC_URL, secret: deps.config.AGENTES_SECRET },
+    hub: deps.extras?.sandbox?.machines?.hub ?? null,
+    mail: deps.adapters.mail,
   };
 
   app.openapi(

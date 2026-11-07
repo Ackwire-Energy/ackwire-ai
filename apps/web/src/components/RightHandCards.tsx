@@ -788,7 +788,7 @@ export function WorkspaceActionCardView({
       components={{ b: <b /> }}
     />
   );
-  const detail = actionCardDetail(card, t);
+  const detail = actionCardDetail(card, t, i18n.language);
   const may = mayApplyCard(card, { userId: me.user.id, may: (key) => can(org, key) });
   const mine = card.forUserId === me.user.id;
   if (card.state !== "pending") {

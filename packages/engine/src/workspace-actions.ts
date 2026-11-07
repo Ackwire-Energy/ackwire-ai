@@ -7,6 +7,7 @@ import {
   publishMessageActions,
   UNDO_WINDOW_MS,
 } from "./agent-actions";
+import type { AgentDeletionDeps } from "./agent-deletion";
 import { agentsByHandle } from "./agents";
 import { recordAudit } from "./audit";
 import { cancelRun } from "./cancel";
@@ -27,7 +28,7 @@ import { queueInvitationEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { approveJoinRequest, denyJoinRequest } from "./invite-requests";
-import { getOrgSettings, TEAM_SIZES, updateChannel, updateOrgSettings } from "./management";
+import { getOrgSettings, updateChannel, updateOrgSettings } from "./management";
 import { AVAILABILITIES, type Availability, setMyStatus } from "./member-status";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { NOTICE_CATEGORIES, type NoticeCategory, noticePrefsView, setNoticePref } from "./notice-prefs";
@@ -101,6 +102,9 @@ export interface ActionDeps {
   pubsub?: PubSub;
   /** The server's address and `AGENTES_SECRET`: invitations an action sends link back to it. */
   server?: ServerLinks;
+  /** What the channel screen's deletion passes: its missions stop on their computers, its mail routines' triggers go. */
+  hub?: AgentDeletionDeps["hub"];
+  mail?: AgentDeletionDeps["mail"];
 }
 
 export interface ServerLinks {
@@ -135,6 +139,8 @@ export interface WorkspaceAction {
   mode: "now" | "card";
   /** The key its screen asks for, to say who may (the engine call checks again, with all its rules): null, anyone. */
   needs: Permission | null;
+  /** It changes whoever runs it (their status…): on a card, only the person it was for applies it. */
+  self?: true;
   /** Names read as ids for `person`, or why not (English). What a card keeps and its click runs. */
   resolve(
     ctx: ToolContext,
@@ -224,13 +230,23 @@ async function roleRow(db: Database, orgId: string, id: string) {
   return row ?? null;
 }
 
-const holders = async (db: Database, orgId: string, roleId: string) =>
+/** Whether anyone or anything holds the role: its people, a channel's audience or exception, a pending invitation. */
+const roleInUse = async (db: Database, orgId: string, roleId: string) =>
   (
     await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(organizationMemberRoles)
-      .where(and(eq(organizationMemberRoles.orgId, orgId), eq(organizationMemberRoles.roleId, roleId)))
-  )[0]?.n ?? 0;
+      .select({
+        used: sql<boolean>`exists (select 1 from ${organizationMemberRoles} where ${organizationMemberRoles.orgId} = ${orgId}
+            and ${organizationMemberRoles.roleId} = ${roleId})
+          or exists (select 1 from ${channelPermissionOverrides} where ${channelPermissionOverrides.orgId} = ${orgId}
+            and ${channelPermissionOverrides.roleId} = ${roleId})
+          or exists (select 1 from ${channels} where ${channels.orgId} = ${orgId}
+            and ${roleId}::uuid = any(${channels.audienceRoleIds}))
+          or exists (select 1 from ${organizationInvitations} where ${organizationInvitations.orgId} = ${orgId}
+            and ${organizationInvitations.acceptedAt} is null and ${roleId}::uuid = any(${organizationInvitations.roleIds}))`,
+      })
+      .from(orgRoles)
+      .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.id, roleId)))
+  )[0]?.used === true;
 
 /** The custom roles' ids, top first. */
 const roleOrder = async (db: Database, orgId: string) =>
@@ -291,8 +307,8 @@ const createRoleAction: WorkspaceAction = {
     const id = str(obj(a.state).roleId) || a.targetId;
     const role = await roleRow(deps.db, a.orgId, id);
     if (!role) throw new NotFoundError("The role is gone", "action.target_gone");
-    // Someone holds it or changed it since: deleting it would take that away.
-    if (!same(roleSnapshot(role), after) || (await holders(deps.db, a.orgId, id)) > 0) throw changedSince();
+    // Changed since, or given to someone or something since: deleting it would take that away too.
+    if (!same(roleSnapshot(role), after) || (await roleInUse(deps.db, a.orgId, id))) throw changedSince();
     await deleteRole(deps.db, actorId, a.orgId, id, deps);
     return undefined;
   },
@@ -632,6 +648,7 @@ const setStatusAction: WorkspaceAction = {
   },
   mode: "now",
   needs: null,
+  self: true,
   async resolve(_ctx, _person, input) {
     if (input.availability === undefined && input.text === undefined) return "Say their availability or status.";
     return { input, words: { what: str(input.text), availability: str(input.availability) } };
@@ -660,7 +677,10 @@ const setStatusAction: WorkspaceAction = {
     const [from, to] = direction === "undo" ? [obj(a.after), obj(a.before)] : [obj(a.before), obj(a.after)];
     if (actorId !== a.targetId) throw new ForbiddenError("Only they change their own status", "action.not_allowed");
     if (!same(await statusNow(deps.db, a.orgId, actorId), from)) throw changedSince();
-    await setMyStatus(deps, actorId, a.orgId, to as Parameters<typeof setMyStatus>[3]);
+    // A line whose time ran out meanwhile comes back as no line: the screen takes no `until` in the past either.
+    const until = str(obj(to.status).until);
+    const status = until && Date.parse(until) <= Date.now() ? null : to.status;
+    await setMyStatus(deps, actorId, a.orgId, { ...to, status } as Parameters<typeof setMyStatus>[3]);
     return undefined;
   },
 };
@@ -683,6 +703,7 @@ const notificationsAction: WorkspaceAction = {
   },
   mode: "now",
   needs: null,
+  self: true,
   async resolve(_ctx, _person, input) {
     return { input, words: { category: str(input.category), variant: input.on === true ? "on" : "off" } };
   },
@@ -740,6 +761,7 @@ const timezoneAction: WorkspaceAction = {
   },
   mode: "now",
   needs: null,
+  self: true,
   async resolve(_ctx, _person, input) {
     const timezone = str(input.timezone);
     return { input: { timezone }, words: timezoneWords(timezone === "workspace" ? null : timezone) };
@@ -785,7 +807,13 @@ const channelTarget = (c: Pick<ChannelRow, "id" | "name">): AgentActionTarget =>
   id: c.id,
   title: c.name,
 });
-const channelSnapshot = (c: ChannelRow) => ({ name: c.name, topic: c.topic, visibility: c.visibility });
+/** With its roles' audience: made public, a private channel forgets them, and Undo gives them back. */
+const channelSnapshot = (c: ChannelRow) => ({
+  name: c.name,
+  topic: c.topic,
+  visibility: c.visibility,
+  audienceRoleIds: [...c.audienceRoleIds],
+});
 
 const updateChannelAction: WorkspaceAction = {
   id: "update_channel",
@@ -836,17 +864,38 @@ const updateChannelAction: WorkspaceAction = {
     const row = await channelRow(deps.db, a.orgId, a.targetId);
     if (!row || row.archivedAt) throw new NotFoundError("The channel is gone", "action.target_gone");
     if (!same(channelSnapshot(row), from)) throw changedSince();
+    const access = same([from.visibility, from.audienceRoleIds], [to.visibility, to.audienceRoleIds])
+      ? {}
+      : { visibility: to.visibility as "public" | "private", audienceRoleIds: list(to.audienceRoleIds) };
     await updateChannel(
       deps.db,
       actorId,
       a.orgId,
       row.id,
-      { name: str(to.name), topic: String(to.topic ?? ""), visibility: to.visibility as "public" | "private" },
+      { name: str(to.name), topic: String(to.topic ?? ""), ...access },
       deps,
     );
     return undefined;
   },
 };
+
+/** Whether `person` sees this channel as `listChannels` would: public, theirs, through a role of theirs, or an admin. */
+async function seesChannel(
+  db: Database,
+  orgId: string,
+  person: string,
+  c: { id: string; visibility: string; audienceRoleIds: string[] },
+) {
+  if (c.visibility === "public" || can(await getMembership(db, person, orgId), "administrator")) return true;
+  const roles = await memberRoleIds(db, orgId, person);
+  if (c.audienceRoleIds.some((id) => roles.includes(id))) return true;
+  const [seat] = await db
+    .select({ id: channelMembers.id })
+    .from(channelMembers)
+    .where(and(eq(channelMembers.channelId, c.id), eq(channelMembers.userId, person)))
+    .limit(1);
+  return Boolean(seat);
+}
 
 /** Archives or brings back, the other one undoing it. */
 async function setArchived(deps: ActionDeps, actorId: string, orgId: string, id: string, archived: boolean) {
@@ -869,7 +918,12 @@ const archiveChannelAction: WorkspaceAction = {
     const name = str(input.channel).replace(/^#/, "").toLowerCase();
     if (input.back === true) {
       const [row] = await ctx.db
-        .select({ id: channels.id, name: channels.name })
+        .select({
+          id: channels.id,
+          name: channels.name,
+          visibility: channels.visibility,
+          audienceRoleIds: channels.audienceRoleIds,
+        })
         .from(channels)
         .where(
           and(
@@ -880,7 +934,8 @@ const archiveChannelAction: WorkspaceAction = {
             isNull(channels.deletedAt),
           ),
         );
-      if (!row) return `No archived channel #${name}.`;
+      // Only one they could see in the list (`listChannels`' rule): a private one they're not in stays unnamed.
+      if (!row || !(await seesChannel(ctx.db, ctx.orgId, person, row))) return `No archived channel #${name}.`;
       return { input: { channelId: row.id, back: true }, words: { channel: row.name, variant: "back" } };
     }
     const channel = await channelNamed(ctx, person, name);
@@ -1007,7 +1062,13 @@ const deleteChannelAction: WorkspaceAction = {
     if (!row) throw new NotFoundError("Channel not found");
     if (!deps.pubsub) throw new Error("Deleting a channel needs the server's events");
     // Its card is the confirmation the screen asks for by the typed name.
-    await deleteChannel({ db: deps.db, pubsub: deps.pubsub }, actorId, orgId, row.id, row.name);
+    await deleteChannel(
+      { db: deps.db, pubsub: deps.pubsub, hub: deps.hub ?? null, mail: deps.mail ?? null },
+      actorId,
+      orgId,
+      row.id,
+      row.name,
+    );
     return { target: channelTarget(row), words: { channel: row.name }, final: true };
   },
 };
@@ -1298,8 +1359,9 @@ const continueWorkAction: WorkspaceAction = {
     return { input: { agentId: agent.id, name: agent.name }, words: { agent: agent.name } };
   },
   async run(deps, actorId, orgId, input) {
-    const [last] = await deps.db
-      .select({ id: agentRuns.id })
+    // Its newest stopped run in a conversation the person reads: an ordinary answer since is no reason to give up.
+    const ended = await deps.db
+      .select({ id: agentRuns.id, channelId: agentRuns.channelId })
       .from(agentRuns)
       .where(
         and(
@@ -1309,31 +1371,40 @@ const continueWorkAction: WorkspaceAction = {
         ),
       )
       .orderBy(desc(agentRuns.updatedAt))
-      .limit(1);
-    if (!last) throw new ConflictError(`${str(input.name)} has nothing stopped to go on with`);
-    await continueRun(deps, actorId, orgId, last.id);
-    return {
-      target: { type: "agent", id: str(input.agentId), title: str(input.name) },
-      words: { agent: str(input.name) },
-      final: true,
-    };
+      .limit(20);
+    let refused: unknown = null;
+    for (const r of ended) {
+      // Someone else's conversation isn't theirs to wake, nor to learn of.
+      if (!(await requireChannelAccess(deps.db, actorId, orgId, r.channelId).catch(() => null))) continue;
+      try {
+        await continueRun(deps, actorId, orgId, r.id);
+        return {
+          target: { type: "agent", id: str(input.agentId), title: str(input.name) },
+          words: { agent: str(input.name) },
+          final: true,
+        };
+      } catch (error) {
+        if (error instanceof ForbiddenError) refused ??= error;
+        else if (!(error instanceof ConflictError && error.code === "run.not_continuable")) throw error;
+      }
+    }
+    throw refused ?? new ConflictError(`${str(input.name)} has nothing stopped to go on with`);
   },
 };
 
 // ── The workspace ────────────────────────────────────────────────────────────
 
-const WORKSPACE_FIELDS = ["name", "timezone", "teamSize", "defaultAgentBudgetNanoUsd"] as const;
+const WORKSPACE_FIELDS = ["name", "timezone", "defaultAgentBudgetNanoUsd"] as const;
 const NANO_PER_USD = 1_000_000_000;
 
 const updateWorkspaceAction: WorkspaceAction = {
   id: "update_workspace",
-  does: "Change the workspace's name, time zone, team size or the monthly budget of agents without their own.",
+  does: "Change the workspace's name, time zone or the monthly budget of agents without their own.",
   input: {
     type: "object",
     properties: {
       name: { type: "string", minLength: 1, maxLength: 80 },
       timezone: { type: "string", minLength: 1, maxLength: 64, description: "IANA, e.g. America/Sao_Paulo." },
-      team_size: { enum: [...TEAM_SIZES] },
       default_budget_usd: { type: "number", minimum: 0.01, maximum: 100_000 },
     },
     additionalProperties: false,
@@ -1353,7 +1424,6 @@ const updateWorkspaceAction: WorkspaceAction = {
     const patch: Record<string, unknown> = {
       ...(str(input.name) ? { name: str(input.name) } : {}),
       ...(str(input.timezone) ? { timezone: str(input.timezone) } : {}),
-      ...(str(input.team_size) ? { teamSize: str(input.team_size) } : {}),
       ...(typeof input.default_budget_usd === "number"
         ? { defaultAgentBudgetNanoUsd: Math.round(input.default_budget_usd * NANO_PER_USD) }
         : {}),
@@ -1441,9 +1511,16 @@ export const workspaceAction = (id: unknown) => WORKSPACE_ACTIONS.find((a) => a.
 const asTools = () =>
   WORKSPACE_ACTIONS.map((a) => ({ name: a.id, description: a.does, inputSchema: a.input }) as ToolDefinition);
 
+type Member = Awaited<ReturnType<typeof getMembership>>;
+
 /** Whether this member may, as far as its screen's key goes (the engine call checks the rest). */
-const mayDo = (membership: Awaited<ReturnType<typeof getMembership>>, a: WorkspaceAction) =>
+const mayDo = (membership: Member, a: WorkspaceAction) =>
   Boolean(membership) && (a.needs === null || can(membership, a.needs));
+
+/** Who a card is sent to ("Pedir a quem pode"), and who may then open it: its key's holders, else the owners. */
+const decides = (needs: Permission | null) => needs !== null && needs !== "read" && needs !== "manage_owners";
+const isDecider = (membership: Member, needs: Permission | null) =>
+  Boolean(membership) && (decides(needs) ? can(membership, needs as Permission) : membership?.role === "owner");
 
 /** `find`: the best actions for what the person wants, with their input and whether they may. */
 export async function findWorkspaceActions(ctx: ToolContext, person: string | null, query: string) {
@@ -1459,7 +1536,7 @@ export async function findWorkspaceActions(ctx: ToolContext, person: string | nu
         `- ${a.id}: ${a.does} ${
           mayDo(membership, a)
             ? a.mode === "now"
-              ? "They may: it applies at once with Undo."
+              ? `They may: it applies at once ${a.revert ? "with Undo" : "and can't be undone"}.`
               : "They may: a card they confirm."
             : "Their roles don't give it: unless its screen lets them anyway (their own channel or agent), a card for someone who may."
         } Input: ${JSON.stringify(a.input)}`,
@@ -1491,6 +1568,8 @@ export interface WorkspaceActionCard {
     why: string;
     /** The person it was for tried and the screen's own rule refused them (a role above theirs): they send it on. */
     refused?: boolean;
+    /** It changes whoever applies it (their own status…): only the person it was for does. */
+    self?: boolean;
   };
   state: "pending" | "applied" | "dismissed";
   decidedByUserId: string | null;
@@ -1499,7 +1578,8 @@ export interface WorkspaceActionCard {
   askedAt?: string | null;
 }
 
-const changesThisRun = async (ctx: ToolContext) =>
+/** The run's changes made at once so far (`workspace_action` and the people card's roles): `MAX_ACTIONS_PER_RUN` caps them. */
+export const changesThisRun = async (ctx: Pick<ToolContext, "db" | "orgId" | "runId">) =>
   (
     await ctx.db
       .select({ n: sql<number>`count(*)::int` })
@@ -1598,7 +1678,7 @@ export function workspaceActionTool(deps: { pubsub?: PubSub; server?: ServerLink
           const done = await actNow(deps, ctx, person, a, resolved.input);
           if (!("refused" in done))
             return {
-              content: `Done at once, with Undo under your reply: ${a.id} (${describe(done.words)}). Say it is done.`,
+              content: `Done at once${a.revert ? ", with Undo under your reply" : " (it can't be undone)"}: ${a.id} (${describe(done.words)}). Say it is done.`,
             };
           // Refused by the engine's own rules (a role above theirs, a key they don't hold): someone who may decides.
           may = false;
@@ -1616,6 +1696,7 @@ export function workspaceActionTool(deps: { pubsub?: PubSub; server?: ServerLink
             needs: a.needs,
             why: str(raw.why),
             ...(refused ? { refused: true } : {}),
+            ...(a.self ? { self: true } : {}),
           },
           state: "pending",
           decidedByUserId: null,
@@ -1671,7 +1752,8 @@ async function cardMessage(db: Database, userId: string, orgId: string, messageI
   const card = message && !message.deletedAt && message.authorType === "agent" ? cardOf(message.meta) : null;
   if (!message || !card) throw new NotFoundError("Card not found", "action_card.not_found");
   const membership = await getMembership(db, userId, orgId);
-  const asked = card.askedAt && membership && (card.params.needs === null || can(membership, card.params.needs));
+  // Sent on, it opens for whom it was sent to (`askWorkspaceAction`), never for every member.
+  const asked = card.askedAt && isDecider(membership, card.params.needs);
   if (!asked) await requireChannelAccess(db, userId, orgId, message.channelId);
   if (!membership) throw new NotFoundError("Card not found", "action_card.not_found");
   return { message, card, membership };
@@ -1716,8 +1798,11 @@ export async function decideWorkspaceAction(
   if (found.card.state !== "pending") throw decided();
   if (decision === "dismiss" && found.card.forUserId !== userId && !mayDo(found.membership, a))
     throw new ForbiddenError("Only the person it was for, or someone who may, dismisses it", "action_card.not_allowed");
+  // Their own status or notifications: anyone else's click would change theirs instead.
+  if (decision === "apply" && a.self && found.card.forUserId !== userId)
+    throw new ForbiddenError("Only the person it was for applies it", "action_card.not_requester");
   const events = holdEvents(deps.pubsub);
-  const next = await deps.db.transaction(async (tx) => {
+  const deciding = deps.db.transaction(async (tx) => {
     const db = tx as unknown as Database;
     // Locked: two clicks at once never apply it twice.
     const [row] = await db
@@ -1725,19 +1810,20 @@ export async function decideWorkspaceAction(
       .from(messages)
       .where(and(eq(messages.orgId, orgId), eq(messages.id, messageId)))
       .for("update");
-    if (cardOf(row?.meta)?.state !== "pending") throw decided();
+    const current = cardOf(row?.meta);
+    if (current?.state !== "pending") throw decided();
     const card: WorkspaceActionCard = {
-      ...found.card,
+      ...current,
       state: decision === "apply" ? "applied" : "dismissed",
       decidedByUserId: userId,
       decidedAt: new Date().toISOString(),
     };
     if (decision === "apply") {
       const done = await a.run(
-        { db, pubsub: events.pubsub, server: deps.server },
+        { db, pubsub: events.pubsub, server: deps.server, hub: deps.hub, mail: deps.mail },
         userId,
         orgId,
-        found.card.params.input,
+        current.params.input,
       );
       const record = recordOf(a, done);
       const now = new Date();
@@ -1774,6 +1860,25 @@ export async function decideWorkspaceAction(
     });
     return card;
   });
+  const next = await deciding.catch(async (error: unknown) => {
+    // The screen's own rule refused the person it was for (a role above theirs): from now on the card sends it on.
+    if (error instanceof ForbiddenError && decision === "apply" && found.card.forUserId === userId) {
+      const refused: WorkspaceActionCard = { ...found.card, params: { ...found.card.params, refused: true } };
+      const [row] = await deps.db
+        .update(messages)
+        .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,params,refused}', 'true'::jsonb)` })
+        .where(
+          and(
+            eq(messages.orgId, orgId),
+            eq(messages.id, messageId),
+            sql`${messages.meta}->'actionCard'->>'state' = 'pending'`,
+          ),
+        )
+        .returning({ id: messages.id });
+      if (row) await announceCard(deps, found.message, refused);
+    }
+    throw error;
+  });
   await events.flush();
   await resolveNotifications(deps, orgId, { groupKey: `${ASK_GROUP}${messageId}` }).catch(() => 0);
   await announceCard(deps, { ...found.message }, next);
@@ -1794,7 +1899,7 @@ export async function askWorkspaceAction(deps: ActionDeps, userId: string, orgId
     throw new ForbiddenError("Only the person it was for can send it", "action_card.not_requester");
   if (card.state !== "pending") throw new ConflictError("This card was already decided", "action_card.decided");
   if (card.askedAt) throw new ConflictError("It was already sent", "action_card.asked");
-  if (mayDo(found.membership, a) && !card.params.refused)
+  if (a.self || (mayDo(found.membership, a) && !card.params.refused))
     throw new ConflictError("You can apply it yourself", "action_card.yours");
   const next: WorkspaceActionCard = { ...card, askedAt: new Date().toISOString() };
   const [row] = await deps.db
@@ -1816,7 +1921,7 @@ export async function askWorkspaceAction(deps: ActionDeps, userId: string, orgId
     .where(
       and(
         eq(organizationMembers.orgId, orgId),
-        a.needs && a.needs !== "read" && a.needs !== "manage_owners"
+        decides(a.needs)
           ? maySql(orgId, organizationMembers.userId, a.needs as RolePermission)
           : eq(organizationMembers.role, "owner"),
       ),

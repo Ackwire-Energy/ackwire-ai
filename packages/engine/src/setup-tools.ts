@@ -41,7 +41,14 @@ import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
-import { actNow, type ServerLinks, workspaceAction, workspaceActionTool } from "./workspace-actions";
+import {
+  actNow,
+  changesThisRun,
+  MAX_ACTIONS_PER_RUN,
+  type ServerLinks,
+  workspaceAction,
+  workspaceActionTool,
+} from "./workspace-actions";
 
 const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
@@ -1107,6 +1114,8 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           if (giving && (await ownWords(ctx)) === forUserId) {
             for (const r of [...rows]) {
               if (!("addRoleIds" in r)) continue;
+              // The turn's cap on changes made at once (`workspace_action`'s too): the rest waits on the card.
+              if ((await changesThisRun(ctx)) >= MAX_ACTIONS_PER_RUN) break;
               const done = await actNow(deps, ctx, forUserId, giving, {
                 userId: r.userId,
                 name: r.name,

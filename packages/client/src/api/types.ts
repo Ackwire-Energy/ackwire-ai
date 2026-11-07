@@ -2906,6 +2906,8 @@ export interface WorkspaceActionCard {
     why: string;
     /** The person it was for tried and the screen's own rule refused them: they send it on, not apply it. */
     refused?: boolean;
+    /** It changes whoever applies it (their own status…): only the person it was for may. */
+    self?: boolean;
   };
   state: "pending" | "applied" | "dismissed";
   decidedByUserId: string | null;

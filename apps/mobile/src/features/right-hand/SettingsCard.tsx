@@ -361,8 +361,8 @@ function SettingsRow({
 
 /**
  * The right hand's card of a change in the workspace (`workspace_action`), as on the web: what it does in the app's own
- * words, applied as whoever taps with the permissions its screen checks. The phone has no roles screen: this card is
- * its way to make these changes. Decided, one pill with who did it and Undo on its receipt while it lasts.
+ * words, applied as whoever taps with the permissions its screen checks. Decided, one pill with who did it and Undo on
+ * its receipt while it lasts.
  */
 function WorkspaceActionView({
   where,
@@ -375,7 +375,7 @@ function WorkspaceActionView({
   card: WorkspaceActionCard;
   actions?: AgentAction[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
@@ -386,7 +386,7 @@ function WorkspaceActionView({
   const say = t as unknown as (key: string, values: Record<string, string>) => string;
   const sentence = say(actionCardKey(card), actionCardWords(card, t));
   const plain = sentence.replace(/<\/?b>/g, "");
-  const detail = actionCardDetail(card, t);
+  const detail = actionCardDetail(card, t, i18n.language);
   const may = mayApplyCard(card, { userId: meId ?? "", may: (key) => can(org, key) });
   const mine = card.forUserId === meId;
   if (card.state !== "pending") {

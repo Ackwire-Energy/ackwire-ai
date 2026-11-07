@@ -30,7 +30,7 @@ export const APP_PAGES = {
     label: "settings.section.general",
   },
   members: { web: "/settings/members", phone: "/me/members", may: null, label: "settings.section.members" },
-  roles: { web: "/settings/roles", phone: null, may: "manage_roles", label: "settings.section.roles" },
+  roles: { web: "/settings/roles", phone: "/settings/roles", may: "manage_roles", label: "settings.section.roles" },
   audit: { web: "/settings/audit", phone: "/settings/audit", may: "view_audit", label: "settings.section.audit" },
   usage: { web: "/settings/usage", phone: "/usage", may: null, label: "settings.section.usage" },
   computers: {

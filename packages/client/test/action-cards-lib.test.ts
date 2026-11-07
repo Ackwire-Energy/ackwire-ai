@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AgentProposalCard } from "../src/api/types";
+import type { AgentProposalCard, WorkspaceActionCard } from "../src/api/types";
 import {
   actionCardDetail,
   actionCardKey,
@@ -336,4 +336,43 @@ test("a card of a workspace change: read from the message, its sentence, what a 
   const refused = { ...card, params: { ...card.params, refused: true } };
   expect(mayApplyCard(refused, { userId: "u1", may: () => true })).toBe(false);
   expect(mayApplyCard(refused, holds)).toBe(true);
+});
+
+test("a card of a workspace change shows all it changes, and a card of their own status is only theirs to apply", () => {
+  const card = (
+    action: string,
+    input: Record<string, unknown>,
+    more: Partial<WorkspaceActionCard["params"]> = {},
+  ): WorkspaceActionCard => ({
+    kind: "workspace_action",
+    forUserId: "u1",
+    params: { action, input, words: {}, needs: "configure", why: "", ...more },
+    state: "pending",
+    decidedByUserId: null,
+    decidedAt: null,
+  });
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    o?.amount
+      ? `${key}(${o.amount})`
+      : key.startsWith("permissions.")
+        ? key.split(".")[1]
+        : key) as unknown as TFunction;
+  // Whoever applies it from their inbox sees the new budget, not only the workspace's name.
+  expect(actionCardDetail(card("update_workspace", { name: "Acme Teste", default_budget_usd: 50 }), t, "en")).toBe(
+    "→ Acme Teste · agent.budgetDefaultChoice(agentPage.perMonth($50.00))",
+  );
+  expect(actionCardDetail(card("update_channel", { topic: "Campanha", private: true }), t)).toBe(
+    "Campanha · channel.visibilityPrivate",
+  );
+  expect(actionCardDetail(card("update_role", { name: "Comercial", add_permissions: ["post"] }), t)).toBe(
+    "→ Comercial · + post",
+  );
+  expect(actionCardDetail(card("move_role", { above: true }, { words: { name: "Ops", other: "Vendas" } }), t)).toBe(
+    "↑ Vendas",
+  );
+  expect(actionCardDetail(card("set_channel_permissions", { allow: [], deny: [] }), t)).toBe("channel.perms.clear");
+  const status = card("set_my_status", { availability: "busy" }, { needs: null, self: true });
+  expect(mayApplyCard(status, { userId: "u1", may: () => false })).toBe(true);
+  expect(mayApplyCard(status, { userId: "u2", may: () => true })).toBe(false);
+  expect(actionCardOf({ actionCard: status })).toMatchObject({ params: { self: true } });
 });

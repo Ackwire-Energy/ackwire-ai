@@ -22,7 +22,7 @@ import { workspaceActionContext, workspaceActionWords } from "./actions";
 import { type AppPage, isAppPage } from "./app-pages";
 import type { ConnectedItem } from "./connected";
 import { isHttpsUrl, sameServer } from "./custom-tools";
-import { joinNames } from "./format";
+import { formatUsd, joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 import type { Permission } from "./permissions";
 import { type TeamWeekCard, teamWeekCardOf } from "./team-week";
@@ -572,6 +572,7 @@ export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null 
       needs: typeof c.params.needs === "string" ? c.params.needs : null,
       why: typeof c.params.why === "string" ? c.params.why : "",
       ...(c.params.refused === true ? { refused: true } : {}),
+      ...(c.params.self === true ? { self: true } : {}),
     },
     state: c.state === "applied" || c.state === "dismissed" ? c.state : "pending",
     decidedByUserId: typeof c.decidedByUserId === "string" ? c.decidedByUserId : null,
@@ -591,32 +592,54 @@ export const actionCardWords = (card: WorkspaceActionCard, t: TFunction) =>
   workspaceActionWords(card.params.action, card.params.words, t);
 
 /**
- * What a role or a channel's exception gives or takes, in the permissions' own words under the card's sentence
- * ("conversar, dar missões e editar a wiki"; "+ editar a wiki, − aprovar ações"). Empty for other actions.
+ * Everything else the card changes, under its sentence, so whoever applies it from their inbox sees all of it: what a
+ * role or a channel's exception gives or takes in the permissions' own words ("conversar, dar missões e editar a wiki";
+ * "+ editar a wiki, − aprovar ações"), a new name, where a role moves, a channel turned private, a new budget. Empty when
+ * the sentence says it all.
  */
-export function actionCardDetail(card: WorkspaceActionCard, t: TFunction): string {
+export function actionCardDetail(card: WorkspaceActionCard, t: TFunction, locale = "en"): string {
   const input = card.params.input;
   const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : []);
   const short = (k: string) => t(`permissions.${k}.short` as never, { defaultValue: k }) as string;
   const change = (add: unknown, take: unknown) =>
     [...keys(add).map((k) => `+ ${short(k)}`), ...keys(take).map((k) => `− ${short(k)}`)].join(", ");
-  if (card.params.action === "create_role") return joinNames(keys(input.permissions).map(short), t);
-  if (card.params.action === "update_role") return change(input.add_permissions, input.remove_permissions);
-  if (card.params.action === "set_channel_permissions") return change(input.allow, input.deny);
   const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  if (card.params.action === "update_channel")
-    return [text(input.name) && `#${text(input.name).replace(/^#/, "")}`, text(input.topic)]
-      .filter(Boolean)
-      .join(" · ");
-  if (card.params.action === "update_workspace")
-    return [text(input.name), text(input.timezone)].filter(Boolean).join(" · ");
-  if (card.params.action === "decide_join_request")
-    return input.approve === true
-      ? keys(input.roleNames)
-          .map((n) => `+ ${n}`)
-          .join(", ")
-      : text(input.reason);
-  return "";
+  const parts = (...p: (string | false)[]) => p.filter(Boolean).join(" · ");
+  const renamed = text(input.name) && `→ ${text(input.name)}`;
+  switch (card.params.action) {
+    case "create_role":
+      return joinNames(keys(input.permissions).map(short), t);
+    case "update_role":
+      return parts(renamed, change(input.add_permissions, input.remove_permissions));
+    case "move_role":
+      return `${input.above === true ? "↑" : "↓"} ${card.params.words.other ?? ""}`.trim();
+    case "set_channel_permissions":
+      return change(input.allow, input.deny) || (t("channel.perms.clear") as string);
+    case "update_channel":
+      return parts(
+        text(input.name) && `→ #${text(input.name).replace(/^#/, "")}`,
+        text(input.topic),
+        typeof input.private === "boolean" &&
+          (t(input.private ? "channel.visibilityPrivate" : "channel.visibilityPublic") as string),
+      );
+    case "update_workspace":
+      return parts(
+        renamed,
+        text(input.timezone),
+        typeof input.default_budget_usd === "number" &&
+          (t("agent.budgetDefaultChoice", {
+            amount: t("agentPage.perMonth", { amount: formatUsd(locale, input.default_budget_usd) }),
+          }) as string),
+      );
+    case "decide_join_request":
+      return input.approve === true
+        ? keys(input.roleNames)
+            .map((n) => `+ ${n}`)
+            .join(", ")
+        : text(input.reason);
+    default:
+      return "";
+  }
 }
 
 /**
@@ -628,4 +651,6 @@ export const mayApplyCard = (
   viewer: { userId: string; may: (key: Permission) => boolean },
 ) =>
   !(card.forUserId === viewer.userId && card.params.refused) &&
+  // Their own status or notifications: only theirs to apply.
+  !(card.params.self && card.forUserId !== viewer.userId) &&
   (card.params.needs === null || viewer.may(card.params.needs));
