@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { Agent, AgentSetupResult, ForeignMailbox, OrgRole, OrgSummary } from "../src/api/types";
 import {
+  agentsReach,
   audienceLines,
   audiencePatch,
   audienceWithMe,
@@ -175,4 +176,20 @@ test("an agent's picture leads to its details unless it left the team or the vie
   expect(opensDetails({ seesDetails: false })).toBe(false);
   expect(opensDetails({ former: "archived" })).toBe(false);
   expect(opensDetails(undefined)).toBe(false);
+});
+
+describe("agentsReach: whether a narrowed audience holds for agents too", () => {
+  const owner = { mode: "owner" as const, userIds: [] };
+  test("everyone talks to it: nothing to say", () => {
+    expect(agentsReach({ mode: "everyone", userIds: [] }, true, "u-heitor")).toBeNull();
+  });
+  test("other agents still consult it unless switched off", () => {
+    expect(agentsReach(owner, false, "u-heitor")).toBe("consulted");
+    expect(agentsReach({ ...owner, consultable: false }, false, "u-heitor")).toBe("blocked");
+    expect(agentsReach({ mode: "people", userIds: ["u-bia"] }, true, "u-heitor")).toBe("consulted");
+  });
+  test("on its owner's plan answering only its owner, nobody else, agents included", () => {
+    expect(agentsReach(owner, true, "u-heitor")).toBe("plan");
+    expect(agentsReach({ mode: "people", userIds: [] }, true, "u-heitor")).toBe("plan");
+  });
 });

@@ -8359,6 +8359,11 @@
     "consultable": "Diğer ajanlar {{name}} ajanına danışabilir",
     "consultableHint": "Listede olmayan kişiler için yalnızca soran ajana yanıt verir, onlara doğrudan asla. Hassas işlemler yine de ondan sorumlu kişilerin onayını gerektirir.",
     "consultableHint_female": "Listede olmayan kişiler için yalnızca soran ajana yanıt verir, onlara doğrudan asla. Hassas işlemler yine de ondan sorumlu kişilerin onayını gerektirir.",
+    "agents": {
+      "consulted": "Bu yalnızca kişiler için geçerli. Diğer ajanlar, listede olmayan kişiler için {{name}} ajanına danışmaya devam edebilir.",
+      "blocked": "Bu ajanlar için de geçerli. Listede olmayan kişiler için başka hiçbir ajan {{name}} ajanına ulaşamaz.",
+      "plan": "Bu ajanlar için de geçerli. {{name}}, sorumlu kişinin yalnızca ona hizmet veren yapay zekâ planını kullanıyor, bu yüzden listede olmayan kişiler için başka hiçbir ajan {{name}} ajanına ulaşamaz."
+    },
     "mode": {
       "everyone": "Çalışma alanındaki herkes",
       "people": "Yalnızca bazı kişiler veya roller",

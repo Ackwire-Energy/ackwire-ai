@@ -28,8 +28,13 @@ export interface AutonomySettings {
   otherProjects: boolean;
 }
 
+/**
+ * Open by default (agents act on their own and call each other, admins narrow it): costly work nobody asked for goes
+ * ahead and any agent may call any other. Projects split agents only once a person sets them (`otherProjects` reads
+ * only then). The caps on parallel unrequested runs and PRs an hour stay: they stop a runaway, they forbid nothing.
+ */
 export const AUTONOMY_DEFAULTS: AutonomySettings = {
-  costly: "ask",
+  costly: "go",
   go: [],
   never: [],
   maxUnrequested: 2,
@@ -50,7 +55,7 @@ export function autonomySettings(raw: unknown): AutonomySettings {
   const r = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const d = AUTONOMY_DEFAULTS;
   return {
-    costly: r.costly === "go" ? "go" : "ask",
+    costly: r.costly === "ask" ? "ask" : "go",
     go: kinds(r.go),
     never: kinds(r.never),
     maxUnrequested: count(r.maxUnrequested, 1, 20, d.maxUnrequested),

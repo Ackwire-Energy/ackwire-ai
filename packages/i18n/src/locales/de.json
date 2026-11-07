@@ -8414,6 +8414,11 @@
     "consultable": "Andere Agenten können {{name}} um Rat fragen",
     "consultableHint": "Personen, die nicht auf der Liste stehen, antwortet er nie direkt, sondern nur dem Agenten, der gefragt hat. Sensible Aktionen brauchen weiterhin die Freigabe der Personen, die sich um ihn kümmern.",
     "consultableHint_female": "Personen, die nicht auf der Liste stehen, antwortet sie nie direkt, sondern nur dem Agenten, der gefragt hat. Sensible Aktionen brauchen weiterhin die Freigabe der Personen, die sich um sie kümmern.",
+    "agents": {
+      "consulted": "Gilt nur für Personen. Andere Agenten können {{name}} weiterhin für alle fragen, die nicht auf der Liste stehen.",
+      "blocked": "Gilt auch für Agenten. Kein anderer Agent erreicht {{name}} für Personen, die nicht auf der Liste stehen.",
+      "plan": "Gilt auch für Agenten. {{name}} nutzt den KI-Plan der verantwortlichen Person, der nur dieser Person dient. Deshalb erreicht kein anderer Agent {{name}} für Personen, die nicht auf der Liste stehen."
+    },
     "mode": {
       "everyone": "Alle im Workspace",
       "people": "Nur bestimmte Personen oder Rollen",

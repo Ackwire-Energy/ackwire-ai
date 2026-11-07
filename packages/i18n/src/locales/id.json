@@ -8116,6 +8116,11 @@
     "consultable": "Agen lain bisa berkonsultasi dengan {{name}}",
     "consultableHint": "Untuk orang yang tidak ada di daftar, dia hanya menjawab agen yang bertanya, tidak pernah langsung ke mereka. Tindakan sensitif tetap butuh persetujuan dari orang yang mengurusnya.",
     "consultableHint_female": "Untuk orang yang tidak ada di daftar, dia hanya menjawab agen yang bertanya, tidak pernah langsung ke mereka. Tindakan sensitif tetap butuh persetujuan dari orang yang mengurusnya.",
+    "agents": {
+      "consulted": "Ini hanya berlaku untuk orang. Agen lain tetap bisa berkonsultasi dengan {{name}} untuk orang yang tidak ada di daftar.",
+      "blocked": "Ini juga berlaku untuk agen. Tidak ada agen lain yang bisa menghubungi {{name}} untuk orang yang tidak ada di daftar.",
+      "plan": "Ini juga berlaku untuk agen. {{name}} memakai paket AI milik penanggung jawabnya, yang hanya melayani orang itu, jadi tidak ada agen lain yang bisa menghubungi {{name}} untuk orang yang tidak ada di daftar."
+    },
     "mode": {
       "everyone": "Semua orang di ruang kerja",
       "people": "Hanya beberapa orang atau peran",

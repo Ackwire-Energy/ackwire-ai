@@ -8471,6 +8471,11 @@
     "consultable_female": "Andere agents kunnen {{name}} raadplegen",
     "consultableHint": "Voor mensen die niet op de lijst staan, antwoordt hij alleen de agent die het vroeg, nooit henzelf. Gevoelige acties vragen nog steeds om goedkeuring van de mensen die voor hem verantwoordelijk zijn.",
     "consultableHint_female": "Voor mensen die niet op de lijst staan, antwoordt zij alleen de agent die het vroeg, nooit henzelf. Gevoelige acties vragen nog steeds om goedkeuring van de mensen die voor haar verantwoordelijk zijn.",
+    "agents": {
+      "consulted": "Dit geldt alleen voor mensen. Andere agents kunnen {{name}} nog steeds raadplegen voor mensen die niet op de lijst staan.",
+      "blocked": "Dit geldt ook voor agents. Geen andere agent kan {{name}} bereiken voor mensen die niet op de lijst staan.",
+      "plan": "Dit geldt ook voor agents. {{name}} gebruikt het AI-abonnement van de verantwoordelijke, dat alleen die persoon helpt, dus geen andere agent kan {{name}} bereiken voor mensen die niet op de lijst staan."
+    },
     "mode": {
       "everyone": "Iedereen in de werkruimte",
       "people": "Alleen bepaalde mensen of rollen",

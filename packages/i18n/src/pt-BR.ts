@@ -8437,6 +8437,18 @@ export const ptBR = {
       "Para quem não está na lista, ele responde só ao agente que perguntou, nunca direto à pessoa. Ações sensíveis continuam pedindo aprovação de quem cuida dele.",
     consultableHint_female:
       "Para quem não está na lista, ela responde só ao agente que perguntou, nunca direto à pessoa. Ações sensíveis continuam pedindo aprovação de quem cuida dela.",
+    agents: {
+      consulted: "Vale só para pessoas. Outros agentes ainda podem consultar o {{name}} por quem não está na lista.",
+      consulted_female:
+        "Vale só para pessoas. Outros agentes ainda podem consultar a {{name}} por quem não está na lista.",
+      blocked:
+        "Vale para agentes também. Nenhum outro agente consegue falar com o {{name}} por quem não está na lista.",
+      blocked_female:
+        "Vale para agentes também. Nenhum outro agente consegue falar com a {{name}} por quem não está na lista.",
+      plan: "Vale para agentes também. O {{name}} usa o plano de IA do responsável, que só atende o responsável, então nenhum outro agente fala com ele por quem não está na lista.",
+      plan_female:
+        "Vale para agentes também. A {{name}} usa o plano de IA do responsável, que só atende o responsável, então nenhum outro agente fala com ela por quem não está na lista.",
+    },
     mode: { everyone: "Todos do workspace", people: "Só algumas pessoas ou papéis", owner: "Só o responsável" },
     modeText: {
       everyone: "Qualquer pessoa do workspace pode chamar o {{name}}.",

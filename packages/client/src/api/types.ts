@@ -659,7 +659,7 @@ export interface AgentBrakes {
 
 /** The brakes an agent has when none were set (`autonomySettings`' defaults on the server). */
 export const BRAKES_DEFAULTS: AgentBrakes = {
-  costly: "ask",
+  costly: "go",
   go: [],
   never: [],
   maxUnrequested: 2,

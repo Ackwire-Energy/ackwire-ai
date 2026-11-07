@@ -1,6 +1,6 @@
 # 0131. Autonomy brakes: proactive by default, bounded where nobody asked
 
-- Status: Accepted (built: the server, the web and the phone app)
+- Status: Accepted (built: the server, the web and the phone app). Amended 2026-11-07: `costly` defaults to `go` (below).
 - Date: 2026-11-02
 - Extends: ADR 0097 (the turn-end controller and its default-allow addendum), ADR 0032 (calm waits and calm wakes), ADR 0053 (who is behind a run), ADR 0121 (long work), ADR 0034 and 0085 (agents asking agents)
 - Code: `packages/engine/src/brakes.ts` (`endsAsking`, `askStillOpen`, `costlyKind`, `costlyGate`, `decideCostlyProposal`, `signatureOf`, `triageItem`, `brakeWakes`, `postAutonomyDigests`, `callableAgents`), `autonomy-settings.ts`, `continuation.ts` (rule `asked`, the judge's `continue` wording), `follow-through.ts` (`wakeFollowUp`), `context.ts` (the proactivity line), `talker.ts` (`statusReply`), `tools/gateway.ts` (the costly gate), `jobs.ts` (`onlyCallable`, the brakes before `dispatchMentions`, `autonomy.later`), `consultations.ts` (`reachableAgent`, the brakes on `tell_agent`, `startNoteRun`), `team.ts` (`teammatesFor`), `notification-producers.ts`, `agents.ts`; server `routes/app/agents.ts` (`brakes` on the agent, `POST …/autonomy-proposals/{signalId}`), `workers.ts` (`autonomyDigest`); client `lib/action-cards.ts` (`CostlyProposalCard`), `lib/message-body.ts`, `lib/long-work.ts` (`talkerStatusText`); web `pages/agent/BrakesCard.tsx`, `components/CostlyProposalCard.tsx`; phone `features/agents/BrakesSection.tsx`, `features/ai/CostlyProposalCard.tsx`; migration `0184_autonomy_brakes.sql`
@@ -56,6 +56,8 @@ Before `dispatchMentions` wakes agents for an agent's or a routine's message nob
 ### Settings
 
 `agents.autonomy_brakes` (jsonb, `{}` = the defaults), read through `autonomySettings` (clamped and filled), shown as `Agent.brakes` and changed with `PATCH …/agents/{id}` `brakes` (fields merged, who manages agents). Web: Configurações → "Trabalho que ninguém pediu" (`BrakesCard`, saved at once). Phone: the agent's edit screen (`BrakesSection`). The defaults keep today's autonomy for normal use: everything a person asks, and cheap proactive steps, are unchanged; only costly unrequested steps ask first.
+
+*Amended 2026-11-07:* defaults are open, admins narrow them. `costly` defaults to `go`: costly work nobody asked for goes ahead within the hourly PR cap and the parallel cap, and §3's card is for agents an admin set to ask first (`costly: ask`). Agents whose brakes were saved before keep what was stored, `ask` included. `otherProjects` stays off: it reads only once a person gives agents projects, which is that narrowing.
 
 ## Consequences
 

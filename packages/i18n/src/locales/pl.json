@@ -9038,6 +9038,11 @@
     "consultable_female": "Inni agenci mogą konsultować się z {{name}}",
     "consultableHint": "Osobom spoza listy odpowiada tylko za pośrednictwem agenta, który pytał, nigdy bezpośrednio. Wrażliwe akcje nadal wymagają zatwierdzenia przez osoby, które się nim opiekują.",
     "consultableHint_female": "Osobom spoza listy odpowiada tylko za pośrednictwem agenta, który pytał, nigdy bezpośrednio. Wrażliwe akcje nadal wymagają zatwierdzenia przez osoby, które się nią opiekują.",
+    "agents": {
+      "consulted": "Dotyczy tylko osób. Inni agenci nadal mogą konsultować się z {{name}} w sprawie osób spoza listy.",
+      "blocked": "Dotyczy też agentów. Żaden inny agent nie skontaktuje się z {{name}} w sprawie osób spoza listy.",
+      "plan": "Dotyczy też agentów. {{name}} korzysta z planu AI osoby odpowiedzialnej, który obsługuje tylko ją, więc żaden inny agent nie skontaktuje się z {{name}} w sprawie osób spoza listy."
+    },
     "mode": {
       "everyone": "Wszyscy w przestrzeni roboczej",
       "people": "Tylko niektóre osoby lub role",

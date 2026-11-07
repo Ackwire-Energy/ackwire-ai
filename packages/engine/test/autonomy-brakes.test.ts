@@ -60,6 +60,13 @@ async function agentOf(name: string, handle: string, brakes: Record<string, unkn
   return a;
 }
 
+/** The agent under test set to ask before costly work nobody asked for (the default is to go ahead). */
+const askFirst = () =>
+  f.db
+    .update(schema.agents)
+    .set({ autonomyBrakes: { costly: "ask" } })
+    .where(eq(schema.agents.id, f.agent.id));
+
 /** An agent's message nobody asked for (no run, no person at its root): a routine's or an alert's. */
 const alert = (agentId: string, body: string) =>
   insertMessage(f.db, {
@@ -198,7 +205,7 @@ test("§1: a follow-up of work nobody asked for, whose question is open, waits a
   expect((await f.db.select().from(agentRuns)).length).toBe(1);
 });
 
-describe("costly work an agent starts on its own needs a go (§3)", () => {
+describe("costly work an agent starts on its own, set to ask first, needs a go (§3)", () => {
   test("what counts as costly: opening a PR, installing packages", () => {
     expect(costlyKind(PERMISSION_TOOL, { tool_name: "Bash", input: { command: "gh pr create --fill" } })).toBe("pr");
     expect(costlyKind("Bash", { command: "cd app && npm install hyperfine" })).toBe("install");
@@ -209,6 +216,7 @@ describe("costly work an agent starts on its own needs a go (§3)", () => {
 
   test("the first try posts one proposal card; go lets that run do it; the run hears each decision", async () => {
     f = await setup();
+    await askFirst();
     const trigger = await alert(f.agent.id, "Erro novo em produção");
     const run = await working(f.agent.id, trigger.id);
     const at = {
@@ -274,6 +282,7 @@ describe("costly work an agent starts on its own needs a go (§3)", () => {
 
   test("a go clicked after the asking run ended reaches the run it wakes: no second card", async () => {
     f = await setup();
+    await askFirst();
     const trigger = await alert(f.agent.id, "Erro novo em produção");
     const run = await working(f.agent.id, trigger.id);
     const at = {
@@ -300,6 +309,7 @@ describe("costly work an agent starts on its own needs a go (§3)", () => {
 
   test("the person a card is for says go or not now; only the agent's owner or an admin says always or never", async () => {
     f = await setup();
+    await askFirst();
     const trigger = await alert(f.agent.id, "Erro novo em produção");
     const run = await working(f.agent.id, trigger.id);
     const at = {
@@ -329,6 +339,7 @@ describe("costly work an agent starts on its own needs a go (§3)", () => {
 
   test("always and never are remembered on the agent; the hourly PR cap holds even with a go", async () => {
     f = await setup();
+    await askFirst();
     const trigger = await alert(f.agent.id, "Sentry: TypeError em checkout");
     const run = await working(f.agent.id, trigger.id);
     const at = {
@@ -367,6 +378,7 @@ describe("costly work an agent starts on its own needs a go (§3)", () => {
       execute: async () => ({ content: JSON.stringify({ behavior: "allow" }) }),
     };
     f = await setup({ toolSources: [{ name: "fake-prompt", tools: async () => [prompt] }] });
+    await askFirst();
     const trigger = await alert(f.agent.id, "Sentry: erro antigo de freeze");
     const run = await working(f.agent.id, trigger.id);
     const tools = f.tools;
@@ -590,13 +602,13 @@ describe("who an agent may call (§8)", () => {
     expect(autonomySettings(saved.autonomyBrakes)).toMatchObject({
       maxUnrequested: 20,
       callAgents: "none",
-      costly: "ask",
+      costly: "go",
     });
-    const again = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { autonomyBrakes: { costly: "go" } });
+    const again = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { autonomyBrakes: { costly: "ask" } });
     expect(autonomySettings(again.autonomyBrakes)).toMatchObject({
       maxUnrequested: 20,
       callAgents: "none",
-      costly: "go",
+      costly: "ask",
     });
   });
 });

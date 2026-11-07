@@ -8759,6 +8759,11 @@
     "consultable_female": "Altri agenti possono consultare {{name}}",
     "consultableHint": "Per le persone non in elenco, risponde solo all'agente che ha chiesto, mai direttamente a loro. Le azioni sensibili richiedono comunque l'approvazione di chi si occupa di lui.",
     "consultableHint_female": "Per le persone non in elenco, risponde solo all'agente che ha chiesto, mai direttamente a loro. Le azioni sensibili richiedono comunque l'approvazione di chi si occupa di lei.",
+    "agents": {
+      "consulted": "Vale solo per le persone. Gli altri agenti possono ancora consultare {{name}} per chi non è in elenco.",
+      "blocked": "Vale anche per gli agenti. Nessun altro agente può contattare {{name}} per chi non è in elenco.",
+      "plan": "Vale anche per gli agenti. {{name}} usa il piano IA della persona responsabile, che serve solo quella persona, quindi nessun altro agente può contattare {{name}} per chi non è in elenco."
+    },
     "mode": {
       "everyone": "Tutti nello spazio di lavoro",
       "people": "Solo alcune persone o ruoli",

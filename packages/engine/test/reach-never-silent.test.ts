@@ -8,13 +8,16 @@ import {
   createJobHandlers,
   drainOutbox,
   insertMessage,
+  type OutboxJob,
   openDm,
   postPersonMessage,
   type RouterStrategy,
   runRoutineNow,
 } from "../src";
+import { SELF_REPORT_NOTICES } from "../src/notices";
 import { notifyAgentUnreached } from "../src/notification-producers";
 import { reachNote, reachOf } from "../src/reach";
+import { deliverNoticeToRun } from "../src/run-resume";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, messagesIn, notificationsOf, routineDeps } from "./routine-fixtures";
 
@@ -148,6 +151,84 @@ describe("a member the person behind an agent's message can't talk to", () => {
       { agentId: gil.id, handle: "gil", reason: "audience", userId: f.owner.id },
     ]);
     expect((await decisionOf(sent.id))?.reason).toContain("audience: @gil");
+  });
+});
+
+const wakeSkipped = async () =>
+  (await f.db.select().from(schema.messages)).filter(
+    (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
+  );
+
+describe("an agent whose every message names an agent it can't reach", () => {
+  test("hears it once and stops: the notice never starts a run of its own", async () => {
+    f = await setup({
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["Já deixei o recado com o @gil acima."] }),
+    });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner", consultable: false })
+      .where(eq(schema.agents.id, gil.id));
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev prepara o resumo",
+    });
+    await drainOutbox(f.db, f.handlers);
+
+    expect((await runsOf()).filter((r) => r.agentId === f.agent.id)).toHaveLength(1);
+    expect((await runsOf()).filter((r) => r.agentId === gil.id)).toEqual([]);
+    expect(await wakeSkipped()).toHaveLength(1);
+  });
+
+  test("no notice about the run's own work starts a run of its own once that run ended", async () => {
+    f = await setup();
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev prepara o resumo",
+    });
+    const [run] = await runsOf();
+    if (!run) throw new Error("no run");
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+    for (const kind of SELF_REPORT_NOTICES) {
+      const delivered = await f.db.transaction((tx) => deliverNoticeToRun(tx, run, { kind, text: "x" }));
+      expect({ kind, runs: delivered.runs }).toEqual({ kind, runs: [] });
+    }
+    expect(await runsOf()).toHaveLength(1);
+  });
+
+  test("named again in the same stretch, no second notice; a plan only its owner uses is the cause it reads", async () => {
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined) });
+    const gil = await agentOf("Gil", "gil", { inGeneral: true });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner", brain: "claude_code" })
+      .where(eq(schema.agents.id, gil.id));
+    const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev prepara o resumo",
+    });
+    const [run] = await runsOf();
+    if (!run) throw new Error("no run");
+    for (const body of ["@gil revisa o relatório.", "@gil, o relatório está acima."]) {
+      const said = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: asked.id,
+        author: { type: "agent", agentId: f.agent.id, runId: run.id, hop: 1 },
+        body,
+      });
+      await f.handlers["message.posted"]?.(
+        { orgId: f.org.id, payload: { messageId: said.id } } as unknown as OutboxJob,
+        { finalAttempt: false },
+      );
+    }
+    const told = await wakeSkipped();
+    expect(told).toHaveLength(1);
+    expect(JSON.stringify(told[0]?.meta.notice)).toContain("its owner's own AI plan");
+    // The live run reads it at its next step: nothing else starts.
+    expect(await runsOf()).toHaveLength(1);
+    const [live] = await runsOf();
+    expect(live?.pendingMessageIds).toContain(told[0]?.id ?? "");
   });
 });
 

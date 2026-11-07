@@ -20382,6 +20382,15 @@
     "value": "For people not on the list, he answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after him.",
     "female": "For people not on the list, she answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after her."
   },
+  "audience.agents.consulted": {
+    "value": "This covers people only. Other agents can still consult {{name}} for anyone not on the list."
+  },
+  "audience.agents.blocked": {
+    "value": "This covers agents too. No other agent can reach {{name}} for anyone not on the list."
+  },
+  "audience.agents.plan": {
+    "value": "This covers agents too. {{name}} uses its owner's AI plan, which serves only its owner, so no other agent can reach {{name}} for anyone not on the list."
+  },
   "audience.mode.everyone": {
     "value": "Everyone in the workspace"
   },
