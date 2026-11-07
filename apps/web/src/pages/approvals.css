@@ -654,14 +654,10 @@ html:not([data-pointer]) .ap-link:focus-visible {
   border-top: 1px solid var(--line);
 }
 .ap-list {
-  position: sticky;
-  top: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  max-height: 100vh;
-  overflow-y: auto;
   padding: 12px 16px 24px 0;
 }
 .ap-list__section {
@@ -780,7 +776,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0 -12px;
 }
 
-/* The open request. */
+/* The open request. In the page's scroll (a narrow or short window) tall enough that its decision bar floats at the
+   window's bottom. */
 .ap-review {
   position: relative;
   display: flex;
@@ -790,6 +787,17 @@ html:not([data-pointer]) .ap-li:focus-visible {
   min-height: calc(100vh - 220px);
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
+}
+/* Its own column (`.page-split`): out to the work area's right edge, where its scrollbar runs. Its decision bar floats
+   16px over the column's bottom, the column's padding (Chrome sets a sticky box's offset inside the padding). */
+@media (min-width: 941px) and (min-height: 560px) {
+  .ap-review {
+    margin-right: -24px;
+    padding-right: 24px;
+  }
+  .ap-review > .ap-bar--float {
+    bottom: 0;
+  }
 }
 /* The face's top on the first line's capitals (`.ac-captop` on "by"), as a chat name starts at its face. */
 .ap-review__head {
@@ -942,13 +950,11 @@ html:not([data-pointer]) .ap-li:focus-visible {
   white-space: normal;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 940px) {
   .ap-split {
     grid-template-columns: minmax(0, 1fr);
   }
   .ap-list {
-    position: static;
-    max-height: none;
     padding-right: 0;
   }
   .ap-review {

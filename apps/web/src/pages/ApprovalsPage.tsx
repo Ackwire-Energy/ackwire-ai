@@ -226,11 +226,14 @@ export function ApprovalsPage() {
   const selectedId = openId && order.includes(openId) ? openId : (order[0] ?? null);
   const selected = all.find((a) => a.id === selectedId) ?? null;
   const cardOf = new Map(approvalCards(shownOpen).flatMap((items) => items.map((a) => [a.id, items] as const)));
-  // A newly opened request starts at its top, not where the last one was scrolled to.
+  // A newly opened request starts at its top, not where the last one was scrolled to: in its own column on a wide
+  // window, in the page under the list on a narrow one.
   useEffect(() => {
     if (!selectedId) return;
     const pane = document.querySelector<HTMLElement>(".ap-review");
-    if (pane && pane.getBoundingClientRect().top < 0) pane.scrollIntoView?.({ block: "start" });
+    if (!pane) return;
+    pane.scrollTop = 0;
+    if (pane.getBoundingClientRect().top < 0) pane.scrollIntoView?.({ block: "start" });
   }, [selectedId]);
   const selectedCard = selected ? cardOf.get(selected.id) : undefined;
   const select = (id: string) => {
@@ -371,8 +374,12 @@ export function ApprovalsPage() {
         )}
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
-          <div className="ap-split">
-            <nav className="ap-list" aria-label={t("approvals.review.list")}>
+          <div className="ap-split page-split">
+            <nav
+              className="ap-list"
+              data-scroll-restoration-id="approvals-list"
+              aria-label={t("approvals.review.list")}
+            >
               {shownOpen.length > 0 &&
                 approvalCards(shownOpen).map((items) => {
                   const always = approveAlwaysOn(items);
@@ -467,7 +474,12 @@ export function ApprovalsPage() {
                   ))}
             </nav>
             {selected && (
-              <section className="ap-review" data-burst="" aria-label={approvalTitle(t, selected)}>
+              <section
+                className="ap-review"
+                data-scroll-restoration-id="approvals-request"
+                data-burst=""
+                aria-label={approvalTitle(t, selected)}
+              >
                 <ReviewHead approval={selected} channel={channelName(selected.channelId)} />
                 <ReviewBody key={selected.id} approval={selected} channel={channelName(selected.channelId)} />
                 <DecisionBar
