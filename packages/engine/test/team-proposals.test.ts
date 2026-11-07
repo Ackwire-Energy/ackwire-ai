@@ -289,12 +289,11 @@ describe("the team card", () => {
     expect(gone?.archivedAt).not.toBeNull();
   });
 
-  test("an admin's team gets every connected app at Ler e escrever, as every agent has it; a member's gets none", async () => {
-    f = await setup({ rightHand: true });
-    const [github] = await f.db
+  const connectGithub = async (fx: Fixture) => {
+    const [row] = await fx.db
       .insert(schema.connectorConnections)
       .values({
-        orgId: f.org.id,
+        orgId: fx.org.id,
         connector: "github",
         label: "GitHub",
         toolPrefix: "github",
@@ -302,36 +301,42 @@ describe("the team card", () => {
         authType: "none",
       })
       .returning();
-    const grants = async (handle: string) => {
-      const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.handle, handle));
-      return (
-        await f.db
-          .select()
-          .from(schema.agentScopes)
-          .where(eq(schema.agentScopes.agentId, agent?.id ?? ""))
-      )
-        .filter((s) => s.connectionId === github?.id)
-        .map((s) => s.scope);
-    };
-    const ctx = await lodiRun(f, f.owner.id, "monta o time");
-    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    return row?.id ?? "";
+  };
+  const grantsOn = async (fx: Fixture, handle: string, connectionId: string) => {
+    const [agent] = await fx.db.select().from(schema.agents).where(eq(schema.agents.handle, handle));
+    return (
+      await fx.db
+        .select()
+        .from(schema.agentScopes)
+        .where(eq(schema.agentScopes.agentId, agent?.id ?? ""))
+    )
+      .filter((s) => s.connectionId === connectionId)
+      .map((s) => s.scope);
+  };
+
+  test("an admin's team gets every connected app at Ler e escrever, as every agent has it", async () => {
+    f = await setup({ rightHand: true });
+    const github = await connectGithub(f);
+    const out = await call(f, await lodiRun(f, f.owner.id, "monta o time"), PROPOSE_TEAM_TOOL, TEAM);
     const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
     expect((await createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).card.state).toBe("created");
-    expect(await grants("iara")).toEqual(["connector:*"]);
-    await undoTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    expect(await grantsOn(f, "iara", github)).toEqual(["connector:*"]);
+  });
 
+  test("a member's team starts without access (ADR 0085 §5)", async () => {
+    f = await setup({ rightHand: true });
+    const github = await connectGithub(f);
     const member = await addMember(f.db, f.org.id, "member");
     const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
     await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [makers.id]);
-    const theirs = await call(f, await lodiRun(f, member.id, "monta o time"), PROPOSE_TEAM_TOOL, {
+    const out = await call(f, await lodiRun(f, member.id, "monta o time"), PROPOSE_TEAM_TOOL, {
       ...TEAM,
       weekly_check: false,
-      agents: TEAM.agents.map((a) => ({ ...a, handle: `${a.handle}2` })),
-      skills: [],
     });
-    const theirId = (theirs.data as { actionCard: { messageId: string } }).actionCard.messageId;
-    expect((await createTeam({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id, theirId)).card.state).toBe("created");
-    expect(await grants("iara2")).toEqual([]);
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    expect((await createTeam({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id, id)).card.state).toBe("created");
+    expect(await grantsOn(f, "iara", github)).toEqual([]);
   });
 
   test("a step that fails creates nothing: the card stays open and says which step", async () => {

@@ -360,6 +360,12 @@ describe("what people read of a notice", () => {
     expect(view({ agentHandles: "ivy", reason: "callable" })?.detail).toMatchObject({
       words: { key: "chat.notice.wakeSkippedCallable" },
     });
+    // No AI connected: who wasn't reached, with no audience words that would name the wrong cause.
+    expect(view({ agentHandles: "ivy", reason: "no_ai" })).toMatchObject({
+      key: "chat.notice.wakeSkipped",
+      values: { name: "Rex", agents: "Ivy" },
+      detail: null,
+    });
     // An older line that didn't keep whom: no names to say, nothing to open.
     expect(view({})).toMatchObject({ key: "chat.notice.wakeSkippedAnon", detail: null });
   });
