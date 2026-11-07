@@ -7,6 +7,7 @@ import {
   buildRunContext,
   changeMemberRole,
   createAgent,
+  createChannel,
   createOrganization,
   deleteAgent,
   drainOutbox,
@@ -191,6 +192,34 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(owner).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
   expect(member).toMatch(/@dev \(Dev\)[^\n]*% of its monthly budget used/);
   expect(member).not.toContain("US$");
+});
+
+test("called in a channel, its prompt holds no private channel, money or app: others read the reply", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const board = await createChannel(f.db, f.owner.id, f.org.id, { name: "diretoria", visibility: "private" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, board.id, { agentId: f.agent.id });
+  await f.db.insert(schema.connectorConnections).values({
+    orgId: f.org.id,
+    connector: "linear",
+    toolPrefix: "linear",
+    label: "Linear",
+    serverUrl: "https://linear.example.com/mcp",
+    authType: "none",
+  });
+  const prompt = (inDm: boolean) =>
+    rightHandPrompt({ db: f.db }, { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm });
+  const dm = await prompt(true);
+  expect(dm).toContain("#diretoria");
+  expect(dm).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
+  expect(dm).toContain("Apps connected: Linear.");
+  const channel = await prompt(false);
+  expect(channel).not.toContain("diretoria");
+  expect(channel).not.toContain("US$");
+  expect(channel).not.toContain("Linear");
+  expect(channel).toMatch(/@dev \(Dev\)[^\n]*in #general;[^\n]*% of its monthly budget used/);
+  expect(channel).not.toContain("An agent is in no channel");
 });
 
 test("its setup checklist names the workspace's context and a computer until they are there", async () => {

@@ -117,9 +117,12 @@ export async function rightHandPrompt(
           ),
         )
     : [];
-  const channelName = new Map(open.map((c) => [c.id, c.name]));
+  // In a channel others read the reply: only the channels everyone may see are named there.
+  const named = input.inDm ? open : open.filter((c) => c.visibility === "public");
+  const channelName = new Map(named.map((c) => [c.id, c.name]));
+  const seatsOf = (agentId: string) => seats.filter((s) => s.agentId === agentId);
   const channelsOf = (agentId: string) =>
-    seats.filter((s) => s.agentId === agentId).map((s) => `#${channelName.get(s.channelId)}`);
+    seatsOf(agentId).flatMap((s) => (channelName.has(s.channelId) ? [`#${channelName.get(s.channelId)}`] : []));
   const ai = deps.ai ? { db, ...deps.ai } : null;
   const [anyAi, aiStates] = ai
     ? await Promise.all([
@@ -137,8 +140,8 @@ export async function rightHandPrompt(
   const name = person[0]?.name ?? "this person";
   const owner = membership?.role === "owner";
 
-  // Money only for who may see usage (ADR 0063); anyone else reads how much of it is used.
-  const money = can(membership, "view_usage");
+  // Money only for who may see usage (ADR 0063), and only in their DM; anyone else reads how much of it is used.
+  const money = can(membership, "view_usage") && input.inDm;
   const agentLines = seen.map((a) => {
     const b = budgets.get(a.id);
     const used = b && b.budgetNanoUsd > 0 ? Math.round((b.spentNanoUsd / b.budgetNanoUsd) * 100) : 0;
@@ -146,7 +149,7 @@ export async function rightHandPrompt(
     return [
       `- @${a.handle} (${a.name})${a.role ? `, ${a.role}` : ""}`,
       `model ${a.model}${aiStates?.get(a.id)?.state === "no_ai" ? " (no AI: it can't answer)" : ""}`,
-      where.length ? `in ${where.join(", ")}` : "in no channel",
+      where.length ? `in ${where.join(", ")}` : seatsOf(a.id).length ? "in private channels only" : "in no channel",
       b
         ? money
           ? `budget ${usd(b.budgetNanoUsd)}/month${b.isDefault ? " (the default)" : ""}, ${used}% used`
@@ -180,7 +183,7 @@ export async function rightHandPrompt(
         ? `This workspace's computer isn't ready yet, so the agents can't browse or run code. Nobody sets it up: ${unpaid ? "it comes by itself once the plan is paid (Settings › Plan and billing)" : "it is on its way, and Settings › Computers shows how far it is"}.`
         : "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
       : "",
-    seen.some((a) => channelsOf(a.id).length === 0)
+    seen.some((a) => seatsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",
     seen.some((a) => {
@@ -210,10 +213,10 @@ export async function rightHandPrompt(
         .slice(0, SNAPSHOT_MAX)
         .map((p) => `${p.name}${p.handle ? ` (@${p.handle})` : ""}${p.role === "owner" ? ", owner" : ""}`)
         .join("; ")}.`,
-      open.length
-        ? `Channels they see: ${open.map((c) => `#${c.name} (${seats.filter((s) => s.channelId === c.id).length} members)`).join(", ")}.`
+      named.length
+        ? `${input.inDm ? "Channels they see" : "Public channels"}: ${named.map((c) => `#${c.name} (${seats.filter((s) => s.channelId === c.id).length} members)`).join(", ")}.`
         : "",
-      apps.length ? `Apps connected: ${apps.map((a) => a.label).join(", ")}.` : "",
+      apps.length && input.inDm ? `Apps connected: ${apps.map((a) => a.label).join(", ")}.` : "",
     ]
       .filter(Boolean)
       .join("\n"),
