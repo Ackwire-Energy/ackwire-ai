@@ -98,11 +98,20 @@ export async function accountSelfCheck(c: SelfCheck): Promise<string | null> {
     return err instanceof Error ? err.message : String(err);
   }
   if (underMaskedRoot(cli)) return `The Claude CLI is inside a folder its own view hides (${cli})`;
+  // Any version runs: the one installed only goes with a failure, so a report shows which CLI changed what.
   const version = /\d+\.\d+\.\d+/.exec(run(cli, [...pre, "--version"]).output)?.[0];
-  if (!version || Bun.semver.order(version, spec.minVersion) < 0 || Bun.semver.order(version, spec.maxVersion) > 0) {
-    return `Claude CLI ${version ?? "(no version)"} isn't one validated for this (${spec.minVersion} to ${spec.maxVersion})`;
-  }
+  const why = await probe(c, cli, pre, run, launcher);
+  return why && version ? `${why} (Claude CLI ${version})` : why;
+}
 
+/** The stand-in agent against the sign-in's user, then the network route. */
+async function probe(
+  c: SelfCheck,
+  cli: string,
+  pre: string[],
+  run: RunCommand,
+  launcher: typeof accountLauncher,
+): Promise<string | null> {
   const account = c.users.ensure(PROBE_ACCOUNT);
   c.users.room(account, PROBE_AGENT.uid);
   const view = launcher(account, PROBE_AGENT, path.join(agentHome(PROBE_AGENT.user), "probe"));

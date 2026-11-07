@@ -1,6 +1,6 @@
 # 0150. How each Claude connection signs in: kept per connection, chosen by the operator for new ones
 
-- Status: Accepted (2026-11-05; built: the runner, the engine, the operator API, the shared client, the web and the phone app)
+- Status: Accepted (2026-11-05; built: the runner, the engine, the operator API, the shared client, the web and the phone app). Amended 2026-11-07: Claude's own login for all agents runs on any Claude CLI version ("Not done")
 - Date: 2026-11-05
 - Extends: ADR 0041 (accounts per agent), ADR 0056 (operator API), ADR 0059 (AI accounts belong to people)
 - Amends: ADR 0059 §2 (the method a Claude sign-in for all agents uses is per connection and chosen by the operator for new ones; an unchecked status is not signed out), ADR 0056 §4 (the Claude sign-in policy and the AI-accounts reads) and §5 (`account.failure`, a failed `run.finished`'s `failure`)
@@ -54,7 +54,9 @@ The policy is the switch: `setup_token` (or no workspaces listed) makes every ne
 
 ## Not done
 
-Claude's own login for a sign-in made for all agents where each agent is its own OS user is built and stays off: nothing validated it on a real machine yet, so no runner lists it unless told to. Its runner config switch (`claudeSharedLogin`: the CLI versions that passed, and the refresh mode) has no default, and with it set `hello.claudeLoginMethods` gains `cli_login` only while a self-check passes, at start and every 6 hours (`account-check.ts`). Without that the server refuses a new sign-in whose effective method would need it (`account.method_unsupported`), and the one-agent sign-in lent to that agent's user stays as it is.
+Claude's own login for a sign-in made for all agents where each agent is its own OS user is built and stays off: nothing validated it on a real machine yet, so no runner lists it unless told to. Its runner config switch (`claudeSharedLogin`: the refresh mode) has no default, and with it set `hello.claudeLoginMethods` gains `cli_login` only while a self-check passes, at start and every 6 hours (`account-check.ts`). Without that the server refuses a new sign-in whose effective method would need it (`account.method_unsupported`), and the one-agent sign-in lent to that agent's user stays as it is.
+
+*Amended 2026-11-07:* the switch no longer carries a range of CLI versions (`minVersion`, `maxVersion`, still read and ignored in older configs, so they read the same as new ones and nothing restarts over them). The self-check runs with whatever Claude CLI is installed and never fails on its version. When it fails for another reason, the reason names that version, and the server sends it to error reports (ADR 0104) once per computer and reason, tagged with the workspace, the computer and its runner's version.
 
 What exists, behind that switch (runner protocol 51, `CLAUDE_SHARED_PROTOCOL`):
 
@@ -67,7 +69,7 @@ What exists, behind that switch (runner protocol 51, `CLAUDE_SHARED_PROTOCOL`):
 
 What the people connecting see doesn't change: Connect Claude, authorize, connected. The method stays the operator's (§2), never a choice in the apps.
 
-What still needs a real Linux machine (Debian 13, the guard in namespace mode and in host mode), before any runner config sets the switch: the CLI's refresh under concurrent processes on one store, and whether its version needs refresh mode B; that no probe through a delegated tool, a prompt or a planted file reaches the store; the mount view with each CLI version; fidelity of the delegated tools against the native ones over real coding tasks; urgent steering and interrupts on long commands; and egress of the CLI through the auth route inside an agent's network namespace, which needs the guard to route `agentes-auth` there first. Until those pass, setup-token stays the method everywhere.
+What still needs a real Linux machine (Debian 13, the guard in namespace mode and in host mode), before any runner config sets the switch: the CLI's refresh under concurrent processes on one store, and whether it needs refresh mode B; that no probe through a delegated tool, a prompt or a planted file reaches the store; the mount view; fidelity of the delegated tools against the native ones over real coding tasks; urgent steering and interrupts on long commands; and egress of the CLI through the auth route inside an agent's network namespace, which needs the guard to route `agentes-auth` there first. Until those pass, setup-token stays the method everywhere.
 
 ## Consequences
 

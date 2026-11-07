@@ -68,6 +68,10 @@ const OrgClaudeAuth = z
         supportsSelected: z.boolean().openapi({
           description: "It can use the method the policy gives it now; else such a sign-in there is refused.",
         }),
+        claudeLoginBlocked: z.string().nullable().openapi({
+          description:
+            "Why its runner's last self-check keeps Claude's own login for all agents off there, as the runner said when it last connected. Null when it can use the policy's method, or the runner didn't say: its check is still running, the switch hasn't reached it, it's offline or older.",
+        }),
       }),
     ),
   })
