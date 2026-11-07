@@ -2732,7 +2732,7 @@ test.if(posix)(
     expect(hellos(off.sockets)[0]).not.toHaveProperty("claudeLoginBlocked");
     await off.daemon.stop();
 
-    const on = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" };
+    const on = { refresh: "A" };
     const passed = await run(on, null);
     await waitFor(
       () => hellos(passed.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
@@ -2778,16 +2778,17 @@ function sharedLoginDaemon() {
     agentUidRange: [21000, 21099],
     access: STATE.access,
   } as StoredConfig;
-  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  const claudeSharedLogin = { refresh: "A" as const };
   writeConfig({ ...config, claudeSharedLogin }, home);
   const sockets: FakeSocket[] = [];
   const events: string[] = [];
   const checks: ((verdict: string | null) => void)[] = [];
+  const logs: string[] = [];
   const daemon = new RunnerDaemon({
     probeEgress: async () => null,
     home,
     mode: "start",
-    log: () => {},
+    log: (line) => void logs.push(line),
     executors: () => ({}),
     self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
     caffeinate: false,
@@ -2822,7 +2823,7 @@ function sharedLoginDaemon() {
     s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
     return s;
   };
-  return { home, config, claudeSharedLogin, daemon, sockets, events, checks, lists, online };
+  return { home, config, claudeSharedLogin, daemon, sockets, events, checks, logs, lists, online };
 }
 
 test.if(posix)(
@@ -2844,9 +2845,22 @@ test.if(posix)(
       d.online().frame({ type: "agents", agents: [{ ...ANA, account: SHARED_LOGIN }] });
       expect(keep).toHaveBeenLastCalledWith(SHARED_LOGIN, undefined, ANA.id);
 
-      // A narrower range: the pass was for the last one, and nothing runs on it until this one's answer.
-      const narrow = { ...claudeSharedLogin, maxVersion: "2.1.305" };
-      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      // The same switch with a version range an older guard still writes: no change, nothing stopped or asked again.
+      writeConfig(
+        {
+          ...config,
+          claudeSharedLogin: { minVersion: "2.1.300", maxVersion: "2.1.320", ...claudeSharedLogin } as never,
+        },
+        home,
+      );
+      await waitFor(() => d.logs.includes("config.json changed; applying it"), 5000);
+      expect(checks).toHaveLength(1);
+      expect(d.events).not.toContain("stop");
+      expect(methods()).toEqual(["setup_token", "cli_login"]);
+
+      // Another refresh mode: the pass was for the last switch, and nothing runs on it until this one's answer.
+      const modeB = { refresh: "B" as const, refreshLock: ".refresh.lock" };
+      writeConfig({ ...config, claudeSharedLogin: modeB }, home);
       await waitFor(() => checks.length === 2, 5000);
       expect(methods()).toEqual(["setup_token"]);
       expect(keep).toHaveBeenLastCalledWith(null, [], ANA.id);
@@ -2863,7 +2877,7 @@ test.if(posix)(
       writeConfig({ ...config, claudeSharedLogin }, home);
       await waitFor(() => checks.length === 3, 5000);
       expect(methods()).toEqual(["setup_token"]);
-      writeConfig({ ...config, claudeSharedLogin: narrow }, home);
+      writeConfig({ ...config, claudeSharedLogin: modeB }, home);
       await waitFor(() => checks.length === 4, 5000);
       checks[2]?.(null);
       await new Promise((r) => setTimeout(r, 20));
@@ -2936,7 +2950,7 @@ test.if(posix)("the login switch going away stops that login's running CLIs, and
     mode: "system",
     agentUidRange: [21000, 21099],
   } as StoredConfig;
-  const claudeSharedLogin = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+  const claudeSharedLogin = { refresh: "A" as const };
   writeConfig({ ...config, claudeSharedLogin }, home);
   const stopped: number[] = [];
   const daemon = new RunnerDaemon({
@@ -2996,7 +3010,7 @@ test.if(posix)(
         mode: "system",
         agentUidRange: [21000, 21099],
         access: STATE.access,
-        claudeSharedLogin: { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" },
+        claudeSharedLogin: { refresh: "A" },
       } as StoredConfig,
       home,
     );
@@ -4548,7 +4562,7 @@ test("a worker that answers no host for a task on a shared CLI login fails the s
 test.if(posix)("refresh mode B: a CLI starts only once the lock's name is gone", async () => {
   const t = setup();
   const h = hosted(t, {
-    shared: () => ({ minVersion: "2.1.0", maxVersion: "2.2.0", refresh: "B", refreshLock: ".lock" }),
+    shared: () => ({ refresh: "B", refreshLock: ".lock" }),
   });
   mkdirSync(path.join(h.store, "config"), { recursive: true });
   const lock = path.join(h.store, "config", ".lock");

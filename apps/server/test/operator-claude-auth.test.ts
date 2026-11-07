@@ -37,7 +37,7 @@ beforeAll(async () => {
         orgId: ada,
         name: "Box",
         protocol: CLAUDE_AUTH_PROTOCOL,
-        executors: { mode: "system", claudeLoginMethods: ["setup_token"] },
+        executors: { mode: "system", claudeLoginMethods: ["setup_token"], claudeLoginBlocked: "Bash is missing" },
       },
       { orgId: ada, name: "Old box", protocol: CLAUDE_AUTH_PROTOCOL - 1, executors: { mode: "system" } },
       { orgId: ada, name: "Mac", protocol: CLAUDE_AUTH_PROTOCOL, executors: { claudeLoginMethods: ["cli_login"] } },
@@ -120,6 +120,7 @@ test("the policy: setup-token by default, set for the listed workspaces, the sam
         protocol: CLAUDE_AUTH_PROTOCOL,
         claudeLoginMethods: ["setup_token"],
         supportsSelected: false,
+        claudeLoginBlocked: "Bash is missing",
       },
       {
         id: machineIds.old,
@@ -128,6 +129,7 @@ test("the policy: setup-token by default, set for the listed workspaces, the sam
         protocol: CLAUDE_AUTH_PROTOCOL - 1,
         claudeLoginMethods: ["setup_token"],
         supportsSelected: false,
+        claudeLoginBlocked: null,
       },
       {
         id: machineIds.own,
@@ -136,6 +138,7 @@ test("the policy: setup-token by default, set for the listed workspaces, the sam
         protocol: CLAUDE_AUTH_PROTOCOL,
         claudeLoginMethods: ["cli_login"],
         supportsSelected: true,
+        claudeLoginBlocked: null,
       },
     ],
   });
@@ -143,6 +146,14 @@ test("the policy: setup-token by default, set for the listed workspaces, the sam
   expect(other).toMatchObject({ effective: { method: "setup_token" }, machines: [] });
 
   await ok(await call("PUT", "/claude-auth", { method: "setup_token", rollout: "selected", orgIds: [] }));
+  // Back on setup-token, a reason the runner stored for Claude's own login no longer applies.
+  const back = await ok<{ machines: { name: string; supportsSelected: boolean; claudeLoginBlocked: unknown }[] }>(
+    await call("GET", `/orgs/${ada}/claude-auth`),
+  );
+  expect(back.machines.find((m) => m.name === "Box")).toMatchObject({
+    supportsSelected: true,
+    claudeLoginBlocked: null,
+  });
 });
 
 test("refusals: a bad body, too many workspaces, one that doesn't exist; an unknown workspace's view is a 404", async () => {

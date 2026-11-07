@@ -569,6 +569,11 @@ export function createMachineHub(deps: MachineHubDeps) {
     // In single-user mode the agents' own code runs as the runner's user and can send any hello: system mode
     // is believed only from a computer's first hello, and from one that has said so ever since.
     const system = frame.mode === "system" && (machine.lastSeenAt === null || machine.executors?.mode === "system");
+    // A runner whose self-check hasn't finished (it just started) lists neither `cli_login` nor a reason: the last
+    // reason stands until a check passes, so a restart doesn't report the same failure again.
+    const loginBlocked =
+      frame.claudeLoginBlocked ??
+      (frame.claudeLoginMethods?.includes("cli_login") ? undefined : machine.executors?.claudeLoginBlocked);
     await db
       .update(machines)
       .set({
@@ -606,7 +611,7 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
                 ...(frame.claudeLoginMethods ? { claudeLoginMethods: frame.claudeLoginMethods } : {}),
-                ...(frame.claudeLoginBlocked ? { claudeLoginBlocked: frame.claudeLoginBlocked } : {}),
+                ...(loginBlocked ? { claudeLoginBlocked: loginBlocked } : {}),
                 ...(frame.authEgressGroup ? { authEgressGroup: true as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
               },
@@ -658,6 +663,20 @@ export function createMachineHub(deps: MachineHubDeps) {
     if (frame.browser?.chromeMissing && !machine.executors?.browser?.chromeMissing) {
       await chromeWentMissing(machine, frame).catch((error) =>
         deps.log?.warn("missing Chrome notice failed", { machineId: machine.id, error: String(error) }),
+      );
+    }
+    // Claude's own login for all agents runs on whatever Claude CLI is installed: a self-check that starts failing
+    // (or fails for a new reason) is how a CLI that changed shows up. Once per reason, however often it reconnects.
+    if (frame.claudeLoginBlocked && frame.claudeLoginBlocked !== machine.executors?.claudeLoginBlocked) {
+      deps.errors?.capture(
+        new Error(`Claude's login for all agents failed the computer's self-check: ${frame.claudeLoginBlocked}`),
+        {
+          org_id: machine.orgId,
+          machine_id: machine.id,
+          machine_kind: machine.kind,
+          runner_version: frame.version,
+          runner_protocol: frame.protocol,
+        },
       );
     }
     // Protocol 9: the agents that use this computer, for the desktop app.
