@@ -508,9 +508,9 @@ export const envVars = {
   LOCAL_SPEECH_URL: {
     schema: z.url().optional(),
     description:
-      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): Speaches, a local Whisper or Parakeet. The audio stays with you.",
+      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): the compose file's `speech` profile (Parakeet, at `http://speech:8000/v1`), Speaches or a local Whisper. The audio stays with you.",
     section: "Chat",
-    example: "http://whisper:8000/v1",
+    example: "http://speech:8000/v1",
   },
   LOCAL_SPEECH_MODEL: {
     schema: z.string().optional(),

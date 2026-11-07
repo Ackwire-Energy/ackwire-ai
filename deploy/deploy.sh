@@ -19,7 +19,11 @@
 # disk alone, so the script refuses to deploy without S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and
 # S3_SECRET_ACCESS_KEY. Set them before the first upload: files already on the disk are not moved to
 # the bucket, and the app stops finding them once it is set. A test server that keeps its files on its disk
-# on purpose says so with FILES_ON_DISK=accepted in .env. For the workflow,
+# on purpose says so with FILES_ON_DISK=accepted in .env. With the speech profile, .env sets
+# AGENTES_SPEECH_IMAGE=agentes-speech:current, which this script builds from deploy/speech when that
+# folder changed; the speech service is optional, so it never holds a deploy or a rollback: an image
+# that doesn't build, or a service that doesn't start, leaves voice messages to the next engine in
+# SPEECH_ENGINES. For the workflow,
 # the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
@@ -27,7 +31,7 @@
 #
 # Back by hand to the version that ran before the current one (one step; the next deploy moves on):
 #   git checkout --quiet --detach refs/deploy/previous && docker tag agentes:previous agentes:current
-#   docker compose up --detach --wait
+#   docker compose up --detach --wait $(docker compose config --services | grep -vx speech)
 set -euo pipefail
 
 main() {
@@ -112,15 +116,17 @@ main() {
   current=$(docker image inspect --format '{{.Id}}' agentes:current 2>/dev/null || true)
   next=$(docker image inspect --format '{{.Id}}' agentes:next)
   docker tag agentes:next agentes:current
+  local services
+  mapfile -t services < <(docker compose config --services | grep -vx speech)
   # Past the image's health check start period (120 s, Dockerfile): a slow boot isn't a broken version.
-  if ! docker compose up --detach --wait --wait-timeout 150; then
+  if ! docker compose up --detach --wait --wait-timeout 150 "${services[@]}"; then
     docker compose logs --no-color --tail 50 agentes >&2 || true
     echo "deploy: ${target:0:7} is not healthy, going back to ${previous:0:7}" >&2
     git checkout --quiet --detach "$previous"
     if [[ -n $current ]]; then
       docker tag "$current" agentes:current
     fi
-    docker compose up --detach --wait --wait-timeout 150 || echo "deploy: the rollback is not healthy either" >&2
+    docker compose up --detach --wait --wait-timeout 150 "${services[@]}" || echo "deploy: the rollback is not healthy either" >&2
     return 1
   fi
   trap - ERR
@@ -128,6 +134,18 @@ main() {
   if [[ -n $current && $current != "$next" ]]; then
     docker tag "$current" agentes:previous
     git update-ref refs/deploy/previous "$previous"
+  fi
+  # The speech service, once the app is live: built again only when deploy/speech changed (the image's
+  # label says), and not waited for, since its models load while the next engine answers.
+  local speech
+  if docker compose config --services | grep -x speech >/dev/null && speech=$(git rev-parse HEAD:deploy/speech 2>/dev/null); then
+    if [[ $(docker image inspect --format '{{index .Config.Labels "agentes.speech"}}' agentes-speech:current 2>/dev/null) != "$speech" ]]; then
+      echo "deploy: building the speech image (about 1 GB of models the first time)"
+      docker build --quiet --label "agentes.speech=$speech" --tag agentes-speech:current deploy/speech >/dev/null ||
+        echo "deploy: the speech image didn't build; voice messages go to the next engine until a deploy builds it" >&2
+    fi
+    docker compose up --detach speech >/dev/null 2>&1 ||
+      echo "deploy: the speech service didn't start; voice messages go to the next engine" >&2
   fi
   docker image prune --force >/dev/null
   docker builder prune --force --filter until=24h >/dev/null

@@ -34,7 +34,7 @@ describe("providers", () => {
       "https://api.assemblyai.com/v2/transcript/t1",
       "https://api.assemblyai.com/v2/transcript/t1",
     ]);
-    expect(json(f.calls[1])).toMatchObject({ language_code: "pt", keyterms_prompt: ["Ada", "Theo"] });
+    expect(json(f.calls[1])).toMatchObject({ keyterms_prompt: ["Ada", "Theo"] });
   });
 
   test("AssemblyAI reads no speech as an empty answer", async () => {
@@ -77,6 +77,47 @@ describe("providers", () => {
       expect(f.calls[0]?.url).toBe(url);
       expect(form(f.calls[0]).get("prompt")).toBe("Ada, Theo");
     }
+  });
+
+  test("the app's language goes only where it is a hint: every other engine hears the language in the audio", async () => {
+    // Someone with the app in English may speak Portuguese, and Whisper takes `language` as an order.
+    for (const [provider, credentials, field] of [
+      ["groq", { apiKey: "key" }, "language"],
+      ["openai", { apiKey: "key" }, "language"],
+      ["local", { baseUrl: "http://speech/v1" }, "language"],
+      ["elevenlabs", { apiKey: "key" }, "language_code"],
+    ] as const) {
+      const f = fake(Response.json({ text: "oi" }));
+      await createSpeechEngine(provider, credentials, options(f))?.file(input);
+      expect(form(f.calls[0]).get(field)).toBeNull();
+    }
+    const assembly = fake(
+      Response.json({ upload_url: "u" }),
+      Response.json({ id: "t1" }),
+      Response.json({ status: "completed" }),
+    );
+    await createSpeechEngine("assemblyai", { apiKey: "key" }, options(assembly))?.file(input);
+    expect(json(assembly.calls[1]).language_code).toBeUndefined();
+    const soniox = fake(
+      Response.json({ id: "f1" }),
+      Response.json({ id: "t1" }),
+      Response.json({ status: "completed" }),
+    );
+    await createSpeechEngine("soniox", { apiKey: "key" }, options(soniox))?.file(input);
+    expect(json(soniox.calls[1]).language_hints).toEqual(["pt"]);
+  });
+
+  test("a server of one's own that says a language isn't for it is refused at once, so the next engine tries", async () => {
+    const notForMe = Response.json(
+      { error: { message: "Parakeet doesn't know this language (it heard ja)", code: "unsupported_language" } },
+      { status: 422 },
+    );
+    const f = fake(notForMe);
+    const error = await createSpeechEngine("local", { baseUrl: "http://speech/v1" }, options(f))
+      ?.file(input)
+      .catch((e: unknown) => e);
+    expect((error as SpeechError).reason).toBe("refused");
+    expect(f.calls).toHaveLength(1);
   });
 
   test("a server of one's own is told the workspace and its key; a provider is never told the workspace", async () => {

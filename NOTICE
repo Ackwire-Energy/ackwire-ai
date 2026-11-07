@@ -39,6 +39,10 @@ Third-party software keeps its own license. The license texts are next to what t
   apps/web/test/fixtures/agent-import.
 - Packages installed from npm and crates.io: the license in each package. The container
   image is built on the oven/bun image (Debian and Bun), whose parts keep their licenses.
+- deploy/speech: the speech image (the compose file's speech profile) holds NVIDIA's Parakeet TDT
+  0.6B v3 (CC BY 4.0) and OpenAI's Whisper tiny (MIT), as ONNX exports by others; deploy/speech/
+  NOTICE credits them and goes into the image. It is built on the python image (Debian, with its
+  ffmpeg) and Python packages from PyPI, each keeping its license.
 
 Every mark and logo listed here is a trademark of its owner, used only to name its product or
 service; none of these licenses grants trademark rights.

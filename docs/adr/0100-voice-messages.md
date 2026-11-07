@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-31
-- Code: `packages/adapters/src/speech.ts`, `packages/engine/src/speech-settings.ts`, `packages/engine/src/voice.ts`, `packages/db/src/schema/voice.ts`, `apps/server/src/routes/app/voice.ts`
+- Code: `packages/adapters/src/speech.ts`, `packages/engine/src/speech-settings.ts`, `packages/engine/src/voice.ts`, `packages/db/src/schema/voice.ts`, `apps/server/src/routes/app/voice.ts`, `deploy/speech/server.py`
 
 ## Context
 
@@ -52,3 +52,34 @@ On agentes.chat's servers only: a person and a workspace have a number of minute
 
 - Recordings hold people's voices and go to the chosen provider; `SELF_HOSTING.md` says so, and a server of one's own keeps them in.
 - Agents aren't told yet that a message was spoken: a change to their prompt needs an eval first.
+
+## Addendum (2026-11-07): Parakeet on our own server, the language heard in the audio
+
+**The decision.** agentes.chat's Cloud turns voice into text on its own production server: NVIDIA's Parakeet TDT 0.6B v3
+(int8, on ONNX Runtime) in the compose file's `speech` profile (`deploy/speech`), with `SPEECH_ENGINES=local,groq`. When
+that service is busy, down, or not for the language spoken, Groq's `whisper-large-v3-turbo` takes the recording, the
+cheapest hosted engine ($0.04 an audio hour, billed for 10 s at least). No model runs on the workspaces' computers,
+which are the agents' to work on. Published measurements on 2 vCPUs give Parakeet about 6 s per minute of audio, about
+3 s end to end for a short note, and 1.2 to 1.8 GB of memory; our own server's numbers come from a benchmark run there.
+
+**The language comes from the audio.** The apps send their interface language, and someone with the app in English may
+speak Portuguese. Engines that detect the language themselves (Groq, OpenAI, AssemblyAI, ElevenLabs and our own server)
+no longer get it: Whisper takes `language` as an order, so the words came out wrong or translated. Soniox still gets it,
+as `language_hints`, which is a hint. Our server never reads it: Whisper tiny guesses the language from the first 30 s,
+and when the shares of Parakeet's 25 European languages add up to `SPEECH_LANGUAGE_MIN` (0.7) or more, Parakeet
+transcribes; it detects which of them by itself. Anything else, or a guess that unsure, answers 422
+`unsupported_language`, which the adapter reads as `refused`: the next engine tries at once, in the same attempt, and
+with no next engine the message goes out as audio with no words, as for any refusal. Parakeet takes no prompt, so the
+workspace's names don't steer it as they steer Whisper.
+
+**The overflow.** The service runs `SPEECH_WORKERS` recordings at once (2) on `SPEECH_THREADS` threads each (2; one
+alone gets them all), within `SPEECH_CPUS` (4) and `SPEECH_MEMORY` (4 GB). Up to `SPEECH_QUEUE` (4) more wait, each at
+most `SPEECH_WAIT_SECONDS` (3); past that, or past the queue, it answers 503 and the next engine takes the recording,
+so nothing waits behind a long one. A server that answers 500, or nothing within half a minute plus twice the
+recording, counts as busy the same way. When the next engine fails too, the job retries as before.
+
+**Optional, everywhere.** The service is on an internal network the app alone reaches, so the audio never leaves the
+machine, and the image carries its models, pinned by revision and sha256 (`deploy/speech/models.txt`, credits in
+`deploy/speech/NOTICE`). `deploy/deploy.sh` builds and starts it after the app is live and never waits for it, so a
+speech image that doesn't build or a service that doesn't start never holds a deploy or a rollback. Self-hosted servers
+turn on the same profile, with the image each release publishes (SELF_HOSTING.md, Voice messages).

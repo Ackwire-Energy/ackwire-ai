@@ -146,6 +146,30 @@ describe("sending", () => {
     await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
     expect((await messageOf(clipId))?.body).toBe("oi");
   });
+
+  test("a server of one's own that says the language isn't for it hands over at once, with no retry", async () => {
+    f = await setup();
+    // The speech service answers 422 for a language Parakeet doesn't know, which the adapter reads as refused.
+    const own = engine(new SpeechError("refused", "The speech server answered 422: unsupported_language"));
+    const next = engine("こんにちは");
+    const deps = voiceDeps([own, next]);
+    const { clipId } = await accept(deps);
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await messageOf(clipId))?.body).toBe("こんにちは");
+    expect([own.sent.length, next.sent.length]).toEqual([1, 1]);
+  });
+
+  test("when the next engine fails too, the recording waits for a retry as before", async () => {
+    f = await setup();
+    const notForMe = () => new SpeechError("refused", "The speech server answered 422: unsupported_language");
+    const busy = () => new SpeechError("busy", "Groq answered 503");
+    const deps = voiceDeps([engine(notForMe(), notForMe()), engine(busy(), busy())]);
+    const { clipId } = await accept(deps);
+    await expect(transcribeVoiceClip(deps, clipId, { finalAttempt: false })).rejects.toBeInstanceOf(SpeechError);
+    expect((await clipOf(clipId)).status).toBe("pending");
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: true });
+    expect(voiceOf((await messageOf(clipId))?.meta)?.noWords).toBe(true);
+  });
 });
 
 describe("when there are no words", () => {
