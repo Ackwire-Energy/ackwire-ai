@@ -413,7 +413,7 @@ export function useBrowserHandoffActions(orgId: string) {
     /** Not in `pending`, as `open`: the browser may take a while to come back. */
     restart: (agentId: string) => m.restart.mutateAsync(agentId),
     /** Not in `pending`: a page may take a while to open, and the rest stays usable meanwhile. */
-    open: (agentId: string, url: string) => m.open.mutateAsync({ agentId, url }),
+    open: (agentId: string, url: PageTarget) => m.open.mutateAsync({ agentId, url }),
     opening: m.open.isPending,
     pending:
       m.takeControl.isPending ||

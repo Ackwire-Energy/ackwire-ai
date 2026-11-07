@@ -1,4 +1,4 @@
-import type { BrowserFrameMetadata } from "./live";
+import { type BrowserFrameMetadata, isBrowserDevice } from "./live";
 
 /**
  * A live view frame as bytes, as the frame socket brings it (ADR 0040 §7.1): a version byte (1), the header's length
@@ -43,6 +43,7 @@ export function decodeBrowserFrameBytes(data: ArrayBuffer | Uint8Array<ArrayBuff
       ...(num(m.capturedAt) ? { capturedAt: m.capturedAt } : {}),
       ...(typeof m.url === "string" ? { url: m.url } : {}),
       ...(typeof m.title === "string" && m.title ? { title: m.title } : {}),
+      ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
     },
     jpeg: bytes.subarray(5 + length),
   };

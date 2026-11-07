@@ -342,6 +342,41 @@ describe("Notificações", () => {
     expect(document.querySelector('[data-n="n-rx"]')).toBeNull();
   });
 
+  test("a body the server wrote reads in the person's language, in the row and in the snooze toast", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    state.notifications = [
+      notification({
+        id: "n-noai",
+        kind: "mention",
+        actors: [{ type: "agent", id: ADA_ID }],
+        source: { channelId: ENG_ID, label: "engenharia" },
+        latest: {
+          text: "I can't answer yet: I have no AI connected.",
+          meta: { bodyCode: "no_ai", noAi: { reason: "none" } },
+        },
+        updatedAt: ago(5),
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(8);
+    const said = "Ainda não consigo responder: não tenho uma IA conectada.";
+    const row = document.querySelector('[data-n="n-noai"]') as HTMLElement;
+    expect(row.textContent).toContain(said);
+    expect(row.textContent).not.toContain("I can't answer");
+    const later = within(row).getByRole("button", { name: "Lembrar depois" });
+    later.focus();
+    await act(async () => {
+      fireEvent.keyDown(later, { key: "Enter" });
+      fireEvent.keyUp(later, { key: "Enter" });
+    });
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: /Amanhã às 9h/ }));
+    await settle(4);
+    expect(document.body.textContent).toContain(said);
+    expect(document.body.textContent).not.toContain("I can't answer");
+  });
+
   test("Lembrar depois, then Desfazer brings it back (snooze with until null)", async () => {
     const { state } = await go();
     const row = document.querySelector('[data-n="n-rx"]') as HTMLElement;
@@ -468,6 +503,28 @@ describe("someone gave an agent the person's plan (ADR 0059 §3)", () => {
       [ORG_ID, "acct_wes", undefined],
     ]);
     expect(document.body.textContent).toContain("Seu plano voltou");
+  });
+});
+
+describe("an agent's model left its plan's list", () => {
+  test("which model, which plan, what runs now; Escolher outro modelo opens the agent's Quem pensa", async () => {
+    const dropped = notification({
+      id: "n-dropped",
+      kind: "plan_model_dropped",
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { agentId: ADA_ID, label: "Ada" },
+      latest: { title: "DeepSeek V4.1 Flash", plan: "OpenCode Go", nowModel: "MiniMax M3" },
+      updatedAt: ago(3),
+    });
+    const { router } = await go(seedState({ notifications: [dropped] }));
+    const row = document.querySelector('[data-n="n-dropped"]') as HTMLElement;
+    expect(row.textContent).toContain(
+      "O DeepSeek V4.1 Flash saiu do OpenCode Go. Ada está usando o MiniMax M3 até você escolher outro modelo.",
+    );
+    await click(within(row).getByRole("button", { name: "Escolher outro modelo" }));
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+    expect(screen().getByRole("dialog", { name: "Quem pensa" })).toBeTruthy();
   });
 });
 

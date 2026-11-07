@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { getPriority } from "node:os";
 import path from "node:path";
 import {
   type AgentScope,
@@ -652,7 +653,9 @@ describe("protocol 25: the screen's text", () => {
     const t = withTesseract("  Banco Exemplo\nSenha: ******  \n");
     const reply = await t.manager.text(AGENT);
     expect(reply).toEqual({ text: "Banco Exemplo\nSenha: ******" });
-    expect(t.runs()).toEqual(["19 stdin stdout -l eng+por"]);
+    // `nice -n 19` adds to this process's own niceness, clamped at the OS floor (19 on Linux, 20 on macOS).
+    const lowest = Math.min(getPriority() + 19, process.platform === "darwin" ? 20 : 19);
+    expect(t.runs()).toEqual([`${lowest} stdin stdout -l eng+por`]);
     expect(t.input()).toBe("not really a jpeg");
     // A capture, never a look: the agent's refs and last look stay as they were.
     expect(t.requests().map((r) => r.op)).toEqual(["hello", "capture"]);

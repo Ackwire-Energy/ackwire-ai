@@ -480,8 +480,6 @@
     "camera": "Камера",
     "photos": "Фото",
     "file": "Файл",
-    "audio": "Аудио",
-    "audioSoon": "Аудио скоро появится.",
     "noCamera": "Нет доступа к камере. Разрешите его в настройках телефона.",
     "mission": "Начать миссию",
     "missionHint": "Долгая работа по плану, от начала до конца",
@@ -778,6 +776,7 @@
   },
   "activity": {
     "title": "Активность",
+    "chooseModel": "Выбрать другую модель",
     "filter": {
       "all": "Все",
       "waiting": "Ждёт вас",
@@ -964,6 +963,10 @@
       "plan_lent_female_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
       "plan_lent_female_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
       "plan_lent_female_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_model_dropped_one": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_few": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_many": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
+      "plan_model_dropped_other": "{{model}} больше нет в {{plan}}. {{names}} пока использует {{runs}}",
       "connector_tool_changed_one": "Подключённый сервер изменил одобренные вами инструменты",
       "connector_tool_changed_few": "Подключённый сервер изменил одобренные вами инструменты",
       "connector_tool_changed_many": "Подключённый сервер изменил одобренные вами инструменты",

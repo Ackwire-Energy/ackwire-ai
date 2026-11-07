@@ -381,7 +381,7 @@ describe("Canal", () => {
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.closest("article")?.textContent).toContain("Ada");
     expect(card.textContent).toContain("Preciso do seu ok para seguir:");
-    expect(card.textContent).toContain("Merge PR #42 into main");
+    expect(card.textContent).toContain("Fazer um merge");
     // Its text isn't repeated above it ("Pedido de aprovação: …").
     expect(card.closest("article")?.querySelector(".ac-msg__text")).toBeNull();
     expect(within(card).getByRole("button", { name: "Agora não" })).toBeTruthy();
@@ -389,8 +389,8 @@ describe("Canal", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
     const done = screen().getByRole("group", { name: "Aprovação concluída" });
-    expect(done.textContent).toContain("Aprovado por você: Merge PR #42 into main");
-    expect(done.querySelector(".rq-done__text b")?.textContent).toBe("Merge PR #42 into main");
+    expect(done.textContent).toContain("Aprovado por você: Fazer um merge");
+    expect(done.querySelector(".rq-done__text b")?.textContent).toBe("Fazer um merge");
     expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     // Nothing behind the line: no reason to show.
     expect(within(done).queryByRole("button")).toBeNull();
@@ -427,7 +427,7 @@ describe("Canal", () => {
       const bar = document.querySelector(".ac-typing") as HTMLElement;
       expect(bar.hasAttribute("data-ask")).toBe(true);
       expect(bar.textContent).toContain("Ada espera sua aprovação");
-      expect(bar.textContent).toContain("Merge PR #42 into main");
+      expect(bar.textContent).toContain("Fazer um merge");
       await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Ver" })));
       expect(card.classList.contains("rq--flash")).toBe(true);
       // Ada at work meanwhile: the line still says the request, and keeps her stop at its end.
@@ -450,11 +450,12 @@ describe("Canal", () => {
     try {
       const state = seedState();
       const merge = state.approvals.find((a) => a.id === "ap-merge");
-      if (merge) merge.title = "Merge <b>PR</b> #42";
+      if (merge)
+        Object.assign(merge, { tool: "request_approval", params: { action: "merge", target: "<b>PR</b> #42" } });
       await open(state);
       await settle(2);
       const line = document.querySelector(".ac-typing__text") as HTMLElement;
-      expect(line.textContent).toBe("Ada espera sua aprovação · Merge <b>PR</b> #42");
+      expect(line.textContent).toBe("Ada espera sua aprovação · Fazer merge de <b>PR</b> #42");
       // Only the agent's name is bold.
       expect(Array.from(line.querySelectorAll("b"), (b) => b.textContent)).toEqual(["Ada"]);
     } finally {
@@ -492,7 +493,7 @@ describe("Canal", () => {
     await open(state);
     await settle(2);
     const line = screen().getByRole("group", { name: "Pedido recusado" });
-    expect(line.textContent).toContain("Recusado por você: Merge PR #42 into main");
+    expect(line.textContent).toContain("Recusado por você: Fazer um merge");
     expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
     expect(line.textContent).not.toContain("Falta a revisão.");
     const see = within(line).getByRole("button", { name: "Ver detalhes" });
@@ -512,7 +513,7 @@ describe("Canal", () => {
     await open(state);
     await settle(2);
     const line = screen().getByRole("group", { name: "Pedido cancelado" });
-    expect(line.textContent).toContain("Cancelado: Merge PR #42 into main");
+    expect(line.textContent).toContain("Cancelado: Fazer um merge");
     expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
   });
 

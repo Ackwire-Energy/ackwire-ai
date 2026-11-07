@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
@@ -103,8 +103,6 @@ export const AGENT_STATUS_TEXT_MAX = 100;
 /** The longest an agent's status may outlive its run. */
 export const AGENT_STATUS_MAX_MS = 24 * 3600_000;
 
-/** How far back an agent's last run is looked for ("active 3 days ago"). */
-const ACTIVITY_LOOKBACK_MS = 7 * 24 * 3600_000;
 const ACTIVE = ["queued", "running"] as const;
 const WAITING = ["waiting_approval", "waiting_input"] as const;
 
@@ -141,7 +139,7 @@ export async function loadAgentStatuses(
   if (ids?.length === 0) return [];
   const ofAgents = ids ? [inArray(agents.id, ids)] : [];
   const ofRuns = ids ? [inArray(agentRuns.agentId, ids)] : [];
-  const [list, open, last] = await Promise.all([
+  const [list, open] = await Promise.all([
     db
       .select({
         id: agents.id,
@@ -162,6 +160,14 @@ export async function loadAgentStatuses(
         statusSource: agents.statusSource,
         statusKind: agents.statusKind,
         statusSubject: agents.statusSubject,
+        // Its last finished run however long ago ("Parado desde…"): none means it never worked. Newest first along
+        // the (org, agent, created) index, so this stops at the first one.
+        // Written out: Drizzle drops a column's table in a one-table select, and `id` would read the run's.
+        lastRunAt: sql<Date | string | null>`(
+          select r.finished_at from agent_runs r
+          where r.org_id = agents.org_id and r.agent_id = agents.id and r.finished_at is not null
+          order by r.created_at desc limit 1
+        )`,
       })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), ...ofAgents)),
@@ -190,17 +196,6 @@ export async function loadAgentStatuses(
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
-    db
-      .select({ agentId: agentRuns.agentId, at: sql<Date | string | null>`max(${agentRuns.finishedAt})` })
-      .from(agentRuns)
-      .where(
-        and(
-          eq(agentRuns.orgId, orgId),
-          gt(agentRuns.createdAt, new Date(now.getTime() - ACTIVITY_LOOKBACK_MS)),
-          ...ofRuns,
-        ),
-      )
-      .groupBy(agentRuns.agentId),
   ]);
   const [works, outs] = await Promise.all([
     liveWorksByAgent(db, orgId, ids),
@@ -224,7 +219,6 @@ export async function loadAgentStatuses(
       r.status === "running" && r.waitingMachineId ? { ...r, status: "waiting_input" as const, waitCode: "busy" } : r,
     );
   const runById = new Map(alive.map((r) => [r.id, r]));
-  const lastAt = new Map(last.map((r) => [r.agentId, r.at ? new Date(r.at) : null]));
   return list.map((a) => {
     // Long work (ADR 0121) speaks through its own line below, never through the wait lines.
     const runs = alive.filter((r) => r.agentId === a.id && !r.workId);
@@ -254,7 +248,7 @@ export async function loadAgentStatuses(
       mine.some((w) => w.status === "live") ||
       working.some((r) => r.background || r.issueId !== null || long(r)) ||
       (stored?.busy === true && working.length > 0);
-    const activeAt = runs.length > 0 || mine.length > 0 ? now : (lastAt.get(a.id) ?? null);
+    const activeAt = runs.length > 0 || mine.length > 0 ? now : a.lastRunAt ? new Date(a.lastRunAt) : null;
     // Out of office (§12) while nothing of its own is thinking: whatever waits, waits for the reset. Its own words
     // stay. A conversation waiting on its plan or budget says so too (nothing could stand in for it), with how many
     // wait: one story for its status, its queue and its notes.

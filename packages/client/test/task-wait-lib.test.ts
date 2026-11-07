@@ -58,6 +58,12 @@ test("a limit: the plan's, a model's own, the region it needs, the budget", () =
   const region = words(task("plan", wait({ ...limit, scope: "region", model: "GLM-5.3" })));
   expect(region?.state).toContain("taskManager.wait.modelRegion");
   expect(region?.next).toBe("taskManager.wait.modelRegionNext");
+  const off = words(task("plan", wait({ ...limit, scope: "off", model: "MiniMax M3" })));
+  expect(off?.state).toContain("taskManager.wait.modelOff");
+  expect(off?.next).toBe("taskManager.wait.modelOffNext");
+  const inactive = words(task("plan", wait({ ...limit, scope: "inactive", model: "MiniMax M3" })));
+  expect(inactive?.state).toBe("taskManager.wait.planInactive");
+  expect(inactive?.next).toBe("taskManager.wait.planInactiveNext");
   const budget = wait({ code: "budget", percent: null, plan: null });
   expect(words(task("budget", budget))?.state).toBe("taskManager.wait.budgetOut");
   const reserved = words(task("budget", { ...budget, resetsAt: null }));
@@ -96,6 +102,8 @@ test("a group needs two rows on the same limit; a computer, a person or a region
   ).toEqual([]);
   const region = wait({ code: "plan_limit", scope: "region" });
   expect(taskWaitGroups([task("plan", region), task("plan", region)])).toEqual([]);
+  const off = wait({ code: "plan_limit", scope: "off" });
+  expect(taskWaitGroups([task("plan", off), task("plan", off)])).toEqual([]);
   const reserved = wait({ code: "budget", key: "budget:a", percent: null, resetsAt: null });
   expect(taskWaitGroups([task("budget", reserved), task("budget", reserved)])).toEqual([]);
   const away = wait({ code: "machine_offline", key: null });

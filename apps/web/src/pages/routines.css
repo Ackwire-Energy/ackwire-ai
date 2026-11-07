@@ -738,70 +738,36 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 }
 
 /* ── "Nova rotina": templates ───────────────────────────────────────────── */
-.routine-presets {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* A row runs to three lines: its mark starts with the first. */
+.ac-tz__option:has(.routine-template__text) > :is(.ac-menu__leading, .ac-menu__label) {
+  align-self: flex-start;
 }
-.routine-presets legend {
-  padding: 0;
-  margin-bottom: 8px;
-}
-.routine-presets__list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2) var(--form-gap);
-}
-.routine-preset {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    transform 0.2s var(--spring),
-    box-shadow 0.2s var(--out);
-}
-.routine-preset:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--e2), var(--top);
-}
-html:not([data-pointer]) .routine-preset:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.routine-preset b {
+.routine-template__text,
+.routine-template__needs {
   display: block;
-  font-size: 13.5px;
-  font-weight: 600;
 }
-.routine-preset small {
-  display: block;
-  margin-top: 1px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.routine-preset__icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: var(--sunken);
+.routine-template__needs {
+  margin-top: 2px;
   color: var(--ink2);
+}
+.routine-needs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--ink2);
+}
+.routine-needs > .connector-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+}
+.routine-needs > span:last-child {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.routine-needs__connect {
+  display: block;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -836,13 +802,6 @@ html:not([data-pointer]) .routine-preset:focus-visible {
   }
   .routines-horizon {
     padding: 12px 12px 0;
-  }
-  .routine-presets legend {
-    padding: 0;
-    margin-bottom: 8px;
-  }
-  .routine-presets__list {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -883,4 +842,76 @@ html:not([data-pointer]) .routine-preset:focus-visible {
   padding: 10px 12px;
   border-radius: var(--control-r-md);
   background: var(--sunken);
+}
+
+/* A GitHub or Sentry event's webhook: the service's mark and name, whether it works, the steps, Testar. */
+.routine-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--control-r-md);
+  background: var(--sunken);
+}
+.routine-setup__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.routine-setup__status {
+  margin: 0;
+}
+.routine-setup__status[data-tone="ok"] {
+  color: var(--ok);
+}
+.routine-setup__status[data-tone="warn"] {
+  color: var(--attention);
+}
+.routine-setup__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+  counter-reset: setup-step;
+}
+.routine-setup__steps > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 28px;
+  counter-increment: setup-step;
+  font-size: 13px;
+  line-height: 18px;
+}
+/* The step's number, as tall as the step's 18px line: centred on its first line's capitals. */
+.routine-setup__steps > li::before {
+  content: counter(setup-step);
+  position: absolute;
+  left: 0;
+  top: calc(-1 * var(--cap-mid));
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.routine-setup__steps p {
+  margin: 0;
+}
+/* The address and secret to paste wrap: all of them in sight, never half hidden behind a sideways scroll. */
+.routine-setup .machine-command__code {
+  overflow-x: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

@@ -36,9 +36,10 @@ import { PushedHeader, successHaptic, Tile } from "../shared/parts";
 export function WikiAudienceScreen({ slug, folder }: { slug?: string; folder?: string }) {
   const orgId = useOrgId();
   const page = useWikiPage(orgId, slug ?? null);
-  const info = useWikiFolderAudience(orgId, folder ?? "", Boolean(folder));
+  // "" is the wiki's root: every page and folder.
+  const info = useWikiFolderAudience(orgId, folder ?? "", folder !== undefined);
   const p = slug ? page.data : undefined;
-  if (folder) {
+  if (folder !== undefined) {
     if (!info.data) return null;
     const { own, above } = info.data;
     return <Form key={folder} folder={folder} initial={own ?? above ?? OPEN_WIKI_ACCESS} above={above} />;
@@ -95,7 +96,7 @@ function Form({
   };
   const save = () => {
     const access = wikiAccessOf(draft);
-    if (folder) {
+    if (folder !== undefined) {
       saveFolder.mutate(
         { folder, access },
         {
@@ -174,18 +175,22 @@ function Form({
     // Who sees and edits, as every access screen: groups on the grouped gray.
     <View style={[styles.fill, { backgroundColor: c.grouped }]}>
       <PushedHeader
-        title={t("wiki.audience")}
+        title={folder === "" ? t("wiki.audienceRootTitle") : t("wiki.audience")}
         solid={false}
         action={{ label: t("common.save"), onPress: save, disabled: action.isPending || saveFolder.isPending }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <Locked when={action.isPending || saveFolder.isPending}>
           <Text variant="footnote" tone="faint" style={styles.lead}>
-            {folder ? t("wiki.audienceFolderText") : t("wiki.audienceText")}
+            {folder
+              ? t("wiki.audienceFolderText")
+              : folder === ""
+                ? t("wiki.audienceRootText")
+                : t("wiki.audienceText")}
           </Text>
           {above ? (
             <Text variant="footnote" tone="faint" style={styles.lead}>
-              {t("wiki.audienceInFolder", { folder: above.folder })}
+              {above.folder ? t("wiki.audienceInFolder", { folder: above.folder }) : t("wiki.audienceInRoot")}
             </Text>
           ) : null}
           <AccessList

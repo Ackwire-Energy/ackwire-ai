@@ -80,7 +80,7 @@ describe("Aprovações: requests sharing a card", () => {
     expect(ids(run)).toEqual(["ap-s1", "ap-s2", "ap-s3"]);
     // Deciding its first request beside the list keeps the rest unfolded.
     await click(row("ap-s1"));
-    expect(review().getAttribute("aria-label")).toBe("Supabase: Execute sql");
+    expect(review().getAttribute("aria-label")).toBe("Fazer um merge");
     await click(review().querySelector('[data-approve="ap-s1"]') as HTMLElement);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args.slice(0, 2)).toEqual([ORG_ID, "ap-s1"]);
     const rest = document.querySelector(".ap-run") as HTMLElement;
@@ -121,7 +121,7 @@ describe("Approvals: the request beside the list", () => {
     expect(row("ap-merge").querySelector(".ap-li__where")?.textContent).toBe("acme/loja #45");
     // Nothing chosen: the first row (closest to expiring) is open.
     expect(row("ap-deploy").getAttribute("aria-current")).toBe("true");
-    expect(title()).toBe("Run deploy workflow");
+    expect(title()).toBe("Fazer um deploy");
 
     await click(row("ap-merge"));
     expect(row("ap-merge").getAttribute("aria-current")).toBe("true");
@@ -155,13 +155,13 @@ describe("Approvals: the request beside the list", () => {
       await act(async () => fireEvent.keyDown(target, { key: k }));
       await settle(4);
     };
-    expect(title()).toBe("Run deploy workflow");
+    expect(title()).toBe("Fazer um deploy");
     await key(document.body, "j");
     expect(title()).toBe("Adicionar comentários da issue");
     expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
     expect(document.activeElement).toBe(row("ap-merge"));
     await key(document.body, "k");
-    expect(title()).toBe("Run deploy workflow");
+    expect(title()).toBe("Fazer um deploy");
     await key(document.body, "j");
     await key(document.body, "r");
     const reason = within(review()).getByLabelText("Por que não?");
@@ -169,5 +169,20 @@ describe("Approvals: the request beside the list", () => {
     await key(reason, "Escape");
     expect(within(review()).queryByLabelText("Por que não?")).toBeNull();
     expect(review().querySelector('[data-approve="ap-merge"]')).not.toBeNull();
+  });
+});
+
+describe("Aprovações: the open request's column", () => {
+  test("another request opens at its top, not where the last one was scrolled to", async () => {
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(seedState()) });
+    await settle(4);
+    const [first, second] = [...document.querySelectorAll<HTMLElement>(".ap-li")];
+    if (!first || !second) throw new Error("two requests");
+    const before = title();
+    review().scrollTop = 400;
+    expect(review().scrollTop).toBe(400);
+    await click(second);
+    expect(title()).not.toBe(before);
+    expect(review().scrollTop).toBe(0);
   });
 });

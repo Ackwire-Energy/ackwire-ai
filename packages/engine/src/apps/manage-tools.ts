@@ -18,7 +18,15 @@ import { handleFromName } from "../imports";
 import { publishMachineAgentsChanged } from "../machines";
 import { notifyAppCreated } from "../notification-producers";
 import { createRoutine, listRoutines } from "../routines";
-import { listSkills, parseSkillMarkdown, SKILL_LIMITS, saveSkill, setAgentSkills, validateSkill } from "../skills";
+import {
+  listSkills,
+  parseSkillMarkdown,
+  SKILL_LIMITS,
+  saveSkill,
+  setAgentSkills,
+  updateSkill,
+  validateSkill,
+} from "../skills";
 import type { AppPrincipal } from "./grants";
 import { type AppsToolDeps, cleanUntrusted, type RegisterTool } from "./tools";
 import { appsUrls } from "./urls";
@@ -35,8 +43,10 @@ export const APP_MANAGE_TOOL_NAMES = [
   "import_summary",
   "create_agent",
   "update_agent_instructions",
+  "update_agent",
   "list_skills",
   "create_skill",
+  "update_skill",
   "create_routine",
   "add_memory",
   "create_channel",
@@ -252,6 +262,74 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
   );
 
   tool(
+    "update_agent",
+    {
+      scope: "manage",
+      title: "Change an agent's role, name or look",
+      description:
+        "Changes the role, the name or the look of an existing agentes.chat agent. What is left out stays. Needs the permission to manage agents; the look alone can also be changed by the agent's owner.",
+      input: z
+        .object({
+          agent: AGENT_REF,
+          role: z.string().max(200).optional().describe("What it does, in a few words"),
+          name: z.string().trim().min(1).max(80).optional().describe("The agent's name"),
+          avatar_color: z.enum(AGENT_LOOK.colors).optional().describe("Its avatar's color"),
+          avatar_eyes: z.enum(AGENT_LOOK.eyes).optional().describe("Its avatar's eyes"),
+          avatar_accessory: z.enum(AGENT_LOOK.accessories).optional().describe("Its avatar's accessory"),
+        })
+        .strict(),
+      readOnly: false,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+    async (args) => {
+      const agent = await resolveAgent(args.agent);
+      const look = args.avatar_color || args.avatar_eyes || args.avatar_accessory;
+      const fields = {
+        ...(args.role !== undefined ? { role: args.role } : {}),
+        ...(args.name ? { name: args.name } : {}),
+      };
+      if (!look && Object.keys(fields).length === 0)
+        throw new ValidationError("Nothing to change: give role, name, or one of the avatar fields.");
+      await allow();
+      let updated: Pick<Agent, "id" | "name" | "handle"> = agent;
+      if (Object.keys(fields).length > 0)
+        updated = await updateAgent(deps.db, p.userId, p.orgId, agent.id, fields, {
+          remember: false,
+          pubsub: deps.pubsub,
+        });
+      if (look) {
+        const now = agent.appearance;
+        updated = await setAgentAppearance(
+          deps.db,
+          p.userId,
+          p.orgId,
+          agent.id,
+          {
+            color: args.avatar_color ?? now?.color ?? AGENT_LOOK.colors[0],
+            eyes: args.avatar_eyes ?? now?.eyes ?? AGENT_LOOK.eyes[0],
+            accessory: args.avatar_accessory ?? now?.accessory ?? "none",
+          },
+          { pubsub: deps.pubsub },
+        );
+      }
+      await recordAudit(deps.db, {
+        orgId: p.orgId,
+        actor: { type: "person", id: p.userId },
+        action: "apps.updated",
+        target: { type: "agent", id: agent.id },
+        details: {
+          grantId: p.grantId,
+          client: p.app.name,
+          changed: [...Object.keys(fields), ...(look ? ["look"] : [])],
+        },
+      });
+      return agentOut(updated, true);
+    },
+  );
+
+  tool(
     "list_skills",
     {
       scope: "manage",
@@ -325,6 +403,61 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
         agent: agent ? { id: agent.id, name: agent.name } : null,
         url: `${base}/settings/skills`,
       };
+    },
+  );
+
+  tool(
+    "update_skill",
+    {
+      scope: "manage",
+      title: "Change a skill",
+      description:
+        "Replaces the body, the description or both of a skill already installed in this workspace, as a new version. Its files stay. Needs the permission to manage agents.",
+      input: z
+        .object({
+          skill: z.string().min(1).max(64).describe("The skill's id or name (from list_skills)"),
+          body: z
+            .string()
+            .min(1)
+            .max(SKILL_LIMITS.bodyChars)
+            .optional()
+            .describe("The skill's whole new Markdown body"),
+          description: z.string().min(1).max(1024).optional().describe("When to use it"),
+        })
+        .strict(),
+      readOnly: false,
+      destructive: true,
+      idempotent: true,
+      openWorld: false,
+    },
+    async (args) => {
+      if (args.body === undefined && args.description === undefined)
+        throw new ValidationError("Nothing to change: give body or description.");
+      const found = (await listSkills(deps.db, p.userId, p.orgId)).find(
+        (s) => s.id === args.skill || s.name === args.skill.trim().toLowerCase(),
+      );
+      if (!found) throw new ValidationError(`No skill "${args.skill}" in this workspace. list_skills lists them.`);
+      if (!deps.blobs) throw new ValidationError("This server has no storage for skills.");
+      await allow();
+      const skill = await updateSkill({ db: deps.db, blobs: deps.blobs }, p.userId, p.orgId, found.id, {
+        body: args.body,
+        description: args.description,
+      });
+      await recordAudit(deps.db, {
+        orgId: p.orgId,
+        actor: { type: "person", id: p.userId },
+        action: "apps.updated",
+        target: { type: "skill", id: found.id },
+        details: {
+          grantId: p.grantId,
+          client: p.app.name,
+          changed: [
+            ...(args.body !== undefined ? ["body"] : []),
+            ...(args.description !== undefined ? ["description"] : []),
+          ],
+        },
+      });
+      return { id: found.id, name: skill.name, version: skill.version, url: `${base}/settings/skills` };
     },
   );
 

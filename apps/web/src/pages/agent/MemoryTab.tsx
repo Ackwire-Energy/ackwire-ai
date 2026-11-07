@@ -11,7 +11,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { memoryLine, proposalTitle, proposalWhy } from "@agenteschat/client/lib/proposals";
+import { memoryLine, pendingOnAgent, proposalTitle, proposalWhy } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -125,9 +125,11 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             >
               {editing ? t("proposals.acceptEdited") : t("proposals.accept")}
             </Button>
-            <Button size="sm" icon="edit" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
-              {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
-            </Button>
+            {proposal.target.type !== "skill" && (
+              <Button size="sm" icon="edit" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
+                {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
+              </Button>
+            )}
             <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={refuse}>
               {t("proposals.refuse")}
             </Button>
@@ -451,9 +453,7 @@ export function MemoryTab() {
   const [kind, setKind] = useState<Kind | "learned">("known");
   const [q, setQ] = useState("");
   const list = memory.data ?? [];
-  const pending = (proposals.data ?? []).filter(
-    (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
-  );
+  const pending = pendingOnAgent(proposals.data ?? [], agent.id);
   const learned = list
     .filter(
       (m) =>

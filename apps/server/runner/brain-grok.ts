@@ -395,7 +395,8 @@ export async function runGrokTurn(input: GrokTurnInput, opts: GrokTurnOptions): 
           continue;
         }
         // Our bridge's calls: the engine ran them.
-        if (event.type === "tool_call" && GROK_META_TOOLS.includes(event.name)) continue;
+        if ((event.type === "tool_call" || event.type === "tool_started") && GROK_META_TOOLS.includes(event.name))
+          continue;
         flush("", true);
         opts.emit(
           event.type === "tool_call"

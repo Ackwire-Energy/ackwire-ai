@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { addsAgentsTo, editsMemory, managesChannel, setsAutoReply, undoesMemoryChange } from "../src/lib/permissions";
+import {
+  addsAgentsTo,
+  editsMemory,
+  leavesChannel,
+  managesChannel,
+  setsAutoReply,
+  undoesMemoryChange,
+} from "../src/lib/permissions";
 
 const member = { permissions: ["read", "post"] };
 const manager = { permissions: ["read", "post", "manage_channels"] };
@@ -65,4 +72,10 @@ test("a channel's exceptions (ADR 0134): the list's `can` decides managing when 
     false,
   );
   expect(managesChannel({ isMember: true }, "u", admin)).toBe(true);
+});
+
+test("anyone in a channel may leave it, except #general, where everyone stays", () => {
+  expect(leavesChannel({ name: "eng", isMember: true })).toBe(true);
+  expect(leavesChannel({ name: "eng", isMember: false })).toBe(false);
+  expect(leavesChannel({ name: "general", isMember: true })).toBe(false);
 });

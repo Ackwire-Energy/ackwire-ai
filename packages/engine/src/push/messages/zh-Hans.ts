@@ -7,6 +7,7 @@ export const strings: Partial<PushStrings> = {
   approvalTitle: (a) => `${a} 需要你审批`,
   approvalBody: "点按查看请求。",
   approvalHighRisk: (what) => `${what}。打开 App 查看。`,
+  approvalHighRiskBody: "高风险请求。打开 App 查看。",
   approvalFromRoutine: (routine) => `例行工作“${routine}”`,
   questionTitle: (a) => `${a} 有个问题想问你`,
   questionBody: "点按回答。",

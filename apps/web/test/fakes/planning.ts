@@ -29,6 +29,8 @@ import type {
   RoutineRun,
   RuleInfo,
   ScheduleParse,
+  WebhookProvider,
+  WebhookSetup,
 } from "@agenteschat/client";
 import { nextOccurrences } from "@agenteschat/ui";
 import { fromApiRule } from "@/lib/recurrence";
@@ -61,6 +63,23 @@ const UNREADABLE = "Não entendi. Tente “toda segunda às 9h” ou “dias út
 
 /** A webhook routine's address, as the server makes them (a 43-character token). */
 const hookUrl = () => `https://app.agentes.test/api/hooks/${mockId("hook").padEnd(43, "x").slice(0, 43)}`;
+/** The workspace's webhook of a service: none made yet until `ensureWebhook`. */
+const webhookOf = (s: { webhooks: Map<WebhookProvider, WebhookSetup> }, provider: WebhookProvider) => {
+  const setup = s.webhooks.get(provider) ?? {
+    provider,
+    id: null,
+    url: null,
+    secret: null,
+    receivedAt: null,
+    refusedAt: null,
+    secretSet: false,
+    canManage: true,
+    oneClick: false,
+  };
+  s.webhooks.set(provider, setup);
+  return setup;
+};
+
 const hookOf = (s: { hooks: Map<string, RoutineHook> }, routineId: string) => {
   const hook = s.hooks.get(routineId) ?? { url: hookUrl(), signed: false, methods: ["POST"], calls: [] };
   s.hooks.set(routineId, hook);
@@ -181,6 +200,8 @@ interface Store {
   runs: Map<string, RoutineRun[]>;
   /** Webhook routines' addresses and calls. */
   hooks: Map<string, RoutineHook>;
+  /** GitHub's and Sentry's webhooks of the workspace. */
+  webhooks: Map<WebhookProvider, WebhookSetup>;
   events: CalendarEvent[];
   proposals: CalendarProposal[];
 }
@@ -198,6 +219,7 @@ export function createMockPlanning(
       routines: [],
       runs: new Map(),
       hooks: new Map(),
+      webhooks: new Map(),
       events: [],
       proposals: [],
     };
@@ -889,6 +911,28 @@ export function createMockPlanning(
           test: true,
         });
         return { runId: null, hook: clone(hook) };
+      },
+      webhookSetup: async (orgId, provider) => clone(webhookOf(await store(orgId), provider)),
+      ensureWebhook: async (orgId, provider) => {
+        record("routines.ensureWebhook", provider);
+        const setup = webhookOf(await store(orgId), provider);
+        if (!setup.id) {
+          setup.id = mockId("webhook");
+          setup.url = `https://app.agentes.test/api/webhooks/${provider}/${setup.id}`;
+          setup.secret = provider === "github" ? "gh-secret-1234" : null;
+        }
+        return clone(setup);
+      },
+      setWebhookSecret: async (orgId, provider, secret) => {
+        record("routines.setWebhookSecret", provider, secret);
+        const setup = webhookOf(await store(orgId), provider);
+        setup.secretSet = true;
+        setup.refusedAt = null;
+        return clone(setup);
+      },
+      addWebhookToRepo: async (orgId, repo) => {
+        record("routines.addWebhookToRepo", repo);
+        return clone(webhookOf(await store(orgId), "github"));
       },
     },
     calendar: {

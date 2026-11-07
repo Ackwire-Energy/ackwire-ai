@@ -457,8 +457,6 @@ export const featureKeysEn = {
     camera: "Camera",
     photos: "Photos",
     file: "File",
-    audio: "Audio",
-    audioSoon: "Audio is coming soon.",
     noCamera: "No camera access. Allow it in the phone's Settings.",
     mission: "Start a mission",
     missionHint: "Long work, with a plan, from start to finish",
@@ -744,6 +742,8 @@ export const featureKeysEn = {
   },
   activity: {
     title: "Activity",
+    /** Under `plan_model_dropped`: opens the agent's model. */
+    chooseModel: "Choose another model",
     filter: {
       all: "All",
       waiting: "Waiting for you",
@@ -846,6 +846,9 @@ export const featureKeysEn = {
       plan_lent_other: "{{names}} connected your {{plan}} plan to {{agent}}",
       plan_lent_female_one: "{{names}} connected your {{plan}} plan to {{agent}}",
       plan_lent_female_other: "{{names}} connected your {{plan}} plan to {{agent}}",
+      /** An agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      plan_model_dropped_one: "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
+      plan_model_dropped_other: "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
       connector_tool_changed_one: "A connected server changed tools you approved",
       connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",

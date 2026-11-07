@@ -8,6 +8,7 @@ import {
   createToolGateway,
   decideProposal,
   getAgent,
+  insertMessage,
   listAudit,
   listProposals,
   MAX_CARDS_PER_RUN,
@@ -37,11 +38,19 @@ const lodiOf = async (fx: Fixture) => {
   return lodi;
 };
 
-/** A run of Lodi on what `userId` wrote in their DM with it: its tools act for that person. */
-async function lodiRun(fx: Fixture, userId: string, body: string): Promise<ToolContext> {
+/**
+ * A run of Lodi on what `userId` wrote in their DM with it: its tools act for that person. Their message relays outside
+ * content, so what they may decide waits on the card; `ownWords`: nothing does, so it applies at once.
+ */
+async function lodiRun(fx: Fixture, userId: string, body: string, ownWords = false): Promise<ToolContext> {
   const lodi = await lodiOf(fx);
   const dm = await openPersonAgentDm(fx.db, fx.org.id, userId, lodi.id);
   const trigger = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, userId, fx.org.id, dm.id, { body });
+  if (!ownWords)
+    await fx.db
+      .update(schema.messages)
+      .set({ meta: { readOutside: true } })
+      .where(eq(schema.messages.id, trigger.id));
   const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   if (!run) throw new Error("no run");
   return {
@@ -83,6 +92,70 @@ async function cardRows(fx: Fixture, viewer: string) {
 }
 
 const USD = 1_000_000_000;
+
+describe("a change the person asked for and may make (ADR 0092 §5)", () => {
+  test("applies as the card is posted, with Undo on it, and goes back", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "chama o dev de Ada e deixa ele teal", true);
+    const out = await call(f, ctx, {
+      changes: [{ agent: "@dev", name: "Ada", look: { color: "teal", eyes: "happy" } }],
+      reason: "pediu",
+    });
+    expect(out.content).toContain("applied at once");
+    expect(out.content).not.toContain("Nothing has changed");
+    expect(await getAgent(f.db, f.org.id, f.agent.id)).toMatchObject({
+      name: "Ada",
+      appearance: { color: "teal", eyes: "happy", accessory: "none" },
+    });
+    const { card, rows } = await cardRows(f, f.owner.id);
+    expect(rows.map((r) => r.status)).toEqual(["accepted", "accepted"]);
+    const receipts = (await actionsFor(f.db, f.org.id, [card.id])).get(card.id) ?? [];
+    expect(receipts.map((r) => r.kind)).toEqual(["agent.settings_changed", "agent.settings_changed"]);
+    for (const r of receipts) await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, r.id);
+    expect(await getAgent(f.db, f.org.id, f.agent.id)).toMatchObject({ name: "Dev", appearance: null });
+  });
+
+  test("a row they can't decide stays on the card, and so does an agent's own", async () => {
+    f = await setup({ rightHand: true });
+    const member = await addMember(f.db, f.org.id, "member", "Bia");
+    const ctx = await lodiRun(f, member.id, "sobe o limite do dev", true);
+    const out = await call(f, ctx, { changes: [{ agent: "@dev", budget_usd: 20 }], reason: "pediu" });
+    expect(out.content).not.toContain("applied at once");
+    expect((await cardRows(f, member.id)).rows[0]?.status).toBe("pending");
+    expect((await getAgent(f.db, f.org.id, f.agent.id))?.monthlyBudgetNanoUsd).toBeNull();
+
+    const own = await lodiRun(f, f.owner.id, "sobe seu próprio limite", true);
+    await call(f, own, { changes: [{ agent: "@lodi", budget_usd: 20 }], reason: "pediu" });
+    expect((await cardRows(f, f.owner.id)).rows[0]?.status).toBe("pending");
+  });
+
+  test("outside content in the conversation leaves it on the card", async () => {
+    f = await setup({ rightHand: true });
+    const outside = await lodiRun(f, f.owner.id, "coloca o dev no haiku");
+    await call(f, outside, { changes: [{ agent: "@dev", model: "claude-haiku-5-5" }], reason: "pediu" });
+    expect((await getAgent(f.db, f.org.id, f.agent.id))?.model).toBe("claude-sonnet-5-5");
+  });
+
+  test("a run another agent's message started leaves it on the card, whoever is behind that agent", async () => {
+    f = await setup({ rightHand: true });
+    const relayed = await lodiRun(f, f.owner.id, "coloca o dev no haiku", true);
+    const message = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: relayed.channelId,
+      author: { type: "agent", agentId: relayed.agentId, runId: relayed.runId, hop: 0 },
+      body: "a pedido dele",
+    });
+    await call(
+      f,
+      { ...relayed, triggerMessageId: message.id },
+      {
+        changes: [{ agent: "@dev", model: "claude-haiku-5-5" }],
+        reason: "pediu",
+      },
+    );
+    expect((await getAgent(f.db, f.org.id, f.agent.id))?.model).toBe("claude-sonnet-5-5");
+  });
+});
 
 describe("the settings card", () => {
   test("every agent that sets the team up has it, and the right hand's run may post 10 cards (3 for the others)", async () => {

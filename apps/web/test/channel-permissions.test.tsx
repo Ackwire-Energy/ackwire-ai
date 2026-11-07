@@ -32,7 +32,7 @@ describe("channel permissions (ADR 0134)", () => {
       within(nav)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["Visão geral", "Permissões", "Membros", "Arquivar canal", "Apagar canal"]);
+    ).toEqual(["Visão geral", "Permissões", "Membros", "Sair do canal", "Arquivar canal", "Apagar canal"]);
     expect(within(nav).getByRole("button", { name: "Visão geral" }).getAttribute("aria-current")).toBe("page");
     expect(within(dialog).getByLabelText("Nome")).toBeTruthy();
   });

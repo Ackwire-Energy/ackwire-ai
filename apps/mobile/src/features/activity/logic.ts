@@ -129,7 +129,13 @@ export type SayWords = (w: Words, otherwise?: string) => string;
  * server's English), and who asked for an approval while nobody watched, leading its title. A GIF or a sticker
  * with no words (`latest.media`, ADR 0091) is said by its word (`mediaWord`: "GIF", "Figurinha").
  */
-export function subtitleOf(n: AppNotification, say: SayWords, mediaWord?: (kind: MediaKind) => string): string {
+export function subtitleOf(
+  n: AppNotification,
+  say: SayWords,
+  mediaWord?: (kind: MediaKind) => string,
+  /** A message's words in the person's language (`latestText`). */
+  written: (l: AppNotification["latest"]) => string | undefined = (l) => l.text,
+): string {
   const l = n.latest;
   const media = mediaKindOf(l.media);
   const word = media && mediaWord ? mediaWord(media) : "";
@@ -143,7 +149,7 @@ export function subtitleOf(n: AppNotification, say: SayWords, mediaWord?: (kind:
     return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
   }
   if (n.kind === "issue_assigned") return l.title ?? l.text ?? "";
-  return (l.text || word || l.text) ?? l.title ?? "";
+  return written(l) || word || (l.text ?? l.title ?? "");
 }
 
 /** Where it happened ("#produto", the thread's title, the mission's name). */

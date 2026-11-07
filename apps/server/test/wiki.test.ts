@@ -223,3 +223,57 @@ test("wiki API: a page limited to admins and agents is out of reach for other me
   expect(await errorCode(wider)).toBe("wiki.audience_wider_than_folder");
   expect((await api(bia, "/wiki/folder-audience?folder=Financeiro")).status).toBe(403);
 });
+
+test("wiki API: a bad note doesn't sink its batch; delete an import, the trash, the root's agents, always in context", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const importId = "0190a000-0000-7000-8000-0000000000aa";
+
+  const imported = await api("/wiki/import", {
+    json: {
+      source: { type: "obsidian", name: "Vault" },
+      importId,
+      notes: [
+        { title: "Boa", body: "ok", tags: ["t".repeat(120)], aliases: ["a".repeat(400)] },
+        { title: "Enorme", body: "x".repeat(250_000) },
+        { title: "Outra", body: "ok" },
+      ],
+    },
+  });
+  expect(imported.status).toBe(200);
+  const result = (await imported.json()) as {
+    created: { importId: string }[];
+    failed: { title: string; reason: string }[];
+  };
+  expect(result.created).toHaveLength(2);
+  expect(result.created[0]?.importId).toBe(importId);
+  expect(result.failed).toEqual([{ title: "Enorme", reason: "too_long" }]);
+
+  const deleted = await api("/wiki/bulk/delete", { json: { importId } });
+  expect(await deleted.json()).toEqual({ deleted: 2, kept: 0 });
+  const trash = (await (await api("/wiki/pages?deleted=true")).json()) as {
+    pages: { id: string; deletedAt: string }[];
+  };
+  expect(trash.pages).toHaveLength(2);
+  const restored = await api("/wiki/trash/restore", { json: { ids: trash.pages.map((p) => p.id) } });
+  expect(await restored.json()).toEqual({ restored: 2, kept: 0, failed: [] });
+  await api("/wiki/bulk/delete", { json: { ids: [trash.pages[0]?.id] } });
+  expect(await (await api("/wiki/trash/purge", { json: {} })).json()).toEqual({ purged: 1, kept: 0 });
+
+  const root = await api("/wiki/folder-audience", {
+    method: "PUT",
+    json: { folder: "", audience: null, agentIds: [] },
+  });
+  expect(await root.json()).toEqual({ folder: "", pages: 1 });
+  expect(((await (await api("/wiki/folder-audience?folder=")).json()) as { own: { folder: string } }).own.folder).toBe(
+    "",
+  );
+  const agents = await api("/wiki/bulk/agents", { method: "PUT", json: { ids: [trash.pages[1]?.id], agentIds: null } });
+  expect(agents.status).toBe(200);
+
+  const on = await api(`/wiki/pages/${trash.pages[1]?.id}/context`, { json: { on: true } });
+  expect(((await on.json()) as { agentContext: boolean }).agentContext).toBe(true);
+});

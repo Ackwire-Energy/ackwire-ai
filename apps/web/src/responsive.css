@@ -332,13 +332,22 @@
     overflow-y: hidden;
     scrollbar-width: none;
   }
+  /* The tokens go on the time's line: beside the words they kept their one line and squeezed a failure's reason to a
+     word a line. */
   .agp-run {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 10px;
   }
   .agp-run time {
-    grid-column: 1 / -1;
+    grid-row: 1;
     padding: 0;
+  }
+  .agp-run__t {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .agp-run__r {
+    grid-row: 1;
   }
   .agp-card.ac-card {
     --card-pad: 16px;
@@ -442,8 +451,15 @@
     gap: 4px 10px;
   }
   .agp-run time {
-    grid-column: 1 / -1;
+    grid-row: 1;
     padding: 0;
+  }
+  .agp-run__t {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .agp-run__r {
+    grid-row: 1;
   }
   .agp-card.ac-card {
     --card-pad: 16px;

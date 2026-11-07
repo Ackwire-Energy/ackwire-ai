@@ -1104,9 +1104,6 @@ function Chat({
         if (a) await upload({ uri: a.uri, name: a.name, type: a.mimeType ?? "application/octet-stream" });
         return;
       }
-      case "audio":
-        toast({ title: t("mobile.plus.audioSoon"), icon: "mic" });
-        return;
       case "mission":
         setTimeout(() => openNewMission(), 250);
         return;

@@ -397,3 +397,15 @@ test("an agent hidden from a member keeps its presence but not its line (it can 
   expect(await of(outsider.id)).toMatchObject({ presence: "busy", status: null });
   expect((await of(f.owner.id))?.status).toMatchObject({ kind: "routine", subject: "Relatório" });
 });
+
+test("an agent idle for weeks reads as idle since then; only one with no finished run never worked", async () => {
+  f = await setup();
+  expect((await presenceOf(f))?.activeAt ?? null).toBeNull();
+  const run = await runOf(f);
+  const longAgo = new Date(Date.now() - 30 * 24 * 3600_000);
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done", createdAt: longAgo, finishedAt: longAgo })
+    .where(eq(schema.agentRuns.id, run.id));
+  expect((await presenceOf(f))?.activeAt).toBe(longAgo.toISOString());
+});

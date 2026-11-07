@@ -32,6 +32,7 @@ import {
   usePrefetchRecent,
   useSidebarItems,
   useSkills,
+  useTasksUnread,
   useUnreadThreads,
 } from "@agenteschat/client";
 import { agentSections, groupOf } from "@agenteschat/client/lib/agent-groups";
@@ -239,6 +240,8 @@ export function Sidebar() {
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
   const missionList = useMissionList(orgId, MISSIONS_WAITING_COUNT);
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
+  // Tarefas: bold for a reply I haven't read in a task's conversation, red for a mention of me there, as a channel.
+  const { unread: unreadTasks, mentions: taskMentions } = useTasksUnread(orgId);
   // …and whether a thread I follow has a reply I haven't read: the entry lights like an unread channel.
   const unreadThreads = useUnreadThreads(orgId).data ?? 0;
   // The tools on top, each where I put it (the rest in More); one there "when there's something" while its count is.
@@ -269,6 +272,8 @@ export function Sidebar() {
       >
         {missionsWaiting}
       </CountChip>
+    ) : id === "issues" && taskMentions > 0 ? (
+      <UnreadCount count={taskMentions} mentions />
     ) : null;
   // The name is on the row: only the rail, which hides it, says it on hover.
   const railTip = (id: SidebarItem | "home") => (rail ? t(`shell.${id}`) : undefined);
@@ -279,7 +284,7 @@ export function Sidebar() {
       params={{ orgId }}
       className="sidebar__item"
       title={id === "threads" && unreadThreads > 0 ? t("shell.unreadThreads", { count: unreadThreads }) : railTip(id)}
-      data-unread={id === "threads" && unreadThreads > 0}
+      data-unread={(id === "threads" && unreadThreads > 0) || (id === "issues" && unreadTasks > 0)}
       inactiveProps={id === "approvals" && onProposals && !proposalsRow ? { "data-status": "active" } : undefined}
     >
       <Icon name={SIDEBAR_TOOLS[id].icon} />
@@ -1813,10 +1818,10 @@ function AccountMenu() {
     });
   }, []);
   const handle = dir.memberById.get(me.user.id)?.handle;
-  // How you appear to yourself (hidden stays hidden; what you picked, even before your socket is up) and your line.
+  // How you appear to yourself, read as the members column reads it (hidden stays hidden), and your line.
   const shown = usePersonPresence(me.user.id);
   const picked = shown?.person.availability;
-  const presence = picked ? presenceOfAvailability(picked) : (shown?.presence ?? null);
+  const presence = shown?.presence ?? null;
   const presenceWord = presence ? t(`presence.${presence}`) : undefined;
   const availability = picked ?? availabilityOf(shown?.presence);
   const line = shown?.status ? personLine(shown.status) : null;

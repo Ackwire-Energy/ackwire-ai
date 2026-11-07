@@ -652,7 +652,7 @@ async function agentReaches(
   a: Pick<ArtifactRow, "id" | "channelId">,
 ) {
   if (!a.channelId) return true;
-  if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(a.channelId)) {
+  if (!(await agentSearchChannels(db, orgId, actor.agentId, actor.channelId, { files: true })).includes(a.channelId)) {
     const person = await runPerson(db, orgId, actor.runId ?? undefined);
     if (person !== null && (await requesterSharedChannels(db, orgId, actor.agentId, person)).includes(a.channelId))
       return true;
@@ -1416,7 +1416,7 @@ export async function listArtifacts(
   let ownRoom: SQL | undefined;
   if (actor.type === "agent") {
     dm = await agentsDmReads(db, orgId, actor.channelId, () => readerOfRun(db, orgId, actor.runId));
-    visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId);
+    visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId, { files: true });
     if (await agentRoom(db, orgId, actor.channelId)) ownRoom = madeInRoomSql(actor.channelId);
     if (filters.requesterUserId) {
       const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);

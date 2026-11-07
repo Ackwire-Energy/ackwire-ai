@@ -1325,7 +1325,12 @@ export function BrowserCard({
             // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
             <div
               ref={pageRef}
-              className={["brw-ac__page", inControl && "is-control", capturing && "is-capturing"]
+              className={[
+                "brw-ac__page",
+                inControl && "is-control",
+                capturing && "is-capturing",
+                frame.metadata.emulated && "is-emulated",
+              ]
                 .filter(Boolean)
                 .join(" ")}
               tabIndex={inControl ? 0 : -1}
@@ -1368,6 +1373,23 @@ export function BrowserCard({
                 </span>
               )}
             </div>
+          )}
+          {!shows && frame?.metadata.emulated && (
+            <span className="brw-emu">
+              {t(`browser.live.emulated.${frame.metadata.emulated}`, {
+                size: `${frame.metadata.deviceWidth}×${frame.metadata.deviceHeight}`,
+              })}
+              {inControl && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={profile ? profileActions.open.isPending : actions.open.isPending}
+                  onClick={() => void openSite({ go: "normalSize" }).catch(didntWork)}
+                >
+                  {t("browser.live.normalSize")}
+                </Button>
+              )}
+            </span>
           )}
           {!shows && cover}
           {framed && !inControl && !otherInControl && (!shows || screenState === "live") && (

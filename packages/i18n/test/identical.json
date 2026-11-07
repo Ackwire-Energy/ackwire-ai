@@ -1,6 +1,7 @@
 {
   "app": {
     "pt-BR": [
+      "chat.wait.said",
       "access.area.skills",
       "agent.builtinName",
       "agentComputer.phone.trackpad",
@@ -233,7 +234,12 @@
       "files.video.volume",
       "linkPills.issue",
       "linkPills.merge",
-      "linkPills.pull"
+      "linkPills.pull",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "es": [
       "agent.builtinName",
@@ -423,10 +429,15 @@
       "connectAi.pick.plan",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "fr": [
       "settings.about.version",
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "deleteAccount.messageCount",
       "queue.fill.routine",
@@ -779,7 +790,11 @@
       "linkPills.document",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "de": [
       "settings.about.version",
@@ -1034,6 +1049,7 @@
       "recurrence.wd.SA.short",
       "recurrence.wd.SU.short",
       "rightHand.field.archive",
+      "rightHand.field.name",
       "roles.admin",
       "rolesPage.administrator",
       "rolesPage.name",
@@ -1143,7 +1159,13 @@
       "approvals.review.state",
       "agentSide.label",
       "agentPage.work.brain.speeds.standard",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "it": [
       "queue.fill.routine",
@@ -1438,9 +1460,16 @@
       "linkPills.file",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "nl": [
+      "wiki.bulk.agents",
       "deleteAccount.agentCount",
       "queue.fill.routine",
       "access.agentCol",
@@ -1943,7 +1972,13 @@
       "linkPills.spreadsheet",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "ja": [
       "access.area.vault",
@@ -2067,9 +2102,14 @@
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
       "teamTemplates.channels.bia",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "ko": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2187,9 +2227,14 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "zh-Hans": [
+      "chat.wait.said",
       "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
@@ -2298,9 +2343,14 @@
       "teamTemplates.channels.theo",
       "teamTemplates.channels.nina",
       "teamTemplates.channels.otto",
-      "teamTemplates.channels.bia"
+      "teamTemplates.channels.bia",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ],
     "id": [
+      "chat.wait.said",
       "access.area.browser",
       "access.area.desktop",
       "agent.builtinName",
@@ -2524,9 +2574,16 @@
       "linkPills.invoice",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "tr": [
+      "chat.wait.said",
       "agent.builtinName",
       "agentPage.fields.model",
       "agentPage.work.brain.planModel",
@@ -2658,7 +2715,12 @@
       "connectAi.pick.plan",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2884,7 +2946,12 @@
       "linkPills.folder",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "ru": [
       "agent.builtinName",
@@ -2996,7 +3063,11 @@
       "teamTemplates.channels.bia",
       "linkPills.pull",
       "linkPills.merge",
-      "linkPills.issue"
+      "linkPills.issue",
+      "routines.setup.github.secret",
+      "routines.setup.github.type",
+      "routines.setup.github.url",
+      "routines.setup.sentry.url"
     ]
   },
   "mobile-base": {

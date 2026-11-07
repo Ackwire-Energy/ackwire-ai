@@ -1049,12 +1049,6 @@
   "plus.file": {
     "value": "File"
   },
-  "plus.audio": {
-    "value": "Audio"
-  },
-  "plus.audioSoon": {
-    "value": "Audio is coming soon."
-  },
   "plus.noCamera": {
     "value": "No camera access. Allow it in the phone's Settings."
   },
@@ -1745,6 +1739,9 @@
   "activity.title": {
     "value": "Activity"
   },
+  "activity.chooseModel": {
+    "value": "Choose another model"
+  },
   "activity.filter.all": {
     "value": "All"
   },
@@ -2030,6 +2027,12 @@
     "female": {
       "one": "{{names}} connected your {{plan}} plan to {{agent}}",
       "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
+  },
+  "activity.kind.plan_model_dropped": {
+    "value": {
+      "one": "{{model}} left {{plan}}. {{names}} is using {{runs}} for now",
+      "other": "{{model}} left {{plan}}. {{names}} is using {{runs}} for now"
     }
   },
   "activity.kind.connector_tool_changed": {

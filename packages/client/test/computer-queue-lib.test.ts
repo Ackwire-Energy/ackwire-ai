@@ -303,5 +303,17 @@ test("the status note of an agent waiting for its computer says that, never that
   expect(talkerStatusText(pt, { minutes: "0", steps: "0", wait: "away" })).toBe(
     "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
   );
-  expect(talkerStatusText(en, { minutes: "11", steps: "3" })).toContain("Still on it (11 min)");
+  expect(talkerStatusText(en, { minutes: "11", steps: "3" })).toBe(
+    "I'm in the middle of a task (11 min) and can't answer yet. Your message is queued and I'll read it at my next step.",
+  );
+});
+
+test("a working agent's status note says when it really reads the message: its next step, or when its turn ends", () => {
+  const pt = tFor("pt-BR");
+  expect(talkerStatusText(pt, { minutes: "7", steps: "0", reads: "turn", kind: "browsing" })).toBe(
+    "Estou no meio de uma tarefa (7 min) e ainda não consigo responder. Sua mensagem está na fila e eu leio quando esta rodada de trabalho terminar. Agora: navegando na web.",
+  );
+  expect(talkerStatusText(pt, { minutes: "7", steps: "0" })).toBe(
+    "Estou no meio de uma tarefa (7 min) e ainda não consigo responder. Sua mensagem está na fila e eu leio no próximo passo.",
+  );
 });

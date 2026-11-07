@@ -18,6 +18,8 @@ const USAGE_NOTES = new Set([
   "plan_model_limit_wait",
   "plan_model_limit_wait_unknown",
   "plan_model_region_wait",
+  "plan_model_off_wait",
+  "plan_inactive_wait",
   "budget_wait",
 ]);
 
@@ -209,3 +211,7 @@ export function previewBody(t: TFunction, text: string, meta: Meta | null, media
   }
   return previewOf(meta ? serverBody(t, text, meta) : text);
 }
+
+/** A message notification's snippet: a body the server wrote in the reader's language, else its text as it came. */
+export const latestText = (t: TFunction, l: { text?: string; meta?: Meta | null }) =>
+  l.text && l.meta ? previewBody(t, l.text, l.meta) : l.text;

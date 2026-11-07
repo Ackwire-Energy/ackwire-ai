@@ -463,8 +463,6 @@ export const featureKeysPtBR = {
     camera: "Câmera",
     photos: "Fotos",
     file: "Arquivo",
-    audio: "Áudio",
-    audioSoon: "Áudio chega em breve.",
     noCamera: "Sem acesso à câmera. Libere nos Ajustes do celular.",
     mission: "Começar uma missão",
     missionHint: "Um trabalho longo, com plano, do começo ao fim",
@@ -749,6 +747,8 @@ export const featureKeysPtBR = {
   },
   activity: {
     title: "Atividade",
+    /** Under `plan_model_dropped`: opens the agent's model. */
+    chooseModel: "Escolher outro modelo",
     filter: {
       all: "Tudo",
       waiting: "Esperando você",
@@ -851,6 +851,9 @@ export const featureKeysPtBR = {
       plan_lent_other: "{{names}} conectaram o seu plano do {{plan}} ao\u00a0{{agent}}",
       plan_lent_female_one: "{{names}} conectou o seu plano do {{plan}} à\u00a0{{agent}}",
       plan_lent_female_other: "{{names}} conectaram o seu plano do {{plan}} à\u00a0{{agent}}",
+      /** An agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      plan_model_dropped_one: "O {{model}} saiu do {{plan}}. {{names}} está usando o {{runs}} por enquanto",
+      plan_model_dropped_other: "O {{model}} saiu do {{plan}}. {{names}} está usando o {{runs}} por enquanto",
       connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
       connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
       computer_disk_full_one: "O disco de um computador está quase cheio",

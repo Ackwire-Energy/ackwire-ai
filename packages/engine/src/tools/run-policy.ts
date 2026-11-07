@@ -1,5 +1,4 @@
 import { fedByRoutine, type RunAuthority } from "../authority";
-import { cutText } from "../format";
 import { directoryRole } from "./directory";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -343,7 +342,10 @@ export function approvalOrigin(authority: RunAuthority): ApprovalOrigin | null {
 /** The reason every request for a person (an approval, `ask_user`) carries, at least this long. */
 export const WHY_MIN_CHARS = 40;
 export const WHY_MAX_CHARS = 1000;
-export const WHY_REFUSAL = `Say why first, in \`why\`: at least ${WHY_MIN_CHARS} characters on what you found and why this action; people see it on the card.`;
+export const WHY_REFUSAL = `Say why first, in \`why\`: at least ${WHY_MIN_CHARS} characters (at most ${WHY_MAX_CHARS}) on what you found and why this action; people see it on the card.`;
+
+/** A reason people can read whole: one too short or too long is refused, never cut to fit. */
+const whyOf = (text: string) => (text.length >= WHY_MIN_CHARS && text.length <= WHY_MAX_CHARS ? text : null);
 
 const WHY_PROPERTY: JsonSchema = {
   type: "string",
@@ -372,7 +374,7 @@ export function withWhy(schema: JsonSchema): JsonSchema {
 
 /**
  * Takes the `why` out of a call's input (the tool itself never sees it): the reason, or null when it
- * is missing or too short, and the input to validate and run. A tool with its own `why` keeps it.
+ * is missing, too short or too long, and the input to validate and run. A tool with its own `why` keeps it.
  */
 export function takeWhy(
   schema: JsonSchema,
@@ -380,9 +382,9 @@ export function takeWhy(
 ): { why: string | null; input: Record<string, unknown> } {
   if (ownsWhy(schema)) {
     const own = typeof input.why === "string" ? input.why.trim() : "";
-    return { why: own.length >= WHY_MIN_CHARS ? cutText(own, WHY_MAX_CHARS) : null, input };
+    return { why: whyOf(own), input };
   }
   const { why, ...rest } = input;
   const text = typeof why === "string" ? why.trim() : "";
-  return { why: text.length >= WHY_MIN_CHARS ? cutText(text, WHY_MAX_CHARS) : null, input: rest };
+  return { why: whyOf(text), input: rest };
 }

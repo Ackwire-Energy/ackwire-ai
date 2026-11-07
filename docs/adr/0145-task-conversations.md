@@ -40,6 +40,8 @@ An agent's run in the conversation sees the task (`canSee` with the task's conve
 
 `notifyMessage` hands a `task` channel's messages to `notifyTaskMessage`: who it @mentions gets a `mention`, the task's followers (its creator, its person assignee, who acted on it, and everyone who wrote in the conversation) an `issue_comment` merged per task, always by who sees the task (`visibleOnIssue`), never by channel membership. The source carries the task (`issueId`, `issueNumber`) and the message (`messageId`): the web opens `/issues/{n}?m=<id>` and the phone `/issues/{n}?m=<id>`, which open the task with its conversation at that message. A routine's line notifies nobody there.
 
+Unread follows the threads' model (ADR 0029): a person named there who sees the task is in the message's `mentioned_user_ids` like a channel member (`insertMessageWithRuns`), and `unreadTaskConversations` (`GET …/unread-tasks`) counts, per task they see now, the replies after their `thread_reads` mark: every one where they follow the conversation (its root is the creator's, so the creator does), else only those that mention them. The web shows the mentions as the red count on Tarefas in the sidebar, the task's card and list row and "Conversa"; a reply they follow lights "Conversa". The phone shows them on Tarefas in Você, the board's card and the conversation row. Reading the thread clears them.
+
 ### 5. The board and the dialog read it in one query
 
 `IssueView.conversation` (`taskConversationSummaries`, one statement for the whole list): `channelId`, `rootId`, `count` (replies, quiet notices left out), `lastAt`, `participants` (the first five to write, oldest first) and `working` (a live run in the conversation). `listIssues` builds it once per board, not per card. A reply's `notifications.message` job announces `issue.updated` for the task, so open boards update their card; the web also lights "Trabalhando" from the live runs it already follows.
@@ -59,7 +61,7 @@ Migration `0215_task_conversations.sql` adds `task` to `channel_kind` and the tw
 
 - A task's conversation is chat: an @mention there wakes the agent, which answers in that thread, with everything chat has.
 - One more channel row and one root message per task someone talked about; nothing for the others.
-- People are never members of a task's conversation: lists, unread counts and search that read membership don't show it, by design. It is read from the task. A task conversation's messages are not in the person's search results yet (search reads joined channels); the task itself is.
+- People are never members of a task's conversation: lists, unread counts and search that read membership don't show it, by design. It is read from the task, and its unread and mentions come from the task (§4). A task conversation's messages are not in the person's search results yet (search reads joined channels); the task itself is.
 - `requireChannelAccess` adds one `exists` to its single query, evaluated only for a `task` channel.
 - Older work threads in DMs keep working: their root (`meta.issueWork`) still gives the brief, and their replies reach the task's conversation.
 

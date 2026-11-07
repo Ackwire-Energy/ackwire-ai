@@ -450,8 +450,6 @@
     "camera": "Camera",
     "photos": "Foto's",
     "file": "Bestand",
-    "audio": "Audio",
-    "audioSoon": "Audio komt binnenkort.",
     "noCamera": "Geen toegang tot de camera. Sta het toe in de Instellingen van de telefoon.",
     "mission": "Een missie starten",
     "missionHint": "Lang werk, met een plan, van begin tot eind",
@@ -730,6 +728,7 @@
   },
   "activity": {
     "title": "Activiteit",
+    "chooseModel": "Ander model kiezen",
     "filter": {
       "all": "Alles",
       "waiting": "Wacht op jou",
@@ -832,6 +831,8 @@
       "plan_lent_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_lent_female_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_model_dropped_one": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
+      "plan_model_dropped_other": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
       "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
       "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",

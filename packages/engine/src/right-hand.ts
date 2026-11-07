@@ -1,19 +1,29 @@
 import { LOCKED_BRAIN_PROTOCOL } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, isNull, type SQL, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNotNull, isNull, type SQL, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import type { NoAiReason } from "./ai-status";
 import { recordAudit } from "./audit";
-import type { BrainUnavailability } from "./brains/select";
+import type { BrainUnavailability, ModelScope } from "./brains/select";
 import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
 import { personBehindCall } from "./requester";
 import type { AgentRun } from "./runs";
 import { scrubSignIns } from "./tool-detail";
+import type { ToolContext } from "./tools/types";
 
-const { agents, agentBudgetPeriods, machineAccounts, organizationMembers, organizations, users } = schema;
+const {
+  agents,
+  agentBudgetPeriods,
+  channelMembers,
+  channels,
+  machineAccounts,
+  organizationMembers,
+  organizations,
+  users,
+} = schema;
 
 /**
  * The team's right hand (ADR 0137): one built-in agent per workspace that sets the team up and changes it, through
@@ -36,7 +46,7 @@ export const RIGHT_HAND_DEFAULTS = {
 export const RIGHT_HAND_AUTO = {
   role: "Workspace assistant",
   instructions:
-    "Sets the team up with people: short questions and cards (a new agent, a setting, an app, an invite). Small work: the smallest tier and low effort, unless the person asks for something long or complex.",
+    "Sets the team up with people through short questions and cards, and follows its work. A status, a greeting or a short question: the smallest tier and low effort. Handing work to an agent, following it up or reporting what came of it: the medium tier. More only when the person asks for something long or complex.",
 } as const;
 
 /** In `RIGHT_HAND_GRANTS`: nothing outside them can be turned on, so nobody is told to ask for it (`refusalOf`). */
@@ -48,10 +58,11 @@ export const RIGHT_HAND_REFUSAL =
 
 /**
  * Its tools, fixed in code whatever its grant rows say (`loadScopeKeys`): the setup cards, reading context, reading
- * the Drive and the wiki as the person behind the run (ADR 0137 §12), routines for any agent, and
+ * the Drive, the wiki and tasks as the person behind the run (ADR 0137 §12, §13), routines for any agent,
  * `propose_instruction_change` (under `memory:write`, whose memory tools are denied: its runs keep no memory, so
- * nothing one person tells it reaches another). No writing files, apps, web, computer, databases or mail, nor posting
- * elsewhere (`share_artifact` too), putting agents in channels without a card, or long work.
+ * nothing one person tells it reaches another) and `create_issue`, a task written as itself, never in a person's name
+ * (§13). No writing files, apps, web, computer, databases or mail, nor posting elsewhere (`share_artifact` too), putting
+ * agents in channels without a card, or long work.
  */
 export const RIGHT_HAND_GRANTS: readonly string[] = [
   FIXED_GRANTS,
@@ -59,6 +70,8 @@ export const RIGHT_HAND_GRANTS: readonly string[] = [
   "context:read",
   "drive:read",
   "wiki:read",
+  "issues:read",
+  "issues:write",
   "schedule:write",
   "memory:write",
   ...[
@@ -77,6 +90,8 @@ export const RIGHT_HAND_GRANTS: readonly string[] = [
     "post_update",
     "steer_work",
     "stop_work",
+    "update_issue",
+    "comment_issue",
   ].map((name) => `deny:${name}`),
 ];
 
@@ -219,6 +234,33 @@ export async function scrubRightHandReply(
   return out.text;
 }
 
+/**
+ * Who a run of the right hand reads for (ADR 0137 §13): the person behind it, in their own DM with it. Null anywhere
+ * else, since others read a reply in a channel, and for any other agent.
+ */
+export async function rightHandReader(
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "channelId" | "runId" | "triggerMessageId"> & { db: Executor },
+): Promise<string | null> {
+  const [agent] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
+  if (!isRightHand(agent)) return null;
+  const person = await personBehindCall(ctx);
+  if (!person) return null;
+  const people = await ctx.db
+    .select({ userId: channelMembers.userId })
+    .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+    .where(and(eq(channelMembers.channelId, ctx.channelId), eq(channels.kind, "dm"), isNotNull(channelMembers.userId)));
+  return people.length === 1 && people[0]?.userId === person ? person : null;
+}
+
+/** The right hand anywhere but a person's own DM with it: what only reads or writes for that person stays out. */
+export async function rightHandAway(
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "channelId" | "runId" | "triggerMessageId"> & { db: Executor },
+) {
+  const [agent] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
+  return isRightHand(agent) && !(await rightHandReader(ctx));
+}
+
 /** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
 
@@ -332,14 +374,22 @@ export async function rightHandPlanRefusal(
 
 /**
  * The line its DM shows when its plan can't think (ADR 0137 §7): it never falls back to an API key, nor waits with a
- * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, or the region that model needs:
- * `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
+ * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, the region that model needs, or
+ * that model switched off for the key: `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
  * installed, or what any agent says.
  */
-export function rightHandNoAiReason(code: string, scope?: "model" | "region"): NoAiReason {
+export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReason {
   if (code === "machine_offline" || code === "machine_paused") return "computer_away";
   if (code === "plan_limit")
-    return scope === "region" ? "model_region" : scope === "model" ? "model_limit" : "plan_limit";
+    return scope === "region"
+      ? "model_region"
+      : scope === "inactive"
+        ? "plan_inactive"
+        : scope === "off"
+          ? "model_off"
+          : scope === "model"
+            ? "model_limit"
+            : "plan_limit";
   if (code === "plan_not_shared" || code === "plan_not_owner") return "plan_not_shared";
   if (code === "runner_outdated" || code === "codex_too_old") return "runner_outdated";
   if (code === "exec_disabled" || code === "tool_off") return "commands_off";

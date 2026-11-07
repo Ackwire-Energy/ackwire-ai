@@ -57,7 +57,12 @@ describe("work summary", () => {
   const at = (s: number) => new Date(Date.UTC(2026, 9, 15, 22, 9, s)).toISOString();
   const steps: RunStep[] = [
     { seq: 1, kind: "context", data: {}, createdAt: at(0) },
-    { seq: 2, kind: "tool_call", data: { toolUseId: "t1", name: "himetrica_get_summary" }, createdAt: at(1) },
+    {
+      seq: 2,
+      kind: "tool_call",
+      data: { toolUseId: "t1", name: "himetrica_get_summary", connector: "Himetrica" },
+      createdAt: at(1),
+    },
     { seq: 3, kind: "tool_result", data: { toolUseId: "t1", isError: false }, createdAt: at(4) },
     { seq: 4, kind: "tool_call", data: { toolUseId: "t2", name: "create_artifact" }, createdAt: at(5) },
     { seq: 5, kind: "tool_result", data: { toolUseId: "t2", isError: true }, createdAt: at(8) },
@@ -71,10 +76,10 @@ describe("work summary", () => {
       ["consulting", 3000, false],
       ["writingDrive", 3000, true],
     ]);
-    expect(w.connectors).toEqual(["himetrica", "Drive"]);
+    expect(w.connectors).toEqual(["Himetrica", "Drive"]);
     expect(workHeader(t, { steps: w.steps.length, connectors: w.connectors, durationMs: w.durationMs })).toEqual({
       steps: "2 passos",
-      connectors: "himetrica e Drive",
+      connectors: "Himetrica e Drive",
       duration: "12 s",
     });
   });
@@ -93,7 +98,11 @@ describe("work summary", () => {
     const reply = state.messages.find((m) => m.id === "m-2");
     if (reply)
       reply.meta = {
-        work: { steps: 2, calls: [{ name: "himetrica_get_summary" }, { name: "create_artifact" }], durationMs: 12_000 },
+        work: {
+          steps: 2,
+          calls: [{ name: "himetrica_get_summary", connector: "Himetrica" }, { name: "create_artifact" }],
+          durationMs: 12_000,
+        },
       };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);

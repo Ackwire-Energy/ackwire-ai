@@ -111,3 +111,44 @@ describe("Aguardando sua resposta, in the chat", () => {
     expect(busy.querySelector(".ac-workline__update")?.textContent).toBe("Revisei a lista.");
   });
 });
+
+describe("the last update, once", () => {
+  const UPDATE = "Montei um script para varrer todas as páginas.";
+  test("in the work's thread its update is the message under the anchor: the line doesn't repeat it", async () => {
+    const state = seedState();
+    state.messages = state.messages.filter((m) => m.channelId !== ENG_ID);
+    const view = work({
+      state: "working",
+      question: null,
+      lastUpdate: { text: UPDATE, at: new Date().toISOString(), seq: 1 },
+    });
+    state.messages.push(message("anchor", null, "Vou cuidar disso.", { longWork: view }));
+    state.messages.push(message("u1", "anchor", UPDATE, { meta: { workUpdate: { id: "w1", seq: 1 } } }));
+    rendered = await renderApp(`/org/${ORG_ID}/threads/anchor`, { api: createFakeApi(state) });
+    await settle(8);
+    const line = document.querySelector(".ac-workline") as HTMLElement;
+    expect(line.querySelector(".ac-workline__text")?.textContent).toContain("Em segundo plano");
+    expect(line.querySelector(".ac-workline__update")).toBeNull();
+    const shown = Array.from(document.querySelectorAll(".ac-msg")).filter((m) => m.textContent?.includes(UPDATE));
+    expect(shown).toHaveLength(1);
+  });
+});
+
+test("an anchor in a thread its updates no longer go to keeps the last update on its line", async () => {
+  const UPDATE = "Montei um script para varrer todas as páginas.";
+  const state = seedState();
+  state.messages = state.messages.filter((m) => m.channelId !== ENG_ID);
+  // Moved out of that thread (`move_here`): its updates land at the top of the channel now.
+  const view = work({
+    state: "working",
+    question: null,
+    threadId: null,
+    lastUpdate: { text: UPDATE, at: new Date().toISOString(), seq: 1 },
+  });
+  state.messages.push(message("root", null, "QA do site"));
+  state.messages.push(message("anchor", "root", "Vou cuidar disso.", { longWork: view }));
+  rendered = await renderApp(`/org/${ORG_ID}/threads/root`, { api: createFakeApi(state) });
+  await settle(8);
+  const line = document.querySelector(".ac-workline") as HTMLElement;
+  expect(line.querySelector(".ac-workline__update")?.textContent).toBe(UPDATE);
+});

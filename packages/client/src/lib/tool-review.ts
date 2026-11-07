@@ -130,12 +130,22 @@ const singular = (w: string) =>
         ? w.slice(0, -1)
         : w;
 
-/** The name's parts when the server didn't send them (older servers, catalog tools); mirrors the backend. */
-export function partsOf(name: string, prefix: string | null = null) {
+/**
+ * The name's parts when the server didn't send them (older servers, catalog tools); mirrors the backend. `verbFirst`:
+ * a name that always leads with its verb (Composio's slugs), so `publish_post` publishes a post, not posts a publish.
+ */
+export function partsOf(name: string, prefix: string | null = null, verbFirst = false) {
   let w = words(name);
   if (prefix && w[0] === prefix && w.length > 1) w = w.slice(1);
   const last = w.length - 1;
-  const v = VERBS.has(w[last] ?? "") ? last : VERBS.has(w[0] ?? "") ? 0 : w.findIndex((x) => VERBS.has(x));
+  const v =
+    verbFirst && VERBS.has(w[0] ?? "")
+      ? 0
+      : VERBS.has(w[last] ?? "")
+        ? last
+        : VERBS.has(w[0] ?? "")
+          ? 0
+          : w.findIndex((x) => VERBS.has(x));
   const verb = v >= 0 ? (w[v] ?? null) : null;
   const rest = v >= 0 ? w.filter((_, i) => i !== v) : w;
   return { verb, words: rest, subject: rest[0] ? singular(rest[0]) : "other" };

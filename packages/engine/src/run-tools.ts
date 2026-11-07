@@ -7,7 +7,13 @@ import type { BrainTool, ToolResult } from "./brains/types";
 import { readableChannelIds } from "./channels";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
-import { liveTurnToolStarted, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import {
+  liveTurnToolStarted,
+  type MemoryUpdate,
+  publishChannelEvent,
+  publishMessageCreated,
+  takeStepWords,
+} from "./events";
 import { pgSafeStringify } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
@@ -469,10 +475,12 @@ export async function invokeWithChip(
   // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
   if (def) void followWork(deps, ctx, def).catch(() => {});
   liveTurnToolStarted(where.runId);
+  const said = takeStepWords(where.runId);
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
     tool: shownName,
+    ...(said ? { said } : {}),
     ...(connector ? { connector } : {}),
     ...(def?.service ? { service: def.service } : {}),
     ...(def?.serviceIcon ? { serviceIcon: def.serviceIcon } : {}),

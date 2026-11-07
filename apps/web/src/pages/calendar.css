@@ -279,6 +279,17 @@ html:not([data-pointer]) .cal-chip:focus-visible {
   padding: 4px 6px 4px 9px;
   touch-action: none;
   z-index: 1;
+  container-type: inline-size;
+}
+/* Two lines fit a one-hour event (42px, padding included). */
+.cal-chip--block :is(.cal-chip__title, .cal-chip__time) {
+  line-height: 16px;
+}
+/* A narrow column says when it starts: a range cut at the edge reads as another time. */
+@container (max-width: 76px) {
+  .cal-chip__end {
+    display: none;
+  }
 }
 .cal-chip--bar {
   align-items: center;

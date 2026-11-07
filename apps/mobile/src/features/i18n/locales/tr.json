@@ -450,8 +450,6 @@
     "camera": "Kamera",
     "photos": "Fotoğraflar",
     "file": "Dosya",
-    "audio": "Ses",
-    "audioSoon": "Ses yakında geliyor.",
     "noCamera": "Kamera erişimi yok. Telefonun Ayarlar bölümünden izin verin.",
     "mission": "Misyon başlat",
     "missionHint": "Baştan sona, planlı uzun bir iş",
@@ -730,6 +728,7 @@
   },
   "activity": {
     "title": "Etkinlik",
+    "chooseModel": "Başka bir model seç",
     "filter": {
       "all": "Tümü",
       "waiting": "Sizi bekleyenler",
@@ -832,6 +831,8 @@
       "plan_lent_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
       "plan_lent_female_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
       "plan_lent_female_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_model_dropped_one": "{{model}}, {{plan}} listesinden çıktı. {{names}} şimdilik {{runs}} kullanıyor",
+      "plan_model_dropped_other": "{{model}}, {{plan}} listesinden çıktı. {{names}} şimdilik {{runs}} kullanıyor",
       "connector_tool_changed_one": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "connector_tool_changed_other": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "computer_disk_full_one": "Bir bilgisayarın diski neredeyse dolu",

@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
+import type { PlanModel } from "@agenteschat/providers/plans";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
@@ -6,7 +7,7 @@ import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
-import { previewMediaKind, readableBody } from "./message-preview";
+import { previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { isAgentOnlyNotice } from "./notices";
 import {
   dropRunFailure,
@@ -160,10 +161,14 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (channel.kind === "task") return notifyTaskMessage(deps, message);
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
-  const text = notificationSnippet(readableBody(await quotedBody(deps, orgId, message), meta));
+  // A reminder's own words, without the English prefix the chat replaces with its own label.
+  const said = typeof meta.reminderText === "string" ? meta.reminderText : await quotedBody(deps, orgId, message);
+  const text = notificationSnippet(readableBody(said, meta));
   // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
   const media = previewMediaKind(message.body, meta);
-  const latest = media ? { text, media } : { text };
+  // A body the server wrote: the apps say it in the reader's language, as the conversation lists do.
+  const written = previewMeta(meta);
+  const latest = { text, ...(media ? { media } : {}), ...(written ? { meta: written } : {}) };
   const label = channel.kind === "channel" ? channel.name : undefined;
   const where: NotificationSource = {
     channelId: message.channelId,
@@ -224,10 +229,10 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   }
 
   // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself,
-  // answered above for the person behind them, except a message the agent started there on someone's behalf,
-  // `send_dm`).
+  // answered above for the person behind them, except what nobody is waiting on: a message the agent started there on
+  // someone's behalf, `send_dm`, and a reminder or a routine's report, which come while the app may be closed).
   if (channel.kind === "dm") {
-    if (message.authorType !== "person" && !meta.agentDm) return;
+    if (message.authorType !== "person" && !meta.agentDm && !meta.routine && !meta.viaRoutine) return;
     const others = await db
       .select({ userId: channelMembers.userId })
       .from(channelMembers)
@@ -946,6 +951,28 @@ export async function notifyPlanResetUnknown(
       label: input.agentName,
     },
     latest: { title: input.plan },
+  });
+}
+
+/** The inbox note of an agent's model that left its plan's list (`plan_model_dropped`); no model: all of the agent's. */
+export const planModelDroppedGroup = (agentId: string, model = "") => `plan_model_dropped:${agentId}:${model}`;
+
+/**
+ * A model the agent thinks with left its plan's live list and its turns run another one: its owner hears it once per
+ * model, with what it runs now, so the switch is never silent.
+ */
+export async function notifyPlanModelDropped(
+  deps: NotificationDeps,
+  input: { orgId: string; agentId: string; agentName: string; plan: string; model: PlanModel; runs: string },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [await agentOwner(deps, input.agentId)],
+    kind: "plan_model_dropped",
+    groupKey: planModelDroppedGroup(input.agentId, input.model.id),
+    actor: agent(input.agentId),
+    source: { agentId: input.agentId, label: input.agentName },
+    latest: { title: input.model.label, plan: input.plan, nowModel: input.runs },
   });
 }
 

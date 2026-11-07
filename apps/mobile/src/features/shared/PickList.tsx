@@ -1,14 +1,19 @@
 import { type BrainPickOption, brainPickText, pickGroups } from "@agenteschat/client/lib/brain-picker";
 import { matchesWords } from "@agenteschat/ui/search";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { GroupedHeader, GroupedList, GroupedRow, ProviderLogo, SearchField, Text } from "@/ui";
+import { GroupedHeader, GroupedList, GroupedRow, type IconName, ProviderLogo, SearchField, Text } from "@/ui";
 
 export type PickRow = Pick<BrainPickOption, "value" | "label" | "keywords"> &
   Partial<Pick<BrainPickOption, "group" | "mark" | "description" | "hint" | "disabled">> & {
     /** Its logo dims: it can't be used here now, though it still opens. */
     off?: boolean;
+    /** What stands before it when no maker's logo does; default: the sparkle. */
+    leading?: ReactNode;
+    icon?: IconName;
+    /** Lines its description may take (default 2). */
+    subLines?: number;
   };
 
 /** One choice from a list, the phone's picker: a search over the rows by their logos, in their groups, the chosen one checked. */
@@ -55,11 +60,13 @@ export function PickList<O extends PickRow>({
                 <GroupedRow
                   key={o.value}
                   label={o.label}
-                  {...(o.description ? { sub: o.description, subLines: 2 } : {})}
+                  {...(o.description ? { sub: o.description, subLines: o.subLines ?? 2 } : {})}
                   {...(o.hint ? { hint: { name: t("common.about", { label: o.label }), text: o.hint } } : {})}
                   {...(o.mark
                     ? { leading: <ProviderLogo id={o.mark} size="sm" off={o.off ?? false} /> }
-                    : { icon: "sparkle" as const })}
+                    : o.leading
+                      ? { leading: o.leading }
+                      : { icon: o.icon ?? ("sparkle" as const) })}
                   checked={o.value === value}
                   disabled={o.disabled ?? false}
                   onPress={() => onPick(o)}

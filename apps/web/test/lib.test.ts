@@ -466,7 +466,7 @@ describe("the confirmation email", () => {
     ]);
   });
 
-  test("a new link that didn't go out says why in the person's words, else the server's (English, every language's fallback)", async () => {
+  test("a new link that didn't go out says why in the person's words, else a plain line in their language, never English", async () => {
     const shown: string[] = [];
     const show = (text: string) => void shown.push(text);
     const refusals = [
@@ -482,7 +482,7 @@ describe("the confirmation email", () => {
     expect(shown).toEqual([
       "Sem conexão com o agentes.chat agora. Tente de novo em instantes.",
       "Muitas tentativas. Espere alguns minutos e tente de novo.",
-      "Email is already verified",
+      "Não deu certo. Confira o que preencheu e tente de novo.",
     ]);
   });
 

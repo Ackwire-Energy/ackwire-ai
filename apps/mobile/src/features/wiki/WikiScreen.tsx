@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { titleOfSlug, toggleTask } from "@agenteschat/client/lib/wiki";
+import { titleOfSlug, toggleTask, wikiImportOf } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -52,6 +52,7 @@ import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { foldersIn, searchWiki, wikiHome } from "./logic";
+import { openWikiAgents, openWikiTrash, useWikiBulkDelete } from "./WikiBulk";
 import { WikiDoc } from "./WikiDoc";
 
 /** Opens a page of the wiki (its slug in the path, encoded: a slug may carry its folder). */
@@ -86,6 +87,14 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const reads = useWikiReads(orgId, folder === "");
   const graph = useWikiGraph(orgId, folder === "");
   const [picked, setPicked] = useState<string | null>(null);
+  // Choosing pages to delete them or set their agents at once.
+  const [selecting, setSelecting] = useState(false);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const bulkDelete = useWikiBulkDelete();
+  const stopSelecting = () => {
+    setSelecting(false);
+    setChosen(new Set());
+  };
   const [q, setQ] = useState("");
   const search = useDeferredValue(q.trim());
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
@@ -107,31 +116,74 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   // The home and the search's results cross-fade as a search starts and ends, and fade in when they load.
   const reduced = useReducedMotion();
   const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
-  const pageRow = (p: WikiPageSummary, i: number, sub?: string) => (
-    <Row
-      key={p.id}
-      divider={i > 0}
-      leading={<PageTile page={p} />}
-      title={p.title}
-      {...(sub ? { subtitle: sub } : {})}
-      chevron
-      onPress={() => openWikiPage(p.slug)}
-    />
-  );
+  const pageRow = (p: WikiPageSummary, i: number, sub?: string) => {
+    const on = chosen.has(p.id);
+    return (
+      <Row
+        key={p.id}
+        divider={i > 0}
+        leading={<PageTile page={p} />}
+        title={p.title}
+        {...(sub ? { subtitle: sub } : {})}
+        {...(selecting
+          ? {
+              meta: <Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />,
+              onPress: () => {
+                const next = new Set(chosen);
+                if (on) next.delete(p.id);
+                else next.add(p.id);
+                setChosen(next);
+              },
+            }
+          : { chevron: true, onPress: () => openWikiPage(p.slug) })}
+      />
+    );
+  };
+  const inThisFolder = folder ? pages.filter((p) => inFolder(p, folder)).length : 0;
+  const choosable = search ? found : (home?.pages ?? []);
   return (
     <View style={styles.fill}>
-      <PushedLargeTitle title={title} bottomInset={96}>
+      <PushedLargeTitle
+        title={title}
+        bottomInset={96}
+        right={
+          writes && pages.length > 0 ? (
+            selecting ? (
+              <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={stopSelecting} />
+            ) : (
+              <View style={styles.headActs}>
+                {folder ? (
+                  <IconButton
+                    icon="trash"
+                    label={t("wiki.bulk.deleteFolder", { folder })}
+                    disabled={bulkDelete.pending}
+                    onPress={() =>
+                      bulkDelete.ask(
+                        { folder },
+                        inThisFolder,
+                        t("wiki.bulk.deleteFolderTitle", { folder, count: inThisFolder }),
+                        goBack,
+                      )
+                    }
+                  />
+                ) : null}
+                <IconButton icon="checks" label={t("wiki.bulk.select")} onPress={() => setSelecting(true)} />
+              </View>
+            )
+          ) : undefined
+        }
+      >
         {folder ? null : (
           <Text variant="subhead" tone="muted" style={styles.lead}>
             {t("wiki.subtitle")}
           </Text>
         )}
-        {folder && choosesAudience ? (
+        {choosesAudience && !selecting ? (
           <Row
             leading={<Tile icon="eye" />}
-            title={t("wiki.audience")}
+            title={folder ? t("wiki.audience") : t("wiki.audienceRootTitle")}
             chevron
-            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder } })}
+            onPress={() => router.push({ pathname: "/wiki-audience", params: folder ? { folder } : { root: "1" } })}
           />
         ) : null}
         <View style={styles.search}>
@@ -166,7 +218,15 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             onPress={() => newWikiPage(folder ? { folder } : {})}
           />
         ) : null}
-        {search ? (
+        {selecting ? (
+          <>
+            <SectionHeader
+              title={chosen.size ? t("wiki.bulk.selected", { count: chosen.size }) : t("wiki.bulk.select")}
+              count={choosable.length}
+            />
+            <Locked when={bulkDelete.pending}>{choosable.map((p, i) => pageRow(p, i, p.folder || undefined))}</Locked>
+          </>
+        ) : search ? (
           found.length === 0 ? (
             pages.length > 0 ? (
               <EmptyState
@@ -253,6 +313,15 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
                 {home.pages.map((p, i) => pageRow(p, i, p.excerpt))}
               </>
             ) : null}
+            {!folder && writes ? (
+              <Row
+                leading={<Tile icon="trash" />}
+                title={t("wiki.trash.title")}
+                subtitle={t("wiki.trash.text")}
+                chevron
+                onPress={openWikiTrash}
+              />
+            ) : null}
             {!folder && (reads.data ?? []).length > 0 ? (
               <>
                 <SectionHeader title={t("wiki.topReads")} />
@@ -278,7 +347,40 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
-      {writes && !(tree.isSuccess && pages.length === 0) ? (
+      {selecting ? (
+        <View
+          style={[styles.pickBar, { paddingBottom: insets.bottom + 12, backgroundColor: c.bg, borderColor: c.line }]}
+        >
+          {choosesAudience ? (
+            <Button
+              variant="secondary"
+              label={t("wiki.bulk.agents")}
+              disabled={chosen.size === 0}
+              onPress={() => {
+                openWikiAgents([...chosen]);
+                stopSelecting();
+              }}
+            />
+          ) : null}
+          <View style={styles.grow}>
+            <Button
+              variant="primary"
+              wide
+              label={chosen.size ? t("wiki.bulk.deleteGo", { count: chosen.size }) : t("wiki.bulk.delete")}
+              loading={bulkDelete.pending}
+              disabled={chosen.size === 0 || bulkDelete.pending}
+              onPress={() =>
+                bulkDelete.ask(
+                  { ids: [...chosen] },
+                  chosen.size,
+                  t("wiki.bulk.deleteTitle", { count: chosen.size }),
+                  stopSelecting,
+                )
+              }
+            />
+          </View>
+        </View>
+      ) : writes && !(tree.isSuccess && pages.length === 0) ? (
         <PressScale
           accessibilityRole="button"
           accessibilityLabel={t("wiki.newPage")}
@@ -343,8 +445,10 @@ function PinCard({ page, by }: { page: WikiPageSummary; by: string }) {
 
 interface MenuItem {
   key: string;
-  icon: "copy" | "pen" | "pin" | "eye" | "lock" | "clock" | "x";
+  icon: "copy" | "pen" | "pin" | "eye" | "lock" | "clock" | "x" | "agent" | "trash";
   label: string;
+  /** What it does, under the label. */
+  hint?: string;
   danger?: boolean;
   run: () => void;
 }
@@ -381,6 +485,7 @@ function WikiPage({ slug }: { slug: string }) {
   const choosesAudience = writes;
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
+  const bulkDelete = useWikiBulkDelete();
   const graph = useWikiGraph(orgId, true);
   const insets = useSafeAreaInsets();
   const p = page.data;
@@ -467,6 +572,21 @@ function WikiPage({ slug }: { slug: string }) {
             { onSuccess: (x) => toast({ title: x.pinned ? t("wiki.pinned") : t("wiki.unpinned") }), onError: failed },
           ),
       });
+    if (writes)
+      items.push({
+        key: "context",
+        icon: "agent",
+        label: p.agentContext ? t("wiki.context.off") : t("wiki.context.on"),
+        hint: t("wiki.context.hint"),
+        run: () =>
+          action.mutate(
+            { type: "context", slug: p.slug, on: !p.agentContext },
+            {
+              onSuccess: (x) => toast({ title: x.agentContext ? t("wiki.context.added") : t("wiki.context.removed") }),
+              onError: failed,
+            },
+          ),
+      });
     if (choosesAudience)
       items.push({
         key: "audience",
@@ -495,12 +615,28 @@ function WikiPage({ slug }: { slug: string }) {
       run: () => router.push({ pathname: "/wiki-history", params: { slug: p.slug } }),
     });
     if (editable) items.push({ key: "delete", icon: "x", label: t("wiki.delete"), danger: true, run: remove });
+    const imported = writes ? wikiImportOf(pages, p) : null;
+    if (imported)
+      items.push({
+        key: "delete-import",
+        icon: "trash",
+        label: t("wiki.bulk.deleteImport", { name: imported.name, count: imported.pages.length }),
+        danger: true,
+        run: () =>
+          bulkDelete.ask(
+            imported.target,
+            imported.pages.length,
+            t("wiki.bulk.deleteImportTitle", { name: imported.name, count: imported.pages.length }),
+            goBack,
+          ),
+      });
     sheet.open(
       <ActionList
         items={items.map((i) => ({
           key: i.key,
           icon: i.icon,
           label: i.label,
+          ...(i.hint ? { hint: i.hint } : {}),
           ...(i.danger ? { danger: true } : {}),
           onPress: () => {
             sheet.close();
@@ -950,6 +1086,18 @@ const styles = StyleSheet.create({
   barWordText: { fontWeight: "600" },
   fabIn: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 20 },
   fabText: { fontWeight: "600" },
+  headActs: { flexDirection: "row", gap: 4 },
+  pickBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   page: { paddingHorizontal: 20, paddingTop: 8, gap: 4 },
   note: { paddingTop: 10 },
   body: { paddingTop: 14 },

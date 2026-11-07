@@ -51,6 +51,12 @@ const runs = () => f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns
 const works = () => f.db.select().from(schema.agentWorks).orderBy(schema.agentWorks.createdAt);
 const messages = () => f.db.select().from(schema.messages).orderBy(schema.messages.createdAt);
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content ?? "");
+/** The agent's messages in a thread after a given message, oldest first. */
+const saidAfter = async (threadId: string, afterId: string) => {
+  const all = await messages();
+  const from = all.findIndex((m) => m.id === afterId);
+  return all.slice(from + 1).filter((m) => m.authorType === "agent" && m.threadId === threadId);
+};
 
 /** A run that started on `body` and is working now (its job not run: the test drives it). */
 async function working(body: string, threadId?: string, channelId?: string): Promise<AgentRun> {
@@ -167,7 +173,7 @@ test("work_in_background: the anchor in the timeline, updates in its thread, the
   expect(notes.map((n) => n.source.messageId)).not.toContain(update?.id);
 });
 
-test("a work frees the conversation: a new message starts a new run; a reply in the anchor's thread steers the work", async () => {
+test("a work frees the conversation: a new message, or a reply in the anchor's thread, starts a reply turn of its own", async () => {
   f = await setup();
   const run = await working("@dev roda a migração");
   const { work, anchor } = await moved(run);
@@ -179,9 +185,124 @@ test("a work frees the conversation: a new message starts a new run; a reply in 
   const [first] = after;
   expect(first?.pendingMessageIds).toEqual([]);
 
+  // No mention needed in the work's thread: the message is for its agent, never held by the work at work.
   const reply = await ask("usa o banco de staging", anchor.id);
-  const [steered] = await runs();
-  expect(steered?.pendingMessageIds).toEqual([reply.id]);
+  const all = await runs();
+  expect(all).toHaveLength(3);
+  expect(all[0]?.pendingMessageIds).toEqual([]);
+  expect(all[2]).toMatchObject({ agentId: f.agent.id, triggerMessageId: reply.id, threadRootId: anchor.id });
+  expect((await messages()).find((m) => m.id === reply.id)?.meta).toMatchObject({ forWork: true });
+});
+
+test("end to end: asked about a running work, the reply turn answers from what it knows; a change of scope steers the work", async () => {
+  const workIdOf = (req: ModelRequest) => /work_id ([0-9a-f-]{36})/.exec(JSON.stringify(req.system))?.[1] ?? "";
+  f = await setup({
+    workTools: true,
+    reply: (req) => {
+      const said = lastText(req);
+      if (said.includes("testa só a LP"))
+        return { chunks: [], toolUses: [{ name: STEER_WORK_TOOL, input: { work_id: workIdOf(req) } }] };
+      if (said.includes("Passed on"))
+        return { chunks: ["Combinado: passei para o trabalho, ele testa só a LP a partir do próximo passo."] };
+      const brief = JSON.stringify(req.system);
+      return {
+        chunks: [
+          brief.includes("Varri 12 páginas") ? "Não, varri 12 páginas até agora, a LP é só a primeira." : "Não sei.",
+        ],
+      };
+    },
+  });
+  const run = await working("@dev faz o QA do site");
+  const { work, anchor } = await moved(run, { title: "QA do site" });
+  await postWorkUpdate(deps(), run.id, { text: "Varri 12 páginas; achei 2 links quebrados." });
+  // The work's own job is driven by the test: only the reply turns run here.
+  await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+
+  const question = await ask("aqui só a LP tá sendo testada?", anchor.id);
+  await drainOutbox(f.db, f.handlers);
+  expect((await saidAfter(anchor.id, question.id)).map((m) => m.body)).toEqual([
+    "Não, varri 12 páginas até agora, a LP é só a primeira.",
+  ]);
+  const brief = JSON.stringify(f.provider.calls[0]?.request.system);
+  expect(brief).toContain(`work_id ${work.id}: \\"QA do site\\"`);
+  expect(brief).toContain("Updates so far");
+  // The work kept running, and its inbox didn't get the question.
+  const [stillWorking] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(stillWorking).toMatchObject({ status: "running", pendingMessageIds: [] });
+  expect((await works())[0]?.status).toBe("live");
+
+  const change = await ask("testa só a LP", anchor.id);
+  await drainOutbox(f.db, f.handlers);
+  const [steered] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(steered).toMatchObject({ status: "running", pendingMessageIds: [change.id] });
+  expect((await saidAfter(anchor.id, change.id)).map((m) => m.body)).toEqual([
+    "Combinado: passei para o trabalho, ele testa só a LP a partir do próximo passo.",
+  ]);
+});
+
+test("a work waiting on a person's help still takes their message; one waiting for its computer leaves it to a reply turn", async () => {
+  f = await setup();
+  const run = await working("@dev entra no painel");
+  const { anchor } = await moved(run);
+  await f.db.update(schema.agentRuns).set({ status: "waiting_input" }).where(eq(schema.agentRuns.id, run.id));
+  const done = await ask("pronto, loguei", anchor.id);
+  const [waiting] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(waiting?.pendingMessageIds).toEqual([done.id]);
+  expect(await runs()).toHaveLength(1);
+
+  await f.db
+    .update(schema.agentRuns)
+    .set({ pendingMessageIds: [], transcript: { waitingForBrain: { code: "busy", waitId: "w1", machineId: "m1" } } })
+    .where(eq(schema.agentRuns.id, run.id));
+  const later = await ask("e aí?", anchor.id);
+  const all = await runs();
+  expect(all).toHaveLength(2);
+  expect(all[1]?.triggerMessageId).toBe(later.id);
+});
+
+test("in the work's thread, a reply that names a person talks to them: no reply turn, the router decides", async () => {
+  f = await setup();
+  const run = await working("@dev faz o QA do site");
+  const { anchor } = await moved(run);
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await f.db
+    .update(schema.organizationMembers)
+    .set({ handle: "bia" })
+    .where(eq(schema.organizationMembers.userId, bia.id));
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const toBia = await ask("@bia dá uma olhada nos links quebrados", anchor.id);
+  expect(toBia.mentionedUserIds).toEqual([bia.id]);
+  expect(toBia.meta.forWork).toBeUndefined();
+  expect(await runs()).toHaveLength(1);
+  expect((await runs())[0]?.pendingMessageIds).toEqual([]);
+});
+
+test("a work left by an archived agent claims no reply in its thread: the router decides", async () => {
+  f = await setup();
+  const run = await working("@dev faz o QA do site");
+  const { anchor } = await moved(run);
+  await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+  const reply = await ask("alguém sabe como ficou o QA?", anchor.id);
+  expect(reply.meta.forWork).toBeUndefined();
+  expect(await runs()).toHaveLength(1);
+});
+
+test("steer_work into a work whose run ended meanwhile: refused, and the message stays with the reply turn", async () => {
+  f = await setup({ workTools: true });
+  const run = await working("@dev faz o QA do site");
+  const { work, anchor } = await moved(run);
+  const reply = await working("testa só a LP", anchor.id);
+  // The work's run ended; its work isn't closed yet (the sweep does that).
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+  const steer = await invokeToolForRun(
+    { ...deps(), tools: f.tools ?? null },
+    { orgId: f.org.id, agentId: f.agent.id, runId: reply.id, machineId: "" },
+    { id: "s1", name: STEER_WORK_TOOL, input: { work_id: work.id } },
+  );
+  expect(steer.result.isError).toBe(true);
+  expect(steer.result.content).toContain("already ended");
+  const [ended] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(ended?.pendingMessageIds).toEqual([]);
 });
 
 test("in a DM too; asked inside a thread, the work keeps the thread and the agent answers there in a new run", async () => {

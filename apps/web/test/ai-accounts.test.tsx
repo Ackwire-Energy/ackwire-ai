@@ -178,6 +178,13 @@ describe("Contas de IA", () => {
       };
       await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
       await signIn();
+      expect(shownText(dialog)).toContain("O app do computador é antigo demais para isso. Atualize e tente de novo.");
+      // A code the app has no words for: the computer didn't answer.
+      api.machines.beginAccountLogin = async () => {
+        throw new ApiError(400, "account.invalid_kind", "Unknown account kind");
+      };
+      await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+      await signIn();
       expect(shownText(dialog)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
     } finally {
       window.open = realOpen;

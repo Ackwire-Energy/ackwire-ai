@@ -34,9 +34,12 @@ test("a thread opens in the members column's place, wider, with no scrim; a phon
   expect(last(wide, ".thread-panel--docked", "flex")).toBe("none");
   // As wide as the floating panel was (640px), the chat keeping at least 400px.
   expect(last(wide, ".thread-panel--docked", "width")).toBe("clamp(360px,100% - 400px,640px)");
-  expect(last(wide, ".thread-panel--docked", "border-radius")).toBe("0");
-  // A hairline from the chat, as the members column's, drawn as a border: the thread's own page covers an inset shadow.
-  expect(last(wide, ".thread-panel--docked", "border-left")).toBe("1px solid var(--line)");
+  // Square, and a hairline from the chat, as the members column's, drawn as a border (the thread's own page covers an
+  // inset shadow): every side pane's, docked or not.
+  const base = topLevel(css);
+  expect(last(base, ".thread-panel", "border-radius")).toBeUndefined();
+  expect(last(base, ".thread-panel", "border-left")).toBe("1px solid var(--line)");
+  expect(last(wide, ".thread-panel--docked", "border-radius")).toBeUndefined();
   expect(last(wide, ".thread-panel--docked", "box-shadow")).toBe("none");
   expect(last(phone, ".thread-panel", "position")).toBe("fixed");
   // A body too narrow for both (a tablet with the sidebar open): the thread takes the conversation's place.

@@ -151,6 +151,11 @@ export interface LiveRun {
   serviceIcon?: string | null;
   /** What the tool works on, when the event says (the skill name for `load_skill`). */
   toolDetail?: string | null;
+  /**
+   * Its step as the brain says it: the words it wrote before its latest call (`said`), or a call of the computer
+   * brain's own that no `agent.tool` told (`tool`, `agent.step`). The next call replaces it.
+   */
+  step?: LiveStep;
   /** "Parar" was pressed and the server hasn't confirmed yet. */
   stopping?: boolean;
   /** Its browser command waits for a shared profile someone else has (ADR 0110). */
@@ -178,6 +183,11 @@ export interface LiveRun {
   gap?: boolean;
   /** The current turn's pieces heard past that hole, kept for the server's copy of the text before them. */
   ahead?: { at: number; text: string }[];
+}
+
+export interface LiveStep {
+  said?: string;
+  tool?: string;
 }
 
 export type LiveWork =
@@ -289,6 +299,8 @@ export interface AgentToolEvent {
   serviceIcon?: string | null;
   /** E.g. the skill being opened by `load_skill`. */
   detail?: string | null;
+  /** On the start: what the agent wrote right before this call, as one short line. */
+  said?: string | null;
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
   code?: LiveCode | null;
   /** `permission_prompt`: the whole command it checks (credentials masked). */
@@ -310,6 +322,17 @@ export interface AgentToolEvent {
    * answer to that request (`failed` when they said no), which ends the line that waited for it.
    */
   requestId?: string | null;
+}
+
+/** A computer brain's own call (Claude Code's Read, Codex's shell) that ended with no `agent.tool`: its step line. */
+export interface AgentStepEvent {
+  type: "agent.step";
+  channelId: string;
+  threadId: string;
+  runId: string;
+  agentId: string;
+  tool: string;
+  said?: string | null;
 }
 
 export interface StreamsState {
@@ -435,6 +458,7 @@ function reopen(state: StreamsState, runId: string): StreamsState {
 type StreamEvent =
   | ChannelEvent
   | AgentToolEvent
+  | AgentStepEvent
   | AgentToolOutputEvent
   | RunCanceledEvent
   | RunSteeredEvent
@@ -616,7 +640,13 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         serviceIcon: event.serviceIcon ?? null,
         toolDetail: event.detail ?? null,
         ...(newCall ? { code: event.code ?? null, output: [] } : {}),
+        // A new call is the step now: its own words, or none (the call's verb says it).
+        ...(newCall ? { step: event.said ? { said: event.said } : undefined } : {}),
       });
+    }
+    case "agent.step": {
+      if (state.finished[event.runId] || !state.runs[event.runId]) return state;
+      return upsert(state, event, { step: { tool: event.tool, ...(event.said ? { said: event.said } : {}) } });
     }
     case "agent.tool.output": {
       if (state.finished[event.runId]) return state;

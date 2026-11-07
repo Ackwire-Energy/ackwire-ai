@@ -702,7 +702,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     keyHint: null,
     ...over,
   });
-  const team = acct({ id: "acct_team", email: "contato@estudio.example" });
+  const team = acct({ id: "acct_team", email: "team@example.com" });
   const pessoal = acct({
     id: "acct_pessoal",
     label: "Claude Pessoal",
@@ -758,7 +758,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(picker.firstElementChild?.textContent).toBe("Já conectadas");
     const rows = [...picker.querySelectorAll(":scope > .ac-option")].map((o) => shownText(o));
     expect(rows.slice(0, 5)).toEqual([
-      "Claude Teamcontato@estudio.example",
+      "Claude Teamteam@example.com",
       "Claude Pessoal · MaxTambém usada por Atlas",
       "ChatGPT PlusTambém usada por Atlas",
       "Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.",
@@ -841,7 +841,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
 
   test("a free login signed out, signed in again under its row: once she thinks with it, it leaves the list and the panel stays, saying so", async () => {
     const state = walters(withCard(), ADA_ID);
-    const out = acct({ id: "acct_out", label: "Claude 08", email: "ti@acme.example", status: "signed_out" });
+    const out = acct({ id: "acct_out", label: "Claude 08", email: "it@example.org", status: "signed_out" });
     const { api, box, picker } = await connectAda(state, { accounts: [out] });
     const row = within(picker).getByRole("button", { name: /^Claude 08/ });
     await click(row);
@@ -849,7 +849,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: { ...out, status: "active" } });
     await signInWithClaude(box);
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
-      [ORG_ID, "machine_1", "claude_code", { accountId: "acct_out", email: "ti@acme.example" }],
+      [ORG_ID, "machine_1", "claude_code", { accountId: "acct_out", email: "it@example.org" }],
     ]);
     expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
       [ORG_ID, ADA_ID, { brain: "claude_code", account: "acct_out" }],

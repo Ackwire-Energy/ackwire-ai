@@ -1773,6 +1773,13 @@ export const en = {
     generalName: "#general keeps its name.",
     archive: "Archive channel",
     archived: "#{{channel}} archived. The conversation is kept.",
+    leave: "Leave channel",
+    left: "You left #{{channel}}",
+    leaveTitle: "Leave #{{channel}}?",
+    leavePrivate: "It's a private channel: to come back, someone in it has to add you.",
+    leaveLast: "You're the last person here: leaving archives the channel.",
+    leaveConfirm: "Leave",
+    leaveLastConfirm: "Leave and archive",
     /** Delete channel: owners and admins, never #general; its name typed to confirm. */
     delete: "Delete channel",
     deleteTitle: "Delete #{{channel}} for good?",
@@ -1907,7 +1914,7 @@ export const en = {
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
     intro: {
       greeting: "Hi, I'm {{name}}. I'll build the team with you.",
-      lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      lead: "I create the agents, connect the apps and invite the people. Nothing changes unless you ask, and I only do what you can do.",
       /** In place of `lead` on a billing hold: the team costs no model call, and the plan is said up front. */
       heldLead:
         "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan.",
@@ -2042,6 +2049,8 @@ export const en = {
         audience: "Only admins and its owner change who talks to it",
         channels: "Only admins and its owner change its channels",
         ai_account: "Only the account's owner gives it",
+        name: "Only admins rename an agent",
+        look: "Only admins and its owner change its look",
         many: "Only admins make these changes",
       },
     },
@@ -2053,8 +2062,11 @@ export const en = {
       audience: "Who can talk",
       archive: "Status",
       channel: "Channel",
+      name: "Name",
+      look: "Look",
     },
     value: {
+      lookDefault: "The default look",
       none: "None",
       budgetDefault: "Workspace default",
       anAccount: "An AI account",
@@ -2249,6 +2261,12 @@ export const en = {
       /** `model`: a model that needs a region setting on the plan's account; it doesn't come back by itself. */
       model_region:
         "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      /** `model`: a model the plan refused for its key (the model or the whole account switched off there). */
+      model_off:
+        "{{name}} can't answer: OpenCode refused {{model}} with this key. Turn the model or the account on in OpenCode, or choose another model.",
+      /** The key's OpenCode account has no active Go subscription: every model of the plan is refused. */
+      plan_inactive:
+        "{{name}} can't answer: OpenCode Go isn't active on this key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       commands_off:
         "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
@@ -2712,6 +2730,10 @@ export const en = {
     /** A teammate's settings changed from the right hand's card, by the person who clicked Aplicar (ADR 0137). */
     agent: {
       settings_changed: "Changed the settings of <b>{{agentName}}</b>",
+      /** One change applied at once from what the person asked (ADR 0092 §5). */
+      settings_changed_instructions: "Changed the instructions of <b>{{agentName}}</b>",
+      settings_changed_role: "Changed the role of <b>{{agentName}}</b>",
+      settings_changed_apps: "Changed the apps of <b>{{agentName}}</b>",
     },
     /** A merge the agent did without asking, in a repository its owner or an admin chose. Nothing undoes it. */
     pr: {
@@ -3525,6 +3547,12 @@ export const en = {
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {
+    /** The same, for someone the request isn't waiting on. */
+    kindOther: {
+      approval: "Asks for approval",
+      browser: "Needs someone in the browser",
+      desktop: "Needs someone on the computer",
+    },
     kind: {
       approval: "Asks for your approval",
       secret: "Asks for a secret",
@@ -3573,12 +3601,15 @@ export const en = {
     said: "<b>{{name}}:</b> “{{text}}”",
     /** A request in the conversation, as the agent asking (ApprovalAsk). */
     askPlain: "I need your OK to go on:",
+    askPlainOther: "I need an OK to go on:",
     seeEmail: "See the email",
     seeDetails: "See details",
     notNow: "Not now",
     /** Several requests of one agent in one conversation: one card with all of them (ApprovalGroupAsk). */
     askMany_one: "I need your OK for this to go on:",
     askMany_other: "I need your OK for these {{count}} to go on:",
+    askManyOther_one: "I need an OK for this to go on:",
+    askManyOther_other: "I need an OK for these {{count}} to go on:",
     all: {
       approve: "Approve all",
       refuse: "Not now for all",
@@ -3712,6 +3743,28 @@ export const en = {
       delete_branches_one: "Delete {{count}} branch in {{repo}}",
       delete_branches_other: "Delete {{count}} branches in {{repo}}",
       request_branch_push: "Push to {{branch}} in {{repo}} (24 h, no force push)",
+      action: {
+        merge: "Merge",
+        deploy: "Deploy",
+        rollback: "Roll back",
+        publish: "Publish",
+        delete: "Delete data",
+        send: "Send a message outside",
+        draft: "Save a draft",
+      },
+      vault_make_password: "Make a password",
+      pg_query: "Query {{target}}",
+      request_approval: {
+        merge: "Merge {{target}}",
+        deploy: "Deploy {{target}}",
+        rollback: "Roll back {{target}}",
+        other: "Approve {{target}}",
+      },
+      github: {
+        merge_pull_request: "Merge PR #{{number}} in {{repo}}",
+        pull_request_review_write: "Review PR #{{number}} in {{repo}}",
+        actions_run_trigger: "Run {{method}} in {{repo}}",
+      },
     },
   },
   home: {
@@ -3787,6 +3840,8 @@ export const en = {
       takeBackAll: "Take it back from every agent",
       done: "Your plan is back",
     },
+    /** Under `plan_model_dropped`: opens the agent's "Quem pensa". */
+    planModelDropped: { choose: "Choose another model" },
     docTitleUnread: "({{count}}) Notifications",
     summaryWaiting_one: "{{count}} thing waiting on you",
     summaryWaiting_other: "{{count}} things waiting on you",
@@ -3884,6 +3939,8 @@ export const en = {
       desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
       /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
       planLent: "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>",
+      /** The agent's model left its plan's list (`plan_model_dropped`): `runs` the model it uses now. */
+      planModelDropped: "{{model}} left {{plan}}. <b>{{name}}</b> is using {{runs}} until you choose another model.",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
@@ -6183,6 +6240,51 @@ export const en = {
         rate_limited: "Refused: too many calls a minute",
       },
     },
+    setup: {
+      /** Over a GitHub or Sentry event's webhook, in the routine form and on its page: `provider` GitHub or Sentry. */
+      title: "{{provider}} webhook",
+      working: "Working. {{provider}} already sends its events here.",
+      waiting: {
+        github: "Waiting for GitHub. It sends a ping the moment the webhook is saved.",
+        sentry: "Waiting for Sentry. It calls when a new error comes in.",
+      },
+      refused: {
+        github: "GitHub called with another secret. Copy the secret below into the webhook again.",
+        sentry: "Sentry called with another secret. Paste the integration's Client Secret again.",
+      },
+      timeout: "Nothing came in 3 minutes. Check the URL and the secret, then test again.",
+      adminOnly: "Someone who manages connectors turns on the {{provider}} webhook. Ask an admin to open this routine.",
+      test: "Test",
+      retest: "Test again",
+      copied: "Copied.",
+      github: {
+        repo: "Repository",
+        repoPlaceholder: "owner/name",
+        oneClick: "Create the webhook",
+        /** After the one-click add: `repo` is owner/name. */
+        added: "Webhook created in {{repo}}.",
+        byHand: "Or by hand: in the repository, Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        open: "In the repository, open Settings\u00a0›\u00a0Webhooks\u00a0›\u00a0Add webhook.",
+        openLink: "Open on GitHub",
+        url: "Payload URL",
+        type: "Content type: application/json",
+        secret: "Secret",
+        events:
+          "Under Which events, choose Let me select individual events. Tick Pull requests and Deployment statuses, then Add webhook.",
+        another: "Add to another repository",
+      },
+      sentry: {
+        open: "In Sentry, create an internal integration.",
+        openLink: "Open in Sentry",
+        url: "Webhook URL",
+        events: "Under Permissions, set Issue & Event to Read. Then under Webhooks, tick issue and save.",
+        secret: "The integration's Client Secret",
+        secretPlaceholder: "Paste the Client Secret",
+        secretSaved: "Saved. Paste a new one to replace it",
+        save: "Save",
+        saved: "Client Secret saved.",
+      },
+    },
     once: "Once · {{weekday}}, {{date}} at {{time}}{{zone}}",
     reminder: "Reminder",
     fired: "Fired",
@@ -6324,19 +6426,161 @@ export const en = {
     },
     presets: {
       title: "Start from a template",
+      placeholder: "Choose a template",
+      search: "Search templates",
+      searchPlaceholder: "Name, area or app",
+      noResults: "No template found",
+      list: "Templates",
+      needsApp: "Needs this app: {{app}}",
+      needsApps: "Needs one of these apps: {{apps}}",
+      needsMailbox: "Needs a connected mailbox",
+      connectFirst: "Connect it so the routine can work.",
+      fillBlank: "Replace the text in brackets first.",
+      replaceTitle: "Replace what you wrote with this template?",
+      replaceConfirm: "Replace",
+      /** The select's sections, by work rather than by tool. */
+      areas: {
+        team: "Team and daily routine",
+        sales: "Sales and customers",
+        support: "Customer service",
+        marketing: "Marketing and content",
+        finance: "Finance",
+        ops: "Operations",
+        people: "People and HR",
+        tech: "Technology",
+      },
+      dayPlan: {
+        name: "Plan for the day",
+        text: "Weekdays at 8:30am, today's tasks and meetings.",
+        prompt: "List the open tasks due today and today's meetings. Say what needs attention first.",
+      },
+      late: {
+        name: "Overdue tasks",
+        text: "Weekdays at 10am, what's past its due date.",
+        prompt: "Look for open tasks past their due date. For each one, say who owns it and how many days late it is.",
+      },
+      unanswered: {
+        name: "Unanswered questions",
+        text: "Weekdays at 4pm, what nobody answered today.",
+        prompt:
+          "Look in the channel for today's questions and requests that got no answer. List each one with who asked.",
+      },
+      leads: {
+        name: "New CRM contacts",
+        text: "Weekdays at 9am, who came in and who to call first.",
+        prompt:
+          "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each.",
+      },
+      stalled: {
+        name: "Stalled deals",
+        text: "Mondays at 9am, deals with no recent activity.",
+        prompt: "Check the CRM for open deals with no activity for over 7 days. Suggest the next step for each.",
+      },
+      prospects: {
+        name: "Find new customers",
+        text: "Mondays at 8am, five companies worth contacting.",
+        prompt:
+          "Search the web for 5 companies that fit our ideal customer. For each one, say what it does and why it's worth contacting.",
+      },
+      newEmail: {
+        name: "Draft email replies",
+        text: "When an email arrives, the agent drafts a reply.",
+        prompt:
+          "Read the email that arrived and say what it's about and how urgent it is. Draft a reply, but don't send it.",
+      },
+      tickets: {
+        name: "Unanswered tickets",
+        text: "Weekdays at 9am and 2pm, who's still waiting.",
+        prompt:
+          "Check the open tickets with no reply for over 4 hours. List the most urgent first and suggest a reply for each.",
+      },
+      themes: {
+        name: "Most common requests",
+        text: "Fridays at 4pm, what customers asked for most.",
+        prompt:
+          "Read this week's tickets and group them by subject. Say which 5 came up most and what would prevent each one.",
+      },
+      mentions: {
+        name: "Company mentions",
+        text: "Weekdays at 9am, what's being said about us.",
+        prompt:
+          "Search the web for recent news and mentions of our company. Say where it appeared, whether it's positive or negative, and whether it needs a reply.",
+      },
+      rivals: {
+        name: "Watch competitors",
+        text: "Mondays at 9am, what competitors changed.",
+        prompt:
+          "Research what our competitors launched or changed last week, such as prices, products and campaigns. Say what matters to us.",
+      },
+      ideas: {
+        name: "Content ideas",
+        text: "Mondays at 10am, five ideas for the week.",
+        prompt:
+          "Suggest 5 content ideas for this week, based on what customers ask and what's happening in our market. Give each one a title and a format.",
+      },
+      traffic: {
+        name: "Website numbers",
+        text: "Mondays at 8:30am, the week against the one before.",
+        prompt:
+          "Check last week's numbers: visits, sign-ups and top pages. Compare them with the week before and say what changed.",
+      },
+      revenue: {
+        name: "Yesterday's sales",
+        text: "Every day at 8am, sales against the weekly average.",
+        prompt:
+          "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual.",
+      },
+      failed: {
+        name: "Payment problems",
+        text: "Weekdays at 10am, declined charges and disputes.",
+        prompt:
+          "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer.",
+      },
+      monthClose: {
+        name: "Month-end summary",
+        text: "On the 1st at 9am, last month's money.",
+        prompt:
+          "Put together a summary of last month: revenue, refunds and disputes. Compare it with the month before.",
+      },
+      sheet: {
+        name: "Check a spreadsheet",
+        text: "Weekdays at 11am, gaps and odd numbers.",
+        prompt:
+          "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time.",
+      },
+      page: {
+        name: "Watch a web page",
+        text: "Every day at 9am, only when it changes.",
+        prompt:
+          "Open this page: (paste the address here). If something important changed since last time, say what changed.",
+      },
+      newTask: {
+        name: "Sort new tasks",
+        text: "When a task is created, the agent reviews it.",
+        prompt: "Read the new task. Say what's missing to start it, and suggest who should own it and a due date.",
+      },
+      pulse: {
+        name: "Question of the week",
+        text: "Thursdays at 4pm, one question for the team.",
+        prompt:
+          "Summarize the answers to last week's question without naming anyone. Then post a short new question in the channel about how the week went.",
+      },
+      away: {
+        name: "Who's out this week",
+        text: "Mondays at 8:30am, time off and trips.",
+        prompt: "Check the calendar for time off and trips this week. List them by day and say what needs covering.",
+      },
       digest: {
         name: "Daily channel digest",
         text: "Weekdays at 9am, what happened yesterday.",
         prompt:
-          "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered.",
-        phrase: "weekdays at 9am",
+          "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered.",
       },
       errors: {
         name: "Watch for new errors",
         text: "Every hour, only when there's a new error.",
         prompt:
           "Check the new Sentry errors since the last run. If there are any, summarize them and say where in the code they happen. If there's nothing new, don't send a message.",
-        phrase: "every hour",
       },
       prs: {
         name: "Review new PRs",
@@ -6347,7 +6591,6 @@ export const en = {
         name: "Week wrap-up",
         text: "Friday at 5pm: decisions and open items.",
         prompt: "Summarize the week: decisions, closed tasks and what's still open.",
-        phrase: "every friday at 5pm",
       },
     },
     close: "Close",
@@ -8588,6 +8831,70 @@ export const en = {
     audienceUseFolder: "Set for the folder {{folder}}",
     audienceFolderSaved: "Done. The folder's audience was updated.",
     audienceFolderOpened: "Done. The folder has no limit now.",
+    audienceRootTitle: "Access to the whole wiki",
+    audienceRootText: "It reaches every page and folder of the wiki, and the ones added later.",
+    audienceInRoot: "The whole wiki is limited: here you can only narrow it further.",
+    audienceFollowsRoot: "From the whole wiki",
+    /** "Sempre no contexto dos agentes": a page that goes into every run of an agent that reads it (at most 3). */
+    context: {
+      on: "Always in the agents' context",
+      off: "Take out of the agents' context",
+      chip: "Always in context",
+      hint: "Goes into every answer of every agent that reads it, even when nobody mentions it. At most 3 pages.",
+      added: "Every agent that reads this page now gets it in every answer.",
+      removed: "Agents now get this page only when a message is about it.",
+    },
+    /** Many pages at once: a selection, a folder or one import. */
+    bulk: {
+      select: "Select",
+      selectAll: "Select all",
+      selected_one: "{{count}} selected",
+      selected_other: "{{count}} selected",
+      agents: "Agents",
+      delete: "Delete",
+      deleteFolder: "Delete the folder {{folder}}",
+      deleteImport_one: "Delete the import “{{name}}” ({{count}} page)",
+      deleteImport_other: "Delete the import “{{name}}” ({{count}} pages)",
+      deleteTitle_one: "Delete {{count}} page?",
+      deleteTitle_other: "Delete {{count}} pages?",
+      deleteFolderTitle_one: "Delete the folder {{folder}} and its page?",
+      deleteFolderTitle_other: "Delete the folder {{folder}} and its {{count}} pages?",
+      deleteImportTitle_one: "Delete the page imported from “{{name}}”?",
+      deleteImportTitle_other: "Delete the {{count}} pages imported from “{{name}}”?",
+      deleteText: "They go to the wiki's trash for 30 days, and you can restore them from there.",
+      deleteGo_one: "Move {{count}} page to the trash",
+      deleteGo_other: "Move {{count}} pages to the trash",
+      deleted_one: "{{count}} page moved to the trash.",
+      deleted_other: "{{count}} pages moved to the trash.",
+      kept_one: "{{count}} stayed: it's locked or only some people edit it.",
+      kept_other: "{{count}} stayed: they're locked or only some people edit them.",
+      failed_one: "{{count}} didn't change ({{titles}}): {{reason}}",
+      failed_other: "{{count}} didn't change ({{titles}}): {{reason}}",
+      agentsTitle_one: "Agents that read {{count}} page",
+      agentsTitle_other: "Agents that read {{count}} pages",
+      agentsText: "Who sees each page among people stays as it is.",
+      agentsSaved_one: "Done. {{count}} page updated.",
+      agentsSaved_other: "Done. {{count}} pages updated.",
+    },
+    /** The wiki's trash: deleted pages stay 30 days (as the Drive's files), then the server removes them. */
+    trash: {
+      title: "Trash",
+      text: "Deleted pages stay here for 30 days, then they're gone.",
+      none: "The trash is empty.",
+      restore: "Restore",
+      restoreMany_one: "Restore {{count}}",
+      restoreMany_other: "Restore {{count}}",
+      purge: "Delete for good",
+      empty: "Empty trash",
+      emptyTitle_one: "Delete {{count}} page for good?",
+      emptyTitle_other: "Delete {{count}} pages for good?",
+      emptyText: "They're gone with their history. This can't be undone.",
+      deletedWhen: "deleted {{when}}",
+      restored_one: "{{count}} page restored.",
+      restored_other: "{{count}} pages restored.",
+      purged_one: "{{count}} page deleted for good.",
+      purged_other: "{{count}} pages deleted for good.",
+    },
     audienceLevel: "What {{name}} can do",
     audienceLevelNone: "No access",
     audienceLevelView: "View",
@@ -8609,7 +8916,8 @@ export const en = {
     noAccessText: "It's for some people only. If you need it, ask whoever looks after the wiki.",
     delete: "Move to trash",
     deleteTitle: "Move {{title}} to the trash?",
-    deleteText: "Links to it become “page to create”. You can't restore it from the app yet.",
+    deleteText:
+      "It goes to the wiki's trash for 30 days, and you can restore it from there. Meanwhile, links to it become “page to create”.",
     deleted: "{{title}} moved to the trash.",
     noBacklinksHint: "No page links here yet. Write [[{{title}}]] in another one.",
     allVersions: "See all {{count}} versions",
@@ -8767,8 +9075,29 @@ export const en = {
       uploaded_one: "{{count}} attachment is in the Drive.",
       uploaded_other: "{{count}} attachments are in the Drive.",
       open: "Open {{title}}",
-      someFailed_one: "{{count}} note didn't come in: {{titles}}",
-      someFailed_other: "{{count}} notes didn't come in: {{titles}}",
+      sendingNotes_one: "of {{count}} note sent",
+      sendingNotes_other: "of {{count}} notes sent",
+      stop: "Stop",
+      stopping: "Stopping…",
+      partialTitle: "Not everything came in",
+      partial_one: "{{count}} note: {{done}} came in, {{failed}} didn't",
+      partial_other: "{{count}} notes: {{done}} came in, {{failed}} didn't",
+      partialText: "The pages that came in are in the wiki already.",
+      whyTitle: "What didn't come in",
+      why: {
+        batch_one: "{{count}} wasn't sent: {{error}}",
+        batch_other: "{{count}} weren't sent: {{error}}",
+        stopped_one: "{{count}} wasn't sent because you stopped",
+        stopped_other: "{{count}} weren't sent because you stopped",
+        tooLong_one: "{{count}} is over 200,000 characters: split it in Obsidian",
+        tooLong_other: "{{count}} are over 200,000 characters: split them in Obsidian",
+        title_one: "{{count}} has no name that can be a title",
+        title_other: "{{count}} have no name that can be a title",
+        skipped_one: "{{count}} already had a page with the same name",
+        skipped_other: "{{count}} already had pages with the same name",
+      },
+      retry_one: "Try {{count}} again",
+      retry_other: "Try {{count}} again",
       overlayTitle: "Drop to import into the wiki",
       overlayText: "An Obsidian vault .zip, the vault folder or .md files. You review everything before it goes in.",
       error: {
@@ -8954,6 +9283,12 @@ export const en = {
     modelLimitUnknown: "{{model}} hit its own limit on this plan. The plan's other models keep working.",
     modelRegion:
       "{{model}} needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy). The plan's other models keep working.",
+    /** OpenCode refused the agent's model for the key: the model or the whole account is switched off there. */
+    modelOff:
+      "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or choose another model.",
+    /** The key's OpenCode account has no active Go subscription: no model of the plan answers. */
+    planInactive:
+      "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
@@ -10780,6 +11115,66 @@ export const en = {
     },
   },
   errors: {
+    /** Refusals in plain words: each server code that needs no line of its own shares one of these. */
+    said: {
+      gone: "This isn't here anymore. Refresh the page and try again.",
+      alreadyDone: "This was already answered or finished. Refresh to see how it stands.",
+      changed: "This changed in the meantime. Refresh and try again.",
+      tooLateUndo: "This can't be undone anymore. Change it by hand.",
+      futureTime: "Pick a time in the future.",
+      tooFar: "Pick a date within a year.",
+      checkDate: "Check the date and time.",
+      notInWorkspace: "That person isn't in this workspace.",
+      validEmail: "Type a valid email address, like ana@example.com.",
+      tooMany: "That's more than fits here. Remove some and try again.",
+      fillIn: "Fill in what's missing and try again.",
+      checkAddress: "Check the address and try again.",
+      tooLong: "That's too long. Shorten it and try again.",
+      updateComputerApp: "The computer's app is too old for this. Update it and try again.",
+      offHere: "This is turned off here.",
+      notInConversation: "They aren't in this conversation.",
+      accountStart: "The computer couldn't start the sign-in. Check that it's on and try again.",
+      accountInUse: "That account already thinks for another agent.",
+      noAiYet: "There's still no AI connected.",
+      filePurged: "This file was deleted more than 30 days ago and can't come back.",
+      looksSecret: "That looks like a password or a key, and everyone here would see it.",
+      blockSpec: "This block has a mistake in its parts or formulas, so it can't be shown. Fix it and try again.",
+      takeControl: "Take control of the profile first.",
+      profileBusy: "Someone else is using this profile.",
+      nameTaken: "That name is already in use. Pick another one.",
+      deleteName: "Type the channel's name to delete it.",
+      generalKept: "#general can't be deleted.",
+      generalStays: "Everyone stays in #general.",
+      mcpUnreachable: "Couldn't connect to the MCP server. Check its address and try again.",
+      notApproved: "This service hasn't approved agentes.chat yet.",
+      alreadyInvited: "This person already has an invitation.",
+      alreadyAsked: "Someone already asked for this person.",
+      mailboxConnected: "This mailbox is already connected.",
+      sendNeedsRecipients: "Sending without asking needs a list of allowed recipients.",
+      missionLive: "The mission still has items running or waiting on its computer. Stop them first.",
+      createRefused: "You can't create a workspace right now.",
+      noAgentToRemind: "No agent in this conversation can remind you.",
+      agentCantRead: "Let the agent read this first, in its access settings.",
+      neverHappens: "This schedule never happens.",
+      soleOwner:
+        "You're the only owner of a workspace with other members. Make someone else an owner, or delete the workspace, first.",
+      testFirst: "Test the connection with these settings before turning it on.",
+      voiceLength: "The recording is too long or too short.",
+      sendAgain: "The file didn't arrive whole. Send it again.",
+      serverKey: "This key is set in the server's settings.",
+      input: "That didn't go through. Check what you filled in and try again.",
+      conflict: "That can't be done right now. Refresh and try again.",
+      computer: "The computer couldn't do this now. Check that it's on and try again.",
+    },
+    /** Setting up a GitHub or Sentry routine's webhook: `repo` is owner/name, `status` GitHub's HTTP status. */
+    webhook: {
+      githubNoAccess:
+        "This workspace's GitHub can't add webhooks to {{repo}}. Follow the steps below to add it by hand.",
+      githubFailed:
+        "GitHub didn't create the webhook in {{repo}} ({{status}}). Follow the steps below to add it by hand.",
+      invalidSecret: "Paste the whole Client Secret, with no spaces.",
+      invalidRepo: "Write the repository as owner/name.",
+    },
     issue: {
       assigneeOutside: "This person can't see this task. Add them to who sees it first.",
       deleteForbidden: "Only who created this task or an administrator can delete it.",
@@ -10803,6 +11198,8 @@ export const en = {
         "This folder is limited: here you can only narrow it further. To open it, change the folder.",
       editLimited: "Only the people chosen edit this page.",
       editorsExcludeYou: "Include yourself among the people who edit, to keep this page.",
+      contextFull: "{{max}} pages are already always in the agents' context. Take one out first.",
+      restoreSlugTaken: "Another page has this name now. Rename it, then restore again.",
       titleTaken: "There's already a page called “{{title}}”.",
       titleCharacters: "A title can't have [ ] | or #.",
       titleNoLetters: "A title needs letters or numbers.",
@@ -10872,6 +11269,11 @@ export const en = {
       membersFull: "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat.",
       deleting: "This workspace is being deleted.",
       notRestorable: "This workspace can't be restored anymore.",
+      /**
+       * Apps can't connect to a workspace on hold or suspended (`workspace_paused`). It names who brings it back: the phone
+       * has no hold banner to point to.
+       */
+      paused: "This workspace is paused, so it can't connect apps now. Whoever runs this workspace can bring it back.",
     },
     reauth: {
       code: "Type the code we emailed you.",
@@ -12363,7 +12765,11 @@ export const en = {
     autoUpdate: "Still on it ({{duration}}).",
     autoUpdateNow: "Now: {{now}}.",
     /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
-    statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
+    statusReply:
+      "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it at my next step.",
+    /** The same line when the agent's computer reads the message only once its current round of work ends. */
+    statusReplyTurn:
+      "I'm in the middle of a task ({{duration}}) and can't answer yet. Your message is queued and I'll read it when this round of work ends.",
     /** The same line for an agent waiting in line for its computer: {{duration}} is how long it has waited. */
     statusReplyQueued: "Waiting for the computer ({{duration}}). I'll read your message when my turn comes.",
     /** The same line for an agent whose computer is away. */
@@ -12410,7 +12816,12 @@ export const en = {
     namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     /** The waiting row's step line before its first step (`waitStep`). */
-    wait: { thinking: "Thinking…", held: "Waiting for approval…" },
+    wait: {
+      thinking: "Thinking…",
+      held: "Waiting for approval…",
+      /** The agent's own words for its step (what it wrote before the call), quoted. */
+      said: "“{{text}}”",
+    },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",
@@ -12645,6 +13056,32 @@ export const en = {
         requestingAccess: "Asked for access",
         requestingSecret: "Asked for a secret",
         queryingDatabase: "Queried the database",
+        searchingWeb: "Searched the web",
+        readingWeb: "Read a web page",
+        preparingCard: "Prepared a card",
+        startingPoll: "Opened a poll",
+        askingChoices: "Asked with options",
+        usingVault: "Worked in the Vault",
+        makingPassword: "Made a password",
+        startingWork: "Started a long work",
+        updatingWork: "Updated a long work",
+        withdrawingRequest: "Withdrew a request",
+        schedulingAction: "Prepared an action for later",
+        updatingDashboard: "Worked on a dashboard",
+        readingDashboards: "Looked at the dashboards",
+        pushingBranch: "Asked to send code",
+        deletingBranches: "Deleted branches",
+        postingMessage: "Posted a message",
+        sendingDm: "Sent a direct message",
+        settingStatus: "Updated its status",
+        settingReplyStyle: "Adjusted how it replies",
+        deletingRoutine: "Deleted a routine",
+        runningRoutine: "Ran a routine now",
+        proposingTeam: "Proposed a team",
+        proposingChange: "Proposed a change",
+        updatingThread: "Updated a thread",
+        addingAgent: "Added an agent to a channel",
+        readingConversation: "Read the conversation",
         usingTool: "Used the {{tool}} tool",
         thinking: "Thought",
         typing: "Wrote",
@@ -12727,6 +13164,32 @@ export const en = {
       requestingAccess: "asking for access",
       requestingSecret: "asking for a secret",
       queryingDatabase: "querying the database",
+      searchingWeb: "searching the web",
+      readingWeb: "reading a web page",
+      preparingCard: "preparing a card",
+      startingPoll: "opening a poll",
+      askingChoices: "asking with options",
+      usingVault: "working in the Vault",
+      makingPassword: "making a password",
+      startingWork: "starting a long work",
+      updatingWork: "updating a long work",
+      withdrawingRequest: "withdrawing a request",
+      schedulingAction: "preparing an action for later",
+      updatingDashboard: "working on a dashboard",
+      readingDashboards: "looking at the dashboards",
+      pushingBranch: "asking to send code",
+      deletingBranches: "deleting branches",
+      postingMessage: "posting a message",
+      sendingDm: "sending a direct message",
+      settingStatus: "updating its status",
+      settingReplyStyle: "adjusting how it replies",
+      deletingRoutine: "deleting a routine",
+      runningRoutine: "running a routine now",
+      proposingTeam: "proposing a team",
+      proposingChange: "proposing a change",
+      updatingThread: "updating a thread",
+      addingAgent: "adding an agent to a channel",
+      readingConversation: "reading the conversation",
       usingTool: "using a tool",
     },
     tokens: "{{value}} tokens",
@@ -12839,6 +13302,12 @@ export const en = {
       /** The model answers only once the OpenCode account allows its Global region: no reset to wait for. */
       plan_model_region_wait:
         "This model ({{model}}) needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      /** OpenCode refused the model for the key (the model or the whole account switched off there): no reset to wait for. */
+      plan_model_off_wait:
+        "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or change {{agent}}'s model.",
+      /** The key's OpenCode account has no active Go subscription: no reset to wait for. */
+      plan_inactive_wait:
+        "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       usage_wait_canceled: "Canceled. It won't run when the limit is back.",
       usage_wait_archived: "It won't run: the agent was archived.",
@@ -12874,6 +13343,10 @@ export const en = {
       no_ai_model_limit: "I can't answer now: {{model}} reached its own limit on my plan.",
       no_ai_model_region:
         "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      no_ai_model_off:
+        "I can't answer: OpenCode refused {{model}} with my key. Turn the model or the account on in OpenCode, or change my model.",
+      no_ai_plan_inactive:
+        "I can't answer: OpenCode Go isn't active on my key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
       no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
       no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
       no_ai_plan_hold:
@@ -13402,6 +13875,14 @@ export const en = {
       ended: "{{name}}'s browser closed.",
       starting: "Opening the page…",
       page: "{{name}}'s page, live",
+      /** Over the live page while the agent shows it at another size than its window's (`emulated`): device · size. */
+      emulated: {
+        phone: "Phone · {{size}}",
+        tablet: "Tablet · {{size}}",
+        desktop: "Desktop · {{size}}",
+      },
+      /** Button beside that label, for the person in control: the page at the window's own size again. */
+      normalSize: "Normal size",
       tabs_one: "{{count}} tab",
       tabs_other: "{{count}} tabs",
       typeHere: "Type here",
@@ -14197,6 +14678,10 @@ export const en = {
       modelLimit: "{{model}} at its limit",
       modelRegion: "{{model}} needs the Global region",
       modelRegionNext: "Turn it on in OpenCode (Settings\u00a0›\u00a0Privacy)",
+      modelOff: "OpenCode refused {{model}}",
+      modelOffNext: "Turn it on in OpenCode or choose another model",
+      planInactive: "OpenCode Go isn't active",
+      planInactiveNext: "Check the Go subscription in OpenCode",
       budgetOut: "This month's budget ran out",
       workLine: "In the agent's line of work",
       workLineNext: "Starts when other work ends",

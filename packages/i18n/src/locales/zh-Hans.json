@@ -1725,6 +1725,13 @@
     "generalName": "#general 的名称不能更改。",
     "archive": "归档频道",
     "archived": "#{{channel}} 已归档。对话会保留。",
+    "leave": "退出频道",
+    "left": "你已退出 #{{channel}}",
+    "leaveTitle": "退出 #{{channel}}？",
+    "leavePrivate": "这是私密频道：要回来，需要频道里的人添加你。",
+    "leaveLast": "你是这里最后一个人：退出后频道会被归档。",
+    "leaveConfirm": "退出",
+    "leaveLastConfirm": "退出并归档",
     "delete": "删除频道",
     "deleteTitle": "要永久删除 #{{channel}} 吗？",
     "deleteGoes": "立即删除：消息、话题、文件和置顶，智能体从这个频道记住的内容，以及在这里发帖的例行任务。",
@@ -1829,7 +1836,7 @@
     "composerHint": "没有你，什么都不会变",
     "intro": {
       "greeting": "你好，我是 {{name}}。我和你一起组建团队。",
-      "lead": "我创建智能体、连接应用、邀请成员。没有你的点击，什么都不会变，而且我只做你能做的事。",
+      "lead": "我创建智能体、连接应用、邀请成员。没有你的要求，什么都不会变，而且我只做你能做的事。",
       "heldLead": "选择你的公司业务，团队就会出现在这里。工作区有 agentes.chat 套餐后，智能体就会开始工作。",
       "connect": {
         "title": "为团队连接 AI",
@@ -1948,6 +1955,8 @@
         "audience": "只有管理员和负责人能更改谁能和它交谈",
         "channels": "只有管理员和负责人能更改它的频道",
         "ai_account": "只有账户所有者能分配它",
+        "name": "只有管理员能重命名智能体",
+        "look": "只有管理员和负责人能更改它的外观",
         "many": "只有管理员能做这些更改"
       }
     },
@@ -1958,9 +1967,12 @@
       "owner": "负责人",
       "audience": "谁能交谈",
       "archive": "状态",
-      "channel": "频道"
+      "channel": "频道",
+      "name": "名称",
+      "look": "外观"
     },
     "value": {
+      "lookDefault": "默认外观",
       "none": "无",
       "budgetDefault": "工作区默认",
       "anAccount": "一个 AI 账户",
@@ -2129,6 +2141,8 @@
       "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 没有只使用 agentes.chat 的工具。",
       "model_limit": "{{name}} 现在无法回答：{{model}} 已达到它在套餐中的自身上限。套餐中的其他模型仍可使用。",
       "model_region": "{{name}} 无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
+      "model_off": "{{name}} 无法回复：OpenCode 拒绝了用这个密钥调用 {{model}}。请在 OpenCode 中开启该模型或账号，或选择其他模型。",
+      "plan_inactive": "{{name}} 无法回复：这个密钥所属的 OpenCode 账号没有启用 OpenCode Go。请在 OpenCode 中检查 Go 订阅，或连接拥有 Go 的账号的密钥。",
       "commands_off": "{{name}} 现在无法回答：套餐所在的电脑上命令已关闭，需要负责这台电脑的人打开。",
       "useKey": "使用 API 密钥"
     },
@@ -2577,7 +2591,10 @@
       "updated": "修正了技能 <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置"
+      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置",
+      "settings_changed_instructions": "更改了 <b>{{agentName}}</b> 的指令",
+      "settings_changed_role": "更改了 <b>{{agentName}}</b> 的角色",
+      "settings_changed_apps": "更改了 <b>{{agentName}}</b> 的应用"
     },
     "pr": {
       "merged": "已合并 <b>{{repo}}</b> 的 PR <b>#{{number}}</b>",
@@ -3332,6 +3349,11 @@
     "dismissedByYou": "你跳过了此问题。"
   },
   "ask": {
+    "kindOther": {
+      "approval": "请求审批",
+      "browser": "需要有人在浏览器中操作",
+      "desktop": "需要有人在电脑上操作"
+    },
     "kind": {
       "approval": "请求你的审批",
       "secret": "请求机密信息",
@@ -3378,10 +3400,12 @@
     },
     "said": "<b>{{name}}：</b>“{{text}}”",
     "askPlain": "需要你同意才能继续：",
+    "askPlainOther": "需要有人同意才能继续：",
     "seeEmail": "查看邮件",
     "seeDetails": "查看详情",
     "notNow": "暂不",
     "askMany_other": "这 {{count}} 项需要你同意才能继续：",
+    "askManyOther_other": "这 {{count}} 项需要有人同意才能继续：",
     "all": {
       "approve": "全部批准",
       "refuse": "全部暂不",
@@ -3496,7 +3520,29 @@
       "post_message": "在 #{{channel}} 中发布",
       "request_permission": "开启：{{permission}}",
       "delete_branches_other": "删除 {{repo}} 中的 {{count}} 个分支",
-      "request_branch_push": "推送到 {{repo}} 的 {{branch}}（24 小时，不允许强制推送）"
+      "request_branch_push": "推送到 {{repo}} 的 {{branch}}（24 小时，不允许强制推送）",
+      "action": {
+        "merge": "合并",
+        "deploy": "部署",
+        "rollback": "回滚",
+        "publish": "发布",
+        "delete": "删除数据",
+        "send": "向外部发送消息",
+        "draft": "保存草稿"
+      },
+      "vault_make_password": "创建密码",
+      "pg_query": "查询 {{target}}",
+      "request_approval": {
+        "merge": "合并 {{target}}",
+        "deploy": "部署 {{target}}",
+        "rollback": "回滚 {{target}}",
+        "other": "批准 {{target}}"
+      },
+      "github": {
+        "merge_pull_request": "合并 {{repo}} 的 PR #{{number}}",
+        "pull_request_review_write": "审查 {{repo}} 的 PR #{{number}}",
+        "actions_run_trigger": "在 {{repo}} 中运行 {{method}}"
+      }
     }
   },
   "home": {
@@ -3596,6 +3642,9 @@
       "takeBackAll": "从所有智能体收回",
       "done": "你的套餐已收回"
     },
+    "planModelDropped": {
+      "choose": "选择其他模型"
+    },
     "docTitleUnread": "({{count}}) 通知",
     "summaryWaiting_other": "{{count}} 件事等你处理",
     "summaryUnread_other": "{{count}} 条未读",
@@ -3686,6 +3735,7 @@
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
       "desktopTaken": "<b>{{name}}</b> 接管了 <b>{{agent}}</b> 的电脑屏幕",
       "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>",
+      "planModelDropped": "{{model}} 已从 {{plan}} 下架。在你选择其他模型之前，<b>{{name}}</b> 会使用 {{runs}}。",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
       "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
@@ -6000,6 +6050,48 @@
         "rate_limited": "已拒绝：每分钟调用次数过多"
       }
     },
+    "setup": {
+      "title": "{{provider}} Webhook",
+      "working": "运行正常。{{provider}} 已在把事件发到这里。",
+      "waiting": {
+        "github": "正在等待 GitHub。保存 Webhook 后它会立刻发送一次 ping。",
+        "sentry": "正在等待 Sentry。出现新错误时它会调用。"
+      },
+      "refused": {
+        "github": "GitHub 用了另一个密钥调用。请把下面的 Secret 重新复制到 Webhook 中。",
+        "sentry": "Sentry 用了另一个密钥调用。请重新粘贴该集成的 Client Secret。"
+      },
+      "timeout": "3 分钟内没有收到任何内容。请检查 URL 和密钥，然后再测试一次。",
+      "adminOnly": "{{provider}} Webhook 由管理连接器的人开启。请让管理员打开这个例行任务。",
+      "test": "测试",
+      "retest": "再测试一次",
+      "copied": "已复制。",
+      "github": {
+        "repo": "仓库",
+        "repoPlaceholder": "所有者/名称",
+        "oneClick": "创建 Webhook",
+        "added": "已在 {{repo}} 中创建 Webhook。",
+        "byHand": "也可以手动：在仓库中打开 Settings › Webhooks › Add webhook。",
+        "open": "在仓库中打开 Settings › Webhooks › Add webhook。",
+        "openLink": "在 GitHub 中打开",
+        "url": "Payload URL",
+        "type": "Content type: application/json",
+        "secret": "Secret",
+        "events": "在 Which events 中选择 Let me select individual events。勾选 Pull requests 和 Deployment statuses，然后点 Add webhook。",
+        "another": "添加到另一个仓库"
+      },
+      "sentry": {
+        "open": "在 Sentry 中创建一个内部集成。",
+        "openLink": "在 Sentry 中打开",
+        "url": "Webhook URL",
+        "events": "在 Permissions 下把 Issue & Event 设为 Read。然后在 Webhooks 下勾选 issue 并保存。",
+        "secret": "集成的 Client Secret",
+        "secretPlaceholder": "粘贴 Client Secret",
+        "secretSaved": "已保存。粘贴新的即可替换",
+        "save": "保存",
+        "saved": "Client Secret 已保存。"
+      }
+    },
     "once": "一次 · {{date}}（{{weekday}}）{{time}}{{zone}}",
     "reminder": "提醒",
     "fired": "已触发",
@@ -6155,17 +6247,142 @@
     },
     "presets": {
       "title": "从模板开始",
+      "placeholder": "选择模板",
+      "search": "搜索模板",
+      "searchPlaceholder": "名称、领域或应用",
+      "noResults": "未找到模板",
+      "list": "模板",
+      "needsApp": "需要这个应用：{{app}}",
+      "needsApps": "需要以下应用之一：{{apps}}",
+      "needsMailbox": "需要已连接的邮箱",
+      "connectFirst": "连接后例行任务才能运行。",
+      "fillBlank": "请先替换括号里的文字。",
+      "replaceTitle": "用这个模板替换你写的内容？",
+      "replaceConfirm": "替换",
+      "areas": {
+        "team": "团队与日常",
+        "sales": "销售与客户",
+        "support": "客户服务",
+        "marketing": "市场与内容",
+        "finance": "财务",
+        "ops": "运营",
+        "people": "人事",
+        "tech": "技术"
+      },
+      "dayPlan": {
+        "name": "今日计划",
+        "text": "工作日 8:30，今天的任务和会议。",
+        "prompt": "列出今天到期的未完成任务和今天的会议。说明哪些事需要先处理。"
+      },
+      "late": {
+        "name": "逾期任务",
+        "text": "工作日 10 点，已过期限的事项。",
+        "prompt": "查找已过期限的未完成任务。说明每项的负责人和逾期天数。"
+      },
+      "unanswered": {
+        "name": "未回复的问题",
+        "text": "工作日 16 点，今天没人回复的事项。",
+        "prompt": "在频道中查找今天没有得到回复的问题和请求。逐条列出并注明提问的人。"
+      },
+      "leads": {
+        "name": "CRM 新联系人",
+        "text": "工作日 9 点，有谁加入以及先联系谁。",
+        "prompt": "在 CRM 中查看上次以来新增的联系人。说明谁最有希望，并为每人建议下一步。"
+      },
+      "stalled": {
+        "name": "停滞的商机",
+        "text": "周一 9 点，最近没有动静的商机。",
+        "prompt": "在 CRM 中查看超过 7 天没有活动的进行中商机。为每个商机建议下一步。"
+      },
+      "prospects": {
+        "name": "寻找新客户",
+        "text": "周一 8 点，五家值得联系的公司。",
+        "prompt": "在网上搜索 5 家符合我们理想客户的公司。说明每家公司做什么，以及为什么值得联系。"
+      },
+      "newEmail": {
+        "name": "准备邮件回复",
+        "text": "收到邮件时，智能体准备回复。",
+        "prompt": "阅读收到的邮件，说明内容和紧急程度。写一份回复建议，但不要发送。"
+      },
+      "tickets": {
+        "name": "未回复的工单",
+        "text": "工作日 9 点和 14 点，还有谁在等。",
+        "prompt": "查看超过 4 小时没有回复的未关闭工单。先列出最紧急的，并为每个工单建议回复。"
+      },
+      "themes": {
+        "name": "最常见的请求",
+        "text": "周五 16 点，客户问得最多的内容。",
+        "prompt": "阅读本周工单并按主题分组。说明最常见的 5 个主题，以及如何避免每一个。"
+      },
+      "mentions": {
+        "name": "公司提及",
+        "text": "工作日 9 点，外界如何谈论我们。",
+        "prompt": "在网上搜索关于我们公司的最新新闻和提及。说明出现在哪里、是正面还是负面、是否需要回应。"
+      },
+      "rivals": {
+        "name": "关注竞争对手",
+        "text": "周一 9 点，竞争对手的变化。",
+        "prompt": "调查竞争对手上周推出或改变了什么，比如价格、产品和活动。说明哪些对我们重要。"
+      },
+      "ideas": {
+        "name": "内容创意",
+        "text": "周一 10 点，本周五个创意。",
+        "prompt": "根据客户的问题和市场动态，为本周提出 5 个内容创意。为每个创意写一个标题和形式。"
+      },
+      "traffic": {
+        "name": "网站数据",
+        "text": "周一 8:30，本周与上周对比。",
+        "prompt": "查看上周的数据：访问量、注册量和热门页面。与再上一周对比，说明发生了什么变化。"
+      },
+      "revenue": {
+        "name": "昨日销售",
+        "text": "每天 8 点，销售与周平均对比。",
+        "prompt": "查看昨天的销售额，并与过去 7 天的平均值对比。如有异常请说明。"
+      },
+      "failed": {
+        "name": "付款问题",
+        "text": "工作日 10 点，拒付和争议。",
+        "prompt": "查看上次以来被拒绝的付款、退款和争议。逐条列出金额和客户。"
+      },
+      "monthClose": {
+        "name": "月度结算",
+        "text": "每月 1 日 9 点，上个月的收支。",
+        "prompt": "整理上个月的摘要：收入、退款和争议。与再上一个月对比。"
+      },
+      "sheet": {
+        "name": "检查表格",
+        "text": "工作日 11 点，缺漏和异常数字。",
+        "prompt": "检查这个表格：（说明是哪一个）。指出空白字段、异常数值以及上次以来的变化。"
+      },
+      "page": {
+        "name": "关注网页",
+        "text": "每天 9 点，只在变化时提醒。",
+        "prompt": "打开这个页面：（在此粘贴地址）。如果与上次相比有重要变化，请说明变了什么。"
+      },
+      "newTask": {
+        "name": "整理新任务",
+        "text": "创建任务时，智能体进行检查。",
+        "prompt": "阅读新任务。说明开始前还缺什么，并建议负责人和期限。"
+      },
+      "pulse": {
+        "name": "每周一问",
+        "text": "周四 16 点，向团队提一个问题。",
+        "prompt": "总结上周问题的回答，不要提及姓名。然后在频道里发一个关于本周情况的简短新问题。"
+      },
+      "away": {
+        "name": "本周谁不在",
+        "text": "周一 8:30，休假和出差。",
+        "prompt": "在日历中查看本周的休假和出差。按天列出，并说明哪些工作需要有人接手。"
+      },
       "digest": {
         "name": "每日频道摘要",
         "text": "工作日上午 9 点，总结昨天发生的事。",
-        "prompt": "总结频道里昨天发生的事：提出的请求、已解决的问题，以及还没人回复的内容。",
-        "phrase": "工作日上午 9 点"
+        "prompt": "总结频道里自上次总结以来发生的事：提出的请求、已解决的问题，以及还没人回复的内容。"
       },
       "errors": {
         "name": "关注新错误",
         "text": "每小时一次，只在出现新错误时发消息。",
-        "prompt": "检查自上次运行以来 Sentry 中的新错误。如果有，总结一下并说明它们发生在代码的哪里。如果没有新内容，就不要发消息。",
-        "phrase": "每小时"
+        "prompt": "检查自上次运行以来 Sentry 中的新错误。如果有，总结一下并说明它们发生在代码的哪里。如果没有新内容，就不要发消息。"
       },
       "prs": {
         "name": "审查新 PR",
@@ -6175,8 +6392,7 @@
       "week": {
         "name": "每周总结",
         "text": "周五下午 5 点：决定和待办事项。",
-        "prompt": "总结这一周：做出的决定、已完成的任务，以及仍未完成的事项。",
-        "phrase": "每周五下午 5 点"
+        "prompt": "总结这一周：做出的决定、已完成的任务，以及仍未完成的事项。"
       }
     },
     "close": "关闭",
@@ -8428,6 +8644,52 @@
     "audienceUseFolder": "为文件夹 {{folder}} 设置",
     "audienceFolderSaved": "完成。文件夹的访问范围已更新。",
     "audienceFolderOpened": "完成。文件夹现在没有限制了。",
+    "audienceRootTitle": "整个 Wiki 的访问权限",
+    "audienceRootText": "适用于 Wiki 的所有页面和文件夹，也包括之后添加的。",
+    "audienceInRoot": "整个 Wiki 已受限：这里只能进一步收窄。",
+    "audienceFollowsRoot": "来自整个 Wiki",
+    "context": {
+      "on": "始终放入智能体的上下文",
+      "off": "移出智能体的上下文",
+      "chip": "始终在上下文中",
+      "hint": "即使没人提到，也会放进每个读取它的智能体的每次回答。最多 3 页。",
+      "added": "现在每个读取此页面的智能体都会在每次回答时收到它。",
+      "removed": "现在只有消息与此页面相关时，智能体才会收到它。"
+    },
+    "bulk": {
+      "select": "选择",
+      "selectAll": "全选",
+      "selected_other": "已选 {{count}} 个",
+      "agents": "智能体",
+      "delete": "删除",
+      "deleteFolder": "删除文件夹 {{folder}}",
+      "deleteImport_other": "删除导入“{{name}}”（{{count}} 页）",
+      "deleteTitle_other": "删除 {{count}} 页？",
+      "deleteFolderTitle_other": "删除文件夹 {{folder}} 及其中的 {{count}} 页？",
+      "deleteImportTitle_other": "删除从“{{name}}”导入的 {{count}} 页？",
+      "deleteText": "它们会进入 Wiki 的回收站保留 30 天，可以从那里恢复。",
+      "deleteGo_other": "将 {{count}} 页移到回收站",
+      "deleted_other": "{{count}} 页已移到回收站。",
+      "kept_other": "{{count}} 页保留了：已锁定，或只有部分人可编辑。",
+      "failed_other": "{{count}} 页没有变化（{{titles}}）：{{reason}}",
+      "agentsTitle_other": "读取 {{count}} 页的智能体",
+      "agentsText": "人员中谁能看到每个页面保持不变。",
+      "agentsSaved_other": "完成。已更新 {{count}} 页。"
+    },
+    "trash": {
+      "title": "回收站",
+      "text": "删除的页面会在这里保留 30 天，之后消失。",
+      "none": "回收站是空的。",
+      "restore": "恢复",
+      "restoreMany_other": "恢复 {{count}} 个",
+      "purge": "永久删除",
+      "empty": "清空回收站",
+      "emptyTitle_other": "永久删除 {{count}} 页？",
+      "emptyText": "它们会连同历史一起消失。此操作无法撤销。",
+      "deletedWhen": "{{when}}删除",
+      "restored_other": "已恢复 {{count}} 页。",
+      "purged_other": "已永久删除 {{count}} 页。"
+    },
     "audienceLevel": "{{name}} 可以做什么",
     "audienceLevelNone": "无访问权限",
     "audienceLevelView": "查看",
@@ -8449,7 +8711,7 @@
     "noAccessText": "它只对部分人开放。如有需要，请询问负责 Wiki 的人。",
     "delete": "移到回收站",
     "deleteTitle": "将 {{title}} 移到回收站？",
-    "deleteText": "指向它的链接会变成“待创建的页面”。目前还不能在应用里恢复。",
+    "deleteText": "它会进入 Wiki 的回收站保留 30 天，可以从那里恢复。在此期间，指向它的链接会变成“待创建页面”。",
     "deleted": "{{title}} 已移到回收站。",
     "noBacklinksHint": "还没有页面链接到这里。在其他页面中写下 [[{{title}}]] 即可。",
     "allVersions": "查看全部 {{count}} 个版本",
@@ -8587,7 +8849,21 @@
       "newMarked": "新页面会标记为“新”。",
       "uploaded_other": "{{count}} 个附件已存入 Drive。",
       "open": "打开 {{title}}",
-      "someFailed_other": "{{count}} 篇笔记未能导入：{{titles}}",
+      "sendingNotes_other": "/ 已发送 {{count}} 条笔记",
+      "stop": "停止",
+      "stopping": "正在停止…",
+      "partialTitle": "没有全部导入",
+      "partial_other": "{{count}} 条笔记：{{done}} 条已导入，{{failed}} 条没有",
+      "partialText": "已导入的页面已经在 Wiki 中。",
+      "whyTitle": "没有导入的内容",
+      "why": {
+        "batch_other": "{{count}} 条未发送：{{error}}",
+        "stopped_other": "因为你停止了，{{count}} 条未发送",
+        "tooLong_other": "{{count}} 条超过 20 万字符：请在 Obsidian 中拆分",
+        "title_other": "{{count}} 条没有可作标题的名称",
+        "skipped_other": "{{count}} 条已有同名页面"
+      },
+      "retry_other": "重试 {{count}} 条",
       "overlayTitle": "拖放到这里导入 Wiki",
       "overlayText": "Obsidian 仓库的 .zip、仓库文件夹或 .md 文件。导入前你会检查所有内容。",
       "error": {
@@ -8770,6 +9046,8 @@
     "modelLimit": "{{model}} 在这个套餐中达到了自身的限额，{{when}}重置。套餐里的其他模型仍可正常使用。",
     "modelLimitUnknown": "{{model}} 在这个套餐中达到了自身的限额。套餐里的其他模型仍可正常使用。",
     "modelRegion": "{{model}} 需要在 OpenCode 的 设置 › 隐私 中开启 Global 区域。套餐里的其他模型仍可正常使用。",
+    "modelOff": "OpenCode 拒绝了用这个密钥调用 {{model}}：该模型或账号在那里已关闭。请在 OpenCode 中开启，或选择其他模型。",
+    "planInactive": "这个密钥所属的 OpenCode 账号没有启用 OpenCode Go，所以它的模型都不会回复。请在 OpenCode 中检查 Go 订阅，或连接拥有 Go 的账号的密钥。",
     "modelHow": {
       "globalRegion": "在 OpenCode 的 设置 › 隐私 中开启 Global 区域。否则这个模型不会回答。",
       "paidTraining": "这个模型的服务商可能会用请求内容训练模型。在 OpenCode 的 设置 › 隐私 中开启付费模型的该权限。否则这个模型不会回答。",
@@ -10774,6 +11052,61 @@
     }
   },
   "errors": {
+    "said": {
+      "gone": "这项内容已不在这里。请刷新页面后重试。",
+      "alreadyDone": "这项已被回答或已结束。请刷新查看最新状态。",
+      "changed": "这项在此期间发生了变化。请刷新后重试。",
+      "tooLateUndo": "这项已无法撤销。请手动修改。",
+      "futureTime": "请选择将来的时间。",
+      "tooFar": "请选择一年内的日期。",
+      "checkDate": "请检查日期和时间。",
+      "notInWorkspace": "此人不在这个工作区。",
+      "validEmail": "请输入有效的邮箱，例如 ana@example.com。",
+      "tooMany": "超出了这里的容量。请移除一些后重试。",
+      "fillIn": "请补全缺少的内容后重试。",
+      "checkAddress": "请检查地址后重试。",
+      "tooLong": "内容太长。请缩短后重试。",
+      "updateComputerApp": "电脑上的应用版本太旧。请更新后重试。",
+      "offHere": "此功能在这里已关闭。",
+      "notInConversation": "不在这个对话中。",
+      "accountStart": "电脑无法开始登录。请确认电脑已开机后重试。",
+      "accountInUse": "这个账号已在为另一个智能体思考。",
+      "noAiYet": "还没有连接 AI。",
+      "filePurged": "这个文件已删除超过 30 天，无法恢复。",
+      "looksSecret": "这看起来像密码或密钥，这里的所有人都会看到。",
+      "blockSpec": "此区块的组成部分或公式有误，因此无法显示。请修正后重试。",
+      "takeControl": "请先接管这个配置文件。",
+      "profileBusy": "其他人正在使用这个配置文件。",
+      "nameTaken": "这个名称已被使用。请换一个。",
+      "deleteName": "输入频道名称才能删除。",
+      "generalKept": "#general 无法删除。",
+      "generalStays": "所有人都留在 #general。",
+      "mcpUnreachable": "无法连接到 MCP 服务器。请检查地址后重试。",
+      "notApproved": "这项服务尚未批准 agentes.chat。",
+      "alreadyInvited": "此人已有邀请。",
+      "alreadyAsked": "已有人为此人提出申请。",
+      "mailboxConnected": "这个邮箱已连接。",
+      "sendNeedsRecipients": "不询问直接发送需要一份允许的收件人名单。",
+      "missionLive": "这个专项任务还有正在运行或等待电脑的项目。请先停止它们。",
+      "createRefused": "你现在无法创建工作区。",
+      "noAgentToRemind": "这个对话中没有能提醒你的智能体。",
+      "agentCantRead": "请先在智能体的访问设置中允许它读取这项内容。",
+      "neverHappens": "这个日程永远不会触发。",
+      "soleOwner": "你是这个有其他成员的工作区的唯一所有者。请先将其他人设为所有者，或删除工作区。",
+      "testFirst": "开启之前，请先用这些设置测试连接。",
+      "voiceLength": "录音太长或太短。",
+      "sendAgain": "文件没有完整送达。请重新发送。",
+      "serverKey": "这个密钥在服务器的设置中。",
+      "input": "没有成功。请检查填写的内容后重试。",
+      "conflict": "现在无法这样做。请刷新后重试。",
+      "computer": "电脑现在无法完成这项操作。请确认电脑已开机后重试。"
+    },
+    "webhook": {
+      "githubNoAccess": "这个工作区的 GitHub 无法在 {{repo}} 中创建 Webhook。请按下面的步骤手动创建。",
+      "githubFailed": "GitHub 没有在 {{repo}} 中创建 Webhook（{{status}}）。请按下面的步骤手动创建。",
+      "invalidSecret": "请完整粘贴 Client Secret，不要带空格。",
+      "invalidRepo": "请把仓库写成 所有者/名称。"
+    },
     "issue": {
       "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
       "deleteForbidden": "只有这项任务的创建者或管理员可以删除它。",
@@ -10796,6 +11129,8 @@
       "audienceWiderThanFolder": "这个文件夹的范围有限：在这里只能进一步缩小范围。要放开，请修改文件夹。",
       "editLimited": "只有被选中的成员可以编辑此页面。",
       "editorsExcludeYou": "请把你自己加入可编辑的成员中，才能保留此页面的编辑权。",
+      "contextFull": "已有 {{max}} 页始终在智能体的上下文中。请先移出一页。",
+      "restoreSlugTaken": "现在另一个页面使用了这个名称。请先为它重命名，再重新恢复。",
       "titleTaken": "已经有一个名为“{{title}}”的页面。",
       "titleCharacters": "标题不能包含 [ ] | 或 #。",
       "titleNoLetters": "标题需要包含字母或数字。",
@@ -10862,7 +11197,8 @@
       "createInviteOnly": "目前创建新工作区需要邀请。",
       "membersFull": "这个工作区的席位目前已全部占满。请邀请你的人空出一个席位。",
       "deleting": "这个工作区正在删除中。",
-      "notRestorable": "这个工作区已无法恢复。"
+      "notRestorable": "这个工作区已无法恢复。",
+      "paused": "这个工作区已暂停，现在无法连接应用。工作区的管理者可以重新启用它。"
     },
     "reauth": {
       "code": "请输入我们通过邮件发给你的验证码。",
@@ -12328,7 +12664,8 @@
     "stopFailed": "无法停止。只有提出请求的人、智能体的负责人或管理员可以。",
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
-    "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
+    "statusReply": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，我会在下一步读到。",
+    "statusReplyTurn": "我正在处理一项任务（{{duration}}），暂时无法回复。你的消息已在队列中，这一轮工作结束后我会读到。",
     "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
     "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
     "status": {
@@ -12374,7 +12711,8 @@
     "namesMore": "{{first}} 等另外 {{count}} 位",
     "wait": {
       "thinking": "思考中…",
-      "held": "等待审批…"
+      "held": "等待审批…",
+      "said": "“{{text}}”"
     },
     "consult": {
       "asking": "{{from}} 正在询问 {{to}}",
@@ -12590,6 +12928,32 @@
         "requestingAccess": "申请了权限",
         "requestingSecret": "请求了机密信息",
         "queryingDatabase": "查询了数据库",
+        "searchingWeb": "搜索了网页",
+        "readingWeb": "读了一个网页",
+        "preparingCard": "准备了一张卡片",
+        "startingPoll": "发起了一个投票",
+        "askingChoices": "用选项提问了",
+        "usingVault": "在 Vault 中操作了",
+        "makingPassword": "创建了密码",
+        "startingWork": "开始了一项长时间工作",
+        "updatingWork": "更新了一项长时间工作",
+        "withdrawingRequest": "撤回了一项请求",
+        "schedulingAction": "准备了一个稍后执行的操作",
+        "updatingDashboard": "处理了一个仪表盘",
+        "readingDashboards": "查看了仪表盘",
+        "pushingBranch": "请求发送代码",
+        "deletingBranches": "删除了分支",
+        "postingMessage": "发布了一条消息",
+        "sendingDm": "发送了一条私信",
+        "settingStatus": "更新了自己的状态",
+        "settingReplyStyle": "调整了回复方式",
+        "deletingRoutine": "删除了例行工作",
+        "runningRoutine": "立即运行了例行工作",
+        "proposingTeam": "提议了一个团队",
+        "proposingChange": "提议了一项更改",
+        "updatingThread": "更新了一个话题",
+        "addingAgent": "把智能体添加到频道",
+        "readingConversation": "读了对话",
         "usingTool": "使用了 {{tool}} 工具",
         "thinking": "思考了",
         "typing": "撰写了",
@@ -12672,6 +13036,32 @@
       "requestingAccess": "申请权限",
       "requestingSecret": "请求机密信息",
       "queryingDatabase": "查询数据库",
+      "searchingWeb": "搜索网页",
+      "readingWeb": "阅读网页",
+      "preparingCard": "准备卡片",
+      "startingPoll": "发起投票",
+      "askingChoices": "用选项提问",
+      "usingVault": "在 Vault 中操作",
+      "makingPassword": "创建密码",
+      "startingWork": "开始长时间工作",
+      "updatingWork": "更新长时间工作",
+      "withdrawingRequest": "撤回请求",
+      "schedulingAction": "准备稍后执行的操作",
+      "updatingDashboard": "处理仪表盘",
+      "readingDashboards": "查看仪表盘",
+      "pushingBranch": "请求发送代码",
+      "deletingBranches": "删除分支",
+      "postingMessage": "发布消息",
+      "sendingDm": "发送私信",
+      "settingStatus": "更新自己的状态",
+      "settingReplyStyle": "调整回复方式",
+      "deletingRoutine": "删除例行工作",
+      "runningRoutine": "立即运行例行工作",
+      "proposingTeam": "提议团队",
+      "proposingChange": "提议更改",
+      "updatingThread": "更新话题",
+      "addingAgent": "把智能体添加到频道",
+      "readingConversation": "阅读对话",
       "usingTool": "使用工具"
     },
     "tokens": "{{value}} 个 token",
@@ -12764,6 +13154,8 @@
       "plan_model_limit_wait": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它{{when}}重置。",
       "plan_model_limit_wait_unknown": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它重置。",
       "plan_model_region_wait": "这个模型（{{model}}）需要在 OpenCode 的 设置 › 隐私 中开启 Global 区域。",
+      "plan_model_off_wait": "OpenCode 拒绝了用这个密钥调用 {{model}}：该模型或账号在那里已关闭。请在 OpenCode 中开启，或更换 {{agent}} 的模型。",
+      "plan_inactive_wait": "这个密钥所属的 OpenCode 账号没有启用 OpenCode Go，所以它的模型都不会回复。请在 OpenCode 中检查 Go 订阅，或连接拥有 Go 的账号的密钥。",
       "budget_wait": "我本月的预算用完了。我会在{{when}}继续，如果管理员提高预算会更早。",
       "usage_wait_canceled": "已取消。限额重置后不会运行。",
       "usage_wait_archived": "不会运行：该智能体已归档。",
@@ -12794,6 +13186,8 @@
       "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 没有只使用 agentes.chat 的工具。",
       "no_ai_model_limit": "我现在无法回答：{{model}} 已达到它在我套餐中的自身上限。",
       "no_ai_model_region": "我无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
+      "no_ai_model_off": "我无法回复：OpenCode 拒绝了用我的密钥调用 {{model}}。请在 OpenCode 中开启该模型或账号，或更换我的模型。",
+      "no_ai_plan_inactive": "我无法回复：我的密钥所属的 OpenCode 账号没有启用 OpenCode Go。请在 OpenCode 中检查 Go 订阅，或连接拥有 Go 的账号的密钥。",
       "no_ai_commands_off": "我现在无法回答：我套餐所在电脑上的命令已关闭。",
       "no_ai_cli_missing": "我还无法回答：我的 AI 程序没有安装在我的电脑上。",
       "no_ai_plan_hold": "我保留了你的消息。 工作区有了 agentes.chat 套餐并连接 AI 后，我会在这里回复。",
@@ -13328,6 +13722,12 @@
       "starting": "正在打开页面…",
       "page": "{{name}} 的页面，实时",
       "page_female": "{{name}} 的页面，实时",
+      "emulated": {
+        "phone": "手机 · {{size}}",
+        "tablet": "平板 · {{size}}",
+        "desktop": "桌面 · {{size}}"
+      },
+      "normalSize": "正常尺寸",
       "tabs_other": "{{count}} 个标签页",
       "typeHere": "在这里输入",
       "typeTo": "输入到 {{field}}",
@@ -14129,6 +14529,10 @@
       "modelLimit": "{{model}} 已达限额",
       "modelRegion": "{{model}} 需要 Global 区域",
       "modelRegionNext": "请在 OpenCode 中开启（Settings › Privacy）",
+      "modelOff": "OpenCode 拒绝了 {{model}}",
+      "modelOffNext": "请在 OpenCode 中开启，或选择其他模型",
+      "planInactive": "OpenCode Go 未启用",
+      "planInactiveNext": "请在 OpenCode 中检查 Go 订阅",
       "budgetOut": "本月预算已用完",
       "workLine": "在智能体的工作队列中",
       "workLineNext": "其他工作结束后开始",

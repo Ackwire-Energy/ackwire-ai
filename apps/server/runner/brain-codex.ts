@@ -78,6 +78,8 @@ const CODEX_LOGIN_STATUS_MS = 5000;
 /** The engine's `BrainEvent` (ADR 0032 contract), as the runner sends it in `brain.event`. */
 export type CodexBrainEvent =
   | { type: "text_delta"; text: string }
+  /** Grok Build, read with Claude Code's parser: a call of its own as it starts. */
+  | { type: "tool_started"; id: string; name: string }
   | {
       type: "tool_call";
       id: string;

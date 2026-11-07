@@ -435,8 +435,6 @@
     "camera": "카메라",
     "photos": "사진",
     "file": "파일",
-    "audio": "오디오",
-    "audioSoon": "오디오는 곧 지원돼요.",
     "noCamera": "카메라에 접근할 수 없어요. 휴대폰 설정에서 허용해 주세요.",
     "mission": "미션 시작",
     "missionHint": "계획을 세워 처음부터 끝까지 하는 긴 작업",
@@ -706,6 +704,7 @@
   },
   "activity": {
     "title": "활동",
+    "chooseModel": "다른 모델 고르기",
     "filter": {
       "all": "전체",
       "waiting": "내 확인 대기",
@@ -766,6 +765,7 @@
       "desktop_taken_female_other": "{{names}} 님이 {{agent}}의 컴퓨터 화면 제어를 넘겨받았어요",
       "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
       "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
+      "plan_model_dropped_other": "{{model}} 모델이 {{plan}}에서 빠졌어요. {{names}}은(는) 당분간 {{runs}}을(를) 써요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",

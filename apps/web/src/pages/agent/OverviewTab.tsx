@@ -1,6 +1,6 @@
 import { useAgentDetail, useChannels, useProposals, useRuns } from "@agenteschat/client";
 import { whenAt } from "@agenteschat/client/lib/format";
-import { proposalTitle } from "@agenteschat/client/lib/proposals";
+import { pendingOnAgent, proposalTitle } from "@agenteschat/client/lib/proposals";
 import { excerpt } from "@agenteschat/client/lib/text";
 import { Button, Card, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -31,9 +31,7 @@ export function OverviewTab() {
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
   const channels = useChannels(org.id);
-  const pending = (proposals.data ?? []).filter(
-    (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
-  );
+  const pending = pendingOnAgent(proposals.data ?? [], agent.id);
   const approvals = detail.data?.pendingApprovals ?? 0;
   const recent = (runs.data ?? []).slice(0, RECENT);
   const decides = viewer !== "member";
@@ -52,7 +50,7 @@ export function OverviewTab() {
                   <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
                   <span>{decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}</span>
                 </span>
-                <span className="agp-attn__tail ac-captop">
+                <span className="agp-attn__tail">
                   <Button asChild size="sm">
                     <Link to="/org/$orgId/approvals" params={{ orgId: org.id }}>
                       {t("agentPage.overview.seeApprovals")}
@@ -77,7 +75,7 @@ export function OverviewTab() {
                         : t("proposals.waitingAdmin")}
                   </span>
                 </span>
-                <span className="agp-attn__tail ac-captop">
+                <span className="agp-attn__tail">
                   <Button size="sm" onClick={() => goTo("memory")}>
                     {t("agentPage.overview.review")}
                   </Button>

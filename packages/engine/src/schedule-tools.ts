@@ -269,7 +269,7 @@ async function neverFires(ctx: ToolContext, trigger: RoutineTriggerInput, what: 
   if (!missing) return null;
   const name = missing === "sentry" ? "Sentry" : "GitHub";
   return {
-    content: `${what}: nothing would ever start it. No ${name} webhook sends this workspace its events. Tell the person what it needs: a workspace admin sets up a ${name} webhook for this workspace (the app can't create one yet). If they'd rather not wait, offer a schedule that checks instead.`,
+    content: `${what}: nothing would ever start it. No ${name} webhook sends this workspace its events yet. Tell the person what it needs: someone who manages connectors picks the ${name} event in Rotinas › Nova rotina and follows the steps shown there. If they'd rather not wait, offer a schedule that checks instead.`,
     isError: true,
   };
 }
@@ -278,7 +278,7 @@ async function neverFires(ctx: ToolContext, trigger: RoutineTriggerInput, what: 
 function needsText(r: RoutineView) {
   if (r.state !== "needs_webhook") return "";
   const name = hookName(r);
-  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: a ${name} webhook for this workspace, which a workspace admin sets up (the app can't create one yet). Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
+  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: someone who manages connectors opens this routine in Rotinas and follows the ${name} webhook steps shown there. Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
 }
 
 /** One run, coded: "2026-10-20 09:00 failed (provider_error)". */

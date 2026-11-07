@@ -162,7 +162,7 @@ export function createChatToolSource(deps: {
       },
       describe: (input) => ({
         title: `Post in #${str(input.channel).replace(/^#/, "")}`,
-        detail: str(input.text).slice(0, 500) || undefined,
+        detail: str(input.text) || undefined,
       }),
       async execute(input, ctx) {
         try {
@@ -331,7 +331,7 @@ export function createChatToolSource(deps: {
       },
       describe: (input) => ({
         title: `Message ${str(input.person).replace(/^@/, "")}`,
-        detail: str(input.text).slice(0, 500) || undefined,
+        detail: str(input.text) || undefined,
       }),
       async execute(input, ctx) {
         try {
