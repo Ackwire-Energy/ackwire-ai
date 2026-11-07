@@ -516,6 +516,47 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     });
   });
 
+  test("a Claude login self-check that fails is reported once per reason, with the computer's tags", async () => {
+    f = await setup();
+    const errors = createFakeErrorReporter();
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, errors });
+    hubs.push(hub);
+    const paired = await pair();
+    // No reason and no `cli_login`: a runner that just started, its self-check still running.
+    const hello = async (claudeLoginBlocked?: string, passed = false) => {
+      const runner = fakeRunner(hub);
+      await runner.hello(paired.token, {
+        claudeLoginMethods: passed ? ["setup_token", "cli_login"] : ["setup_token"],
+        ...(claudeLoginBlocked ? { claudeLoginBlocked } : {}),
+      });
+      runner.disconnect();
+    };
+    const tools = "The Claude CLI kept a tool of its own (Bash) (Claude CLI 2.1.330)";
+
+    await hello();
+    await hello(tools);
+    await hello(tools);
+    // A restart: the check hasn't finished on its first hello, then fails again for the same reason.
+    await hello();
+    await hello(tools);
+    expect(errors.reports).toHaveLength(1);
+    expect(String(errors.reports[0]?.error)).toContain(tools);
+    expect(errors.reports[0]?.tags).toMatchObject({
+      org_id: f.org.id,
+      machine_id: paired.machineId,
+      runner_version: RUNNER.version,
+    });
+    // A new reason is news; passing, then failing again for the old one, is too.
+    await hello("It needs systemd");
+    await hello(undefined, true);
+    await hello(tools);
+    expect(errors.reports.map((r) => String(r.error))).toEqual([
+      expect.stringContaining(tools),
+      expect.stringContaining("It needs systemd"),
+      expect.stringContaining(tools),
+    ]);
+  });
+
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {
     f = await setup({ machines: true });
     const hub = f.machineHub as MachineHub;

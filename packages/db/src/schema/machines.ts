@@ -65,7 +65,7 @@ export interface MachineExecutors {
   mode?: "system";
   /** `hello.claudeLoginMethods` (protocol 50): what a new Claude sign-in for all agents can use there; absent: older. */
   claudeLoginMethods?: ("cli_login" | "setup_token" | "api_key")[];
-  /** `hello.claudeLoginBlocked`: why the computer's self-check keeps `cli_login` for all agents off. */
+  /** `hello.claudeLoginBlocked`: why the computer's self-check keeps `cli_login` for all agents off, kept until a check passes. */
   claudeLoginBlocked?: string;
   /** `hello.authEgressGroup` (protocol 50): root's Claude sign-in CLIs there run in the `agentes-auth` group. */
   authEgressGroup?: true;

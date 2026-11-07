@@ -98,13 +98,16 @@ test("config: the mode and the agents' uid range are read and checked", () => {
 });
 
 test("config: Claude's own login for all agents is off unless its switch is whole, and a new pairing keeps it", () => {
-  const on = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "B" };
+  const on = { refresh: "B" };
   expect(normalizeStored({ claudeSharedLogin: on }).claudeSharedLogin).toEqual(on as never);
+  // A version range from an older guard is ignored, so the switch reads the same and nothing restarts over it.
+  const ranged = { minVersion: "2.1.300", maxVersion: "2.1.320", ...on };
+  expect(normalizeStored({ claudeSharedLogin: ranged })).toEqual(normalizeStored({ claudeSharedLogin: on }));
   const locked = { ...on, refreshLock: ".refresh.lock" };
   expect(normalizeStored({ claudeSharedLogin: locked }).claudeSharedLogin).toEqual(locked as never);
   const stray = { ...on, refreshLock: "../.credentials.json" };
   expect(normalizeStored({ claudeSharedLogin: stray }).claudeSharedLogin).toEqual(on as never);
-  for (const bad of [true, {}, { ...on, refresh: "C" }, { ...on, minVersion: "2.1" }, { ...on, maxVersion: 3 }]) {
+  for (const bad of [true, {}, { ...on, refresh: "C" }, { minVersion: "2.1.300", maxVersion: "2.1.320" }]) {
     expect(normalizeStored({ claudeSharedLogin: bad })).toEqual({});
   }
   const paired = configFromGrant(
