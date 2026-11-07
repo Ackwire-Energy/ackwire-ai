@@ -12,6 +12,7 @@ import {
   helpersOf,
   hiddenCount,
   taskClock,
+  taskPlace,
   taskState,
   tasksOf,
   taskTitle,
@@ -653,7 +654,7 @@ function TaskRow({
 }) {
   const { t } = useTranslation();
   const title = taskTitle(t, task);
-  const where = taskWhere(t, task);
+  const where = taskPlace(t, task);
   const asked = task.requester
     ? task.requester.userId === meId
       ? t("taskManager.askedByYou")
@@ -662,7 +663,7 @@ function TaskRow({
   const helpers = task.helpers ? t("taskManager.helpers", { count: task.helpers }) : null;
   const sub = [
     look === "flat"
-      ? `${agentName} · ${chain ?? where}`
+      ? [agentName, chain ?? where].filter(Boolean).join(" · ")
       : taskSub(t, task, [where, task.background ? null : (chain ?? asked)].filter(Boolean).join(" · ")),
     helpers,
   ]
@@ -909,7 +910,7 @@ function EndedRow({
           <button type="button" className="tm-hit" aria-pressed={selected} onClick={onOpen}>
             <span className="tm-hit__text">{taskTitle(t, task)}</span>
           </button>
-          <small>{`${agentName} · ${taskWhere(t, task)}`}</small>
+          <small>{[agentName, taskPlace(t, task)].filter(Boolean).join(" · ")}</small>
         </span>
       </span>
       <span className="tm-cell tm-cell--state">

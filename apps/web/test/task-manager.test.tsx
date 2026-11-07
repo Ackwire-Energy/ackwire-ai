@@ -518,11 +518,15 @@ describe("the task manager page", () => {
         startedAt: ago(1315 + 5),
         finishedAt: ago(5),
       }),
+      // No title of its own (never the message's words): its place names it, said once.
+      ended({ runId: "r-hi", agentId: ADA_ID, status: "done" }),
     ];
     const { router } = await open(seedState({ taskManager: view }), "task-manager");
     await click(screen().getByRole("button", { name: /Terminadas hoje/ }));
-    const row = document.querySelector(".tm-row--ended") as HTMLElement;
+    const [row, untitled] = [...document.querySelectorAll<HTMLElement>(".tm-row--ended")];
+    if (!row || !untitled) throw new Error("no rows");
     expect(row.querySelector(".tm-cell--time")?.textContent).toBe("21 h 55 min");
+    expect(untitled.querySelector(".tm-name")?.textContent).toBe("#engAda");
     await click(within(row).getByRole("button", { name: "Relatório das lojas" }));
     await settle(4);
     const panel = screen().getByRole("complementary", { name: "Relatório das lojas" });

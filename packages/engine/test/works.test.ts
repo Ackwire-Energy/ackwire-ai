@@ -388,7 +388,9 @@ test("the safety net: a slow tool past the time moves the run by itself, and the
   expect(work).toMatchObject({ how: "auto", status: "done" });
   const anchor = (await messages()).find((m) => m.id === work?.anchorMessageId);
   expect(anchor?.meta).toMatchObject({ longWork: { id: work?.id, auto: true }, bodyCode: "work_auto_moved" });
-  expect(JSON.stringify(f.provider.calls[1]?.request.messages)).toContain("This is now background work");
+  // The brain's next call hears it (the cheap model's call naming the work comes between).
+  const heard = f.provider.calls.slice(1).map((c) => JSON.stringify(c.request.messages));
+  expect(heard.some((m) => m.includes("This is now background work"))).toBe(true);
   const report = (await messages()).find((m) => m.meta.workEnd);
   expect(report?.body).toBe("Build pronto.");
   expect(report?.threadId).toBeNull();
@@ -803,12 +805,13 @@ test("the sweep closes a work whose run is gone without stopping at it", async (
 });
 
 test("an automatic move is named by the cheap model in the conversation's words, never the ask's raw text", async () => {
-  let named = "Permissões no Play Console";
+  const named = "Permissões no Play Console";
   const assessing = (req: ModelRequest) => systemText(req.system).startsWith("You read a conversation thread");
   f = await setup({
     reply: (req) => ({ chunks: [assessing(req) ? JSON.stringify({ title: named, resolved: false }) : "ok"] }),
   });
   const root = await ask("@dev a versão 8 precisa do SHA-256 da Assinatura de apps");
+  await f.db.update(schema.agentRuns).set({ status: "done" });
   const run = await working("@dev qual permissao vc precisa? https://media.giphy.com/media/x/giphy.gif", root.id);
   const out = await moveToBackground({ ...deps(), context: f.context }, run.id, { how: "auto", title: "" });
   expect(out?.work.title).toBe("Permissões no Play Console");
@@ -821,9 +824,14 @@ test("an automatic move is named by the cheap model in the conversation's words,
   const view = await taskManager(f.db, f.owner.id, f.org.id);
   expect(view.tasks.find((t) => t.runId === run.id)?.label).toBe("Permissões no Play Console");
   expect(JSON.stringify(view)).not.toContain("qual permissao");
+});
 
-  // The model fails: no title (the apps say "em segundo plano"), and no card until a name comes.
-  named = "";
+test("a work the cheap model can't name has no title, and gets its card only once named", async () => {
+  let named = "";
+  const assessing = (req: ModelRequest) => systemText(req.system).startsWith("You read a conversation thread");
+  f = await setup({
+    reply: (req) => ({ chunks: [assessing(req) ? JSON.stringify({ title: named, resolved: false }) : "ok"] }),
+  });
   const other = await working("@dev Boa noite, pessoal! https://media.giphy.com/media/y/giphy.gif");
   const unnamed = await moveToBackground({ ...deps(), context: f.context }, other.id, { how: "auto", title: "" });
   expect(unnamed?.work.title).toBe("");

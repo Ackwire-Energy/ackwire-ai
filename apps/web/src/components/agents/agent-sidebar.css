@@ -69,10 +69,12 @@
   line-height: 18px;
   color: var(--muted);
 }
+/* As wide as the column at most (the head doesn't stretch its lines): a long line ends in "…", never past the edge. */
 .dm-side__status {
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
   margin-top: 2px;
 }
 .dm-side__dot {

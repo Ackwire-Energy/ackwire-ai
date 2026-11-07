@@ -7,9 +7,9 @@ import {
   delegationText,
   endedState,
   taskClock,
+  taskPlace,
   taskState,
   taskTitle,
-  taskWhere,
 } from "@agenteschat/client/lib/task-manager";
 import { Button, Chip, PixelStop } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
@@ -85,7 +85,7 @@ export function TaskPanel({
     : null;
   const nameOf = (id: string) => dir.anyAgent(id)?.name;
   const chain = last ? delegationText(t, last, nameOf, me.user.id) : null;
-  const meta = [name, taskWhere(t, source), source.background ? null : (chain ?? asked)].filter(Boolean).join(" · ");
+  const meta = [name, taskPlace(t, source), source.background ? null : (chain ?? asked)].filter(Boolean).join(" · ");
   // How it ended: the page's list, else my own stop on its way there.
   const end = task ? null : ended ? endedState(ended) : stopping ? "stopped" : null;
   const stopper = ended?.stoppedBy ?? (stopping ? { userId: me.user.id, name: me.user.name } : null);
