@@ -769,19 +769,21 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0 -12px;
 }
 
-/* The open request. */
+/* The open request. In the page's scroll (a narrow or short window) tall enough that its decision bar floats at the
+   window's bottom. */
 .ap-review {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  min-height: calc(100vh - 220px);
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
 }
 /* Its own column (`.page-split`): out to the work area's right edge, where its scrollbar runs. Its decision bar floats
    16px over the column's bottom, the column's padding (Chrome sets a sticky box's offset inside the padding). */
-@media (min-width: 941px) {
+@media (min-width: 941px) and (min-height: 560px) {
   .ap-review {
     margin-right: -24px;
     padding-right: 24px;
@@ -954,9 +956,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   .ap-list {
     padding-right: 0;
   }
-  /* Under the list, in the page's scroll: tall enough that its decision bar floats at the window's bottom. */
   .ap-review {
-    min-height: calc(100vh - 220px);
     padding-left: 0;
     border-left: 0;
     border-top: 1px solid var(--line);

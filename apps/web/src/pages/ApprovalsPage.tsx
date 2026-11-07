@@ -373,7 +373,11 @@ export function ApprovalsPage() {
 
         {(shownOpen.length > 0 || shownDecided.length > 0) && (
           <div className="ap-split page-split">
-            <nav className="ap-list" aria-label={t("approvals.review.list")}>
+            <nav
+              className="ap-list"
+              data-scroll-restoration-id="approvals-list"
+              aria-label={t("approvals.review.list")}
+            >
               {shownOpen.length > 0 &&
                 approvalCards(shownOpen).map((items) => {
                   const always = approveAlwaysOn(items);
@@ -468,7 +472,12 @@ export function ApprovalsPage() {
                   ))}
             </nav>
             {selected && (
-              <section className="ap-review" data-burst="" aria-label={approvalTitle(t, selected)}>
+              <section
+                className="ap-review"
+                data-scroll-restoration-id="approvals-request"
+                data-burst=""
+                aria-label={approvalTitle(t, selected)}
+              >
                 <ReviewHead approval={selected} channel={channelName(selected.channelId)} />
                 <ReviewBody key={selected.id} approval={selected} channel={channelName(selected.channelId)} />
                 <DecisionBar

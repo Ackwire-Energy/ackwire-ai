@@ -13,7 +13,8 @@ import {
 } from "@tanstack/react-router";
 import { act, cleanup, render } from "@testing-library/react";
 import { pageScrollReset } from "../src/lib/page-scroll";
-import { settle } from "./render";
+import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { renderApp, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -23,8 +24,8 @@ async function app() {
   const page = () => (
     <main className="shell__main">
       <div className="settings page-split">
-        <nav className="settings__nav" />
-        <div className="settings__body">
+        <nav className="settings__nav" data-scroll-restoration-id="settings-nav" />
+        <div className="settings__body" data-scroll-restoration-id="settings-section">
           <h2 id="jev">Jev</h2>
         </div>
       </div>
@@ -37,9 +38,22 @@ async function app() {
     component: page,
     validateSearch: (s: Record<string, unknown>) => ({ open: typeof s.open === "string" ? s.open : undefined }),
   });
+  // Another page whose own scrolling column sits where the settings section does (`main > div > div:nth-child(2)`).
+  const wiki = createRoute({
+    getParentRoute: () => root,
+    path: "wiki",
+    component: () => (
+      <main className="shell__main">
+        <div className="wiki">
+          <aside className="wiki-nav" />
+          <div className="wiki__center" />
+        </div>
+      </main>
+    ),
+  });
   const pageScroll = pageScrollReset();
   const router = createRouter({
-    routeTree: root.addChildren([section, drive]),
+    routeTree: root.addChildren([section, drive, wiki]),
     history: createMemoryHistory({ initialEntries: ["/settings/members"] }),
     scrollRestoration: true,
     scrollToTopSelectors: pageScroll.selectors,
@@ -85,6 +99,13 @@ describe("page column scroll", () => {
     expect(body().scrollTop).toBe(700);
   });
 
+  test("a section's scroll never lands on another page's column in the same place", async () => {
+    const { router, scrollBody, go } = await app();
+    scrollBody(700);
+    await go(() => router.history.push("/wiki"));
+    expect((document.querySelector(".wiki__center") as HTMLElement).scrollTop).toBe(0);
+  });
+
   test("another page starts at the top too", async () => {
     const { router, column, scroll, go } = await app();
     scroll(400);
@@ -115,4 +136,19 @@ describe("page column scroll", () => {
     }
     expect(landed).toEqual(["jev"]);
   });
+});
+
+// The router hands a scrolled element's place to whatever sits at the same spot in the next page's DOM, unless the
+// element names itself: every column of a split does, so its scroll stays on its own page.
+describe("a split's columns name their scroll", () => {
+  for (const path of ["approvals", "proposals", "settings/account"])
+    test(path, async () => {
+      await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi(seedState()) });
+      await settle(4);
+      const columns = [...document.querySelectorAll(".page-split > *")];
+      expect(columns.length).toBe(2);
+      const ids = columns.map((c) => c.getAttribute("data-scroll-restoration-id"));
+      expect(ids.every(Boolean)).toBe(true);
+      expect(new Set(ids).size).toBe(2);
+    });
 });

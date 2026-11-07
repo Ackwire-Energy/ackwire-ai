@@ -118,7 +118,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
       {current && (
         <div className="proposals page-split">
-          <nav className="proposals__list" aria-label={t("proposals.list")}>
+          <nav className="proposals__list" data-scroll-restoration-id="proposals-list" aria-label={t("proposals.list")}>
             {list.map((p) => (
               <button
                 key={p.id}
@@ -142,7 +142,12 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             ))}
           </nav>
 
-          <Card as="article" className="proposals__detail" aria-labelledby="prop-title">
+          <Card
+            as="article"
+            className="proposals__detail"
+            data-scroll-restoration-id="proposals-detail"
+            aria-labelledby="prop-title"
+          >
             <div className="row">
               <AgentAvatar agentId={proposerOf(current)} size="sm" name={agentName(proposerOf(current))} />
               <span className="small muted">

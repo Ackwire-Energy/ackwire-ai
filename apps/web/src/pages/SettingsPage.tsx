@@ -160,7 +160,7 @@ export function SettingsPage({
 
   return (
     <div className="settings page-split">
-      <nav className="settings__nav" aria-label={t("settings.nav")}>
+      <nav className="settings__nav" data-scroll-restoration-id="settings-nav" aria-label={t("settings.nav")}>
         <div className="settings__head">
           <h1 className="settings__title">{t("settings.title")}</h1>
           <span className="settings__org">
@@ -204,7 +204,7 @@ export function SettingsPage({
           })}
         </div>
       </nav>
-      <div className="settings__body">
+      <div className="settings__body" data-scroll-restoration-id="settings-section">
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
           <PageHeader
             level={2}
