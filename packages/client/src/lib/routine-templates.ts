@@ -1,4 +1,3 @@
-import { BUSINESS_DAYS, type RecurrenceRule, type Weekday } from "@agenteschat/ui/recurrence";
 import type { TFunction } from "i18next";
 import type { ConnectorDef, RoutineEvent, RoutineReport } from "../api/types";
 import { type ConnectedItem, connectedIds } from "./connected";
@@ -17,16 +16,27 @@ export const ROUTINE_TEMPLATE_AREAS = [
 ] as const;
 export type RoutineTemplateArea = (typeof ROUTINE_TEMPLATE_AREAS)[number];
 
-type TemplateRule = Pick<RecurrenceRule, "freq" | "interval" | "times" | "byWeekday" | "byMonthDay">;
+/**
+ * A template's schedule: part of `@agenteschat/ui`'s `RecurrenceRule`, written out because the shared client stays free
+ * of the web's package (`no-dom.test.ts`). What `templateRule` returns is a whole `RecurrenceRule`.
+ */
+type Day = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+interface TemplateRule {
+  freq: "hourly" | "daily" | "weekly" | "monthly";
+  interval: number;
+  times: string[];
+  byWeekday?: Day[];
+  byMonthDay?: number[];
+}
 
 const weekdays = (...times: string[]): TemplateRule => ({
   freq: "daily",
   interval: 1,
-  byWeekday: BUSINESS_DAYS,
+  byWeekday: ["MO", "TU", "WE", "TH", "FR"],
   times,
 });
 const everyDay = (time: string): TemplateRule => ({ freq: "daily", interval: 1, times: [time] });
-const weekly = (day: Weekday, time: string): TemplateRule => ({
+const weekly = (day: Day, time: string): TemplateRule => ({
   freq: "weekly",
   interval: 1,
   byWeekday: [day],
@@ -108,10 +118,13 @@ export const ROUTINE_TEMPLATES = [
 export type RoutineTemplateItem = (typeof ROUTINE_TEMPLATES)[number];
 
 /** A template's rule, starting where the form's does and in its zone. */
-export const templateRule = (
-  template: { rule: TemplateRule },
-  from: Pick<RecurrenceRule, "start" | "timezone">,
-): RecurrenceRule => ({ ...template.rule, start: from.start, timezone: from.timezone, until: null, count: null });
+export const templateRule = (template: { rule: TemplateRule }, from: { start: string; timezone: string }) => ({
+  ...template.rule,
+  start: from.start,
+  timezone: from.timezone,
+  until: null,
+  count: null,
+});
 
 export interface RoutineTemplateOption {
   value: string;
