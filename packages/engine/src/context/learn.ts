@@ -522,13 +522,14 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
   }
   const parsed = parseLearnOutput(result.text);
   const now = new Date().toISOString();
-  // Who holds what reaches every channel, but what was said in a DM stays there.
+  // Who holds what reaches every channel from a public one; from a DM, a private channel or a task it stays there.
   const [where] = parsed.items.some((i) => i.kind === "access")
     ? await db
-        .select({ kind: channels.kind })
+        .select({ kind: channels.kind, visibility: channels.visibility })
         .from(channels)
         .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)))
     : [];
+  const everywhere = where?.kind === "channel" && where.visibility === "public";
   const judging = {
     ...memoryJudging(deps),
     mayReplace: (old: { createdByKind: string }) => old.createdByKind !== "person",
@@ -582,11 +583,13 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
               (conversation.names.get(m.id) ?? "").toLowerCase() === item.about_person.trim().toLowerCase(),
           )?.authorUserId ?? null)
         : null;
+    const title = item.title.trim().slice(0, 200);
+    const key = (typeof item.key === "string" ? item.key.trim().slice(0, 200) : "") || title;
     // Who holds which access is the whole team's to know, read from a page or not: it only points at the holder (it
     // grants nothing, and an untrusted one is labeled so), and kept to one agent it can't stop another from saying
-    // nobody has it.
+    // nobody has it. Untrusted, it may only name this agent as the holder: a page can't point the team at someone.
     const scope =
-      item.kind === "access"
+      item.kind === "access" && (trust === "high" || ownAccess(agent.handle, key))
         ? "workspace"
         : trust !== "high" || item.kind === "how_to"
           ? "own"
@@ -594,8 +597,6 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
             ? "own"
             : item.scope;
     const confidence = trust === "low" ? 0.5 : evidence.some((e) => e.type === "human") ? 0.7 : 0.8;
-    const title = item.title.trim().slice(0, 200);
-    const key = (typeof item.key === "string" ? item.key.trim().slice(0, 200) : "") || title;
     const base: NewContextItem = {
       orgId: run.orgId,
       kind: item.kind === "how_to" ? "note" : item.kind === "term" || item.kind === "access" ? "fact" : item.kind,
@@ -614,7 +615,7 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
       // A pointer, not a page's say: short.
       content: item.kind === "access" ? cutText(item.content.trim(), 300) : item.content.trim(),
       sourceIds: [...new Set(cited.messages.map((m) => m.id))],
-      channelIds: item.kind === "access" && where && where.kind !== "dm" ? [] : [run.channelId],
+      channelIds: scope === "workspace" && item.kind === "access" && everywhere ? [] : [run.channelId],
       trust,
       evidence,
       confidence,
@@ -665,6 +666,9 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
   }
   return out;
 }
+
+/** An access fact's key names this agent as the holder (`@handle service`). */
+const ownAccess = (handle: string, key: string) => key.trim().toLowerCase().startsWith(`@${handle.toLowerCase()} `);
 
 type ConversationMessage = typeof messages.$inferSelect;
 

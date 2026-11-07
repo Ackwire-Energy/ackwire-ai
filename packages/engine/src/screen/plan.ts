@@ -318,8 +318,8 @@ interface Targets {
 }
 
 /**
- * The page an `open` landed on is another one than asked: another site or path, past a `www.`, a trailing slash, the
- * query and the fragment. Opening a site's front page never counts (it may send to a language's own).
+ * The page an `open` landed on is another one than asked: another site or path, past a `www.`, a trailing slash, a
+ * language prefix, the query and the fragment. Opening a site's front page never counts (it may send to a language's own).
  */
 export function landedElsewhere(asked: string, landed: string): boolean {
   const place = (u: string) => {
@@ -332,7 +332,8 @@ export function landedElsewhere(asked: string, landed: string): boolean {
   };
   const a = place(asked);
   const b = place(landed);
-  return Boolean(a && b && a.path !== "" && (a.host !== b.host || a.path !== b.path));
+  // A language or region put in front (`/docs` → `/en/docs`) is the same page.
+  return Boolean(a && b && a.path !== "" && (a.host !== b.host || !b.path.endsWith(a.path)));
 }
 
 /** Runs `steps` in order on `deps.surface` (see the file's comment). */

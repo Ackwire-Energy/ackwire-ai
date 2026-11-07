@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { askVerdict, HOW_YOU_WORK, type Judge, type ToolSource, turnMeans } from "../../src";
-import { continuationVerdict, decideTurnEnd, type TurnEnd } from "../../src/continuation";
+import { continuationVerdict, decideTurnEnd, type TurnEnd, untriedNudge } from "../../src/continuation";
 import { HAND_OVER_STEP } from "../../src/tools/directory";
 import { closeWorlds, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -191,6 +191,10 @@ describe("a step that needs the person is never a blocker", () => {
     expect(criteria.done).toContain("one direct question offering to start a way it names");
     expect(criteria.done).toContain("someone else's, not the asking person's own, is done");
     expect(criteria.ask).toContain("A way to do the request itself, even worded 'only if you want'");
+    // "Nobody has access, someone please…" without looking in the workspace first is untried.
+    expect(criteria.done).toContain("without having looked in the workspace");
+    expect(criteria.untried).toContain("without first looking in the workspace");
+    expect(untriedNudge([], [])).toContain("Look in the workspace first");
   });
 
   test("the question check: a way to do the request, however it is worded, is no optional offer", async () => {

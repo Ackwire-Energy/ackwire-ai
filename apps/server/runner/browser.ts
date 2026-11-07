@@ -1000,7 +1000,7 @@ const VIEWPORT = "[window.innerWidth, window.innerHeight]";
  */
 export const NAME_CONTROLS = `(() => {
   const CONTROLS = 'button,a[href],[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="switch"],[role="checkbox"],[role="option"],input[type="button"],input[type="submit"],input[type="image"]';
-  const TIPS = ["data-tooltip", "data-tooltip-text", "data-title", "data-original-title", "data-tip", "tooltip", "mattooltip", "ng-reflect-message", "aria-description", "title"];
+  const TIPS = ["data-tooltip", "data-tooltip-text", "data-title", "data-original-title", "data-tip", "data-tooltip-content", "data-tippy-content", "data-bs-original-title", "tooltip", "mattooltip", "materialtooltip", "ng-reflect-message", "aria-description", "title"];
   const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
   const roots = [document];
   let named = 0;

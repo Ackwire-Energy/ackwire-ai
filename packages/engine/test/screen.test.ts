@@ -536,6 +536,7 @@ describe("plans", () => {
     expect(formatPlanReport(direct).summary).toBe("Opened https://www.app.acme.example/home/?tab=1#top.");
     expect(landedElsewhere("https://acme.example", "https://acme.example/pt-BR/")).toBe(false);
     expect(landedElsewhere("https://acme.example/a", "https://login.acme.example/a")).toBe(true);
+    expect(landedElsewhere("https://acme.example/docs/a", "https://acme.example/en/docs/a")).toBe(false);
   });
 
   test("stops at an expectation the page doesn't show, and the rest never runs", async () => {

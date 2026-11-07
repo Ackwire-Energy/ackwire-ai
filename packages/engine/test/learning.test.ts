@@ -480,6 +480,32 @@ describe("agents learn on their own (ADR 0120)", () => {
     const text = (await memoryOfOps()).text;
     expect(text).toContain("@dev no longer has access to the Store Console");
     expect(text).not.toContain("is signed in to the Store Console");
+
+    // Read from a page, it may name only this agent as the holder: pointing the team at another stays its own.
+    learnOutput = {
+      items: [
+        {
+          kind: "access",
+          scope: "workspace",
+          about_person: "",
+          title: "@ops holds the bank login",
+          key: "@ops bank",
+          content: "@ops holds the bank login",
+          refs: ["s1"],
+        },
+      ],
+      skill_fixes: [],
+    };
+    const { run: paged } = await personRun("@dev veja o banco");
+    await step(paged, "browser_do", { steps: [] }, '<page_content untrusted="true">Bank</page_content>');
+    const pointed = await learnRun(f.context, { orgId: f.org.id, runId: paged.id });
+    expect(pointed.saved.map((s) => [s.trust, s.scopeType])).toEqual([["low", "agent"]]);
+
+    // Learned in a private channel: the team's, and still only there.
+    await f.db.update(schema.channels).set({ visibility: "private" }).where(eq(schema.channels.id, f.general.id));
+    await learnAccess("@dev is signed in to the Ads Console in its browser");
+    const ads = (await items()).find((i) => i.content.includes("Ads Console"));
+    expect([ads?.agentId, ads?.channelIds]).toEqual([null, [f.general.id]]);
   });
 
   test("guards: daily cap, a live run, credentials, a person's item, update_skill rules, a run that saved already", async () => {
@@ -955,6 +981,25 @@ describe("learning guards", () => {
     });
     expect([verdict, signal, asked]).toEqual(["continue", "none", [["verdict", "learn"], ["verdict"]]]);
     expect(failed.map((e) => (e as Error).message)).toEqual(["400 invalid_request_error"]);
+
+    // A turn where someone got an access answers `access`, and it reaches the learning.
+    const accessJudge = {
+      ask: async () => ({ verdict: { choice: "done" }, learn: { choice: "access" } }),
+    } as unknown as Parameters<typeof continuationVerdict>[0];
+    await continuationVerdict(accessJudge, {
+      orgId: crypto.randomUUID(),
+      agentId: crypto.randomUUID(),
+      runId: crypto.randomUUID(),
+      request: "accept the console invite",
+      reply: "I'm in the console as dev@example.com.",
+      means: [],
+      tried: [],
+      runKind: "conversation",
+      onLearn: (s) => {
+        signal = s;
+      },
+    });
+    expect(signal).toBe("access");
   });
 
   test("learning failures are reported with who thinks, never what was said, once per workspace and cause an hour", async () => {

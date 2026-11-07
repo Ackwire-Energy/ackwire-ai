@@ -1368,7 +1368,7 @@ test("NAME_CONTROLS labels an icon button from its tooltip, and leaves named one
   const labeled = el({ "aria-label": "Close" });
   const picture = el({ title: "Ignored" }, "", { img: true });
   const nothing = el({});
-  const inShadow = el({ mattooltip: "Settings" });
+  const inShadow = el({ materialtooltip: "Settings" });
   const host = el({}, "", {
     shadowRoot: { querySelectorAll: (s) => (s === "*" ? [] : [live(inShadow)]), getElementById: () => null },
   });
