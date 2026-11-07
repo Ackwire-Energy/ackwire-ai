@@ -230,11 +230,62 @@ describe("artifact viewer", () => {
     await settle(2);
     expect(copied[0]).toBe(`http://localhost:3000/org/${ORG_ID}/drive?artifact=${a.document.id}`);
     expect(screen().getByText("Link copiado.")).toBeTruthy();
+    // The whole text in one click, right after Baixar: the document's Markdown as it was written.
+    const copy = within(dialog).getByRole("button", { name: "Copiar texto" });
+    expect(copy.previousElementSibling?.textContent).toContain("Baixar");
+    await click(copy);
+    await settle(2);
+    expect(copied[1]).toContain("## O que aconteceu");
+    expect(copied[1]).toContain("**38 clientes**");
+    expect(screen().getByText("Texto copiado.")).toBeTruthy();
+  });
+
+  test("an uploaded text file (HTML, JSON, code): Copiar texto between Baixar and Enviar nova versão", async () => {
+    const api = createFakeApi(seedState());
+    const page = '<h2 id="combo">Como funciona</h2>\n<p>Texto da matéria.</p>\n';
+    const html = await api.artifacts.upload(ORG_ID, new File([page], "materia.html", { type: "text/html" }));
+    const json = await api.artifacts.upload(
+      ORG_ID,
+      new File(['{"ok":true}'], "dados.json", { type: "application/json" }),
+    );
+    const bin = await api.artifacts.upload(ORG_ID, new File([new Uint8Array([1, 2, 3])], "dados.bin"));
+    await renderApp(`/org/${ORG_ID}/drive?artifact=${html.id}`, { api });
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: "materia.html" });
+    const actions = [...(dialog.querySelector(".ac-details__actions")?.children ?? [])].map((b) => b.textContent);
+    expect(actions.slice(0, 3)).toEqual(["Baixar", "Copiar texto", "Enviar nova versão"]);
+    // On a phone each is its icon alone (its words hidden, still its name): the file's name keeps the room to read.
+    expect(
+      [...dialog.querySelectorAll(".ac-details__actions .artifact-action__label")].map((l) => l.textContent),
+    ).toEqual(["Baixar", "Copiar texto", "Enviar nova versão"]);
+    expect(within(dialog).getByRole("button", { name: "Enviar nova versão" }).getAttribute("title")).toBe(
+      "Enviar nova versão",
+    );
+    await click(within(dialog).getByRole("button", { name: "Copiar texto" }));
+    await settle(2);
+    expect(copied.at(-1)).toBe(page);
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/drive?artifact=${json.id}`, { api });
+    await settle(8);
+    await click(
+      within(screen().getByRole("dialog", { name: "dados.json" })).getByRole("button", { name: "Copiar texto" }),
+    );
+    await settle(2);
+    expect(copied.at(-1)).toBe('{"ok":true}');
+    cleanup();
+    // A file with no text to show has none to copy.
+    await renderApp(`/org/${ORG_ID}/drive?artifact=${bin.id}`, { api });
+    await settle(8);
+    expect(
+      within(screen().getByRole("dialog", { name: "dados.bin" })).queryByRole("button", { name: "Copiar texto" }),
+    ).toBeNull();
   });
 
   test("table: sticky header, sort and Baixar CSV", async () => {
     const { a } = await openChannel();
     const dialog = await openCard("Pedidos mais comuns nos reviews");
+    // A table has no one text to copy.
+    expect(within(dialog).queryByRole("button", { name: "Copiar texto" })).toBeNull();
     const firstColumn = () =>
       within(dialog)
         .getAllByRole("row")
