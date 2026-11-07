@@ -1,5 +1,4 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
-import { formatBytes } from "@agenteschat/client/lib/files";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -182,7 +181,6 @@ function PdfPage({ detail }: { detail: ArtifactDetail }) {
 
 /** A video, filling the screen between the top and the bar; one this phone can't play shows its card. */
 function VideoPage({ detail, info }: { detail: ArtifactDetail; info: FileInfo }) {
-  const { i18n } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
   const link = useRemoteFile(orgId, detail.id, detail.shownVersion);
@@ -200,7 +198,6 @@ function VideoPage({ detail, info }: { detail: ArtifactDetail; info: FileInfo })
           variant="screen"
           source={source}
           name={info.name}
-          size={info.size !== null ? formatBytes(i18n.language || "en", info.size) : undefined}
           onFailed={() => setFailed(true)}
         />
       ) : (

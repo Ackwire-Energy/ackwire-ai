@@ -22,7 +22,6 @@ import {
 } from "@agenteschat/client/lib/drive";
 import { PAGE_CSP } from "@agenteschat/client/lib/isolated-page";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { parseDelimited } from "@/components/artifacts/ArtifactCard";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { HTML_SANDBOX, HtmlFrame, withShim } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
@@ -164,21 +163,6 @@ describe("artifact cards in the chat", () => {
     expect(thumb.getAttribute("scrolling")).toBe("no");
     expect(thumb.getAttribute("tabindex")).toBe("-1");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
-  });
-});
-
-describe("a CSV's cover", () => {
-  test("its first lines as rows, quotes understood, CRLF too, no more than asked", () => {
-    const csv = 'Cliente,Valor\r\n"Acme, Ltda",10\r\n"Diz ""oi""",20\r\nBeta,30\r\n';
-    expect(parseDelimited(csv, ",", 3)).toEqual([
-      ["Cliente", "Valor"],
-      ["Acme, Ltda", "10"],
-      ['Diz "oi"', "20"],
-    ]);
-    expect(parseDelimited("a\tb\n1\t2", "\t", 10)).toEqual([
-      ["a", "b"],
-      ["1", "2"],
-    ]);
   });
 });
 

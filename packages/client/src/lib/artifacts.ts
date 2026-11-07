@@ -169,6 +169,44 @@ export function fileName(title: string, content: ArtifactContent | { kind: Artif
   return `${slug}.${ext}`;
 }
 
+/** The start of a document for a tile's cover: at most `max` characters, cut at a line (never half a block's marks). */
+export function documentStart(markdown: string, max: number) {
+  if (markdown.length <= max) return markdown;
+  const cut = markdown.slice(0, max);
+  const line = cut.lastIndexOf("\n");
+  return line > max / 2 ? cut.slice(0, line) : cut;
+}
+
+/** The first `limit` lines of a CSV or TSV, quotes understood ("a, b" in quotes is one cell). */
+export function parseDelimited(text: string, sep: string, limit: number): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length && rows.length < limit; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"' && cell === "") quoted = true;
+    else if (ch === sep) {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += ch;
+  }
+  if (rows.length < limit && (cell || row.length)) rows.push([...row, cell]);
+  return rows;
+}
+
 /** First lines of a document, without Markdown marks or code (card preview). */
 export function documentPreview(markdown: string, lines = 3) {
   const out: string[] = [];

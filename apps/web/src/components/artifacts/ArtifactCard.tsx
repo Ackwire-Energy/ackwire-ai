@@ -1,6 +1,6 @@
 import type { Artifact, ArtifactContent, ArtifactFileContent, ArtifactRef } from "@agenteschat/client";
 import { useArtifact } from "@agenteschat/client";
-import { KIND_ICON, patchCounts } from "@agenteschat/client/lib/artifacts";
+import { documentStart, KIND_ICON, parseDelimited, patchCounts } from "@agenteschat/client/lib/artifacts";
 import { fileIcon, formatBytes, previewKind } from "@agenteschat/client/lib/files";
 import { Button, Icon, type IconName, Menu } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -263,7 +263,14 @@ function Cover({ content, title }: { content: ArtifactContent; title: string }) 
     case "document":
       // Its own headings, paragraphs and lists, smaller, fading at the foot; a first heading equal to the title isn't
       // drawn again.
-      return <Markdown source={startOf(content.markdown)} title={title} excerpt className="artifact-tile__doc" />;
+      return (
+        <Markdown
+          source={documentStart(content.markdown, COVER_CHARS)}
+          title={title}
+          excerpt
+          className="artifact-tile__doc"
+        />
+      );
     case "table":
       return <CoverTable columns={content.columns} rows={content.rows} />;
     case "diff":
@@ -294,14 +301,6 @@ function Cover({ content, title }: { content: ArtifactContent; title: string }) 
     default:
       return null;
   }
-}
-
-/** The start of a document, cut at a line so a cover never draws half a word or half a block's marks. */
-function startOf(markdown: string) {
-  if (markdown.length <= COVER_CHARS) return markdown;
-  const cut = markdown.slice(0, COVER_CHARS);
-  const line = cut.lastIndexOf("\n");
-  return line > COVER_CHARS / 2 ? cut.slice(0, line) : cut;
 }
 
 /** A signed percentage ("+12%", "−3%"): its cell takes the up or down tone. */
@@ -397,7 +396,7 @@ function FileCover({ content }: { content: ArtifactFileContent }) {
     return <CoverTable columns={head} rows={rows} />;
   }
   if (ext === "md" || ext === "markdown")
-    return <Markdown source={startOf(text)} excerpt className="artifact-tile__doc" />;
+    return <Markdown source={documentStart(text, COVER_CHARS)} excerpt className="artifact-tile__doc" />;
   const lines = text.split("\n").slice(0, COVER_LINES).join("\n");
   return CODE_EXT.has(ext) ? (
     <pre className="artifact-tile__code">
@@ -417,36 +416,6 @@ function TypeCover({ content }: { content: ArtifactFileContent }) {
       {ext && <span>{ext}</span>}
     </span>
   );
-}
-
-/** The first `limit` lines of a CSV or TSV, quotes understood ("a, b" in quotes is one cell). */
-export function parseDelimited(text: string, sep: string, limit: number): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < text.length && rows.length < limit; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (ch === '"') quoted = false;
-      else cell += ch;
-    } else if (ch === '"' && cell === "") quoted = true;
-    else if (ch === sep) {
-      row.push(cell);
-      cell = "";
-    } else if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = "";
-    } else cell += ch;
-  }
-  if (rows.length < limit && (cell || row.length)) rows.push([...row, cell]);
-  return rows;
 }
 
 /** The page drawn at `PAGE_WIDTH` and scaled to the tile's width. */
