@@ -5772,7 +5772,6 @@
     "movedStage": "Nu in {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Kolom",
-    "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
     "filterButton": "Filteren",

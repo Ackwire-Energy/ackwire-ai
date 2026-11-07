@@ -13793,9 +13793,6 @@
   "issues.column": {
     "value": "Column"
   },
-  "issues.flowHint": {
-    "value": "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve."
-  },
   "issues.moreOptions": {
     "value": "More options"
   },

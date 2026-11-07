@@ -5808,8 +5808,6 @@ export const ptBR = {
     movedStage: "Agora está em {{stage}} · #{{number}}",
     movedDetail: "#{{number}} · {{title}}",
     column: "Coluna",
-    flowHint:
-      "A tarefa anda sozinha, para a primeira coluna de cada etapa: Em andamento quando um agente começa, Em revisão quando fica pronta para conferir, Feito quando você aprova.",
     moreOptions: "Mais opções",
     showCanceled: "Mostrar canceladas",
     filterButton: "Filtro",

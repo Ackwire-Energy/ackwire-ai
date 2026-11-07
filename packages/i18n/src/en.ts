@@ -5732,8 +5732,6 @@ export const en = {
     movedStage: "Now in {{stage}} · #{{number}}",
     movedDetail: "#{{number}} · {{title}}",
     column: "Column",
-    flowHint:
-      "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve.",
     moreOptions: "More options",
     showCanceled: "Show canceled",
     filterButton: "Filter",

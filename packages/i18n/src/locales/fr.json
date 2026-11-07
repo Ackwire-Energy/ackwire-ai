@@ -5939,7 +5939,6 @@
     "movedStage": "Maintenant dans {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Colonne",
-    "flowHint": "La tâche avance d'elle-même, vers la première colonne de chaque étape : En cours quand un agent commence, En revue quand elle est prête à être vérifiée, Terminée quand vous approuvez.",
     "moreOptions": "Plus d'options",
     "showCanceled": "Afficher les annulées",
     "filterButton": "Filtre",

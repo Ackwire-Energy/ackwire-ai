@@ -5692,7 +5692,6 @@
     "movedStage": "Artık {{stage}} aşamasında · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Sütun",
-    "flowHint": "Görev kendiliğinden her aşamanın ilk sütununa geçer: bir ajan başladığında Devam ediyor, kontrole hazır olduğunda İncelemede, siz onayladığınızda Tamamlandı.",
     "moreOptions": "Diğer seçenekler",
     "showCanceled": "İptal edilenleri göster",
     "filterButton": "Filtre",

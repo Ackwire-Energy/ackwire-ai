@@ -5540,7 +5540,6 @@
     "movedStage": "Sekarang di {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Kolom",
-    "flowHint": "Tugas berpindah sendiri, ke kolom pertama tiap tahap: Sedang dikerjakan saat agen mulai, Ditinjau saat siap diperiksa, Selesai saat kamu menyetujuinya.",
     "moreOptions": "Opsi lainnya",
     "showCanceled": "Tampilkan yang dibatalkan",
     "filterButton": "Saring",

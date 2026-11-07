@@ -6130,7 +6130,6 @@
     "movedStage": "Teraz w: {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Kolumna",
-    "flowHint": "Zadanie przesuwa się samo do pierwszej kolumny każdego etapu: W toku, gdy agent zaczyna, Do przeglądu, gdy jest gotowe do sprawdzenia, Gotowe, gdy zatwierdzisz pracę.",
     "moreOptions": "Więcej opcji",
     "showCanceled": "Pokaż anulowane",
     "filterButton": "Filtr",

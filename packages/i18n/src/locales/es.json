@@ -5888,7 +5888,6 @@
     "movedStage": "Ahora en {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Columna",
-    "flowHint": "La tarea avanza sola, a la primera columna de cada etapa: En curso cuando un agente empieza, En revisión cuando está lista para revisar, Hecha cuando la apruebas.",
     "moreOptions": "Más opciones",
     "showCanceled": "Mostrar canceladas",
     "filterButton": "Filtro",

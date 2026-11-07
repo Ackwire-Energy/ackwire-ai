@@ -5731,7 +5731,6 @@
     "movedStage": "Jetzt in {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Spalte",
-    "flowHint": "Die Aufgabe wandert von selbst in die erste Spalte jeder Phase: In Arbeit, wenn ein Agent beginnt, In Prüfung, wenn sie bereit zur Prüfung ist, Erledigt, wenn du freigibst.",
     "moreOptions": "Weitere Optionen",
     "showCanceled": "Abgebrochene anzeigen",
     "filterButton": "Filtern",

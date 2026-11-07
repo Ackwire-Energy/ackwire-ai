@@ -5946,7 +5946,6 @@
     "movedStage": "Ora in {{stage}} · #{{number}}",
     "movedDetail": "#{{number}} · {{title}}",
     "column": "Colonna",
-    "flowHint": "L'attività si sposta da sola, nella prima colonna di ogni fase: In corso quando un agente inizia, In revisione quando è pronta da verificare, Fatto quando approvi.",
     "moreOptions": "Altre opzioni",
     "showCanceled": "Mostra annullate",
     "filterButton": "Filtro",
