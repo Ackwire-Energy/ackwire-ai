@@ -8,8 +8,9 @@ import { sessions, users } from "./auth";
  * to one person at a time: registering it again moves it to whoever is signed in. Tokens the push
  * service reports as gone are deleted.
  *
- * Phones carry their Expo push token. Browsers (`web`) carry their Web Push subscription: the endpoint
- * in `token` and its keys in `webKeys`, and belong to the session that turned them on (`sessionId`).
+ * Android phones carry their FCM registration token (ADR 0152), iPhones their Expo push token. Browsers
+ * (`web`) carry their Web Push subscription: the endpoint in `token` and its keys in `webKeys`, and belong
+ * to the session that turned them on (`sessionId`).
  */
 export const pushDevices = pgTable(
   "push_devices",
@@ -20,7 +21,7 @@ export const pushDevices = pgTable(
     userId: text()
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** Expo push token (`ExponentPushToken[…]`), or a browser's Web Push endpoint. */
+    /** An Android phone's FCM token, an iPhone's Expo push token (`ExponentPushToken[…]`), or a browser's endpoint. */
     token: text().notNull().unique(),
     /** `ios | android | web`, validated in code. */
     platform: text().$type<"ios" | "android" | "web">().notNull(),
@@ -41,9 +42,10 @@ export const pushDevices = pgTable(
 );
 
 /**
- * This installation's own push identity (ADR 0071): one row, made on first use. Not a tenant's, so
+ * This installation's own push identity (ADR 0071, ADR 0152): one row, made on first use. Not a tenant's, so
  * no `org_id`. The Web Push (VAPID, RFC 8292) key pair the server made for itself, the private part
- * sealed with the installation's key (`AGENTES_SECRET`).
+ * sealed with the installation's key (`AGENTES_SECRET`); and, when its Android pushes go through the push
+ * relay, the credentials the relay gave it (the secret sealed the same way).
  */
 export const instancePush = pgTable(
   "instance_push",
@@ -53,7 +55,33 @@ export const instancePush = pgTable(
     vapidPublicKey: text(),
     /** VAPID private key (JWK `d`), sealed. */
     vapidPrivateKey: text(),
+    /** The push relay these credentials are for (`PUSH_RELAY_URL`): another one means registering again. */
+    relayUrl: text(),
+    /** This installation's id at the push relay. */
+    relayInstanceId: text(),
+    /** Its secret at the push relay, sealed. */
+    relaySecret: text(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("instance_push_one_row", sql`${t.id} = 1`)],
 );
+
+/**
+ * The installations that send their Android pushes through this server's push relay (ADR 0152,
+ * `PUSH_RELAY_SERVE`). They register on their own, with no account: an id and a secret, of which only
+ * the SHA-256 is kept. Not a tenant's, so no `org_id`. No message is stored: only how many went.
+ */
+export const pushRelayInstances = pgTable("push_relay_instances", {
+  id: uuid()
+    .primaryKey()
+    .$defaultFn(() => Bun.randomUUIDv7()),
+  /** SHA-256 (hex) of the installation's secret. */
+  secretHash: text().notNull().unique(),
+  /** Messages it sent through the relay. */
+  sent: integer().notNull().default(0),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  /** Last time it called the relay (moved at most once a minute). */
+  lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  /** Set by the relay's operator: its requests are refused (`blocked`) from then on. */
+  blockedAt: timestamp({ withTimezone: true }),
+});

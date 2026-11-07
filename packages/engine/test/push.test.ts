@@ -4,6 +4,7 @@ import {
   createFakePushSender,
   createFakeWebPushSender,
   createMemoryPresence,
+  createPhonePushSender,
   generateVapidKeys,
   type KeyWrapper,
   PushError,
@@ -58,6 +59,8 @@ afterEach(async () => {
 const deps = () => ({ db: f.db, pubsub: f.pubsub });
 const TOKEN_BIA = "ExponentPushToken[bia-phone-0001]";
 const TOKEN_BIA_EN = "ExponentPushToken[bia-tablet-0001]";
+/** An Android phone's FCM registration token (ADR 0152). */
+const FCM_BIA = `bia-android:APA91b${"a".repeat(140)}`;
 
 /** Bia in #general with a phone (pt-BR), and the fake sender wired into the job handlers. */
 async function withPhone(options: { unregistered?: string[]; goneLater?: string[] } = {}) {
@@ -416,6 +419,60 @@ describe("push delivery", () => {
       source: { channelId: f.general.id },
     });
     expect(await pushJobs()).toEqual([]);
+  });
+});
+
+describe("Android push (FCM)", () => {
+  test("each phone's push says its platform; nothing taken and FCM busy: the job is tried again", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await registerPushDevice(f.db, bia.id, { token: FCM_BIA, platform: "android", locale: "pt-BR" });
+    const [n] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: "mention:android",
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "oi" },
+    });
+    const id = n?.id ?? "";
+    const push = createFakePushSender({ failing: [FCM_BIA] });
+    await expect(deliverPush({ db: f.db, push }, id)).rejects.toMatchObject({ retryable: true });
+    expect((await listPushDevices(f.db, bia.id)).map((d) => d.token)).toEqual([FCM_BIA]);
+
+    // Her iPhone took it: the Android failure is left alone, so the iPhone is never pushed twice.
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
+    expect(await deliverPush({ db: f.db, push }, id)).toEqual({ sent: 1, removed: 0, failed: 1 });
+
+    push.failing.clear();
+    expect(await deliverPush({ db: f.db, push }, id)).toEqual({ sent: 2, removed: 0, failed: 0 });
+    const sent = push.sent.map((m) => `${m.platform} ${m.to}`);
+    expect(sent.slice(1).sort()).toEqual([`android ${FCM_BIA}`, `ios ${TOKEN_BIA}`]);
+    expect(push.sent[1]).toMatchObject({ data: { orgId: f.org.id, kind: "mention", notificationId: id } });
+  });
+
+  test("a server that sends no Android push: the phone stays registered, and it is no failure", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await registerPushDevice(f.db, bia.id, { token: FCM_BIA, platform: "android", locale: "pt-BR" });
+    const [n] = await notify(deps(), {
+      orgId: f.org.id,
+      userIds: [bia.id],
+      kind: "mention",
+      groupKey: "mention:no-fcm",
+      actor: { type: "agent", id: f.agent.id },
+      source: { channelId: f.general.id },
+      latest: { text: "oi" },
+    });
+    const push = createPhonePushSender({ android: null, ios: createFakePushSender() });
+    expect(await deliverPush({ db: f.db, push }, n?.id ?? "")).toEqual({ sent: 0, removed: 0, failed: 0 });
+    expect(await listPushDevices(f.db, bia.id)).toHaveLength(1);
+
+    // So a browser's failure that may work later is still tried again.
+    const webPush = createFakeWebPushSender({ failing: [BROWSER] });
+    await registerPushDevice(f.db, bia.id, webSubscription(BROWSER, await signIn(bia.id)));
+    await expect(deliverPush({ db: f.db, push, webPush }, n?.id ?? "")).rejects.toMatchObject({ retryable: true });
   });
 });
 

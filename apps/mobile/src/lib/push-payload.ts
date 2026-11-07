@@ -69,3 +69,12 @@ export function deviceBody(token: string, platform: string, locale: string) {
 
 /** `DELETE /api/app/push/devices/:token` path (the token has brackets: encode it). */
 export const devicePath = (token: string) => `/api/app/push/devices/${encodeURIComponent(token)}`;
+
+/**
+ * The token `getDevicePushTokenAsync` / `addPushTokenListener` hand over (`{ type, data }`): on Android the FCM
+ * registration token, a string (ADR 0152). Anything else is no token.
+ */
+export function systemToken(token: { data?: unknown } | null | undefined): string | null {
+  const data = token?.data;
+  return typeof data === "string" && data.length > 0 && data.length <= 2048 ? data : null;
+}
