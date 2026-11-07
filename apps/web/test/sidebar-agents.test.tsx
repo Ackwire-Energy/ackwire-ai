@@ -194,6 +194,56 @@ describe("Mudar de setor", () => {
   });
 });
 
+describe("Dragging into a setor", () => {
+  const dataTransfer = () => {
+    const data = new Map<string, string>();
+    return { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? "" };
+  };
+  const dragInto = async (agentId: string, zone: HTMLElement, at: { clientY?: number } = {}) => {
+    const dt = dataTransfer();
+    const row = nav().querySelector(`[data-agent-row="${agentId}"] a`) as HTMLElement;
+    await act(async () => fireEvent.dragStart(row, { dataTransfer: dt }));
+    await act(async () => fireEvent.dragOver(zone, { dataTransfer: dt, ...at }));
+    await act(async () => fireEvent.drop(zone, { dataTransfer: dt, ...at }));
+    await settle(6);
+  };
+  const pinned = (state: State, agents: string[]) => {
+    state.sidebarView = { agentSort: "workspace", showAllAgents: false, pins: { agents, channels: [], people: [] } };
+    return state;
+  };
+
+  test("an agent pinned on top lands in the empty setor it's dropped on and leaves the pins; Desfazer pins it back", async () => {
+    const { state } = await go(pinned(withGroups(), [ADA_ID]));
+    expect(rowsIn(section("Agentes"))).toEqual(["Ada"]);
+    await dragInto(ADA_ID, section("Diretoria"));
+    expect(screen().getByText("Ada foi para o setor Diretoria")).toBeTruthy();
+    expect(rowsIn(section("Diretoria"))).toEqual(["Ada"]);
+    expect(rowsIn(section("Agentes"))).toEqual([]);
+    expect(views(state).at(-1)).toMatchObject({ pins: { agents: [] } });
+    const toast = screen()
+      .getByText("Ada foi para o setor Diretoria")
+      .closest("[role='status'], li, div") as HTMLElement;
+    await click(within(toast.parentElement as HTMLElement).getByRole("button", { name: "Desfazer" }));
+    expect(rowsIn(section("Agentes"))).toEqual(["Ada"]);
+    expect(within(nav()).getByRole("img", { name: "Fixado no topo" })).toBeTruthy();
+    expect(views(state).at(-1)).toMatchObject({ pins: { agents: [ADA_ID] } });
+  });
+
+  test("dropped under a setor's last row, it lands after it, past the setor's agents pinned on top", async () => {
+    const state = withGroups();
+    const caio = { ...(state.agents[0] as State["agents"][number]), id: "00000000-0000-4000-8000-0000000000a3" };
+    state.agents.push({ ...caio, name: "Caio", handle: "caio" });
+    state.agentGroups = [{ id: INTEGRATIONS, name: "Integrations", agentIds: [ATLAS_ID, caio.id] }];
+    pinned(state, [ATLAS_ID]);
+    await go(state);
+    expect(rowsIn(section("Integrations"))).toEqual(["Caio"]);
+    await dragInto(ADA_ID, section("Integrations"), { clientY: 9999 });
+    const moves = state.calls.filter((c) => c.method === "agentGroups.move").map((c) => c.args[2]);
+    expect(moves).toEqual([{ groupId: INTEGRATIONS, index: 2 }]);
+    expect(rowsIn(section("Integrations"))).toEqual(["Caio", "Ada"]);
+  });
+});
+
 describe("Fixar no topo", () => {
   test("day one: my own agents on top of Agentes, with a line about pins; its ✕ keeps them and the line goes", async () => {
     const state = seedState();

@@ -45,6 +45,23 @@ export function togglePin(pins: SidebarPins, kind: PinKind, id: string): Sidebar
 }
 
 /**
+ * `view` with these agents out of its pins; null when none of them is pinned. A pin takes an agent out of its group,
+ * so an agent the person just put in a group leaves their pins, or it stays on top and the group looks empty.
+ */
+export function unpinAgents(view: SidebarView, ids: readonly string[]): SidebarView | null {
+  const agents = view.pins?.agents.filter((id) => !ids.includes(id));
+  if (!view.pins || !agents || agents.length === view.pins.agents.length) return null;
+  return { ...view, pins: { ...view.pins, agents } };
+}
+
+/** `view` with the agent pinned again at `at` among the pinned agents (Desfazer after a move took its pin off). */
+export function repinAgent(view: SidebarView, id: string, at: number): SidebarView {
+  const pins = view.pins;
+  if (!pins || pins.agents.includes(id) || pins.agents.length >= SIDEBAR_PIN_LIMIT) return view;
+  return { ...view, pins: { ...pins, agents: [...pins.agents.slice(0, at), id, ...pins.agents.slice(at)] } };
+}
+
+/**
  * One group's agents in the person's order (stable): the workspace's, the ones I'm responsible for first (`mine`), or
  * the ones working now first (`working`, `busy` their ids).
  */
