@@ -41,6 +41,7 @@ import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { neutralizeUntrusted, untrustedBlock } from "../untrusted";
 import { wikiHitsForAgent } from "../wiki";
 import {
+  accessSql,
   type ConsolidateResult,
   type ContextItem,
   checkPermissionText,
@@ -48,6 +49,7 @@ import {
   getContextItems,
   howToSql,
   howToSubject,
+  isAccess,
   isHowTo,
   learnedQuietly,
   mayEditItem,
@@ -1186,13 +1188,20 @@ export async function retrieveForRun(
   );
   // Fresh beats merely popular: relevance with a 30-day recency, so what was used most doesn't stay on top forever.
   const freshness = sql`0.7 * ${contextItems.relevance} + 0.3 * exp(-extract(epoch from now() - ${contextItems.updatedAt}) / 2592000.0)`;
-  const [pinned, own, shared, personal] = await Promise.all([
+  const [pinned, holders, own, shared, personal] = await Promise.all([
     db
       .select()
       .from(contextItems)
       .where(and(base, eq(contextItems.pinned, true)))
       .orderBy(desc(contextItems.updatedAt))
       .limit(20),
+    // Who holds which access, in every run whatever it is about: an agent never tells people nobody has it.
+    db
+      .select()
+      .from(contextItems)
+      .where(and(base, accessSql()))
+      .orderBy(desc(contextItems.updatedAt))
+      .limit(ACCESS_IN_PROMPT),
     db
       .select()
       .from(contextItems)
@@ -1239,7 +1248,7 @@ export async function retrieveForRun(
     searched = await withLinked(db, base, searched);
   }
   const budget = input.budgetChars ?? MEMORY_BUDGET_CHARS;
-  const candidates = [...pinned, ...own, ...personal, ...shared, ...searched];
+  const candidates = [...pinned, ...holders, ...own, ...personal, ...shared, ...searched];
   const fromDm = dm ? await Promise.all(candidates.map((i) => dm.item(i))) : null;
   const picked = pickDistinct(
     candidates.filter((_, i) => fromDm?.[i] !== false),
@@ -1262,6 +1271,8 @@ export async function retrieveForRun(
   return { text: lines.join("\n"), itemIds: [...seen] };
 }
 
+/** Facts on who holds which access every run reads, the newest first; the rest come in when the request matches. */
+const ACCESS_IN_PROMPT = 8;
 /** Memory in a run's prompt, at most (characters), pinned items aside. */
 export const MEMORY_BUDGET_CHARS = 3500;
 /** One item's content in the prompt, at most (pinned ones: 600). */
@@ -1298,6 +1309,8 @@ export function pickDistinct(candidates: ContextItem[], known: string): ContextI
       if (kept.pinned) return false;
       if (item.kind === "period_summary" || kept.kind === "period_summary")
         return item.kind === kept.kind && channelOf(item) === channelOf(kept);
+      // Who holds what: two holders of one service, or one of two, read alike and are both true.
+      if (isAccess(item) || isAccess(kept)) return false;
       return (
         CLAIM_KINDS.has(item.kind) && family.includes(kept.kind) && overlap(kept.content, item.content) >= SAME_ITEM
       );

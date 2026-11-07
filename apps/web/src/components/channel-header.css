@@ -52,16 +52,22 @@
   gap: 14px;
 }
 /* No plate on hover, pressed or open: the icon's own color says it, as Discord's header does. */
-/* Each box reaches 6px into the gap on both sides (as a ghost button's plate does), so 14px of gap reads as the
-   glyphs' own air: one glyph every 26px. */
+/* Each box is a square that reaches 7px into the gap on both sides, so 14px of gap reads as the glyphs' own air: one
+   glyph every 26px. Its target keeps the header's 40px height (`::after`). */
 .channel__icon.ac-btn {
   position: relative;
-  width: 24px;
-  min-width: 24px;
-  height: var(--control-h-md);
-  margin: 0 -6px;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  margin: 0 -7px;
   padding: 0;
   color: var(--muted);
+}
+.channel__icon.ac-btn::after {
+  content: "";
+  position: absolute;
+  inset: calc((26px - var(--control-h-md)) / 2) 0;
 }
 .channel__icon.ac-btn,
 .channel__icon.ac-btn:hover,
@@ -88,8 +94,8 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
    figures' cap box rounds half a pixel low on a 2x screen. */
 .channel__icon-count.ac-count {
   position: absolute;
-  top: 3px;
-  right: -3px;
+  top: -4px;
+  right: -2px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;

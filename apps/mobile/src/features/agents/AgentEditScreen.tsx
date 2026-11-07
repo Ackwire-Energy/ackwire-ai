@@ -1,5 +1,5 @@
 import { useUpdateAgent } from "@agenteschat/client";
-import { audienceOf, consultableLocked, offersConsultable } from "@agenteschat/client/lib/audience";
+import { agentsReach, audienceOf, consultableLocked, offersConsultable } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
@@ -81,6 +81,7 @@ export function AgentEditScreen({ id }: { id: string }) {
     ? { ...saved, ...edits, handle: handleAfterRename(saved, edits.name ?? saved.name, edits.handle) }
     : null;
   const changes = saved && draft ? agentChanges(saved, draft, fields) : null;
+  const reach = draft ? agentsReach(draft.audience, onPlan, agent?.ownerUserId ?? null) : null;
   const nameMissing = Boolean(draft && fields.has("name") && !draft.name.trim());
   const taken = useMemo(
     () => takenHandles(dir.agents, [...dir.memberById.values()], id),
@@ -219,26 +220,29 @@ export function AgentEditScreen({ id }: { id: string }) {
 
           {fields.has("look") ? <LookList look={draft.look} onChange={(look) => set("look", look)} /> : null}
 
-          {/* Only an audience that leaves someone out has anyone to be consulted for. */}
-          {!rightHand && offersConsultable(draft.audience, onPlan) ? (
+          {/* Only an audience that leaves someone out has anyone to be consulted for, and says whether it holds for agents. */}
+          {!rightHand && reach ? (
             <>
               <View style={styles.gap} />
-              <GroupedList>
-                <GroupedRow
-                  icon="agent"
-                  label={t("audience.consultable", agentGrammar(agent.name))}
-                  labelLines={2}
-                  sub={t("audience.consultableHint", agentGrammar(agent.name))}
-                  subLines={4}
-                  toggle={draft.audience.consultable !== false}
-                  disabled={
-                    !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
-                  }
-                  onPress={() =>
-                    set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
-                  }
-                />
-              </GroupedList>
+              {offersConsultable(draft.audience, onPlan) ? (
+                <GroupedList>
+                  <GroupedRow
+                    icon="agent"
+                    label={t("audience.consultable", agentGrammar(agent.name))}
+                    labelLines={2}
+                    sub={t("audience.consultableHint", agentGrammar(agent.name))}
+                    subLines={4}
+                    toggle={draft.audience.consultable !== false}
+                    disabled={
+                      !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
+                    }
+                    onPress={() =>
+                      set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
+                    }
+                  />
+                </GroupedList>
+              ) : null}
+              <GroupedFooter>{t(`audience.agents.${reach}`, agentGrammar(agent.name))}</GroupedFooter>
             </>
           ) : null}
 

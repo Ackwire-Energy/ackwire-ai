@@ -17,15 +17,14 @@ import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/clien
 import { messageMediaOf } from "@agenteschat/client/lib/media";
 import {
   answeredNotices,
-  followUpLine,
   isAgentOnlyNotice,
   isAnsweredNotice,
   isEventLine,
   isTalkerReply,
-  noticeAgentHandle,
+  type NoticeView,
   noticeOf,
-  noticeRoutineName,
-  skippedHandles,
+  noticeView,
+  settledNotices,
 } from "@agenteschat/client/lib/notices";
 import { replyOf } from "@agenteschat/client/lib/reply";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
@@ -133,13 +132,26 @@ export function standsAlone(m: Message) {
  * routine's call written as its creator is left out, like the web's `buildTimeline`. The sticker or GIF an agent
  * adds right after its own reply (ADR 0091) always groups under that reply, whatever the reply carries.
  */
-export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
+export function buildRows(
+  messages: Message[],
+  hidden: (m: Message) => boolean = () => false,
+  /** The agents at work in this conversation: an event over once they happened is left out (`settledNotices`). */
+  working: ReadonlySet<string> = new Set(),
+): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastDay = "";
   let prev: Message | null = null;
   const answered = answeredNotices(messages);
+  const settled = settledNotices(messages, working);
   for (const m of [...messages].sort(byTime)) {
-    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta)) continue;
+    if (
+      hidden(m) ||
+      settled.has(m.id) ||
+      isRoutineCall(m) ||
+      isAnsweredNotice(m, answered) ||
+      isAgentOnlyNotice(m.meta)
+    )
+      continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });
@@ -164,21 +176,13 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
 // ── Automatic lines ──────────────────────────────────────────────────────────
 
 /**
- * One quiet line instead of a voice (the web's `ChatNotices`): what reached an agent's conversation
- * (`meta.notice`: "Rotina «X» entregou um relatório" while nobody answered it yet, "@Infra respondeu",
- * "Nota de @Dev", "Chegou o resultado que Ada esperava"); the text on demand. `key`/`values` are the
- * shared i18n (`chat.notice.*`). A talker reply is never one: it shows as the agent's message
- * (`noticeOf` leaves it out).
+ * One quiet line instead of a voice (the web's `ChatNotices`): what reached an agent's conversation, as the shared
+ * `noticeView` words it ("Rotina «X» entregou um relatório" while nobody answered it yet, "Infra respondeu"), with
+ * what "Show" opens. A talker reply is never one: it shows as the agent's message (`noticeOf` leaves it out).
  */
-export interface EventLineView {
+export interface EventLineView extends NoticeView {
   kind: "notice";
-  icon: "clock" | "agent" | "chat" | "check" | "bell";
-  key: string;
-  values: Record<string, string>;
-  /** Shown on "Show": the message's text, else the notice's. */
-  text: string;
-  /** A follow-up still to come: it can be canceled ("Cancel"). */
-  pending?: boolean;
+  icon: "clock" | "agent" | "chat" | "check" | "bell" | "info";
 }
 
 const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
@@ -187,6 +191,7 @@ const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
   agent_note: "chat",
   wait_result: "check",
   follow_up: "clock",
+  wake_skipped: "info",
 };
 
 export function eventLineOf(
@@ -195,44 +200,9 @@ export function eventLineOf(
   /** A follow-up's time for the reader ("18:30"), and the reader's locale for its day. */
   when: { time: (iso: string) => string; locale: string } = { time: (iso) => iso, locale: "pt-BR" },
 ): EventLineView | null {
-  const notice = noticeOf(m.meta);
-  if (!notice) return null;
-  const handle = noticeAgentHandle(notice);
-  // `from` is written for the agent ("@infra"): the app says the agent's name, without the @.
-  const from = handle ? (names.agentByHandle(handle) ?? handle) : notice.from;
-  const icon = NOTICE_ICON[notice.kind] ?? "bell";
-  const line = (key: string, values: Record<string, string> = {}): EventLineView => ({
-    kind: "notice",
-    icon,
-    key,
-    values,
-    text: m.body.trim() || notice.text,
-  });
-  switch (notice.kind) {
-    case "routine_handoff": {
-      const routine = noticeRoutineName(notice);
-      return routine ? line("chat.notice.routineHandoff", { routine }) : line("chat.notice.routineHandoffAnon");
-    }
-    case "consult_reply":
-      return from ? line("chat.notice.consultReply", { from }) : line("chat.notice.consultReplyAnon");
-    case "agent_note":
-      return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
-    case "wait_result":
-      return line("chat.notice.waitResult", { name: names.author });
-    case "wake_skipped":
-      return line("chat.notice.wakeSkipped", {
-        name: names.author,
-        agents: skippedHandles(notice)
-          .map((h) => names.agentByHandle(h) ?? h)
-          .join(", "),
-      });
-    case "follow_up": {
-      const followUp = followUpLine(notice, names.author, when);
-      return followUp ? { ...line(followUp.key, followUp.values), pending: followUp.pending } : null;
-    }
-    default:
-      return line("chat.notice.other", { name: names.author });
-  }
+  const view = noticeView(m, names, when);
+  const kind = noticeOf(m.meta)?.kind ?? "";
+  return view ? { ...view, kind: "notice", icon: NOTICE_ICON[kind] ?? "bell" } : null;
 }
 
 // ── What a message carries ───────────────────────────────────────────────────

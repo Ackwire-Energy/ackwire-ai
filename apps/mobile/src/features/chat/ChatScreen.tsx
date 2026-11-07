@@ -84,6 +84,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeOut,
+  Keyframe,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -104,6 +105,7 @@ import {
   Icon,
   IconButton,
   LineIcon,
+  motion,
   PressScale,
   type SendHow,
   Text,
@@ -256,7 +258,11 @@ const OFFLINE_AFTER_MS = 1200;
 /** "Conectado de novo" stays this long. */
 const BACK_ONLINE_MS = 1600;
 /** A row that just arrived at the bottom rises in (only while it is fresh: not when scrolled back into view). */
-const ENTER = FadeInDown.duration(220);
+/** A live arrival rises 6pt into place (`--dur-base`, as on the web); history and a jump never do. */
+const ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 6 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }] },
+}).duration(motion.base);
 const FRESH_MS = 800;
 /** How close to the end a scroll has to stop for a list held at a long message's start to follow again. */
 const READ_RELEASE_PX = 24;
@@ -572,6 +578,9 @@ function Chat({
   // ── Rows ──
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
   const superseded = useMemo(() => supersededBrainNotices(list), [list]);
+  const workingKey = runs.map((r) => r.agentId).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: new only when who is at work changes
+  const agentsAtWork = useMemo(() => new Set(runs.map((r) => r.agentId)), [workingKey]);
   const waitsNow = conversationWaits(isThread ? list : list.filter((m) => !m.threadId), live.receipts, (id) =>
     live.runs.some((r) => r.runId === id),
   );
@@ -629,7 +638,7 @@ function Chat({
           : [];
       return [
         ...head,
-        ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
+        ...asTurns(buildRows(replies, (m) => superseded.has(m.id), agentsAtWork)),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
         ...waitRows,
@@ -639,7 +648,7 @@ function Chat({
     // A thread's replies live in the thread; the channel shows its link.
     const hidden = (m: Message) => superseded.has(m.id) || Boolean(m.threadId);
     return [
-      ...asTurns(buildRows(list, hidden)),
+      ...asTurns(buildRows(list, hidden, agentsAtWork)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...waitRows,
@@ -657,6 +666,7 @@ function Chat({
     browsing,
     held,
     superseded,
+    agentsAtWork,
     t,
     waits,
   ]);
@@ -832,10 +842,15 @@ function Chat({
   useEffect(() => {
     prevKeysRef.current = rowKeys;
   }, [rowKeys]);
-  const isFresh = useCallback((key: string) => {
-    const t0 = freshRef.current.get(key);
-    return t0 !== undefined && Date.now() - t0 <= FRESH_MS;
-  }, []);
+  // Less motion asked for: nothing rises in.
+  const stillRows = useReducedMotion();
+  const isFresh = useCallback(
+    (key: string) => {
+      const t0 = freshRef.current.get(key);
+      return !stillRows && t0 !== undefined && Date.now() - t0 <= FRESH_MS;
+    },
+    [stillRows],
+  );
 
   // ── Read ──
   // Seen up to the latest message: the list's badges (a channel's or DM's, or a thread's) clear at once.

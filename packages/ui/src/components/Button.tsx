@@ -47,16 +47,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
+  const leading = variant === "agent" && !icon ? "agent" : icon;
+  // An icon and nothing else is an icon button, said or not: square, as `ac-btn--icon` draws it.
+  const onlyIcon =
+    iconOnly || (Boolean(leading) && !asChild && (children == null || children === false || children === "") && !kbd);
   const classes = cx(
     "ac-btn",
     variant !== "default" && `ac-btn--${variant}`,
     size !== "md" && `ac-btn--${size}`,
-    iconOnly && "ac-btn--icon",
+    onlyIcon && "ac-btn--icon",
     block && "ac-btn--block",
     loading && "ac-btn--loading",
     className,
   );
-  const leading = variant === "agent" && !icon ? "agent" : icon;
   if (asChild) {
     return (
       <Slot.Root ref={ref} className={classes} aria-disabled={disabled || undefined} {...rest}>

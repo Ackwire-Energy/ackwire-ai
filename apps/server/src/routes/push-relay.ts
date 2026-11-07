@@ -113,7 +113,7 @@ export function pushRelayRoutes(deps: PushRelayDeps) {
 
 function limited(c: Context, resetAt: Date) {
   c.header("retry-after", String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))));
-  return apiError(c, 429, "rate_limited", "Too many requests; try again later", { retryable: true });
+  return apiError(c, 429, "rate_limited", "Too many requests. Try again later", { retryable: true });
 }
 
 /** The JSON body as an object, or null (missing, not JSON, not an object). */

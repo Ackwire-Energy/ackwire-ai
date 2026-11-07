@@ -7,13 +7,10 @@ import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   consultationOfNotice,
-  followUpLine,
-  type MessageNotice,
-  noticeAgentHandle,
+  type NoticeView,
   noticeOf,
-  noticeRoutineName,
+  noticeView,
   type StoppedNotice,
-  skippedHandles,
   stoppedNoticeOf,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
@@ -29,7 +26,6 @@ import {
   ProviderLogo,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -51,39 +47,6 @@ const NOTICE_ICON: Record<string, IconName> = {
   wake_skipped: "alert",
 };
 
-/** The line's words: the app's own, never the agent-facing `from` ("Routine «…»") as is. */
-function noticeLabel(
-  t: TFunction,
-  notice: MessageNotice,
-  agentName: string,
-  nameOfHandle: (handle: string) => string | null,
-): string {
-  const handle = noticeAgentHandle(notice);
-  // The agent's name, without the @ of its handle (`from` is written for the agent).
-  const from = handle ? (nameOfHandle(handle) ?? handle) : notice.from;
-  switch (notice.kind) {
-    case "routine_handoff": {
-      const routine = noticeRoutineName(notice);
-      return routine ? t("chat.notice.routineHandoff", { routine }) : t("chat.notice.routineHandoffAnon");
-    }
-    case "consult_reply":
-      return from ? t("chat.notice.consultReply", { from }) : t("chat.notice.consultReplyAnon");
-    case "agent_note":
-      return from ? t("chat.notice.agentNote", { from }) : t("chat.notice.agentNoteAnon");
-    case "wait_result":
-      return t("chat.notice.waitResult", { name: agentName });
-    case "wake_skipped":
-      return t("chat.notice.wakeSkipped", {
-        name: agentName,
-        agents: skippedHandles(notice)
-          .map((h) => nameOfHandle(h) ?? h)
-          .join(", "),
-      });
-    default:
-      return t("chat.notice.other", { name: agentName });
-  }
-}
-
 /**
  * One event pill (`EventPill`) with its text on demand ("Ver"): an automatic event of the conversation, not a voice.
  */
@@ -91,22 +54,28 @@ function EventLine({
   message,
   icon,
   label,
-  text,
+  detail,
   labels,
   action,
 }: {
   message: Message;
   icon: IconName;
   label: ReactNode;
-  text: string;
+  /** What "Ver" opens (`noticeView`): never the words written for the agent. */
+  detail: NoticeView["detail"];
   labels: { show: string; hide: string };
   /** What a person can still do about it ("Cancelar" on a follow-up): an `EventPillAction`. */
   action?: ReactNode;
 }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
+  const text = detail
+    ? "content" in detail
+      ? detail.content
+      : t(detail.words.key as "chat.notice.wakeSkippedAudience", detail.words.values as { name: string })
+    : "";
   return (
     <EventPill
       className="cn-pill"
@@ -175,17 +144,23 @@ export function NoticeLine({ message }: { message: Message }) {
         <ConsultPairRow askerId={consulted.askerId} items={[pairItemOf(consulted.consultation)]} />
       </div>
     );
-  const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;
-  const name = dir.authorName(message.author);
-  const followUp = followUpLine(notice, name, { time: (iso) => formatTime(i18n.language, iso), locale: i18n.language });
+  const view = noticeView(
+    message,
+    {
+      author: dir.authorName(message.author),
+      agentByHandle: (handle) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null,
+    },
+    { time: (iso) => formatTime(i18n.language, iso), locale: i18n.language },
+  );
+  if (!view) return null;
   return (
     <EventLine
       message={message}
       icon={NOTICE_ICON[notice.kind] ?? "info"}
-      label={followUp ? t(followUp.key, followUp.values) : noticeLabel(t, notice, name, nameOfHandle)}
-      text={message.body.trim() || notice.text}
+      label={t(view.key as "chat.notice.other", view.values as { name: string })}
+      detail={view.detail}
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
-      action={followUp?.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
+      action={view.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
     />
   );
 }

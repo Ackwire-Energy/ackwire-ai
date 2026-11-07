@@ -85,10 +85,10 @@ describe("mentions of me in a task's conversation (ADR 0145)", () => {
 
     await act(async () => fireEvent.click(toggle));
     await settle(10);
-    // The conversation is the docked side pane threads use, not a card inside the page.
+    // The conversation is the side panel threads use, over a scrim, not a card inside the page.
     const pane = document.querySelector(".issue-page__talk");
     expect(pane?.classList.contains("thread-panel")).toBe(true);
-    expect(pane?.classList.contains("thread-panel--docked")).toBe(true);
+    expect(pane?.previousElementSibling?.classList.contains("thread-panel__scrim")).toBe(true);
     expect(marked).toContain(at.rootId);
     await settle(6);
     expect(mentionsIn(tasksRow())).toBeNull();
@@ -96,17 +96,17 @@ describe("mentions of me in a task's conversation (ADR 0145)", () => {
   });
 });
 
-test("what ships keeps every side pane flush with the area's top, right and bottom edges", async () => {
+test("what ships floats every side pane 10px in from the window's top, right and bottom, rounded", async () => {
   const css = topLevel(await builtCss("src/styles.css", "src/components/threads/threads.css", "src/pages/issues.css"));
   const last = (selector: string, property: string) =>
     declarations(css, selector)
       .filter(([p]) => p === property)
       .at(-1)?.[1];
-  for (const edge of ["top", "right", "bottom"]) expect(last(".thread-panel", edge)).toBe("0");
-  expect(last(".thread-panel", "border-radius")).toBeUndefined();
-  // The task's page lays its conversation out as a channel lays a thread: the same container, the pane at its edge.
-  expect(last(".issue-page--talk", "container")).toBe("channel-body/inline-size");
-  expect(last(".issue-page--talk", "padding")).toBe("0");
+  expect(last(".thread-panel", "position")).toBe("fixed");
+  for (const edge of ["top", "right", "bottom"]) expect(last(".thread-panel", edge)).toBe("10px");
+  expect(last(".thread-panel", "border-radius")).toBe("var(--radius-section)");
+  // The task's page has no layout of its own for its conversation any more.
+  expect(css).not.toContain(".issue-page--talk");
 });
 
 test("an unread reply visibly changes Conversa: a ghost button is already 600 in the muted color", async () => {

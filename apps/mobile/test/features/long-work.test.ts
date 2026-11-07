@@ -135,13 +135,16 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
       count: 1,
       ...over,
     });
-    expect(workStatusText(t, line({}), NOW)).toBe("Trabalhando em: Migrar a cobrança · 20 min");
+    // The time leads: a line cut to fit loses the end of the title, never the time.
+    expect(workStatusText(t, line({}), NOW)).toBe("Trabalhando há 20 min: Migrar a cobrança");
+    expect(workStatusText(t, line({ since: ago(1315) }), NOW)).toBe("Trabalhando há 21 h 55 min: Migrar a cobrança");
     expect(workStatusText(t, line({ count: 2, second: "Relatório de churn" }), NOW)).toBe(
       "Em 2 trabalhos: Migrar a cobrança e Relatório de churn",
     );
     expect(workStatusText(t, line({ count: 3 }), NOW)).toBe("Em 3 trabalhos: Migrar a cobrança e mais 2");
     expect(workStatusText(t, line({ wait: "approval" }), NOW)).toBe("Aguardando aprovação: Migrar a cobrança");
-    expect(workStatusText(t, line({ subject: null }), NOW)).toBe("Trabalhando em segundo plano · 20 min");
+    expect(workStatusText(t, line({ subject: null }), NOW)).toBe("Trabalhando há 20 min em segundo plano");
+    expect(workStatusText(t, line({ since: undefined }), NOW)).toBe("Trabalhando em: Migrar a cobrança");
     expect(blockedText(t, { reason: "waiting_approval" })).toBe("Bloqueado · aguardando aprovação");
     expect(blockedText(t, { reason: "paused" })).toBe("Pausado · limite do plano");
     expect(blockedText(t, { reason: "failed", text: "run.budget_exceeded" })).toBe(

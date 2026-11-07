@@ -335,6 +335,7 @@ import {
   useExpired,
   WaitMark,
 } from "@/components/RequestCard";
+import { SidePanel } from "@/components/SidePanel";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
@@ -374,7 +375,6 @@ import { holdOnScreen } from "@/lib/island";
 import { lookOf } from "@/lib/look";
 import { threadSearch, useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
-import { coversConversation } from "@/lib/side-pane";
 import { useToast } from "@/lib/toast";
 import {
   reconcileChannelRuns,
@@ -870,7 +870,6 @@ function ChannelView({
   const [searchOpen, setSearchOpen] = useState(Boolean(carried));
   // The thread a hit opened: it goes over the results, where any other thread takes their place.
   const hitThread = useRef(carried?.thread);
-  const sidePane = useRef<HTMLElement>(null);
   const carry = headerSearch?.carry;
   useEffect(() => {
     if (!searchOpen || !carry) return;
@@ -1206,6 +1205,9 @@ function ChannelView({
       lines: channelList.lines,
     };
   }, [thread, channelList, threadList, older, channelMessages.data, channel.id, panel?.id]);
+  // The agents at work here: a follow-up's line that woke one stays while its turn runs (`settledNotices`).
+  const workingKey = useStreams((s) => [...new Set(scopedRuns(s).map((r) => r.agentId))].sort().join(" "));
+  const agentsAtWork = useMemo(() => new Set(workingKey ? workingKey.split(" ") : []), [workingKey]);
   const timeline = useMemo(() => {
     if (thread) {
       // The thread's conversation. One made from a range: not its root (the channel's marker) nor the
@@ -1222,6 +1224,7 @@ function ChannelView({
         list.filter((m) => !passed.has(m.id)),
         [],
         [],
+        agentsAtWork,
       );
     }
     const visible = channelList?.visible ?? [];
@@ -1230,6 +1233,7 @@ function ChannelView({
       visible.filter((m) => !passed.has(m.id)),
       [],
       [],
+      agentsAtWork,
     );
     // A marker, a closed line or a thread's line is not a message: nothing groups under it.
     const special = (m: MessageType) =>
@@ -1237,7 +1241,7 @@ function ChannelView({
       threadsView?.byId.get(m.id)?.state === "closed" ||
       Boolean(channelList?.lines.has(m.id));
     return ungroupAfter(items, special);
-  }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView]);
+  }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView, agentsAtWork]);
 
   // The agents' blocks at the end of the conversation (one per run, from "pensando" to its final
   // message: `chat/run-slots.ts`). They change when runs start or end, never on a streaming delta.
@@ -1790,6 +1794,8 @@ function ChannelView({
     if (focusDone || !focusTarget || !serverRead) return;
     if (found) {
       setFocusDone(true);
+      // A search hit's Ir para: the message is there, so the panel over it goes (the header's field keeps the words).
+      if (jumping.current && !panel) setSearchOpen(false);
       jumping.current = false;
       stick.current = false;
       highlightMessage(scroller.current, focusTarget);
@@ -1823,6 +1829,7 @@ function ChannelView({
   const jumpTo = (messageId: string) => {
     if (highlightMessage(scroller.current, messageId)) {
       stick.current = false;
+      if (!panel) setSearchOpen(false);
       return;
     }
     focusPages.current = 0;
@@ -2257,7 +2264,8 @@ function ChannelView({
     agentDm && dmAgent
       ? {
           open: !paneOpen && dmSidebar.open,
-          docked: !paneOpen && dmSidebar.column,
+          // A side panel floats over the conversation: the column stays under it, so nothing moves behind the scrim.
+          docked: dmSidebar.column,
           toggle: () => toggleColumn(dmSidebar),
         }
       : null;
@@ -2718,8 +2726,8 @@ function ChannelView({
                     />
                   )}
                 </div>
-                {/* A thread, the search's results or an agent's page opens in the members' place, wider, and gives it
-                  back when it closes; the channel stays in use beside it (a phone: a sheet over it). */}
+                {/* A thread, the search's results or an agent's page floats over the conversation (`SidePanel`), one
+                  at a time; the members column stays under it. */}
                 {profile ? (
                   <AgentPanel
                     key={`${profile.agentId}:${profile.tab ?? ""}`}
@@ -2768,10 +2776,12 @@ function ChannelView({
                     onClose={() => setTasksOpen(false)}
                   />
                 ) : panel || searchOpen ? (
-                  <aside
-                    ref={sidePane}
-                    className="thread-panel thread-panel--docked"
-                    aria-label={t(panel ? "threads.side.label" : "searchPage.panel.label")}
+                  <SidePanel
+                    label={t(panel ? "threads.side.label" : "searchPage.panel.label")}
+                    onClose={() => {
+                      setPanel(null);
+                      setSearchOpen(false);
+                    }}
                   >
                     {searchOpen && (
                       <MessageLookContext.Provider value={namedLook}>
@@ -2805,16 +2815,20 @@ function ChannelView({
                         onSeeInChannel={(messageId, channelId) => {
                           if (channelId !== channel.id) return false;
                           setPanel(null);
-                          // Results under the thread would come back over the message.
-                          if (coversConversation(sidePane.current)) setSearchOpen(false);
+                          // The panel covers the conversation: the results close too (the header's field keeps the
+                          // words, one click brings them back).
+                          setSearchOpen(false);
                           jumpTo(messageId);
                           return true;
                         }}
                       />
                     )}
-                  </aside>
-                ) : side && dmAgent && (side.docked || dmSidebar.sheet) ? (
-                  <AgentSidebar agent={dmAgent} onClose={dmSidebar.sheet ? dmSidebar.closeSheet : undefined} />
+                  </SidePanel>
+                ) : (
+                  side && dmAgent && dmSidebar.sheet && <AgentSidebar agent={dmAgent} onClose={dmSidebar.closeSheet} />
+                )}
+                {side && dmAgent && side.docked && !dmSidebar.sheet ? (
+                  <AgentSidebar agent={dmAgent} />
                 ) : (
                   !chrome &&
                   membersColumn.column && (
@@ -4051,7 +4065,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       );
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
-    if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
+    if (!a && !p) return `@${handle}`;
     const isMe = !!p && p.userId === me.user.id;
     const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
     const shown = a?.name ?? p?.name ?? handle;

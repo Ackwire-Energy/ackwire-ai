@@ -199,8 +199,10 @@ describe("creating an agent on the phone", () => {
       { id: "c2", def: { id: "stripe" } },
       { id: "c3", def: null },
     ];
-    expect(presetLevels("dev", items)).toEqual({ c1: "write", c2: "none", c3: "none" });
-    expect(presetLevels("custom", items)).toEqual({ c1: "none", c2: "none", c3: "none" });
+    // An app the role doesn't list is open, as for every agent there.
+    expect(presetLevels("dev", items)).toEqual({ c1: "write", c2: "write", c3: "none" });
+    expect(presetLevels("finance", items)).toEqual({ c1: "write", c2: "read", c3: "none" });
+    expect(presetLevels("custom", items)).toEqual({ c1: "write", c2: "write", c3: "none" });
     const channels = [
       { id: "1", name: "Engenharia" },
       { id: "2", name: "geral" },

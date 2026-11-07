@@ -42,6 +42,7 @@ import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { StatusLine } from "@/components/Presence";
 import { RightHandMineRow } from "@/components/RightHandSettings";
+import { SidePanel } from "@/components/SidePanel";
 import { AgentCover, colorOf } from "@/components/Sky";
 import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -99,27 +100,18 @@ function FloatingSide({ onClose, children }: { onClose: () => void; children: Re
   const { t } = useTranslation();
   useEscClose(onClose);
   return (
-    <>
-      <button
-        type="button"
-        className="thread-panel__scrim"
-        tabIndex={-1}
+    <SidePanel className="dm-side dm-side--float" label={t("agentSide.label")} onClose={onClose}>
+      <Button
+        size="sm"
+        iconOnly
+        icon="close"
+        className="agp-glass dm-side__close"
         aria-label={t("common.close")}
+        title={t("common.close")}
         onClick={onClose}
       />
-      <aside className="thread-panel dm-side dm-side--float" aria-label={t("agentSide.label")}>
-        <Button
-          size="sm"
-          iconOnly
-          icon="close"
-          className="agp-glass dm-side__close"
-          aria-label={t("common.close")}
-          title={t("common.close")}
-          onClick={onClose}
-        />
-        <div className="dm-side__scroll">{children}</div>
-      </aside>
-    </>
+      <div className="dm-side__scroll">{children}</div>
+    </SidePanel>
   );
 }
 

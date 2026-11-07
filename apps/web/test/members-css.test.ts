@@ -71,5 +71,5 @@ test("a DM's floating sidebar: 360px over the chat, and where panels take the wh
   const width = (sheet: string) =>
     declarations(sheet, ".thread-panel.dm-side--float").find(([p]) => p === "width")?.[1];
   expect(width(topLevel(css))).toBeUndefined();
-  expect(width(atRule(css, "@media (min-width: 861px)"))).toContain("360px");
+  expect(width(atRule(css, "@media (min-width: 861px)"))).toBe("min(360px,100vw - 20px)");
 });

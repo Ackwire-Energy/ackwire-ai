@@ -11,6 +11,8 @@ import {
   findInPage,
   formatPlanReport,
   type Judge,
+  LANDED_ELSEWHERE,
+  landedElsewhere,
   locateOnImage,
   observeSnapshot,
   pageKey,
@@ -456,7 +458,8 @@ describe("checks", () => {
 });
 
 /** A screen that is a list of pages: each action may move it to the next one. */
-function fakeSurface(pages: Record<string, string>, start: string) {
+/** `redirects`: a page an `open` of another one lands on instead (a deep link the site doesn't take). */
+function fakeSurface(pages: Record<string, string>, start: string, redirects: Record<string, string> = {}) {
   let at = start;
   const actions: ScreenAction[] = [];
   let failNext: string | null = null;
@@ -480,7 +483,10 @@ function fakeSurface(pages: Record<string, string>, start: string) {
         failNext = null;
         return { ok: false, error };
       }
-      if (action.kind === "open") at = new URL(action.url).pathname.slice(1);
+      if (action.kind === "open") {
+        const asked = new URL(action.url).pathname.slice(1);
+        at = redirects[asked] ?? asked;
+      }
       if (action.kind === "click" && "ref" in action.at && action.at.ref === "e5") at = "home";
       return { ok: true, observation: look() };
     },
@@ -514,6 +520,23 @@ describe("plans", () => {
     expect(text.summary).toContain("Done: all 4 steps.");
     expect(text.summary).toContain('Clicked button (e5) (✓ "the dashboard shows").');
     expect(text.screen).toContain("Now at https://app.acme.example/home");
+  });
+
+  test("a deep link the site sends elsewhere says so, and to use the site's own way there", async () => {
+    const judge = createFakeJudge(() => undefined);
+    const surface = fakeSurface(PAGES, "blank", { "app/signing": "home" });
+    const sent = await runPlan({ judge, ...ids, surface, scope: "a" }, [
+      { do: "open", url: "https://app.acme.example/app/signing" },
+    ]);
+    expect(sent.steps[0]?.landedElsewhere).toBe(true);
+    expect(formatPlanReport(sent).summary).toBe(`Opened https://app.acme.example/app/signing. ${LANDED_ELSEWHERE}`);
+    const direct = await runPlan({ judge, ...ids, surface, scope: "a" }, [
+      { do: "open", url: "https://www.app.acme.example/home/?tab=1#top" },
+    ]);
+    expect(formatPlanReport(direct).summary).toBe("Opened https://www.app.acme.example/home/?tab=1#top.");
+    expect(landedElsewhere("https://acme.example", "https://acme.example/pt-BR/")).toBe(false);
+    expect(landedElsewhere("https://acme.example/a", "https://login.acme.example/a")).toBe(true);
+    expect(landedElsewhere("https://acme.example/docs/a", "https://acme.example/en/docs/a")).toBe(false);
   });
 
   test("stops at an expectation the page doesn't show, and the rest never runs", async () => {

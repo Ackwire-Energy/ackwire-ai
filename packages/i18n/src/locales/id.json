@@ -8116,6 +8116,11 @@
     "consultable": "Agen lain bisa berkonsultasi dengan {{name}}",
     "consultableHint": "Untuk orang yang tidak ada di daftar, dia hanya menjawab agen yang bertanya, tidak pernah langsung ke mereka. Tindakan sensitif tetap butuh persetujuan dari orang yang mengurusnya.",
     "consultableHint_female": "Untuk orang yang tidak ada di daftar, dia hanya menjawab agen yang bertanya, tidak pernah langsung ke mereka. Tindakan sensitif tetap butuh persetujuan dari orang yang mengurusnya.",
+    "agents": {
+      "consulted": "Ini hanya berlaku untuk orang. Agen lain tetap bisa berkonsultasi dengan {{name}} untuk orang yang tidak ada di daftar.",
+      "blocked": "Ini juga berlaku untuk agen. Tidak ada agen lain yang bisa menghubungi {{name}} untuk orang yang tidak ada di daftar.",
+      "plan": "Ini juga berlaku untuk agen. {{name}} memakai paket AI milik penanggung jawabnya, yang hanya melayani orang itu, jadi tidak ada agen lain yang bisa menghubungi {{name}} untuk orang yang tidak ada di daftar."
+    },
     "mode": {
       "everyone": "Semua orang di ruang kerja",
       "people": "Hanya beberapa orang atau peran",
@@ -12672,6 +12677,8 @@
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
+      "oneFor": "Bekerja selama {{duration}}: {{subject}}",
+      "oneUntitledFor": "Selama {{duration}} bekerja di latar belakang",
       "two": "Mengerjakan 2 pekerjaan: {{first}} dan {{second}}",
       "many": "Mengerjakan {{count}} pekerjaan: {{subject}} dan {{more}} lainnya",
       "manyUntitled": "Mengerjakan {{count}} pekerjaan di latar belakang",
@@ -12795,6 +12802,9 @@
       "followUpCancel": "Batalkan",
       "other": "Pemberitahuan untuk {{name}}",
       "wakeSkipped": "Sebutan dari {{name}} tidak sampai ke {{agents}}",
+      "wakeSkippedAnon": "Sebutan dari {{name}} tidak sampai ke agen lain",
+      "wakeSkippedAudience": "Hanya sebagian orang yang boleh memanggil {{agents}}, dan pekerjaan {{name}} ini tidak datang dari salah satu dari mereka. Orang yang boleh memanggil {{agents}} bisa meneruskan permintaannya.",
+      "wakeSkippedCallable": "Pengaturan {{name}} tidak mengizinkannya memanggil {{agents}} (proyek lain, atau tidak ada di daftar agen yang boleh dipanggil). Orang yang mengurus {{name}} bisa mengubahnya di halaman agen.",
       "show": "Tampilkan",
       "hide": "Sembunyikan",
       "talker": "sambil bekerja",
@@ -12844,7 +12854,6 @@
       "autoApprovedNobody": "Disetujui otomatis",
       "error": "gagal",
       "seconds": "{{n}} dtk",
-      "minutes": "{{n}} mnt",
       "step": {
         "schedulingReminder": "Menjadwalkan pengingat",
         "creatingRoutine": "Membuat rutinitas",

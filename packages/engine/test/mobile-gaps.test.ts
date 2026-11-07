@@ -337,7 +337,8 @@ describe("working now (any member)", () => {
       // Asked in the channel: it answers there.
       threadId: null,
       status: "running",
-      label: "Dev, can you check the deploy?",
+      // Never the ask's own words: with no thread title the apps say where it is.
+      label: null,
     });
     expect(Object.keys(mine[0] ?? {})).not.toContain("costUsd");
 

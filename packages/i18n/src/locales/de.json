@@ -8414,6 +8414,11 @@
     "consultable": "Andere Agenten können {{name}} um Rat fragen",
     "consultableHint": "Personen, die nicht auf der Liste stehen, antwortet er nie direkt, sondern nur dem Agenten, der gefragt hat. Sensible Aktionen brauchen weiterhin die Freigabe der Personen, die sich um ihn kümmern.",
     "consultableHint_female": "Personen, die nicht auf der Liste stehen, antwortet sie nie direkt, sondern nur dem Agenten, der gefragt hat. Sensible Aktionen brauchen weiterhin die Freigabe der Personen, die sich um sie kümmern.",
+    "agents": {
+      "consulted": "Gilt nur für Personen. Andere Agenten können {{name}} weiterhin für alle fragen, die nicht auf der Liste stehen.",
+      "blocked": "Gilt auch für Agenten. Kein anderer Agent erreicht {{name}} für Personen, die nicht auf der Liste stehen.",
+      "plan": "Gilt auch für Agenten. {{name}} nutzt den KI-Plan der verantwortlichen Person, der nur dieser Person dient. Deshalb erreicht kein anderer Agent {{name}} für Personen, die nicht auf der Liste stehen."
+    },
     "mode": {
       "everyone": "Alle im Workspace",
       "people": "Nur bestimmte Personen oder Rollen",
@@ -13117,6 +13122,8 @@
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
+      "oneFor": "Arbeitet seit {{duration}}: {{subject}}",
+      "oneUntitledFor": "Arbeitet seit {{duration}} im Hintergrund",
       "two": "An 2 Arbeiten: {{first}} und {{second}}",
       "many": "An {{count}} Arbeiten: {{subject}} und {{more}} weitere",
       "manyUntitled": "An {{count}} Arbeiten im Hintergrund",
@@ -13243,6 +13250,9 @@
       "followUpCancel": "Abbrechen",
       "other": "Hinweis für {{name}}",
       "wakeSkipped": "Die Erwähnung von {{name}} hat {{agents}} nicht erreicht",
+      "wakeSkippedAnon": "Die Erwähnung von {{name}} hat keinen anderen Agenten erreicht",
+      "wakeSkippedAudience": "Nur bestimmte Personen dürfen {{agents}} aufrufen, und diese Arbeit von {{name}} kam von keiner von ihnen. Jemand, der {{agents}} aufrufen darf, kann die Anfrage weitergeben.",
+      "wakeSkippedCallable": "Die Einstellungen von {{name}} erlauben nicht, {{agents}} aufzurufen (ein anderes Projekt oder nicht auf der Liste der aufrufbaren Agenten). Wer sich um {{name}} kümmert, kann das auf der Seite des Agenten ändern.",
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "talker": "während der Arbeit",
@@ -13294,7 +13304,6 @@
       "autoApprovedNobody": "Automatisch freigegeben",
       "error": "Fehler",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} Min.",
       "step": {
         "schedulingReminder": "Eine Erinnerung geplant",
         "creatingRoutine": "Eine Routine erstellt",

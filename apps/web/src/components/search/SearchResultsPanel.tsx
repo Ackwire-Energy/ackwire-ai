@@ -31,15 +31,15 @@ import { useOrg } from "@/components/org-context";
 import { useEscClose } from "@/hooks/useEscClose";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { groupHits, hitLink, SEARCH_PAGE, useHeaderSearch } from "@/hooks/useWorkspaceSearch";
-import { coversConversation } from "@/lib/side-pane";
 import "./search.css";
 
 /**
  * The header search's results in the conversation's side pane, where a thread opens: how many and for what, "Filtros"
  * back to the field, the sort; message hits by where they were said (a channel, a DM, a thread), each a message card
  * with its words marked and "Ir para". Other hits (actions, context) under their kind, while no filter is on.
- * "Ir para" leaves them open for the next hit: a message shows in the conversation beside them, a reply in its thread
- * over them (`hidden`, so they come back as they were), another conversation's with them open there.
+ * "Ir para" on a reply opens its thread over them in the same panel (`hidden`, so they come back as they were); on a
+ * message here the conversation goes to it and, once it is there, closes them (the header's field keeps the words);
+ * another conversation's message closes them on the way there, its reply opens there with them.
  */
 export function SearchResultsPanel({
   channelId,
@@ -63,7 +63,6 @@ export function SearchResultsPanel({
   const channels = useChannels(org.id);
   const categories = useChannelCategories(org.id);
   const phone = useMatchMedia(COMPACT_QUERY);
-  const pane = useRef<HTMLElement>(null);
   const jumpedFrom = useRef<HTMLElement | null>(null);
   useEscClose(onClose);
   // Back from the thread a hit opened: where the person was, its back button gone.
@@ -92,14 +91,12 @@ export function SearchResultsPanel({
     const place = hit.channelIds[0];
     const m = hit.messageId;
     const reply = m && hit.threadId && hit.threadId !== m ? { id: hit.threadId, focus: m } : undefined;
-    // Over the conversation (a phone, a narrow window) the results would hide what they went to: they close.
-    const covers = coversConversation(pane.current);
     if (place === channelId && reply) {
       onOpenThread(reply.id, reply.focus);
       return;
     }
     if (place === channelId && m) {
-      if (covers) onClose();
+      // Found, the conversation closes the results over it (a missing one says so, and they stay).
       actions?.jumpTo?.(m);
       return;
     }
@@ -110,7 +107,7 @@ export function SearchResultsPanel({
       ws.dmWith(place),
     );
     if (!link) return;
-    if (place && (reply || !covers)) ws.carry.current = { channelId: place, ...(reply ? { thread: reply.id } : {}) };
+    if (place && reply) ws.carry.current = { channelId: place, ...(reply ? { thread: reply.id } : {}) };
     else onClose();
     void navigate(reply ? { ...link, search: { thread: reply.id, tm: reply.focus } } : link);
   };
@@ -163,7 +160,7 @@ export function SearchResultsPanel({
       ? t("searchPage.countMore", { count: SEARCH_PAGE })
       : t("searchPage.panel.count", { count: hits.length });
   return (
-    <section ref={pane} className="shell__main shell__main--chat thread-panel__chat" hidden={hidden}>
+    <section className="shell__main shell__main--chat thread-panel__chat" hidden={hidden}>
       <header className="channel__header thread-head thread-head--panel search-panel__head">
         <span className="thread-head__who" aria-hidden="true">
           <Icon name="search" size={18} />

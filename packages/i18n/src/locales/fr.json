@@ -8742,6 +8742,11 @@
     "consultable_female": "Les autres agents peuvent consulter {{name}}",
     "consultableHint": "Pour les personnes absentes de la liste, il ne répond qu'à l'agent qui a demandé, jamais directement à elles. Les actions sensibles nécessitent toujours l'approbation des personnes qui s'occupent de lui.",
     "consultableHint_female": "Pour les personnes absentes de la liste, elle ne répond qu'à l'agent qui a demandé, jamais directement à elles. Les actions sensibles nécessitent toujours l'approbation des personnes qui s'occupent d'elle.",
+    "agents": {
+      "consulted": "Cela ne vaut que pour les personnes. Les autres agents peuvent toujours consulter {{name}} pour les personnes absentes de la liste.",
+      "blocked": "Cela vaut aussi pour les agents. Aucun autre agent ne peut joindre {{name}} pour les personnes absentes de la liste.",
+      "plan": "Cela vaut aussi pour les agents. {{name}} utilise le forfait IA de la personne responsable, qui ne sert que cette personne, donc aucun autre agent ne peut joindre {{name}} pour les personnes absentes de la liste."
+    },
     "mode": {
       "everyone": "Tout l'espace de travail",
       "people": "Seulement certaines personnes ou certains rôles",
@@ -13578,6 +13583,8 @@
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",
+      "oneFor": "Travaille depuis {{duration}} : {{subject}}",
+      "oneUntitledFor": "Travaille depuis {{duration}} en arrière-plan",
       "two": "Sur 2 travaux : {{first}} et {{second}}",
       "many": "Sur {{count}} travaux : {{subject}} et {{more}} autres",
       "manyUntitled": "Sur {{count}} travaux en arrière-plan",
@@ -13718,6 +13725,9 @@
       "followUpCancel": "Annuler",
       "other": "Avis pour {{name}}",
       "wakeSkipped": "La mention de {{name}} n'a pas atteint {{agents}}",
+      "wakeSkippedAnon": "La mention de {{name}} n’a atteint aucun autre agent",
+      "wakeSkippedAudience": "Seules certaines personnes peuvent appeler {{agents}}, et ce travail de {{name}} ne vient d’aucune d’elles. Quelqu’un qui peut appeler {{agents}} peut lui transmettre la demande.",
+      "wakeSkippedCallable": "Les réglages de {{name}} ne lui permettent pas d’appeler {{agents}} (un autre projet, ou hors de sa liste d’agents à appeler). La personne qui s’occupe de {{name}} peut changer cela sur la page de l’agent.",
       "show": "Afficher",
       "hide": "Masquer",
       "talker": "en travaillant",
@@ -13771,7 +13781,6 @@
       "autoApprovedNobody": "Approuvé automatiquement",
       "error": "erreur",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "A programmé un rappel",
         "creatingRoutine": "A créé une routine",

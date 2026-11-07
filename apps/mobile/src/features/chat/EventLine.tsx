@@ -69,7 +69,7 @@ export function EventLine({ message, fold, gap }: { message: Message; fold?: Con
         time={when.time(message.createdAt)}
         actions={[
           line.pending ? <CancelFollowUp key="cancel" messageId={message.id} /> : null,
-          line.text ? (
+          line.detail ? (
             <EventPillAction
               key="show"
               label={open ? t("chat.notice.hide") : t("chat.notice.show")}
@@ -79,9 +79,13 @@ export function EventLine({ message, fold, gap }: { message: Message; fold?: Con
           ) : null,
         ]}
         below={
-          open && line.text ? (
+          open && line.detail ? (
             <EventPillText>
-              <MessageText body={line.text} />
+              <MessageText
+                body={
+                  "content" in line.detail ? line.detail.content : t(line.detail.words.key, line.detail.words.values)
+                }
+              />
             </EventPillText>
           ) : null
         }

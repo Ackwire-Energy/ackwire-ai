@@ -20382,6 +20382,15 @@
     "value": "For people not on the list, he answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after him.",
     "female": "For people not on the list, she answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after her."
   },
+  "audience.agents.consulted": {
+    "value": "This covers people only. Other agents can still consult {{name}} for anyone not on the list."
+  },
+  "audience.agents.blocked": {
+    "value": "This covers agents too. No other agent can reach {{name}} for anyone not on the list."
+  },
+  "audience.agents.plan": {
+    "value": "This covers agents too. {{name}} uses its owner's AI plan, which serves only its owner, so no other agent can reach {{name}} for anyone not on the list."
+  },
   "audience.mode.everyone": {
     "value": "Everyone in the workspace"
   },
@@ -31857,6 +31866,12 @@
   "work.status.oneUntitled": {
     "value": "Working in the background"
   },
+  "work.status.oneFor": {
+    "value": "Working for {{duration}}: {{subject}}"
+  },
+  "work.status.oneUntitledFor": {
+    "value": "Working for {{duration}} in the background"
+  },
   "work.status.two": {
     "value": "On 2 jobs: {{first}} and {{second}}"
   },
@@ -32157,6 +32172,15 @@
   "chat.notice.wakeSkipped": {
     "value": "{{name}}'s mention didn't reach {{agents}}"
   },
+  "chat.notice.wakeSkippedAnon": {
+    "value": "{{name}}'s mention didn't reach another agent"
+  },
+  "chat.notice.wakeSkippedAudience": {
+    "value": "Only some people may call {{agents}}, and this work of {{name}} didn't come from one of them. Someone who may call {{agents}} can pass the request on."
+  },
+  "chat.notice.wakeSkippedCallable": {
+    "value": "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page."
+  },
   "chat.notice.show": {
     "value": "Show"
   },
@@ -32287,9 +32311,6 @@
   },
   "chat.work.seconds": {
     "value": "{{n}} s"
-  },
-  "chat.work.minutes": {
-    "value": "{{n}} min"
   },
   "chat.work.step.schedulingReminder": {
     "value": "Scheduled a reminder"

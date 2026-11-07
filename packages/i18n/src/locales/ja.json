@@ -8067,6 +8067,11 @@
     "consultable": "他のエージェントが{{name}}に相談できる",
     "consultableHint": "リストにない人については、依頼したエージェントにだけ返信し、本人には直接返信しません。重要な操作には、引き続き担当者の承認が必要です。",
     "consultableHint_female": "リストにない人については、依頼したエージェントにだけ返信し、本人には直接返信しません。重要な操作には、引き続き担当者の承認が必要です。",
+    "agents": {
+      "consulted": "これは人にだけ適用されます。リストにない人のために、他のエージェントは引き続き{{name}}に相談できます。",
+      "blocked": "これはエージェントにも適用されます。リストにない人のために{{name}}に連絡できるエージェントはいません。",
+      "plan": "これはエージェントにも適用されます。{{name}}は担当者本人だけが使えるAIプランで動いているため、リストにない人のために{{name}}に連絡できるエージェントはいません。"
+    },
     "mode": {
       "everyone": "ワークスペースの全員",
       "people": "一部の人またはロールのみ",
@@ -12618,6 +12623,8 @@
     "status": {
       "one": "作業中: {{subject}}",
       "oneUntitled": "バックグラウンドで作業中",
+      "oneFor": "{{duration}}作業中: {{subject}}",
+      "oneUntitledFor": "{{duration}}バックグラウンドで作業中",
       "two": "2件の作業中: {{first}}、{{second}}",
       "many": "{{count}}件の作業中: {{subject}}ほか{{more}}件",
       "manyUntitled": "バックグラウンドで{{count}}件の作業中",
@@ -12741,6 +12748,9 @@
       "followUpCancel": "キャンセル",
       "other": "{{name}}へのお知らせ",
       "wakeSkipped": "{{name}}のメンションは{{agents}}に届きませんでした",
+      "wakeSkippedAnon": "{{name}} のメンションはほかのエージェントに届きませんでした",
+      "wakeSkippedAudience": "{{agents}} を呼べるのは一部の人だけで、{{name}} のこの作業はその誰からの依頼でもありません。{{agents}} を呼べる人が依頼を引き継げます。",
+      "wakeSkippedCallable": "{{name}} の設定では {{agents}} を呼べません（別のプロジェクト、または呼べるエージェントの一覧にない）。{{name}} の担当者がエージェントのページで変更できます。",
       "show": "表示",
       "hide": "隠す",
       "talker": "作業中に",
@@ -12790,7 +12800,6 @@
       "autoApprovedNobody": "自動で承認",
       "error": "エラー",
       "seconds": "{{n}}秒",
-      "minutes": "{{n}}分",
       "step": {
         "schedulingReminder": "リマインダーを設定しました",
         "creatingRoutine": "ルーティンを作成しました",

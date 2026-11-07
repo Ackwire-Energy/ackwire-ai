@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { LineIcon, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -430,8 +430,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: ONE_ROW,
     paddingVertical: (ONE_ROW - ACTION) / 2,
-    paddingLeft: 12,
-    paddingRight: 10,
+    ...ROW_CARD_INSET,
   },
   // The "small" line (20) on the action's middle.
   oneTx: { paddingTop: (ACTION - 20) / 2 },

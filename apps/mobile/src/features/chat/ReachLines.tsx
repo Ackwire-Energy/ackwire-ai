@@ -22,7 +22,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, RowAction, Text, useTheme, useToast } from "@/ui";
+import { Button, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -254,8 +254,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 50,
     paddingVertical: (50 - 32) / 2,
-    paddingLeft: 12,
-    paddingRight: 10,
+    ...ROW_CARD_INSET,
     borderWidth: StyleSheet.hairlineWidth,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,

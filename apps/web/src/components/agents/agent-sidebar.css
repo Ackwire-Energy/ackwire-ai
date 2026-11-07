@@ -12,16 +12,13 @@
 /* Under this a panel is the whole screen, as a thread's is. */
 @media (min-width: 861px) {
   .thread-panel.dm-side--float {
-    width: min(360px, calc(100% - 20px));
+    width: min(360px, calc(100vw - 20px));
   }
 }
 .dm-side__scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-.channel__body:has(> .dm-side--float) {
-  position: relative;
 }
 .dm-side__close.ac-btn {
   position: absolute;
@@ -69,10 +66,12 @@
   line-height: 18px;
   color: var(--muted);
 }
+/* As wide as the column at most (the head doesn't stretch its lines): a long line ends in "…", never past the edge. */
 .dm-side__status {
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
   margin-top: 2px;
 }
 .dm-side__dot {

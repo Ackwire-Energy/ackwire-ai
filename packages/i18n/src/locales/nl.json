@@ -8471,6 +8471,11 @@
     "consultable_female": "Andere agents kunnen {{name}} raadplegen",
     "consultableHint": "Voor mensen die niet op de lijst staan, antwoordt hij alleen de agent die het vroeg, nooit henzelf. Gevoelige acties vragen nog steeds om goedkeuring van de mensen die voor hem verantwoordelijk zijn.",
     "consultableHint_female": "Voor mensen die niet op de lijst staan, antwoordt zij alleen de agent die het vroeg, nooit henzelf. Gevoelige acties vragen nog steeds om goedkeuring van de mensen die voor haar verantwoordelijk zijn.",
+    "agents": {
+      "consulted": "Dit geldt alleen voor mensen. Andere agents kunnen {{name}} nog steeds raadplegen voor mensen die niet op de lijst staan.",
+      "blocked": "Dit geldt ook voor agents. Geen andere agent kan {{name}} bereiken voor mensen die niet op de lijst staan.",
+      "plan": "Dit geldt ook voor agents. {{name}} gebruikt het AI-abonnement van de verantwoordelijke, dat alleen die persoon helpt, dus geen andere agent kan {{name}} bereiken voor mensen die niet op de lijst staan."
+    },
     "mode": {
       "everyone": "Iedereen in de werkruimte",
       "people": "Alleen bepaalde mensen of rollen",
@@ -13172,6 +13177,8 @@
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
+      "oneFor": "Al {{duration}} bezig: {{subject}}",
+      "oneUntitledFor": "Al {{duration}} bezig op de achtergrond",
       "two": "Met 2 klussen bezig: {{first}} en {{second}}",
       "many": "Met {{count}} klussen bezig: {{subject}} en nog {{more}}",
       "manyUntitled": "Met {{count}} klussen bezig op de achtergrond",
@@ -13309,6 +13316,9 @@
       "followUpCancel": "Annuleren",
       "other": "Melding voor {{name}}",
       "wakeSkipped": "De vermelding van {{name}} bereikte {{agents}} niet",
+      "wakeSkippedAnon": "De vermelding van {{name}} bereikte geen andere agent",
+      "wakeSkippedAudience": "Alleen bepaalde mensen mogen {{agents}} aanroepen, en dit werk van {{name}} kwam van geen van hen. Iemand die {{agents}} mag aanroepen, kan het verzoek doorgeven.",
+      "wakeSkippedCallable": "De instellingen van {{name}} staan niet toe dat het {{agents}} aanroept (een ander project, of niet op de lijst van agents die het mag aanroepen). Wie voor {{name}} zorgt, kan dat aanpassen op de pagina van de agent.",
       "show": "Tonen",
       "hide": "Verbergen",
       "talker": "tijdens het werk",
@@ -13360,7 +13370,6 @@
       "autoApprovedNobody": "Automatisch goedgekeurd",
       "error": "fout",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Een herinnering gepland",
         "creatingRoutine": "Een routine gemaakt",

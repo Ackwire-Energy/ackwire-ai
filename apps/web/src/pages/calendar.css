@@ -389,7 +389,9 @@ html:not([data-pointer]) .cal-marks:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Words after the marks, not one more mark: the kit's smallest gap from them, the marks' own 2px gap and 2px more. */
 .cal-marks__more {
+  margin-inline-start: calc(var(--space-1) - 2px);
   font-size: 10px;
   line-height: 1;
   font-weight: 600;
@@ -404,6 +406,9 @@ html:not([data-pointer]) .cal-marks:focus-visible {
 }
 .cal-week__marks .cal-marks__pixels {
   flex-direction: column;
+}
+.cal-week__marks .cal-marks__more {
+  margin: calc(var(--space-1) - 2px) 0 0;
 }
 /* In a month cell: one row under the events */
 .cal-month__marks {

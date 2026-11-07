@@ -46,11 +46,11 @@ test("search results and floating panels", async () => {
   expect(last(shipped, ".search-result__jump.ac-btn", "position")).toBeUndefined();
   // A floating panel's scrim dims the whole window, the sidebar too.
   expect(last(shipped, ".thread-panel__scrim", "position")).toBe("fixed");
-  // `fixed` fills the page while its entrance holds a transform. The entrance only stops holding: taken away, it would
-  // play again over the whole page when the panel closes.
-  const page = "main.shell__main:has(.thread-panel__scrim)";
-  expect(last(shipped, page, "animation-fill-mode")).toBe("backwards");
-  expect(last(shipped, page, "animation")).toBeUndefined();
+  // It hangs from <body> (SidePanel's portal), so no page's entrance can hold it inside the page: no rule on `main`.
+  expect(css).not.toContain("main.shell__main:has(.thread-panel__scrim)");
+  // Outside the work area it brings the area's surfaces along (headers and sticky bars paint `--bg`/`--surface`).
+  expect(last(shipped, ".thread-panel", "--bg")).toBe("var(--pane)");
+  expect(last(shipped, ".thread-panel", "--surface")).toBe("var(--pane)");
   // A thread's narrow head drops its channel's name; the results' line says what was searched and stays.
   const narrow = css.slice(css.indexOf("@container thread-dock"));
   expect(last(narrow, ".search-panel__head .thread-head__meta>.thread-head__where", "display")).toBe("block");

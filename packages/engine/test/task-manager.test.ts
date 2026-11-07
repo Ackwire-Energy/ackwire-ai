@@ -75,7 +75,7 @@ describe("work agents asked of each other (ADR 0128)", () => {
       agentId: infra.id,
       channelKind: "dm",
       betweenAgents: true,
-      label: "Vê o log de ontem",
+      label: null,
       canStop: true,
       delegation: { agentId: f.agent.id, origin: { kind: "person", userId: f.owner.id } },
     });
@@ -371,7 +371,8 @@ describe("the task manager", () => {
       steps: 1,
       canStop: true,
     });
-    expect(view.tasks[0]?.label).toContain("compara os preços");
+    // Never the ask's own words: no work or thread title yet, so the apps say where it is.
+    expect(view.tasks[0]?.label).toBeNull();
     expect(view.activity[f.agent.id]?.at(-1)).toBe(1);
 
     await cancelRun(deps(), f.owner.id, f.org.id, run.id);

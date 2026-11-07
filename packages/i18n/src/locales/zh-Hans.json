@@ -8124,6 +8124,11 @@
     "consultable_female": "其他智能体可以咨询 {{name}}",
     "consultableHint": "对于不在名单上的人，他只回复发起询问的智能体，绝不直接回复他们。敏感操作仍需负责他的人审批。",
     "consultableHint_female": "对于不在名单上的人，她只回复发起询问的智能体，绝不直接回复他们。敏感操作仍需负责她的人审批。",
+    "agents": {
+      "consulted": "这只适用于人。对于不在名单上的人，其他智能体仍然可以咨询 {{name}}。",
+      "blocked": "这也适用于智能体。对于不在名单上的人，其他智能体都无法联系 {{name}}。",
+      "plan": "这也适用于智能体。{{name}} 使用负责人的 AI 套餐，只为负责人本人服务，所以对于不在名单上的人，其他智能体都无法联系 {{name}}。"
+    },
     "mode": {
       "everyone": "工作区所有人",
       "people": "仅部分成员或角色",
@@ -12673,6 +12678,8 @@
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
+      "oneFor": "已工作 {{duration}}：{{subject}}",
+      "oneUntitledFor": "已在后台工作 {{duration}}",
       "two": "正在处理 2 项工作：{{first}}和{{second}}",
       "many": "正在处理 {{count}} 项工作：{{subject}}和另外 {{more}} 项",
       "manyUntitled": "正在后台处理 {{count}} 项工作",
@@ -12807,6 +12814,9 @@
       "followUpCancel": "取消",
       "other": "给 {{name}} 的通知",
       "wakeSkipped": "{{name}} 的提及没有传达给 {{agents}}",
+      "wakeSkippedAnon": "{{name}} 的提及没有叫到其他智能体",
+      "wakeSkippedAudience": "只有部分人可以呼叫 {{agents}}，而 {{name}} 的这项工作并非来自其中任何人。可以呼叫 {{agents}} 的人可以把请求转交过去。",
+      "wakeSkippedCallable": "{{name}} 的设置不允许它呼叫 {{agents}}（属于其他项目，或不在它可呼叫的智能体列表中）。负责 {{name}} 的人可以在该智能体的页面上更改。",
       "show": "显示",
       "hide": "隐藏",
       "talker": "工作间隙",
@@ -12856,7 +12866,6 @@
       "autoApprovedNobody": "已自动批准",
       "error": "错误",
       "seconds": "{{n}} 秒",
-      "minutes": "{{n}} 分钟",
       "step": {
         "schedulingReminder": "设置了提醒",
         "creatingRoutine": "创建了例行工作",

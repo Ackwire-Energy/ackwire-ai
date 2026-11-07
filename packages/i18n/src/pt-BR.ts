@@ -8436,6 +8436,18 @@ export const ptBR = {
       "Para quem não está na lista, ele responde só ao agente que perguntou, nunca direto à pessoa. Ações sensíveis continuam pedindo aprovação de quem cuida dele.",
     consultableHint_female:
       "Para quem não está na lista, ela responde só ao agente que perguntou, nunca direto à pessoa. Ações sensíveis continuam pedindo aprovação de quem cuida dela.",
+    agents: {
+      consulted: "Vale só para pessoas. Outros agentes ainda podem consultar o {{name}} por quem não está na lista.",
+      consulted_female:
+        "Vale só para pessoas. Outros agentes ainda podem consultar a {{name}} por quem não está na lista.",
+      blocked:
+        "Vale para agentes também. Nenhum outro agente consegue falar com o {{name}} por quem não está na lista.",
+      blocked_female:
+        "Vale para agentes também. Nenhum outro agente consegue falar com a {{name}} por quem não está na lista.",
+      plan: "Vale para agentes também. O {{name}} usa o plano de IA do responsável, que só atende o responsável, então nenhum outro agente fala com ele por quem não está na lista.",
+      plan_female:
+        "Vale para agentes também. A {{name}} usa o plano de IA do responsável, que só atende o responsável, então nenhum outro agente fala com ela por quem não está na lista.",
+    },
     mode: { everyone: "Todos do workspace", people: "Só algumas pessoas ou papéis", owner: "Só o responsável" },
     modeText: {
       everyone: "Qualquer pessoa do workspace pode chamar o {{name}}.",
@@ -12880,6 +12892,9 @@ export const ptBR = {
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
+      /** Com o tempo: ele vem antes, então numa linha estreita quem é cortado é o título, nunca o tempo. */
+      oneFor: "Trabalhando há {{duration}}: {{subject}}",
+      oneUntitledFor: "Trabalhando há {{duration}} em segundo plano",
       two: "Em 2 trabalhos: {{first}} e {{second}}",
       many: "Em {{count}} trabalhos: {{subject}} e mais {{more}}",
       manyUntitled: "Em {{count}} trabalhos em segundo plano",
@@ -13045,6 +13060,11 @@ export const ptBR = {
       followUpCancel: "Cancelar",
       other: "Aviso para {{name}}",
       wakeSkipped: "A menção de {{name}} não chamou {{agents}}",
+      wakeSkippedAnon: "A menção de {{name}} não chamou outro agente",
+      wakeSkippedAudience:
+        "Só algumas pessoas podem chamar {{agents}}, e este trabalho de {{name}} não veio de nenhuma delas. Alguém que pode chamar {{agents}} passa o pedido adiante.",
+      wakeSkippedCallable:
+        "As configurações de {{name}} não deixam chamar {{agents}} (outro projeto, ou fora da lista de agentes que pode chamar). Quem cuida de {{name}} muda isso na página do agente.",
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",
@@ -13101,7 +13121,6 @@ export const ptBR = {
       autoApprovedNobody: "Aprovado automaticamente",
       error: "erro",
       seconds: "{{n}} s",
-      minutes: "{{n}} min",
       step: {
         schedulingReminder: "Agendou um lembrete",
         creatingRoutine: "Criou uma rotina",

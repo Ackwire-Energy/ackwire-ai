@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { Pressable, Text as RNText, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Count } from "./Count";
 import type { FiltersProps } from "./Filters";
 import { haptics } from "./haptics";
@@ -19,9 +21,27 @@ export type SegmentedProps = FiltersProps & {
 const PAD = 4;
 const RADIUS = 14;
 
-/** A segmented control: a sunken track, the selected segment raised. */
+/** A segmented control: a sunken track, the selected segment raised; the raised plate slides to a new choice. */
 export function Segmented({ items, value, onChange, wide = false }: SegmentedProps) {
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, motion, reducedMotion } = useTheme();
+  const [boxes, setBoxes] = useState<Record<string, { x: number; width: number }>>({});
+  const at = boxes[value];
+  const x = useSharedValue(0);
+  const width = useSharedValue(0);
+  // The first place is taken at once; only a change of choice slides.
+  const placed = useRef(false);
+  useEffect(() => {
+    if (!at) return;
+    const timing = {
+      duration: reducedMotion || !placed.current ? 0 : motion.base,
+      easing: Easing.bezier(...motion.out),
+    };
+    x.value = withTiming(at.x, timing);
+    width.value = withTiming(at.width, timing);
+    placed.current = true;
+  }, [at, x, width, reducedMotion, motion]);
+  const plate = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }], width: width.value }));
+  const raised = { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` };
   return (
     <View
       style={{
@@ -34,6 +54,12 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
       }}
       accessibilityRole="tablist"
     >
+      {at ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[{ position: "absolute", left: 0, top: PAD, bottom: PAD, borderRadius: RADIUS - PAD }, raised, plate]}
+        />
+      ) : null}
       {items.map((item) => {
         const on = item.key === value;
         return (
@@ -45,6 +71,12 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            onLayout={(e) => {
+              const { x: left, width: w } = e.nativeEvent.layout;
+              setBoxes((b) =>
+                b[item.key]?.x === left && b[item.key]?.width === w ? b : { ...b, [item.key]: { x: left, width: w } },
+              );
+            }}
             style={({ pressed }) => [
               wide === "fit" ? { flexGrow: 1 } : wide ? { flex: 1 } : null,
               pressed && !on ? { opacity: 0.6 } : null,
@@ -64,7 +96,7 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
                   justifyContent: "center",
                   gap: 6,
                 },
-                on ? { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` } : null,
+                on && !at ? raised : null,
               ]}
             >
               {item.icon ? <Icon name={item.icon} size={13} color={on ? colors.ink : colors.muted} /> : null}

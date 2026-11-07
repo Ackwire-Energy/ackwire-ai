@@ -1,15 +1,22 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { resources } from "@agenteschat/i18n";
+import { LOCALES } from "@agenteschat/i18n/locale";
 import type { Message } from "../src/index";
 import { formatShortDate } from "../src/lib/format";
 import {
+  AGENT_ONLY_NOTICES,
   answeredNotices,
   consultationOfNotice,
   followUpLine,
   isAgentOnlyNotice,
   isTalkerReply,
+  NOTICE_KINDS,
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  noticeView,
   routineReportText,
 } from "../src/lib/notices";
 import { buildTimeline } from "../src/lib/timeline";
@@ -222,5 +229,156 @@ describe("consultationOfNotice", () => {
       consultationOfNotice(notice({ askerAgentId: "dev", agentId: "infra", status: "failed", question: "Q?" }))
         ?.consultation.kind,
     ).toBeUndefined();
+  });
+});
+
+describe("events over once they happened", () => {
+  const rex = { type: "agent" as const, id: "rex" };
+  const shown = (list: Message[], working = new Set<string>()) =>
+    buildTimeline(list, [], [], working).flatMap((i) => (i.kind === "message" ? [i.message.id] : []));
+  const follow = (refs: Record<string, string>) => ({
+    notice: {
+      kind: "follow_up",
+      text: "Check CI run 42 and tell #releases",
+      refs: { at: "x", about: "ver o CI", ...refs },
+    },
+  });
+
+  test("a follow-up that came: its line goes, and the line that woke the agent stays only while its turn runs", () => {
+    const set = msg("set", 0, rex, follow({ state: "done" }));
+    const woke = msg("woke", 20, rex, follow({ wake: "1", followUpId: "set" }));
+    const reply = msg("reply", 21, rex);
+    // The turn is running: nothing after it yet, or a person wrote while the agent works.
+    expect(shown([set, woke])).toEqual(["woke"]);
+    expect(shown([set, woke, msg("p", 21, walter)], new Set(["rex"]))).toEqual(["woke", "p"]);
+    // Over: the agent said something after it, or something came after it and the agent isn't at work.
+    expect(shown([set, woke, reply])).toEqual(["reply"]);
+    expect(shown([set, woke, msg("p", 21, walter)])).toEqual(["p"]);
+    // Another conversation's message says nothing of this one.
+    expect(shown([woke, { ...reply, threadId: "t" }])).toEqual(["woke", "reply"]);
+  });
+
+  test("a follow-up still to come or canceled stays", () => {
+    const pending = msg("pending", 0, rex, follow({ state: "pending" }));
+    const canceled = msg("canceled", 1, rex, follow({ state: "canceled" }));
+    expect(shown([pending, canceled, msg("after", 2, rex)])).toEqual(["pending", "canceled", "after"]);
+  });
+
+  test("a mention that couldn't wake an agent folds into its message's own line about it, else stays", () => {
+    const reach = [{ agentId: "ivy-id", handle: "ivy", reason: "audience", userId: "u1" }];
+    const named = msg("named", 0, rex, { reach });
+    const skipped = (id: string, messageId: string) =>
+      msg(id, 1, rex, {
+        notice: {
+          kind: "wake_skipped",
+          text: "@ivy wasn't woken by your mention",
+          refs: { messageId, agentHandles: "ivy", reason: "audience" },
+        },
+      });
+    expect(shown([named, skipped("s1", "named")])).toEqual(["named"]);
+    // Its message isn't loaded, or says nothing of that agent: the line is all people have.
+    expect(shown([skipped("s2", "elsewhere")])).toEqual(["s2"]);
+    expect(shown([msg("plain", 0, rex), skipped("s3", "plain")])).toEqual(["plain", "s3"]);
+  });
+});
+
+describe("what people read of a notice", () => {
+  const when = { time: (iso: string) => iso.slice(11, 16), locale: "pt-BR" };
+  const names = { author: "Rex", agentByHandle: (h: string) => (h === "ivy" ? "Ivy" : null) };
+  /** Every ref any kind words a line or its detail from. */
+  const refs = {
+    at: "2026-11-06T23:40:00.000Z",
+    about: "ver o build",
+    state: "done",
+    routineName: "Sentry",
+    agentHandle: "ivy",
+    answer: "Versão 8 confirmada",
+    agentHandles: "ivy",
+    messageId: "m1",
+  };
+  const AGENT_TEXT = "Check run 42 via github_actions_list and tell #releases";
+  const engineKinds = [
+    ...(readFileSync(join(import.meta.dir, "../../engine/src/notices.ts"), "utf8")
+      .match(/export type NoticeKind =([^;]+);/)?.[1]
+      ?.matchAll(/"(\w+)"/g) ?? []),
+  ].map((m) => m[1]);
+  const leaf = (code: string, key: string) =>
+    key
+      .split(".")
+      .reduce<unknown>(
+        (node, k) => (node && typeof node === "object" ? (node as Record<string, unknown>)[k] : undefined),
+        resources[code as keyof typeof resources]?.translation,
+      );
+
+  test("the apps know every kind the server writes", () => {
+    expect([...NOTICE_KINDS].sort() as string[]).toEqual(engineKinds.sort() as string[]);
+  });
+
+  test("every kind people see has its own words in every language, and never the text written for the agent", () => {
+    const seen = NOTICE_KINDS.filter((k) => !AGENT_ONLY_NOTICES.has(k) && k !== "talker_reply" && k !== "run_stopped");
+    expect(seen.length).toBeGreaterThan(0);
+    const missing: string[] = [];
+    for (const kind of seen) {
+      for (const reason of ["audience", "callable"]) {
+        // A routine's report is what it found for people; every other notice's text is the agent's.
+        const said = kind === "routine_handoff" ? "3 erros novos no checkout" : AGENT_TEXT;
+        const view = noticeView(
+          { body: said, meta: { notice: { kind, text: said, from: "@ivy", refs: { ...refs, reason } } } },
+          names,
+          when,
+        );
+        if (!view) {
+          missing.push(`${kind}: no line`);
+          continue;
+        }
+        expect(view.key).not.toBe("chat.notice.other");
+        const keys = [view.key, ...(view.detail && "words" in view.detail ? [view.detail.words.key] : [])];
+        for (const code of LOCALES.map((l) => l.code))
+          for (const key of keys) if (typeof leaf(code, key) !== "string") missing.push(`${kind}: ${key} in ${code}`);
+        // What "Show" opens is the app's words or what people wrote, never the agent's English.
+        if (view.detail && "content" in view.detail) {
+          expect(view.detail.content).not.toContain("github_actions_list");
+          expect(["routine_handoff", "consult_reply"]).toContain(kind);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("a mention that couldn't wake says why in people's words, by the reason it carries", () => {
+    const view = (r: Record<string, string>) =>
+      noticeView(
+        { body: AGENT_TEXT, meta: { notice: { kind: "wake_skipped", text: AGENT_TEXT, refs: r } } },
+        names,
+        when,
+      );
+    expect(view({ agentHandles: "ivy" })).toMatchObject({
+      key: "chat.notice.wakeSkipped",
+      values: { name: "Rex", agents: "Ivy" },
+      detail: { words: { key: "chat.notice.wakeSkippedAudience" } },
+    });
+    expect(view({ agentHandles: "ivy", reason: "callable" })?.detail).toMatchObject({
+      words: { key: "chat.notice.wakeSkippedCallable" },
+    });
+    // No AI connected: who wasn't reached, with no audience words that would name the wrong cause.
+    expect(view({ agentHandles: "ivy", reason: "no_ai" })).toMatchObject({
+      key: "chat.notice.wakeSkipped",
+      values: { name: "Rex", agents: "Ivy" },
+      detail: null,
+    });
+    // An older line that didn't keep whom: no names to say, nothing to open.
+    expect(view({})).toMatchObject({ key: "chat.notice.wakeSkippedAnon", detail: null });
+  });
+
+  test("a follow-up's line has nothing to open: its note to itself is the agent's", () => {
+    const view = noticeView(
+      {
+        body: AGENT_TEXT,
+        meta: { notice: { kind: "follow_up", text: AGENT_TEXT, refs: { ...refs, state: "pending" } } },
+      },
+      names,
+      when,
+    );
+    expect(view).toMatchObject({ key: "chat.notice.followUpOn", pending: true, detail: null });
   });
 });

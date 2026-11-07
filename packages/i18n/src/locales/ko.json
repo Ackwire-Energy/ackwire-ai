@@ -8061,6 +8061,11 @@
     "consultable": "다른 에이전트가 {{name}}에게 물어볼 수 있어요",
     "consultableHint": "목록에 없는 사람의 경우, 물어본 에이전트에게만 답하고 그 사람에게 직접 답하지는 않아요. 민감한 작업은 여전히 담당자의 승인이 필요해요.",
     "consultableHint_female": "목록에 없는 사람의 경우, 물어본 에이전트에게만 답하고 그 사람에게 직접 답하지는 않아요. 민감한 작업은 여전히 담당자의 승인이 필요해요.",
+    "agents": {
+      "consulted": "사람에게만 적용돼요. 목록에 없는 사람을 위해 다른 에이전트는 계속 {{name}}에게 물어볼 수 있어요.",
+      "blocked": "에이전트에게도 적용돼요. 목록에 없는 사람을 위해 {{name}}에게 연락할 수 있는 다른 에이전트는 없어요.",
+      "plan": "에이전트에게도 적용돼요. 이 에이전트는 담당자 본인만 쓰는 AI 플랜을 사용해서, 목록에 없는 사람을 위해 {{name}}에게 연락할 수 있는 다른 에이전트는 없어요."
+    },
     "mode": {
       "everyone": "워크스페이스의 모든 사람",
       "people": "일부 사람 또는 역할만",
@@ -12610,6 +12615,8 @@
     "status": {
       "one": "작업 중: {{subject}}",
       "oneUntitled": "백그라운드에서 작업 중",
+      "oneFor": "{{duration}}째 작업 중: {{subject}}",
+      "oneUntitledFor": "{{duration}}째 백그라운드에서 작업 중",
       "two": "작업 2개 진행 중: {{first}}, {{second}}",
       "many": "작업 {{count}}개 진행 중: {{subject}} 외 {{more}}개",
       "manyUntitled": "백그라운드에서 작업 {{count}}개 진행 중",
@@ -12733,6 +12740,9 @@
       "followUpCancel": "취소",
       "other": "{{name}}에게 온 알림",
       "wakeSkipped": "{{name}}의 멘션이 {{agents}}에게 전달되지 않았어요",
+      "wakeSkippedAnon": "{{name}}의 멘션이 다른 에이전트에게 닿지 않았어요",
+      "wakeSkippedAudience": "{{agents}}은(는) 일부 사람만 부를 수 있는데, {{name}}의 이 작업은 그중 누구에게서도 오지 않았어요. {{agents}}을(를) 부를 수 있는 사람이 요청을 전달할 수 있어요.",
+      "wakeSkippedCallable": "{{name}}의 설정에서 {{agents}}을(를) 부를 수 없어요(다른 프로젝트이거나 부를 수 있는 에이전트 목록에 없음). {{name}} 담당자가 에이전트 페이지에서 바꿀 수 있어요.",
       "show": "보기",
       "hide": "숨기기",
       "talker": "작업하면서",
@@ -12782,7 +12792,6 @@
       "autoApprovedNobody": "자동 승인됨",
       "error": "오류",
       "seconds": "{{n}}초",
-      "minutes": "{{n}}분",
       "step": {
         "schedulingReminder": "리마인더를 예약했어요",
         "creatingRoutine": "루틴을 만들었어요",

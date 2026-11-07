@@ -5,10 +5,10 @@ import {
   agentSummary,
   helpersOf,
   linePlace,
+  taskPlace,
   taskState,
   taskTitle,
   taskWaitWords,
-  taskWhere,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
@@ -22,6 +22,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
+import { SidePanel } from "@/components/SidePanel";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -117,7 +118,7 @@ export function AgentTasksPanel({
   ];
 
   return (
-    <aside className="thread-panel thread-panel--docked tm-agentpanel" aria-label={title}>
+    <SidePanel className="tm-agentpanel" label={title} onClose={onClose}>
       <header className="channel__header thread-head thread-head--panel">
         <span className="thread-head__who">
           <OpensAgent agentId={agentId}>
@@ -191,7 +192,7 @@ export function AgentTasksPanel({
           </>
         )}
       </footer>
-    </aside>
+    </SidePanel>
   );
 }
 
@@ -223,7 +224,7 @@ function TaskCard({
   const working = taskState(task) === "working" && !stopping;
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
-  const where = here ? t("taskManager.where.here") : taskWhere(t, task);
+  const where = here ? t("taskManager.where.here") : taskPlace(t, task);
   const wait = taskWaitWords(t, i18n.language, task, now);
   const place = linePlace(task);
   const program = programText(task)?.name ?? null;
@@ -233,7 +234,7 @@ function TaskCard({
     wait && !waitsOnPerson(task)
       ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
       : taskState(task) === "queued"
-        ? `${t("taskManager.state.queued")} · ${where}`
+        ? [t("taskManager.state.queued"), where].filter(Boolean).join(" · ")
         : [where, program, formatDuration(t, taskAge(task, now))].filter(Boolean).join(" · ");
   const name = dir.anyAgent(task.agentId)?.name ?? t("channel.unknownAgent");
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;

@@ -91,9 +91,9 @@ describe("the DM's search is the channel's, held to the DM", () => {
     const panel = screen().getByRole("complementary", { name: "Resultados da busca" });
     expect(panel.textContent).toContain("zebra na DM");
     expect(panel.textContent).not.toContain("uma zebra no general");
-    // Ir para lands on the message in the DM.
+    // Ir para lands on the message in the DM, the results closing over it.
     await click(within(panel).getByRole("button", { name: "Ir para a mensagem de Ada" }));
-    expect(screen().queryByRole("complementary", { name: "Resultados da busca" })).toBeTruthy();
+    expect(screen().queryByRole("complementary", { name: "Resultados da busca" })).toBeNull();
     const row = document.querySelector(`article[data-message-id="m-${dm}"]`);
     expect(row?.classList.contains("ac-msg--focus")).toBe(true);
   });
@@ -177,14 +177,16 @@ describe("the profile in the panel closes", () => {
     expect(screen().queryByRole("complementary", PANEL)).toBeNull();
   });
 
-  test("an agent's public card closes too, by its ×, with no overlay over the conversation", async () => {
+  test("an agent's public card closes too, by its ×, and by a click on its scrim", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.seesDetails = false;
-    const { panel } = await openAda(state);
-    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    const { trigger, panel } = await openAda(state);
     await click(within(panel).getByRole("button", { name: "Fechar" }));
+    expect(screen().queryByRole("complementary", PANEL)).toBeNull();
+    await click(trigger);
+    await click(screen().getByRole("complementary", PANEL).previousElementSibling as HTMLElement);
     expect(screen().queryByRole("complementary", PANEL)).toBeNull();
   });
 

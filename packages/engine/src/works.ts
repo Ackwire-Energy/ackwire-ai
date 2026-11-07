@@ -3,6 +3,7 @@ import { and, asc, type Database, desc, type Executor, eq, gte, inArray, isNull,
 import { appLocale } from "@agenteschat/i18n/locale";
 import { runAuthority } from "./authority";
 import { getChannelCached } from "./context";
+import type { ContextDeps } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { isAgentOnlyDm } from "./dms";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -17,6 +18,7 @@ import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
 import { ago, stepLine } from "./talker-snapshot";
+import { nameConversation } from "./thread-assess";
 import { maskCredentials } from "./tool-detail";
 
 const { agentQuestions, agentRunSteps, agentWorks, agentRuns, messages, threadFollows, users } = schema;
@@ -371,12 +373,13 @@ export interface MoveInput {
  * does from now on lands there. The run keeps going. Null: it already moved (or ended).
  */
 export async function moveToBackground(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; context?: ContextDeps },
   runId: string,
   input: MoveInput,
   now = new Date(),
 ): Promise<{ work: WorkRow; anchor: Message; queued: boolean } | null> {
   const { db } = deps;
+  const title = await workTitle(deps, runId, input.title);
   const moved = await db.transaction(async (tx) => {
     const [run] = await tx.select().from(agentRuns).where(eq(agentRuns.id, runId)).for("update");
     if (!run || run.workId || isTerminal(run.status)) return null;
@@ -394,7 +397,6 @@ export async function moveToBackground(
       .where(and(eq(agentWorks.orgId, run.orgId), eq(agentWorks.status, "live")));
     const queued = (live?.agent ?? 0) >= WORK_LIMITS.perAgent || (live?.org ?? 0) >= perOrgCap;
     const workId = Bun.randomUUIDv7();
-    const title = plainText(input.title, WORK_LIMITS.titleMax) || (await defaultTitle(tx, run)) || "Background work";
     const say = plainText(input.say, WORK_LIMITS.sayMax);
     const locale = await localeOf(tx, requester);
     const anchor = await insertMessage(tx, {
@@ -447,7 +449,7 @@ export async function moveToBackground(
     if (ownThread) {
       await tx
         .insert(schema.threads)
-        .values({ orgId: run.orgId, channelId: run.channelId, rootMessageId: anchor.id, title })
+        .values({ orgId: run.orgId, channelId: run.channelId, rootMessageId: anchor.id, title: title || null })
         .onConflictDoNothing({ target: [schema.threads.orgId, schema.threads.rootMessageId] });
     }
     // The asker follows the work's thread: its updates count as unread for them, never as a push.
@@ -546,18 +548,27 @@ export async function moveRun(
   await deps.pubsub.publish(workTopic(run.id), { type: "run.moved", runId: run.id }).catch(() => {});
 }
 
-/** A work with no title of its own: its thread's title, else the start of the ask. */
-async function defaultTitle(tx: Executor, run: Pick<AgentRun, "orgId" | "threadRootId" | "triggerMessageId">) {
-  const [thread] = await tx
-    .select({ title: schema.threads.title })
+/**
+ * A work's title: the one given, else its thread's when a person wrote it, else a short name the org's cheap model
+ * gives the conversation, in its language. Never the ask's own words (a raw message, a link, a GIF): what the apps
+ * say the agent works on and what its task is called. Empty when nothing names it (the apps say "in the background").
+ */
+async function workTitle(deps: { db: Database; context?: ContextDeps }, runId: string, given: string) {
+  const title = plainText(given, WORK_LIMITS.titleMax);
+  if (title) return title;
+  const [run] = await deps.db
+    .select({ orgId: agentRuns.orgId, rootId: agentRuns.threadRootId, agentId: agentRuns.agentId })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, runId));
+  if (!run) return "";
+  const [thread] = await deps.db
+    .select({ title: schema.threads.title, auto: schema.threads.titleAuto })
     .from(schema.threads)
-    .where(and(eq(schema.threads.orgId, run.orgId), eq(schema.threads.rootMessageId, run.threadRootId)));
-  if (thread?.title?.trim()) return plainText(thread.title, WORK_LIMITS.titleMax);
-  const [ask] = await tx
-    .select({ body: messages.body })
-    .from(messages)
-    .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
-  return ask ? replyExcerpt(ask.body, WORK_LIMITS.titleMax) : "";
+    .where(and(eq(schema.threads.orgId, run.orgId), eq(schema.threads.rootMessageId, run.rootId)));
+  if (thread?.title?.trim() && !thread.auto) return plainText(thread.title, WORK_LIMITS.titleMax);
+  if (!deps.context) return "";
+  const named = await nameConversation(deps.context, { ...run, runId }).catch(() => null);
+  return plainText(named, WORK_LIMITS.titleMax);
 }
 
 async function localeOf(db: Executor, userId: string | null) {
@@ -673,7 +684,7 @@ export async function postWorkUpdate(
  * card. A work that waits on something has no timer; an update meanwhile (`update_seq` moved) makes this a no-op.
  */
 export async function checkInWork(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; context?: ContextDeps },
   orgId: string,
   input: { workId: string; seq: number; phase: "nudge" | "fallback" | "card"; due?: number },
   now = new Date(),
@@ -1121,7 +1132,7 @@ export async function workBrief(db: Executor, run: Pick<AgentRun, "orgId" | "age
         return line ? [`${ago(now, st.createdAt)}: ${line}`] : [];
       });
       const doing = lately.length ? ` Latest steps: ${lately.join("; ")}.` : "";
-      return `- work_id ${w.id}: "${w.title}" (${w.status === "queued" ? "waiting in line" : `${minutes} min in`}).${plan}${told}${doing}`;
+      return `- work_id ${w.id}: ${w.title ? `"${w.title}"` : "(untitled)"} (${w.status === "queued" ? "waiting in line" : `${minutes} min in`}).${plan}${told}${doing}`;
     }),
   );
   return [
@@ -1227,11 +1238,11 @@ export async function liveWorksByAgent(db: Executor, orgId: string, agentIds?: s
  * new one assigned to the agent, visible to exactly who reads the conversation.
  */
 export async function ensureWorkCard(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; context?: ContextDeps },
   workId: string,
   input: { number?: number; description?: string },
 ) {
-  const [work] = await deps.db.select().from(agentWorks).where(eq(agentWorks.id, workId));
+  let [work] = await deps.db.select().from(agentWorks).where(eq(agentWorks.id, workId));
   if (!work || work.issueId) return work?.issueId ?? null;
   const [run] = await deps.db
     .select()
@@ -1240,6 +1251,13 @@ export async function ensureWorkCard(
     .orderBy(desc(agentRuns.createdAt))
     .limit(1);
   if (!run) return null;
+  // A card needs a name: an unnamed work (its model failed at the move) is named now, else at its next check-in.
+  if (!work.title) {
+    const title = await workTitle(deps, run.id, "");
+    if (!title) return null;
+    [work] = await deps.db.update(agentWorks).set({ title }).where(eq(agentWorks.id, work.id)).returning();
+    if (!work) return null;
+  }
   let description = input.description ? cutText(input.description.trim(), 4000) : "";
   if (!description) {
     const [ask] = await deps.db

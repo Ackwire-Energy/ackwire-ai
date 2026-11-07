@@ -13,6 +13,7 @@ import { type ChannelActions, ChannelActionsContext } from "@/components/channel
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
+import { SidePanel } from "@/components/SidePanel";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
@@ -89,7 +90,7 @@ export function ConsultationPanel({
   }
 
   return (
-    <aside className="thread-panel thread-panel--docked" aria-label={label}>
+    <SidePanel label={label} onClose={onClose}>
       <section className="shell__main shell__main--chat thread-panel__chat">
         <header className="channel__header thread-head thread-head--panel">
           <span className="thread-head__who" aria-hidden="true">
@@ -195,6 +196,6 @@ export function ConsultationPanel({
           </div>
         </div>
       </section>
-    </aside>
+    </SidePanel>
   );
 }

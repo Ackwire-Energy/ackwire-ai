@@ -318,7 +318,8 @@ html[data-pointer] :focus-visible {
 .ac-btn--ghost.ac-btn--glyph::before {
   content: "";
   position: absolute;
-  inset: 0 var(--glyph-air, 0px);
+  /* Square, as every icon button: set in by the glyph's air on all four sides. */
+  inset: var(--glyph-air, 0px);
   border-radius: inherit;
   transition: inherit;
 }
@@ -342,7 +343,7 @@ html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--icon-gap);
   height: 36px;
   box-sizing: border-box;
   padding: 0 var(--space-4);
@@ -1634,9 +1635,9 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   display: inline-flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--icon-gap);
   min-width: 0;
-  padding: 6px 12px 6px 10px;
+  padding: 6px 12px;
 }
 .ac-eventpill__mark {
   display: inline-flex;
@@ -1673,7 +1674,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
 .ac-eventpill__action {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--icon-gap-sm);
   padding: 0 12px;
   border: 0;
   border-left: 1px solid var(--line);
@@ -3760,10 +3761,10 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
 @media (prefers-reduced-motion: no-preference) {
   .ac-turn__out {
     display: block;
-    animation: ac-turn-out 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: ac-turn-out var(--dur-panel) var(--out) both;
   }
   .ac-turn__in {
-    animation: ac-turn-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: ac-turn-in var(--dur-panel) var(--out) both;
   }
   .ac-turn__in[data-first] {
     animation: ac-fade-in 160ms ease-out both;
@@ -3823,6 +3824,15 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
 .ac-receipt__check .ac-icon {
   width: 16px;
   height: 16px;
+}
+/* The check alone is an icon button: square, the line's height kept. */
+.ac-receipt__check:has(> .ac-icon:only-child) {
+  flex: none;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-block: -2px;
+  padding: 0;
 }
 .ac-receipt__check:hover {
   color: var(--ink);
@@ -4383,12 +4393,77 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 }
 
 /*
- * Motion (2026-10): enter transitions only, 120–200 ms, opacity and
- * transform (no layout shift). Nothing moves with prefers-reduced-motion.
+ * Motion (2026-10): enters and exits, 120–200 ms (`--dur-fast`, `--dur-base`; a side panel's slide `--dur-panel`), ease-out,
+ * exits faster than entrances, opacity and transform only (no layout shift). Nothing moves with
+ * prefers-reduced-motion. What people do by keyboard many times a day (⌘K) has none.
  */
 @media (prefers-reduced-motion: no-preference) {
   .ac-dialog__scrim[data-state="open"] {
     animation: ac-fade-in 160ms ease-out;
+  }
+  /* Exits: Radix keeps the element until its exit ends. */
+  .ac-dialog__scrim[data-state="closed"] {
+    animation: ac-fade-out var(--dur-fast) ease-out forwards;
+  }
+  .ac-dialog[data-state="closed"],
+  .ac-details[data-state="closed"] {
+    animation: ac-dialog-out var(--dur-fast) var(--out) forwards;
+  }
+  .ac-menu[data-state="closed"],
+  .ac-hint__bubble[data-state="closed"] {
+    animation: ac-fade-out var(--dur-fast) ease-out forwards;
+  }
+  /* A toast rises in, and a new one coming fast picks up from where the last one was (a transition, not keyframes). */
+  .ac-toast {
+    transition:
+      opacity var(--dur-base) var(--out),
+      transform var(--dur-base) var(--out);
+  }
+  @starting-style {
+    .ac-toast {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .ac-toast[data-leaving] {
+    opacity: 0;
+    transform: translateY(4px);
+    transition-duration: var(--dur-fast);
+  }
+  /* Rows a list gains after it first appeared (an approval, a task coming in) rise in alone. */
+  .ac-list > * {
+    transition:
+      opacity var(--dur-base) var(--out),
+      transform var(--dur-base) var(--out);
+  }
+  @starting-style {
+    .ac-list > * {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  /* A tab's content fades in (no slide: arrow keys switch tabs too). */
+  .ac-tabpanel[data-state="active"] {
+    animation: ac-fade-in var(--dur-fast) ease-out;
+  }
+  /* Chips, cards and pills changing state change color, never jump. */
+  .ac-chip {
+    transition:
+      background-color var(--dur-fast) ease,
+      color var(--dur-fast) ease,
+      box-shadow var(--dur-fast) ease;
+  }
+  .ac-card--interactive:active {
+    transform: scale(0.99);
+  }
+  /* Staged files and the voice note in the composer pop in. */
+  .ac-composer__file,
+  .ac-composer__voice {
+    animation: ac-chip-in var(--dur-fast) var(--out);
+  }
+  /* "Fim da resposta" over the list. */
+  .ac-new-messages {
+    animation: ac-pill-in var(--dur-fast) var(--out);
   }
   .ac-dialog[data-state="open"] {
     animation: ac-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -4436,6 +4511,29 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   }
   .ac-list--stagger > :nth-child(n + 6) {
     animation-delay: 100ms;
+  }
+}
+@keyframes ac-dialog-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+}
+@keyframes ac-chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes ac-pill-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.95);
+  }
+}
+@keyframes ac-fade-out {
+  to {
+    opacity: 0;
   }
 }
 @keyframes ac-dialog-in {
@@ -4678,7 +4776,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--sm {
   height: var(--control-h-sm);
   padding: 0 var(--control-px-sm);
-  gap: 6px;
+  gap: var(--icon-gap-sm);
   font-size: var(--control-fs-sm);
   border-radius: var(--control-r-sm);
 }
@@ -4689,7 +4787,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--lg {
   height: var(--control-h-lg);
   padding: 0 var(--control-px-lg);
-  gap: 10px;
+  gap: var(--icon-gap-lg);
   font-size: var(--control-fs-lg);
   border-radius: var(--control-r-lg);
 }
@@ -4707,8 +4805,10 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   margin-inline-start: calc(-1 * var(--lead-air));
   translate: 0 calc(-1 * var(--lead-rise));
 }
-/* Icon buttons are square, same shape as the rest of the ruler (no round plates). */
+/* Icon buttons are square, same shape as the rest of the ruler (no round plates), and a crowded row never squeezes
+   one narrower than tall. */
 .ac-btn--icon {
+  flex-shrink: 0;
   width: var(--control-h-md);
   padding: 0;
 }
@@ -5174,15 +5274,20 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
  * tall as before and its first line runs through the buttons' middle.
  */
 .ac-toast {
-  --toast-line-pad: calc((var(--control-h-sm) - 20px) / 2);
+  --toast-button: var(--control-h-sm);
+  --toast-line-pad: calc((var(--toast-button) - 20px) / 2);
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px 12px 12px;
+  gap: var(--icon-gap);
+  padding: 12px;
 }
 @media (pointer: coarse) {
   .ac-toast {
-    --toast-line-pad: calc((var(--control-h-md) - 20px) / 2);
+    --toast-button: var(--control-h-md);
   }
+}
+/* The close's × stands as far from the right edge as the tone's icon from the left: it reaches out by its air. */
+.ac-toast > .ac-btn--icon:last-child {
+  margin-inline-end: calc((var(--control-icon-sm) - var(--toast-button)) / 2);
 }
 .ac-toast > :is(.ac-icon, .ac-toast__text) {
   margin-block: var(--toast-line-pad);
@@ -5870,12 +5975,13 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
  * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
  * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
- * 15.5px / 1.7 line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
+ * 15.5px / 1.7 line, minus half a 28px button (square, as every icon button). 84px wide, so the row's 96px left padding
+ * holds them at any width.
  */
 @media not ((hover: none) or (pointer: coarse)) {
   .ac-msg--own > .ac-msg__body > .ac-msg__actions,
   .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px);
+    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 14px);
     right: calc(100% + 2px);
     flex-direction: row-reverse;
     padding: 0;
@@ -5886,8 +5992,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm {
     min-width: 28px;
     width: 28px;
-    height: 30px;
-    border-radius: 15px;
+    height: 28px;
+    border-radius: 14px;
     color: var(--faint);
   }
   .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm:is(:hover, [aria-expanded="true"]) {
@@ -7854,24 +7960,7 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
   color: var(--muted);
   font-size: 14px;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .ac-palette[data-state="open"] {
-    animation: ac-palette-in 0.22s var(--spring) both;
-  }
-  .ac-palette__scrim[data-state="open"] {
-    animation: ac-fade-in 160ms ease-out;
-  }
-}
-@keyframes ac-palette-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%);
-  }
-}
+/* No entrance: ⌘K opens it many times a day, from the keyboard; it is there at once. */
 /* Pending: the pixel orbit alone (a square in the round tick would poke out). */
 /*
  * The tools of one reply (ToolBlock): a card in one line while it works (the apps' logos, what it
@@ -9285,6 +9374,16 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     .ac-details[data-state="open"] {
       animation-name: ac-sheet-up;
     }
+    .ac-dialog[data-state="closed"],
+    .ac-details[data-state="closed"] {
+      animation-name: ac-sheet-down;
+    }
+  }
+}
+@keyframes ac-sheet-down {
+  to {
+    opacity: 0;
+    transform: translateY(24px);
   }
 }
 @keyframes ac-sheet-up {
@@ -10250,34 +10349,35 @@ html:not([data-pointer]) .ac-msg__note:focus-visible .ac-msg__note-tip {
 }
 @media (prefers-reduced-motion: no-preference) {
   .ac-mo__scrim {
-    animation: ac-mo-fade 0.45s var(--out) both;
+    animation: ac-mo-fade var(--dur-panel) var(--out) both;
   }
   .ac-mo__scrim[data-state="closed"] {
-    animation: ac-mo-fade 0.25s var(--out) reverse both;
+    animation: ac-mo-fade var(--dur-base) var(--out) reverse both;
   }
   .ac-mo[data-state="closed"] {
-    animation: ac-mo-fade 0.25s var(--out) reverse both;
+    animation: ac-mo-fade var(--dur-base) var(--out) reverse both;
   }
   .ac-mo__backdrop {
     animation: ac-mo-fade 0.9s var(--out) 0.15s both;
   }
+  /* Rows rise in as a list's do: short, and never hidden long enough to wait for. */
   .ac-mo__item {
-    animation: ac-mo-in 0.5s var(--out) both;
+    animation: ac-mo-in var(--dur-base) var(--out) both;
   }
   .ac-mo__item:nth-child(2) {
-    animation-delay: 0.14s;
+    animation-delay: 20ms;
   }
   .ac-mo__item:nth-child(3) {
-    animation-delay: 0.18s;
+    animation-delay: 40ms;
   }
   .ac-mo__item:nth-child(4) {
-    animation-delay: 0.22s;
+    animation-delay: 60ms;
   }
   .ac-mo__item:nth-child(5) {
-    animation-delay: 0.26s;
+    animation-delay: 80ms;
   }
   .ac-mo__item:nth-child(n + 6) {
-    animation-delay: 0.3s;
+    animation-delay: 100ms;
   }
 }
 @media (max-width: 720px) {

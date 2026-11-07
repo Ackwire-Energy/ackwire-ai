@@ -1,4 +1,4 @@
-import { motion as motionCurves, radius as radii, type ShadowLayer } from "@agenteschat/tokens";
+import { durations, motion as motionCurves, radius as radii, type ShadowLayer } from "@agenteschat/tokens";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccessibilityInfo, Platform, useColorScheme } from "react-native";
 import { readValue, STORED, writeValue } from "@/lib/storage";
@@ -33,11 +33,15 @@ export const fonts = {
 
 const bezier = (c: readonly number[]) => c as unknown as [number, number, number, number];
 
-/** Motion: the token curves plus spring settings for Reanimated (the tokens' springy curve). */
+/**
+ * Motion: the token curves and durations (ms: `fast` presses, menus and exits, `base` dialogs, toasts and arrivals,
+ * `panel` a sheet's slide), plus spring settings for Reanimated (the tokens' springy curve).
+ */
 export const motion = {
   spring: bezier(motionCurves.spring),
   out: bezier(motionCurves.out),
   ios: bezier(motionCurves.ios),
+  ...durations,
   /** `withSpring` config close to cubic-bezier(.34, 1.4, .5, 1): a small overshoot. */
   press: { damping: 15, stiffness: 420, mass: 0.6 },
   pop: { damping: 13, stiffness: 260, mass: 0.7 },

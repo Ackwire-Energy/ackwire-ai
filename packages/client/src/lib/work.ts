@@ -5,6 +5,7 @@ import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TO
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
 import { capitalize, joinNames, lowerFirst, shortTarget } from "./format";
+import { workDuration } from "./long-work";
 import { MAIL_BRANDS } from "./mail";
 
 /**
@@ -307,10 +308,10 @@ export function foldLiveWork(work: LiveWork[]): LiveWork[] {
   });
 }
 
-/** "12 s", "3 min". */
+/** "12 s", "3 min", "21 h 55 min": past a minute, as people say it (`workDuration`). */
 export function formatDuration(t: TFunction, ms: number) {
   const s = Math.max(1, Math.round(ms / 1000));
-  return s < 60 ? t("chat.work.seconds", { n: s }) : t("chat.work.minutes", { n: Math.round(s / 60) });
+  return s < 60 ? t("chat.work.seconds", { n: s }) : workDuration(t, ms);
 }
 
 /** The pieces of the header: "4 passos", "himetrica e Drive", "12 s". */

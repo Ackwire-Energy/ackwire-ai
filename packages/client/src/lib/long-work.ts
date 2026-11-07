@@ -174,7 +174,10 @@ export function workPlanProgress(w: Pick<WorkView, "plan">) {
   return { done: w.plan.filter((p) => p.state === "done").length, total: w.plan.length };
 }
 
-/** The agent's status line on background work: "Trabalhando em: X · 20 min", "Em 2 trabalhos: A e B"… */
+/**
+ * The agent's status line on background work: "Trabalhando há 20 min: X", "Em 2 trabalhos: A e B"… The time leads, so
+ * a line cut to fit loses the end of the title, never the time.
+ */
 export function workStatusText(t: TFunction, line: AgentStatusLine, now = new Date()): string {
   const say = loose(t);
   const count = line.count ?? 1;
@@ -184,8 +187,11 @@ export function workStatusText(t: TFunction, line: AgentStatusLine, now = new Da
     return line.subject ? say(`${key}Titled`, { subject: line.subject }) : say(key);
   }
   if (count === 1) {
-    const head = line.subject ? say("work.status.one", { subject: line.subject }) : say("work.status.oneUntitled");
-    return duration ? `${head} · ${duration}` : head;
+    if (duration)
+      return line.subject
+        ? say("work.status.oneFor", { duration, subject: line.subject })
+        : say("work.status.oneUntitledFor", { duration });
+    return line.subject ? say("work.status.one", { subject: line.subject }) : say("work.status.oneUntitled");
   }
   if (count === 2 && line.subject && line.second)
     return say("work.status.two", { first: line.subject, second: line.second });

@@ -2,10 +2,13 @@
 <style>
   .box { border: 1px solid #000; width: 400px; margin: 8px; }
   .inline { display: flex; align-items: center; }
-  .dock { position: fixed; inset: 0; pointer-events: none; }
-  .dock > .thread-panel { position: absolute; width: 100px; animation: none; }
-  .dock > .bad-docked { top: 10px; right: 10px; bottom: 10px; }
-  .dock > .good-docked { top: 0; right: 0; bottom: 0; }
+  .float { pointer-events: none; }
+  .float > .thread-panel { position: fixed; width: 100px; animation: none; }
+  .float > .thread-panel__scrim { position: fixed; top: 0; right: 0; bottom: 0; }
+  .float > .thread-panel.bad-floating { top: 0; right: 0; bottom: 0; }
+  .float > .thread-panel__scrim.bad-floating { left: 300px; }
+  .float > .thread-panel.good-floating { top: 10px; right: 10px; bottom: 10px; }
+  .float > .thread-panel__scrim.good-floating { left: 0; }
 </style>
 <div class="box bad-edge inline" style="height: 40px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
 <div class="box good-edge inline" style="height: 60px; padding: 0 12px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
@@ -29,6 +32,13 @@
 <span class="ac-btn--icon bad-plate" style="display: inline-flex; width: 32px; height: 32px; align-items: flex-start"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span>
 <span class="ac-btn--icon good-plate" style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span>
 
+<div class="bad-sliver" style="width: 200px; height: 40px; overflow-y: auto"><div style="height: 42px">Quase cabe</div></div>
+<div class="good-sliver" style="width: 200px; height: 40px; overflow-y: auto"><div style="height: 40px">Cabe</div></div>
+<div class="good-sliver" style="width: 200px; height: 40px; overflow-y: auto"><div style="height: 120px">Rola de verdade</div></div>
+
+<div class="ac-popover bad-actions" style="position: relative; width: 240px; height: 80px; max-height: none; overflow-y: auto"><p style="flex: none; height: 70px; margin: 0">Lodi</p><div class="profile-card__actions"><span class="ac-btn ac-btn--primary">Mensagem</span></div></div>
+<div class="ac-popover good-actions" style="position: relative; width: 240px; height: 80px; max-height: none; overflow-y: auto"><p style="flex: none; height: 70px; margin: 0">Lodi</p><div class="profile-card__actions" style="position: sticky; bottom: 0"><span class="ac-btn ac-btn--primary">Mensagem</span></div></div>
+
 <div class="ac-form bad-stack" style="display: flex; flex-direction: column; gap: 16px; width: 200px"><div>Um</div><div style="margin-top: 12px">Dois</div></div>
 <div class="ac-form good-stack" style="display: flex; flex-direction: column; gap: 16px; width: 200px"><div>Um</div><div>Dois</div></div>
 
@@ -38,5 +48,17 @@
 <div style="width: 400px"><div class="ac-msg__text" style="background: #eee; padding: 8px">Uma bolha</div><div class="consult-pair bad-quiet" style="height: 26px">Lodi e Theo</div></div>
 <div style="width: 400px"><div class="ac-msg__text" style="background: #eee; padding: 8px">Uma bolha</div><div class="consult-pair good-quiet" style="height: 26px; margin-top: 16px">Lodi e Theo</div></div>
 
-<div class="dock"><aside class="thread-panel bad-docked">Uma conversa</aside></div>
-<div class="dock"><aside class="thread-panel good-docked">Outra conversa</aside></div>
+<div class="inline" style="gap: 10px; width: 400px"><span class="bad-touch">#2</span><div style="flex: 1; cursor: text; margin-left: -10px; padding-left: 10px">Subir app iOS</div></div>
+<div class="inline" style="gap: 8px; width: 400px"><span class="good-touch">#2</span><div style="flex: 1; cursor: text; padding-left: 8px">Subir app iOS</div></div>
+
+<div class="float"><div class="thread-panel__scrim bad-floating"></div><aside class="thread-panel bad-floating">Uma conversa</aside></div>
+<div class="float"><div class="thread-panel__scrim good-floating"></div><aside class="thread-panel good-floating">Outra conversa</aside></div>
+
+<div class="bad-inset" style="display: flex; align-items: center; gap: 8px; width: 360px; background: #eee; border-radius: 10px; padding: 7px 8px 7px 12px"><span style="display: grid; width: 16px"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span><span style="flex: 1">Não consegui chamar a Ivy</span><button type="button" style="border: 0; background: none; padding: 0; font: inherit">Deixar falar</button></div>
+<div class="good-inset" style="display: flex; align-items: center; gap: 8px; width: 360px; background: #eee; border-radius: 10px; padding: 7px 12px"><span style="display: grid; width: 16px"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span><span style="flex: 1">Não consegui chamar a Ivy</span><button type="button" style="border: 0; background: none; padding: 0; font: inherit">Deixar falar</button></div>
+
+<span class="ac-chip bad-icongap" style="display: inline-flex; align-items: center; gap: 14px; padding: 0 10px; border: 1px solid #000"><svg width="14" height="14"><path d="M0 0h14v14H0z"/></svg>Ivy</span>
+<span class="ac-chip good-icongap" style="display: inline-flex; align-items: center; gap: var(--icon-gap); padding: 0 10px; border: 1px solid #000"><svg width="14" height="14"><path d="M0 0h14v14H0z"/></svg>Ivy</span>
+
+<button type="button" class="bad-square" aria-label="Fechar" style="display: inline-flex; box-sizing: border-box; width: 40px; height: 32px; padding: 0; align-items: center; justify-content: center"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></button>
+<button type="button" class="good-square" aria-label="Fechar" style="display: inline-flex; box-sizing: border-box; width: 32px; height: 32px; padding: 0; align-items: center; justify-content: center"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></button>

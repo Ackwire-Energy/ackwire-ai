@@ -8335,6 +8335,12 @@ export const en = {
       "For people not on the list, he answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after him.",
     consultableHint_female:
       "For people not on the list, she answers only the agent that asked, never them directly. Sensitive actions still need approval from the people who look after her.",
+    /** Under a narrowed audience: whether it holds for other agents too (`agentsReach`). */
+    agents: {
+      consulted: "This covers people only. Other agents can still consult {{name}} for anyone not on the list.",
+      blocked: "This covers agents too. No other agent can reach {{name}} for anyone not on the list.",
+      plan: "This covers agents too. {{name}} uses its owner's AI plan, which serves only its owner, so no other agent can reach {{name}} for anyone not on the list.",
+    },
     mode: { everyone: "Everyone in the workspace", people: "Only some people or roles", owner: "Only the owner" },
     modeText: {
       everyone: "Anyone in the workspace can call {{name}}.",
@@ -12783,6 +12789,9 @@ export const en = {
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
+      /** With how long: the time leads, so a narrow line cuts the title, never the time. */
+      oneFor: "Working for {{duration}}: {{subject}}",
+      oneUntitledFor: "Working for {{duration}} in the background",
       two: "On 2 jobs: {{first}} and {{second}}",
       many: "On {{count}} jobs: {{subject}} and {{more}} more",
       manyUntitled: "On {{count}} jobs in the background",
@@ -12933,6 +12942,14 @@ export const en = {
       followUpCancel: "Cancel",
       other: "Notice for {{name}}",
       wakeSkipped: "{{name}}'s mention didn't reach {{agents}}",
+      /** The same, on an older line that didn't keep whom. */
+      wakeSkippedAnon: "{{name}}'s mention didn't reach another agent",
+      /** What "Show" opens under it: why, for people (only some people may call those agents), and the way out. */
+      wakeSkippedAudience:
+        "Only some people may call {{agents}}, and this work of {{name}} didn't come from one of them. Someone who may call {{agents}} can pass the request on.",
+      /** The same when the agent's own settings don't let it call them. */
+      wakeSkippedCallable:
+        "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page.",
       show: "Show",
       hide: "Hide",
       talker: "while working",
@@ -12988,7 +13005,6 @@ export const en = {
       autoApprovedNobody: "Approved automatically",
       error: "error",
       seconds: "{{n}} s",
-      minutes: "{{n}} min",
       step: {
         schedulingReminder: "Scheduled a reminder",
         creatingRoutine: "Created a routine",

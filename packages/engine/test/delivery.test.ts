@@ -484,3 +484,79 @@ describe("a run held by a decision takes nothing new: the agent stays responsive
     expect(all[1]?.triggerMessageId).toBe(more.id);
   });
 });
+
+describe("a reply in a thread joins only the run of the agent it is for", () => {
+  /**
+   * Dev answers the person in a thread and names Theo there, so Theo works in that thread on a run Dev's message
+   * started. The person then writes in the thread.
+   */
+  const devNamedTheo = async () => {
+    f = await setup();
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo" },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: theo.id });
+    const root = await post("@dev olha essa tela");
+    const [devRun] = await runs();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", finishedAt: new Date() })
+      .where(eq(schema.agentRuns.id, devRun?.id ?? ""));
+    const devReply = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: root.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+      body: "Era essa tela. O @theo pode seguir daqui.",
+    });
+    const [theoRun] = await f.db.transaction((tx) => createAgentRuns(tx, devReply, [theo.id], "mention"));
+    if (!theoRun) throw new Error("no run");
+    const reply = (body: string, replyTo?: string) =>
+      postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+        body,
+        threadId: root.id,
+        ...(replyTo ? { replyTo } : {}),
+      });
+    return { theo, root, devReply, theoRun, reply };
+  };
+
+  test("a quote of the agent that spoke goes to that agent, not into the run it named", async () => {
+    const { devReply, theoRun, reply } = await devNamedTheo();
+    const asked = await reply("e por que não achou antes?", devReply.id);
+    expect((await messageById(asked.id))?.meta.steeredRunIds).toBeUndefined();
+    expect((await runById(theoRun.id))?.pendingMessageIds).toEqual([]);
+  });
+
+  test("unaddressed, it is for the agent that spoke last, not the one it named", async () => {
+    const { theoRun, reply } = await devNamedTheo();
+    const asked = await reply("e por que não achou antes?");
+    expect((await messageById(asked.id))?.meta.steeredRunIds).toBeUndefined();
+    expect((await runById(theoRun.id))?.pendingMessageIds).toEqual([]);
+  });
+
+  test("a mention of the other agent never feeds the run in progress", async () => {
+    const { theoRun, reply } = await devNamedTheo();
+    const asked = await reply("@dev e por que não achou antes?");
+    expect((await runById(theoRun.id))?.pendingMessageIds).toEqual([]);
+    const devRuns = (await runs()).filter((r) => r.agentId === f.agent.id && r.triggerMessageId === asked.id);
+    expect(devRuns).toHaveLength(1);
+  });
+
+  test("once the named agent speaks, or when quoted, the person's reply joins its run", async () => {
+    const { theo, root, theoRun, reply } = await devNamedTheo();
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: root.id,
+      author: { type: "agent", agentId: theo.id, runId: theoRun.id, hop: 2 },
+      body: "Vou gerar o build agora.",
+    });
+    const follow = await reply("usa a branch dev");
+    const quote = await reply("e assina com a chave nova", said.id);
+    expect((await runById(theoRun.id))?.pendingMessageIds).toEqual([follow.id, quote.id]);
+  });
+});

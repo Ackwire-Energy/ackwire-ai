@@ -1210,7 +1210,8 @@ describe("automatic lines (notices) and fast replies", () => {
       icon: "clock",
       key: "chat.notice.routineHandoff",
       values: { routine: "Sentry diário" },
-      text: "3 erros novos",
+      detail: { content: "3 erros novos" },
+      pending: false,
     });
     const fromOnly = eventLineOf(
       agentMsg("n2", { notice: { kind: "routine_handoff", text: "x", from: "Rotina «Bom dia»" } }),
@@ -1240,7 +1241,12 @@ describe("automatic lines (notices) and fast replies", () => {
       }),
       names,
     );
-    expect(line).toMatchObject({ key: "chat.notice.wakeSkipped", values: { name: "Ada", agents: "Infra, zed" } });
+    expect(line).toMatchObject({
+      key: "chat.notice.wakeSkipped",
+      values: { name: "Ada", agents: "Infra, zed" },
+      // What it opens is people's words for why, never the line written for the agent.
+      detail: { words: { key: "chat.notice.wakeSkippedAudience", values: { name: "Ada", agents: "Infra, zed" } } },
+    });
   });
 
   test("an agent's follow-up: when it will be back and for what (Cancel while it is to come), then the line that woke it", () => {
@@ -1258,7 +1264,8 @@ describe("automatic lines (notices) and fast replies", () => {
       icon: "clock",
       key: "chat.notice.followUp",
       values: { name: "Ada", about: "ver o CI", time: "12:00", day: "" },
-      text: "Check CI run 42",
+      // Its note to itself is the agent's: nothing to open.
+      detail: null,
       pending: true,
     });
     const canceled = eventLineOf(
@@ -1276,7 +1283,35 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(woke).toMatchObject({ key: "chat.notice.followUpWake", values: { name: "Ada", about: "ver o CI" } });
   });
 
-  test("a wait's result names the agent that waited; the message's own text wins over the notice's", () => {
+  test("as on the web, a follow-up that came leaves the conversation once the agent's turn is over", () => {
+    const refs = { runId: "r1", at: "x", about: "ver o CI" };
+    const at = (minute: number) => new Date(Date.UTC(2026, 10, 6, 20, minute)).toISOString();
+    const list = [
+      agentMsg(
+        "set",
+        { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "done" } } },
+        { createdAt: at(0) },
+      ),
+      agentMsg(
+        "woke",
+        { notice: { kind: "follow_up", text: "x", refs: { ...refs, wake: "1" } } },
+        { createdAt: at(20) },
+      ),
+    ];
+    const ids = (rows: ReturnType<typeof buildRows>) =>
+      rows.flatMap((r) => (r.kind === "message" ? [r.message.id] : []));
+    // At work: the line that woke it stays.
+    expect(ids(buildRows(list, undefined, new Set(["ada"])))).toEqual(["woke"]);
+    const reply = message({
+      id: "reply",
+      author: { type: "agent", id: "ada" },
+      body: "O CI passou.",
+      createdAt: at(21),
+    });
+    expect(ids(buildRows([...list, reply]))).toEqual(["reply"]);
+  });
+
+  test("a wait's result names the agent that waited, and opens nothing written for the agent", () => {
     const line = eventLineOf(
       agentMsg("n1", { notice: { kind: "wait_result", text: "notice text" } }, { body: "  o deploy terminou  " }),
       names,
@@ -1285,7 +1320,7 @@ describe("automatic lines (notices) and fast replies", () => {
       icon: "check",
       key: "chat.notice.waitResult",
       values: { name: "Ada" },
-      text: "o deploy terminou",
+      detail: null,
     });
     expect(eventLineOf(agentMsg("n2", { notice: { kind: "new_kind", text: "x" } }), names)).toMatchObject({
       icon: "bell",

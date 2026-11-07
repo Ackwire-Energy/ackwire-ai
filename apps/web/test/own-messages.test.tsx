@@ -181,12 +181,12 @@ describe("own message styles", () => {
     ]) {
       const bar = r.get(sel) ?? "";
       expect(bar).toContain("right: calc(100% + 2px)");
-      expect(bar).toContain("top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px)");
+      expect(bar).toContain("top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 14px)");
       expect(bar).toMatch(/background: transparent;\s*box-shadow: none;\s*transform: none;/);
       expect(bar).not.toContain("top: 0");
     }
-    // Three 28px icons fit the row's 96px left padding beside a full-width bubble.
-    expect(mouse).toMatch(/\.ac-msg__actions \.ac-btn--sm \{\s*min-width: 28px;\s*width: 28px;\s*height: 30px;/);
+    // Three 28px square icons fit the row's 96px left padding beside a full-width bubble.
+    expect(mouse).toMatch(/\.ac-msg__actions \.ac-btn--sm \{\s*min-width: 28px;\s*width: 28px;\s*height: 28px;/);
     // The bubble's padding and line, which the bar's top is computed from.
     expect(r.get(".ac-msg--own .ac-msg__text")).toContain("padding: 7px 14px");
     expect(r.get(".ac-msg__text")).toMatch(/font-size: 15\.5px;\s*line-height: 1\.7/);

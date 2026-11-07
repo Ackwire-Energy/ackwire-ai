@@ -5,10 +5,10 @@ import {
   endedState,
   groupTasks,
   hiddenCount,
+  taskPlace,
   taskState,
   taskTitle,
   taskWaitWords,
-  taskWhere,
 } from "@agenteschat/client/lib/task-manager";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -533,9 +533,8 @@ function EndedRow({ task, divider, meId }: { task: EndedTask; divider: boolean; 
   const dir = useDirectory();
   const when = useWhen();
   const title = taskTitle(t, task);
-  const where = taskWhere(t, task);
   const agentName = dir.nameOf({ type: "agent", id: task.agentId });
-  const line = [agentName, where === title ? null : where].filter(Boolean).join(" · ");
+  const line = [agentName, taskPlace(t, task)].filter(Boolean).join(" · ");
   const how = endedText(t, task, meId);
   const state = endedState(task);
   return (

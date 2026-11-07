@@ -6,10 +6,14 @@
   const EDGE_MIN = 8;
   /** A quiet line (the agents' pair, a date, "Novas") and a bubble: closer than this reads as touching. */
   const QUIET_MIN = 4;
+  /** The kit's smallest gap (`--space-1`): two things side by side in a row closer than this touch. */
+  const GAP_MIN = 4;
+  /** Taller than this is a layout's column or a card, not an inline item. */
+  const INLINE_MAX = 120;
   const PAD_DIFF = 2;
   const PLATE_DIFF = 1;
   const GAP_DIFF = 1.5;
-  /** The narrowest window a side pane docks in instead of covering the screen (threads.css, 861px). */
+  /** The narrowest window a side pane floats in instead of covering the screen (`.thread-panel` in threads.css). */
   const DESKTOP_MIN = 861;
 
   const sig = (el) => {
@@ -137,6 +141,73 @@
     return false;
   };
 
+  /** The kit's gaps between an icon and the words it leads, by the control's size (`--icon-gap`, `-sm`, `-lg`). */
+  const iconGaps = () =>
+    ["--icon-gap", "--icon-gap-sm", "--icon-gap-lg"]
+      .map((t) => parseFloat(style(document.documentElement).getPropertyValue(t)))
+      .filter((v) => v > 0);
+  /** Words the eye reads: a text node laid out wider than a pixel (a visually hidden label is one pixel wide). */
+  const visibleText = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim() || !seen(n.parentElement)) continue;
+      if ([...textRange(n).getClientRects()].some((r) => r.width > 1 && r.height > 1)) return true;
+    }
+    return false;
+  };
+  /** Words a button has, shown or hidden at this width, but not a label only a screen reader reads (one pixel, clipped). */
+  const hasWords = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const box = n.parentElement;
+      const r = box.getBoundingClientRect();
+      const clipped = r.width <= 1 && r.height <= 1 && style(box).position === "absolute";
+      if (!clipped && !box.closest(".sr-only,.ac-sr-only,.visually-hidden")) return true;
+    }
+    return false;
+  };
+  /**
+   * The glyph a flow child is, if it is only one: an `svg`, or a box around one and nothing else that shows. A control
+   * (a button, a link) is its own thing, and an icon on a tile of its own (a surface: a connector's tile, a face) is
+   * that tile.
+   */
+  const glyphOf = (el) => {
+    if (el.tagName.toLowerCase() === "svg") return el;
+    if (el.matches("button,a,[role=button]") || visibleText(el) || hasSurface(style(el))) return null;
+    const svgs = [...el.querySelectorAll("svg")].filter(seen);
+    if (svgs.length !== 1) return null;
+    for (let p = svgs[0].parentElement; p && p !== el; p = p.parentElement) if (hasSurface(style(p))) return null;
+    return svgs[0];
+  };
+  /** Where what shows of a flow child starts and ends: its glyph, its plate, or its words. */
+  const inkOf = (el) => {
+    const glyph = glyphOf(el);
+    if (glyph) return glyph.getBoundingClientRect();
+    if (hasSurface(style(el))) return el.getBoundingClientRect();
+    return contentRect(el);
+  };
+  /** Pills, chips, tokens and buttons with words: the `pad` rule's family. */
+  const PILLS =
+    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
+  /**
+   * A card: a row with a surface of its own that starts with an icon and ends with what can be done about it (a button,
+   * a link) or another icon. Pills are the `pad` rule's.
+   */
+  const cards = () =>
+    [...document.querySelectorAll("div,li,section,article,aside")].filter((el) => {
+      // A list's row or an option has no corners of its own, a field is a field.
+      if (!seen(el) || el.matches(`${PILLS},[role=option]`) || el.querySelector("input,textarea,[contenteditable]"))
+        return false;
+      const s = style(el);
+      if (!s.display.includes("flex") || s.flexDirection.startsWith("column") || !hasSurface(s)) return false;
+      if (!(parseFloat(s.borderTopLeftRadius) > 0 && parseFloat(s.borderBottomRightRadius) > 0)) return false;
+      const kids = flow(el);
+      if (kids.length < 3) return false;
+      const last = kids[kids.length - 1];
+      return Boolean(glyphOf(kids[0])) && (last.matches("button,a,[role=button]") || Boolean(glyphOf(last)));
+    });
+
   const SIDES = ["Top", "Bottom", "Left", "Right"];
   const ROW_NAME = /(^|\s|[_-])(row|card|item)(\s|$|--)/;
   /**
@@ -200,9 +271,7 @@
       }
     },
     pad(out) {
-      const q =
-        ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
-      for (const el of document.querySelectorAll(q)) {
+      for (const el of document.querySelectorAll(PILLS)) {
         if (!seen(el)) continue;
         const s = style(el);
         if (!hasSurface(s) || s.display === "inline") continue;
@@ -227,6 +296,90 @@
             left: +left.toFixed(1),
             right: +right.toFixed(1),
             text: words(el),
+          });
+      }
+    },
+    /** A card (`cards`): its first icon's glyph as far from its start as what ends it is from its end. */
+    inset(out) {
+      for (const el of cards()) {
+        const kids = flow(el);
+        const first = inkOf(kids[0]);
+        const last = inkOf(kids[kids.length - 1]);
+        if (!first || !last) continue;
+        const b = el.getBoundingClientRect();
+        const s = style(el);
+        const left = first.left - b.left - parseFloat(s.borderLeftWidth);
+        const right = b.right - parseFloat(s.borderRightWidth) - last.right;
+        if (left < 0 || right < 0) continue;
+        if (Math.abs(left - right) > PAD_DIFF)
+          out.push({
+            rule: "inset",
+            node: el,
+            el: sig(el),
+            left: +left.toFixed(1),
+            right: +right.toFixed(1),
+            text: words(el),
+          });
+      }
+    },
+    /** In a pill or a card, the words an icon leads stand one of the kit's icon gaps from its glyph. */
+    icongap(out) {
+      const gaps = iconGaps();
+      const want = gaps.join(" or ");
+      const boxes = new Set([...document.querySelectorAll(PILLS)].filter(seen));
+      for (const card of cards()) boxes.add(card);
+      for (const box of boxes) {
+        // An inline pill flows with its line's words and spaces, as the `pad` rule leaves it.
+        if (style(box).display === "inline") continue;
+        // A pill's sentence sits in a part of its frame (`__main`): its row is the one the icon is in.
+        const rows = [box, ...box.querySelectorAll(":scope > [class*='__main']")];
+        for (const row of rows) {
+          // Words can be the row's own text, not a box of their own: its child nodes, not only its laid-out boxes.
+          const nodes = [...row.childNodes].filter((n) =>
+            n.nodeType === 3 ? n.textContent.trim() : n.nodeType === 1 && flow(row).includes(n),
+          );
+          const at = nodes.findIndex((n) => n.nodeType === 1 && glyphOf(n));
+          const next = at >= 0 ? nodes[at + 1] : undefined;
+          // Words, not another glyph or a count on its own plate.
+          if (!next || (next.nodeType === 1 && (glyphOf(next) || !visibleText(next) || hasSurface(style(next)))))
+            continue;
+          const ink = next.nodeType === 3 ? textRange(next).getClientRects()[0] : contentRect(next);
+          if (!ink) continue;
+          const gap = ink.left - glyphOf(nodes[at]).getBoundingClientRect().right;
+          if (!gaps.some((g) => Math.abs(gap - g) <= 1))
+            out.push({ rule: "icongap", node: row, el: sig(row), px: +gap.toFixed(1), want, text: words(row) });
+        }
+      }
+    },
+    /**
+     * A button that is only an icon is a square: its box, or the plate it shows on hover and focus when that is drawn
+     * apart from its box (a `::before` set in from its sides, as `.ac-btn--glyph` does).
+     */
+    square(out) {
+      // A select's trigger and a segmented control's part are sized by the control they belong to.
+      const parts = "[role=combobox],[aria-haspopup=listbox],.ac-select__trigger,.ac-seg__item,[role=tab],[role=radio]";
+      for (const el of document.querySelectorAll("button,a.ac-btn,[role=button]")) {
+        if (!seen(el) || el.matches(parts) || hasWords(el)) continue;
+        // One glyph: two side by side (a face and a +) are a pill of their own.
+        if ([...el.querySelectorAll("svg")].filter(seen).length !== 1) continue;
+        const b = el.getBoundingClientRect();
+        const before = getComputedStyle(el, "::before");
+        const plate =
+          before.content !== "none" && before.position === "absolute"
+            ? {
+                width: b.width - (parseFloat(before.left) || 0) - (parseFloat(before.right) || 0),
+                height: b.height - (parseFloat(before.top) || 0) - (parseFloat(before.bottom) || 0),
+              }
+            : b;
+        const r = { width: plate.width, height: plate.height };
+        if (Math.abs(r.width - r.height) > 0.5)
+          out.push({
+            rule: "square",
+            node: el,
+            el: sig(el),
+            box: placeOf(el),
+            w: +r.width.toFixed(1),
+            h: +r.height.toFixed(1),
           });
       }
     },
@@ -360,21 +513,30 @@
     },
     /**
      * A side pane (`.thread-panel`: a thread, search, an agent's page, a task's conversation, Auditoria's details) on a
-     * desktop window: flush with the top of the area it docks in (under a channel's header, the area's top is the
-     * header's foot) and with the window's right and bottom edges, no gap. Phones take the whole screen (another rule).
+     * desktop window floats 10px in from the window's top, right and bottom, never touching its left, over a scrim
+     * (the element right before it) that covers the whole window, the sidebar included. Phones take the whole screen.
      */
-    docked(out) {
+    floating(out) {
       if (innerWidth < DESKTOP_MIN) return;
+      const GAP = 10;
       // An inline position is a test's own stand-in for a narrow window, not the app's layout.
       for (const pane of document.querySelectorAll(".thread-panel:not([style])")) {
         if (!seen(pane)) continue;
         const a = pane.getBoundingClientRect();
-        const area = pane.parentElement.getBoundingClientRect();
-        const gaps = { Top: a.top - area.top, Right: innerWidth - a.right, Bottom: innerHeight - a.bottom };
+        const gaps = { Top: a.top - GAP, Right: innerWidth - a.right - GAP, Bottom: innerHeight - a.bottom - GAP };
+        if (a.left < GAP) gaps.Left = a.left - GAP;
+        const before = pane.previousElementSibling;
+        const scrim = before?.matches(".thread-panel__scrim") ? before : null;
+        const s = scrim?.getBoundingClientRect();
+        const off = s
+          ? Math.abs(s.left) + Math.abs(s.top) + Math.abs(innerWidth - s.right) + Math.abs(innerHeight - s.bottom)
+          : Number.POSITIVE_INFINITY;
+        if (off > 2)
+          out.push({ rule: "floating", node: scrim ?? pane, el: sig(scrim ?? pane), box: sig(pane), side: "Scrim" });
         for (const [side, px] of Object.entries(gaps)) {
           if (Math.abs(px) > 0.5)
             out.push({
-              rule: "docked",
+              rule: "floating",
               node: pane,
               el: sig(pane),
               box: sig(pane.parentElement),
@@ -395,6 +557,50 @@
         out.push({ rule: "nameless", node: head, el: sig(head), box: placeOf(head), text: words(time) });
       }
     },
+    /**
+     * Two things side by side in a row, words next to a field, an icon, a pill or a button: at least the kit's smallest
+     * gap between them. A box that shows a plate under the pointer (an in-place title, a link button) counts as its
+     * whole box, the plate's, even at rest. A field's own affixes and a segmented control are drawn as one.
+     */
+    touch(out) {
+      const control = (el) => {
+        if (el.matches("button,input,textarea,select,svg,img,canvas,[role=button],[class*='pill'],[class*='chip']"))
+          return true;
+        const s = style(el);
+        if (hasSurface(s)) return true;
+        const parent = el.parentElement;
+        return ["pointer", "text"].includes(s.cursor) && (!parent || style(parent).cursor !== s.cursor);
+      };
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest("svg,.ac-input-affix,.ac-seg")) continue;
+        const s = style(row);
+        if (!s.display.includes("flex") || s.flexDirection.startsWith("column")) continue;
+        const kids = flow(row);
+        for (let i = 1; i < kids.length; i++) {
+          const [a, b] = [kids[i - 1], kids[i]];
+          // Words on one side, a control on the other: two controls side by side (a toolbar's ghost buttons, a pill's
+          // actions, faces in a stack) are drawn as one group.
+          const ca = control(a);
+          if (ca === control(b) || !((ca ? b : a).textContent ?? "").trim()) continue;
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          // Columns of a layout (a list beside a pane) are no inline items.
+          if (Math.max(ra.height, rb.height) > INLINE_MAX) continue;
+          // On different lines of a wrapping row: not side by side.
+          if (Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top) <= 0) continue;
+          const gap = Math.max(rb.left - ra.right, ra.left - rb.right);
+          if (gap < GAP_MIN - 0.25)
+            out.push({
+              rule: "touch",
+              node: b,
+              el: `${sig(a)} + ${sig(b)}`,
+              box: sig(row),
+              px: +gap.toFixed(1),
+              text: words(b),
+            });
+        }
+      }
+    },
     /** A quiet line across the conversation sitting on a bubble above or under it, with no gap between them. */
     quiet(out) {
       const bubbles = [...document.querySelectorAll(".ac-msg__text")].filter(
@@ -412,12 +618,50 @@
         }
       }
     },
+    /**
+     * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
+     * nudge it) over content that, to the eye, fits.
+     */
+    sliver(out) {
+      const SLIVER_MAX = 4;
+      for (const el of document.body.querySelectorAll("*")) {
+        const y = style(el).overflowY;
+        if ((y !== "auto" && y !== "scroll") || el.matches("textarea,input,select") || !seen(el)) continue;
+        const px = el.scrollHeight - el.clientHeight;
+        if (px > 0 && px < SLIVER_MAX) out.push({ rule: "sliver", node: el, el: sig(el), px });
+      }
+    },
+    /**
+     * A popover's own actions (its primary button, its actions' row, the field at its foot) cut by its box: scrolled out
+     * of sight instead of pinned to its foot. The box, not the window: where a captured screen puts it isn't Radix's.
+     */
+    actions(out) {
+      for (const pop of document.querySelectorAll(".ac-popover")) {
+        if (!seen(pop)) continue;
+        const p = pop.getBoundingClientRect();
+        for (const el of pop.querySelectorAll(
+          ".ac-btn--primary,[class*='actions'] > .ac-btn,[class*='__foot'] input",
+        )) {
+          if (!seen(el)) continue;
+          const r = el.getBoundingClientRect();
+          const px = Math.max(r.bottom - p.bottom, p.top - r.top);
+          if (px > 0.5)
+            out.push({ rule: "actions", node: el, el: sig(el), box: sig(pop), px: +px.toFixed(1), text: words(el) });
+        }
+      }
+    },
   };
 
   window.geometry = {
     /** Puts a captured screen in the page and waits for the type its words use. */
     async load(html) {
       document.body.innerHTML = html;
+      // The tests' DOM measures nothing, so a captured popover says it has no room (-24px) and its cap folds it to
+      // nothing: it gets the window's, as Radix gives a card on a side with the room.
+      for (const w of document.querySelectorAll("[data-radix-popper-content-wrapper]")) {
+        if (parseFloat(w.style.getPropertyValue("--radix-popper-available-height")) <= 0)
+          w.style.setProperty("--radix-popper-available-height", "calc(100vh - 24px)");
+      }
       await document.fonts.ready;
     },
     detect() {

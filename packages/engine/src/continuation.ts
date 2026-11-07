@@ -1,7 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
-import { getAgentCached } from "./agents";
+import { type Agent, getAgentCached } from "./agents";
+import { answersOthers, audienceOf } from "./audience";
 import { accountablePerson, runAuthority } from "./authority";
+import { isComputerBrain } from "./brains/types";
 import { endsAsking } from "./brakes";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
@@ -9,10 +11,12 @@ import { isAgentOnlyDm } from "./dms";
 import { decisionNudge, FOLLOW_THROUGH_NUDGE, FOLLOW_THROUGH_NUDGE_DM, MISSION_ASK_NUDGE } from "./follow-through";
 import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
+import type { NoticeKind } from "./notices";
 import { notifyRunFailed } from "./notification-producers";
 import { ANSWER_NUDGE } from "./reply-policy";
 import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
+import { runStretchOf } from "./stretch";
 import { HAND_OVER_STEP } from "./tools/directory";
 import { neutralizeUntrusted, untrustedBlock } from "./untrusted";
 
@@ -50,7 +54,7 @@ export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "sec
  */
 export function untriedNudge(means: string[], tried: string[]) {
   const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
-  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. ${SAFETY_FINAL} ${HAND_OVER_STEP} If no way is left at all, say what you tried and the one step a person must do.`;
+  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. Missing an access or a login? Look in the workspace first (your memory, search_context for who signed in or holds it) and ask the teammate who has it. ${SAFETY_FINAL} ${HAND_OVER_STEP} If no way is left at all, say what you tried and the one step a person must do.`;
 }
 
 /**
@@ -173,9 +177,9 @@ export async function continuationVerdict(
           instructions:
             "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
           criteria: {
-            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision) and it already asked them for it (with its request: `tried` shows browser_ask_person, desktop_ask_person, request_secret, request_approval, request_permission or ask_user; for a decision, one direct question) or `means` has no way to hand it to them. A reply that says it can't, stops, or only offers in passing, because a step needs the person (a sign-in, a QR code, a code, a captcha, an approval, a permission) is not done while `means` can hand that step to them: that is untried. When the request left open how to do it, one direct question offering to start a way it names, with the step the person will do ('I can do it in my browser: you'll scan a QR code. Shall I start?'), is done. A refusal because the account or the data is someone else's, not the asking person's own, is done. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision) and it already asked them for it (with its request: `tried` shows browser_ask_person, desktop_ask_person, request_secret, request_approval, request_permission or ask_user; for a decision, one direct question) or `means` has no way to hand it to them. A reply that says it can't, stops, or only offers in passing, because a step needs the person (a sign-in, a QR code, a code, a captcha, an approval, a permission) is not done while `means` can hand that step to them: that is untried. When the request left open how to do it, one direct question offering to start a way it names, with the step the person will do ('I can do it in my browser: you'll scan a QR code. Shall I start?'), is done. A refusal because the account or the data is someone else's, not the asking person's own, is done. Saying it or the team has no access, or asking people for one, without having looked in the workspace (search_context, find_agent, ask_agent or tell_agent in `tried`) is not done: that is untried. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
             untried:
-              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. Also when it said it couldn't, stopped, or only offered in passing ('one option would be…', 'only if you want'), because a step needs the person (a sign-in, a QR code scanned with their phone, a code sent to them, a captcha, an approval, a permission, their consent to their own account) instead of doing everything up to it and handing that step over, while `means` can hand it over: a step that needs the person is never a blocker. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
+              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. Also when it said it or the team lacks an access, a login or an account, or asked people for one or who has it, without first looking in the workspace (`tried` has no search_context, find_agent, ask_agent or tell_agent): a teammate or an earlier conversation may hold it. Also when it said it couldn't, stopped, or only offered in passing ('one option would be…', 'only if you want'), because a step needs the person (a sign-in, a QR code scanned with their phone, a code sent to them, a captcha, an approval, a permission, their consent to their own account) instead of doing everything up to it and handing that step over, while `means` can hand it over: a step that needs the person is never a blocker. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
             continue:
               "It said it will do more itself (next, later, after a build), or stopped midway, and nothing it set up brings it back. A reply that asks the person whether to do something ('want me to…?', 'quer que eu faça?') is not this: it waits for their answer. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
             ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need, or `request` asked what is missing or left to do and the list answers it: that is done. A way to do the request itself, even worded 'only if you want', is never optional extra work.",
@@ -220,8 +224,8 @@ export async function continuationVerdict(
 }
 
 /** What a finished turn taught, as the turn-end judgment reads it (ADR 0120): `none` starts no learning. */
-export type LearnSignal = "none" | "method" | "correction" | "fact";
-const LEARN_SIGNALS: readonly LearnSignal[] = ["none", "method", "correction", "fact"];
+export type LearnSignal = "none" | "method" | "correction" | "fact" | "access";
+const LEARN_SIGNALS: readonly LearnSignal[] = ["none", "method", "correction", "fact", "access"];
 
 const LEARN_QUESTION = {
   type: "choice" as const,
@@ -233,6 +237,8 @@ const LEARN_QUESTION = {
     correction:
       "A person corrected it or said how they want things done from now on ('always…', 'from now on…', 'don't… again').",
     fact: "A person's message or a tool result gave a lasting fact about the company, its people or its systems.",
+    access:
+      "Someone in the team got, lost or was named for an access: the agent or another signed in to a service, got a login, a key, a connector or a mailbox, or a person said who handles a service.",
     none: "Anything else: a one-off request, a passing error, a plain answer or a story.",
   },
 };
@@ -477,20 +483,30 @@ export async function reportRunFailure(
       .where(and(eq(schema.agentRuns.orgId, run.orgId), eq(schema.agentRuns.id, trigger.runId)));
     const agent = await getAgentCached(deps.db, run.orgId, run.agentId);
     if (!sender || sender.background || !agent) return;
+    // Its mention of the same agent failing again in the stretch is written, not woken for: a run that names it
+    // each time would wake itself each time.
+    const again = (await stretchNoticeRefs(deps.db, sender, "consult_reply")).some(
+      (r) => r.via === "mention" && r.agentId === run.agentId,
+    );
     const delivered = await deps.db.transaction((tx) =>
-      deliverNoticeToRun(tx, sender, {
-        kind: "consult_reply",
-        from: `@${agent.handle}`,
-        text: `It couldn't finish what your mention handed it (${reason.split(":")[0]}).`,
-        refs: {
-          kind: "note",
-          via: "mention",
-          wake: "1",
-          runId: run.id,
-          agentId: run.agentId,
-          askerAgentId: sender.agentId,
+      deliverNoticeToRun(
+        tx,
+        sender,
+        {
+          kind: "consult_reply",
+          from: `@${agent.handle}`,
+          text: `It couldn't finish what your mention handed it (${reason.split(":")[0]}).`,
+          refs: {
+            kind: "note",
+            via: "mention",
+            wake: "1",
+            runId: run.id,
+            agentId: run.agentId,
+            askerAgentId: sender.agentId,
+          },
         },
-      }),
+        again ? { wake: false } : {},
+      ),
     );
     await publishDelivery(deps.pubsub, delivered);
   } catch {
@@ -507,16 +523,81 @@ const handedOffRun = async (db: Database, run: AgentRun) =>
       .limit(1)
   ).length > 0;
 
+/** The `refs` of the `kind` notices `run`'s agent got in its stretch (ADR 0089), in its conversation. */
+async function stretchNoticeRefs(db: Database, run: AgentRun, kind: NoticeKind) {
+  const rows = await db
+    .select({ refs: sql<Record<string, string> | null>`${schema.messages.meta}->'notice'->'refs'` })
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.orgId, run.orgId),
+        eq(schema.messages.channelId, run.channelId),
+        eq(schema.messages.authorAgentId, run.agentId),
+        eq(schema.messages.stretchId, runStretchOf(run)),
+        sql`${schema.messages.meta}->'notice'->>'kind' = ${kind}`,
+      ),
+    );
+  return rows.map((r) => r.refs ?? {});
+}
+
+/**
+ * Tells the run behind `messageId` that its mention didn't wake `skipped` (each with why), once per agent and
+ * stretch: the same agent named again there adds nothing (a run that keeps naming it would hear it each time). A
+ * self-report (`SELF_REPORT_NOTICES`): it joins the run while live, else waits for the agent's next turn.
+ */
+export async function tellWakeSkipped(
+  deps: { db: Database; pubsub?: PubSub },
+  run: AgentRun,
+  messageId: string,
+  skipped: { handle: string; why: string }[],
+  reason: "audience" | "callable" | "no_ai",
+) {
+  if (run.background || skipped.length === 0) return;
+  const told = new Set(
+    (await stretchNoticeRefs(deps.db, run, "wake_skipped")).flatMap((r) => (r.agentHandles ?? "").split(",")),
+  );
+  const fresh = skipped.filter((s) => !told.has(s.handle));
+  if (fresh.length === 0) return;
+  const text = `${fresh.map((s) => `@${s.handle} wasn't woken by your mention: ${s.why}.`).join(" ")} ${WAKE_SKIPPED_STEP}`;
+  const delivered = await deps.db.transaction((tx) =>
+    deliverNoticeToRun(tx, run, {
+      kind: "wake_skipped",
+      text,
+      refs: { runId: run.id, messageId, agentHandles: fresh.map((s) => s.handle).join(","), reason },
+    }),
+  );
+  await publishDelivery(deps.pubsub, delivered);
+}
+
+/** What the author does about agents its mention didn't wake: hand it over once, in words, and stop. */
+export const WAKE_SKIPPED_STEP =
+  "The people here see that under your message. Don't mention it again for this: if the work still needs it, say once what it should do, without the @, so someone who can reach it hands it over, and leave it there.";
+
+/**
+ * Why an agent's mention couldn't reach `a` for the person behind it (`person`, null for nobody): the real cause, so
+ * the author says it right. Its owner's own plan answering only its owner (ADR 0059 §5) keeps everyone else out,
+ * consultations too.
+ */
+function unreachableWhy(a: Agent, person: string | null) {
+  if (isComputerBrain(a.brain) && !answersOthers({ ...audienceOf(a), consultable: false }, a.ownerUserId))
+    return "it thinks with its owner's own AI plan, which answers only its owner";
+  const who = person ? "the person you work for isn't one" : "nobody is behind this work";
+  return a.consultable
+    ? `only certain people may talk to it, and ${who}`
+    : `only certain people may talk to it, it takes no requests from other agents for anyone else, and ${who}`;
+}
+
 /**
  * Agents an agent's @mention selected that dispatch couldn't wake because only certain people may talk to them and
- * the person behind the message isn't one (nobody, for a run with no requester): the skip goes in the message's
- * routing decision (`settleReach` records the audience ones), and the author hears it once, as a line people see too, so it hands the work another way or
- * tells the person (I5, I7). Agents not in the conversation are told by `unreachedNote` already. Never throws.
+ * the person behind the message isn't one (nobody, for a run with no requester), and that no consultation reached
+ * (`settleReach` asks the ones that take them): the skip goes in the message's routing decision (`settleReach`
+ * records the audience ones), and the author hears it once per stretch (`tellWakeSkipped`). Agents not in the
+ * conversation are told by `unreachedNote` already. Never throws.
  */
 export async function reportDroppedMentions(
   deps: { db: Database; pubsub?: PubSub },
   message: { id: string; orgId: string; agentRunId: string | null },
-  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[],
+  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience"; noAi?: boolean }[],
 ) {
   if (dropped.length === 0) return;
   try {
@@ -539,15 +620,36 @@ export async function reportDroppedMentions(
       .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId)));
     if (!sender || sender.background) return;
     const person = (await runAuthority(deps.db, sender)).personId;
-    const names = audience.map((d) => `@${d.handle}`).join(", ");
-    const delivered = await deps.db.transaction((tx) =>
-      deliverNoticeToRun(tx, sender, {
-        kind: "wake_skipped",
-        text: `${names} ${audience.length === 1 ? "wasn't" : "weren't"} woken by your mention: only certain people may talk to ${audience.length === 1 ? "it" : "them"}, and ${person ? "the person you work for isn't one" : "nobody is behind this work"}. Tell the people here what still needs ${names}, so someone who may talk to ${audience.length === 1 ? "it" : "them"} hands it over.`,
-        refs: { runId: sender.id, messageId: message.id, agentHandles: audience.map((d) => d.handle).join(",") },
-      }),
+    const rows = await deps.db
+      .select()
+      .from(schema.agents)
+      .where(
+        and(
+          eq(schema.agents.orgId, message.orgId),
+          inArray(
+            schema.agents.id,
+            audience.map((d) => d.agentId),
+          ),
+        ),
+      );
+    const noAi = new Set(audience.filter((d) => d.noAi).map((d) => d.agentId));
+    // One notice per cause: the app words people read under it come from `refs.reason`.
+    await tellWakeSkipped(
+      deps,
+      sender,
+      message.id,
+      rows
+        .filter((a) => noAi.has(a.id))
+        .map((a) => ({ handle: a.handle, why: "it has no AI connected, so nothing could answer it" })),
+      "no_ai",
     );
-    await publishDelivery(deps.pubsub, delivered);
+    await tellWakeSkipped(
+      deps,
+      sender,
+      message.id,
+      rows.filter((a) => !noAi.has(a.id)).map((a) => ({ handle: a.handle, why: unreachableWhy(a, person) })),
+      "audience",
+    );
   } catch {
     // The run that mentioned them is unaffected; the decision row keeps what it had.
   }

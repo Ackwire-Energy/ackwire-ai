@@ -15,7 +15,7 @@ export interface WorkItem {
   key: string;
   agentId: string;
   kind: "run" | "mission" | "work";
-  /** Mission: its title. Run: the thread's title or the start of its first message (null: say where instead). */
+  /** Mission: its title. Run: its work's or thread's title, never its first message's words (null: say where instead). */
   what: string | null;
   channelId: string;
   /** Null: the main timeline (DMs are flat). */

@@ -1583,9 +1583,9 @@ describe("new-agent rules", () => {
       { id: "c2", def: { id: "notion" } },
       { id: "c3", def: null },
     ];
-    expect(presetLevels("dev", items)).toEqual({ c1: "write", c2: "none", c3: "none" });
+    expect(presetLevels("dev", items)).toEqual({ c1: "write", c2: "write", c3: "none" });
     expect(presetLevels("pm", items)).toEqual({ c1: "read", c2: "write", c3: "none" });
-    expect(presetLevels("custom", items)).toEqual({ c1: "none", c2: "none", c3: "none" });
+    expect(presetLevels("custom", items)).toEqual({ c1: "write", c2: "write", c3: "none" });
     const chans = [
       { id: "1", name: "Engenharia" },
       { id: "2", name: "general" },

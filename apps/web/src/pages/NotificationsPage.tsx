@@ -132,8 +132,10 @@ function durationText(t: TFunction, ms: number) {
   return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
 }
 
-/** A snippet with @mentions: mine highlighted, others in bold. */
+/** A snippet with @mentions: mine highlighted, the workspace's others in bold, anyone else's as typed. */
 function Snippet({ text, mine }: { text: string; mine: string | null }) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
   const parts = text.split(MENTION_RE);
   return (
     <>
@@ -142,9 +144,12 @@ function Snippet({ text, mine }: { text: string; mine: string | null }) {
           mine && p.slice(1).toLowerCase() === mine.toLowerCase() ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: positional pieces of one text
             <Mention key={i}>{p}</Mention>
-          ) : (
+          ) : dir.mentionName(p.slice(1)) ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: positional pieces of one text
             <b key={i}>{p}</b>
+          ) : (
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional pieces of one text
+            <Fragment key={i}>{p}</Fragment>
           )
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: positional pieces of one text

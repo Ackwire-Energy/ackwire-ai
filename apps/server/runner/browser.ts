@@ -991,6 +991,40 @@ const BATCH_STEP_MS = 8;
 const HELD_PRESS_MS = 33_000;
 const VIEWPORT = "[window.innerWidth, window.innerHeight]";
 
+/**
+ * Run before every `snapshot`: a button or link with no words of its own (an icon, or an icon font's ligature such as
+ * "content_copy") gets an `aria-label` from what names it to a person, so the snapshot shows its name. Chrome's
+ * accessible name already takes `aria-label` and a bare `title`; the snapshot leaves out the description, which is
+ * where a tooltip (`aria-describedby`, `data-tooltip`, a framework's tooltip attribute) puts "Copy SHA-256". Open
+ * shadow roots too. Answers how many it named.
+ */
+export const NAME_CONTROLS = `(() => {
+  const CONTROLS = 'button,a[href],[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="switch"],[role="checkbox"],[role="option"],input[type="button"],input[type="submit"],input[type="image"]';
+  const TIPS = ["data-tooltip", "data-tooltip-text", "data-title", "data-original-title", "data-tip", "data-tooltip-content", "data-tippy-content", "data-bs-original-title", "tooltip", "mattooltip", "materialtooltip", "ng-reflect-message", "aria-description", "title"];
+  const clean = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+  const roots = [document];
+  let named = 0;
+  for (let i = 0; i < roots.length && i < 100; i++) {
+    const root = roots[i];
+    for (const e of root.querySelectorAll("*")) if (e.shadowRoot) roots.push(e.shadowRoot);
+    for (const e of root.querySelectorAll(CONTROLS)) {
+      if (e.hasAttribute("aria-label") || e.hasAttribute("aria-labelledby")) continue;
+      const text = clean(e.textContent);
+      const ligature = /^[a-z0-9_]+$/.test(text) && e.querySelector('[class*="icon" i],[class*="symbol" i]');
+      if (text && !ligature) continue;
+      if (!text && e.querySelector('img[alt]:not([alt=""])')) continue;
+      const byId = (id) => (root.getElementById ? root.getElementById(id) : null) || document.getElementById(id);
+      let label = clean(clean(e.getAttribute("aria-describedby")).split(" ").map((id) => (id && byId(id) ? byId(id).textContent : "")).join(" "));
+      for (const a of TIPS) if (!label) label = clean(e.getAttribute(a));
+      if (!label) label = clean(e.querySelector("svg title") && e.querySelector("svg title").textContent);
+      if (!label) continue;
+      e.setAttribute("aria-label", label.slice(0, 150));
+      named++;
+    }
+  }
+  return named;
+})()`;
+
 /** A script's test for what `e` is: a field that takes keys. */
 const TEXT_FIELD = `(e.isContentEditable || e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && /^(text|search|email|url|tel|password|number)$/.test(e.type)))`;
 
@@ -2106,6 +2140,13 @@ export class BrowserManager {
       if (allowed.length > 0) {
         const left = await this.leftAllowedSites(session, allowed, signal);
         if (left) return { success: false, data: null, error: left };
+      }
+      // Every snapshot, whoever asks for it: a page that won't take the script is read as it is.
+      if (command === "snapshot") {
+        await this.run(session, ["eval", NAME_CONTROLS], {
+          timeoutMs: QUICK_TIMEOUT_MS,
+          ...(signal ? { signal } : {}),
+        });
       }
     }
     const acting = new AbortController();

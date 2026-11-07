@@ -4,10 +4,10 @@ import {
   helpersOf,
   hiddenCount,
   linePlace,
+  taskPlace,
   taskProgram,
   taskSince,
   taskTitle,
-  taskWhere,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
@@ -204,8 +204,7 @@ function TaskRow({
   const state = rowState(task, stopping);
   const words = taskStateWords(t, i18n.language, task, state, now);
   const title = taskTitle(t, task);
-  const where = taskWhere(t, task);
-  const place = here ? t("taskManager.where.here") : where === title ? null : where;
+  const place = here ? t("taskManager.where.here") : taskPlace(t, task);
   const waits = state === "ok" || state === "answer";
   const program = usingNow(t, taskProgram(task), { locale: i18n.language })?.name ?? null;
   // Working, or waiting on a person (the mark says which): where, the program, how long. Held or in a line: that

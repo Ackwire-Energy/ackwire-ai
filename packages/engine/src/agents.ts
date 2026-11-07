@@ -19,7 +19,7 @@ import type { AgentAppearance } from "./appearance";
 import { dropAgentRules } from "./approval-rules";
 import { answersOthers, audienceOf, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
-import { type AutonomySettings, autonomySettings } from "./autonomy-settings";
+import { type AutonomySettings, autonomySettings, chosenAutonomy } from "./autonomy-settings";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
@@ -338,14 +338,14 @@ export async function updateAgent(
   await refuseRightHandFields(db, orgId, agentId, patch);
   const cleaned =
     patch.handle === undefined ? patch : { ...patch, handle: patch.handle.trim().replace(/^@/, "").toLowerCase() };
-  // Stored whole and normalized: what the brakes read is what the settings show.
+  // Only what people set is stored (normalized): the rest follows the defaults (`chosenAutonomy`).
   const input =
     cleaned.autonomyBrakes === undefined
       ? cleaned
       : {
           ...cleaned,
-          autonomyBrakes: autonomySettings({
-            ...autonomySettings((await getAgent(db, orgId, agentId))?.autonomyBrakes),
+          autonomyBrakes: chosenAutonomy({
+            ...(await getAgent(db, orgId, agentId))?.autonomyBrakes,
             ...cleaned.autonomyBrakes,
           }),
         };

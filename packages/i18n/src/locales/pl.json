@@ -9038,6 +9038,11 @@
     "consultable_female": "Inni agenci mogą konsultować się z {{name}}",
     "consultableHint": "Osobom spoza listy odpowiada tylko za pośrednictwem agenta, który pytał, nigdy bezpośrednio. Wrażliwe akcje nadal wymagają zatwierdzenia przez osoby, które się nim opiekują.",
     "consultableHint_female": "Osobom spoza listy odpowiada tylko za pośrednictwem agenta, który pytał, nigdy bezpośrednio. Wrażliwe akcje nadal wymagają zatwierdzenia przez osoby, które się nią opiekują.",
+    "agents": {
+      "consulted": "Dotyczy tylko osób. Inni agenci nadal mogą konsultować się z {{name}} w sprawie osób spoza listy.",
+      "blocked": "Dotyczy też agentów. Żaden inny agent nie skontaktuje się z {{name}} w sprawie osób spoza listy.",
+      "plan": "Dotyczy też agentów. {{name}} korzysta z planu AI osoby odpowiedzialnej, który obsługuje tylko ją, więc żaden inny agent nie skontaktuje się z {{name}} w sprawie osób spoza listy."
+    },
     "mode": {
       "everyone": "Wszyscy w przestrzeni roboczej",
       "people": "Tylko niektóre osoby lub role",
@@ -14038,6 +14043,8 @@
     "status": {
       "one": "Pracuje nad: {{subject}}",
       "oneUntitled": "Pracuje w tle",
+      "oneFor": "Pracuje od {{duration}}: {{subject}}",
+      "oneUntitledFor": "Pracuje od {{duration}} w tle",
       "two": "Przy 2 pracach: {{first}} i {{second}}",
       "many": "Przy {{count}} pracach: {{subject}} i jeszcze {{more}}",
       "manyUntitled": "Przy {{count}} pracach w tle",
@@ -14181,6 +14188,9 @@
       "followUpCancel": "Anuluj",
       "other": "Powiadomienie dla: {{name}}",
       "wakeSkipped": "Wzmianka od {{name}} nie dotarła do: {{agents}}",
+      "wakeSkippedAnon": "Wzmianka {{name}} nie dotarła do innego agenta",
+      "wakeSkippedAudience": "Tylko niektóre osoby mogą wywołać {{agents}}, a ta praca {{name}} nie pochodzi od żadnej z nich. Ktoś, kto może wywołać {{agents}}, może przekazać prośbę dalej.",
+      "wakeSkippedCallable": "Ustawienia {{name}} nie pozwalają wywołać {{agents}} (inny projekt albo spoza listy agentów, których może wywołać). Osoba, która opiekuje się {{name}}, może to zmienić na stronie agenta.",
       "show": "Pokaż",
       "hide": "Ukryj",
       "talker": "w trakcie pracy",
@@ -14236,7 +14246,6 @@
       "autoApprovedNobody": "Zatwierdzono automatycznie",
       "error": "błąd",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Zaplanowano przypomnienie",
         "creatingRoutine": "Utworzono rutynę",

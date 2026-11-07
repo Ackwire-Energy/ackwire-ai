@@ -8,7 +8,7 @@ import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
 import { previewMediaKind, previewMeta, readableBody } from "./message-preview";
-import { isAgentOnlyNotice } from "./notices";
+import { isQuietNotice } from "./notices";
 import {
   dropRunFailure,
   joinRunFailure,
@@ -144,12 +144,9 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (meta.questionId || meta.approvalId || meta.secretRequestId) return;
   // An agent's sticker or GIF after its own reply (ADR 0091) is silent: the reply already told whoever it was for.
   if (isMediaAfterReply(meta)) return;
-  // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
-  if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
-  // A person stopped a task (ADR 0128): the line is a receipt, never news.
-  if ((meta.notice as { kind?: unknown } | undefined)?.kind === "run_stopped") return;
-  // Only for its agent: people never see it.
-  if (isAgentOnlyNotice(meta)) return;
+  // Only for its agent, or never news (a follow-up's lines: the reply it brings notifies instead; a stopped task's
+  // receipt; a mention its message's own line explains).
+  if (isQuietNotice(meta)) return;
   // A long work's progress line (ADR 0121) never pushes: it counts as unread only for who follows its thread.
   if (meta.workUpdate) return;
   const [channel] = await db

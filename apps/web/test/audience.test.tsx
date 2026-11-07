@@ -109,7 +109,14 @@ describe("Quem pode falar com a Ada", () => {
     const toggle = within(section).getByRole("switch", { name: "Outros agentes podem consultar a Ada" });
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(section.textContent).toContain("ela responde só ao agente que perguntou, nunca direto à pessoa");
+    // Whether it holds for agents too, said plainly under the choice.
+    expect(section.textContent).toContain(
+      "Vale só para pessoas. Outros agentes ainda podem consultar a Ada por quem não está na lista.",
+    );
     await click(toggle);
+    expect(section.textContent).toContain(
+      "Vale para agentes também. Nenhum outro agente consegue falar com a Ada por quem não está na lista.",
+    );
     await click(
       within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
     );
@@ -126,6 +133,7 @@ describe("Quem pode falar com a Ada", () => {
     await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
     const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
     expect(within(section).queryByRole("switch", { name: "Outros agentes podem consultar a Ada" })).toBeNull();
+    expect(section.textContent).toContain("Vale para agentes também. A Ada usa o plano de IA do responsável");
   });
 
   test("an agent that doesn't answer me: chip, no @ suggestion, DM composer off with the notice", async () => {

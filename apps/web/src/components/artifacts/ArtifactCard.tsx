@@ -415,7 +415,7 @@ function TypeCover({ content }: { content: ArtifactFileContent }) {
   const ext = extOf(content.name).toUpperCase();
   return (
     <span className="artifact-tile__type">
-      <Icon name={fileIcon(content.name, content.contentType)} size={28} />
+      <Icon name={fileIcon(content.name, content.contentType)} size={20} />
       {ext && <span>{ext}</span>}
     </span>
   );

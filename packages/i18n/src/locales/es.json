@@ -8682,6 +8682,11 @@
     "consultable": "Otros agentes pueden consultar a {{name}}",
     "consultableHint": "Para las personas que no están en la lista, responde solo al agente que preguntó, nunca a ellas directamente. Las acciones sensibles siguen necesitando la aprobación de las personas a cargo de él.",
     "consultableHint_female": "Para las personas que no están en la lista, responde solo al agente que preguntó, nunca a ellas directamente. Las acciones sensibles siguen necesitando la aprobación de las personas a cargo de ella.",
+    "agents": {
+      "consulted": "Vale solo para personas. Otros agentes aún pueden consultar a {{name}} por quienes no están en la lista.",
+      "blocked": "Vale también para agentes. Ningún otro agente puede hablar con {{name}} por quienes no están en la lista.",
+      "plan": "Vale también para agentes. {{name}} usa el plan de IA de la persona responsable, que solo la atiende a ella, así que ningún otro agente puede hablar con {{name}} por quienes no están en la lista."
+    },
     "mode": {
       "everyone": "Todo el espacio de trabajo",
       "people": "Solo algunas personas o roles",
@@ -13510,6 +13515,8 @@
     "status": {
       "one": "Trabajando en: {{subject}}",
       "oneUntitled": "Trabajando en segundo plano",
+      "oneFor": "Trabajando desde hace {{duration}}: {{subject}}",
+      "oneUntitledFor": "Trabajando desde hace {{duration}} en segundo plano",
       "two": "En 2 trabajos: {{first}} y {{second}}",
       "many": "En {{count}} trabajos: {{subject}} y {{more}} más",
       "manyUntitled": "En {{count}} trabajos en segundo plano",
@@ -13639,6 +13646,9 @@
       "followUpCancel": "Cancelar",
       "other": "Aviso para {{name}}",
       "wakeSkipped": "La mención de {{name}} no llegó a {{agents}}",
+      "wakeSkippedAnon": "La mención de {{name}} no llegó a otro agente",
+      "wakeSkippedAudience": "Solo algunas personas pueden llamar a {{agents}}, y este trabajo de {{name}} no vino de ninguna de ellas. Alguien que pueda llamar a {{agents}} puede pasarle el pedido.",
+      "wakeSkippedCallable": "La configuración de {{name}} no le deja llamar a {{agents}} (otro proyecto, o fuera de su lista de agentes a los que puede llamar). Quien se ocupa de {{name}} puede cambiarlo en la página del agente.",
       "show": "Mostrar",
       "hide": "Ocultar",
       "talker": "mientras trabajaba",
@@ -13692,7 +13702,6 @@
       "autoApprovedNobody": "Aprobado automáticamente",
       "error": "error",
       "seconds": "{{n}} s",
-      "minutes": "{{n}} min",
       "step": {
         "schedulingReminder": "Programó un recordatorio",
         "creatingRoutine": "Creó una rutina",

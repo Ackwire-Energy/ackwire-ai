@@ -57,10 +57,31 @@ export const agentOnlyNoticeSql = (meta: SQL): SQL =>
   )})`;
 
 /**
- * Notices people see in the conversation but that are never news (ADR 0128): a person stopping a task is a receipt.
- * Conversation previews, unread counts and a thread's activity skip them, like the agent-only ones.
+ * Notices people see in the conversation but that are never news: a person stopping a task is a receipt (ADR 0128), a
+ * follow-up's line and the notice that wakes it are followed by the agent's own reply, and an @mention that couldn't
+ * wake an agent is said under the message that named it (`meta.reach`). Their text is written for the agent, in
+ * English. Conversation previews, unread counts, a thread's activity, notifications and search skip them, like the
+ * agent-only ones.
  */
-export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped"];
+export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped", "follow_up", "wake_skipped"];
+
+/** Agent-only or quiet (`QUIET_NOTICES`): never news, never found. */
+export const isQuietNotice = (meta: Record<string, unknown> | null | undefined) =>
+  isAgentOnlyNotice(meta) ||
+  QUIET_NOTICES.includes((meta?.notice as { kind?: unknown } | undefined)?.kind as NoticeKind);
+
+/**
+ * Notices that report on what the agent's own run did (its mention woke nobody, its work moved on, a person stopped
+ * it, it already answered). They join that run while it is live and otherwise wait for its next turn: never a run of
+ * their own, or a run whose every message draws such a notice wakes itself forever (`deliverNotice` holds this).
+ * Every other kind brings news from outside the run (an answer, a result, a decision, a timer it set).
+ */
+export const SELF_REPORT_NOTICES: readonly NoticeKind[] = [
+  "wake_skipped",
+  "work_check_in",
+  "run_stopped",
+  "talker_reply",
+];
 
 /** Agent-only or quiet, in SQL, on a message's `meta`: left out of previews, unread counts and thread activity. */
 export const quietNoticeSql = (meta: SQL): SQL =>

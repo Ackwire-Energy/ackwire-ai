@@ -232,10 +232,16 @@ export const SELF_TESTED = [
   "wordwrap",
   "viewport",
   "plate",
+  "sliver",
+  "actions",
   "stack",
   "nameless",
   "quiet",
-  "docked",
+  "inset",
+  "icongap",
+  "square",
+  "touch",
+  "floating",
 ];
 
 /** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
