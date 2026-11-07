@@ -18,6 +18,7 @@ import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { ArtifactLink } from "./run-tools";
 import { replyThreadOf } from "./runs";
+import { accountInUse } from "./standing";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 import { movableRun, moveRun } from "./works";
@@ -100,9 +101,14 @@ export const plainName = (v: string) =>
 
 /**
  * Who in the organization `who` names: their @handle, email, full name, or a first name only one person
- * has. Several: the agent asks which one.
+ * has. Several: the agent asks which one. A blocked account or one waiting for its deletion is nobody, as for
+ * `getMembership`; `includeBlocked` is for acting on their membership (removing them, changing their role).
  */
-export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: string) {
+export async function findMember(
+  ctx: Pick<ToolContext, "db" | "orgId">,
+  who: string,
+  options: { includeBlocked?: boolean } = {},
+) {
   const people = await ctx.db
     .select({
       userId: schema.organizationMembers.userId,
@@ -112,7 +118,7 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
     })
     .from(schema.organizationMembers)
     .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
-    .where(eq(schema.organizationMembers.orgId, ctx.orgId));
+    .where(and(eq(schema.organizationMembers.orgId, ctx.orgId), options.includeBlocked ? undefined : accountInUse));
   const q = plainName(who);
   if (!q) return [];
   const exact = people.filter(

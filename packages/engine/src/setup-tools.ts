@@ -1062,7 +1062,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           const changes = (Array.isArray(input.changes) ? input.changes : []) as Record<string, unknown>[];
           const rows: MemberChangeRow[] = [];
           for (const change of changes) {
-            const found = await findMember(ctx, str(change.person));
+            const found = await findMember(ctx, str(change.person), { includeBlocked: true });
             if (found.length !== 1)
               return {
                 content: found.length
