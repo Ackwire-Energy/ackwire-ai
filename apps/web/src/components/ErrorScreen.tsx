@@ -7,7 +7,7 @@ import { useBrowserOffline } from "@/chat/offline";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { BootSplash } from "@/components/Sky";
 import { useServerBack } from "@/hooks/useServerBack";
-import { reloadingForNewVersion } from "@/lib/app-version";
+import { onVersionReload, reloadIfStale, reloadingForNewVersion } from "@/lib/app-version";
 import { inDesktopApp, pageReadyAfterPaint } from "@/lib/desktop";
 import { onReportTaken, reportError, reportTaken, shortErrorId } from "@/lib/error-reports";
 
@@ -17,7 +17,8 @@ import { onReportTaken, reportError, reportTaken, shortErrorId } from "@/lib/err
  * stands in for the root's own component, so in the desktop app it brings the strip the window drags by and lifts
  * the app's cover. Two failures are no crash, so no report and no code: a request that got no answer, or only the
  * proxy's (the server restarting, the network gone), which opens again by itself once the server answers, and a
- * page's file from before a deploy, the boot sky while the new version loads.
+ * page's file from before a deploy, the boot sky while the new version loads. A crash in a tab a deploy left behind
+ * reloads into the new version too.
  */
 export function ErrorScreen({ error }: ErrorComponentProps) {
   const { t } = useTranslation();
@@ -26,8 +27,13 @@ export function ErrorScreen({ error }: ErrorComponentProps) {
   const unreachable = noAnswer(error);
   const offline = useBrowserOffline();
   useServerBack(unreachable);
+  // The sky only while the reload is on its way: a person who stayed (a page asked before leaving) gets the crash back.
+  const reloading = useSyncExternalStore(onVersionReload, reloadingForNewVersion);
   useEffect(pageReadyAfterPaint, []);
-  if (reloadingForNewVersion()) return <BootSplash />;
+  useEffect(() => {
+    if (!unreachable) void reloadIfStale();
+  }, [unreachable]);
+  if (reloading) return <BootSplash />;
   const reload = () => window.location.reload();
   return (
     <div className="page page--mid">

@@ -29,8 +29,8 @@ describe("the tools' order", () => {
     expect(moveShownTool(order, shown, "drive", 1)).toEqual(order);
   });
 
-  test("a tool this build has no page for is dropped, one the saved order lacks comes last", () => {
-    const saved = ["drive", "from_a_newer_server", "threads"] as SidebarItem[];
+  test("a tool this build has no page for (newer, or removed) is dropped, one the saved order lacks comes last", () => {
+    const saved = ["drive", "from_a_newer_server", "forum", "threads"] as SidebarItem[];
     const known = knownToolOrder(saved);
     expect(known.slice(0, 2)).toEqual(["drive", "threads"]);
     expect([...known].sort()).toEqual([...SIDEBAR_ITEMS].sort());
