@@ -159,7 +159,7 @@ export function SettingsPage({
     id === "right_hand" && rightHand ? rightHand.name : t(`settings.section.${id}`);
 
   return (
-    <div className="settings">
+    <div className="settings page-split">
       <nav className="settings__nav" aria-label={t("settings.nav")}>
         <div className="settings__head">
           <h1 className="settings__title">{t("settings.title")}</h1>

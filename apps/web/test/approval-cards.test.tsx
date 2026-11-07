@@ -171,3 +171,18 @@ describe("Approvals: the request beside the list", () => {
     expect(review().querySelector('[data-approve="ap-merge"]')).not.toBeNull();
   });
 });
+
+describe("Aprovações: the open request's column", () => {
+  test("another request opens at its top, not where the last one was scrolled to", async () => {
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(seedState()) });
+    await settle(4);
+    const [first, second] = [...document.querySelectorAll<HTMLElement>(".ap-li")];
+    if (!first || !second) throw new Error("two requests");
+    const before = title();
+    review().scrollTop = 400;
+    expect(review().scrollTop).toBe(400);
+    await click(second);
+    expect(title()).not.toBe(before);
+    expect(review().scrollTop).toBe(0);
+  });
+});

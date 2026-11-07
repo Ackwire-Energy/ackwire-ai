@@ -117,7 +117,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       )}
 
       {current && (
-        <div className="proposals">
+        <div className="proposals page-split">
           <nav className="proposals__list" aria-label={t("proposals.list")}>
             {list.map((p) => (
               <button

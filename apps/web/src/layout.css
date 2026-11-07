@@ -835,6 +835,53 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 14px;
   padding-bottom: 96px;
 }
+/*
+ * A list or a nav beside what it opens (Aprovações, Propostas, Settings): `.page-split` holds the columns. Where they
+ * sit side by side, the page fills the work area and never scrolls: the split takes the height under the page's
+ * header and each of its columns scrolls on its own, so the header, a column's head and a footer floating at its
+ * bottom stay put. Every element between the work area and the split hands the height down. Narrower (these pages
+ * stack their columns at 940px), the page scrolls as any other. `.shell__main` in each selector: the pages' own
+ * stylesheets load after this one and must not win.
+ */
+@media (min-width: 941px) {
+  .shell__main:has(.page-split) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .shell__main > :is(:has(.page-split), .page-split) {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+  .shell__main :has(.page-split) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
+  }
+  .shell__main :has(.page-split) > * {
+    flex-shrink: 0;
+  }
+  .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
+    flex: 1 1 auto;
+  }
+  .shell__main .page-split {
+    min-height: 0;
+    align-items: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .shell__main .page-split > * {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* A column is as tall as the split, not as its content: what it holds scrolls in it instead of squeezing to fit. */
+  .shell__main .page-split > * > * {
+    flex-shrink: 0;
+  }
+}
 .list-group-head {
   display: flex;
   align-items: center;
@@ -1387,6 +1434,24 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   flex: 999 1 480px;
   min-width: 0;
   gap: 16px;
+}
+/* Columns of their own (`.page-split`), on one line: a wrapping line would grow to the taller column instead of the
+   split's height. The card keeps its height and scrolls inside once it is taller than the column; the list keeps room
+   for its cards' shadows and focus rings, which its scroll would cut. */
+@media (min-width: 941px) {
+  .proposals {
+    flex-wrap: nowrap;
+  }
+  .proposals__detail {
+    align-self: flex-start;
+    max-height: 100%;
+  }
+  .proposals__list {
+    flex-basis: 272px;
+    max-width: 332px;
+    margin: -6px -6px 0;
+    padding: 6px;
+  }
 }
 /* Too narrow for the list beside the proposal (260 + 16 + 480): it goes above it at its full width instead of a
    320px column left alone on the left, whatever the window (the sidebar takes its share of it). */
@@ -3708,6 +3773,29 @@ html:not([data-pointer]) .settings__link:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+/*
+ * Side by side the nav and the section are columns that scroll on their own (`.page-split`). The section's column runs
+ * to the work area's right edge, so the wheel scrolls it there too, and its text keeps the old width: the page's
+ * centred 1120px, its side room as before (28px, or half of what the window has past 1120px). The page's top room
+ * moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings at
+ * their edges, which their scroll would cut.
+ */
+@media (min-width: 941px) {
+  .settings {
+    max-width: none;
+    margin: 0;
+    padding: 0 0 0 max(28px, calc(50% - 532px));
+  }
+  .settings__nav {
+    flex-basis: 228px;
+    margin: 0 -6px;
+    padding: 36px 6px 24px;
+  }
+  .settings__body {
+    margin-left: -12px;
+    padding: 36px max(28px, calc(100% - 1064px)) 96px 12px;
+  }
 }
 .settings__section {
   display: flex;

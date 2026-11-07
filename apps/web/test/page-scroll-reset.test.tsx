@@ -22,7 +22,12 @@ async function app() {
   const root = createRootRoute({ component: Outlet });
   const page = () => (
     <main className="shell__main">
-      <h2 id="jev">Jev</h2>
+      <div className="settings page-split">
+        <nav className="settings__nav" />
+        <div className="settings__body">
+          <h2 id="jev">Jev</h2>
+        </div>
+      </div>
     </main>
   );
   const section = createRoute({ getParentRoute: () => root, path: "settings/$section", component: page });
@@ -43,17 +48,20 @@ async function app() {
   render(<RouterProvider router={router} />);
   await settle();
   const column = () => document.querySelector("main.shell__main") as HTMLElement;
-  const scroll = (top: number) => {
-    column().scrollTop = top;
-    column().dispatchEvent(new Event("scroll"));
+  const scrollOf = (el: () => HTMLElement) => (top: number) => {
+    el().scrollTop = top;
+    el().dispatchEvent(new Event("scroll"));
   };
+  const scroll = scrollOf(column);
+  const body = () => document.querySelector(".settings__body") as HTMLElement;
+  const nav = () => document.querySelector(".settings__nav") as HTMLElement;
   const go = async (to: () => unknown) => {
     await act(async () => {
       await to();
     });
     await settle();
   };
-  return { router, column, scroll, go };
+  return { router, column, scroll, body, nav, scrollBody: scrollOf(body), scrollNav: scrollOf(nav), go };
 }
 
 describe("page column scroll", () => {
@@ -64,6 +72,17 @@ describe("page column scroll", () => {
     expect(column().scrollTop).toBe(0);
     await go(() => router.history.back());
     expect(column().scrollTop).toBe(600);
+  });
+
+  test("where the nav and the section scroll on their own, another section starts at the top and the nav stays", async () => {
+    const { router, body, nav, scrollBody, scrollNav, go } = await app();
+    scrollNav(120);
+    scrollBody(700);
+    await go(() => router.history.push("/settings/agents"));
+    expect(body().scrollTop).toBe(0);
+    expect(nav().scrollTop).toBe(120);
+    await go(() => router.history.back());
+    expect(body().scrollTop).toBe(700);
   });
 
   test("another page starts at the top too", async () => {
