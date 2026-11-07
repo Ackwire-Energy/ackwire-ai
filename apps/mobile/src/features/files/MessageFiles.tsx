@@ -12,7 +12,7 @@ import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { ImageStack } from "./ImageStack";
-import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight, VIDEO_EXT } from "./logic";
+import { encodeFileList, extensionOf, type FileInfo, fileInfo, IMAGE_EXT, singleImageHeight, VIDEO_EXT } from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
 import { VideoPlayer } from "./VideoPlayer";
 
@@ -33,7 +33,6 @@ export interface MessageFile {
 
 /** Widest a picture block gets in a message. */
 const MAX_WIDTH = 300;
-const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"]);
 
 export function MessageFiles({ files, align = "start" }: { files: MessageFile[]; align?: "start" | "end" }) {
   const orgId = useOrgId();
