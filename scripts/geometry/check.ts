@@ -232,6 +232,8 @@ export const SELF_TESTED = [
   "wordwrap",
   "viewport",
   "plate",
+  "sliver",
+  "actions",
   "stack",
   "nameless",
   "quiet",

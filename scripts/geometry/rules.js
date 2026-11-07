@@ -609,12 +609,50 @@
         }
       }
     },
+    /**
+     * A box that scrolls for a few px: margins, a border or rounding past its edge show a scrollbar (and let the wheel
+     * nudge it) over content that, to the eye, fits.
+     */
+    sliver(out) {
+      const SLIVER_MAX = 4;
+      for (const el of document.body.querySelectorAll("*")) {
+        const y = style(el).overflowY;
+        if ((y !== "auto" && y !== "scroll") || el.matches("textarea,input,select") || !seen(el)) continue;
+        const px = el.scrollHeight - el.clientHeight;
+        if (px > 0 && px < SLIVER_MAX) out.push({ rule: "sliver", node: el, el: sig(el), px });
+      }
+    },
+    /**
+     * A popover's own actions (its primary button, its actions' row, the field at its foot) cut by its box: scrolled out
+     * of sight instead of pinned to its foot. The box, not the window: where a captured screen puts it isn't Radix's.
+     */
+    actions(out) {
+      for (const pop of document.querySelectorAll(".ac-popover")) {
+        if (!seen(pop)) continue;
+        const p = pop.getBoundingClientRect();
+        for (const el of pop.querySelectorAll(
+          ".ac-btn--primary,[class*='actions'] > .ac-btn,[class*='__foot'] input",
+        )) {
+          if (!seen(el)) continue;
+          const r = el.getBoundingClientRect();
+          const px = Math.max(r.bottom - p.bottom, p.top - r.top);
+          if (px > 0.5)
+            out.push({ rule: "actions", node: el, el: sig(el), box: sig(pop), px: +px.toFixed(1), text: words(el) });
+        }
+      }
+    },
   };
 
   window.geometry = {
     /** Puts a captured screen in the page and waits for the type its words use. */
     async load(html) {
       document.body.innerHTML = html;
+      // The tests' DOM measures nothing, so a captured popover says it has no room (-24px) and its cap folds it to
+      // nothing: it gets the window's, as Radix gives a card on a side with the room.
+      for (const w of document.querySelectorAll("[data-radix-popper-content-wrapper]")) {
+        if (parseFloat(w.style.getPropertyValue("--radix-popper-available-height")) <= 0)
+          w.style.setProperty("--radix-popper-available-height", "calc(100vh - 24px)");
+      }
       await document.fonts.ready;
     },
     detect() {

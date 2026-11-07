@@ -383,4 +383,22 @@ describe("a card that opens on hover", () => {
     await tick(OPEN_MS);
     expect(open()).toEqual(["Cartão de Equipe", "Cartão de Ada"]);
   });
+
+  test("a card that opens on hover still watches its size, to move over its trigger when the window is short", async () => {
+    const watched: Element[] = [];
+    const Real = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      observe(el: Element) {
+        watched.push(el);
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      await openAda();
+      expect(watched).toContain(card("Ada") as Element);
+    } finally {
+      globalThis.ResizeObserver = Real;
+    }
+  });
 });

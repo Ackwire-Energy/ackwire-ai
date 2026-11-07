@@ -13230,7 +13230,8 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
     animation: ac-fade-in 200ms ease-out both;
   }
 }
-/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. */
+/* The receipt's last line: who picked the agents, or how they are picked, under a hairline. At least 3px under it: an
+   agent's face draws its accessories below its tile, and with less the popover scrolls by a pixel. */
 .who-by {
   margin-top: 4px;
   padding: 8px 6px 4px;

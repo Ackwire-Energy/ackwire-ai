@@ -1,17 +1,25 @@
-/* The member card, Discord's profile popover: a banner, the big face over its edge, the ⋯ on it, then the body. */
+/* The member card, Discord's profile popover: a banner, the big face over its edge, the ⋯ on it, then the body.
+   Short of room, the banner gives way first (down to a band the face still overlaps), then the popover moves over its
+   trigger (`Popover`), and only then does the card scroll, its actions pinned to the foot. */
 .mcard.profile-card {
   position: relative;
   width: 340px;
   max-width: calc(100vw - 24px);
   max-height: min(720px, var(--radix-popover-content-available-height, calc(100dvh - 16px)));
   padding: 0;
+  gap: 0;
   overflow-x: hidden;
   overflow-y: auto;
   border-radius: var(--radius-xl);
 }
+/* Its banner, face and body are the card's own rows, so only the banner shrinks. */
+.mcard__frame {
+  display: contents;
+}
 .mcard__banner {
   position: relative;
-  height: 96px;
+  flex: 0 1 96px;
+  min-height: 56px;
   overflow: hidden;
   background: var(--sunken);
 }
@@ -36,10 +44,13 @@
 .mcard__act.ac-btn[data-state="open"] {
   background: var(--raised);
 }
+/* 90px tall, 44 of it over the banner's foot and the rest in the body's top padding: it takes no room of its own. */
 .mcard__face {
-  position: absolute;
-  top: 52px;
-  left: 16px;
+  position: relative;
+  z-index: 1;
+  flex: none;
+  align-self: flex-start;
+  margin: -44px 0 -46px 16px;
   padding: 5px;
   border-radius: 30%;
   background: var(--raised);
@@ -53,6 +64,7 @@
   font-size: 26px;
 }
 .mcard .profile-card__body {
+  flex: none;
   padding: 50px 16px 16px;
   gap: 12px;
 }
@@ -156,10 +168,11 @@ html:not([data-pointer]) .mcard__edit:focus-visible {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
-/* A card taller than the room scrolls: its message field stays at its foot, 16px from the edge as at rest, on the
-   card's own face that fades in over the 12px above it, so what scrolls passes under it instead of the edge cutting
-   the field. At rest it sits where it did (the fade takes the body's gap back). */
-.mcard__foot {
+/* A card taller than the room scrolls: its message field or buttons stay at its foot, 16px from the edge as at rest, on
+   the card's own face that fades in over the 12px above it, so what scrolls passes under them instead of the edge
+   cutting them. At rest they sit where they did (the fade takes the body's gap back). */
+.mcard__foot,
+.mcard .profile-card__body > .profile-card__actions:last-child {
   position: sticky;
   bottom: 0;
   z-index: 1;

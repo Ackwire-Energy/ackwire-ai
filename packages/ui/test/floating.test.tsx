@@ -6,7 +6,7 @@ setupDom();
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
 import { Dialog, DialogBody, Field, monthGrid, normalizeTime, Select, Token, timeOptions } from "../src";
-import { EDGE_ROOM } from "../src/floating";
+import { EDGE_ROOM, pullToFit } from "../src/floating";
 
 const body = () => within(document.body);
 const key = async (el: Element, k: string) => {
@@ -87,6 +87,19 @@ describe("floating layers", () => {
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(within(dialog).getByRole("combobox", { name: "Repetir" }).textContent).toContain("Toda semana");
   }, 10_000);
+
+  test("a card the room on its side cuts moves over its trigger by what it lacks, never past the window's edges", () => {
+    const card = { scroll: 473, client: 420, height: 420, room: 420, base: 420, window: 900 };
+    expect(pullToFit(card)).toBe(53);
+    // Placed again: it fits, nothing more to gain.
+    expect(pullToFit({ ...card, scroll: 473, client: 473, height: 473, room: 473 })).toBe(0);
+    expect(pullToFit({ ...card, window: 460 })).toBe(460 - 2 * EDGE_ROOM - 420);
+    expect(pullToFit({ ...card, room: 876, base: 876 })).toBe(0);
+    expect(pullToFit({ ...card, scroll: 420 })).toBe(0);
+    // A menu at its own 280px cap scrolls where it is.
+    expect(pullToFit({ ...card, client: 280, height: 280 })).toBe(0);
+    expect(pullToFit({ ...card, room: Number.NaN })).toBe(0);
+  });
 });
 
 describe("DatePicker", () => {
