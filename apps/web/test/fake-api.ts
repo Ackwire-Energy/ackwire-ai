@@ -103,6 +103,7 @@ import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
+import type { PlanModel } from "@agenteschat/client/lib/plans";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
 import type { TeamWeekPrefs } from "@agenteschat/client/lib/team-week";
@@ -229,6 +230,8 @@ export interface FakeState {
   keyRefusalParams?: Record<string, unknown>;
   /** What an endpoint lists (ADR 0146); absent: nothing. */
   endpointList?: { baseURL: string; models: { id: string }[]; error?: string };
+  /** The coding plans' models as the server read them from their makers' lists; absent: an older server. */
+  planModels?: Partial<Record<string, readonly PlanModel[]>>;
   /** Each model's test result when an endpoint is saved; absent: `ok`. */
   endpointChecks?: Record<string, EndpointCheck>;
   approvals: Approval[];
@@ -2302,6 +2305,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       former: async () => state.former ?? [],
       models: async () => ({
+        ...(state.planModels ? { planModels: state.planModels } : {}),
         defaultModel: "claude-sonnet-5-5",
         models: [
           {

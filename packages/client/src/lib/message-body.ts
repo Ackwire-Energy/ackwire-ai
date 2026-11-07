@@ -18,6 +18,8 @@ const USAGE_NOTES = new Set([
   "plan_model_limit_wait",
   "plan_model_limit_wait_unknown",
   "plan_model_region_wait",
+  "plan_model_off_wait",
+  "plan_inactive_wait",
   "budget_wait",
 ]);
 

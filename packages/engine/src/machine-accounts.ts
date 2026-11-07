@@ -634,13 +634,14 @@ async function settleAccount(
  * full is a model's (`refusalScope`), not the account's.
  */
 function accountReading(provider: string | null, prev: PlanUsage | null | undefined, next: PlanUsage): PlanUsage {
-  const { limited, models: _, ...rest } = next;
+  const { limited, models: _, answered: __, ...rest } = next;
   const models = liveModelLimits(prev);
   const perModel = planOf(provider)?.limitsPerModel === true;
   return {
     ...rest,
     ...(limited && !(perModel && !planWindows(next).some((w) => w.used >= 100)) ? { limited } : {}),
     ...(models ? { models } : {}),
+    ...(perModel && prev?.answered ? { answered: prev.answered } : {}),
   };
 }
 

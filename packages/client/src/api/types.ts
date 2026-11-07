@@ -1255,6 +1255,8 @@ export interface AiStatus {
       | "plan_limit"
       | "model_limit"
       | "model_region"
+      | "model_off"
+      | "plan_inactive"
       | "commands_off"
       | "plan_not_shared"
       | "runner_outdated"
@@ -5314,8 +5316,11 @@ export interface PlanUsage {
   limited?: boolean;
   source: "turn" | "probe";
   at: string;
-  /** Models at a limit of their own, by model id: until `until` (absent: unknown), or `region` the model needs. */
-  models?: Record<string, { at: string; until?: string; region?: true }>;
+  /**
+   * Models at a limit of their own, by model id: until `until` (absent: unknown), `region` the model needs, or `off`
+   * the plan refused it for the key.
+   */
+  models?: Record<string, { at: string; until?: string; region?: true; off?: true; inactive?: true }>;
 }
 
 export interface AgentBrainInput {
@@ -6359,9 +6364,9 @@ export interface TaskWait {
   key: string | null;
   /** The plan in words ("Claude"); null for a budget. */
   plan: string | null;
-  /** A wait on a model's own limit or the region it needs: the model's name, and which. */
+  /** A wait on one model's refusal (its own limit, the region it needs, switched off): the model's name, and which. */
   model: string | null;
-  scope: "model" | "region" | null;
+  scope: "model" | "region" | "off" | "inactive" | null;
   /** Paused near a limit: how far along, and the plan's window. */
   percent: number | null;
   window: string | null;

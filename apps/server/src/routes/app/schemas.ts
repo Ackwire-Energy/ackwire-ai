@@ -323,12 +323,18 @@ export const PlanUsage = z
     models: z
       .record(
         z.string(),
-        z.object({ at: z.string(), until: z.string().optional(), region: z.literal(true).optional() }),
+        z.object({
+          at: z.string(),
+          until: z.string().optional(),
+          region: z.literal(true).optional(),
+          off: z.literal(true).optional(),
+          inactive: z.literal(true).optional(),
+        }),
       )
       .optional()
       .openapi({
         description:
-          "Models at a limit of their own, by model id: until `until` (absent: unknown), or `region`: the model needs a region the account doesn't allow.",
+          "Models at a limit of their own, by model id: until `until` (absent: unknown), `region`: the model needs a region the account doesn't allow, `off`: the plan refused it for the key (the model or the account switched off there), or `inactive`: the key's workspace has no active subscription.",
       }),
   })
   .openapi("PlanUsage", {
@@ -737,6 +743,18 @@ export const Usage = z
     costUsd: z.number(),
   })
   .openapi("AgentUsage");
+
+export const PlanModelOut = z
+  .object({
+    id: z.string(),
+    label: z.string(),
+    alias: z.enum(["opus", "sonnet", "haiku"]).optional(),
+    tag: z.enum(["cheap", "fast", "smart"]).optional(),
+    needs: z.enum(["globalRegion", "paidTraining", "freeTraining"]).optional(),
+    free: z.literal(true).optional(),
+    maker: z.string().optional(),
+  })
+  .openapi("PlanModel");
 
 export const Model = z
   .object({

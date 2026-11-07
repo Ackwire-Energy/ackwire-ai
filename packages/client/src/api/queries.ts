@@ -31,6 +31,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
@@ -652,7 +653,9 @@ export const useTeam = (orgId: string) => {
 
 export const useModels = () => {
   const api = useApi();
-  return useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
+  const models = useQuery({ queryKey: keys.models, queryFn: () => api.agents.models(), staleTime: 10 * 60_000 });
+  if (models.data?.planModels) learnPlanModels(models.data.planModels);
+  return models;
 };
 
 /** A catalog model's name ("Claude Haiku 5.5") once the list is in: its id for one the list doesn't have, null before. */

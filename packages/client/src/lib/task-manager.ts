@@ -121,6 +121,13 @@ export function taskWaitWords(
           state: s("taskManager.wait.modelRegion", { model: w.model ?? "" }),
           next: s("taskManager.wait.modelRegionNext"),
         };
+      if (w?.scope === "inactive")
+        return { state: s("taskManager.wait.planInactive"), next: s("taskManager.wait.planInactiveNext") };
+      if (w?.scope === "off")
+        return {
+          state: s("taskManager.wait.modelOff", { model: w.model ?? "" }),
+          next: s("taskManager.wait.modelOffNext"),
+        };
       if (w?.scope === "model")
         return { state: s("taskManager.wait.modelLimit", { model: w.model ?? "" }), next: back() };
       if (w?.code === "plan_limit")
@@ -146,7 +153,14 @@ const USAGE_LIMITS = new Set(["plan_limit", "budget"]);
  * only reservations fill for a moment).
  */
 function limitKey({ held, wait: w }: ManagedTask) {
-  if (!w?.key || w.scope === "region" || (held === "budget" && !w.resetsAt)) return null;
+  if (
+    !w?.key ||
+    w.scope === "region" ||
+    w.scope === "off" ||
+    w.scope === "inactive" ||
+    (held === "budget" && !w.resetsAt)
+  )
+    return null;
   const near = w.code === "usage_pause" && w.percent !== null;
   return near || USAGE_LIMITS.has(w.code) ? `${w.code}:${w.key}:${w.model ?? ""}:${w.window ?? ""}` : null;
 }

@@ -691,12 +691,28 @@ test.skipIf(!posix)(
     expect(cli.claudeRuns()[2]?.args).toEqual(expect.arrayContaining(["--model", "sonnet"]));
     expect(done(id(42))?.result).toStartWith("key ");
     expect(JSON.stringify(frames)).not.toContain(KEY);
+    // On OpenCode Go, the model the server named runs the whole task, Claude Code's own small calls included.
+    await tasks.start(
+      AGENT,
+      { taskId: id(60), executor: "claude", prompt: "Go", account: ROOTS_ACCOUNT, model: "deepseek-v4.1-flash" },
+      undefined,
+      { kind: "key", provider: "opencode", key: "oc_sk_fake-for-tests" },
+    );
+    await waitFor(() => Boolean(done(id(60))), 8000);
+    const go = cli.claudeRuns().at(-1);
+    expect(go?.args).toEqual(expect.arrayContaining(["--model", "deepseek-v4.1-flash"]));
+    expect(go?.settingsEnv).toMatchObject({
+      ANTHROPIC_BASE_URL: "https://opencode.ai/inference/go/anthropic",
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: "deepseek-v4.1-flash",
+      ANTHROPIC_DEFAULT_SONNET_MODEL: "deepseek-v4.1-flash",
+      ANTHROPIC_SMALL_FAST_MODEL: "deepseek-v4.1-flash",
+    });
 
     // No account: the computer's own sign-in, and there is none here. The agent reads what it can do, never the
     // CLI's "Please run /login".
     await tasks.start(AGENT, { taskId: id(43), executor: "claude", prompt: "Ship it" });
     await waitFor(() => Boolean(done(id(43))), 8000);
-    expect(cli.claudeRuns()[3]).toMatchObject({ configDir: path.join(cli.own, ".claude"), oauthToken: null });
+    expect(cli.claudeRuns().at(-1)).toMatchObject({ configDir: path.join(cli.own, ".claude"), oauthToken: null });
     const failed = done(id(43));
     expect(failed?.exitCode).toBe(1);
     expect(failed?.result).toStartWith(
@@ -711,7 +727,7 @@ test.skipIf(!posix)(
         .catch((err: Error) => err.message);
     expect(await refused(44, GONE_ACCOUNT)).toBe(ACCOUNT_MISSING_MESSAGE.claude_code);
     expect(await refused(45, ROOTS_ACCOUNT, { kind: "none" })).toBe(ACCOUNT_SIGNED_OUT);
-    expect(cli.claudeRuns()).toHaveLength(4);
+    expect(cli.claudeRuns()).toHaveLength(5);
   },
   30_000,
 );

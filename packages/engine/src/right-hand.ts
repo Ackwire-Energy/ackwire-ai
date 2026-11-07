@@ -6,7 +6,7 @@ import { AUTO_MODEL } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import type { NoAiReason } from "./ai-status";
 import { recordAudit } from "./audit";
-import type { BrainUnavailability } from "./brains/select";
+import type { BrainUnavailability, ModelScope } from "./brains/select";
 import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
 import { personBehindCall } from "./requester";
@@ -332,14 +332,22 @@ export async function rightHandPlanRefusal(
 
 /**
  * The line its DM shows when its plan can't think (ADR 0137 §7): it never falls back to an API key, nor waits with a
- * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, or the region that model needs:
- * `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
+ * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, the region that model needs, or
+ * that model switched off for the key: `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
  * installed, or what any agent says.
  */
-export function rightHandNoAiReason(code: string, scope?: "model" | "region"): NoAiReason {
+export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReason {
   if (code === "machine_offline" || code === "machine_paused") return "computer_away";
   if (code === "plan_limit")
-    return scope === "region" ? "model_region" : scope === "model" ? "model_limit" : "plan_limit";
+    return scope === "region"
+      ? "model_region"
+      : scope === "inactive"
+        ? "plan_inactive"
+        : scope === "off"
+          ? "model_off"
+          : scope === "model"
+            ? "model_limit"
+            : "plan_limit";
   if (code === "plan_not_shared" || code === "plan_not_owner") return "plan_not_shared";
   if (code === "runner_outdated" || code === "codex_too_old") return "runner_outdated";
   if (code === "exec_disabled" || code === "tool_off") return "commands_off";

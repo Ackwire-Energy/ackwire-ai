@@ -33,7 +33,7 @@ import {
   type ToolImage,
   textOf,
 } from "@agenteschat/providers";
-import { ownLimitsModel } from "@agenteschat/providers/plans";
+import { autoPlanModel, ownLimitsModel } from "@agenteschat/providers/plans";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
@@ -70,12 +70,16 @@ import {
   brainSpeedFor,
   forgetModelLimit,
   forgetPlanLimit,
+  type ModelScope,
   mayFallBack,
   NO_AI_CODES,
+  noteAnswered,
   noteModelLimit,
   notePlanLimit,
+  offRefusal,
   recordRunBrain,
   refusalScope,
+  regionRefusal,
   resolveBrain,
   storedPlanUsage,
   UNAVAILABLE_CODES,
@@ -594,8 +598,8 @@ export interface Transcript {
     plan?: string;
     /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
     model?: string | null;
-    /** A plan wait on the model's own limit or the region it needs (`refusalScope`): a fresh reading of the account doesn't wake it. */
-    scope?: "model" | "region";
+    /** A plan wait on one model's refusal (`refusalScope`): a fresh reading of the account doesn't wake it. */
+    scope?: ModelScope;
     /** Parked again on its limit right after a wake: no wake for `REPARK_STEADY_MS` after that park, only its timer. */
     steady?: true;
     /** A plan pause's: where its plan was read. */
@@ -2545,6 +2549,8 @@ async function executeRunInner(
   // brain itself never changes). A resumed run keeps its choice; a run that couldn't ask is medium/medium.
   /** The agent as this run's model brain sees it: its `auto` model replaced by the one chosen. */
   let thinker: Agent = agent;
+  /** The computer brain's model is "Automático": a model of its plan the key can't use gives way (`autoPlanModel`). */
+  const autoBrain = brainPlan.kind !== "model" && isAutoModel(brainPlan.model);
   if (needsAutoChoice(agent, brainPlan)) {
     const t = transcript;
     const kept = t.autoModel;
@@ -2570,6 +2576,10 @@ async function executeRunInner(
       throw outage;
     }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
+    if (autoBrain) {
+      const model = autoPlanModel(brainPlan.account?.provider, brainPlan.model, brainPlan.usage);
+      if (model) brainPlan = { ...brainPlan, model };
+    }
     if (!kept) {
       t.autoModel = { ...choice, ...(applied.apiModel ? { apiModel: applied.apiModel } : {}) };
       const chosen = {
@@ -3247,17 +3257,26 @@ async function executeRunInner(
       notePlanLimit(machineId, plan.kind, resetsAt, Date.now(), account.id);
       return resetsAt ? { resetsAt } : {};
     }
-    const region = found.scope === "region";
+    // The region a model needs, the model switched off for the key, or no subscription: nothing resets them.
+    const fixed = found.scope === "region" || found.scope === "off" || found.scope === "inactive";
     await noteModelLimit(
       db,
       run.orgId,
       account.id,
       ownModel.id,
-      region ? { region } : resetsAt ? { until: resetsAt } : {},
+      found.scope === "region"
+        ? { region: true }
+        : found.scope === "off"
+          ? { off: true }
+          : found.scope === "inactive"
+            ? { inactive: true }
+            : resetsAt
+              ? { until: resetsAt }
+              : {},
     )
       .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
       .catch(() => {});
-    return { scope: found.scope, ...(!region && resetsAt ? { resetsAt } : {}) };
+    return { scope: found.scope, ...(!fixed && resetsAt ? { resetsAt } : {}) };
   };
 
   /**
@@ -3275,8 +3294,8 @@ async function executeRunInner(
     soon?: boolean;
     /** Long work paused near a limit (ADR 0118): on what, how far along, and the plan's window. */
     pause?: { source: "plan" | "budget"; used: number; window?: string };
-    /** The model's own limit or the region it needs, not the account's (`refusalScope`). */
-    scope?: "model" | "region";
+    /** One model's refusal, not the account's (`refusalScope`). */
+    scope?: ModelScope;
   }) => {
     await deferred;
     const t = transcript as Transcript;
@@ -3313,11 +3332,13 @@ async function executeRunInner(
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
     const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
-    // The region a model needs has no reset: its note already says what to turn on.
+    // The region a model needs, a model switched off or no subscription has no reset: its note says what to do.
     const tellOwner =
       !budget &&
       !paused &&
       scope !== "region" &&
+      scope !== "off" &&
+      scope !== "inactive" &&
       !known &&
       !wait.noticed &&
       now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
@@ -3365,20 +3386,30 @@ async function executeRunInner(
                   "plan_model_region_wait",
                   `This model (${ownModel.label}) needs the Global region on in OpenCode (Settings › Privacy).`,
                 ]
-              : ownModel
+              : ownModel && scope === "inactive"
                 ? [
-                    known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
-                    `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                    "plan_inactive_wait",
+                    "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it.",
                   ]
-                : cut
+                : ownModel && scope === "off"
                   ? [
-                      known ? "plan_limit_cut" : "plan_limit_cut_unknown",
-                      `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                      "plan_model_off_wait",
+                      `OpenCode refused ${ownModel.label} with this key: the model or the account is turned off there. Turn it on in OpenCode or change ${agent.name}'s model.`,
                     ]
-                  : [
-                      known ? "plan_limit_wait" : "plan_limit_wait_unknown",
-                      `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
-                    ];
+                  : ownModel
+                    ? [
+                        known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
+                        `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                      ]
+                    : cut
+                      ? [
+                          known ? "plan_limit_cut" : "plan_limit_cut_unknown",
+                          `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                        ]
+                      : [
+                          known ? "plan_limit_wait" : "plan_limit_wait_unknown",
+                          `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
+                        ];
           const m = await post(
             tx,
             replyThreadId,
@@ -3969,6 +4000,9 @@ async function executeRunInner(
                   cacheWriteTokens: u.cacheWrite ?? 0,
                 }),
               ),
+            refusedByPlan: (message) =>
+              regionRefusal(turnPlan.account?.provider, turnPlan.model, message) ||
+              offRefusal(turnPlan.account?.provider, turnPlan.model, message),
             onLimit: (resetsAt) => {
               turnLimited = true;
               const machineId = turnPlan.session?.machineId;
@@ -4033,8 +4067,9 @@ async function executeRunInner(
             const ownModel = ownLimitsModel(account?.provider, turnPlan.model);
             if (account && ownModel)
               later(async () => {
-                if (await forgetModelLimit(db, run.orgId, account.id, ownModel.id))
-                  await publishAccountsChanged(deps.pubsub, run.orgId, planMachine);
+                const forgot = await forgetModelLimit(db, run.orgId, account.id, ownModel.id);
+                await noteAnswered(db, run.orgId, account.id, ownModel.id);
+                if (forgot) await publishAccountsChanged(deps.pubsub, run.orgId, planMachine);
               });
             const key = usageWaitKey({
               code: "plan_limit",
@@ -4164,15 +4199,26 @@ async function executeRunInner(
           (error.retryable || UNAVAILABLE_CODES.has(error.code))
         ) {
           const machineId = turnPlan.session?.machineId;
-          const handled = await brainUnavailable({
-            code: error.code,
-            message: error.message,
-            ...(error.code === "plan_limit" && machineId
+          const refusal =
+            error.code === "plan_limit" && machineId
               ? await refusalOf(machineId, error)
               : error.resetsAt
                 ? { resetsAt: error.resetsAt }
-                : {}),
-          });
+                : {};
+          // "Automático" refused on one model: the turn goes again at once on the model that last answered with this key.
+          if (autoBrain && refusal.scope && refusal.scope !== "inactive" && machineId) {
+            const stored = await storedPlanUsage(db, run.orgId, machineId, turnPlan.kind, turnPlan.account?.id).catch(
+              () => null,
+            );
+            const from = turnPlan.model;
+            const to = autoPlanModel(turnPlan.account?.provider, from, stored);
+            if (to && to !== from) {
+              plan = { ...plan, model: to };
+              later(() => addRunStep(db, run, "context", { autoModelStandIn: { from: from ?? null, to } }));
+              continue;
+            }
+          }
+          const handled = await brainUnavailable({ code: error.code, message: error.message, ...refusal });
           if (handled === "fallback") continue;
           if (handled === "waited" || handled === "failed") return;
         }
@@ -5030,6 +5076,8 @@ async function thinkOnce(
     onTaken?(): void | Promise<void>;
     /** Fast failed and the turn answered at standard speed. */
     onSpeedFallback?(message: string): void;
+    /** A failed turn that is the plan's refusal, though the CLI didn't call it a limit. */
+    refusedByPlan?(message: string): boolean;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -5090,8 +5138,12 @@ async function thinkOnce(
         };
       }
     } else if (event.type === "error") {
-      // After a `limit`, whatever ended the turn was the plan's refusal.
+      // After a `limit`, whatever ended the turn was the plan's refusal. Without one, only before anything ran: the
+      // words of a later failure can be a command's own.
+      const untouched = executedCount === 0 && toolCalls.length === 0;
       if (limit) throw limitFailure(event.message, event.worked);
+      if (event.code === "claude_failed" && untouched && hooks.refusedByPlan?.(event.message))
+        throw limitFailure(event.message, false);
       throw new BrainFailure(
         event.code,
         event.message,

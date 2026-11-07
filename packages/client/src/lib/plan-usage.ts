@@ -78,7 +78,8 @@ export function usageWhenShort(t: TFunction, locale: string | undefined, iso: st
 
 /**
  * The brain card's line when the agent's model is at a limit of its own on its plan (`PlanUsage.models`), so the
- * account's meters don't read as room for it: when it resets, or the region it needs. Null: none now.
+ * account's meters don't read as room for it: when it resets, the region it needs, or that the plan refused it.
+ * Null: none now.
  */
 export function modelLimitText(
   t: TFunction,
@@ -92,6 +93,8 @@ export function modelLimitText(
   const limit = model ? modelLimitOf(usage?.models, model.id, now.getTime()) : null;
   if (!model || !limit) return null;
   if (limit.region) return t("brain.modelRegion", { model: model.label });
+  if (limit.inactive) return t("brain.planInactive");
+  if (limit.off) return t("brain.modelOff", { model: model.label });
   return limit.until === null
     ? t("brain.modelLimitUnknown", { model: model.label })
     : t("brain.modelLimit", {

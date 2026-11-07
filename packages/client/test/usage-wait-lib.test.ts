@@ -102,13 +102,31 @@ test("a model's own limit: the note names the model and the way out, the brain c
   expect(
     modelLimitText(t, "en", region, "opencode", "deepseek-v4.1-flash", new Date(now.getTime() + 3600_000)),
   ).toBeNull();
+  // Refused for the key: the model or the account switched off in OpenCode.
+  const off = { models: { "minimax-m3": { at, off: true as const } } };
+  expect(modelLimitText(t, "en", off, "opencode", "sonnet", now)).toBe('brain.modelOff {"model":"MiniMax M3"}');
+  expect(
+    serverBody(t, "x", { bodyCode: "plan_model_off_wait", bodyParams: { model: "MiniMax M3", agent: "Lia" } }),
+  ).toBe('chat.body.plan_model_off_wait {"model":"MiniMax M3","agent":"Lia","when":""}');
+  // No active Go subscription on the key's account: the account's words, and no other model offered.
+  const inactive = { models: { "minimax-m3": { at, inactive: true as const } } };
+  expect(modelLimitText(t, "en", inactive, "opencode", "sonnet", now)).toBe("brain.planInactive {}");
+  expect(serverBody(t, "x", { bodyCode: "plan_inactive_wait", bodyParams: { model: "MiniMax M3" } })).toBe(
+    'chat.body.plan_inactive_wait {"model":"MiniMax M3","when":""}',
+  );
+  expect(usageWaitFix({ bodyCode: "plan_inactive_wait" }, { admin: true, owner: true })).toBeNull();
 });
 
 test("a wait's way out: another model for its owner or an admin, a higher budget for an admin, none for a plan's limit", () => {
   const anyone = { admin: false, owner: false };
   const owner = { admin: false, owner: true };
   const admin = { admin: true, owner: false };
-  for (const bodyCode of ["plan_model_limit_wait", "plan_model_limit_wait_unknown", "plan_model_region_wait"]) {
+  for (const bodyCode of [
+    "plan_model_limit_wait",
+    "plan_model_limit_wait_unknown",
+    "plan_model_region_wait",
+    "plan_model_off_wait",
+  ]) {
     expect(usageWaitFix({ bodyCode }, owner)).toBe("changeModel");
     expect(usageWaitFix({ bodyCode }, admin)).toBe("changeModel");
     expect(usageWaitFix({ bodyCode }, anyone)).toBeNull();

@@ -50,7 +50,7 @@ export const brainModelChoices = (
  * (`glm-5.3-flash-free`…) never answers, so its free models show only on the OpenCode brain (ADR 0132 §7).
  */
 export const planFreeHint = (t: TFunction, plan: CodingPlan | undefined) =>
-  plan === CODING_PLANS.opencode ? t("brain.opencodeFreeHint") : undefined;
+  plan?.name === CODING_PLANS.opencode.name ? t("brain.opencodeFreeHint") : undefined;
 
 /**
  * The choice a stored model shows as: on a plan, the model it runs there (an alias the plan leaves out or another

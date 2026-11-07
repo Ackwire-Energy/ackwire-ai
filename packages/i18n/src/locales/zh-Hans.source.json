@@ -5437,6 +5437,12 @@
   "noAi.rightHand.model_region": {
     "value": "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
   },
+  "noAi.rightHand.model_off": {
+    "value": "{{name}} can't answer: OpenCode refused {{model}} with this key. Turn the model or the account on in OpenCode, or choose another model."
+  },
+  "noAi.rightHand.plan_inactive": {
+    "value": "{{name}} can't answer: OpenCode Go isn't active on this key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it."
+  },
   "noAi.rightHand.commands_off": {
     "value": "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on."
   },
@@ -22515,6 +22521,12 @@
   "brain.modelRegion": {
     "value": "{{model}} needs the Global region turned on in OpenCode (Settings › Privacy). The plan's other models keep working."
   },
+  "brain.modelOff": {
+    "value": "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or choose another model."
+  },
+  "brain.planInactive": {
+    "value": "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it."
+  },
   "brain.modelHow.globalRegion": {
     "value": "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer."
   },
@@ -32744,6 +32756,12 @@
   "chat.body.plan_model_region_wait": {
     "value": "This model ({{model}}) needs the Global region turned on in OpenCode (Settings › Privacy)."
   },
+  "chat.body.plan_model_off_wait": {
+    "value": "OpenCode refused {{model}} with this key: the model or the account is turned off there. Turn it on in OpenCode or change {{agent}}'s model."
+  },
+  "chat.body.plan_inactive_wait": {
+    "value": "OpenCode Go isn't active on this key's OpenCode account, so none of its models answer. Check the Go subscription in OpenCode, or connect a key from the account that has it."
+  },
   "chat.body.budget_wait": {
     "value": "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it."
   },
@@ -32833,6 +32851,12 @@
   },
   "chat.body.no_ai_model_region": {
     "value": "I can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
+  },
+  "chat.body.no_ai_model_off": {
+    "value": "I can't answer: OpenCode refused {{model}} with my key. Turn the model or the account on in OpenCode, or change my model."
+  },
+  "chat.body.no_ai_plan_inactive": {
+    "value": "I can't answer: OpenCode Go isn't active on my key's OpenCode account. Check the Go subscription in OpenCode, or connect a key from the account that has it."
   },
   "chat.body.no_ai_commands_off": {
     "value": "I can't answer now: commands are turned off on my plan's computer."
@@ -35565,6 +35589,18 @@
   },
   "taskManager.wait.modelRegionNext": {
     "value": "Turn it on in OpenCode (Settings › Privacy)"
+  },
+  "taskManager.wait.modelOff": {
+    "value": "OpenCode refused {{model}}"
+  },
+  "taskManager.wait.modelOffNext": {
+    "value": "Turn it on in OpenCode or choose another model"
+  },
+  "taskManager.wait.planInactive": {
+    "value": "OpenCode Go isn't active"
+  },
+  "taskManager.wait.planInactiveNext": {
+    "value": "Check the Go subscription in OpenCode"
   },
   "taskManager.wait.budgetOut": {
     "value": "This month's budget ran out"

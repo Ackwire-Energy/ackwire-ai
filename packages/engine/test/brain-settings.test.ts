@@ -7,7 +7,7 @@ import {
   SPEED_PROTOCOL,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { planOf } from "@agenteschat/providers/plans";
+import { CODING_PLANS, learnPlanModels, planOf } from "@agenteschat/providers/plans";
 import {
   ConflictError,
   canTalkTo,
@@ -705,4 +705,23 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
     expect(saved).toMatchObject({ brainAccountId: BIAS, brainAccountLentBy: caio.id, planForOthers: false });
     expect(await takeBackPlan(deps, bia.id, fx.org.id, BIAS)).toEqual({ agentIds: [lodi.id] });
   });
+});
+
+test("a model its plan's list dropped since: a save that repeats it goes through, a new choice of it doesn't", async () => {
+  const { fx, deps } = await world();
+  const save = (input: Parameters<typeof setAgentBrain>[4]) =>
+    setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, input);
+  await save({ brain: "claude_code", model: "hy3" });
+  const table = CODING_PLANS.opencode.claudeCode.models;
+  learnPlanModels({ opencode: table.filter((m) => m.id !== "hy3") });
+  try {
+    expect(await save({ brain: "claude_code", model: "hy3", fallback: false })).toMatchObject({
+      model: "hy3",
+      fallback: false,
+    });
+    await save({ model: "opus" });
+    await expect(save({ model: "hy3" })).rejects.toBeInstanceOf(ValidationError);
+  } finally {
+    learnPlanModels({ opencode: table });
+  }
 });

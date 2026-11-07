@@ -38,7 +38,7 @@ import {
   type TaskExecutor,
   type TaskStart,
 } from "@agenteschat/adapters/machine-protocol";
-import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, planForTurn, planOf } from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
   ACCOUNT_SIGNED_OUT,
@@ -1063,7 +1063,10 @@ export class TaskManager {
     const hosted = executor === "claude" && grant?.kind === "hosted";
     const signIn = executor === "shell" || hosted ? null : await this.signIn(executor, req.account, grant);
     if (signIn?.release) this.releases.set(taskId, signIn.release);
-    const plan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
+    const keyPlan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
+    const plan = keyPlan && planForTurn(keyPlan, req.model);
+    // The agent's model on its plan, as its turns: the plan's `sonnet` when the server named none.
+    const planModel = plan ? claudeCodeModel(plan, req.model) : undefined;
     const folder = await this.opts.agentFolder(agent);
     let cwd = folder;
     if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
@@ -1148,7 +1151,7 @@ export class TaskManager {
     const input = where ? `${where}\n\n${prompt}` : prompt;
     // On an account, Claude Code's endpoint and proxies are pinned in its own `--settings`, as a turn's: a project's
     // settings never send its sign-in elsewhere.
-    const accountSettings = executor === "claude" && signIn ? { env: accountSettingsEnv(plan, undefined) } : {};
+    const accountSettings = executor === "claude" && signIn ? { env: accountSettingsEnv(plan, planModel) } : {};
     if (hosted) {
       // Its CLI's files and tools are root's and this worker's bridge's.
     } else if (missionId && this.opts.mcp) {
@@ -1251,7 +1254,7 @@ export class TaskManager {
       extra.push("--settings", shellArg(settingsFile));
     }
     // A coding plan serves only its own models: Claude Code asks for one by the alias the plan maps (as a turn).
-    if (executor === "claude" && plan) extra.push("--model", claudeCodeModel(plan, undefined));
+    if (planModel) extra.push("--model", planModel);
     const command = hosted
       ? "claude"
       : executorCommand(executor, {
