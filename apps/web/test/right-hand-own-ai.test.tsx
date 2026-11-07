@@ -120,12 +120,11 @@ describe("the agent's page beside its conversation", () => {
   };
   const panel = () => document.querySelector(".thread-panel--wide") as HTMLElement | null;
 
-  test("docks in the conversation's body, with no scrim, and gives the focus back on Esc", async () => {
+  test("floats over a scrim, takes the focus, and gives it back on Esc", async () => {
     const opener = await openPanel();
     const side = panel() as HTMLElement;
-    expect(side.classList.contains("thread-panel--docked")).toBe(true);
-    expect(side.parentElement?.classList.contains("channel__body")).toBe(true);
-    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    expect(side.previousElementSibling?.classList.contains("thread-panel__scrim")).toBe(true);
+    expect(side.contains(document.activeElement)).toBe(true);
     expect(opener.getAttribute("aria-expanded")).toBe("true");
     await act(async () => fireEvent.keyDown(side, { key: "Escape" }));
     await settle(3);

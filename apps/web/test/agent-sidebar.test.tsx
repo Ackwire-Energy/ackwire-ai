@@ -118,19 +118,23 @@ describe("the toggle", () => {
     expect(side()).toBeNull();
   });
 
-  test("sits under the header, in the members' place, and the agent's page takes that place while it is open", async () => {
+  test("sits under the header, in the members' place, and stays under the agent's page floating over it", async () => {
     widthIs(DM_SIDE_WIDE_QUERY);
     await openDm();
     const body = screen().getByRole("main").querySelector(":scope > .channel__body") as HTMLElement;
-    expect(body.lastElementChild).toBe(side());
+    const column = side();
+    expect(body.lastElementChild).toBe(column);
     const header = screen().getByRole("main").querySelector(".channel__header") as HTMLElement;
     await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Perfil de Ada" })));
     await settle(6);
-    expect(side()).toBeNull();
-    expect(toggle()?.getAttribute("aria-pressed")).toBe("false");
-    await act(async () => fireEvent.click(toggle() as HTMLElement));
+    const page = document.querySelector(".thread-panel--wide") as HTMLElement;
+    expect(page).toBeTruthy();
+    expect(side()).toBe(column);
+    expect(column?.inert).toBe(true);
+    await act(async () => fireEvent.click(document.querySelector(".thread-panel__scrim") as HTMLElement));
     await settle(6);
-    expect(side()).toBeTruthy();
+    expect(document.querySelector(".thread-panel--wide")).toBeNull();
+    expect(side()).toBe(column);
   });
 
   test("no sidebar in a DM with a person", async () => {

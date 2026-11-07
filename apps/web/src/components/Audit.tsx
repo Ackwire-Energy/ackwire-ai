@@ -43,6 +43,7 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { DetailsLink } from "@/components/details-link";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { SidePanel } from "@/components/SidePanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
@@ -289,137 +290,128 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
   const reasonKey = auditReasonKey(row);
 
   return (
-    <>
-      <button
-        type="button"
-        className="thread-panel__scrim"
-        tabIndex={-1}
-        aria-label={t("common.close")}
-        onClick={onClose}
-      />
-      <aside className="thread-panel audit-panel" aria-label={t("audit.panel.label")}>
-        <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who" aria-hidden="true">
-            <Face row={row} />
+    <SidePanel className="audit-panel" label={t("audit.panel.label")} onClose={onClose}>
+      <header className="channel__header thread-head thread-head--panel">
+        <span className="thread-head__who" aria-hidden="true">
+          <Face row={row} />
+        </span>
+        <div className="thread-head__text">
+          <h1 className="channel__title thread-title">
+            <span className="thread-title__text">{auditHint(row) ?? auditPhrase(t, row)}</span>
+          </h1>
+          <span className="channel__topic thread-head__meta">
+            <span className="thread-head__where">{name}</span>
+            <span>·</span>
+            <span>{whenAt(t, i18n.language, row.at)}</span>
           </span>
-          <div className="thread-head__text">
-            <h1 className="channel__title thread-title">
-              <span className="thread-title__text">{auditHint(row) ?? auditPhrase(t, row)}</span>
-            </h1>
-            <span className="channel__topic thread-head__meta">
-              <span className="thread-head__where">{name}</span>
-              <span>·</span>
-              <span>{whenAt(t, i18n.language, row.at)}</span>
+        </div>
+        <Menu
+          align="end"
+          label={t("audit.panel.more")}
+          trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("audit.panel.more")} />}
+        >
+          <MenuItem
+            icon="copy"
+            onSelect={async () => {
+              await navigator.clipboard?.writeText(row.id);
+              toast.show(t("audit.panel.copied"));
+            }}
+          >
+            {t("audit.panel.copyLink")}
+          </MenuItem>
+        </Menu>
+        <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
+      </header>
+
+      <div className="thread-panel__page audit-panel__body">
+        <p className="audit-panel__lead">
+          <Sentence row={row} />
+        </p>
+        {look && (
+          <div>
+            <OutcomeChip row={row} />
+          </div>
+        )}
+        {reason && (
+          <div className={`audit-panel__reason ac-iconline audit-panel__reason--${reasonKey}`}>
+            <Icon name={reasonKey === "refused" ? "block" : reasonKey === "failed" ? "alert" : "info"} size={16} />
+            <span>
+              <strong>{t(`audit.panel.reason.${reasonKey}`)}:</strong> {reason}
             </span>
           </div>
-          <Menu
-            align="end"
-            label={t("audit.panel.more")}
-            trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("audit.panel.more")} />}
-          >
-            <MenuItem
-              icon="copy"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(row.id);
-                toast.show(t("audit.panel.copied"));
-              }}
-            >
-              {t("audit.panel.copyLink")}
-            </MenuItem>
-          </Menu>
-          <Button size="sm" variant="ghost" iconOnly icon="close" aria-label={t("common.close")} onClick={onClose} />
-        </header>
-
-        <div className="thread-panel__page audit-panel__body">
-          <p className="audit-panel__lead">
-            <Sentence row={row} />
-          </p>
-          {look && (
-            <div>
-              <OutcomeChip row={row} />
-            </div>
-          )}
-          {reason && (
-            <div className={`audit-panel__reason ac-iconline audit-panel__reason--${reasonKey}`}>
-              <Icon name={reasonKey === "refused" ? "block" : reasonKey === "failed" ? "alert" : "info"} size={16} />
-              <span>
-                <strong>{t(`audit.panel.reason.${reasonKey}`)}:</strong> {reason}
-              </span>
-            </div>
-          )}
-          <dl className="audit-panel__facts">
-            {facts.map(([k, v]) => (
-              <div key={k}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {input && Object.keys(input).length > 0 && (
-            <div className="audit-panel__sent">
-              <h4>{t("audit.panel.sent")}</h4>
-              <KeyValues entries={Object.entries(input)} />
-              <p className="audit-panel__hint">{t("audit.panel.sentHint")}</p>
-            </div>
-          )}
-          {changeDetails && changeDetails.length > 0 && (
-            <div className="audit-panel__sent">
-              <h4>{t("audit.panel.details")}</h4>
-              <KeyValues entries={changeDetails} />
-            </div>
-          )}
-          <details className="audit-panel__tech">
-            <summary>
-              <Icon name="chevronRight" size={14} />
-              {t("audit.panel.tech")}
-            </summary>
-            <dl>
-              <dt>{t("audit.panel.techAction")}</dt>
-              <dd>{row.action}</dd>
-              {isCall && row.target.id && (
-                <>
-                  <dt>{t("audit.panel.techTool")}</dt>
-                  <dd>{row.target.id}</dd>
-                </>
-              )}
-              {auditStr(row.details.kind) && (
-                <>
-                  <dt>{t("audit.panel.techKind")}</dt>
-                  <dd>{auditStr(row.details.kind)}</dd>
-                </>
-              )}
-              {row.runId && (
-                <>
-                  <dt>{t("audit.panel.techRun")}</dt>
-                  <dd>{row.runId}</dd>
-                </>
-              )}
-              <dt>{t("audit.panel.techId")}</dt>
-              <dd>{row.id}</dd>
-            </dl>
-          </details>
-        </div>
-
-        {(row.channel || row.approval?.status === "pending") && (
-          <footer className="audit-panel__foot">
-            {row.approval?.status === "pending" && (
-              <Button asChild variant="primary" icon="waiting">
-                <DetailsLink item={{ kind: "approval", id: row.approval.id }}>
-                  {t("audit.panel.openApproval")}
-                </DetailsLink>
-              </Button>
-            )}
-            {row.channel && (
-              <Button asChild icon="message">
-                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: row.channel.id }}>
-                  {t("audit.panel.openConversation")}
-                </Link>
-              </Button>
-            )}
-          </footer>
         )}
-      </aside>
-    </>
+        <dl className="audit-panel__facts">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        {input && Object.keys(input).length > 0 && (
+          <div className="audit-panel__sent">
+            <h4>{t("audit.panel.sent")}</h4>
+            <KeyValues entries={Object.entries(input)} />
+            <p className="audit-panel__hint">{t("audit.panel.sentHint")}</p>
+          </div>
+        )}
+        {changeDetails && changeDetails.length > 0 && (
+          <div className="audit-panel__sent">
+            <h4>{t("audit.panel.details")}</h4>
+            <KeyValues entries={changeDetails} />
+          </div>
+        )}
+        <details className="audit-panel__tech">
+          <summary>
+            <Icon name="chevronRight" size={14} />
+            {t("audit.panel.tech")}
+          </summary>
+          <dl>
+            <dt>{t("audit.panel.techAction")}</dt>
+            <dd>{row.action}</dd>
+            {isCall && row.target.id && (
+              <>
+                <dt>{t("audit.panel.techTool")}</dt>
+                <dd>{row.target.id}</dd>
+              </>
+            )}
+            {auditStr(row.details.kind) && (
+              <>
+                <dt>{t("audit.panel.techKind")}</dt>
+                <dd>{auditStr(row.details.kind)}</dd>
+              </>
+            )}
+            {row.runId && (
+              <>
+                <dt>{t("audit.panel.techRun")}</dt>
+                <dd>{row.runId}</dd>
+              </>
+            )}
+            <dt>{t("audit.panel.techId")}</dt>
+            <dd>{row.id}</dd>
+          </dl>
+        </details>
+      </div>
+
+      {(row.channel || row.approval?.status === "pending") && (
+        <footer className="audit-panel__foot">
+          {row.approval?.status === "pending" && (
+            <Button asChild variant="primary" icon="waiting">
+              <DetailsLink item={{ kind: "approval", id: row.approval.id }}>
+                {t("audit.panel.openApproval")}
+              </DetailsLink>
+            </Button>
+          )}
+          {row.channel && (
+            <Button asChild icon="message">
+              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: row.channel.id }}>
+                {t("audit.panel.openConversation")}
+              </Link>
+            </Button>
+          )}
+        </footer>
+      )}
+    </SidePanel>
   );
 }
 

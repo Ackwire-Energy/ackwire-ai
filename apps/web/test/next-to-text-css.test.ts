@@ -25,29 +25,25 @@ test("a row's minor action, its time and its stop sit right after its words, nev
   expect(last(shipped, ".ac-typing__step", "max-width")).toBeUndefined();
 });
 
-test("a thread opens in the members column's place, wider, with no scrim; a phone keeps the whole-screen sheet", async () => {
+test("a thread floats over the window like a dialog, 10px in, over a scrim; a phone keeps the whole-screen sheet", async () => {
   const css = await sheets();
-  const block = atRule(css, "@media (min-width: 861px)");
-  const wide = topLevel(block);
-  const phone = atRule(css, "@media (max-width: 860px)");
-  expect(last(wide, ".thread-panel--docked", "position")).toBe("relative");
-  expect(last(wide, ".thread-panel--docked", "flex")).toBe("none");
-  // As wide as the floating panel was (640px), the chat keeping at least 400px.
-  expect(last(wide, ".thread-panel--docked", "width")).toBe("clamp(360px,100% - 400px,640px)");
-  // Square, and a hairline from the chat, as the members column's, drawn as a border (the thread's own page covers an
-  // inset shadow): every side pane's, docked or not.
   const base = topLevel(css);
-  expect(last(base, ".thread-panel", "border-radius")).toBeUndefined();
-  expect(last(base, ".thread-panel", "border-left")).toBe("1px solid var(--line)");
-  expect(last(wide, ".thread-panel--docked", "border-radius")).toBeUndefined();
-  expect(last(wide, ".thread-panel--docked", "box-shadow")).toBe("none");
-  expect(last(phone, ".thread-panel", "position")).toBe("fixed");
-  // A body too narrow for both (a tablet with the sidebar open): the thread takes the conversation's place.
-  const narrow = atRule(block, "@container channel-body (max-width: 719px)");
-  expect(last(narrow, ".thread-panel--docked", "position")).toBe("absolute");
-  expect(last(narrow, ".thread-panel--docked", "inset")).toBe("0");
-  expect(last(wide, ".channel__body:has(>.thread-panel--docked)", "position")).toBe("relative");
-  // A narrow docked thread drops the channel's name and its "·", never leaving a lone "· 2 respostas".
-  const slim = atRule(block, "@container thread-dock (max-width: 479px)");
+  const phone = atRule(css, "@media (max-width: 860px)");
+  expect(last(base, ".thread-panel", "position")).toBe("fixed");
+  for (const edge of ["top", "right", "bottom"]) expect(last(base, ".thread-panel", edge)).toBe("10px");
+  // As wide as it always was (640px), from the window, rounded and lifted, no hairline of its own.
+  expect(last(base, ".thread-panel", "width")).toBe("min(640px,100vw - 20px)");
+  expect(last(base, ".thread-panel", "border-radius")).toBe("var(--radius-section)");
+  expect(last(base, ".thread-panel", "box-shadow")).toBe("var(--e3), var(--top)");
+  expect(last(base, ".thread-panel", "border-left")).toBeUndefined();
+  expect(last(base, ".thread-panel__scrim", "inset")).toBe("0");
+  expect(last(base, ".thread-panel__scrim", "position")).toBe("fixed");
+  expect(last(phone, ".thread-panel", "inset")).toBe("0");
+  expect(last(phone, ".thread-panel", "border-radius")).toBe("0");
+  expect(last(phone, ".thread-panel__scrim", "display")).toBe("none");
+  // No docked variant left.
+  expect(css).not.toContain("thread-panel--docked");
+  // A narrow panel drops the channel's name and its "·", never leaving a lone "· 2 respostas".
+  const slim = atRule(atRule(css, "@media (min-width: 861px)"), "@container thread-dock (max-width: 479px)");
   expect(last(slim, ".thread-head__meta>.thread-head__where", "display")).toBe("none");
 });

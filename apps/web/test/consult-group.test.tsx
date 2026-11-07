@@ -323,9 +323,8 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver conversa" })));
     await settle(3);
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
-    // Beside the conversation, like a thread: nothing dimmed.
-    expect(panel()?.parentElement?.className).toBe("channel__body");
-    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    // Over the conversation, like a thread: the whole window dimmed under it.
+    expect(panel()?.previousElementSibling?.className).toBe("thread-panel__scrim");
   });
 
   test("the answer far below its question: the same pair row where it arrived, opening the conversation", async () => {

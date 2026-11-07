@@ -5144,7 +5144,11 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 }
 .tr-subj__b {
   padding: 2px 8px 10px;
-  animation: tr-fade 0.22s var(--out) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tr-subj__b {
+    animation: tr-fade var(--dur-base) var(--out) both;
+  }
 }
 @keyframes tr-fade {
   from {
@@ -5301,7 +5305,11 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   box-shadow: var(--e2), var(--top);
   padding: 24px;
   overflow: hidden;
-  animation: tr-fade 0.3s var(--out) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tr-done {
+    animation: tr-fade var(--dur-base) var(--out) both;
+  }
 }
 .tr-done__title {
   margin: 0;
@@ -6662,17 +6670,14 @@ html:not([data-pointer]) .run-continue:focus-visible {
   gap: 0;
 }
 /* The bell's badge bumps when a notification arrives. */
-.sidebar__bump {
-  animation: sidebar-bump 0.5s var(--spring);
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar__bump {
+    animation: sidebar-bump 0.5s var(--spring);
+  }
 }
 @keyframes sidebar-bump {
   40% {
     transform: scale(1.35);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar__bump {
-    animation: none;
   }
 }
 .sidebar[data-rail="true"] .sidebar__unread,
@@ -8404,8 +8409,10 @@ html:not([data-pointer]) .onb__step:focus-visible {
   max-width: 660px;
   padding-bottom: 28px;
 }
-.newag__content > * {
-  animation: newag-in 0.32s var(--out) both;
+@media (prefers-reduced-motion: no-preference) {
+  .newag__content > * {
+    animation: newag-in var(--dur-base) var(--out) both;
+  }
 }
 @keyframes newag-in {
   from {
@@ -9846,7 +9853,11 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   flex-direction: column;
   gap: 16px;
   padding: 24px var(--agp-gutter) 0;
-  animation: agp-in 0.3s var(--out) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .agp-view {
+    animation: agp-in var(--dur-base) var(--out) both;
+  }
 }
 @keyframes agp-in {
   from {
@@ -10920,7 +10931,11 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   backdrop-filter: blur(18px) saturate(1.5);
   box-shadow: var(--e3), var(--top);
   box-sizing: border-box;
-  animation: agp-bar-in 0.35s var(--spring) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .agp-savebar {
+    animation: agp-bar-in var(--dur-panel) var(--out) both;
+  }
 }
 @keyframes agp-bar-in {
   from {
@@ -11096,10 +11111,14 @@ html:not([data-pointer]) .agp-changes__jump:focus-visible {
   align-items: center;
   cursor: pointer;
   color: var(--faint);
-  animation: msg-mem-in 0.5s var(--spring) both;
   transition:
     transform 0.2s var(--spring),
     box-shadow 0.15s;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .msg-mem {
+    animation: msg-mem-in 0.5s var(--spring) both;
+  }
 }
 .msg-mem:hover {
   transform: translateY(-1px);

@@ -235,7 +235,7 @@ export const SELF_TESTED = [
   "stack",
   "nameless",
   "quiet",
-  "docked",
+  "floating",
 ];
 
 /** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */

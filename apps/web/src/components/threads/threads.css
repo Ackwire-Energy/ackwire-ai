@@ -890,40 +890,30 @@ html:not([data-pointer]) .thread-line:focus-visible {
 }
 
 /*
- * Every side pane (a thread, search, an agent's page, a task's conversation, Auditoria's details): flush with the area's
- * top, right and bottom edges, a hairline on its left, docked (`.thread-panel--docked`) or over a scrim. Over a
- * channel the channel keeps its full width under it; the thread view inside is the same as its page (header,
- * messages, composer). Phones: the whole screen.
+ * Every side pane (`SidePanel`: a thread, search, an agent's page, a task's conversation or steps, Auditoria's details,
+ * a DM's side on a narrow window): a card floating 10px in from the window's top, right and bottom, over a scrim that
+ * dims the whole window, the sidebar included. It is `fixed` to the window, so its widths come from the window too.
+ * The thread view inside is the same as its page (header, messages, composer). Phones: the whole screen, no scrim.
+ * The geometry guard's `floating` rule (scripts/geometry/rules.js) measures both.
  */
 .thread-panel {
-  position: absolute;
-  z-index: 30;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(640px, calc(100% - 20px));
+  position: fixed;
+  z-index: var(--z-dialog);
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: min(640px, calc(100vw - 20px));
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-left: 1px solid var(--line);
+  container: thread-dock / inline-size;
+  border-radius: var(--radius-section);
   background: var(--pane);
-  box-shadow: var(--e3);
-  animation: thread-panel-in 0.24s var(--out);
+  box-shadow: var(--e3), var(--top);
 }
-[data-theme="dark"] .thread-panel {
-  border-left-color: var(--line2);
-}
-@keyframes thread-panel-in {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .thread-panel {
-    animation: none;
-  }
+.thread-panel:focus {
+  outline: none;
 }
 .thread-panel > .thread-panel__chat {
   flex: 1 1 auto;
@@ -942,52 +932,20 @@ html:not([data-pointer]) .thread-line:focus-visible {
 }
 @media (max-width: 1100px) {
   .thread-panel {
-    width: min(560px, calc(100% - 20px));
+    width: min(560px, calc(100vw - 20px));
   }
 }
 @media (max-width: 860px) {
   .thread-panel {
-    position: fixed;
     inset: 0;
     width: auto;
-    border-left: 0;
+    border-radius: 0;
     box-shadow: none;
   }
-}
-/* A thread beside its channel (`.thread-panel--docked`): in the members column's place under the channel's header,
-   wider than it, with no scrim, so the channel stays in use; closing it brings the members back. The chat keeps
-   400px where it can and never less than 360px; a body too narrow for both (a tablet with the sidebar open) gives
-   the thread the conversation's place under the header until it closes. A phone keeps the whole-screen sheet above. */
-.channel__body {
-  container: channel-body / inline-size;
-}
-.thread-panel--docked {
-  container: thread-dock / inline-size;
 }
 @media (min-width: 861px) {
-  .thread-panel--docked {
-    position: relative;
-    z-index: auto;
-    inset: auto;
-    flex: none;
-    width: clamp(360px, calc(100% - 400px), 640px);
-    box-shadow: none;
-    animation: ac-fade-in 160ms ease-out;
-  }
-  .channel__body:has(> .thread-panel--docked) {
-    position: relative;
-  }
-  @container channel-body (max-width: 719px) {
-    .thread-panel--docked {
-      position: absolute;
-      z-index: 30;
-      inset: 0;
-      width: auto;
-      border-left: 0;
-    }
-  }
-  /* Narrow beside its channel: the channel's name and who is in it go (the channel is right there, their faces
-     lead the header), so the replies and the time never follow a lone "·". */
+  /* Narrow (a small window): the channel's name and who is in it go from the header (their faces lead it), so the
+     replies and the time never follow a lone "·". */
   @container thread-dock (max-width: 479px) {
     .thread-head__meta > .thread-head__where,
     .thread-head__meta > .thread-head__where + [aria-hidden="true"] {
@@ -1009,38 +967,16 @@ html:not([data-pointer]) .thread-line:focus-visible {
     }
   }
 }
-@media (min-width: 861px) and (prefers-reduced-motion: reduce) {
-  .thread-panel--docked {
-    animation: none;
-  }
-}
-/* The agent's page in the same panel ("Ver perfil" in its DM): it scrolls inside, so its tabs and
-   save bar stick to the panel. */
+/* The agent's page and a task's steps scroll inside, so their tabs and save bar stick to the panel. */
 .thread-panel__page {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
-/* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. Beside the
-   conversation it never squeezes it: the chat keeps 520px and the page takes the rest, from 420px to 760px; a body
-   too narrow for both gives the page the conversation's place until it closes, as a thread does. */
+/* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. */
 .thread-panel--wide {
-  width: min(900px, calc(100% - 20px));
+  width: min(900px, calc(100vw - 20px));
   container: agp-side / inline-size;
-}
-@media (min-width: 861px) {
-  .thread-panel--docked.thread-panel--wide {
-    width: clamp(420px, calc(100% - 520px), 760px);
-  }
-  @container channel-body (max-width: 939px) {
-    .thread-panel--docked.thread-panel--wide {
-      position: absolute;
-      z-index: 30;
-      inset: 0;
-      width: auto;
-      border-left: 0;
-    }
-  }
 }
 @media (max-width: 860px) {
   .thread-panel--wide {
@@ -1049,9 +985,6 @@ html:not([data-pointer]) .thread-line:focus-visible {
 }
 /* Its × (AgentPanel), top right where the cover's buttons end, stays put while the page scrolls under it; the
    cover's own buttons, a page's header and the tabs stuck under it make room for it. */
-.thread-panel--wide:focus {
-  outline: none;
-}
 .thread-panel__close {
   position: absolute;
   z-index: 2;
@@ -1066,32 +999,75 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
 }
-/* Under a panel that floats (not one docked in a conversation): the whole window dims like under a dialog
-   (.ac-dialog__scrim, e.g. a routine's details), the sidebar too, and a click there closes the panel. */
+/* Under the panel the whole window dims like under a dialog (`--scrim`, so both read the same in each theme), the
+   sidebar too, and a click there closes the panel. */
 .thread-panel__scrim {
   position: fixed;
-  z-index: 29;
+  z-index: var(--z-scrim);
   inset: 0;
   padding: 0;
   border: 0;
-  /* The dialog's own dim (`--scrim`), so both read the same in each theme. */
   background: var(--scrim);
   cursor: default;
-  animation: thread-scrim-in 0.24s var(--out);
+}
+@media (max-width: 860px) {
+  .thread-panel__scrim {
+    display: none;
+  }
+}
+/* Motion: the panel slides in from past the window's right edge, opaque the whole way, and back out a little faster
+   (`leaveAnimated` keeps a copy on screen for the exit); the scrim fades with it. Content replacing other content
+   inside (a thread a search hit opened over the results) comes in from a little to the right. A panel replacing
+   another in the same moment (`data-swap`) just swaps. Reduced motion: nothing moves. */
+@media (prefers-reduced-motion: no-preference) {
+  .thread-panel {
+    animation: thread-panel-in var(--dur-panel) var(--drawer);
+  }
+  .thread-panel[data-leaving] {
+    animation: thread-panel-out var(--dur-base) var(--out) forwards;
+  }
+  .thread-panel__scrim {
+    animation: thread-scrim-in var(--dur-panel) var(--out);
+  }
+  .thread-panel__scrim[data-leaving] {
+    animation: thread-scrim-out var(--dur-base) var(--out) forwards;
+  }
+  .thread-panel__chat[hidden] + .thread-panel__chat {
+    animation: thread-panel-push var(--dur-base) var(--out);
+  }
+  .thread-panel[data-swap],
+  .thread-panel__scrim[data-swap] {
+    animation: none;
+  }
+}
+.thread-panel[data-leaving],
+.thread-panel__scrim[data-leaving] {
+  pointer-events: none;
+}
+@keyframes thread-panel-in {
+  from {
+    transform: translateX(calc(100% + 10px));
+  }
+}
+@keyframes thread-panel-out {
+  to {
+    transform: translateX(calc(100% + 10px));
+  }
 }
 @keyframes thread-scrim-in {
   from {
     opacity: 0;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .thread-panel__scrim {
-    animation: none;
+@keyframes thread-scrim-out {
+  to {
+    opacity: 0;
   }
 }
-@media (max-width: 860px) {
-  .thread-panel__scrim {
-    display: none;
+@keyframes thread-panel-push {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
   }
 }
 /* A page's entrance (`page-in`) holds its last frame, and a transform held there makes the page, not the window, what

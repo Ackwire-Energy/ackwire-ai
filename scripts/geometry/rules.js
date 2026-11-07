@@ -9,7 +9,7 @@
   const PAD_DIFF = 2;
   const PLATE_DIFF = 1;
   const GAP_DIFF = 1.5;
-  /** The narrowest window a side pane docks in instead of covering the screen (threads.css, 861px). */
+  /** The narrowest window a side pane floats in instead of covering the screen (`.thread-panel` in threads.css). */
   const DESKTOP_MIN = 861;
 
   const sig = (el) => {
@@ -360,21 +360,30 @@
     },
     /**
      * A side pane (`.thread-panel`: a thread, search, an agent's page, a task's conversation, Auditoria's details) on a
-     * desktop window: flush with the top of the area it docks in (under a channel's header, the area's top is the
-     * header's foot) and with the window's right and bottom edges, no gap. Phones take the whole screen (another rule).
+     * desktop window floats 10px in from the window's top, right and bottom, never touching its left, over a scrim
+     * (the element right before it) that covers the whole window, the sidebar included. Phones take the whole screen.
      */
-    docked(out) {
+    floating(out) {
       if (innerWidth < DESKTOP_MIN) return;
+      const GAP = 10;
       // An inline position is a test's own stand-in for a narrow window, not the app's layout.
       for (const pane of document.querySelectorAll(".thread-panel:not([style])")) {
         if (!seen(pane)) continue;
         const a = pane.getBoundingClientRect();
-        const area = pane.parentElement.getBoundingClientRect();
-        const gaps = { Top: a.top - area.top, Right: innerWidth - a.right, Bottom: innerHeight - a.bottom };
+        const gaps = { Top: a.top - GAP, Right: innerWidth - a.right - GAP, Bottom: innerHeight - a.bottom - GAP };
+        if (a.left < GAP) gaps.Left = a.left - GAP;
+        const before = pane.previousElementSibling;
+        const scrim = before?.matches(".thread-panel__scrim") ? before : null;
+        const s = scrim?.getBoundingClientRect();
+        const off = s
+          ? Math.abs(s.left) + Math.abs(s.top) + Math.abs(innerWidth - s.right) + Math.abs(innerHeight - s.bottom)
+          : Number.POSITIVE_INFINITY;
+        if (off > 2)
+          out.push({ rule: "floating", node: scrim ?? pane, el: sig(scrim ?? pane), box: sig(pane), side: "Scrim" });
         for (const [side, px] of Object.entries(gaps)) {
           if (Math.abs(px) > 0.5)
             out.push({
-              rule: "docked",
+              rule: "floating",
               node: pane,
               el: sig(pane),
               box: sig(pane.parentElement),

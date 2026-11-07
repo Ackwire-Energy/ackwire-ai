@@ -696,6 +696,20 @@ html:not([data-pointer]) .ap-link:focus-visible {
 .ap-li:hover {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
+/* A request coming in while the list is on screen rises in (the kit's `.ac-list` rows do the same). */
+@media (prefers-reduced-motion: no-preference) {
+  .ap-li {
+    transition:
+      opacity var(--dur-base) var(--out),
+      transform var(--dur-base) var(--out);
+  }
+  @starting-style {
+    .ap-li {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+}
 /* The list scrolls with no room on its left (the rows' plates start on the page's edge): the ring goes inside. */
 html:not([data-pointer]) .ap-li:focus-visible {
   box-shadow: var(--focus-ring-inset);

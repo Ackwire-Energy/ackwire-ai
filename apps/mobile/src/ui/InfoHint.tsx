@@ -12,13 +12,13 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { hintBack, hintClosed, hintOpened, hintTouched } from "./hints";
 import { Icon } from "./Icon";
 import { Text, type TextVariant, textLineOf } from "./Text";
-import { useTheme } from "./theme";
+import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
 /** The ⓘ as drawn (points); `hitSlop` makes its target 44. */
 const GLYPH = 18;
 const SLOP = (44 - GLYPH) / 2;
-const HINT_IN = FadeIn.duration(160);
+const HINT_IN = FadeIn.duration(motion.fast);
 
 export interface InfoHintOptions {
   /** The ⓘ's accessible name, translated: `t("common.about", { label })` → "About Time zone". */

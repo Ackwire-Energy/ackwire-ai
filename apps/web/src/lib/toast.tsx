@@ -26,6 +26,8 @@ export interface Toast {
   actions?: ToastAction[];
   /** The agent the words name: its face goes before its name. */
   who?: ToastWho;
+  /** Its time is up: it plays its exit (`.ac-toast[data-leaving]`, `--dur-fast`) before it goes. */
+  leaving?: boolean;
 }
 
 /**
@@ -57,6 +59,8 @@ const ToastContext = createContext<ToastApi>({ show: () => {} });
 export const TOAST_MS = 6000;
 
 let nextId = 1;
+/** A toast's exit (`--dur-fast`). */
+const LEAVE_MS = 140;
 
 /** A tiny store so non-React code (the QueryClient) can raise toasts. */
 export function createToastStore() {
@@ -81,8 +85,12 @@ export function createToastStore() {
       toasts = [...toasts.filter((t) => t.text !== text), toast].slice(-3);
       emit();
       setTimeout(() => {
-        toasts = toasts.filter((t) => t.id !== toast.id);
+        toasts = toasts.map((t) => (t.id === toast.id ? { ...t, leaving: true } : t));
         emit();
+        setTimeout(() => {
+          toasts = toasts.filter((t) => t.id !== toast.id);
+          emit();
+        }, LEAVE_MS);
       }, TOAST_MS);
     },
     dismiss(id: number) {
@@ -126,6 +134,7 @@ export function ToastProvider({
             key={toast.id}
             className={`ac-toast ac-toast--${toast.tone}`}
             role={toast.tone === "error" ? "alert" : "status"}
+            data-leaving={toast.leaving || undefined}
           >
             <Icon name={toast.tone === "error" || toast.tone === "warning" ? "alert" : "check"} />
             <span className="ac-toast__text">

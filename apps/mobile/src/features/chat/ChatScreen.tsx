@@ -84,6 +84,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeOut,
+  Keyframe,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -104,6 +105,7 @@ import {
   Icon,
   IconButton,
   LineIcon,
+  motion,
   PressScale,
   type SendHow,
   Text,
@@ -256,7 +258,11 @@ const OFFLINE_AFTER_MS = 1200;
 /** "Conectado de novo" stays this long. */
 const BACK_ONLINE_MS = 1600;
 /** A row that just arrived at the bottom rises in (only while it is fresh: not when scrolled back into view). */
-const ENTER = FadeInDown.duration(220);
+/** A live arrival rises 6pt into place (`--dur-base`, as on the web); history and a jump never do. */
+const ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 6 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }] },
+}).duration(motion.base);
 const FRESH_MS = 800;
 /** How close to the end a scroll has to stop for a list held at a long message's start to follow again. */
 const READ_RELEASE_PX = 24;
@@ -832,10 +838,15 @@ function Chat({
   useEffect(() => {
     prevKeysRef.current = rowKeys;
   }, [rowKeys]);
-  const isFresh = useCallback((key: string) => {
-    const t0 = freshRef.current.get(key);
-    return t0 !== undefined && Date.now() - t0 <= FRESH_MS;
-  }, []);
+  // Less motion asked for: nothing rises in.
+  const stillRows = useReducedMotion();
+  const isFresh = useCallback(
+    (key: string) => {
+      const t0 = freshRef.current.get(key);
+      return !stillRows && t0 !== undefined && Date.now() - t0 <= FRESH_MS;
+    },
+    [stillRows],
+  );
 
   // ── Read ──
   // Seen up to the latest message: the list's badges (a channel's or DM's, or a thread's) clear at once.

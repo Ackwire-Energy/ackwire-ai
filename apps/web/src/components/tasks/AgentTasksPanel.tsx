@@ -22,6 +22,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
+import { SidePanel } from "@/components/SidePanel";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -109,7 +110,7 @@ export function AgentTasksPanel({
   ];
 
   return (
-    <aside className="thread-panel thread-panel--docked tm-agentpanel" aria-label={title}>
+    <SidePanel className="tm-agentpanel" label={title} onClose={onClose}>
       <header className="channel__header thread-head thread-head--panel">
         <span className="thread-head__who">
           <OpensAgent agentId={agentId}>
@@ -183,7 +184,7 @@ export function AgentTasksPanel({
           </>
         )}
       </footer>
-    </aside>
+    </SidePanel>
   );
 }
 

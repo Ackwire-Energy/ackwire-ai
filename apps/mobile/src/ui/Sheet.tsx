@@ -51,7 +51,7 @@ const WIDE_WIDTH = 560;
  * away. Keyboard-aware for forms: with the keyboard up it fits the room above it and scrolls.
  */
 export function Sheet({ open, onClose, children, solid = false, onGone }: SheetProps) {
-  const { colors, shadows, reducedMotion } = useTheme();
+  const { colors, shadows, reducedMotion, motion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -90,10 +90,10 @@ export function Sheet({ open, onClose, children, solid = false, onGone }: SheetP
       setMounted(true);
       y.value = height;
       y.value = withTiming(0, { duration: ms, easing: ease });
-      scrim.value = withTiming(1, { duration: reducedMotion ? 0 : 300 });
+      scrim.value = withTiming(1, { duration: reducedMotion ? 0 : motion.panel });
     } else if (mounted) {
-      scrim.value = withTiming(0, { duration: reducedMotion ? 0 : 250 });
-      y.value = withTiming(height, { duration: reducedMotion ? 0 : 320, easing: ease }, (done) => {
+      scrim.value = withTiming(0, { duration: reducedMotion ? 0 : motion.base });
+      y.value = withTiming(height, { duration: reducedMotion ? 0 : motion.panel, easing: ease }, (done) => {
         if (done) runOnJS(setMounted)(false);
       });
     }

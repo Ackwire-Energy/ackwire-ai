@@ -176,7 +176,7 @@ export function CoverTabStack({ title }: { title: string }) {
  * round plate floating like iOS 26's glass one (the toolbar's own arrow sat bare on the bar).
  */
 export function usePushedOptions(): NativeStackNavigationOptions {
-  const { colors } = useTheme();
+  const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const backTitle = t("mobile.common.back");
   return useMemo<NativeStackNavigationOptions>(
@@ -193,10 +193,12 @@ export function usePushedOptions(): NativeStackNavigationOptions {
       headerTitleStyle: { color: colors.ink },
       headerTintColor: colors.ink,
       gestureEnabled: true,
+      // From the right on both platforms (Android's default rises from below); a cross-fade with less motion.
+      animation: reducedMotion ? "fade" : "slide_from_right",
       contentStyle: { backgroundColor: colors.bg },
       ...plateBack(backTitle),
     }),
-    [colors, backTitle],
+    [colors, backTitle, reducedMotion],
   );
 }
 

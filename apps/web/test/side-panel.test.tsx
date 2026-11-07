@@ -54,7 +54,7 @@ async function openThread() {
     message: reply,
   };
   api.pins = { list: async () => [pin], pin: async () => ({}) as never, unpin: async () => {} };
-  const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+  const { router, services } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
   await settle(8);
   expect(members()).toBeTruthy();
   await click(screen().getByRole("button", { name: /^Mensagens fixadas \(/ }));
@@ -62,44 +62,60 @@ async function openThread() {
   const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
   await click(list.querySelector(".thread-pop__row") as HTMLElement);
   await settle(6);
-  return { router };
+  return { router, services };
 }
 
-test("a thread opens in the members column's place, beside the channel, with no scrim; closing it brings them back", async () => {
-  const { router } = await openThread();
+test("a thread floats over a scrim: everything behind it is out of reach, the toasts aside, until its × closes it", async () => {
+  const { router, services } = await openThread();
   const side = thread() as HTMLElement;
   expect(side).toBeTruthy();
-  expect(side.classList.contains("thread-panel--docked")).toBe(true);
-  // In the channel's body, right of the conversation, under the channel's header.
-  const body = side.parentElement as HTMLElement;
-  expect(body.classList.contains("channel__body")).toBe(true);
-  expect(side.previousElementSibling?.classList.contains("channel__col")).toBe(true);
-  // The members give it their place; nothing dims the channel, which stays in use.
-  expect(members()).toBeNull();
-  expect(document.querySelector(".thread-panel__scrim")).toBeNull();
-  expect(screen().getByRole("button", { name: "Membros do canal (4)" }).getAttribute("aria-pressed")).toBe("false");
+  expect(side.classList.contains("thread-panel")).toBe(true);
+  // Its scrim right before it; the members column stays under both, so nothing moves behind the scrim.
+  expect(side.previousElementSibling?.classList.contains("thread-panel__scrim")).toBe(true);
+  expect(members()).toBeTruthy();
+  // The sidebar, the conversation and the members are inert; the toasts (a Desfazer) stay live.
+  const sidebar = document.querySelector(".sidebar") as HTMLElement;
+  expect(sidebar.closest("[inert]")).toBeTruthy();
+  expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(true);
+  expect(side.closest("[inert]")).toBeNull();
+  await act(async () => services.toasts.show("Salvo"));
+  expect((document.querySelector(".ac-toasts") as HTMLElement).closest("[inert]")).toBeNull();
   // Its own page is one click away.
   expect(within(side).getByRole("button", { name: "Abrir em tela cheia" })).toBeTruthy();
 
   await click(within(side).getByRole("button", { name: "Fechar a thread" }));
   await settle(3);
   expect(thread()).toBeNull();
-  expect(members()).toBeTruthy();
+  expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+  expect(sidebar.closest("[inert]")).toBeNull();
+  expect((document.querySelector(".channel__col") as HTMLElement).inert).toBe(false);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
 });
 
-test("the members toggle with a thread open closes the thread and shows the members", async () => {
+test("a click on the scrim closes it, and so does Esc, the focus back where it was", async () => {
   await openThread();
-  expect(thread()).toBeTruthy();
-  await click(screen().getByRole("button", { name: "Membros do canal (4)" }));
+  await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
   await settle(3);
   expect(thread()).toBeNull();
-  expect(members()).toBeTruthy();
+
+  const reply = within(document.querySelector(".channel__col") as HTMLElement).getAllByRole("button", {
+    name: "Responder",
+  })[0] as HTMLElement;
+  reply.focus();
+  await click(reply);
+  await settle(6);
+  const side = thread() as HTMLElement;
+  expect(side.contains(document.activeElement)).toBe(true);
+  await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "Escape" }));
+  await settle(3);
+  expect(thread()).toBeNull();
+  expect(document.activeElement).toBe(reply);
 });
 
-test("over the agent's page with unsaved edits, opening a thread beside it asks first and keeps the page", async () => {
+test("over the agent's page with unsaved edits, a click on the scrim asks first and keeps the page", async () => {
   await openThread();
-  await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+  // From inside the thread: everything outside the panel is out of reach.
+  await click(within(thread() as HTMLElement).getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
   await settle(6);
   const card = screen().getByRole("dialog", { name: "Perfil" });
   await act(async () =>
@@ -109,8 +125,10 @@ test("over the agent's page with unsaved edits, opening a thread beside it asks 
   await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Ver perfil" }));
   await settle(6);
   const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
-  expect(side.classList.contains("thread-panel--docked")).toBe(true);
+  // The agent's page took the thread's place in the one panel.
   expect(thread()).toBeNull();
+  expect(document.querySelectorAll(".thread-panel")).toHaveLength(1);
+  expect(document.querySelectorAll(".thread-panel__scrim")).toHaveLength(1);
   // Configurações is in the tabs' More menu (Radix opens it on pointer down).
   await act(async () =>
     fireEvent.pointerDown(within(side).getByRole("button", { name: /^Mais$/ }), { button: 0, ctrlKey: false }),
@@ -119,12 +137,8 @@ test("over the agent's page with unsaved edits, opening a thread beside it asks 
   await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: /^Configurações/ }));
   await settle(4);
   await click(within(within(side).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
-  await click(screen().getByRole("button", { name: /^Mensagens fixadas \(/ }));
+  await click(side.previousElementSibling as HTMLElement);
   await settle(2);
-  const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
-  await click(list.querySelector(".thread-pop__row") as HTMLElement);
-  await settle(6);
   expect(document.querySelector(".thread-panel--wide")).toBeTruthy();
-  expect(document.querySelector(".thread-panel:not(.thread-panel--wide)")).toBeNull();
   expect(screen().getByRole("button", { name: "Continuar editando" })).toBeTruthy();
 });

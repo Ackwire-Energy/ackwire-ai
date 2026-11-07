@@ -54,10 +54,10 @@ describe("geometry check", () => {
     expect(coverage(["c", "b", "a"], (name) => html[name] as string)).toEqual(["a", "c"]);
   });
 
-  test("every rule the run checks has an offender and a sound twin in the fixture, the docked panes too", () => {
+  test("every rule the run checks has an offender and a sound twin in the fixture, the floating panes too", () => {
     const fixture = readFileSync(join(import.meta.dir, "fixture.html"), "utf8");
     const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
-    expect(SELF_TESTED).toContain("docked");
+    expect(SELF_TESTED).toContain("floating");
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);

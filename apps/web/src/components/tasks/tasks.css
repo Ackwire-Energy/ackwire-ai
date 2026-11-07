@@ -276,7 +276,7 @@
 /* A task's panel ("Ver passos"): the thread's panel (.thread-panel in threads.css), narrower; its body and foot. */
 @media (min-width: 861px) {
   .tm-panel.thread-panel {
-    width: min(480px, calc(100% - 20px));
+    width: min(480px, calc(100vw - 20px));
   }
 }
 .tm-panel__body {
