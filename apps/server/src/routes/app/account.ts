@@ -209,6 +209,13 @@ export function accountRoutes(deps: AppDeps) {
                 description:
                   "Where the app reports its own errors (`SENTRY_WEB_DSN`, a Sentry-compatible server, ADR 0104), and under which environment and release. Null: it reports nothing and loads no reporting code.",
               }),
+            mobileErrorReports: z
+              .object({ dsn: z.string(), environment: z.string(), release: z.string() })
+              .nullable()
+              .openapi({
+                description:
+                  "The same for the phone app (`SENTRY_MOBILE_DSN`, else `SENTRY_WEB_DSN`); `release` is the server's, the app files its reports under its own.",
+              }),
           }),
         ),
       },
@@ -217,6 +224,8 @@ export function accountRoutes(deps: AppDeps) {
       const users = await countUsers(db);
       // The first account of an installation that waits for its owner's link or key is made there, not here.
       const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
+      const reportsTo = (dsn: string | undefined) =>
+        dsn ? { dsn, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) } : null;
       return c.json(
         {
           ...authUiConfig(config),
@@ -227,9 +236,8 @@ export function accountRoutes(deps: AppDeps) {
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
           billingUrl: config.BILLING_URL ?? null,
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
-          errorReports: config.SENTRY_WEB_DSN
-            ? { dsn: config.SENTRY_WEB_DSN, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) }
-            : null,
+          errorReports: reportsTo(config.SENTRY_WEB_DSN),
+          mobileErrorReports: reportsTo(config.SENTRY_MOBILE_DSN ?? config.SENTRY_WEB_DSN),
         },
         200,
       );

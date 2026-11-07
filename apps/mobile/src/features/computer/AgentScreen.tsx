@@ -44,9 +44,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
+import type { WebView } from "react-native-webview";
 import { scheduleOnRN } from "react-native-worklets";
-import { lastCookie } from "@/lib/auth";
 import { useServer } from "@/lib/server";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useAppActive } from "@/lib/useAppActive";
@@ -83,6 +82,7 @@ import { Cover } from "./Cover";
 import { DOCK_HANG, DockDone, DockIcon, DockRule, DockText, EdgeDock } from "./EdgeDock";
 import { LiveTrail } from "./LiveTrail";
 import { PixelCursor } from "./PixelCursor";
+import { reportStuck, ScreenPage } from "./ScreenPage";
 import {
   BUTTON,
   PointerLine,
@@ -90,10 +90,6 @@ import {
   type ScreenKey,
   type ScreenRowKey,
   screenCall,
-  screenEvent,
-  screenPageStays,
-  screenPageUrl,
-  sessionCookieScript,
   typedSince,
 } from "./screen-page";
 import {
@@ -218,6 +214,9 @@ export function AgentScreen({
   const [ready, setReady] = useState(false);
   const [page, setPage] = useState<DesktopViewState>("connecting");
   const [stuck, setStuck] = useState(false);
+  // How far the page got, for the report of a screen that never opens.
+  const pageNow = useRef({ ready, page });
+  pageNow.current = { ready, page };
   const [taking, setTaking] = useState(false);
   // The mode of the stream's session now, as the page says it (`session`): a switch's cover waits for it.
   const [session, setSession] = useState<DesktopMode | null>(null);
@@ -316,9 +315,12 @@ export function AgentScreen({
       setStuck(false);
       return;
     }
-    const id = setTimeout(() => setStuck(true), STUCK_MS);
+    const id = setTimeout(() => {
+      setStuck(true);
+      reportStuck("computer", agentId, pageNow.current.ready, pageNow.current.page);
+    }, STUCK_MS);
     return () => clearTimeout(id);
-  }, [waitsOn]);
+  }, [waitsOn, agentId]);
   const lost = stuck && waitsOn;
   const words = askControlWords(status, Boolean(f?.browser), Boolean(run));
   // Watching, a tap on the screen asks before control and reaches nothing there; the question stays until Cancelar.
@@ -774,24 +776,13 @@ export function AgentScreen({
                 pointerEvents="none"
                 style={[{ width: deskSize.width, height: deskSize.height }, styles.frame, frame]}
               >
-                <WebView
+                <ScreenPage
                   key={life}
                   ref={web}
-                  source={{ uri: screenPageUrl(server, orgId, agentId) }}
-                  originWhitelist={[new URL(server).origin]}
-                  onShouldStartLoadWithRequest={(request) => screenPageStays(server, request.url)}
-                  injectedJavaScriptBeforeContentLoaded={sessionCookieScript(lastCookie(), server)}
-                  incognito
-                  javaScriptEnabled
-                  scrollEnabled={false}
-                  bounces={false}
-                  overScrollMode="never"
-                  textInteractionEnabled={false}
-                  androidLayerType="hardware"
-                  style={styles.web}
-                  onMessage={(e) => {
-                    const event = screenEvent(server, e.nativeEvent);
-                    if (!event) return;
+                  server={server}
+                  orgId={orgId}
+                  agentId={agentId}
+                  onEvent={(event) => {
                     if (event.type === "ready") setReady(true);
                     else if (event.type === "view") setPage(event.state);
                     else if (event.type === "session") setSession(event.mode);
@@ -799,12 +790,7 @@ export function AgentScreen({
                     else if (event.type === "changed") void view.desktopQ.refetch();
                     else toast({ title: t("desktop.clipboard.tooLong", g), icon: "x" });
                   }}
-                  onContentProcessDidTerminate={() => {
-                    setReady(false);
-                    setSession(null);
-                    setLife((n) => n + 1);
-                  }}
-                  onRenderProcessGone={() => {
+                  onGone={() => {
                     setReady(false);
                     setSession(null);
                     setLife((n) => n + 1);
@@ -1489,7 +1475,6 @@ const styles = StyleSheet.create({
   box: { marginHorizontal: 12, borderRadius: 20, overflow: "hidden", backgroundColor: "#101010" },
   boxWide: { marginHorizontal: 0, borderRadius: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
-  web: { flex: 1, backgroundColor: "transparent" },
   cursor: {
     position: "absolute",
     left: 0,

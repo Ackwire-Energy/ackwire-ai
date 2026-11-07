@@ -96,3 +96,7 @@ Later, if it's wanted: a request that says where on the screen it is, so the vie
 - A person can now hold a desktop from a phone on a bad network. The grace bounds that, as it does for a laptop.
 - The app has a WebView that holds a session. It is narrow by design, but it deserves its own review.
 - Testing needs a real connected Linux computer and a real phone: the simulator says nothing about touch or a mobile network.
+
+## Addendum (2026-11-07): the cookie on Android
+
+The first open question, on Android: not reliably from the start script. react-native-webview runs `injectedJavaScriptBeforeContentLoaded` there at `onPageStarted`, where it may still reach the document before the page, and every `incognito` WebView clears all WebViews' cookies as it mounts. A socket opened with no session is refused before the upgrade and closes with no code, so the screen stays on "Abrindo o computador…" until it says it can't be shown, while the web shows it: what a phone on Android saw after the update. The app now sets the cookie again in the page's own document whenever its socket may open next (`sessionAnswer`: on `ready`, before the first `set`, and on `changed`, before the page opens again after a close), in one WebView both views share (`ScreenPage`). A view that never opens is reported (ADR 0104).

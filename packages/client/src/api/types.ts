@@ -105,6 +105,8 @@ export interface AuthConfig {
   turnstileSiteKey?: string | null;
   /** Where the app reports its own errors (a Sentry-compatible server, ADR 0104); null or absent: nowhere. */
   errorReports?: ErrorReportsConfig | null;
+  /** The same for the phone app; null or absent (a server from before it): nowhere. */
+  mobileErrorReports?: ErrorReportsConfig | null;
 }
 
 export interface ErrorReportsConfig {

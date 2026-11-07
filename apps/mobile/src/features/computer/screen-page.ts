@@ -86,6 +86,16 @@ export function sessionCookieScript(cookie: string, server: string): string {
   return `${sets.join("")}true;`;
 }
 
+/**
+ * What the app answers a page event with: the session cookie again, set in the page's own document, before each time
+ * its socket may open (`ready` comes before the app's first `set`, `changed` before the page opens again after a
+ * close). On Android the start script runs at `onPageStarted`, which may still be the document before this one, and
+ * any `incognito` WebView mounting clears every WebView's cookies, so the start script's cookie can't be counted on
+ * there: the socket opened with no session and the screen stayed on opening.
+ */
+export const sessionAnswer = (event: ScreenEvent, cookie: string, server: string): string | null =>
+  event.type === "ready" || event.type === "changed" ? sessionCookieScript(cookie, server) : null;
+
 type PageCalls = {
   set: [{ connect: boolean; mode: DesktopMode }];
   retry: [];
