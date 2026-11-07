@@ -1,12 +1,19 @@
 import {
   type AgentScope,
+  BROWSER_DEVICE_SIZES,
+  BROWSER_DEVICES,
   BROWSER_FAST_PROTOCOL,
+  BROWSER_VIEWPORT_PROTOCOL,
+  BROWSER_VIEWPORT_SIDE,
   BROWSER_WARM_PROTOCOL,
   type BrowserBatchCommand,
   type BrowserSetup,
+  type BrowserViewport,
   browserSetupOf,
+  browserViewportOf,
   chromeFailureKind,
   type ErrorReporter,
+  emulatedOf,
   formatVaultRule,
   type MachineReplies,
   PASSWORD_CLASSES,
@@ -512,6 +519,24 @@ function urlOf(data: unknown): string | null {
   return url && /^(https?:|about:)/.test(url) ? url.slice(0, 2048) : null;
 }
 
+const VIEWPORT_HELP = `Give \`viewport\` a \`device\` (${BROWSER_DEVICES.join(", ")}), and for an exact size both \`width\` and \`height\` (${BROWSER_VIEWPORT_SIDE.min} to ${BROWSER_VIEWPORT_SIDE.max}).`;
+
+/** `browser_open`'s `viewport` as `agentes:viewport`'s arguments, or null when it isn't one. */
+function viewportArgs(v: unknown): string[] | null {
+  if (!v || typeof v !== "object") return null;
+  const { device, width, height } = v as Record<string, unknown>;
+  const args =
+    width === undefined && height === undefined ? [String(device)] : [String(device), String(width), String(height)];
+  return browserViewportOf(args) === undefined ? null : args;
+}
+
+/** What the agent is told while its browser shows pages at an emulated size, as a line of its own; "" otherwise. */
+function emulatedLine(v: NonNullable<BrowserViewport> | undefined): string {
+  return v
+    ? `\nEvery tab shows as a ${v.device} (${v.width}×${v.height}) until you open with viewport desktop and no size, or your browser closes.`
+    : "";
+}
+
 /** An image a judge can take (Jev: each side 280 to 1568 pixels), or null. */
 function judgeImage(shot: MachineReplies["browser.capture"]): ScreenImage | null {
   const { width, height } = shot;
@@ -754,6 +779,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         setup: BrowserSetup;
         /** The profile the commands went to (the chat's chip); null: the agent's own browser. */
         profile: { id: string; name: string } | null;
+        /** The page size its browser emulated at its last answer (protocol 52); undefined at its own. */
+        emulated: () => NonNullable<BrowserViewport> | undefined;
       }
     | { ok: false; text: string }
   > {
@@ -830,6 +857,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     };
     const fast = status.protocol >= BROWSER_FAST_PROTOCOL;
     let reached = false;
+    let emulated: NonNullable<BrowserViewport> | undefined;
     // The live view, take over and Stop follow the computer the browser runs on (a mission's or the agent's own).
     const reachedOnce = async () => {
       if (reached || profileId) return;
@@ -861,6 +889,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         return { ok: false, text: explain(error, status.machineName) };
       }
       addSetup(reply);
+      emulated = emulatedOf(reply.emulated);
       await reachedOnce();
       return reply.success ? { ok: true, data: reply.data } : failed(reply.error, reply.code);
     };
@@ -901,6 +930,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
           return [{ ok: false, text: explain(error, status.machineName) }];
         }
         addSetup(reply);
+        emulated = emulatedOf(reply.emulated);
         await reachedOnce();
         return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error, a.code)));
       },
@@ -938,7 +968,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         }`,
       };
     }
-    return { ok: true, link, status, setup, profile: turn ? { id: turn.profile.id, name: turn.profile.name } : null };
+    return {
+      ok: true,
+      link,
+      status,
+      setup,
+      profile: turn ? { id: turn.profile.id, name: turn.profile.name } : null,
+      emulated: () => emulated,
+    };
   }
 
   /** Runs one `agent-browser` command and answers with `done(data)`, or the failure as an error result. */
@@ -954,7 +991,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (!r.ok) return { content: neutralizeUntrusted(r.text), isError: true };
     const url = urlOf(r.data);
     return {
-      content: done(r.data),
+      content: `${done(r.data)}${emulatedLine(linked.emulated())}`,
       data: { ...(url ? { url } : {}), ...profileData(linked.profile), ...(extra?.(r.data) ?? {}) },
     };
   }
@@ -1148,7 +1185,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       await markPageRead(ctx.db, ctx);
     }
     const f = formatPlanReport(report);
-    const content = f.screen ? `${f.summary}\n${wrapPage(f.screen)}` : f.summary;
+    // Said on every answer while it lasts: a later run, or another agent on a profile, didn't choose it.
+    const summary = `${f.summary}${emulatedLine(linked.emulated())}`;
+    const content = f.screen ? `${summary}\n${wrapPage(f.screen)}` : summary;
     const url = report.after?.url ?? null;
     const timing = {
       ms: report.ms,
@@ -1391,18 +1430,47 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         return plan(ctx, valid, { trail: true });
       },
     ),
-    step(
+    tool(
       "browser_open",
-      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there. To open a page and do something on it, use one browser_do that starts with \`open\` instead.`,
+      `${BROWSER_TOOL_INFO.browser_open.description} The browser is yours alone and keeps its logins between runs. It answers with what you can act on there. To open a page and do something on it, use one browser_do that starts with \`open\` instead. To see a site as on a phone or a tablet (a responsive check), open it with \`viewport\`: \`phone\` is ${BROWSER_DEVICE_SIZES.phone.width}×${BROWSER_DEVICE_SIZES.phone.height} with touch and a phone's user agent, \`tablet\` ${BROWSER_DEVICE_SIZES.tablet.width}×${BROWSER_DEVICE_SIZES.tablet.height}; \`width\` and \`height\` set an exact size. Every tab keeps it (browser_read, browser_screenshot and the person watching see it) until you open with \`viewport\` \`desktop\` and no size, the window's own.`,
       {
         type: "object",
-        properties: { url: { type: "string", description: "Full address (https://…).", maxLength: 2048 } },
+        properties: {
+          url: { type: "string", description: "Full address (https://…).", maxLength: 2048 },
+          viewport: {
+            type: "object",
+            properties: {
+              device: { type: "string", enum: [...BROWSER_DEVICES] },
+              width: { type: "integer", minimum: BROWSER_VIEWPORT_SIDE.min, maximum: BROWSER_VIEWPORT_SIDE.max },
+              height: { type: "integer", minimum: BROWSER_VIEWPORT_SIDE.min, maximum: BROWSER_VIEWPORT_SIDE.max },
+            },
+            required: ["device"],
+            additionalProperties: false,
+          },
+        },
         required: ["url"],
         additionalProperties: false,
       },
-      (input) => {
+      async (input, ctx) => {
         const url = str(input.url).trim();
-        return /^https?:\/\//i.test(url) ? { do: "open", url } : "Give a full web address starting with https://.";
+        if (!/^https?:\/\//i.test(url))
+          return { content: "Give a full web address starting with https://.", isError: true };
+        if (input.viewport === undefined) return plan(ctx, [{ do: "open", url }]);
+        const args = viewportArgs(input.viewport);
+        if (!args) return { content: VIEWPORT_HELP, isError: true };
+        const linked = await linkFor(ctx);
+        if (!linked.ok) return { content: linked.text, isError: true };
+        if (linked.status.protocol < BROWSER_VIEWPORT_PROTOCOL) {
+          return { content: vaultUpdateText(linked.status.machineName, "change the page size"), isError: true };
+        }
+        // Before the page loads: its site sees the phone from the first request.
+        const sized = await linked.link.act({ command: "agentes:viewport", args, timeoutSeconds: COMMAND_SECONDS });
+        if (!sized.ok) return { content: neutralizeUntrusted(sized.text), isError: true };
+        const out = await plan(ctx, [{ do: "open", url }]);
+        // An emulated size is said by every answer while it lasts (`plan`).
+        return args.length === 1 && args[0] === "desktop"
+          ? { ...out, content: `The page shows at the window's own size again.\n${out.content}` }
+          : out;
       },
     ),
     step(
@@ -1488,7 +1556,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         const url = urlOf(r.data);
         const page = whole ? observationOf(r.data) : null;
         if (page) seen.remember(seenKey(ctx), page);
-        const head = url ? `Page: ${neutralizeUntrusted(url)}\n` : "";
+        const sized = emulatedLine(linked.emulated()).slice(1);
+        const head = `${url ? `Page: ${neutralizeUntrusted(url)}\n` : ""}${sized ? `${sized}\n` : ""}`;
         if (question && page && deps.judge) {
           const found = await findInPage({
             judge,
@@ -1780,7 +1849,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         });
         if (!r.ok) return { content: neutralizeUntrusted(r.text), isError: true };
         const url = urlOf(r.data);
-        const saved = { content: `Saved ${path} in your folder.`, data: { ...(url ? { url } : {}), path } };
+        const saved = {
+          content: `Saved ${path} in your folder.${emulatedLine(linked.emulated())}`,
+          data: { ...(url ? { url } : {}), path },
+        };
         if (input.share !== true) return { ...saved, content: `${saved.content} ${SHARE_HINT}` };
         return shareSavedFile(deps, ctx, linked.status.machineId, path, saved);
       },

@@ -14646,6 +14646,12 @@
       "starting": "Apertura della pagina…",
       "page": "La pagina di {{name}}, in diretta",
       "page_female": "La pagina di {{name}}, in diretta",
+      "emulated": {
+        "phone": "Telefono · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Desktop · {{size}}"
+      },
+      "normalSize": "Dimensione normale",
       "tabs_one": "{{count}} scheda",
       "tabs_many": "{{count}} schede",
       "tabs_other": "{{count}} schede",

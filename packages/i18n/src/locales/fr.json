@@ -14642,6 +14642,12 @@
       "starting": "Ouverture de la page…",
       "page": "Page de {{name}}, en direct",
       "page_female": "Page de {{name}}, en direct",
+      "emulated": {
+        "phone": "Téléphone · {{size}}",
+        "tablet": "Tablette · {{size}}",
+        "desktop": "Ordinateur · {{size}}"
+      },
+      "normalSize": "Taille normale",
       "tabs_one": "{{count}} onglet",
       "tabs_many": "{{count}} onglets",
       "tabs_other": "{{count}} onglets",

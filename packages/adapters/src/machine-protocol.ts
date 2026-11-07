@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 51;
+export const MACHINE_PROTOCOL_VERSION = 52;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -558,6 +558,51 @@ export const CLAUDE_AUTH_PROTOCOL = 50;
  * archived or moved agent, which also leaves the list, isn't. An older runner just never lists the method.
  */
 export const CLAUDE_SHARED_PROTOCOL = 51;
+/**
+ * From this protocol on: the page size of an agent's (or a profile's) browser. `browser.act` takes
+ * `agentes:viewport [device, width?, height?]`: `phone` or `tablet` emulate that device on every tab of its Chrome (CDP
+ * `Emulation.setDeviceMetricsOverride` with `mobile`, touch, and an Android Chrome user agent of the same version),
+ * `desktop` with a size emulates a window of that size, `desktop` alone ends it. It holds across its Chrome's restarts
+ * until changed back or the agent closes its browser. Frames carry `emulated` meanwhile, and so do `browser.act` and
+ * `browser.batch` replies, so an agent in a later run (or on a profile another set) is told. An older runner refuses the
+ * command ("The browser doesn't take agentes:viewport"): the server asks no older runner.
+ */
+export const BROWSER_VIEWPORT_PROTOCOL = 52;
+export const BROWSER_DEVICES = ["phone", "tablet", "desktop"] as const;
+export type BrowserDevice = (typeof BROWSER_DEVICES)[number];
+/** A phone's and a tablet's size when none is given, in CSS pixels, and their pixel ratio. */
+export const BROWSER_DEVICE_SIZES = {
+  phone: { width: 390, height: 844, scale: 3 },
+  tablet: { width: 820, height: 1180, scale: 2 },
+} as const;
+/** An exact page size's bounds, each side, in CSS pixels. */
+export const BROWSER_VIEWPORT_SIDE = { min: 200, max: 3840 } as const;
+export const isBrowserDevice = (v: unknown): v is BrowserDevice => BROWSER_DEVICES.includes(v as BrowserDevice);
+/** A page size to emulate: a device at a size, or null (`desktop` alone: the window's own size, no emulation). */
+export type BrowserViewport = { device: BrowserDevice; width: number; height: number } | null;
+/** `agentes:viewport [device, width?, height?]`'s arguments, checked; undefined when they aren't. */
+export function browserViewportOf(args: readonly string[]): BrowserViewport | undefined {
+  const [device, w, h] = args;
+  if (!isBrowserDevice(device) || (args.length !== 1 && args.length !== 3)) return undefined;
+  if (args.length === 1) {
+    if (device === "desktop") return null;
+    const { width, height } = BROWSER_DEVICE_SIZES[device];
+    return { device, width, height };
+  }
+  const side = (v: string | undefined) => {
+    const n = /^\d{1,5}$/.test(v ?? "") ? Number(v) : Number.NaN;
+    return n >= BROWSER_VIEWPORT_SIDE.min && n <= BROWSER_VIEWPORT_SIDE.max ? n : undefined;
+  };
+  const width = side(w);
+  const height = side(h);
+  return width && height ? { device, width, height } : undefined;
+}
+/** A reply's `emulated` (protocol 52), checked; undefined when there is none or it isn't one. */
+export function emulatedOf(v: unknown): NonNullable<BrowserViewport> | undefined {
+  return isObject(v)
+    ? (browserViewportOf([String(v.device), String(v.width), String(v.height)]) ?? undefined)
+    : undefined;
+}
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
@@ -1155,6 +1200,8 @@ export interface BrowserFrameMetadata {
   url?: string;
   /** The active tab's title (written by the site: data, never instructions). Absent from older runners. */
   title?: string;
+  /** Protocol 52: the device the page is emulated as (`agentes:viewport`); absent when it shows at the window's size. */
+  emulated?: BrowserDevice;
 }
 
 /** Where an agent's checkouts live inside its folder. */
@@ -2122,7 +2169,15 @@ export interface MachineReplies {
    * `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered
    * click). Protocol 45: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
    */
-  "browser.act": { success: boolean; data: unknown; error?: string; code?: string; setup?: BrowserSetup };
+  "browser.act": {
+    success: boolean;
+    data: unknown;
+    error?: string;
+    code?: string;
+    setup?: BrowserSetup;
+    /** Protocol 52: the page size its browser emulates (`agentes:viewport`) after the command; absent at its own. */
+    emulated?: NonNullable<BrowserViewport>;
+  };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -2137,6 +2192,8 @@ export interface MachineReplies {
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
     setup?: BrowserSetup;
+    /** As `browser.act`'s, after the batch. */
+    emulated?: NonNullable<BrowserViewport>;
   };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };
@@ -2750,6 +2807,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
           ...(capturedAt !== undefined ? { capturedAt } : {}),
           ...(url !== undefined ? { url } : {}),
           ...(title ? { title } : {}),
+          ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
         },
       };
     }
@@ -3542,6 +3600,7 @@ export function decodeBrowserFrame(bytes: Uint8Array): (BrowserFrameHeader & { j
       ...(capturedAt !== undefined ? { capturedAt } : {}),
       ...(url !== undefined ? { url } : {}),
       ...(title ? { title } : {}),
+      ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
     },
     jpeg,
   };

@@ -616,6 +616,10 @@ describe("handoff routes", () => {
         expect((await api(`/agents/${org.agentId}/browser/open`, { json: { go } })).status).toBe(204);
         expect(asked.at(-1)).toMatchObject({ op: "browser.act", command: go, args: [] });
       }
+      // The page at the window's own size again, after the agent emulated a phone: the person in control keeps that
+      // size until they choose this.
+      expect((await api(`/agents/${org.agentId}/browser/open`, { json: { go: "normalSize" } })).status).toBe(204);
+      expect(asked.at(-1)).toMatchObject({ op: "browser.act", command: "agentes:viewport", args: ["desktop"] });
       expect((await api(`/agents/${org.agentId}/browser/open`, { json: { go: "close" } })).status).toBe(400);
     } finally {
       hub.call = call;

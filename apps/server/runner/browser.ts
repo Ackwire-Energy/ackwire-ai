@@ -17,10 +17,13 @@ import {
   agentBrowserUrl,
   BROWSER_LIMITS,
   BROWSER_VIEW,
+  BROWSER_VIEWPORT_SIDE,
   type BrowserHandoffInfo,
   type BrowserInputEvent,
   type BrowserSetup,
   type BrowserStreamMode,
+  type BrowserViewport,
+  browserViewportOf,
   CHROME_FAILURES,
   type MachineReplies,
   type MachineRequest,
@@ -34,7 +37,7 @@ import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
 import { vaultRuleLabel, vaultRuleMatches } from "@agenteschat/adapters/vault/site";
 import type { BrowserPorts } from "./browser-ports";
-import { type CrashedPage, countChromeTraffic, type TrafficCounter } from "./browser-traffic";
+import { type CrashedPage, countChromeTraffic, emulationCommands, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
@@ -1362,9 +1365,10 @@ export function captureTime(raw: unknown): number | null {
   return ms >= 1e12 ? Math.round(ms) : null;
 }
 
-const pageMeta = (stream: Stream) => ({
+const pageMeta = (session: Session, stream: Stream) => ({
   ...(stream.url ? { url: stream.url } : {}),
   ...(stream.title ? { title: stream.title } : {}),
+  ...(session.viewport ? { emulated: session.viewport.device } : {}),
 });
 
 interface Session {
@@ -1412,6 +1416,8 @@ interface Session {
   crash?: PageCrash;
   /** How many times each tab's page died since the agent last heard of it. */
   crashes: Map<string, number>;
+  /** The page size it emulates (`agentes:viewport`), on every Chrome it starts until changed back or closed. */
+  viewport?: NonNullable<BrowserViewport>;
   /** Its `memory.events` when Chrome started or a page last died. */
   memory?: Record<string, number> | null;
   /** The version of Chrome its running Chrome was started from. */
@@ -1798,7 +1804,7 @@ export class BrowserManager {
         opening.close();
       }
     });
-    return { ...answer, ...withSetup(setup) };
+    return { ...answer, ...withSetup(setup), ...(session.viewport ? { emulated: session.viewport } : {}) };
   }
 
   /**
@@ -1881,7 +1887,7 @@ export class BrowserManager {
         // Each Vault value this batch opened goes with it (ADR 0144).
         opening.close();
       }
-      return { answers, ...withSetup(setup) };
+      return { answers, ...withSetup(setup), ...(session.viewport ? { emulated: session.viewport } : {}) };
     });
   }
 
@@ -2013,6 +2019,15 @@ export class BrowserManager {
     const timeoutMs = Math.max(1, Math.min(600, Number(timeoutSeconds) || 60)) * 1000;
     // Checked when it runs (the secret, the site, the field).
     if (command === "agentes:type_secret") return { command, args, timeoutMs };
+    if (command === "agentes:viewport") {
+      if (browserViewportOf(args) === undefined) {
+        throw new RunnerError(
+          "bad_request",
+          `agentes:viewport takes phone, tablet or desktop, then a width and a height (${BROWSER_VIEWPORT_SIDE.min} to ${BROWSER_VIEWPORT_SIDE.max})`,
+        );
+      }
+      return { command, args, timeoutMs };
+    }
     // ADR 0144: a Vault login's shape is checked before anything of the batch runs; its site and field when it runs.
     if (command === "agentes:type_vault") {
       parseTypeVault(args);
@@ -2073,10 +2088,16 @@ export class BrowserManager {
       await this.stopChrome(session);
       session.aliveAt = null;
       session.url = undefined;
+      session.viewport = undefined;
       this.noteAct(session, command, args, answer, link);
       return answer;
     }
     if (!READS.has(command)) await this.ensureOwnChrome(agent, session, desktop, allowed, false, setup);
+    if (command === "agentes:viewport") {
+      const answer = this.setViewport(session, browserViewportOf(args) ?? null);
+      this.noteAct(session, command, args, answer, link);
+      return answer;
+    }
     if (READS.has(command)) {
       if (!(await this.browserOpen(session, signal))) {
         return { success: false, data: null, error: "The browser isn't open: open a page first" };
@@ -2108,6 +2129,11 @@ export class BrowserManager {
             signal,
           },
         )));
+    // agent-browser sizes the page for a full-page shot and leaves it at the window's pixel ratio after (measured on
+    // Chrome for Testing 156): the emulated size goes back.
+    if (session.viewport && command === "screenshot" && (args.includes("--full") || args.includes("-f"))) {
+      this.setViewport(session, session.viewport);
+    }
     // Up when it just answered (the next read skips the check); unknown after an error.
     session.aliveAt = answer.success ? this.now() : null;
     this.noteAct(session, command, args, answer, link);
@@ -2518,6 +2544,7 @@ export class BrowserManager {
       (page) => this.pageCrashed(session, chrome, page),
     );
     this.counters.set(chrome, counter);
+    if (session.viewport) counter.emulate(emulationCommands(session.viewport, session.version ?? null));
     void chrome.exited.then(() => {
       const last = counter.take();
       this.trafficLeft.up += last.up;
@@ -2528,6 +2555,15 @@ export class BrowserManager {
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([counter.attached, new Promise((r) => (timer = setTimeout(r, TRAFFIC_ATTACH_MS)))]);
     clearTimeout(timer);
+  }
+
+  /** `agentes:viewport` (protocol 52): every tab of the session's Chrome shows its page at that size, or its own. */
+  private setViewport(session: Session, viewport: BrowserViewport): BrowserAnswer {
+    const counter = session.chrome ? this.counters.get(session.chrome) : undefined;
+    if (!counter) return { success: false, data: null, error: "This computer's browser can't change its page size" };
+    session.viewport = viewport ?? undefined;
+    counter.emulate(viewport ? emulationCommands(viewport, session.version ?? null) : null);
+    return { success: true, data: viewport ?? { device: "desktop" } };
   }
 
   /**
@@ -3729,7 +3765,7 @@ export class BrowserManager {
         deviceHeight: height,
         ...(Number.isFinite(scale) ? { pageScaleFactor: scale } : {}),
         capturedAt: captureTime(m.timestamp) ?? this.now(),
-        ...pageMeta(stream),
+        ...pageMeta(session, stream),
       },
     });
     // The next one once there is room for it (after the send: the view counts this one first).
@@ -3807,7 +3843,7 @@ export class BrowserManager {
             deviceWidth: size.width,
             deviceHeight: size.height,
             capturedAt: this.now(),
-            ...pageMeta(stream),
+            ...pageMeta(session, stream),
           },
         });
       } finally {

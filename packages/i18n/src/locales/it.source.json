@@ -34248,6 +34248,18 @@
   "browser.live.page": {
     "value": "{{name}}'s page, live"
   },
+  "browser.live.emulated.phone": {
+    "value": "Phone · {{size}}"
+  },
+  "browser.live.emulated.tablet": {
+    "value": "Tablet · {{size}}"
+  },
+  "browser.live.emulated.desktop": {
+    "value": "Desktop · {{size}}"
+  },
+  "browser.live.normalSize": {
+    "value": "Normal size"
+  },
   "browser.live.tabs": {
     "value": {
       "one": "{{count}} tab",

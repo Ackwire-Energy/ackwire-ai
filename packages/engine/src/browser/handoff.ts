@@ -1679,13 +1679,19 @@ export function webAddress(typed: string): string | null {
   }
 }
 
-/** The address bar's arrows and reload, as the browser's own commands. */
-export const PAGE_MOVES = ["back", "forward", "reload"] as const;
+/**
+ * The address bar's arrows and reload, as the browser's own commands, and `normalSize`: the page at the window's own
+ * size again after the agent emulated a phone or another size (`agentes:viewport`, protocol 52; the live view offers
+ * it only on frames that say `emulated`, which no older runner sends).
+ */
+export const PAGE_MOVES = ["back", "forward", "reload", "normalSize"] as const;
 export type PageMove = (typeof PAGE_MOVES)[number];
 
 /** The browser's command for what the person typed in the address bar (400 when it's no web address), or an arrow. */
 export function pageCommand(to: string | { go: PageMove }): { command: string; args: string[] } {
-  if (typeof to !== "string") return { command: to.go, args: [] };
+  if (typeof to !== "string") {
+    return to.go === "normalSize" ? { command: "agentes:viewport", args: ["desktop"] } : { command: to.go, args: [] };
+  }
   const url = webAddress(to);
   if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
   return { command: "open", args: [url] };

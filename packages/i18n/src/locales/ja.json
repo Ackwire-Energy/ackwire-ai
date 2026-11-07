@@ -13630,6 +13630,12 @@
       "ended": "{{name}}のブラウザを閉じました。",
       "starting": "ページを開いています…",
       "page": "{{name}}のページ（ライブ）",
+      "emulated": {
+        "phone": "スマートフォン · {{size}}",
+        "tablet": "タブレット · {{size}}",
+        "desktop": "デスクトップ · {{size}}"
+      },
+      "normalSize": "通常サイズ",
       "tabs_other": "{{count}}個のタブ",
       "typeHere": "ここに入力",
       "typeTo": "{{field}}に入力されます",

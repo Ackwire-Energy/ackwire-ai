@@ -19,7 +19,14 @@ export interface BrowserFrameMetadata {
   url?: string;
   /** Written by the site (show it as text); absent from older runners. */
   title?: string;
+  /** The device the agent's page is emulated as, at `deviceWidth`×`deviceHeight`; absent at the window's own size. */
+  emulated?: BrowserDevice;
 }
+
+/** Mirrors `BROWSER_DEVICES` in `packages/adapters/src/machine-protocol.ts` (the client imports no server package). */
+export const BROWSER_DEVICES = ["phone", "tablet", "desktop"] as const;
+export type BrowserDevice = (typeof BROWSER_DEVICES)[number];
+export const isBrowserDevice = (v: unknown): v is BrowserDevice => BROWSER_DEVICES.includes(v as BrowserDevice);
 
 /**
  * One picture of the page: as base64 when it came on the realtime socket (`data`), as the JPEG's bytes when it came
@@ -157,6 +164,7 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
           ...(num(m.capturedAt) ? { capturedAt: m.capturedAt as number } : {}),
           ...(typeof m.url === "string" ? { url: m.url } : {}),
           ...(typeof m.title === "string" && m.title ? { title: m.title } : {}),
+          ...(isBrowserDevice(m.emulated) ? { emulated: m.emulated } : {}),
         },
       };
     }

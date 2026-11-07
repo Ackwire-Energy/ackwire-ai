@@ -61,3 +61,12 @@ test("a frame with bytes is a live view frame like one with base64; both draw an
   expect(browserFrameDataUrl(frame)).toBe(browserFrameDataUrl(frame));
   expect(browserFrameDataUrl({ data: base64 })).toBe(`data:image/jpeg;base64,${base64}`);
 });
+
+test("a frame says the device the agent's page is emulated as, either way it came; anything else is left out", () => {
+  const metadata = { ...META, deviceWidth: 390, deviceHeight: 844, emulated: "phone" };
+  expect(decodeBrowserFrameBytes(frameBytes({ seq: 6, metadata }, JPEG))?.metadata.emulated).toBe("phone");
+  const parsed = parseBrowserLiveMessage({ type: "browser.frame", agentId: "a1", seq: 6, data: "/9j/", metadata });
+  expect(parsed?.type === "browser.frame" ? parsed.metadata.emulated : null).toBe("phone");
+  const odd = { ...META, emulated: "watch" };
+  expect(decodeBrowserFrameBytes(frameBytes({ seq: 6, metadata: odd }, JPEG))?.metadata).toEqual(META);
+});

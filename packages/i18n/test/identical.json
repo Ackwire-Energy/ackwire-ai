@@ -238,7 +238,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "es": [
       "agent.builtinName",
@@ -1162,7 +1163,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "it": [
       "queue.fill.routine",
@@ -1461,7 +1464,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "nl": [
       "wiki.bulk.agents",
@@ -1971,7 +1976,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "ja": [
       "access.area.vault",
@@ -2571,7 +2578,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet",
+      "browser.live.emulated.desktop"
     ],
     "tr": [
       "chat.wait.said",
@@ -2710,7 +2719,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "pl": [
       "deleteAccount.agentCount",
@@ -2940,7 +2950,8 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "browser.live.emulated.tablet"
     ],
     "ru": [
       "agent.builtinName",

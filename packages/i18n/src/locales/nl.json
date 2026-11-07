@@ -14227,6 +14227,12 @@
       "starting": "Pagina openen…",
       "page": "Pagina van {{name}}, live",
       "page_female": "Pagina van {{name}}, live",
+      "emulated": {
+        "phone": "Telefoon · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Desktop · {{size}}"
+      },
+      "normalSize": "Normaal formaat",
       "tabs_one": "{{count}} tabblad",
       "tabs_other": "{{count}} tabbladen",
       "typeHere": "Typ hier",

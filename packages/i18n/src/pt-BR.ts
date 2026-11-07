@@ -14011,6 +14011,12 @@ export const ptBR = {
       ended_female: "O navegador da {{name}} fechou.",
       starting: "Abrindo a página…",
       page: "Página do {{name}}, ao vivo",
+      emulated: {
+        phone: "Celular · {{size}}",
+        tablet: "Tablet · {{size}}",
+        desktop: "Computador · {{size}}",
+      },
+      normalSize: "Tamanho normal",
       page_female: "Página da {{name}}, ao vivo",
       tabs_one: "{{count}} aba",
       tabs_other: "{{count}} abas",

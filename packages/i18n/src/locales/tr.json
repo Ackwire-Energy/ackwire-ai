@@ -14068,6 +14068,12 @@
       "ended": "{{name}} ajanının tarayıcısı kapatıldı.",
       "starting": "Sayfa açılıyor…",
       "page": "{{name}} ajanının sayfası, canlı",
+      "emulated": {
+        "phone": "Telefon · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Masaüstü · {{size}}"
+      },
+      "normalSize": "Normal boyut",
       "tabs_one": "{{count}} sekme",
       "tabs_other": "{{count}} sekme",
       "typeHere": "Buraya yazın",

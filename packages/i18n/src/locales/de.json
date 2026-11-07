@@ -14138,6 +14138,12 @@
       "ended": "Browser von {{name}} geschlossen.",
       "starting": "Seite wird geöffnet…",
       "page": "Seite von {{name}}, live",
+      "emulated": {
+        "phone": "Smartphone · {{size}}",
+        "tablet": "Tablet · {{size}}",
+        "desktop": "Desktop · {{size}}"
+      },
+      "normalSize": "Normale Größe",
       "tabs_one": "{{count}} Tab",
       "tabs_other": "{{count}} Tabs",
       "typeHere": "Hier tippen",

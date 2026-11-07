@@ -1,4 +1,4 @@
-import { isObject } from "@agenteschat/adapters/machine-protocol";
+import { BROWSER_DEVICE_SIZES, type BrowserViewport, isObject } from "@agenteschat/adapters/machine-protocol";
 import type { StreamSocket } from "./browser";
 import { urlCarries } from "./vault";
 
@@ -25,6 +25,8 @@ import { urlCarries } from "./vault";
  * on its session: Chrome's sad tab) and opens it again or shows another page
  * there (`onCrash`), and asks Chrome to quit (`quit`), so each Chrome has one
  * socket of ours.
+ *
+ * It also holds the page size the agent asked for (`emulate`, protocol 52) on every tab.
  *
  * It also guards a password about to be typed (ADR 0144, `guard`): for a
  * while, every request of that Chrome pauses (`Fetch.enable` on each of its
@@ -93,7 +95,73 @@ export interface TrafficCounter {
    * `onBlocked` for each (ADR 0144). Arm it before typing and type once `ready` is true.
    */
   guard(values: string[], ms: number, onBlocked: () => void, readyMs?: number): ArmedGuard;
+  /**
+   * Sends `commands` (`emulationCommands`) to every tab now and to each tab that opens later, on this connection's
+   * own session with it, which stays attached while Chrome runs: Chrome drops a session's overrides when it detaches.
+   * Null ends it on every tab.
+   */
+  emulate(commands: CdpCommand[] | null): void;
   close(): void;
+}
+
+export interface CdpCommand {
+  method: string;
+  params: Record<string, unknown>;
+}
+
+/** An empty user agent is no override: the one Chrome started with again. */
+const NO_USER_AGENT: CdpCommand = { method: "Emulation.setUserAgentOverride", params: { userAgent: "" } };
+const CLEAR_EMULATION: CdpCommand[] = [
+  { method: "Emulation.clearDeviceMetricsOverride", params: {} },
+  { method: "Emulation.setTouchEmulationEnabled", params: { enabled: false } },
+  NO_USER_AGENT,
+];
+
+/**
+ * What makes a tab show its page as `viewport` (`agentes:viewport`, protocol 52). A phone or a tablet is mobile
+ * (the page's `<meta name="viewport">` applies, scrollbars overlay), takes touch, and says it is Chrome on Android of
+ * this Chrome's major version (`version`), as Chrome on Android reduces its user agent, with the client hints to
+ * match; without the version only its size changes. A desktop size changes the size alone.
+ */
+export function emulationCommands(viewport: NonNullable<BrowserViewport>, version: string | null): CdpCommand[] {
+  const mobile = viewport.device !== "desktop";
+  const scale = viewport.device === "desktop" ? 0 : BROWSER_DEVICE_SIZES[viewport.device].scale;
+  const { width, height } = viewport;
+  const commands: CdpCommand[] = [
+    {
+      method: "Emulation.setDeviceMetricsOverride",
+      params: { width, height, deviceScaleFactor: scale, mobile, screenWidth: width, screenHeight: height },
+    },
+    {
+      method: "Emulation.setTouchEmulationEnabled",
+      params: mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false },
+    },
+  ];
+  const major = version ? /^(\d+)\./.exec(version)?.[1] : undefined;
+  if (!mobile || !major) return [...commands, NO_USER_AGENT];
+  const phone = viewport.device === "phone";
+  return [
+    ...commands,
+    {
+      method: "Emulation.setUserAgentOverride",
+      params: {
+        userAgent: `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 ${phone ? "Mobile " : ""}Safari/537.36`,
+        platform: "Linux armv8l",
+        userAgentMetadata: {
+          brands: [
+            { brand: "Google Chrome", version: major },
+            { brand: "Chromium", version: major },
+            { brand: "Not_A Brand", version: "24" },
+          ],
+          platform: "Android",
+          platformVersion: "10.0.0",
+          architecture: "",
+          model: "K",
+          mobile: phone,
+        },
+      },
+    },
+  ];
 }
 
 /** A tab whose page died. */
@@ -170,6 +238,8 @@ export function countChromeTraffic(
   /** Each session's `Fetch.enable` while armed. One that failed (or never answered) is asked again by the next guard. */
   const fetchStates = new Map<string, FetchState>();
   let guardTimer: ReturnType<typeof setTimeout> | undefined;
+  /** What each new tab gets (`emulate`), while a size is emulated. */
+  let emulation: CdpCommand[] | null = null;
   const send = (
     method: string,
     params: Params,
@@ -312,6 +382,7 @@ export function countChromeTraffic(
         const target = isObject(p.targetInfo) ? p.targetInfo : {};
         if (!sessionId && target.type === "page" && typeof target.targetId === "string") {
           pages.set(p.sessionId, target.targetId);
+          for (const c of emulation ?? []) send(c.method, c.params, p.sessionId);
         }
         if (target.type === "worker") workers.add(p.sessionId);
         send("Network.enable", NETWORK, p.sessionId);
@@ -439,6 +510,10 @@ export function countChromeTraffic(
           schedule();
         },
       };
+    },
+    emulate(commands) {
+      emulation = commands;
+      for (const id of pages.keys()) for (const c of commands ?? CLEAR_EMULATION) send(c.method, c.params, id);
     },
     close() {
       try {
