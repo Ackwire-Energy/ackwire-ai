@@ -14,7 +14,9 @@ import type { MachineTaskView } from "./machine-tasks";
 import { oneLine } from "./mail/text";
 import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
+import { stripSentinel } from "./reply-policy";
 import type { TeamProposalCard } from "./team-proposals";
+import { redactCredentials } from "./tool-detail";
 import type { WorkView } from "./works";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -102,11 +104,14 @@ export function holdStepWords(runId: string, text: string) {
   else stepHeld.delete(runId);
 }
 
-/** The step's words, once: the first sentence of what it wrote before the call, plain, on one short line. */
+/**
+ * The step's words, once: the first sentence of what it wrote before the call, plain, on one short line, with no
+ * credential (a key, a token in an address) and never the silence word.
+ */
 export function takeStepWords(runId: string): string | undefined {
   const held = stepHeld.get(runId);
   stepHeld.delete(runId);
-  const line = held ? (plainLines(held.replace(/\p{Cc}/gu, " "))[0] ?? "") : "";
+  const line = held ? (plainLines(redactCredentials(stripSentinel(held)).replace(/\p{Cc}/gu, " "))[0] ?? "") : "";
   const sentence = /^.+?[.!?…:](?=\s|$)/u.exec(line)?.[0] ?? line;
   return oneLine(sentence.replace(/[.:]$/, ""), STEP_WORDS_MAX) || undefined;
 }

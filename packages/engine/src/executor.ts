@@ -3892,6 +3892,19 @@ async function executeRunInner(
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
       const executedNow: { id: string; name: string; input: unknown; result?: ToolResult }[] = [];
+      /** Its own calls whose step line went out as they started (`tool_started`): not again as they end. */
+      const stepTold = new Set<string>();
+      /** A call of its own (not ours through the bridge, which says its step as it starts) is the step line now. */
+      const ownStep = (call: { id: string; name: string }) => {
+        if (run.background || turnTools.some((t) => t.name === call.name)) return;
+        const said = takeStepWords(run.id);
+        void publishChannelEvent(deps.pubsub, {
+          type: "agent.step",
+          ...where,
+          tool: call.name,
+          ...(said ? { said } : {}),
+        }).catch(() => {});
+      };
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -3992,19 +4005,14 @@ async function executeRunInner(
               }
             },
             ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
+            onStarted: (call) => {
+              stepTold.add(call.id);
+              ownStep(call);
+            },
             onExecuted: (call) => {
               executedNow.push(call);
-              // Its own call (not ours through the bridge, which said its step as it started): the step line says it
-              // now, with what it wrote before it.
-              if (!run.background && !turnTools.some((t) => t.name === call.name)) {
-                const said = takeStepWords(run.id);
-                void publishChannelEvent(deps.pubsub, {
-                  type: "agent.step",
-                  ...where,
-                  tool: call.name,
-                  ...(said ? { said } : {}),
-                }).catch(() => {});
-              }
+              // A brain that tells its calls only once they ended (Codex, an older runner) says the step now.
+              if (!stepTold.delete(call.id)) ownStep(call);
               // The text it streams next is another model call's: never one reply with what it wrote before.
               deltas.toolEnded();
             },
@@ -5051,6 +5059,8 @@ async function thinkOnce(
     limitGraceMs?: number;
     /** A call the brain already ran (through the bridge, or its own tools). */
     onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
+    /** A call of its own the brain started (`tool_started`): its `onExecuted` follows. */
+    onStarted?(call: { id: string; name: string }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
     /** The brain's first event that isn't an error: a computer had room for the turn. Done before that event is read. */
@@ -5097,6 +5107,7 @@ async function thinkOnce(
       await hooks.onTaken?.();
     }
     if (event.type === "text_delta") onDelta(event.text);
+    else if (event.type === "tool_started") hooks.onStarted?.(event);
     else if (event.type === "tool_call") {
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {

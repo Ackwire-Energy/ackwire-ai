@@ -22,7 +22,7 @@ export const ASK_USER_TOOL = "ask_user";
 /** A question card holds one short question: never a whole reply, and never one cut to fit. */
 export const QUESTION_MAX_CHARS = 300;
 export const questionTooLong = (length: number) =>
-  `Not asked: this question is ${length} characters, and a card holds one short question (at most ${QUESTION_MAX_CHARS}). Write what you found and your plan in your text first (it is posted above the card), then call ask_user again with one short question, with choices when they fit (e.g. "Posso começar a preencher o formulário?" with Sim and Ainda não).`;
+  `Not asked: this question is ${length} characters, and a card holds one short question (at most ${QUESTION_MAX_CHARS}). Write what you found and your plan in your text first (it is posted above the card), then call ask_user again with one short question, with choices when they fit (e.g. "Can I start filling in the form?" with Yes and Not yet, in the people's language).`;
 
 /** The shape the app renders (`meta.question`, `question.asked` / `question.answered`). */
 export interface AgentQuestion {

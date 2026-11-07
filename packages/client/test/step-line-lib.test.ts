@@ -49,6 +49,7 @@ test("a computer brain's own call, which no agent.tool told, says what it did un
   expect(stepAfter([read], 9000)).toBe("mexendo nos arquivos do PC…");
   expect(stepAfter([{ ...read, tool: "Bash", said: "Vou rodar os testes" }], 9000)).toBe("“Vou rodar os testes”");
   expect(stepAfter([read], 1000)).toBe("pensando…");
+  expect(stepAfter([{ ...read, tool: "run_terminal_command" }], 9000)).toBe("rodando um comando…");
 });
 
 test("a call waiting on a person says so before any words", () => {

@@ -54,7 +54,7 @@ test("a model brain: what it wrote before its call is that call's step words, cu
   expect(await agentBodies()).toEqual(["Faltam o ícone e a classificação de conteúdo."]);
 });
 
-test("a computer brain: its own call says its step once it ended, a bridged call as it starts", async () => {
+const onComputer = async (brain: Brain) => {
   f = await setup({ contextTools: true });
   const deps = { db: f.db, pubsub: f.pubsub, publicUrl: "https://agentes.chat" };
   const paired = await pairMachine(deps, f.owner.id, f.org.id, {
@@ -71,6 +71,25 @@ test("a computer brain: its own call says its step once it ended, a bridged call
     .update(schema.agents)
     .set({ machineId: paired.machineId, brain: "claude_code" })
     .where(eq(schema.agents.id, f.agent.id));
+  return createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id): Promise<MachineStatus> => ({
+        id,
+        orgId: f.org.id,
+        name: "MacBook",
+        online: true,
+        execAllowed: true,
+        os: "darwin",
+        protocol: 8,
+        executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      }),
+    },
+  });
+};
+
+test("a computer brain: its own call says its step once it ended, a bridged call as it starts", async () => {
   const brain: Brain = {
     kind: "claude_code",
     async *run(_turn, io) {
@@ -91,22 +110,7 @@ test("a computer brain: its own call says its step once it ended, a bridged call
       yield { type: "done", text: "Pronto: falta o ícone." };
     },
   };
-  const handlers = createJobHandlers({
-    ...f.jobDeps,
-    brains: { claude_code: () => brain },
-    machines: {
-      status: async (id): Promise<MachineStatus> => ({
-        id,
-        orgId: f.org.id,
-        name: "MacBook",
-        online: true,
-        execAllowed: true,
-        os: "darwin",
-        protocol: 8,
-        executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
-      }),
-    },
-  });
+  const handlers = await onComputer(brain);
   const events = f.listen(f.general.id);
   await post("@dev o que falta?");
   await drainOutbox(f.db, handlers);
@@ -120,4 +124,40 @@ test("a computer brain: its own call says its step once it ended, a bridged call
   expect((steps[1] as { said?: string }).said).toBeUndefined();
   expect(toolStarts(events)).toMatchObject([{ tool: "search_context", said: "Agora procuro nas conversas" }]);
   expect(await agentBodies()).toEqual(["Pronto: falta o ícone."]);
+});
+
+test("a computer brain that tells its own call as it starts: the step line says it then, once, with no credential", async () => {
+  let atStart: { type: string }[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield { type: "text_delta", text: "Vou rodar o build com a chave sk-ant-abcdefghijklmnopqrstuv. Demora." };
+      yield { type: "tool_started", id: "b1", name: "Bash" };
+      // The command still runs: what the line says now is what people see while it does.
+      await new Promise((r) => setTimeout(r, 20));
+      atStart = events.filter((e) => e.type === "agent.step");
+      yield {
+        type: "tool_call",
+        id: "b1",
+        name: "Bash",
+        input: { command: "bun run build" },
+        executed: { content: "ok" },
+      };
+      yield { type: "text_delta", text: "NO_REPLY" };
+      yield { type: "tool_started", id: "g1", name: "Grep" };
+      yield { type: "tool_call", id: "g1", name: "Grep", input: { pattern: "x" }, executed: { content: "" } };
+      yield { type: "text_delta", text: "Build ok." };
+      yield { type: "done", text: "Build ok." };
+    },
+  };
+  const handlers = await onComputer(brain);
+  const events = f.listen(f.general.id);
+  await post("@dev roda o build?");
+  await drainOutbox(f.db, handlers);
+
+  expect(atStart).toEqual([expect.objectContaining({ tool: "Bash", said: "Vou rodar o build com a chave ••••" })]);
+  const steps = events.filter((e) => e.type === "agent.step");
+  // Each call once, as it started; the silence word is never its words.
+  expect(steps).toMatchObject([{ tool: "Bash" }, { tool: "Grep" }]);
+  expect((steps[1] as { said?: string }).said).toBeUndefined();
 });

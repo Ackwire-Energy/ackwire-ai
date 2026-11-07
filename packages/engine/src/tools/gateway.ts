@@ -21,7 +21,7 @@ import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { provenReadOnly } from "../databases/guard";
-import { cutText, pgSafeJson, pgSafeText } from "../format";
+import { cutMarked, cutText, pgSafeJson, pgSafeText } from "../format";
 import { mergeReposOfCall, recordMergeDone, reposOfGithubCall } from "../git/repos";
 import { recordRead } from "../outbound";
 import { routineCreatorOf } from "../requester";
@@ -625,8 +625,8 @@ export function createToolGateway(deps: {
         connectionId,
         params: input,
         actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: input }),
-        title: described.title.slice(0, 300),
-        detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
+        title: cutMarked(described.title, 300),
+        detail: cutMarked(described.detail ?? "", APPROVAL_DETAIL_CHARS),
         why: request.why,
         ownerUserId: owner,
         requestedByUserId: authority.personId,
@@ -1248,8 +1248,8 @@ export function createToolGateway(deps: {
             connectionId,
             params: call.input,
             actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: call.input }),
-            title: described.title.slice(0, 300),
-            detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
+            title: cutMarked(described.title, 300),
+            detail: cutMarked(described.detail ?? "", APPROVAL_DETAIL_CHARS),
             why,
             origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,

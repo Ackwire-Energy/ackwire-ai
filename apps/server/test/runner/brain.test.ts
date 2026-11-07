@@ -181,18 +181,21 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       line({ type: "assistant", parent_tool_use_id: null, message: { content: [{ type: "text", text: "Hello" }] } }),
     ).events,
   ).toEqual([]);
-  p.push(
-    line({
-      type: "assistant",
-      parent_tool_use_id: null,
-      message: {
-        content: [
-          { type: "tool_use", id: "t1", name: "mcp__agentes__search_context", input: { query: "q" } },
-          { type: "tool_use", id: "t2", name: "Bash", input: { command: "ls" } },
-        ],
-      },
-    }),
-  );
+  // Only its own call is told as it starts: ours through the bridge tell the engine themselves.
+  expect(
+    p.push(
+      line({
+        type: "assistant",
+        parent_tool_use_id: null,
+        message: {
+          content: [
+            { type: "tool_use", id: "t1", name: "mcp__agentes__search_context", input: { query: "q" } },
+            { type: "tool_use", id: "t2", name: "Bash", input: { command: "ls" } },
+          ],
+        },
+      }),
+    ).events,
+  ).toEqual([{ type: "tool_started", id: "t2", name: "Bash" }]);
   const results = p.push(
     line({
       type: "user",
@@ -289,7 +292,8 @@ test("parser: a streamed message said again in a later assistant event (with its
       { type: "text", text: "Vou olhar." },
       { type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } },
     ]),
-  ).toEqual([]);
+    // Its own call is told as it starts (the step line), ours through the bridge never.
+  ).toEqual([{ type: "tool_started", id: "t1", name: "Bash" }]);
   // The next API message, never streamed (no partials for it): its text comes whole.
   expect(
     p.push(

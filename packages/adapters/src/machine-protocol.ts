@@ -1466,7 +1466,9 @@ export type WireBrainEvent =
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] }
   /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
-  | { type: "speed_fallback"; message: string };
+  | { type: "speed_fallback"; message: string }
+  /** A call the brain starts on its own (Claude Code's Read, Bash, Task): its `tool_call` follows once it ended. */
+  | { type: "tool_started"; id: string; name: string };
 
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
@@ -2632,6 +2634,10 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
     }
     case "speed_fallback":
       return { type: "speed_fallback", message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message) };
+    case "tool_started":
+      return isString(v.id) && isString(v.name)
+        ? { type: "tool_started", id: v.id.slice(0, 128), name: v.name.slice(0, BRAIN_LIMITS.toolName) }
+        : null;
     default:
       return null;
   }

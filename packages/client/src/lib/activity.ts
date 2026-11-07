@@ -201,9 +201,15 @@ const BUILTIN: Record<string, ActivityKind> = {
   cancel_follow_up: "cancelingFollowUp",
 };
 
-/** A computer brain's own tools (`agent.step`: Claude Code's, Codex's, OpenCode's), lower-cased. */
+/** A computer brain's own tools (`agent.step`: Claude Code's, Codex's, OpenCode's, Grok Build's), lower-cased. */
 const OWN_TOOLS: Record<string, ActivityKind> = {
   read: "pcFiles",
+  write_file: "pcFiles",
+  edit_file: "pcFiles",
+  search_replace: "pcFiles",
+  list_dir: "pcFiles",
+  run_terminal_cmd: "runningCommandAny",
+  run_terminal_command: "runningCommandAny",
   edit: "pcFiles",
   multiedit: "pcFiles",
   write: "pcFiles",
