@@ -494,9 +494,10 @@ html:not([data-pointer]) .ac-link:focus-visible {
   gap: var(--form-gap);
   min-width: 0;
 }
-/* A paragraph among fields takes the form's gap, not its browser margins on top. */
-:where(.ac-form, .ac-field, .ac-dialog__body) > p {
-  margin: 0;
+/* A paragraph or a list among fields or in a card takes the stack's gap, not its browser margins on top (13px more on
+   each side of a small note). A class with margins of its own keeps them. */
+:where(.ac-form, .ac-field, .ac-dialog__body, .ac-card, .ac-details__section) > :where(p, ul, ol) {
+  margin-block: 0;
 }
 .ac-form__actions {
   display: flex;
@@ -9867,8 +9868,8 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 .ac-setnote + .ac-setnote {
   margin-top: 8px;
 }
-/* In a stack (a form, a field, a dialog's body) the stack's gap is the room above it, as for any paragraph there. */
-:is(.ac-form, .ac-field, .ac-dialog__body) > .ac-setnote {
+/* In a stack (a form, a field, a dialog's body, a card) the stack's gap is the room above it, as for any paragraph there. */
+:is(.ac-form, .ac-field, .ac-dialog__body, .ac-card) > .ac-setnote {
   margin: 0;
 }
 .ac-setnote .ac-icon {

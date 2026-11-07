@@ -3297,6 +3297,22 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   flex-direction: column;
   gap: 12px;
 }
+/* A paragraph or a list in the app's own stacks takes the stack's gap, not its browser margins on top: an agent card's
+   "só responde a" note sat 25px from the bar and the button around it, its gap 12. The kit does the same in its cards
+   and forms; a class with margins of its own keeps them. */
+:where(
+  .profile-card__body,
+  .stack-4,
+  .skill-sheet__main,
+  .skill-history,
+  .issue-aside,
+  .wiki-editor,
+  .cal-side__section,
+  .cflow__key,
+  .imp-block
+) > :where(p, ul, ol) {
+  margin-block: 0;
+}
 .profile-card__head {
   display: flex;
   align-items: center;
