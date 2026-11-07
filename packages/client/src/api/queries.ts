@@ -15,6 +15,7 @@ import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
+import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
@@ -3557,7 +3558,8 @@ export const useAnswerChoices = (orgId: string, id: string) => {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (picks: number[]) => api.artifacts.answerChoices(orgId, id, picks, newClientId()),
+    mutationFn: ({ picks, others }: ChoiceAnswer) =>
+      api.artifacts.answerChoices(orgId, id, picks, newClientId(), others),
     onSuccess: (out) => qc.setQueryData(keys.choices(orgId, id), out.choices),
     // The card says it itself, and says nothing when someone answered first.
     meta: { silent: true },

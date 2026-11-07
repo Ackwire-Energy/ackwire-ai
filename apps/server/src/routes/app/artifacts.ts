@@ -189,9 +189,16 @@ const Choices = z
     answer: z
       .object({
         userId: z.string(),
-        picks: z.array(z.number()).openapi({ description: "The option picked for each question, in order." }),
+        picks: z.array(z.number()).openapi({
+          description:
+            "The option picked for each question, in order. One past the question's last option: a written answer (`others`).",
+        }),
         messageId: z.string().nullable(),
         at: z.string(),
+        others: z
+          .array(z.string().nullable())
+          .optional()
+          .openapi({ description: "What was written for each question answered in words (null for a picked option)." }),
       })
       .nullable(),
   })
@@ -681,13 +688,20 @@ export function artifactRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/choices/{artifactId}/answer",
       tags,
       security,
-      summary: "Answer a choice card: one option per question, sent to its agent as the person's own message",
-      description: "Once: the first answer in wins (409 `choices.answered` after that).",
+      summary:
+        "Answer a choice card: one option per question, or a written answer, sent to its agent as the person's own message",
+      description:
+        'Once: the first answer in wins (409 `choices.answered` after that). A question answered in words ("Outra resposta") takes the pick one past its last option and the text at its place in `others`.',
       request: {
         params: ArtifactParams,
         body: body(
           z.object({
             picks: z.array(z.number().int().min(0)).min(1).max(ARTIFACT_LIMITS.choiceQuestions),
+            others: z
+              .array(z.string().max(ARTIFACT_LIMITS.choiceOtherChars).nullable())
+              .max(ARTIFACT_LIMITS.choiceQuestions)
+              .nullable()
+              .optional(),
             clientId: z.string().max(64).nullable().optional(),
           }),
         ),

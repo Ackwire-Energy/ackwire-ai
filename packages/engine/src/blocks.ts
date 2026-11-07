@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, count, type Database, eq, inArray, isNotNull, isNull, lt, schema } from "@agenteschat/db";
 import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
+  ARTIFACT_LIMITS,
   type ArtifactContent,
   type ArtifactDeps,
   type ChoiceQuestion,
@@ -27,7 +28,8 @@ import type { Talker } from "./talker";
 import { listsEveryTool } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
-const { agentRuns, agents, artifacts, channelMembers, channels, choiceAnswers, pollVotes, polls, users } = schema;
+const { agentRuns, agents, artifacts, channelMembers, channels, choiceAnswers, messages, pollVotes, polls, users } =
+  schema;
 
 /**
  * What lives in a conversation and not in the Drive (ADR 0113). A file is for keeping; a block is for using now: a
@@ -291,10 +293,19 @@ async function replyAsPerson(
   return postPersonMessage(deps, userId, orgId, a.channelId, { body, threadId: a.threadId, clientId, meta });
 }
 
-/** A choice card's answer as the apps draw it (`choices.updated`); its questions are the artifact's content. */
+/**
+ * A choice card's answer as the apps draw it (`choices.updated`); its questions are the artifact's content. A pick past
+ * a question's last option is "Outra resposta": what was written is in `others`, at that question's place.
+ */
 export interface ChoicesView {
   id: string;
-  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+  answer: {
+    userId: string;
+    picks: number[];
+    messageId: string | null;
+    at: string;
+    others?: (string | null)[];
+  } | null;
 }
 
 /**
@@ -309,18 +320,36 @@ const unposted = (artifactId: string) =>
     lt(choiceAnswers.createdAt, new Date(Date.now() - UNPOSTED_CLAIM_MS)),
   );
 
+/** The written answers a reply carries (`meta.choiceReply.others`), the person's message being where they live. */
+async function writtenAnswers(db: Database, orgId: string, messageId: string) {
+  const [row] = await db
+    .select({ meta: messages.meta })
+    .from(messages)
+    .where(and(eq(messages.orgId, orgId), eq(messages.id, messageId)))
+    .limit(1);
+  const others = (row?.meta.choiceReply as { others?: unknown } | undefined)?.others;
+  return Array.isArray(others) && others.every((o) => o === null || typeof o === "string")
+    ? (others as (string | null)[])
+    : undefined;
+}
+
 async function loadChoicesView(db: Database, orgId: string, artifactId: string): Promise<ChoicesView> {
   const [row] = await db
     .select()
     .from(choiceAnswers)
     .where(and(eq(choiceAnswers.artifactId, artifactId), eq(choiceAnswers.orgId, orgId)));
   const lost = row && !row.messageId && row.createdAt.getTime() < Date.now() - UNPOSTED_CLAIM_MS;
+  if (!row || lost) return { id: artifactId, answer: null };
+  const others = row.messageId ? await writtenAnswers(db, orgId, row.messageId) : undefined;
   return {
     id: artifactId,
-    answer:
-      row && !lost
-        ? { userId: row.userId, picks: row.picks, messageId: row.messageId, at: row.createdAt.toISOString() }
-        : null,
+    answer: {
+      userId: row.userId,
+      picks: row.picks,
+      messageId: row.messageId,
+      at: row.createdAt.toISOString(),
+      ...(others ? { others } : {}),
+    },
   };
 }
 
@@ -332,31 +361,46 @@ export async function getChoices(deps: ArtifactDeps, userId: string, orgId: stri
 }
 
 /**
- * What the agent reads as the person's reply: each question with its pick, one per line. The question is always
- * there: the agent's own history shows its reply text, not the card it sent.
+ * What the agent reads as the person's reply: each question with its pick, or what they wrote instead, one per line.
+ * The question is always there: the agent's own history shows its reply text, not the card it sent.
  */
-export function choiceReplyText(questions: ChoiceQuestion[], picks: number[]): string {
-  return questions.map((q, i) => `${q.question} ${q.options[picks[i] as number]?.label ?? ""}`).join("\n");
+export function choiceReplyText(
+  questions: ChoiceQuestion[],
+  picks: number[],
+  others: readonly (string | null | undefined)[] = [],
+): string {
+  return questions.map((q, i) => `${q.question} ${others[i] ?? q.options[picks[i] as number]?.label ?? ""}`).join("\n");
 }
 
 /**
- * A person picks on a choice card (ADR 0124): one option per question, once, the first answer in. It goes to the agent
- * as that person's own message (`meta.choiceReply`), and the card shows what was picked to everyone.
+ * A person picks on a choice card (ADR 0124): one option per question, or a written answer ("Outra resposta": the
+ * pick past its last option, the text in `others` at its place), once, the first answer in. It goes to the agent as
+ * that person's own message (`meta.choiceReply`, which keeps what was written), and the card shows the answer to
+ * everyone.
  */
 export async function answerChoices(
   deps: ReplyDeps,
   userId: string,
   orgId: string,
   artifactId: string,
-  input: { picks: number[]; clientId?: string | null },
+  input: { picks: number[]; others?: (string | null)[] | null; clientId?: string | null },
 ): Promise<{ choices: ChoicesView; message: MessageView }> {
   const a = await getArtifact(deps, { type: "person", userId }, orgId, artifactId);
   if (a.kind !== "choices" || a.content.kind !== "choices" || !a.channelId)
     throw new NotFoundError("Choice card not found");
   const { questions } = a.content;
   const picks = input.picks;
-  if (picks.length !== questions.length || picks.some((p, i) => !Number.isInteger(p) || !questions[i]?.options[p]))
-    throw new ValidationError("Pick one option for each question");
+  const others = questions.map((q, i) => (picks[i] === q.options.length ? (input.others?.[i]?.trim() ?? "") : null));
+  const fits = (p: number, i: number) => {
+    const q = questions[i];
+    if (!q || !Number.isInteger(p)) return false;
+    const written = others[i];
+    if (written === null || written === undefined) return Boolean(q.options[p]);
+    return written.length > 0 && written.length <= ARTIFACT_LIMITS.choiceOtherChars;
+  };
+  if (picks.length !== questions.length || !picks.every(fits))
+    throw new ValidationError("Pick an option or write an answer for each question");
+  const wrote = others.some((o) => o !== null);
   await deps.db.delete(choiceAnswers).where(unposted(artifactId));
   const [claimed] = await deps.db
     .insert(choiceAnswers)
@@ -369,8 +413,8 @@ export async function answerChoices(
     userId,
     orgId,
     a,
-    choiceReplyText(questions, picks),
-    { choiceReply: { id: a.id, title: a.title } },
+    choiceReplyText(questions, picks, others),
+    { choiceReply: { id: a.id, title: a.title, ...(wrote ? { others } : {}) } },
     input.clientId,
   ).catch(async (error: unknown) => {
     // Not sent: the card stays open for another try.
@@ -507,7 +551,7 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
   const askChoices: ToolDefinition = {
     name: ASK_CHOICES_TOOL,
     description:
-      'Ask the person to pick between a few clear options, as a card they answer with one click (options lettered A, B, C…), instead of writing "you have two options: 1… 2…" in your reply. Use it for a short decision between options you can name: which way to go, which of two fixes, whether to do it now or later. Several related decisions can go in one card (questions, up to 5). Never for an open question, for a secret (request_secret) or for an approval of a sensitive action (that action asks by itself). Their pick reaches you as their next message. To stop in the middle of work for an answer, use ask_user instead. After calling, write at most one short line around it and end your turn: don\'t repeat the options in your text.',
+      'Ask the person to pick between a few clear options, as a card they answer with one click (options lettered A, B, C…), instead of writing "you have two options: 1… 2…" in your reply. Use it for a short decision between options you can name: which way to go, which of two fixes, whether to do it now or later. Several related decisions can go in one card (questions, up to 5). Every question also takes a written answer (the card adds "Outra resposta" after your options), so never add an "Other" option yourself. Never for an open question, for a secret (request_secret) or for an approval of a sensitive action (that action asks by itself). Their pick, or what they wrote, reaches you as their next message. To stop in the middle of work for an answer, use ask_user instead. After calling, write at most one short line around it and end your turn: don\'t repeat the options in your text.',
     scope: "",
     inputSchema: {
       type: "object",
