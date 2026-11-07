@@ -1,7 +1,8 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +12,7 @@ import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { goBack, MONO } from "../shared/parts";
 import { useFileActions } from "./actions";
-import { type FileInfo, fileInfo } from "./logic";
+import { encodeFileList, type FileInfo, fileInfo } from "./logic";
 import { FileTile, useFileLine } from "./MessageFiles";
 import { fileText, useRemoteFile } from "./source";
 import { VideoPlayer } from "./VideoPlayer";
@@ -41,6 +42,12 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const actions = useFileActions(detail);
   const info = detail ? fileInfo(detail) : null;
   const close = () => goBack();
+  // A picture opened here (a notification, a link, an issue's files) belongs to the picture viewer.
+  const picture = info?.view === "image" && detail ? detail.shownVersion : null;
+  useEffect(() => {
+    if (picture === null) return;
+    router.replace({ pathname: "/images", params: { files: encodeFileList([{ id, version: picture }]), at: "0" } });
+  }, [picture, id]);
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
   const shows = info ? info.view === "markdown" || info.view === "text" || info.view === "video" || pdf : false;

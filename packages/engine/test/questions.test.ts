@@ -14,6 +14,8 @@ import {
   postPersonMessage,
   ValidationError,
 } from "../src";
+import { listNotifications } from "../src/notifications";
+import { resolveStaleQuestionNotifications } from "../src/questions";
 import { type Fixture, setup } from "./fixtures";
 
 // The first test pays for migrating the PGlite template (2-3 s idle, past 5 s under a full suite's load), and the
@@ -121,6 +123,18 @@ describe("ask_user", () => {
     await Bun.sleep(5);
     const closed = events.find((e) => e.type === "question.answered") as unknown as { question: { id: string } };
     expect(closed?.question.id).toBe(q?.id ?? "");
+    // Out of the inbox too: nothing waits on a person for an answer nobody can give.
+    const inbox = () => listNotifications({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { filter: "waiting" });
+    expect((await inbox()).items.filter((n) => n.kind === "agent_question")).toEqual([]);
+    // A notification left waiting after the question closed (a release before this one, a crash in between) is
+    // swept by the expiry worker.
+    await f.db
+      .update(schema.notifications)
+      .set({ doneAt: null })
+      .where(eq(schema.notifications.groupKey, `agent_question:${q?.id ?? ""}`));
+    expect((await inbox()).items.filter((n) => n.kind === "agent_question")).toHaveLength(1);
+    expect(await resolveStaleQuestionNotifications({ db: f.db, pubsub: f.pubsub })).toBe(1);
+    expect((await inbox()).items.filter((n) => n.kind === "agent_question")).toEqual([]);
   });
 
   test("the next message in the channel answers it, without starting another run", async () => {

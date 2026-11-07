@@ -9,6 +9,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
+import { resolveQuestionNotifications } from "./notification-producers";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { type AgentQuestionRow, publishQuestion, syncQuestionMessage } from "./questions";
 import { closeRoutineRun } from "./routine-ledger";
@@ -334,7 +335,11 @@ export async function stopRun(
     if (done) {
       run = done;
       for (const r of closedSecrets) await publishSecret(deps, r, "secret.updated");
-      for (const q of closedQuestions) await publishQuestion(deps.pubsub, q, "question.answered");
+      for (const q of closedQuestions) {
+        await publishQuestion(deps.pubsub, q, "question.answered");
+        // Out of everyone's inbox too: a question nobody can answer any more never waits on a person.
+        await resolveQuestionNotifications(deps, orgId, q.id).catch(() => {});
+      }
       break;
     }
     if (attempt >= 3) throw new ConflictError("This task changed state. Try again.", "run.state_changed");
