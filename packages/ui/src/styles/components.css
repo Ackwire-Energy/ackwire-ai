@@ -9115,11 +9115,6 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-searchfield:focus-within:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
   padding-right: var(--control-px-sm);
 }
-@media (max-width: 760px), (pointer: coarse) {
-  .ac-searchfield:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
-    padding-right: var(--control-px-sm);
-  }
-}
 .ac-toolbar .ac-searchfield__icon,
 .ac-searchfield--sm .ac-searchfield__icon {
   left: 11px;
@@ -9540,6 +9535,10 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-searchfield__input,
   .ac-searchfield--sm .ac-searchfield__input {
     font-size: 16px;
+  }
+  /* The "/" hint doesn't show here (below): an empty field's words take its room. */
+  .ac-searchfield:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
+    padding-right: var(--control-px-sm);
   }
   /* No keyboard hints: a button's keys (its `kbd` or a key among its words), the send button's, a search field's,
      the palette's and a menu's. */
