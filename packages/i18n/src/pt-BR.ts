@@ -10264,6 +10264,7 @@ export const ptBR = {
     toolsCount_other: "{{count}} ferramentas",
     active: "Ativo",
     notReviewed: "Aguardando revisão",
+    noToolsNow: "Sem ferramentas agora",
     toReview_one: "{{count}} ferramenta nova para revisar",
     toReview_other: "{{count}} ferramentas novas para revisar",
     usedBy_one: "{{count}} de {{total}} agentes",

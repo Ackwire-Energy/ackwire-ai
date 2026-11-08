@@ -1580,6 +1580,7 @@ export const featureKeysEn = {
     everyoneFailed: "Couldn't change everyone's access. Try again.",
     disconnectFailed: "Couldn't disconnect {{name}}. Try again.",
     needsReconnect: "The {{name}} account stopped working. Agents can't use it until someone reconnects it.",
+    noTools: "{{name}}'s tools couldn't be read. Agents go without them until they're read again, in Tools.",
     accountTitle: "This account",
     renameFailed: "Couldn't rename it. Try again.",
     whoTitle: "Who uses it and how far",

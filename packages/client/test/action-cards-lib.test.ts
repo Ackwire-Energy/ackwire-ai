@@ -215,6 +215,9 @@ test("connect-an-app and invite cards: read from the message, a plain http addre
   expect(connectAppDone(app, [server("https://MCP.acme.dev/mcp/")])).toBe(true);
   const linear = { kind: "connect_app" as const, forUserId: null, connector: "linear", why: "" };
   expect(connectAppDone(linear, [{ def: { id: "linear" } as never, server: null }])).toBe(true);
+  // Its sign-in stopped working: the card asks again.
+  expect(connectAppDone(linear, [{ def: { id: "linear" } as never, server: null, needsReconnect: true }])).toBe(false);
+  expect(connectAppDone(app, [{ ...server("https://mcp.acme.dev/mcp"), needsReconnect: true }])).toBe(false);
   expect(connectAppDone({ kind: "connect_app", forUserId: null, why: "" }, [server("https://x.dev")])).toBe(false);
 
   const invite = actionCardOf({

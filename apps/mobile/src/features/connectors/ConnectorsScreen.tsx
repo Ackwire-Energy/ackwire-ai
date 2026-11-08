@@ -218,7 +218,7 @@ function Gallery() {
                         <ConnectedTile
                           key={item.id}
                           item={item}
-                          waiting={admin && item.pending > 0}
+                          review={admin && item.pending > 0}
                           onPress={() => openItem(item)}
                         />
                       ))}
@@ -338,22 +338,24 @@ function EmptyHint({ acts }: { acts: boolean }) {
 }
 
 /**
- * A connection in the row: its mark with the check, its name; when its tools wait on you (a server's new or unclear
- * tools), the amber wait mark and its name in amber instead (its screen lists them first).
+ * A connection in the row: its mark with the check, its name; when it waits on you (its sign-in stopped working, its
+ * tools couldn't be read, or a server's new or unclear tools), the amber wait mark and its name in amber instead (its
+ * screen says why first).
  */
-function ConnectedTile({ item, waiting, onPress }: { item: ConnectedItem; waiting: boolean; onPress: () => void }) {
+function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review: boolean; onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const name = itemName(t, item);
+  const why = item.needsReconnect
+    ? t("connectors.composio.needsReconnect")
+    : item.toolsError
+      ? t("connectors.noToolsNow")
+      : review
+        ? t("toolReview.decideTitle", { count: item.pending })
+        : null;
+  const waiting = why !== null;
   return (
-    <MiniTile
-      onPress={onPress}
-      label={
-        waiting
-          ? `${name}, ${t("toolReview.decideTitle", { count: item.pending })}`
-          : t("mobile.connectors.connectedCheck", { name })
-      }
-    >
+    <MiniTile onPress={onPress} label={why ? `${name}, ${why}` : t("mobile.connectors.connectedCheck", { name })}>
       <View>
         <ConnectorIcon def={item.def} image={item.image} label={name} size={48} check={!waiting} />
         {waiting ? (

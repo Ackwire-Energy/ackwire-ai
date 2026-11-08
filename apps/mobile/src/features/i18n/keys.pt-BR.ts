@@ -1581,6 +1581,8 @@ export const featureKeysPtBR = {
     everyoneFailed: "Não deu para mudar o acesso de todos. Tente de novo.",
     disconnectFailed: "Não deu para desconectar o {{name}}. Tente de novo.",
     needsReconnect: "A conta do {{name}} parou de funcionar. Os agentes não usam até alguém reconectar.",
+    noTools:
+      "Não deu para ler as ferramentas do {{name}}. Os agentes ficam sem elas até serem lidas de novo, em Ferramentas.",
     accountTitle: "Esta conta",
     renameFailed: "Não deu para renomear. Tente de novo.",
     whoTitle: "Quem usa e até onde",

@@ -11207,6 +11207,7 @@
     "toolsCount_other": "{{count}} narzędzia",
     "active": "Aktywny",
     "notReviewed": "Czeka na przegląd",
+    "noToolsNow": "Na razie bez narzędzi",
     "toReview_one": "{{count}} nowe narzędzie do przejrzenia",
     "toReview_few": "{{count}} nowe narzędzia do przejrzenia",
     "toReview_many": "{{count}} nowych narzędzi do przejrzenia",

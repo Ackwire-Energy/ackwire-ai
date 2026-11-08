@@ -9984,6 +9984,7 @@
     "toolsCount_other": "도구 {{count}}개",
     "active": "활성",
     "notReviewed": "검토 대기 중",
+    "noToolsNow": "지금은 도구 없음",
     "toReview_other": "검토할 새 도구 {{count}}개",
     "usedBy_other": "에이전트 {{total}}명 중 {{count}}명",
     "usedByNone": "아직 에이전트 없음",

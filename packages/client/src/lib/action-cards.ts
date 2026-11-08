@@ -499,11 +499,19 @@ export function connectAiDone(
   );
 }
 
-/** Done once the workspace has it: a connection of its catalog entry, or a server at its address. */
-export const connectAppDone = (card: ConnectAppCard, items: readonly Pick<ConnectedItem, "def" | "server">[]) =>
-  card.connector
-    ? items.some((i) => i.def?.id === card.connector)
-    : Boolean(card.url) && items.some((i) => sameServer(i.server?.serverUrl, card.url));
+/**
+ * Done once the workspace has it working: a connection of its catalog entry, or a server at its address, whose sign-in
+ * still works (one to reconnect opens the card again).
+ */
+export const connectAppDone = (
+  card: ConnectAppCard,
+  items: readonly (Pick<ConnectedItem, "def" | "server"> & Partial<Pick<ConnectedItem, "needsReconnect">>)[],
+) => {
+  const working = items.filter((i) => !i.needsReconnect);
+  return card.connector
+    ? working.some((i) => i.def?.id === card.connector)
+    : Boolean(card.url) && working.some((i) => sameServer(i.server?.serverUrl, card.url));
+};
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 

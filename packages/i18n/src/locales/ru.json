@@ -11159,6 +11159,7 @@
     "toolsCount_other": "{{count}} инструмента",
     "active": "Активен",
     "notReviewed": "Ждёт проверки",
+    "noToolsNow": "Сейчас без инструментов",
     "toReview_one": "{{count}} новый инструмент на проверку",
     "toReview_few": "{{count}} новых инструмента на проверку",
     "toReview_many": "{{count}} новых инструментов на проверку",

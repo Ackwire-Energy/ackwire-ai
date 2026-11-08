@@ -1487,6 +1487,7 @@
     "everyoneFailed": "모두의 접근 권한을 바꾸지 못했어요. 다시 시도해 주세요.",
     "disconnectFailed": "{{name}} 연결을 해제하지 못했어요. 다시 시도해 주세요.",
     "needsReconnect": "{{name}} 계정이 작동하지 않아요. 누군가 다시 연결할 때까지 에이전트가 쓸 수 없어요.",
+    "noTools": "{{name}}의 도구를 읽지 못했어요. 도구에서 다시 읽을 때까지 에이전트가 쓸 수 없어요.",
     "accountTitle": "이 계정",
     "renameFailed": "이름을 바꾸지 못했어요. 다시 시도해 주세요.",
     "whoTitle": "누가 어디까지 쓰는지",

@@ -28,10 +28,12 @@ export interface ConnectedItem {
   account: string | null;
   /** Connected through Composio (ADR 0107): its page signs in, and no address shows. */
   viaComposio: boolean;
-  /** Its account stopped working (a Composio account): no tools until Reconectar. */
+  /** Its sign-in stopped working (a refresh refused, a 401, a Composio account gone): no tools until Reconectar. */
   needsReconnect: boolean;
   /** OAuth scopes its sign-in lacks (GitHub's `project`): Reconectar adds what they let agents do. */
   reconnectAdds: string[];
+  /** A server by address whose tools couldn't be read last time (its words): agents have none from it now. */
+  toolsError: string | null;
   createdAt: string;
   /** Tools agents can be given. */
   tools: number;
@@ -64,8 +66,9 @@ export function fromConnection(c: Connection, catalog: ConnectorDef[]): Connecte
     image: null,
     account: accountNote(c.label, c.accountLabel),
     viaComposio: false,
-    needsReconnect: false,
+    needsReconnect: c.status === "needs_reconnect",
     reconnectAdds: c.reconnectAdds ?? [],
+    toolsError: null,
     createdAt: c.createdAt,
     tools: def?.tools.length ?? 0,
     pending: 0,
@@ -87,6 +90,7 @@ export function fromServer(s: CustomServer, catalog: ConnectorDef[]): ConnectedI
     viaComposio: s.via === "composio",
     needsReconnect: s.status === "needs_reconnect",
     reconnectAdds: [],
+    toolsError: s.toolsError ?? null,
     createdAt: s.createdAt,
     tools: exposedTools(s).length,
     pending,

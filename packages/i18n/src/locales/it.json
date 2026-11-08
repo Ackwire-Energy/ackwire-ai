@@ -10820,6 +10820,7 @@
     "toolsCount_other": "{{count}} strumenti",
     "active": "Attivo",
     "notReviewed": "In attesa di revisione",
+    "noToolsNow": "Nessuno strumento per ora",
     "toReview_one": "{{count}} nuovo strumento da rivedere",
     "toReview_many": "{{count}} nuovi strumenti da rivedere",
     "toReview_other": "{{count}} nuovi strumenti da rivedere",

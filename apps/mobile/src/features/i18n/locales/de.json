@@ -1579,6 +1579,7 @@
     "everyoneFailed": "Der Zugriff für alle ließ sich nicht ändern. Versuch es noch einmal.",
     "disconnectFailed": "{{name}} ließ sich nicht trennen. Versuch es noch einmal.",
     "needsReconnect": "Das Konto bei {{name}} funktioniert nicht mehr. Agenten können es erst nutzen, wenn jemand es neu verbindet.",
+    "noTools": "Die Tools von {{name}} ließen sich nicht lesen. Die Agenten haben sie erst wieder, wenn sie unter Tools neu gelesen werden.",
     "accountTitle": "Dieses Konto",
     "renameFailed": "Umbenennen hat nicht geklappt. Versuch es noch einmal.",
     "whoTitle": "Wer es nutzt und wie weit",

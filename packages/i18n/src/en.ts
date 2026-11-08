@@ -10151,6 +10151,8 @@ export const en = {
     active: "Active",
     notReviewed: "Waiting for review",
     toReview_one: "{{count}} new tool to review",
+    /** A server by address whose tools couldn't be read last time: agents have none from it now. */
+    noToolsNow: "No tools right now",
     toReview_other: "{{count}} new tools to review",
     usedBy_one: "{{count}} of {{total}} agents",
     usedBy_other: "{{count}} of {{total}} agents",

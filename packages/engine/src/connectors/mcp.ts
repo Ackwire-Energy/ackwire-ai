@@ -18,6 +18,7 @@ import {
   type ConnectorConnection,
   type ConnectorDeps,
   connectionHeaders,
+  noteRefusedSignIn,
   toolPrefixOfConnection,
 } from "./connections";
 import {
@@ -236,11 +237,16 @@ export function createConnectorToolSource(
 
   async function withSession<T>(connection: ConnectorConnection, fn: (s: McpSession) => Promise<T>): Promise<T> {
     const extra = isCustom(connection) ? undefined : CONNECTOR_CATALOG[connection.connector]?.headers;
-    const session = await connect(connection, { ...extra, ...(await connectionHeaders(deps, connection)) });
     try {
-      return await fn(session);
-    } finally {
-      await session.close().catch(() => {});
+      const session = await connect(connection, { ...extra, ...(await connectionHeaders(deps, connection)) });
+      try {
+        return await fn(session);
+      } finally {
+        await session.close().catch(() => {});
+      }
+    } catch (error) {
+      await noteRefusedSignIn(deps.db, connection, error);
+      throw error;
     }
   }
 
@@ -270,7 +276,7 @@ export function createConnectorToolSource(
    * tool's); its workbench, bash and proxy always ask.
    */
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
-    // A Composio account that stopped working has no tools until it is reconnected.
+    // A sign-in that stopped working (a Composio account too) has no tools until it is reconnected.
     if (connection.status === "needs_reconnect") return [];
     const classified = await classifiedTools(deps.db, connection.id);
     if (classified.length === 0) return [];
@@ -381,7 +387,8 @@ export function createConnectorToolSource(
           continue;
         }
         const def = CONNECTOR_CATALOG[connection.connector];
-        if (!def) continue;
+        // A sign-in that stopped working has no tools until Reconectar.
+        if (!def || connection.status === "needs_reconnect") continue;
         const prefix = toolPrefixOfConnection(connection);
         let listed: McpTool[];
         try {

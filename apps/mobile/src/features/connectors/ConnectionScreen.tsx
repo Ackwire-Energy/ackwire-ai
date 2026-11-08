@@ -111,6 +111,8 @@ function Connection({ id }: { id: string }) {
           <View style={styles.body}>
             {item.needsReconnect ? (
               <Problem text={t("mobile.connectors.needsReconnect", { name })} />
+            ) : item.toolsError ? (
+              <Problem text={t("mobile.connectors.noTools", { name })} />
             ) : item.reconnectAdds.length > 0 ? (
               <Text variant="footnote" tone="muted" style={styles.lead}>
                 {reconnectAddsText(t, item)}

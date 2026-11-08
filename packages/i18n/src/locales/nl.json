@@ -10480,6 +10480,7 @@
     "toolsCount_other": "{{count}} tools",
     "active": "Actief",
     "notReviewed": "Wacht op controle",
+    "noToolsNow": "Nu geen tools",
     "toReview_one": "{{count}} nieuwe tool om te controleren",
     "toReview_other": "{{count}} nieuwe tools om te controleren",
     "usedBy_one": "{{count}} van {{total}} agents",

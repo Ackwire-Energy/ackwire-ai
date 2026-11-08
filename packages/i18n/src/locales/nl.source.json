@@ -25162,6 +25162,9 @@
   "connectors.notReviewed": {
     "value": "Waiting for review"
   },
+  "connectors.noToolsNow": {
+    "value": "No tools right now"
+  },
   "connectors.toReview": {
     "value": {
       "one": "{{count}} new tool to review",

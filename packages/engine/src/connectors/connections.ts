@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
@@ -203,6 +204,7 @@ export const connectionView = (c: ConnectorConnection) => ({
   createdAt: c.createdAt.toISOString(),
   revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
   reconnectAdds: missingOAuthScopes(c),
+  status: c.status === "needs_reconnect" ? ("needs_reconnect" as const) : ("active" as const),
 });
 
 function checkServerUrl(url: string) {
@@ -558,11 +560,39 @@ async function tokenRequest(
   });
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || body.error || !body.access_token) {
-    throw new ValidationError(
-      `The provider refused the authorization: ${body.error_description ?? body.error ?? res.status}`,
-    );
+    const said = `The provider refused the authorization: ${body.error_description ?? body.error ?? res.status}`;
+    // Its own answer (some say `error` with a 200): a 5xx or a 429 is the provider busy, not the sign-in gone.
+    throw res.status < 500 && res.status !== 429 ? new TokenRefused(said) : new ValidationError(said);
   }
   return body;
+}
+
+/** The provider answered a token request with no: the sign-in it was made with no longer works. */
+export class TokenRefused extends ValidationError {}
+
+/**
+ * A connection whose sign-in stopped working (a refresh refused, a server answering 401, a Composio account gone): no
+ * tools until Reconectar, which makes a sign-in anew. Its row and the agents' listings say so.
+ */
+export async function markToReconnect(
+  db: Database,
+  connection: Pick<ConnectorConnection, "id" | "orgId">,
+  reason: string,
+) {
+  await db
+    .update(connectorConnections)
+    .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: new Date() })
+    .where(and(eq(connectorConnections.id, connection.id), isNull(connectorConnections.revokedAt)));
+  caches.connections.delete(`${connection.orgId}:active`);
+}
+
+/**
+ * A server that refused the connection's credentials (HTTP 401) marks it to reconnect, never through Composio: its
+ * refusals say whose they are (`composioFailure`).
+ */
+export async function noteRefusedSignIn(db: Database, connection: ConnectorConnection, error: unknown) {
+  if (!(error instanceof StreamableHTTPError) || error.code !== 401 || connection.composioAccountId) return;
+  await markToReconnect(db, connection, error.message);
 }
 
 /**
@@ -708,6 +738,9 @@ async function refreshOnce(deps: ConnectorDeps, id: string, at: Date): Promise<C
     if (leased) {
       try {
         return (await refreshTokens(deps, row, stored, at)) ?? stored;
+      } catch (error) {
+        if (error instanceof TokenRefused) await markToReconnect(deps.db, row, error.message);
+        throw error;
       } finally {
         // Left alone (the process died), the lease ends by itself.
         await deps.db

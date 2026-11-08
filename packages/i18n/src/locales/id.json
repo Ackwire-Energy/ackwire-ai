@@ -10044,6 +10044,7 @@
     "toolsCount_other": "{{count}} alat",
     "active": "Aktif",
     "notReviewed": "Menunggu ditinjau",
+    "noToolsNow": "Tanpa alat untuk saat ini",
     "toReview_other": "{{count}} alat baru untuk ditinjau",
     "usedBy_other": "{{count}} dari {{total}} agen",
     "usedByNone": "Belum ada agen",

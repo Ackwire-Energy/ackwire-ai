@@ -10051,6 +10051,7 @@
     "toolsCount_other": "{{count}} 个工具",
     "active": "已启用",
     "notReviewed": "等待审核",
+    "noToolsNow": "暂时没有工具",
     "toReview_other": "{{count}} 个新工具待审核",
     "usedBy_other": "{{total}} 个智能体中的 {{count}} 个",
     "usedByNone": "还没有智能体",

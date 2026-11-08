@@ -10355,6 +10355,7 @@
     "toolsCount_other": "{{count}} araç",
     "active": "Etkin",
     "notReviewed": "İnceleme bekliyor",
+    "noToolsNow": "Şu an araç yok",
     "toReview_one": "İncelenecek {{count}} yeni araç",
     "toReview_other": "İncelenecek {{count}} yeni araç",
     "usedBy_one": "{{total}} ajandan {{count}} tanesi",

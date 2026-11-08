@@ -9990,6 +9990,7 @@
     "toolsCount_other": "{{count}}個のツール",
     "active": "有効",
     "notReviewed": "確認待ち",
+    "noToolsNow": "今はツールなし",
     "toReview_other": "確認が必要な新しいツールが{{count}}個",
     "usedBy_other": "{{total}}体中{{count}}体のエージェント",
     "usedByNone": "エージェントはまだいません",

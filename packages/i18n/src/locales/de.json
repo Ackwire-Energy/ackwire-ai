@@ -10419,6 +10419,7 @@
     "toolsCount_other": "{{count}} Tools",
     "active": "Aktiv",
     "notReviewed": "Wartet auf Prüfung",
+    "noToolsNow": "Gerade keine Tools",
     "toReview_one": "{{count}} neues Tool zu prüfen",
     "toReview_other": "{{count}} neue Tools zu prüfen",
     "usedBy_one": "{{count}} von {{total}} Agenten",

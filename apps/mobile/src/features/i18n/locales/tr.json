@@ -1579,6 +1579,7 @@
     "everyoneFailed": "Herkesin erişimi değiştirilemedi. Tekrar deneyin.",
     "disconnectFailed": "{{name}} bağlantısı kesilemedi. Tekrar deneyin.",
     "needsReconnect": "{{name}} hesabı çalışmayı bıraktı. Biri yeniden bağlayana kadar ajanlar onu kullanamaz.",
+    "noTools": "{{name}} araçları okunamadı. Araçlar bölümünde yeniden okunana kadar ajanlar bunları kullanamaz.",
     "accountTitle": "Bu hesap",
     "renameFailed": "Yeniden adlandırılamadı. Tekrar deneyin.",
     "whoTitle": "Kim, ne kadar kullanıyor",

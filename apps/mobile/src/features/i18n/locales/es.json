@@ -1671,6 +1671,7 @@
     "everyoneFailed": "No se pudo cambiar el acceso de todos. Inténtalo de nuevo.",
     "disconnectFailed": "No se pudo desconectar {{name}}. Inténtalo de nuevo.",
     "needsReconnect": "La cuenta de {{name}} dejó de funcionar. Los agentes no pueden usarla hasta que alguien la reconecte.",
+    "noTools": "No se pudieron leer las herramientas de {{name}}. Los agentes no las tienen hasta que se lean de nuevo, en Herramientas.",
     "accountTitle": "Esta cuenta",
     "renameFailed": "No se pudo cambiar el nombre. Inténtalo de nuevo.",
     "whoTitle": "Quién lo usa y hasta dónde",

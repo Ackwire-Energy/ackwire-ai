@@ -3886,6 +3886,9 @@
   "connectors.needsReconnect": {
     "value": "The {{name}} account stopped working. Agents can't use it until someone reconnects it."
   },
+  "connectors.noTools": {
+    "value": "{{name}}'s tools couldn't be read. Agents go without them until they're read again, in Tools."
+  },
   "connectors.accountTitle": {
     "value": "This account"
   },

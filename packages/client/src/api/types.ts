@@ -1891,6 +1891,8 @@ export interface Connection {
   revokedAt: string | null;
   /** OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`). Older servers leave it out. */
   reconnectAdds?: string[];
+  /** `needs_reconnect`: its sign-in stopped working, no tools until Reconectar. Older servers leave it out. */
+  status?: "active" | "needs_reconnect";
 }
 
 /** An installation of our GitHub App bound to the organization (repository access for git and PRs). */

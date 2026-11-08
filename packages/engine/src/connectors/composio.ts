@@ -21,6 +21,7 @@ import {
   type ConnectOutcome,
   type ConnectorConnection,
   type ConnectorDeps,
+  markToReconnect,
   OAUTH_STATE_TTL_MS,
   oauthRedirectUri,
 } from "./connections";
@@ -271,26 +272,13 @@ export async function abandonComposioOAuth(deps: ConnectorDeps, state: string) {
 export const forgetComposioAccount = (client: Pick<ComposioClient, "deleteConnectedAccount">, accountId: string) =>
   client.deleteConnectedAccount(accountId, { revoke: false }).catch(() => {});
 
-/** A connection whose Composio account stopped working: no tools until Reconectar (or Composio says it works again). */
-export async function markComposioBroken(
-  db: Database,
-  connection: Pick<ConnectorConnection, "id" | "orgId">,
-  reason: string,
-) {
-  await db
-    .update(connectorConnections)
-    .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: new Date() })
-    .where(and(eq(connectorConnections.id, connection.id), isNull(connectorConnections.revokedAt)));
-  caches.connections.delete(`${connection.orgId}:active`);
-}
-
 /** Composio's webhook said an account expired: every live connection on it needs reconnecting. */
 export async function markComposioAccountBroken(db: Database, accountId: string, reason: string) {
   const rows = await db
     .select({ id: connectorConnections.id, orgId: connectorConnections.orgId })
     .from(connectorConnections)
     .where(and(eq(connectorConnections.composioAccountId, accountId), isNull(connectorConnections.revokedAt)));
-  for (const row of rows) await markComposioBroken(db, row, reason);
+  for (const row of rows) await markToReconnect(db, row, reason);
   return rows.length;
 }
 
@@ -344,7 +332,7 @@ export async function composioFailure(
   const fail = (code: string, content: string) => ({ content, isError: true as const, data: { code } });
   if (error instanceof ComposioLimitError) return fail(error.code, error.message);
   if (error instanceof MailAuthError) {
-    await markComposioBroken(deps.db, connection, error.message);
+    await markToReconnect(deps.db, connection, error.message);
     return fail(
       "connector.needs_reconnect",
       `The ${connection.label} account stopped working (its sign-in expired or was removed). Someone who manages connectors must reconnect it in Settings › Connectors and MCPs.`,
