@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Icon } from "./Icon";
+import { CARD_PAD } from "./rhythm";
 import { Text, textLineOf } from "./Text";
 import { useTheme } from "./theme";
 import { leadBox } from "./type-scale";
@@ -48,7 +49,8 @@ export function Row({
         flexDirection: "row",
         alignItems: tall ? "flex-start" : "center",
         gap: 12,
-        padding: 14,
+        paddingHorizontal: CARD_PAD,
+        paddingVertical: 14,
         minHeight: 60,
         backgroundColor: pressed ? colors.plate : "transparent",
       }}
@@ -58,7 +60,7 @@ export function Row({
           style={{
             position: "absolute",
             top: 0,
-            left: leading ? 14 + LEAD + 12 : 14,
+            left: leading ? CARD_PAD + LEAD + 12 : CARD_PAD,
             right: 0,
             height: StyleSheet.hairlineWidth,
             backgroundColor: colors.line2,

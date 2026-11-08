@@ -11,7 +11,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, Text, weights } from "@/ui";
+import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, SCREEN_X, Section, Text, weights } from "@/ui";
 import { router } from "@/ui/navigation";
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   scroll: { paddingTop: 4 },
-  head: { paddingHorizontal: 20, gap: 6 },
+  head: { paddingHorizontal: SCREEN_X, gap: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   semibold: { fontWeight: weights.semibold },
   num: { fontVariant: ["tabular-nums"] },

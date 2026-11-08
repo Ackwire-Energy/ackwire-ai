@@ -12,7 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, EmptyState, ListRow, SectionHeader, Text } from "@/ui";
+import { Button, EmptyState, ListRow, SCREEN_X, SectionHeader, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -29,7 +29,6 @@ const AGENT = 30;
 /** Between the people's columns; a column's width when they scroll sideways (more than two). */
 const COLUMN_GAP = 14;
 const SCROLL_COLUMN = 168;
-const PAGE = 16;
 /** The line from an agent's trunk to its face. */
 const ELBOW = 18;
 /** How far a supervisor's reports sit in under it: their line drops from its face's center. */
@@ -190,7 +189,7 @@ function OrgChart({
   const dir = useDirectory();
   const { width } = useWindowDimensions();
   const wide = columns.length > 2;
-  const column = wide ? SCROLL_COLUMN : Math.floor((width - PAGE * 2 - COLUMN_GAP) / 2);
+  const column = wide ? SCROLL_COLUMN : Math.floor((width - SCREEN_X * 2 - COLUMN_GAP) / 2);
   const line = { backgroundColor: c.line2 };
   return (
     <View>
@@ -322,7 +321,7 @@ function ChannelCard({
       style={({ pressed }) => [
         styles.card,
         surface,
-        { width: Math.floor((width - PAGE * 2 - 10) / 2) },
+        { width: Math.floor((width - SCREEN_X * 2 - 10) / 2) },
         pressed && styles.pressed,
       ]}
     >
@@ -359,11 +358,11 @@ function ChannelCard({
 }
 
 const styles = StyleSheet.create({
-  // Under the large title's words (20 in, not the page's 16), tucked to it as Memória's and Wiki's lines are.
-  summary: { paddingHorizontal: 20, marginTop: -4 },
-  page: { paddingHorizontal: PAGE },
+  // Under the large title's words, tucked to it as Memória's and Wiki's lines are.
+  summary: { paddingHorizontal: SCREEN_X, marginTop: -4 },
+  page: { paddingHorizontal: SCREEN_X },
   lead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  columns: { paddingHorizontal: PAGE, gap: COLUMN_GAP },
+  columns: { paddingHorizontal: SCREEN_X, gap: COLUMN_GAP },
   column: { paddingTop: 14 },
   person: { flexDirection: "row", alignItems: "center", gap: 10 },
   // The agents hang from a line under the person's face center.
@@ -373,12 +372,12 @@ const styles = StyleSheet.create({
   trunk: { position: "absolute", left: 0, top: 0, bottom: 0, width: 1 },
   trunkEnd: { bottom: "50%" },
   elbow: { position: "absolute", left: 0, top: "50%", width: ELBOW, height: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: PAGE },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: SCREEN_X },
   card: { padding: 12, gap: 8, borderRadius: 20, borderBottomLeftRadius: 6 },
   faces: { flexDirection: "row", alignItems: "center" },
   overlap: { marginLeft: -8 },
   more: { marginLeft: 6 },
-  outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: PAGE, paddingTop: 14 },
+  outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: SCREEN_X, paddingTop: 14 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   pressed: { opacity: 0.7 },

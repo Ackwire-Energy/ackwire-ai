@@ -146,6 +146,8 @@ export interface GroupedRowProps {
   leading?: ReactNode;
   /** The value on the right, faint ("Ligadas"). */
   value?: string;
+  /** A short fact about the value, after it on its line ("Pela API"); a sentence goes in `sub`. */
+  valueNote?: string;
   /** Drawn just before the value (a picked agent's face, a format's glyph). */
   valueLeading?: ReactNode;
   /** A chevron: it opens a screen. */
@@ -161,7 +163,7 @@ export interface GroupedRowProps {
   faint?: boolean;
   disabled?: boolean;
   onPress?: () => void;
-  /** An ⓘ at the row's end: a tap on it shows the note under the row and never presses the row. */
+  /** An ⓘ right after the label: a tap on it shows the note under the row and never presses the row. */
   hint?: { name: string; text: string };
   /** An × at the row's end that takes it off the list; VoiceOver merges it into the row, so it is the row's action too. */
   remove?: { label: string; onPress: () => void };
@@ -174,11 +176,11 @@ export function GroupedRow(props: GroupedRowProps) {
 
 /** VoiceOver merges a button inside the row's button into it: the row reads the note out with its label. */
 function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string; text: string } }) {
-  // On the label's line: in a row whose text wraps the ⓘ stays beside the label, not at the row's top edge.
+  // On the label's first line, also when the label wraps.
   const info = useInfoHint({ ...hint, variant: "body" });
   return (
     <View>
-      <Row {...props} said={hint.text} after={info.button} />
+      <Row {...props} said={hint.text} labelAfter={info.button} />
       <View style={[styles.hint, info.open ? styles.hintOpen : null]}>{info.text}</View>
     </View>
   );
@@ -194,6 +196,7 @@ function Row({
   icon,
   leading,
   value,
+  valueNote,
   valueLeading,
   chevron = false,
   more = false,
@@ -205,8 +208,8 @@ function Row({
   onPress,
   remove,
   said,
-  after,
-}: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
+  labelAfter,
+}: Omit<GroupedRowProps, "hint"> & { said?: string; labelAfter?: ReactNode }) {
   const { colors: c } = useTheme();
   const { fontScale } = useWindowDimensions();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
@@ -228,7 +231,7 @@ function Row({
       onPress={press}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
-      accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
+      accessibilityLabel={[label, belowText, said, value, valueNote].filter(Boolean).join(", ")}
       {...(remove
         ? {
             accessibilityActions: [{ name: "delete", label: remove.label }],
@@ -257,9 +260,18 @@ function Row({
       ) : null}
       {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
-        <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
-          {label}
-        </Text>
+        {labelAfter ? (
+          <View style={styles.labelLine}>
+            <Text variant="body" numberOfLines={labelLines} style={[styles.shrink, { color: tone }]}>
+              {label}
+            </Text>
+            {labelAfter}
+          </View>
+        ) : (
+          <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
+            {label}
+          </Text>
+        )}
         {sub ? (
           <Text variant="footnote" tone="faint" numberOfLines={subLines}>
             {sub}
@@ -272,12 +284,24 @@ function Row({
           </Text>
         ) : null}
       </View>
-      {valueLeading ? (
-        <View style={[styles.value, styles.valued, line ? { minHeight: line.height } : null]}>
+      {valueLeading || valueNote ? (
+        <View
+          style={[
+            styles.value,
+            styles.valued,
+            valueNote ? styles.noted : null,
+            line ? { minHeight: line.height } : null,
+          ]}
+        >
           {valueLeading}
           {value ? (
             <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
               {value}
+            </Text>
+          ) : null}
+          {valueNote ? (
+            <Text variant="footnote" tone="faint" numberOfLines={1}>
+              {valueNote}
             </Text>
           ) : null}
         </View>
@@ -288,7 +312,6 @@ function Row({
           </Text>
         </View>
       ) : null}
-      {after}
       {checked ? (
         <View style={onLine(18)}>
           <Icon name="check" size={18} color={c.ink} />
@@ -438,8 +461,11 @@ const styles = StyleSheet.create({
   },
   lead: { width: LEAD, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
+  labelLine: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   value: { flexShrink: 1, maxWidth: "50%" },
   valued: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // A note that doesn't fit beside its value goes under it, so the value isn't cut for it.
+  noted: { flexWrap: "wrap", justifyContent: "flex-end" },
   field: {
     flexDirection: "row",
     alignItems: "center",
