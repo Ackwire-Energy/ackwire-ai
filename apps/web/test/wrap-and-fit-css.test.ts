@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-const css = await builtCss("src/styles.css");
+const css = await builtCss("src/styles.css", "src/pages/routines.css");
 const top = topLevel(css);
 const last = (sheet: string, selector: string, property: string) =>
   declarations(sheet, selector)
@@ -35,4 +35,11 @@ test("a settings row's control taller than its name's line stays clear of the ha
     "none",
   );
   expect(last(panel, ".agp-card .settings-row", "flex-direction")).toBeUndefined();
+});
+
+test("what a row says wraps instead of losing its end to an ellipsis", () => {
+  for (const selector of [".routine-row__when-text b", ".routine-row__when-text small"]) {
+    expect([selector, last(top, selector, "text-overflow")]).toEqual([selector, undefined]);
+    expect([selector, last(top, selector, "white-space")]).toEqual([selector, undefined]);
+  }
 });
