@@ -248,27 +248,37 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Freigaben",
-    summary: "Nichts Heikles passiert ohne einen Menschen.",
+    summary: "Heikle Aktionen warten auf einen Menschen, einmal oder für immer.",
     sections: [
       {
         id: "what",
         heading: "Was vorher fragt",
         blocks: [
-          "Wenn ein Agent mergen, deployen, zurückrollen, etwas nach außen senden oder Daten löschen will, fragt er vorher, egal welchen Zugriff er hat. Die Anfrage erscheint unter **Freigaben** und im Kanal, mit der genauen Aktion und dem Grund.",
+          "Wenn ein Agent mergen, deployen, zurückrollen, etwas nach außen senden oder Daten löschen will, fragt er vorher, egal welchen Zugriff er hat. Die Anfrage erscheint unter **Freigaben** und in der Unterhaltung, mit der genauen Aktion und dem Grund.",
         ],
       },
       {
-        id: "exact",
-        heading: "Eine Freigabe, eine Aktion",
+        id: "always",
+        heading: "Einmal oder immer",
         blocks: [
-          "Jede Freigabe gilt für genau eine Aktion, mit ihren Werten. Ändert der Agent irgendetwas, muss er erneut fragen.",
+          "Eine Freigabe gilt für genau eine Aktion, mit ihren Werten. Ändert der Agent irgendetwas, fragt er erneut.",
+          "**Immer freigeben** lässt den Agenten diese Art von Aktion ab jetzt mit beliebigen Werten tun, ohne zu fragen. Bei der Anfrage einer Routine macht **Immer in dieser Routine** dasselbe nur für diese Routine. Beides gibt es nie für Merge, Deploy, Rollback und Ähnliches. Rückgängig machen kannst du es unter **Tools und Zugriff** auf der Seite des Agenten oder in den Einstellungen der Routine.",
         ],
       },
       {
         id: "who",
         heading: "Wer freigibt",
         blocks: [
-          "Der Inhaber des Agenten gibt seine Anfragen frei. Bei einem Agenten ohne Inhaber machen das die Admins.",
+          {
+            list: [
+              "Der Inhaber des Agenten, für seine Anfragen.",
+              "Alle, deren Rolle **Aktionen von Agenten freigeben** hat, für jeden Agenten.",
+              "Die Personen, die ein Agent beim Fragen nennt, anstelle seines Inhabers.",
+              "Wer jemanden unter **Wer für mich freigibt** vertritt, für das, worum diese Person gebeten wird. Merge, Deploy und andere riskante Aktionen nur, wenn das eingeschaltet ist.",
+            ],
+          },
+          "Eine Aktion im eigenen Postfach von jemandem wartet nur auf diese Person. Neuer Zugriff für einen Agenten wartet auf die, die Agenten verwalten.",
+          "Lodi, deine rechte Hand, kann außerdem für dich neue Agenten freigeben, die andere Agenten vorschlagen, und Änderungen an Modell, Budget und Kanälen eines Agenten, nur wenn du darum gebeten hast. Wer dich vertritt und was Lodi freigibt, legst du unter **Einstellungen\u00a0›\u00a0Du\u00a0›\u00a0Freigaben** fest.",
         ],
       },
       {

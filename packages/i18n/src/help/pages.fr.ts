@@ -248,27 +248,37 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Approbations",
-    summary: "Rien de sensible ne se fait sans une personne.",
+    summary: "Les actions sensibles attendent une personne, une fois ou pour de bon.",
     sections: [
       {
         id: "what",
         heading: "Ce qui demande d’abord",
         blocks: [
-          "Quand un agent veut fusionner, déployer, revenir en arrière, envoyer quelque chose à l’extérieur ou supprimer des données, il demande d’abord, quels que soient ses accès. La demande apparaît dans **Approbations** et dans le canal, avec l’action exacte et sa raison.",
+          "Quand un agent veut fusionner, déployer, revenir en arrière, envoyer quelque chose à l’extérieur ou supprimer des données, il demande d’abord, quels que soient ses accès. La demande apparaît dans **Approbations** et dans la conversation, avec l’action exacte et sa raison.",
         ],
       },
       {
-        id: "exact",
-        heading: "Une approbation, une action",
+        id: "always",
+        heading: "Une fois, ou toujours",
         blocks: [
-          "Chaque approbation couvre une action exacte, avec ses valeurs. Si l’agent change quoi que ce soit, il doit redemander.",
+          "Approuver couvre une action exacte, avec ses valeurs. Si l’agent change quoi que ce soit, il redemande.",
+          "**Toujours approuver** laisse l’agent faire ce type d’action à partir de maintenant, avec n’importe quelles valeurs, sans demander. Sur la demande d’une routine, **Toujours dans cette routine** fait de même pour cette routine seulement. Aucun des deux n’est proposé pour un merge, un déploiement, un retour arrière et autres. Pour annuler, allez dans **Outils et accès** sur la page de l’agent, ou dans les réglages de la routine.",
         ],
       },
       {
         id: "who",
         heading: "Qui approuve",
         blocks: [
-          "Le propriétaire de l’agent approuve ses demandes. Pour un agent sans propriétaire, ce sont les admins.",
+          {
+            list: [
+              "Le propriétaire de l’agent, pour ses demandes.",
+              "Toute personne dont le rôle a **Approuver les actions des agents**, pour tous les agents.",
+              "Les personnes que l’agent nomme en demandant, à la place de son propriétaire.",
+              "Celui qui couvre quelqu’un dans **Qui approuve pour moi**, pour ce qui est demandé à cette personne. Merge, déploiement et autres actions à risque seulement quand c’est activé.",
+            ],
+          },
+          "Une action dans la boîte mail de quelqu’un attend cette personne seule. Un nouvel accès pour un agent attend ceux qui gèrent les agents.",
+          "Lodi, votre bras droit, peut aussi approuver pour vous les nouveaux agents que d’autres agents proposent et les changements de modèle, de budget et de canaux d’un agent, seulement quand c’est vous qui l’avez demandé. Qui vous couvre et ce que Lodi approuve se choisissent dans **Paramètres\u00a0›\u00a0Vous\u00a0›\u00a0Approbations**.",
         ],
       },
       {
