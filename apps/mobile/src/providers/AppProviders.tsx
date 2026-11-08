@@ -1,4 +1,5 @@
 import { ApiProvider, createSnapshot, outbox } from "@agenteschat/client";
+import { textSizeOf } from "@agenteschat/client/lib/chat-look";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -15,9 +16,10 @@ import { snapshotStoreFor } from "@/lib/snapshot";
 import { ChoiceHost } from "@/ui/ChoiceHost";
 import { hintTouches } from "@/ui/hints";
 import { ToastHost } from "@/ui/Toast";
+import { TextScaleProvider } from "@/ui/text-scale";
 import { ThemeProvider } from "@/ui/theme";
 import { setupI18n } from "./i18n";
-import { OrgProvider } from "./org";
+import { OrgProvider, useOrgMaybe } from "./org";
 import { PushProvider } from "./push";
 import { bindFocusToAppState, createQueryClient } from "./query";
 import { RealtimeProvider } from "./realtime";
@@ -81,15 +83,17 @@ export function AppProviders({ children }: { children: ReactNode }) {
                 <ApiProvider client={scope.api}>
                   <SessionProvider auth={scope.auth} server={server}>
                     <OrgProvider>
-                      <RealtimeProvider>
-                        <PushProvider>
-                          <ToastHost>
-                            {children}
-                            {/* Choices longer than Android's dialog (three buttons), once for the whole app. */}
-                            <ChoiceHost />
-                          </ToastHost>
-                        </PushProvider>
-                      </RealtimeProvider>
+                      <AppTextSize>
+                        <RealtimeProvider>
+                          <PushProvider>
+                            <ToastHost>
+                              {children}
+                              {/* Choices longer than Android's dialog (three buttons), once for the whole app. */}
+                              <ChoiceHost />
+                            </ToastHost>
+                          </PushProvider>
+                        </RealtimeProvider>
+                      </AppTextSize>
                     </OrgProvider>
                   </SessionProvider>
                 </ApiProvider>
@@ -100,4 +104,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/**
+ * The person's text size (Você › Conversa) for every screen, read from the workspace they are in; the default before
+ * one is chosen (sign-in, the first run).
+ */
+function AppTextSize({ children }: { children: ReactNode }) {
+  const org = useOrgMaybe()?.org;
+  return <TextScaleProvider size={textSizeOf(org?.chatPrefs)}>{children}</TextScaleProvider>;
 }

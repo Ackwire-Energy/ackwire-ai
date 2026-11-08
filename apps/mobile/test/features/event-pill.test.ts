@@ -73,8 +73,10 @@ describe("the event pill", () => {
     const pill = src("ui/EventPill.tsx");
     // The row tops its parts; the mark sits where the eye reads the words' first line, the time is one such line.
     expect(pill).toMatch(/main: \{\s*flexDirection: "row",\s*alignItems: "flex-start",/);
-    expect(pill).toContain('variant="small" text={WORDS} />');
-    expect(pill).toContain("time: { lineHeight: WORDS.lineHeight,");
+    // The words are the small variant with no size of their own, so they grow with the person's text size.
+    expect(pill).toContain('color={markColor ?? c.faint} variant="small" />');
+    expect(pill).toContain("time: { lineHeight: WORDS_LINE,");
+    expect(pill).not.toContain("fontSize");
   });
 
   test("the automatic lines use it: notices, stops, decided requests, the task taken, the speed fallback", () => {
