@@ -142,6 +142,8 @@ describe("floating layers", () => {
     // As wide as the window allows, and a word longer than that (a mailbox in a connector's tip) breaks inside it.
     expect(rule).toContain(`max-width: calc(100vw - ${2 * EDGE_ROOM}px)`);
     expect(rule).toContain("overflow-wrap: anywhere");
+    // Wider than a phone, a time's details stop at a reading width; a phone keeps the window's.
+    expect(await css("components.css")).toMatch(/@media \(min-width: 641px\) \{\s*\.ac-msg__tip \{\s*max-width: 420px;/);
     await act(async () => fireEvent.pointerLeave(time, { pointerType: "mouse" }));
     expect(document.querySelector(".ac-tip")).toBeNull();
     unmount();

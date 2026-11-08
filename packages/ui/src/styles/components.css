@@ -1295,6 +1295,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+/* Wider than a phone, long details (a model's full name, a mailbox) wrap at a reading width, not across the chat. */
+@media (min-width: 641px) {
+  .ac-msg__tip {
+    max-width: 420px;
+  }
+}
 /* A person-facing state on the header line ("enviando…"): icon + word, muted */
 .ac-msg__status {
   display: inline-flex;
