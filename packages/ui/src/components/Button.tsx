@@ -90,3 +90,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
+
+/**
+ * A button's words that take turns ("Copiar link", then "Copiado"): both stay in place, the other one unseen, so the
+ * button keeps the wider one's width and doesn't move under the pointer when they change.
+ */
+export function SwapLabel({ label, alt, showAlt }: { label: ReactNode; alt: ReactNode; showAlt: boolean }) {
+  return (
+    <span className="ac-swap">
+      <span aria-hidden={showAlt || undefined}>{label}</span>
+      <span aria-hidden={!showAlt || undefined}>{alt}</span>
+    </span>
+  );
+}
