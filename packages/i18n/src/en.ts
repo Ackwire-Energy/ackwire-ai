@@ -13309,8 +13309,6 @@ export const en = {
       machine_task_done: "“{{title}}” finished on {{computer}}.",
       machine_task_failed: "“{{title}}” failed on {{computer}}.",
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}.",
-      /** The card of an event an agent proposed, as lists, the inbox and searches say it. */
-      calendar_proposal: "Event proposal: {{title}}",
       machine_task_interrupted: "“{{title}}” was interrupted on {{computer}}.",
       machine_task_doneNoComputer: "“{{title}}” finished.",
       machine_task_failedNoComputer: "“{{title}}” failed.",
@@ -13417,6 +13415,7 @@ export const en = {
       action_update_skills: "Update skills",
       action_approvals: "Approvals waiting for you",
       action_open_page: "Open a screen",
+      calendar_proposal: "Event proposal: {{title}}",
       agent_proposal: "Proposed a new agent: {{name}}",
       team_proposal: "Proposed a team: {{names}}",
       settings_proposal: "Proposed a change to {{names}}",

@@ -33143,9 +33143,6 @@
   "chat.body.machine_task_canceled": {
     "value": "“{{title}}” was stopped on {{computer}}."
   },
-  "chat.body.calendar_proposal": {
-    "value": "Event proposal: {{title}}"
-  },
   "chat.body.machine_task_interrupted": {
     "value": "“{{title}}” was interrupted on {{computer}}."
   },
@@ -33379,6 +33376,9 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "chat.body.calendar_proposal": {
+    "value": "Event proposal: {{title}}"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"

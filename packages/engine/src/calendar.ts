@@ -11,6 +11,7 @@ import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
 import { calendarReminders, routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
+import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { userVisibleChannels } from "./search";
 import { taskSeenSql } from "./task-access";
@@ -1090,8 +1091,7 @@ export async function proposeCalendarEvent(
       meta: {
         calendarProposalId: row.id,
         calendarProposal: proposalView(row),
-        bodyCode: "calendar_proposal",
-        bodyParams: { title: row.title },
+        ...bodyCode("calendar_proposal", { title: row.title }),
       },
     });
     const [linked] = await tx
