@@ -44,6 +44,8 @@ export const AGENT_ACTION_KINDS = [
   /** A teammate's settings changed from the right hand's card (ADR 0137): by the person who clicked, not by an agent. */
   "agent.settings_changed",
   "pr.merged",
+  /** A change from the right hand's catalog (`workspace-actions.ts`, `params.action` says which), at once or from its card. */
+  "workspace.changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
@@ -76,7 +78,10 @@ export type AgentActionTargetType =
   | "thread"
   | "skill"
   | "agent"
-  | "repository";
+  | "repository"
+  | "role"
+  | "person"
+  | "workspace";
 
 /** What the change was made to, with enough to label it ("#23 · Prompt…"). */
 export interface AgentActionTarget {
@@ -303,5 +308,7 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `changed ${Array.isArray(p.fields) ? p.fields.join(", ") : "settings"} of ${t.title ?? "an agent"} from your card`;
     case "pr.merged":
       return `merged ${p.number ? `PR #${p.number}` : `${String(p.ref ?? "a branch")}`} in ${String(p.repo ?? t.title ?? "a repository")}`;
+    case "workspace.changed":
+      return `did ${String(p.action ?? "a change")}${t.title ? ` on ${t.title}` : ""}`;
   }
 }

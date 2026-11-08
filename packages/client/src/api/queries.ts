@@ -183,6 +183,8 @@ import type {
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkView,
 } from "./types";
 
@@ -718,6 +720,47 @@ export function useAgentProposal(orgId: string, messageId: string | null) {
     queryKey: keys.agentProposal(orgId, messageId ?? ""),
     queryFn: () => api.agents.proposal(orgId, messageId ?? ""),
     enabled: Boolean(messageId),
+  });
+}
+
+/** The right hand's card of a workspace change, whole (its event or a click): in the conversation and its own query. */
+export function cacheActionCard(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  card: WorkspaceActionCard,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ actionCard: card }));
+  qc.setQueryData<WorkspaceActionCardView>(keys.actionCard(orgId, where.messageId), (old) =>
+    old ? { ...old, card } : old,
+  );
+}
+
+/** The card where it was sent (the inbox of whoever may): read on its own, since its conversation isn't theirs. */
+export function useActionCard(orgId: string, messageId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.actionCard(orgId, messageId ?? ""),
+    queryFn: () => part(api, "actionCards").get(orgId, messageId ?? ""),
+    enabled: Boolean(messageId),
+  });
+}
+
+/**
+ * Aplicar, Descartar or Pedir a quem pode on the right hand's card of a workspace change: the card comes back as it is
+ * now, and what the change touches (roles, people, channels) is read again.
+ */
+export function useDecideActionCard(orgId: string, where: { channelId: string; messageId: string }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: "apply" | "dismiss" | "ask") =>
+      part(api, "actionCards").decide(orgId, where.messageId, decision),
+    onSuccess: ({ card }) => {
+      cacheActionCard(qc, orgId, where, card);
+      for (const key of [keys.roles(orgId), keys.members(orgId), keys.channels(orgId)])
+        void qc.invalidateQueries({ queryKey: key });
+    },
   });
 }
 
@@ -5703,7 +5746,16 @@ export function useNotificationReply(orgId: string) {
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
 function part<
-  K extends "pins" | "threadFollows" | "reads" | "working" | "reminders" | "actions" | "agentForYou" | "gifs",
+  K extends
+    | "pins"
+    | "threadFollows"
+    | "reads"
+    | "working"
+    | "reminders"
+    | "actions"
+    | "actionCards"
+    | "agentForYou"
+    | "gifs",
 >(api: ApiClient, name: K): NonNullable<ApiClient[K]> {
   const value = api[name];
   if (!value) throw new Error(`This API client has no ${name}`);

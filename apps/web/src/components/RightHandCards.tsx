@@ -1,7 +1,15 @@
-import type { AppNotification, CardDelegate, Message, Proposal } from "@agenteschat/client";
+import type {
+  AgentAction,
+  AppNotification,
+  CardDelegate,
+  Message,
+  Proposal,
+  WorkspaceActionCard,
+} from "@agenteschat/client";
 import {
   CardVia,
   keys,
+  useActionCard,
   useAgentActions,
   useAgentProposal,
   useApproval,
@@ -11,6 +19,7 @@ import {
   useCardProposals,
   useChangeRole,
   useChannels,
+  useDecideActionCard,
   useDecideProposal,
   useDecideProposals,
   useMembers,
@@ -21,8 +30,12 @@ import {
 } from "@agenteschat/client";
 import {
   type ApprovalsCard,
+  actionCardDetail,
+  actionCardKey,
+  actionCardWords,
   type MemberChangeRow,
   type MemberChangesCard,
+  mayApplyCard,
   memberRowDone,
   type OpenPageCard,
   rolesAfter,
@@ -49,7 +62,7 @@ import { Button, EventPillAction, Icon, Switch } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { AgentProposalCardView } from "@/components/ActionCard";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
 import { ApprovalAsk } from "@/components/ApprovalAsk";
@@ -493,6 +506,26 @@ function SettingsRow({
  * agent's, created as them from here).
  */
 export function ChangeRequestCard({ n }: { n: AppNotification }) {
+  if (n.source.action && n.source.messageId)
+    return <InboxActionCard messageId={n.source.messageId} agentId={n.source.agentId ?? null} />;
+  return <ChangeRequestProposal n={n} />;
+}
+
+/** A card of a workspace change sent to this person's inbox: read on its own, decided here as them. */
+function InboxActionCard({ messageId, agentId }: { messageId: string; agentId: string | null }) {
+  const { org } = useOrg();
+  const view = useActionCard(org.id, messageId).data;
+  if (!view) return null;
+  return (
+    <WorkspaceActionCardView
+      where={{ messageId: view.messageId, channelId: view.channelId }}
+      agentId={agentId}
+      card={view.card}
+    />
+  );
+}
+
+function ChangeRequestProposal({ n }: { n: AppNotification }) {
   const { org } = useOrg();
   const proposalId = n.source.proposalId;
   const rows = useCardProposals(org.id, proposalId ? [proposalId] : []);
@@ -719,5 +752,132 @@ export function OpenPageCardView({ card }: { card: OpenPageCard }) {
     >
       {title}
     </RequestOpen>
+  );
+}
+
+/**
+ * The right hand's card of a change in the workspace (`workspace_action`): what it does in the app's own words (never
+ * only the agent's), applied as whoever clicks with the permissions its screen checks; Descartar for the person it was
+ * for or whoever may. Who can't reads who may, and the person it was for sends it to them. Decided, one line with who
+ * did it and, while it lasts, Desfazer on its receipt.
+ */
+export function WorkspaceActionCardView({
+  where,
+  agentId,
+  card,
+  actions,
+}: {
+  where: { messageId: string; channelId: string };
+  agentId: string | null;
+  card: WorkspaceActionCard;
+  /** The card message's receipts: its Desfazer once applied. */
+  actions?: AgentAction[];
+}) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const decide = useDecideActionCard(org.id, where);
+  const undo = useAgentActions(org.id, where.channelId).undo;
+  const toast = useToast();
+  const failed = (e: unknown) => toast.show(errorText(t, e), "error");
+  const label = t("rightHand.action.title");
+  const sentence = (
+    <Trans
+      i18nKey={actionCardKey(card) as "rightHand.action.other"}
+      values={actionCardWords(card, t)}
+      components={{ b: <b /> }}
+    />
+  );
+  const detail = actionCardDetail(card, t, i18n.language);
+  const may = mayApplyCard(card, { userId: me.user.id, may: (key) => can(org, key) });
+  const mine = card.forUserId === me.user.id;
+  if (card.state !== "pending") {
+    const receipt = actions?.find((a) => a.kind === "workspace.changed");
+    const undoable = receipt && !receipt.undoneAt && Date.parse(receipt.undoableUntil) > Date.now();
+    const byMe = card.decidedByUserId === me.user.id;
+    const name = dir.memberById.get(card.decidedByUserId ?? "")?.name ?? "";
+    const who =
+      card.state === "applied"
+        ? byMe
+          ? t("rightHand.card.appliedByYou")
+          : t("rightHand.card.appliedBy", { name })
+        : byMe
+          ? t("rightHand.card.declinedByYou")
+          : t("rightHand.card.declinedBy", { name });
+    return (
+      <RequestDone
+        done={card.state === "applied" && !receipt?.undoneAt}
+        label={label}
+        action={
+          undoable && (
+            <EventPillAction disabled={undo.isPending} onClick={() => undo.mutate(receipt.id, { onError: failed })}>
+              {t("rightHand.card.undo")}
+            </EventPillAction>
+          )
+        }
+        time={card.decidedAt ? formatTime(i18n.language, card.decidedAt) : undefined}
+      >
+        {who}: {sentence}
+        {receipt?.undoneAt && ` · ${t("rightHand.card.undone")}`}
+      </RequestDone>
+    );
+  }
+  const decision = may ? (
+    <>
+      <Button
+        size="sm"
+        variant={card.params.action.startsWith("delete_") ? "danger" : "primary"}
+        disabled={decide.isPending}
+        loading={decide.isPending && decide.variables === "apply"}
+        onClick={() => decide.mutate("apply", { onError: failed })}
+      >
+        {t("rightHand.card.apply")}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={decide.isPending}
+        loading={decide.isPending && decide.variables === "dismiss"}
+        onClick={() => decide.mutate("dismiss", { onError: failed })}
+      >
+        {t(mine ? "rightHand.card.dismiss" : "rightHand.card.decline")}
+      </Button>
+    </>
+  ) : card.askedAt ? (
+    <span className="rq__sent ac-iconline">
+      <Icon name="arrowUp" size={14} />
+      <span>{t("rightHand.card.sentToAny", { when: formatTime(i18n.language, card.askedAt) })}</span>
+    </span>
+  ) : (
+    mine && (
+      <Button
+        size="sm"
+        variant="primary"
+        icon="arrowUp"
+        loading={decide.isPending}
+        onClick={() => decide.mutate("ask", { onError: failed })}
+      >
+        {t("rightHand.action.ask")}
+      </Button>
+    )
+  );
+  return (
+    <RequestCard
+      id={where.messageId}
+      kind="proposal"
+      agent={dir.anyAgent(agentId ?? "")}
+      label={label}
+      mine={may}
+      waitingFor={may ? undefined : t("rightHand.action.only")}
+      lead={card.params.why || sentence}
+      object={{
+        logo: <Icon name={card.params.action.includes("channel") ? "channel" : "shield"} size={20} />,
+        title: sentence,
+        ...(detail ? { detail } : {}),
+      }}
+      actions={decision || undefined}
+      what={label}
+      locked={decide.isPending}
+    />
   );
 }

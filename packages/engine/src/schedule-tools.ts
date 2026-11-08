@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
-import { agentsByHandle, currentHandles } from "./agents";
+import { agentsByHandle, currentHandles, getAgentCached } from "./agents";
 import { cancelAheadApproval, cancelableAhead } from "./approvals";
 import { canTalkTo, speakerFor } from "./audience";
 import { runAuthorityById } from "./authority";
@@ -10,6 +10,7 @@ import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { ForbiddenError } from "./errors";
 import { cutText, stringsOf } from "./format";
+import { isRightHand } from "./right-hand";
 import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
 import { HOOK_METHODS, routineHookKeys } from "./routine-hooks";
 import {
@@ -932,7 +933,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const id = str(input.id);
-          const own = await ownRoutine(ctx, id);
+          // The right hand deletes or runs any agent's routine the person may manage (checked as them).
+          const own = await ownRoutine(ctx, id, isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)));
           if (!own.row) return { content: own.error, isError: true };
           await deleteRoutine(routineDeps(ctx), requester, ctx.orgId, id);
           await recordAgentActions(ctx.db, ctx, [
@@ -965,7 +967,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const id = str(input.id);
-          const own = await ownRoutine(ctx, id);
+          // The right hand deletes or runs any agent's routine the person may manage (checked as them).
+          const own = await ownRoutine(ctx, id, isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)));
           if (!own.row) return { content: own.error, isError: true };
           const routine = await runRoutineNow(routineDeps(ctx), requester, ctx.orgId, id);
           return {

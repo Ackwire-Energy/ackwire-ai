@@ -11,6 +11,7 @@ import {
   type BlockState,
   type ChannelEvent,
   type ConsultsState,
+  cacheActionCard,
   cacheAgentProposal,
   cacheApproval,
   cacheCardDelegate,
@@ -334,6 +335,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "calendar.proposal.updated":
       // An agent's event proposal was confirmed or dismissed: its card says so.
       cacheMessageMeta(qc, orgId, channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
+      break;
+    case "action_card.updated":
+      // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
+      cacheActionCard(qc, orgId, event, event.card);
       break;
     case "browser.handoff.updated": {
       const { handoff } = event;

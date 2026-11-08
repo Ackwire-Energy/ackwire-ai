@@ -698,6 +698,14 @@ export type ChannelEvent =
       messageId: string;
       card: TeamProposalCard;
     }
+  /** A catalog action's card of the right hand was applied, dismissed or sent to whoever may: the whole card. */
+  | {
+      type: "action_card.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: Record<string, unknown>;
+    }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
   | {
       type: "card.delegate";

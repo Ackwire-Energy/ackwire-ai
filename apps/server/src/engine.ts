@@ -418,6 +418,7 @@ export function buildEngine(o: EngineOptions) {
         ai: { gateway },
         context,
         catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
+        server: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
       }),
       createIssueToolSource(artifacts),
       // Dashboards and widgets (ADR 0135 §10): boards for the person, and a widget run's only voice (`update_widget`).

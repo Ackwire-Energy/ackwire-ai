@@ -61,9 +61,10 @@ export const RIGHT_HAND_REFUSAL =
  * Its tools, fixed in code whatever its grant rows say (`loadScopeKeys`): the setup cards, reading context, reading
  * the Drive, the wiki and tasks as the person behind the run (ADR 0137 §12, §13), routines for any agent,
  * `propose_instruction_change` (under `memory:write`, whose memory tools are denied: its runs keep no memory, so
- * nothing one person tells it reaches another) and `create_issue`, a task written as itself, never in a person's name
- * (§13). No writing files, apps, web, computer, databases or mail, nor posting elsewhere (`share_artifact` too), putting
- * agents in channels without a card, or long work.
+ * nothing one person tells it reaches another), `create_issue`, a task written as itself, never in a person's name
+ * (§13), `update_issue` on a task its person sees, and wiki pages its person may edit (written as itself, at their
+ * request). No writing Drive files, apps, web, computer, databases or mail, nor posting elsewhere (`share_artifact`
+ * too), putting agents in channels without a card, or long work.
  */
 export const RIGHT_HAND_GRANTS: readonly string[] = [
   FIXED_GRANTS,
@@ -71,6 +72,7 @@ export const RIGHT_HAND_GRANTS: readonly string[] = [
   "context:read",
   "drive:read",
   "wiki:read",
+  "wiki:write",
   "issues:read",
   "issues:write",
   "schedule:write",
@@ -91,7 +93,6 @@ export const RIGHT_HAND_GRANTS: readonly string[] = [
     "post_update",
     "steer_work",
     "stop_work",
-    "update_issue",
     "comment_issue",
   ].map((name) => `deny:${name}`),
 ];

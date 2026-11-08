@@ -45,6 +45,10 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`change_request`: the proposal to decide (`POST …/proposals/{id}/accept`)." }),
+      action: z.string().optional().openapi({
+        description:
+          "`change_request` of a right hand's card (`messageId`, `GET …/action-cards/{messageId}`): its action.",
+      }),
       screen: z.enum(SCREEN_KINDS).optional(),
       agentId: z
         .string()

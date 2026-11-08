@@ -6,6 +6,7 @@ import {
   useAgentActions,
   useApi,
 } from "@agenteschat/client";
+import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   actionErrorKey,
   actionTextKey,
@@ -55,7 +56,11 @@ import {
 export function Receipts({ message: m }: { message: Message }) {
   // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
   const handed = new Set(handedTasksOf(m.meta).map((h) => h.issueId));
-  const list = (m.actions ?? []).filter((a) => !(a.kind === "issue.created" && handed.has(a.target.id)));
+  // A workspace change's card says what was applied and has its own Undo.
+  const onCard = actionCardOf(m.meta)?.kind === "workspace_action";
+  const list = (m.actions ?? []).filter(
+    (a) => !(a.kind === "issue.created" && handed.has(a.target.id)) && !(onCard && a.kind === "workspace.changed"),
+  );
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
   if (layout === "none") return null;

@@ -37,6 +37,7 @@ import {
   type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
+  cacheActionCard,
   cacheAgentProposal,
   cacheApproval,
   cacheCardDelegate,
@@ -832,6 +833,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "calendar.proposal.updated")
         cacheMessageMeta(qc, orgId, event.channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
+      // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
+      if (event.type === "action_card.updated") cacheActionCard(qc, orgId, event, event.card);
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.

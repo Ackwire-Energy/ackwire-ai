@@ -116,9 +116,14 @@ async function describeIssue(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
 }
 
 /** Resolves `issue` as an id or a number (`131`, `#131`). */
-async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
+/** An issue's number (#131) or id, as `getIssue` takes it. */
+const issueKey = (ref: string) => {
   const n = /^#?(\d+)$/.exec(ref.trim());
-  return getIssue(deps.db, actorOf(ctx), ctx.orgId, n ? { number: Number(n[1]) } : { id: ref.trim() });
+  return n ? { number: Number(n[1]) } : { id: ref.trim() };
+};
+
+async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
+  return getIssue(deps.db, actorOf(ctx), ctx.orgId, issueKey(ref));
 }
 
 /**
@@ -579,11 +584,19 @@ export function createIssueToolSource(deps: ArtifactDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
+          // The right hand changes a task for the person in their DM, one they see, as they could (ADR 0137 §13).
+          if (await rightHandAway(ctx)) return ONLY_IN_DM;
+          const reader = await rightHandReader(ctx);
           const url = str(input.pull_request_url);
           const number = typeof input.pull_request_number === "number" ? input.pull_request_number : undefined;
           const fromUrl = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? Number.NaN);
           const prNumber = number ?? (Number.isFinite(fromUrl) ? fromUrl : undefined);
           const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          if (reader) {
+            await getIssue(deps.db, { type: "person", userId: reader }, ctx.orgId, issueKey(str(input.issue)));
+            const refused = assignee !== undefined && (await rightHandTaskRefusal(deps, ctx, reader, assignee, null));
+            if (refused) return { content: refused, isError: true };
+          }
           const due = typeof input.due_date === "string" ? input.due_date.trim() : undefined;
           let before: Record<string, unknown> = {};
           const asked = givenFiles(input) ?? [];

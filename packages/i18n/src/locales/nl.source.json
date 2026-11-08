@@ -5228,6 +5228,96 @@
   "rightHand.open.notAllowed": {
     "value": "You don't have access to this screen"
   },
+  "rightHand.action.title": {
+    "value": "Change in the workspace"
+  },
+  "rightHand.action.only": {
+    "value": "Only someone who may make this change applies it"
+  },
+  "rightHand.action.ask": {
+    "value": "Send to whoever may"
+  },
+  "rightHand.action.other": {
+    "value": "Make a change in the workspace"
+  },
+  "rightHand.action.create_role": {
+    "value": "Create the role <b>{{name}}</b>"
+  },
+  "rightHand.action.update_role": {
+    "value": "Change the role <b>{{name}}</b>"
+  },
+  "rightHand.action.delete_role": {
+    "value": "Delete the role <b>{{name}}</b> for good"
+  },
+  "rightHand.action.move_role": {
+    "value": "Move the role <b>{{name}}</b>"
+  },
+  "rightHand.action.set_member_roles": {
+    "value": "Change the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "rightHand.action.set_channel_permissions": {
+    "value": "Change what {{who}} may do in <b>#{{channel}}</b>"
+  },
+  "rightHand.action.set_my_status": {
+    "value": "Set your status: <b>{{what}}</b>"
+  },
+  "rightHand.action.set_notifications_on": {
+    "value": "Turn on your notifications for <b>{{category}}</b>"
+  },
+  "rightHand.action.set_notifications_off": {
+    "value": "Turn off your notifications for <b>{{category}}</b>"
+  },
+  "rightHand.action.set_my_timezone": {
+    "value": "Set your time zone to <b>{{timezone}}</b>"
+  },
+  "rightHand.action.set_my_timezone_workspace": {
+    "value": "Follow the workspace's time zone again"
+  },
+  "rightHand.action.set_invitation_roles": {
+    "value": "Change the roles the invitation of <b>{{email}}</b> gives: {{change}}"
+  },
+  "rightHand.action.update_channel": {
+    "value": "Change the channel <b>#{{channel}}</b>"
+  },
+  "rightHand.action.archive_channel": {
+    "value": "Archive <b>#{{channel}}</b>"
+  },
+  "rightHand.action.archive_channel_back": {
+    "value": "Bring <b>#{{channel}}</b> back"
+  },
+  "rightHand.action.channel_people": {
+    "value": "Change who is in <b>#{{channel}}</b>: {{change}}"
+  },
+  "rightHand.action.delete_channel": {
+    "value": "Delete the channel <b>#{{channel}}</b> for good, with its messages and files"
+  },
+  "rightHand.action.revoke_invitation": {
+    "value": "Cancel the invitation of <b>{{email}}</b>"
+  },
+  "rightHand.action.resend_invitation": {
+    "value": "Send the invitation to <b>{{email}}</b> again"
+  },
+  "rightHand.action.decide_join_request_approve": {
+    "value": "Let <b>{{email}}</b> into the workspace"
+  },
+  "rightHand.action.decide_join_request_deny": {
+    "value": "Turn down the request of <b>{{email}}</b> to join"
+  },
+  "rightHand.action.stop_work": {
+    "value": "Stop what <b>{{agent}}</b> is doing"
+  },
+  "rightHand.action.continue_work": {
+    "value": "Let <b>{{agent}}</b> go on"
+  },
+  "rightHand.action.update_workspace": {
+    "value": "Change the workspace <b>{{name}}</b>"
+  },
+  "rightHand.action.set_action_check_on": {
+    "value": "Turn on the check of what the team already did"
+  },
+  "rightHand.action.set_action_check_off": {
+    "value": "Turn off the check of what the team already did"
+  },
   "teamWeek.title": {
     "value": "Team week"
   },
@@ -6579,6 +6669,87 @@
   },
   "agentActions.pr.merged_branch": {
     "value": "Merged <b>{{ref}}</b> in <b>{{repo}}</b>"
+  },
+  "agentActions.workspace.changed": {
+    "value": "Made a change in the workspace"
+  },
+  "agentActions.workspace.changed_create_role": {
+    "value": "Created the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_update_role": {
+    "value": "Changed the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_delete_role": {
+    "value": "Deleted the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_move_role": {
+    "value": "Moved the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_set_member_roles": {
+    "value": "Changed the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "agentActions.workspace.changed_set_channel_permissions": {
+    "value": "Changed what {{who}} may do in <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_status": {
+    "value": "Set your status: <b>{{what}}</b>"
+  },
+  "agentActions.workspace.changed_set_notifications_on": {
+    "value": "Turned on your notifications for <b>{{category}}</b>"
+  },
+  "agentActions.workspace.changed_set_notifications_off": {
+    "value": "Turned off your notifications for <b>{{category}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_timezone": {
+    "value": "Set your time zone to <b>{{timezone}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_timezone_workspace": {
+    "value": "Your time zone follows the workspace's again"
+  },
+  "agentActions.workspace.changed_set_invitation_roles": {
+    "value": "Changed the roles the invitation of <b>{{email}}</b> gives: {{change}}"
+  },
+  "agentActions.workspace.changed_update_channel": {
+    "value": "Changed the channel <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_archive_channel": {
+    "value": "Archived <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_archive_channel_back": {
+    "value": "Brought <b>#{{channel}}</b> back"
+  },
+  "agentActions.workspace.changed_channel_people": {
+    "value": "Changed who is in <b>#{{channel}}</b>: {{change}}"
+  },
+  "agentActions.workspace.changed_delete_channel": {
+    "value": "Deleted the channel <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_revoke_invitation": {
+    "value": "Canceled the invitation of <b>{{email}}</b>"
+  },
+  "agentActions.workspace.changed_resend_invitation": {
+    "value": "Sent the invitation to <b>{{email}}</b> again"
+  },
+  "agentActions.workspace.changed_decide_join_request_approve": {
+    "value": "Let <b>{{email}}</b> into the workspace"
+  },
+  "agentActions.workspace.changed_decide_join_request_deny": {
+    "value": "Turned down the request of <b>{{email}}</b> to join"
+  },
+  "agentActions.workspace.changed_stop_work": {
+    "value": "Stopped what <b>{{agent}}</b> was doing"
+  },
+  "agentActions.workspace.changed_continue_work": {
+    "value": "Let <b>{{agent}}</b> go on"
+  },
+  "agentActions.workspace.changed_update_workspace": {
+    "value": "Changed the workspace <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_set_action_check_on": {
+    "value": "Turned on the check of what the team already did"
+  },
+  "agentActions.workspace.changed_set_action_check_off": {
+    "value": "Turned off the check of what the team already did"
   },
   "agentActions.other": {
     "value": "Made a change"
@@ -34180,6 +34351,9 @@
   },
   "chat.body.calendar_proposal": {
     "value": "Event proposal: {{title}}"
+  },
+  "chat.body.action_workspace": {
+    "value": "Proposed a change in the workspace"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"

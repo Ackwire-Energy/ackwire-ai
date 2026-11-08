@@ -18,6 +18,7 @@ import { writeSkillBody } from "./skills";
 import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
+import { revertWorkspaceAction } from "./workspace-actions";
 
 const {
   agentActions,
@@ -560,6 +561,9 @@ handlers["agent.settings_changed"] = async (deps, a, userId, direction) => {
   await revertSettings(deps, a, userId, direction, changedSince);
   return undefined;
 };
+
+handlers["workspace.changed"] = (deps, a, userId, direction) =>
+  revertWorkspaceAction(deps, a, userId, direction, changedSince);
 
 handlers["issue.assigned"] = handlers["issue.updated"] as Handler;
 handlers["memory.updated"] = handlers["memory.saved"] as Handler;

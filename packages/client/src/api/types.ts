@@ -3,6 +3,7 @@
 import type { ChatPrefs } from "../lib/chat-look";
 import type { RoleId } from "../lib/new-agent";
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { Permission } from "../lib/permissions";
 import type { AudienceChoice } from "../lib/who-sees";
 
 /** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
@@ -1536,6 +1537,14 @@ export type ChannelEvent =
       messageId: string;
       card: TeamProposalCard;
     }
+  /** A right hand's card of a workspace change was applied, dismissed or sent to whoever may: the whole card. */
+  | {
+      type: "action_card.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: WorkspaceActionCard;
+    }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now. */
   | {
       type: "card.delegate";
@@ -2817,12 +2826,53 @@ export const AGENT_ACTION_KINDS = [
   "skill.updated",
   "agent.settings_changed",
   "pr.merged",
+  "workspace.changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
+/**
+ * The right hand's catalog actions this build can word (`workspace.changed` receipts, its cards): the engine's
+ * `WORKSPACE_ACTIONS` (a test keeps them the same). A newer server's action reads the plain sentence.
+ */
+export const WORKSPACE_ACTION_IDS = [
+  "create_role",
+  "update_role",
+  "delete_role",
+  "move_role",
+  "set_member_roles",
+  "set_channel_permissions",
+  "set_my_status",
+  "set_notifications",
+  "set_my_timezone",
+  "update_channel",
+  "archive_channel",
+  "channel_people",
+  "delete_channel",
+  "revoke_invitation",
+  "resend_invitation",
+  "set_invitation_roles",
+  "decide_join_request",
+  "stop_work",
+  "continue_work",
+  "update_workspace",
+  "set_action_check",
+] as const;
+
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent" | "repository";
+  type:
+    | "issue"
+    | "memory"
+    | "routine"
+    | "channel"
+    | "wiki_page"
+    | "thread"
+    | "skill"
+    | "agent"
+    | "repository"
+    | "role"
+    | "person"
+    | "workspace";
   id: string;
   /** Issues. */
   number?: number;
@@ -2901,6 +2951,41 @@ export interface AgentForYou {
   items: AgentForYouItem[];
   /** Items since the first day of this month. */
   monthCount: number;
+}
+
+/**
+ * The right hand's card of a workspace change (`workspace_action`): an action of its catalog (`create_role`…) for whoever
+ * may make it, applied as them. Its receipt, with Desfazer, lands on the card's message.
+ */
+export interface WorkspaceActionCard {
+  kind: "workspace_action";
+  forUserId: string;
+  params: {
+    /** The sentence: `rightHand.action.{action}` with `words`; done, `agentActions.workspace.changed_{action}`. */
+    action: string;
+    input: Record<string, unknown>;
+    words: Record<string, string>;
+    /** The key its screen asks for (the server checks it again); null: anyone. */
+    needs: Permission | null;
+    why: string;
+    /** The person it was for tried and the screen's own rule refused them: they send it on, not apply it. */
+    refused?: boolean;
+    /** It changes whoever applies it (their own status…): only the person it was for may. */
+    self?: boolean;
+  };
+  state: "pending" | "applied" | "dismissed";
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  /** Sent to whoever may ("Pedir a quem pode"). */
+  askedAt?: string | null;
+}
+
+/** `GET …/action-cards/{messageId}`: the card where it is, for its conversation or the inbox it was sent to. */
+export interface WorkspaceActionCardView {
+  messageId: string;
+  channelId: string;
+  threadId: string | null;
+  card: WorkspaceActionCard;
 }
 
 /** `POST …/messages/{messageId}/actions/undo` (Desfazer tudo). */
@@ -6197,6 +6282,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `change_request`: the proposal to decide. */
   proposalId?: string;
+  /** `change_request` of a right hand's card of a workspace change (`messageId`): the action. */
+  action?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */

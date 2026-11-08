@@ -47,11 +47,16 @@ import "./agent-actions.css";
  */
 export function AgentActionReceipts({ message }: { message: Message }) {
   // The right hand's settings card says what was applied and has its own Desfazer (ADR 0137).
-  const onCard = actionCardOf(message.meta)?.kind === "settings_proposal";
+  const cardKind = actionCardOf(message.meta)?.kind;
+  const onCard = cardKind === "settings_proposal";
   // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
   const handed = new Set(handedTasksOf(message.meta).map((h) => h.issueId));
   const list = (message.actions ?? []).filter(
-    (a) => !(onCard && a.kind === "agent.settings_changed") && !(a.kind === "issue.created" && handed.has(a.target.id)),
+    (a) =>
+      !(onCard && a.kind === "agent.settings_changed") &&
+      // A workspace change's card says what was applied and has its own Desfazer, as a settings card does.
+      !(cardKind === "workspace_action" && a.kind === "workspace.changed") &&
+      !(a.kind === "issue.created" && handed.has(a.target.id)),
   );
   if (message.author.type !== "agent" || list.length === 0) return null;
   return <Receipts message={message} list={list} />;
@@ -79,6 +84,7 @@ export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "skill.updated": "book",
   "agent.settings_changed": "settings",
   "pr.merged": "repo",
+  "workspace.changed": "settings",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

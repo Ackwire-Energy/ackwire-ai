@@ -1,27 +1,31 @@
 import type { TFunction } from "i18next";
-import type {
-  Agent,
-  AgentDraft,
-  AgentProposalCard,
-  AiStatus,
-  CalendarProposal,
-  CardDelegate,
-  CostKind,
-  CostlyDecision,
-  Member,
-  PersonLimitCard,
-  ProposedRoutine,
-  Role,
-  Skill,
-  SuggestedAi,
-  TeamProposalCard,
+import {
+  type Agent,
+  type AgentDraft,
+  type AgentProposalCard,
+  type AiStatus,
+  type CalendarProposal,
+  type CardDelegate,
+  type CostKind,
+  type CostlyDecision,
+  type Member,
+  type PersonLimitCard,
+  type ProposedRoutine,
+  type Role,
+  type Skill,
+  type SuggestedAi,
+  type TeamProposalCard,
+  WORKSPACE_ACTION_IDS,
+  type WorkspaceActionCard,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import { workspaceActionContext, workspaceActionWords } from "./actions";
 import { type AppPage, isAppPage } from "./app-pages";
 import type { ConnectedItem } from "./connected";
 import { isHttpsUrl, sameServer } from "./custom-tools";
-import { joinNames } from "./format";
+import { formatUsd, joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
+import type { Permission } from "./permissions";
 import { type TeamWeekCard, teamWeekCardOf } from "./team-week";
 import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
@@ -215,6 +219,7 @@ export function calendarProposalCardOf(meta: Record<string, unknown> | null | un
 
 export type ActionCard =
   | CalendarProposalCard
+  | WorkspaceActionCard
   | ApprovalsCard
   | MemberChangesCard
   | OpenPageCard
@@ -423,6 +428,8 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
+  const workspace = workspaceActionCardOf(raw);
+  if (workspace) return workspace;
   if ((raw as { kind?: unknown }).kind === "settings_proposal") {
     const r = raw as { forUserId?: unknown; proposalIds?: unknown; delegate?: CardDelegate | null };
     const proposalIds = Array.isArray(r.proposalIds)
@@ -572,3 +579,106 @@ export function skillUpdateState(skill: Pick<Skill, "checkedAt" | "pendingUpdate
   if (skill.pendingUpdate && !skill.pendingUpdate.dismissed) return "waiting" as const;
   return skill.checkedAt && skill.checkedAt >= postedAt ? ("done" as const) : ("open" as const);
 }
+
+/**
+ * The right hand's card of a workspace change (`workspace_action`), or null: an action of its catalog for whoever may,
+ * with the words of its sentence (`rightHand.action.{action}`).
+ */
+export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null {
+  const c = (raw ?? {}) as Partial<WorkspaceActionCard>;
+  if (c.kind !== "workspace_action" || !c.params || typeof c.params.action !== "string") return null;
+  const words = Object.fromEntries(
+    Object.entries(c.params.words ?? {}).filter((e): e is [string, string] => typeof e[1] === "string"),
+  );
+  return {
+    kind: "workspace_action",
+    forUserId: typeof c.forUserId === "string" ? c.forUserId : "",
+    params: {
+      action: c.params.action,
+      input: c.params.input && typeof c.params.input === "object" ? c.params.input : {},
+      words,
+      needs: typeof c.params.needs === "string" ? c.params.needs : null,
+      why: typeof c.params.why === "string" ? c.params.why : "",
+      ...(c.params.refused === true ? { refused: true } : {}),
+      ...(c.params.self === true ? { self: true } : {}),
+    },
+    state: c.state === "applied" || c.state === "dismissed" ? c.state : "pending",
+    decidedByUserId: typeof c.decidedByUserId === "string" ? c.decidedByUserId : null,
+    decidedAt: typeof c.decidedAt === "string" ? c.decidedAt : null,
+    askedAt: typeof c.askedAt === "string" ? c.askedAt : null,
+  };
+}
+
+/** The card's sentence: `rightHand.action.{action}`, or the plain one for an action this build doesn't know. */
+export const actionCardKey = (card: WorkspaceActionCard) =>
+  (WORKSPACE_ACTION_IDS as readonly string[]).includes(card.params.action)
+    ? `rightHand.action.${workspaceActionContext(card.params.action, card.params.words)}`
+    : "rightHand.action.other";
+
+/** The values of the card's sentence, in the reader's language (`workspaceActionWords`). */
+export const actionCardWords = (card: WorkspaceActionCard, t: TFunction) =>
+  workspaceActionWords(card.params.action, card.params.words, t);
+
+/**
+ * Everything else the card changes, under its sentence, so whoever applies it from their inbox sees all of it: what a
+ * role or a channel's exception gives or takes in the permissions' own words ("conversar, dar missões e editar a wiki";
+ * "+ editar a wiki, − aprovar ações"), a new name, where a role moves, a channel turned private, a new budget. Empty when
+ * the sentence says it all.
+ */
+export function actionCardDetail(card: WorkspaceActionCard, t: TFunction, locale = "en"): string {
+  const input = card.params.input;
+  const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : []);
+  const short = (k: string) => t(`permissions.${k}.short` as never, { defaultValue: k }) as string;
+  const change = (add: unknown, take: unknown) =>
+    [...keys(add).map((k) => `+ ${short(k)}`), ...keys(take).map((k) => `− ${short(k)}`)].join(", ");
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const parts = (...p: (string | false)[]) => p.filter(Boolean).join(" · ");
+  const renamed = text(input.name) && `→ ${text(input.name)}`;
+  switch (card.params.action) {
+    case "create_role":
+      return joinNames(keys(input.permissions).map(short), t);
+    case "update_role":
+      return parts(renamed, change(input.add_permissions, input.remove_permissions));
+    case "move_role":
+      return `${input.above === true ? "↑" : "↓"} ${card.params.words.other ?? ""}`.trim();
+    case "set_channel_permissions":
+      return change(input.allow, input.deny) || (t("channel.perms.clear") as string);
+    case "update_channel":
+      return parts(
+        text(input.name) && `→ #${text(input.name).replace(/^#/, "")}`,
+        text(input.topic),
+        typeof input.private === "boolean" &&
+          (t(input.private ? "channel.visibilityPrivate" : "channel.visibilityPublic") as string),
+      );
+    case "update_workspace":
+      return parts(
+        renamed,
+        text(input.timezone),
+        typeof input.default_budget_usd === "number" &&
+          (t("agent.budgetDefaultChoice", {
+            amount: t("agentPage.perMonth", { amount: formatUsd(locale, input.default_budget_usd) }),
+          }) as string),
+      );
+    case "decide_join_request":
+      return input.approve === true
+        ? keys(input.roleNames)
+            .map((n) => `+ ${n}`)
+            .join(", ")
+        : text(input.reason);
+    default:
+      return "";
+  }
+}
+
+/**
+ * Whether this viewer gets Aplicar on the card: the key its screen asks for, unless they are the person it was for and
+ * the screen already refused them (a role above theirs), who sends it on instead. The server checks again either way.
+ */
+export const mayApplyCard = (
+  card: WorkspaceActionCard,
+  viewer: { userId: string; may: (key: Permission) => boolean },
+) =>
+  !(card.forUserId === viewer.userId && card.params.refused) &&
+  // Their own status or notifications: only theirs to apply.
+  !(card.params.self && card.forUserId !== viewer.userId) &&
+  (card.params.needs === null || viewer.may(card.params.needs));
