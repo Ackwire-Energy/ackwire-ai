@@ -13395,6 +13395,7 @@ export const ptBR = {
       machine_task_done: "“{{title}}” terminou no {{computer}}.",
       machine_task_failed: "“{{title}}” falhou no {{computer}}.",
       machine_task_canceled: "“{{title}}” foi parada no {{computer}}.",
+      calendar_proposal: "Proposta de evento: {{title}}",
       machine_task_interrupted: "“{{title}}” foi interrompida no {{computer}}.",
       machine_task_doneNoComputer: "“{{title}}” terminou.",
       machine_task_failedNoComputer: "“{{title}}” falhou.",

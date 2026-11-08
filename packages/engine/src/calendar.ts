@@ -1086,8 +1086,13 @@ export async function proposeCalendarEvent(
       channelId: run.channelId,
       threadId: replyThreadOf(run),
       author: { type: "agent", agentId: run.agentId, runId: run.runId, hop: 1 },
-      body: `Proposta de evento: ${row.title}`,
-      meta: { calendarProposalId: row.id, calendarProposal: proposalView(row) },
+      body: `Event proposal: ${row.title}`,
+      meta: {
+        calendarProposalId: row.id,
+        calendarProposal: proposalView(row),
+        bodyCode: "calendar_proposal",
+        bodyParams: { title: row.title },
+      },
     });
     const [linked] = await tx
       .update(calendarProposals)
