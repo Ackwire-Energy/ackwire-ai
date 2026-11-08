@@ -10686,21 +10686,6 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   padding-top: 0;
   border-top: 0;
 }
-/* Aprendizados: the skills it made, under what it learned */
-.agp-subhead {
-  margin: 16px 0 4px;
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.agp-subhead:first-child {
-  margin-top: 0;
-}
-.agp-subhead + p {
-  margin: 0 0 8px;
-}
 /* A learned item's technical detail, folded under its plain summary */
 .agp-mem__details > summary {
   cursor: pointer;
@@ -10723,22 +10708,6 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   overflow-wrap: anywhere;
 }
 /* Atividade */
-.agp-runs {
-  display: flex;
-  flex-direction: column;
-}
-.agp-day + .agp-day {
-  margin-top: 10px;
-}
-.agp-day__label {
-  margin: 0;
-  padding: 6px 0;
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 /* The time and the tokens sit on the title's first baseline (the smaller type pushed down 2px sat lower than it). */
 .agp-run {
   display: grid;

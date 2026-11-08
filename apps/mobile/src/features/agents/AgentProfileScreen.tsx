@@ -633,9 +633,15 @@ function Profile({ id }: { id: string }) {
       </GroupedFooter>
       {learned.playbook.length > 0 ? (
         <>
-          <GroupedHeader>{t("agentPage.memory.playbook", agentGrammar(name))}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("agentPage.memory.playbook", agentGrammar(name)) }),
+              text: t("agentPage.memory.playbookNote"),
+            }}
+          >
+            {t("agentPage.memory.playbook", agentGrammar(name))}
+          </GroupedHeader>
           <GroupedList>{learned.playbook.map(memoryRow)}</GroupedList>
-          <GroupedFooter>{t("agentPage.memory.playbookNote")}</GroupedFooter>
           {learned.people.length === 0 ? <GroupedFooter>{editFoot}</GroupedFooter> : null}
         </>
       ) : null}

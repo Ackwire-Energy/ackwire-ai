@@ -23,7 +23,9 @@ import {
   diffLines,
   EmptyState,
   Field,
+  GroupHeading,
   Icon,
+  InfoHint,
   Locked,
   SearchField,
   Segmented,
@@ -416,8 +418,9 @@ function LearnedList({ list }: { list: Memory[] }) {
     );
   const people = list.filter((m) => !m.playbook);
   const playbook = list.filter((m) => m.playbook);
+  const how = t("agentPage.memory.playbook", g);
   return (
-    <>
+    <div className="ac-groups">
       {people.length > 0 && (
         <ul className="agp-list agp-mems">
           {people.map((m) => (
@@ -425,30 +428,35 @@ function LearnedList({ list }: { list: Memory[] }) {
           ))}
         </ul>
       )}
-      {playbook.length + skills.length > 0 && (
-        <>
-          <h3 className="agp-subhead">{t("agentPage.memory.playbook", g)}</h3>
-          <p className="small muted">{t("agentPage.memory.playbookNote")}</p>
-        </>
-      )}
       {playbook.length > 0 && (
-        <ul className="agp-list agp-mems" aria-label={t("agentPage.memory.playbook", g)}>
-          {playbook.map((m) => (
-            <LearnedRow key={m.id} m={m} />
-          ))}
-        </ul>
+        <div>
+          <GroupHeading
+            level={3}
+            title={
+              <span className="ac-hintline">
+                <span>{how}</span>
+                <InfoHint name={t("common.about", { label: how })}>{t("agentPage.memory.playbookNote")}</InfoHint>
+              </span>
+            }
+          />
+          <ul className="agp-list agp-mems" aria-label={how}>
+            {playbook.map((m) => (
+              <LearnedRow key={m.id} m={m} />
+            ))}
+          </ul>
+        </div>
       )}
       {skills.length > 0 && (
-        <>
-          <h3 className="agp-subhead">{t("agentPage.memory.skills")}</h3>
+        <div>
+          <GroupHeading level={3} title={t("agentPage.memory.skills")} />
           <ul className="agp-list agp-mems">
             {skills.map((s) => (
               <LearnedSkillRow key={s.id} s={s} />
             ))}
           </ul>
-        </>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
