@@ -642,7 +642,7 @@ function WikiPage({ slug }: { slug: string }) {
   };
 
   const person = p?.updatedBy.onBehalfOf ? dir.memberById.get(p.updatedBy.onBehalfOf)?.name : undefined;
-  // "Theo a pedido de Walter · 3 de nov.": the version lives in Histórico, under the page.
+  // "Theo a pedido de Ana · 3 de nov.": the version lives in Histórico, under the page.
   // A writer that no longer exists (a deleted agent) leaves just when.
   const writer = p ? dir.nameOf(p.updatedBy) : "";
   const by = p
