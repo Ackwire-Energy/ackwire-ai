@@ -91,6 +91,7 @@ import {
   type DidLine,
   didLines,
   knownAboutMe,
+  modelRow,
   plainRole,
   spendOf,
   statusCardShown,
@@ -733,7 +734,11 @@ function Profile({ id }: { id: string }) {
               <GroupedRow
                 icon="brain"
                 label={t("rightHand.profile.model")}
-                value={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+                {...modelRow(
+                  t,
+                  agent.brain,
+                  agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
+                )}
               />
             </GroupedList>
           </View>
