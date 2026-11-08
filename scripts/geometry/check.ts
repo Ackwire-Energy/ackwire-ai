@@ -282,10 +282,19 @@ export const SELF_TESTED = [
   "corner",
   "clip",
   "cascadeorder",
+  "pagetop",
+  "groupedge",
+  "menuitem",
+  "rowpad",
+  "emptyselect",
+  "toolorder",
+  "toolrow",
+  "captop",
+  "timeedge",
 ];
 
-/** Rules about a desktop layout only (panes floating beside the conversation): a phone has none to check. */
-export const DESKTOP_ONLY = ["floating"];
+/** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */
+export const DESKTOP_ONLY = ["floating", "toolorder"];
 
 type Tab = Awaited<ReturnType<typeof openTab>>;
 

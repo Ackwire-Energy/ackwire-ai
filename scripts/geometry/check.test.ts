@@ -81,6 +81,9 @@ describe("geometry check", () => {
     for (const rule of ["floating", "inset", "icongap", "square"]) expect(SELF_TESTED).toContain(rule);
     for (const rule of ["squarecol", "rim", "inlinebase", "iconmid", "fieldwidth", "corner", "clip", "cascadeorder"])
       expect(SELF_TESTED).toContain(rule);
+    for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
+      expect(SELF_TESTED).toContain(rule);
+    expect(SELF_TESTED).toContain("timeedge");
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
@@ -91,8 +94,26 @@ describe("geometry check", () => {
   test("the self-test runs every rule at every checked width, but a desktop-only rule at the phone's", () => {
     const check = readFileSync(join(import.meta.dir, "check.ts"), "utf8");
     expect(check).toMatch(/async function selfTest[\s\S]*for \(const width of WIDTHS\)/);
-    expect(DESKTOP_ONLY).toEqual(["floating"]);
+    expect(DESKTOP_ONLY).toEqual(["floating", "toolorder"]);
     for (const rule of DESKTOP_ONLY) expect(SELF_TESTED).toContain(rule);
+  });
+
+  test("a captured toolbar stacks where the app's does: rules.js measures one row as Toolbar.tsx's fitsOneRow", () => {
+    const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
+    const toolbar = readFileSync(join(import.meta.dir, "../../packages/ui/src/components/Toolbar.tsx"), "utf8");
+    for (const part of [
+      'display !== "none"',
+      ".columnGap",
+      'classList.contains("ac-toolbar__search")',
+      ".minWidth",
+      "p.getBoundingClientRect().width",
+      "need <= bar.clientWidth + 0.5",
+    ]) {
+      expect(rules).toContain(part);
+      expect(toolbar).toContain(part);
+    }
+    expect(rules).toMatch(/detect\(\) \{\s*stackToolbars\(\);/);
+    expect(rules).toMatch(/styles\(\) \{\s*stackToolbars\(\);/);
   });
 
   test("the reverse CSS order holds the same sheets: the page sheets backwards, then the app's entry last", () => {
