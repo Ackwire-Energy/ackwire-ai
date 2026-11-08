@@ -212,7 +212,7 @@ export async function deliverNoticeToRun(
  * the same words without `@handle`s, so another agent's words never mention
  * (and start) an agent.
  */
-function forPeople(notice: Notice) {
+export function forPeople(notice: Notice) {
   const text = `${notice.from ? `${notice.from}: ` : ""}${notice.text}`;
   return text.replace(/(^|[^\w@.])@(?=[a-zA-Z0-9])/g, "$1").slice(0, 40_000);
 }

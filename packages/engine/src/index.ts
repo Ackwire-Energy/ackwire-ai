@@ -124,6 +124,7 @@ export * from "./git/github-app";
 export * from "./git/github-app-installs";
 export * from "./git/github-app-settings";
 export * from "./git/github-call";
+export * from "./git/github-events";
 export * from "./git/inflate";
 export * from "./git/machine";
 export * from "./git/pack";

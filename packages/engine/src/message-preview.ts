@@ -28,13 +28,14 @@ export function voiceOf(meta: Record<string, unknown> | null | undefined): Messa
 /**
  * A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0100).
  * A notice's body is written for the agent, in English: only what people may read of it (a routine's report, a fast
- * reply, another agent's own answer), else nothing, as the chat's `noticeView` does.
+ * reply, another agent's own answer, what someone wrote on GitHub), else nothing, as the chat's `noticeView` does.
  */
 export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) => {
   if (voiceOf(meta)) return "";
-  const notice = meta?.notice as { kind?: unknown; refs?: { answer?: unknown } } | undefined;
+  const notice = meta?.notice as { kind?: unknown; text?: unknown; refs?: { answer?: unknown } } | undefined;
   if (!notice || typeof notice !== "object") return body;
   if (notice.kind === "routine_handoff" || notice.kind === "talker_reply") return body;
+  if (notice.kind === "github_event") return typeof notice.text === "string" ? notice.text : "";
   return notice.kind === "consult_reply" && typeof notice.refs?.answer === "string" ? notice.refs.answer : "";
 };
 

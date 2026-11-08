@@ -20,4 +20,11 @@ describe("what lists a notice never shows the words written for the agent", () =
     expect(readableBody("Já vejo", notice("talker_reply"))).toBe("Já vejo");
     expect(readableBody("oi", {})).toBe("oi");
   });
+
+  test("what someone wrote on GitHub lists as they wrote it, never the server's English line", () => {
+    const github = { notice: { kind: "github_event", text: "Pode cobrir o token expirado?", refs: {} } };
+    expect(readableBody("ana commented on PR #12 (acme/app) on GitHub: Pode cobrir o token expirado?", github)).toBe(
+      "Pode cobrir o token expirado?",
+    );
+  });
 });
