@@ -1,5 +1,7 @@
 import { keys, useApi, useAuthConfig, useMe } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
+import { serverHost } from "@agenteschat/client/lib/server";
+import { skyHourOf } from "@agenteschat/ui/sky/workspace";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Href, ThemeProvider as NavigationThemeProvider, Stack, usePathname } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -185,6 +187,7 @@ function Gate() {
       {firstRun ? (
         <View style={onInvite ? { display: "none" } : StyleSheet.absoluteFill}>
           <OnboardingFlow
+            another={fresh ? (org.state?.org?.name ?? null) : null}
             onLeave={
               fresh
                 ? () => {
@@ -210,6 +213,7 @@ function Gate() {
           onDone={launched}
           waiting={down ? <ServerDownPanel down={down} /> : null}
           eyesClosed={down !== null && !down.checking}
+          dusk={down !== null && skyHourOf(serverHost(down.server)) === "dusk"}
         />
       ) : null}
     </NavigationThemeProvider>
