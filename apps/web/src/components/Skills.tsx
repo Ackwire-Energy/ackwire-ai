@@ -66,6 +66,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   List,
   ListRow,
@@ -211,18 +212,20 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
       />
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
       {settings.data && (
-        <>
-          <span className="row" style={{ gap: 10, alignItems: "center" }}>
-            <Switch
-              id="skills-agents-improve"
-              checked={settings.data.agentsImprove}
-              disabled={action.isPending}
-              onCheckedChange={(on) => action.mutate({ type: "settings", settings: { agentsImprove: on } })}
-            />
+        <span className="row" style={{ gap: 10, alignItems: "center" }}>
+          <Switch
+            id="skills-agents-improve"
+            checked={settings.data.agentsImprove}
+            disabled={action.isPending}
+            onCheckedChange={(on) => action.mutate({ type: "settings", settings: { agentsImprove: on } })}
+          />
+          <span className="ac-hintline">
             <label htmlFor="skills-agents-improve">{t("skills.agentsImprove")}</label>
+            <InfoHint name={t("common.about", { label: t("skills.agentsImprove") })}>
+              {t("skills.agentsImproveHelp")}
+            </InfoHint>
           </span>
-          <p className="small muted">{t("skills.agentsImproveHelp")}</p>
-        </>
+        </span>
       )}
       {skills.isLoading && <LoadingList count={3} avatar={false} />}
       {noSkills && (
@@ -553,7 +556,11 @@ export function InstallSkillDialog({
                 ]}
               >
                 <TabPanel value="github">
-                  <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
+                  <Field
+                    label={t("skills.githubUrl")}
+                    id="skill-url"
+                    hint={{ name: t("common.about", { label: t("skills.githubUrl") }), text: t("skills.githubHelp") }}
+                  >
                     <Input
                       value={url}
                       onChange={(e) => {
@@ -652,13 +659,24 @@ export function InstallSkillDialog({
                   <Field label={t("skills.name")} id="skill-name">
                     <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                   </Field>
-                  <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
+                  <Field
+                    label={t("skills.description")}
+                    id="skill-desc"
+                    hint={{
+                      name: t("common.about", { label: t("skills.description") }),
+                      text: t("skills.descriptionHelp"),
+                    }}
+                  >
                     <Input
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                     />
                   </Field>
-                  <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
+                  <Field
+                    label={t("skills.body")}
+                    id="skill-body"
+                    hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.bodyHelp") }}
+                  >
                     <Textarea
                       rows={10}
                       value={form.body}
@@ -955,9 +973,11 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           disabled={action.isPending}
           onCheckedChange={(on) => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: on } })}
         />
-        <label htmlFor={`skill-auto-${s.id}`}>{t("skills.autoUpdate")}</label>
+        <span className="ac-hintline">
+          <label htmlFor={`skill-auto-${s.id}`}>{t("skills.autoUpdate")}</label>
+          <InfoHint name={t("common.about", { label: t("skills.autoUpdate") })}>{t("skills.autoUpdateHelp")}</InfoHint>
+        </span>
       </span>
-      <p className="small muted">{t("skills.autoUpdateHelp")}</p>
     </>
   );
 }
@@ -1270,7 +1290,11 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
         <Field label={t("skills.description")} id="edit-skill-desc">
           <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
-        <Field label={t("skills.body")} id="edit-skill-body" help={t("skills.newVersion")}>
+        <Field
+          label={t("skills.body")}
+          id="edit-skill-body"
+          hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.newVersion") }}
+        >
           <Textarea rows={14} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
         </Field>
         <span className="row" style={{ gap: 10, alignItems: "center" }}>

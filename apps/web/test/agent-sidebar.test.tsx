@@ -245,7 +245,7 @@ describe("what the viewer sees", () => {
       },
     });
     const rows = section("Rotinas") as HTMLElement;
-    expect(rows.querySelector(".dm-side__count")?.textContent).toBe("4");
+    expect(rows.querySelector(".ac-grouphead__count")?.textContent).toBe("4");
     const switches = within(rows).getAllByRole("switch") as HTMLButtonElement[];
     expect(switches.map((s) => s.disabled)).toEqual([false, true, false]);
     expect(within(rows).getByRole("link", { name: "Ver todas" }).getAttribute("href")).toContain("/routines");

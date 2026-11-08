@@ -168,7 +168,18 @@ function AboutStep({ typed }: { typed: string | null }) {
           />
         ))}
       </GroupedList>
-      <GroupedHeader>{t("agentSetup.firstRun.about.line")}</GroupedHeader>
+      <GroupedHeader
+        {...(other
+          ? {}
+          : {
+              hint: {
+                name: t("common.about", { label: t("agentSetup.firstRun.about.line") }),
+                text: t("agentSetup.firstRun.about.optional"),
+              },
+            })}
+      >
+        {t("agentSetup.firstRun.about.line")}
+      </GroupedHeader>
       <TextArea
         value={shown}
         onChangeText={setLine}
@@ -177,7 +188,6 @@ function AboutStep({ typed }: { typed: string | null }) {
         scrollEnabled={false}
         editable={!save.isPending}
       />
-      {other ? null : <GroupedFooter>{t("agentSetup.firstRun.about.optional")}</GroupedFooter>}
     </SettingsPage>
   );
 }
@@ -591,7 +601,14 @@ function HowStep({ agent }: { agent: Agent }) {
       <GroupedFooter>{t("agentSetup.how.desc")}</GroupedFooter>
       {seesBudget ? (
         <>
-          <GroupedHeader>{t("agentSetup.how.budget")}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("agentSetup.how.budget") }),
+              text: t("agentSetup.how.budgetHelp", g),
+            }}
+          >
+            {t("agentSetup.how.budget")}
+          </GroupedHeader>
           <View style={[styles.budget, { backgroundColor: c.raised }]}>
             <Text variant="body" tone="muted">
               US$
@@ -605,7 +622,7 @@ function HowStep({ agent }: { agent: Agent }) {
               style={[styles.amount, fieldText("body"), { color: c.ink }]}
             />
           </View>
-          <GroupedFooter>{budgetOk ? t("agentSetup.how.budgetHelp", g) : t("agent.budgetInvalid")}</GroupedFooter>
+          {budgetOk ? null : <GroupedFooter>{t("agent.budgetInvalid")}</GroupedFooter>}
         </>
       ) : null}
       {onApi ? (
@@ -615,12 +632,12 @@ function HowStep({ agent }: { agent: Agent }) {
             <GroupedRow
               icon="brain"
               label={t("agentSetup.how.model")}
+              hint={{ name: t("common.about", { label: t("agentSetup.how.model") }), text: t("brain.auto.hint") }}
               value={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
               chevron
               onPress={() => openAgentAi(agent.id)}
             />
           </GroupedList>
-          <GroupedFooter>{t("brain.auto.hint")}</GroupedFooter>
         </>
       ) : null}
     </SettingsPage>

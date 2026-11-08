@@ -18,7 +18,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 
 /* ── Agents working now ─────────────────────────────────────────────────── */
@@ -612,34 +612,13 @@ html:not([data-pointer]) .issue-card:focus-visible {
 }
 
 /* ── List ───────────────────────────────────────────────────────────────── */
-.issues-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
 .issues-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.issues-group__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 4px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
-}
-.issues-group__title > .tabular {
-  font-weight: 500;
-  font-size: 12.5px;
-  color: var(--faint);
 }
 .issues-group__col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   border-radius: var(--radius-section);
   transition: background-color 0.18s;
 }
@@ -649,19 +628,9 @@ html:not([data-pointer]) .issue-card:focus-visible {
 .issues-group__col + .issues-group__col {
   margin-top: 6px;
 }
-/* A column's name inside its stage (customized board only). */
-.issues-group__sub {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.issues-group__sub > .tabular {
-  font-weight: 500;
-  color: var(--faint);
+/* A column's name inside its stage (customized board only): its group stands apart from the one above. */
+.issues-group__col + .issues-group__col:has(> .ac-grouphead) {
+  margin-top: var(--space-4);
 }
 .issue-list {
   list-style: none;

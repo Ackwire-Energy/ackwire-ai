@@ -22,6 +22,7 @@ import {
   IconButton,
   ListRow,
   PixelOrbit,
+  SCREEN_X,
   SearchField,
   SectionHeader,
   Segmented,
@@ -344,11 +345,11 @@ function Column({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  title: { paddingHorizontal: 16, paddingTop: 4 },
+  title: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  search: { paddingHorizontal: 16, paddingBottom: 8 },
-  views: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  search: { paddingHorizontal: SCREEN_X, paddingBottom: 8 },
+  views: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 8 },
   check: { width: CHECK_BOX, height: CHECK_BOX, alignItems: "center", justifyContent: "center" },
   subLine: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },

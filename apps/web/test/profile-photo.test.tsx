@@ -46,7 +46,7 @@ describe("profile photo", () => {
     await settle(2);
     const profile = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     // Photo and @ need no line; the time zone's use is its ⓘ, which also describes the picker.
-    expect(profile.querySelectorAll(".ac-field__help, .small.muted")).toHaveLength(0);
+    expect(profile.querySelectorAll(".ac-field__example, .small.muted")).toHaveLength(0);
     const zone = within(profile).getByRole("button", { name: "Sobre Fuso horário" });
     const zoneHint = document.getElementById(zone.getAttribute("aria-describedby") ?? "");
     expect(zoneHint?.textContent).toBe("Mostra a sua hora local no seu cartão de perfil.");

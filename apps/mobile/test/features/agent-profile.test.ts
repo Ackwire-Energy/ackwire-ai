@@ -11,6 +11,7 @@ import {
   freeSections,
   knownAboutMe,
   memoryOrigin,
+  modelRow,
   plainRole,
   statusCardShown,
   teamLines,
@@ -526,5 +527,21 @@ describe("an agent that doesn't answer me", () => {
     );
     const screen = await Bun.file(new URL("../../src/features/chat/ReachLines.tsx", import.meta.url).pathname).text();
     expect(screen.match(/ask\(audience\)/g)).toHaveLength(2);
+  });
+});
+
+describe("Perfil: the Modelo row says how it thinks on the value's line (#44)", () => {
+  test("through the API: the model, then Pela API; on a plan: the plan's model, then the plan", async () => {
+    const pt = await translator("pt-BR");
+    expect(modelRow(pt, undefined, "Claude Sonnet 4.5")).toEqual({ value: "Claude Sonnet 4.5", valueNote: "Pela API" });
+    expect(modelRow(pt, { kind: "model", model: null }, "Automático")).toEqual({
+      value: "Automático",
+      valueNote: "Pela API",
+    });
+    expect(modelRow(pt, { kind: "claude_code", model: "Sonnet" }, "Claude Sonnet 4.5")).toEqual({
+      value: "Sonnet",
+      valueNote: "Claude",
+    });
+    expect(modelRow(pt, { kind: "claude_code", model: "auto" }, "Claude Sonnet 4.5").value).toBe("Automático");
   });
 });

@@ -32,6 +32,7 @@ import {
   PixelDone,
   PixelFail,
   PixelStopped,
+  SCREEN_X,
   SectionHeader,
   SkeletonList,
   Text,
@@ -525,8 +526,8 @@ const FLAT_INSET = 58;
 const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  // Under the large title's words (20 in), as Equipe's line.
-  summary: { paddingHorizontal: 16, marginTop: -4, paddingBottom: 4 },
+  // Under the large title's words, as Equipe's line.
+  summary: { paddingHorizontal: SCREEN_X, marginTop: -4, paddingBottom: 4 },
   agent: {
     flexDirection: "row",
     alignItems: "center",
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
   agentDivider: { left: 16 },
   taskDivider: { left: TASK_INSET },
   flatDivider: { left: FLAT_INSET },
-  none: { paddingHorizontal: 16, paddingBottom: 12 },
+  none: { paddingHorizontal: SCREEN_X, paddingBottom: 12 },
   end: { alignItems: "flex-end", gap: 2, maxWidth: 130 },
   computer: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 16 },
   computerDivider: { left: FLAT_INSET },

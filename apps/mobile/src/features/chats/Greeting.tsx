@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, Icon, PixelOrbit, Sky, Text, WorkspaceSky } from "@/ui";
+import { AgentAvatar, Button, CARD_PAD, Card, Icon, PixelOrbit, SCREEN_X, Sky, Text, WorkspaceSky } from "@/ui";
 import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
@@ -211,7 +211,7 @@ export function FirstAgentEmpty() {
 }
 
 /** The empty state's card: its padding, which the sky runs past to the card's edges. */
-const EMPTY_PAD = 20;
+const EMPTY_PAD = CARD_PAD;
 /** An example's row: its inset, the tile and the gap to the words (the hairline starts at the words). */
 const IDEA_INSET = 14;
 const IDEA_TILE = 36;
@@ -219,8 +219,8 @@ const IDEA_GAP = 12;
 
 const styles = StyleSheet.create({
   sky: { opacity: 0.5 },
-  // At the screen's 16, as the field under it and the list.
-  mini: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
+  // At the screen's sides, as the field under it and the list.
+  mini: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 16 },
   line: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   after: { marginTop: 16 },
   part: { flexDirection: "row", alignItems: "center", gap: 8 },

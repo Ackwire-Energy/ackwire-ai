@@ -4,6 +4,7 @@ import { cx } from "../cx";
 import { EDGE_ROOM } from "../floating";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
+import { CountChip } from "./Chip";
 import { SearchField } from "./Toolbar";
 
 export interface FilterOption {
@@ -13,6 +14,8 @@ export interface FilterOption {
   leading?: ReactNode;
   /** Consecutive options with the same group get a heading ("Pessoas", "Agentes"). */
   group?: string;
+  /** How many there are of it (Tipo: 3 Documentos), at the row's end before the check. */
+  count?: number;
 }
 
 export interface FilterChipProps {
@@ -170,6 +173,7 @@ export function FilterChip({
                     >
                       {o.leading}
                       <span className="ac-filter__label">{o.label}</span>
+                      {o.count !== undefined && <CountChip>{o.count}</CountChip>}
                       <span className="ac-tz__check" aria-hidden="true">
                         {on && (
                           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">

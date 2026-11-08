@@ -23,18 +23,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTim
 import { scheduleOnRN } from "react-native-worklets";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
-import {
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  haptics,
-  Icon,
-  Segmented,
-  Text,
-  useTheme,
-  useToast,
-} from "@/ui";
+import { GroupedHeader, GroupedList, GroupedRow, haptics, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
 import {
   bubbleFill,
   CHAT_TEXT,
@@ -531,12 +520,25 @@ export function ChatLookPage() {
       />
       <View style={styles.previewGap} />
       <ChatPreview style={style} tone={tone} size={shownSize} dm={dm} />
-      <GroupedHeader>{t("settings.account.chat.density")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("settings.account.chat.density") }),
+          text: t("settings.account.chat.densityHelp"),
+        }}
+      >
+        {t("settings.account.chat.density")}
+      </GroupedHeader>
       <StylePicker value={style} names={names} onPick={(s) => save(dm ? { dmStyle: s } : { channelStyle: s })} />
-      <GroupedFooter>{t("settings.account.chat.densityHelp")}</GroupedFooter>
       {style === "bubbles" ? (
         <>
-          <GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", {
+                label: t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels"),
+              }),
+              text: t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp"),
+            }}
+          >
             {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
           </GroupedHeader>
           <Segmented
@@ -548,12 +550,16 @@ export function ChatLookPage() {
             value={tone}
             onChange={(v) => save(dm ? { dmTone: v as ChatTone } : { channelTone: v as ChatTone })}
           />
-          <GroupedFooter>
-            {t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp")}
-          </GroupedFooter>
         </>
       ) : null}
-      <GroupedHeader>{t("settings.account.chat.textSize")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("settings.account.chat.textSize") }),
+          text: t("settings.account.chat.textSizePhone"),
+        }}
+      >
+        {t("settings.account.chat.textSize")}
+      </GroupedHeader>
       <SizeSlider
         value={shownSize}
         labels={sizes}
@@ -562,8 +568,14 @@ export function ChatLookPage() {
           if (v !== textSize) save({ textSize: v });
         }}
       />
-      <GroupedFooter>{t("settings.account.chat.textSizePhone")}</GroupedFooter>
-      <GroupedHeader>{t("settings.account.chat.openAt")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("settings.account.chat.openAt") }),
+          text: t("mobile.me.chatOpenAtHelp"),
+        }}
+      >
+        {t("settings.account.chat.openAt")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           label={t("settings.account.chat.openRead")}
@@ -576,7 +588,6 @@ export function ChatLookPage() {
           onPress={() => save({ openAt: "latest" })}
         />
       </GroupedList>
-      <GroupedFooter>{t("mobile.me.chatOpenAtHelp")}</GroupedFooter>
     </Page>
   );
 }

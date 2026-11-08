@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
+import { SCREEN_X } from "./rhythm";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 
@@ -173,8 +174,8 @@ const PULL_MARK = 56;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  // At the screen's 16, as the lists and cards under it.
-  head: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 },
+  // At the screen's sides (SCREEN_X), as the lists and cards under it.
+  head: { paddingHorizontal: SCREEN_X, paddingTop: 2, paddingBottom: 10 },
   // Above the content's top edge: only a pull-down brings it into view (the system's wheel sits there too).
   pullMark: {
     position: "absolute",

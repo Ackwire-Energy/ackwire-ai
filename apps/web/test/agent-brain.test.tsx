@@ -55,12 +55,14 @@ async function open(state = seedState(), api = createFakeApi(state)) {
 }
 /** "Como trabalha" under the name: where, who thinks, the browser. */
 const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
-/** The "Pensa com" cell: what thinks (and its effort), and under it what pays. */
+/** The "Pensa com" cell: what thinks (and its effort), and what pays (on the value's line in the fact sheet). */
 const brainCell = () => {
   const cell = within(sentence()).getByRole("button", { name: "Mudar quem pensa" });
+  const value = cell.querySelector(".agp-cell__value")?.cloneNode(true) as HTMLElement | undefined;
+  value?.querySelector(".agp-cell__sub")?.remove();
   return {
     label: cell.querySelector("small")?.textContent,
-    value: cell.querySelector(".agp-cell__value")?.textContent,
+    value: value?.textContent,
     sub: cell.querySelector(".agp-cell__sub")?.textContent,
   };
 };

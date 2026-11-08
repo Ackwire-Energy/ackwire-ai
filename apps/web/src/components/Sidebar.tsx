@@ -1634,7 +1634,7 @@ function AgentRow({
           {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
         />
         <span className="sidebar__item-text">
-          <span className="sidebar__item-label">{a.name}</span>
+          <span className={under ? "sidebar__item-label ac-captop" : "sidebar__item-label"}>{a.name}</span>
           {under && (
             <span
               className={cx(
@@ -1722,7 +1722,7 @@ function RightHandRow({
     >
       <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
       <span className="sidebar__item-text">
-        <span className="sidebar__item-label">{a.name}</span>
+        <span className="sidebar__item-label ac-captop">{a.name}</span>
         <span className="sidebar__item-role">{label}</span>
       </span>
       {unread > 0 ? (

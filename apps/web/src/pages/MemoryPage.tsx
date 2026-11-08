@@ -160,7 +160,7 @@ function MemoryView({ agent }: { agent: Agent }) {
   const pendingProposals = (proposals.data ?? []).filter((p) => p.agentId === agent.id && p.status === "pending");
 
   return (
-    <div className="page page--full page--tight">
+    <div className="page page--full">
       <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }} className="ac-back">
         <Icon name="chevronLeft" />
         {t("memory.back", g)}
@@ -313,7 +313,10 @@ function EditMemoryDialog({
         <Field
           label={t("memory.text")}
           id="edit-text"
-          help={t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" })}
+          hint={{
+            name: t("common.about", { label: t("memory.text") }),
+            text: t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" }),
+          }}
         >
           <Textarea rows={3} maxLength={8000} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>

@@ -14,7 +14,7 @@ import {
 import { ScrollView } from "react-native-gesture-handler";
 import Animated, { type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, type IconName, PressScale, Text, ToastHost, useReducedMotion } from "@/ui";
+import { Icon, type IconName, PressScale, SCREEN_X, Text, ToastHost, useReducedMotion } from "@/ui";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { goBack } from "../shared/parts";
 import { savedAt, useFileActions, useSavedWhen } from "./actions";
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   sides: { position: "absolute", left: 0, right: 0, height: ROUND },
   side: { position: "absolute", top: 0 },
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 6 },
-  actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 20, paddingTop: 10 },
+  actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: SCREEN_X, paddingTop: 10 },
   action: { minWidth: 88 },
   actionIn: { alignItems: "center", gap: 6 },
   circle: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },

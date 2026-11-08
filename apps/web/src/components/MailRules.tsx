@@ -80,12 +80,12 @@ export function MailRulesPanel({
         <AddressList
           id={id("senders")}
           label={t("mail.rule.senders")}
-          help={t("mail.rule.sendersHelp")}
+          example={t("mail.rule.sendersHelp")}
           values={policy.senders}
           onChange={(senders) => set({ senders })}
           disabled={disabled}
         />
-        <Field label={t("mail.rule.window")} id={id("window")} help={t("mail.rule.windowHelp")}>
+        <Field label={t("mail.rule.window")} id={id("window")} example={t("mail.rule.windowHelp")}>
           <AffixInput
             className="ac-num"
             type="number"
@@ -105,7 +105,7 @@ export function MailRulesPanel({
         <AddressList
           id={id("recipients")}
           label={t("mail.rule.recipients")}
-          help={t("mail.rule.recipientsHelp")}
+          example={t("mail.rule.recipientsHelp")}
           values={policy.allowedRecipients}
           onChange={(allowedRecipients) => set({ allowedRecipients })}
           disabled={disabled}
@@ -145,7 +145,10 @@ export function MailRulesPanel({
         <Field
           label={t("mail.rule.from")}
           id={id("from")}
-          help={t("mail.rule.fromHelp", { address: account.defaultFrom ?? account.address })}
+          hint={{
+            name: t("common.about", { label: t("mail.rule.from") }),
+            text: t("mail.rule.fromHelp", { address: account.defaultFrom ?? account.address }),
+          }}
         >
           <Select
             disabled={disabled}

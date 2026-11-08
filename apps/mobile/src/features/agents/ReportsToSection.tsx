@@ -59,6 +59,7 @@ export function ReportsToSection({ agentId }: { agentId: string }) {
         <GroupedRow
           icon="members"
           label={t("team.reportsTo.label")}
+          hint={{ name: t("common.about", { label: t("team.reportsTo.label") }), text: t("team.reportsTo.help") }}
           value={current?.name ?? t("team.reportsTo.none")}
           {...(manages ? { chevron: true, onPress: () => setOpen((o) => !o) } : {})}
         />
@@ -83,11 +84,11 @@ export function ReportsToSection({ agentId }: { agentId: string }) {
           />
         ) : null}
       </GroupedList>
-      <GroupedFooter>
-        {reports.length > 0
-          ? `${t("team.reportsTo.reports", { name: agent.name })}: ${reports.map((r) => r.name).join(", ")}. ${t("team.reportsTo.help")}`
-          : t("team.reportsTo.help")}
-      </GroupedFooter>
+      {reports.length > 0 ? (
+        <GroupedFooter>
+          {`${t("team.reportsTo.reports", { name: agent.name })}: ${reports.map((r) => r.name).join(", ")}.`}
+        </GroupedFooter>
+      ) : null}
     </>
   );
 }

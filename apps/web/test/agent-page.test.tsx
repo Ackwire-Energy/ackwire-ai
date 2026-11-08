@@ -261,7 +261,7 @@ describe("agent page: its usage (ADR 0063)", () => {
     // It informs: changing the account is "Quem pensa"'s.
     expect(within(now).queryByRole("button")).toBeNull();
     const sources = screen().getByRole("region", { name: "Por conta, este mês" });
-    expect(sources.textContent).toContain("≈ US$\u00a076,00 pela API");
+    expect(sources.textContent).toContain("≈ US$\u00a076,00 pelo preço da API");
     expect(sources.textContent).toContain("US$\u00a00,80 pagos");
   });
 
@@ -869,6 +869,13 @@ describe("agent page: memory and proposals", () => {
       within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
     );
     const list = screen().getByRole("list", { name: "Como a Ada trabalha" });
+    // Its heading is the kit's list heading, the note behind the ⓘ beside it, not a sentence under it.
+    const group = list.parentElement as HTMLElement;
+    expect(group.querySelector(":scope > .ac-grouphead > h3 > .ac-hintline > :first-child")?.textContent).toBe(
+      "Como a Ada trabalha",
+    );
+    expect(hintText(group, "Como a Ada trabalha")).toStartWith("Jeitos de trabalhar que guardou para si.");
+    expect(group.querySelector(":scope > p")).toBeNull();
     const row = within(list).getByText("Como gravar senhas no Supabase sem expô-las").closest("li") as HTMLElement;
     const details = row.querySelector("details") as HTMLDetailsElement;
     expect(details.open).toBe(false);
@@ -924,6 +931,8 @@ describe("agent page: activity", () => {
     // New input, cached and output tokens per run (the 1.240 of the run, split).
     expect(runs.textContent).toContain("1.140 entrada · 0 cache · 100 saída");
     expect(within(runs).getByRole("region", { name: "Hoje" })).toBeTruthy();
+    // Each day under the kit's list heading, the days 24 apart, as Auditoria's.
+    expect(runs.querySelector(".ac-groups > section > .ac-grouphead")?.textContent).toBe("Hoje");
     const filters = within(runs).getByRole("radiogroup", { name: "Filtrar execuções" });
     await click(within(filters).getByRole("radio", { name: /^Falhas/ }));
     expect(runs.textContent).toContain("roda a suíte de checkout");

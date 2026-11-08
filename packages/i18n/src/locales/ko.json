@@ -1297,7 +1297,7 @@
       "calendar": "회의와 마감일",
       "team": "누가 누구인지: 사람, 에이전트, 그룹",
       "dashboards": "에이전트가 최신 상태로 유지하는 숫자와 차트",
-      "taskManager": "에이전트마다 지금 하는 일을 보고, 필요한 작업은 중지해요"
+      "taskManager": "에이전트마다 지금 하는 일과, 필요한 작업 중지"
     },
     "customizeSidebar": "사이드바 맞춤 설정",
     "sidebarMenu": {
@@ -1503,7 +1503,7 @@
     "list": {
       "agents": "에이전트",
       "people": "사람",
-      "search": "이름, 역할 또는 채널로 검색",
+      "search": "팀에서 검색",
       "filterLabel": "에이전트 표시",
       "filter": {
         "mine": "내 에이전트",
@@ -7706,6 +7706,7 @@
     "noResults": "그런 이름이 없어요.",
     "channels_other": "채널 {{count}}개",
     "people_other": "사람 또는 에이전트 {{count}}명",
+    "kinds_other": "유형 {{count}}개",
     "clearAll": "필터 지우기",
     "clearSearch": "검색 지우기"
   },
@@ -9686,7 +9687,6 @@
     "searchHint": "검색 단축키",
     "who": "만든 사람",
     "everyone": "모두",
-    "kinds": "유형",
     "kindMany": {
       "document": "문서",
       "table": "표",
@@ -9698,7 +9698,6 @@
       "poll": "투표",
       "choices": "선택지"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "보기",
     "viewGrid": "그리드",
     "viewList": "목록",
@@ -12809,6 +12808,7 @@
     "about": "각 사람이 얼마나, 어떤 에이전트로 쓰는지 볼 수 있어요. 비공개 대화의 내용은 여기에 절대 나오지 않아요.",
     "plansAbout": "플랜은 이미 결제됐어요. 이 금액은 사람 간 사용량을 비교하는 용도예요.",
     "sub_other": "{{month}} · {{count}}명 · AI {{amount}}",
+    "subPlans_other": "{{month}} · {{count}}명 · {{amount}}",
     "periodLabel": "기간",
     "period": {
       "month": "이번 달",
@@ -12856,7 +12856,8 @@
     "meter": {
       "of": "/ {{limit}}",
       "noLimit": "· 한도 없음",
-      "estimate": "API 기준 ≈ {{amount}}"
+      "estimate": "API 가격으로 ≈ {{amount}}",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "지금",
@@ -12895,7 +12896,8 @@
     },
     "limits": {
       "title": "사람별 사용 한도",
-      "lead": "각 사람이 한 달에 모든 에이전트를 합쳐 쓸 수 있는 AI의 양이에요. 본인의 요청과 본인이 만든 루틴이 포함돼요.",
+      "lead": "각 사람이 한 달에 모든 에이전트를 합쳐 쓸 수 있는 AI의 양이에요.",
+      "leadMore": "본인의 요청과 본인이 만든 루틴이 포함돼요.",
       "default": "워크스페이스 기본값",
       "defaultHint": "역할이나 예외로 정한 한도가 없는 사람에게 적용돼요.",
       "byRole": "역할별",
@@ -12906,7 +12908,8 @@
       "amount": "월 한도",
       "rule": "본인의 한도가 우선이에요. 없으면 역할 중 가장 높은 한도, 둘 다 없으면 기본값이에요. 소유자는 한도가 없어요.",
       "whenTitle": "누군가 한도에 도달하면",
-      "block": "에이전트가 그 사람을 위한 새 작업을 시작하지 않아요",
+      "whenHint": "새 작업 멈추기: 에이전트가 그 사람을 위한 새 작업을 시작하지 않아요. 관리자에게만 알리기: 작업은 계속되고 관리자가 알림을 받아요.",
+      "blockShort": "새 작업 멈추기",
       "notify": "관리자에게만 알리기",
       "warn": "80%에서 알리기",
       "warnHint": "본인이 알림을 받고, 100%에서 관리자도 알림을 받아요.",
@@ -12945,7 +12948,9 @@
     "usesNow": "지금 사용 중",
     "monthTokens": "이번 달 토큰 {{tokens}}",
     "tokens": "토큰 {{tokens}}",
-    "equivalent": "API 기준 ≈ {{amount}}",
+    "equivalent": "API 가격으로 ≈ {{amount}}",
+    "apiPrice": "API 가격",
+    "apiPriceHint": "에이전트가 플랜을 쓰면 아무도 사용량만큼 내지 않아요. 이 금액은 같은 사용을 API로 했을 때의 비용이에요.",
     "thisMonth": "이번 달",
     "moreAgents_other": "+에이전트 {{count}}명",
     "paid": "{{amount}} 결제됨",

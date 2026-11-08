@@ -79,7 +79,7 @@ export function ConnectorTriggerFields({
             />
           </Field>
         )}
-        <Field label={t("mail.routine.inboxAddress")} id="nr-inbox" help={t("mail.routine.inboxAddressHelp")}>
+        <Field label={t("mail.routine.inboxAddress")} id="nr-inbox" example={t("mail.routine.inboxAddressHelp")}>
           <Input
             type="email"
             value={value.filter.to ?? ""}
@@ -92,7 +92,7 @@ export function ConnectorTriggerFields({
       <AddressList
         id="nr-ms-from"
         label={t("mail.routine.from")}
-        help={t("mail.routine.fromHelp")}
+        example={t("mail.routine.fromHelp")}
         values={value.filter.from ?? []}
         onChange={(from) => setFilter({ ...value.filter, from })}
       />

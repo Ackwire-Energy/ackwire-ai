@@ -12,7 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { EmptyState, Icon, IconButton, ListRow, SectionHeader, Text, weights } from "@/ui";
+import { EmptyState, Icon, IconButton, ListRow, SCREEN_X, SectionHeader, Text, weights } from "@/ui";
 import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -29,7 +29,6 @@ const AGENT = 28;
 /** Between the people's columns; a column's width when they scroll sideways (more than two). */
 const COLUMN_GAP = 12;
 const SCROLL_COLUMN = 156;
-const PAGE = 16;
 /** How far a supervisor's reports sit in under it (ADR 0148 addendum). */
 const INDENT = 16;
 /** Faces on a channel's card before "+N". */
@@ -198,7 +197,7 @@ function OrgChart({
   const dir = useDirectory();
   const { width } = useWindowDimensions();
   const wide = columns.length > 2;
-  const column = wide ? SCROLL_COLUMN : Math.floor((width - PAGE * 2 - COLUMN_GAP) / 2);
+  const column = wide ? SCROLL_COLUMN : Math.floor((width - SCREEN_X * 2 - COLUMN_GAP) / 2);
   const stem = { backgroundColor: c.line2 };
   return (
     <View>
@@ -313,7 +312,7 @@ function ChannelCard({
       style={({ pressed }) => [
         styles.card,
         surface,
-        { width: Math.floor((width - PAGE * 2 - COLUMN_GAP) / 2) },
+        { width: Math.floor((width - SCREEN_X * 2 - COLUMN_GAP) / 2) },
         pressed && styles.pressed,
       ]}
     >
@@ -350,25 +349,25 @@ function ChannelCard({
 }
 
 const styles = StyleSheet.create({
-  // Under the large title's words (20 in, not the page's 16), tucked to it as Memória's and Wiki's lines are.
-  summary: { paddingHorizontal: 16, marginTop: -4 },
-  page: { paddingHorizontal: PAGE },
+  // Under the large title's words, tucked to it as Memória's and Wiki's lines are.
+  summary: { paddingHorizontal: SCREEN_X, marginTop: -4 },
+  page: { paddingHorizontal: SCREEN_X },
   lead: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52 },
   // The thin stem between a face and what hangs from it.
   stem: { width: 1, height: 12 },
   personStem: { alignSelf: "center", marginVertical: 4 },
-  columns: { paddingHorizontal: PAGE, gap: COLUMN_GAP },
+  columns: { paddingHorizontal: SCREEN_X, gap: COLUMN_GAP },
   column: { paddingTop: 4 },
   person: { alignItems: "center", gap: 4 },
   // A row of 44 for each agent, its hairline from its face's right edge.
   node: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingVertical: 4, paddingRight: 4 },
   nodeLine: { position: "absolute", right: 0, top: 0, height: StyleSheet.hairlineWidth },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: COLUMN_GAP, paddingHorizontal: PAGE },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: COLUMN_GAP, paddingHorizontal: SCREEN_X },
   card: { padding: 16, gap: 8, borderRadius: 20, borderBottomLeftRadius: 6 },
   faces: { flexDirection: "row", alignItems: "center" },
   overlap: { marginLeft: -8 },
   more: { marginLeft: 6 },
-  outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: PAGE, paddingTop: 14 },
+  outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: SCREEN_X, paddingTop: 14 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: weights.semibold },
   pressed: { opacity: 0.7 },

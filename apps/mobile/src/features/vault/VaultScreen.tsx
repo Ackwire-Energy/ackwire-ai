@@ -268,7 +268,14 @@ function Connections({ data }: { data: VaultOverview }) {
           </GroupedList>
         </>
       ) : null}
-      <GroupedHeader>{t("mobile.vault.connections.add")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("mobile.vault.connections.add") }),
+          text: t("mobile.vault.connections.help"),
+        }}
+      >
+        {t("mobile.vault.connections.add")}
+      </GroupedHeader>
       {data.sources.length === 0 ? (
         <GroupedFooter>{t("mobile.vault.connections.none")}</GroupedFooter>
       ) : (
@@ -288,7 +295,6 @@ function Connections({ data }: { data: VaultOverview }) {
           ))}
         </GroupedList>
       )}
-      <GroupedFooter>{t("mobile.vault.connections.help")}</GroupedFooter>
     </>
   );
 }

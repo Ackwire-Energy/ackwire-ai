@@ -1,4 +1,11 @@
-import { type ButtonHTMLAttributes, forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  type ButtonHTMLAttributes,
+  forwardRef,
+  type InputHTMLAttributes,
+  type ReactNode,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import { CountChip } from "./Chip";
@@ -84,10 +91,37 @@ export function FilterToggle({
 }
 
 /**
- * The bar above a list: the search first, then the filters (FilterBar,
- * FilterChip, FilterToggle, a Segmented), then `actions` at the end. Wraps
- * on narrow screens; on a phone the search takes the whole line and the
- * filters scroll sideways in one row.
+ * Whether a toolbar holds its parts on one row: each at its own width, the search at its floor (its `min-width`), and
+ * the gaps between them. Measured in the one-row layout. scripts/geometry/rules.js mirrors it for captured screens.
+ */
+export function fitsOneRow(bar: HTMLElement) {
+  const parts = [...bar.children].filter((p) => getComputedStyle(p).display !== "none");
+  let need = (Number.parseFloat(getComputedStyle(bar).columnGap) || 0) * Math.max(0, parts.length - 1);
+  for (const p of parts)
+    need += p.classList.contains("ac-toolbar__search")
+      ? Number.parseFloat(getComputedStyle(p).minWidth) || 0
+      : p.getBoundingClientRect().width;
+  return need <= bar.clientWidth + 0.5;
+}
+
+/**
+ * Stacked, whether the search at its floor (its `min-width`) and the actions share the top row. When they can't, the
+ * search takes that row alone and the actions lead the filters' row (`data-stack="split"`): the search never shrinks
+ * under its floor. scripts/geometry/rules.js mirrors it for captured screens.
+ */
+export function topRowFits(bar: HTMLElement) {
+  const search = bar.querySelector(":scope > .ac-toolbar__search");
+  const actions = bar.querySelector(":scope > .ac-toolbar__actions");
+  if (!search || !actions) return true;
+  const gap = Number.parseFloat(getComputedStyle(bar).columnGap) || 0;
+  const floor = Number.parseFloat(getComputedStyle(search).minWidth) || 0;
+  return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+}
+
+/**
+ * The bar above a list: the search on the left, the filters (FilterBar, FilterChip, FilterToggle, a Segmented) and
+ * `actions` at the end, on one row from 761px, the search giving way first. When they can't fit even so, it takes
+ * the phone's two rows (`data-stack`): the search and the actions, then the filters in one row that scrolls sideways.
  */
 export function Toolbar({
   search,
@@ -107,8 +141,32 @@ export function Toolbar({
   /** Names the filters' group for screen readers. */
   label?: string;
 }) {
+  const bar = useRef<HTMLDivElement>(null);
+  const searched = Boolean(search);
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!searched || !el || typeof ResizeObserver === "undefined") return;
+    const watched = new WeakSet<Element>();
+    // Measured with one row each time the toolbar or a part changes width (the window, a filter that got a value),
+    // watching the parts that came since (filters that appeared once their data loaded).
+    const measure = () => {
+      for (const part of [el, ...el.querySelectorAll(":scope > *, :scope > * > *")]) {
+        if (watched.has(part)) continue;
+        watched.add(part);
+        watch.observe(part);
+      }
+      el.removeAttribute("data-stack");
+      if (!fitsOneRow(el)) el.setAttribute("data-stack", topRowFits(el) ? "" : "split");
+    };
+    const watch = new ResizeObserver(measure);
+    measure();
+    return () => {
+      watch.disconnect();
+      el.removeAttribute("data-stack");
+    };
+  }, [searched]);
   return (
-    <div className={cx("ac-toolbar", size === "sm" && "ac-toolbar--sm", className)}>
+    <div ref={bar} className={cx("ac-toolbar", size === "sm" && "ac-toolbar--sm", className)}>
       {search && <div className="ac-toolbar__search">{search}</div>}
       {children &&
         (label ? (

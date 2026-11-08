@@ -14,6 +14,7 @@ import {
   DialogFooter,
   EmptyState,
   Field,
+  GroupHeading,
   Icon,
   Input,
   List,
@@ -412,11 +413,7 @@ export function ConnectAppDialog({
             const heading = group && `apps-group-${group}`;
             return (
               <section key={group ?? "other"} className="apps-group" aria-labelledby={heading || undefined}>
-                {group && (
-                  <h3 id={heading || undefined} className="cflow-group__title">
-                    {t(`apps.dialog.group.${group}`)}
-                  </h3>
-                )}
+                {group && <GroupHeading level={3} id={heading || undefined} title={t(`apps.dialog.group.${group}`)} />}
                 <div className="apps-clients">
                   {clients.map((c) => (
                     <button

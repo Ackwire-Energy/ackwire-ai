@@ -11,7 +11,7 @@ import {
   taskState,
   taskTitle,
 } from "@agenteschat/client/lib/task-manager";
-import { Button, Chip, PixelStop } from "@agenteschat/ui";
+import { Button, Chip, GroupHeading, PixelStop } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
@@ -171,22 +171,24 @@ export function TaskPanel({
             </div>
           ))}
         </dl>
-        <h3 className="tm-panel__h">{t("taskManager.panel.steps")}</h3>
-        {steps.isLoading ? (
-          <LoadingList count={2} avatar={false} />
-        ) : steps.isError && !steps.data ? (
-          <ErrorState error={steps.error} onRetry={() => void refetch()} />
-        ) : steps.data && hasSteps ? (
-          <TaskStepsBlock
-            steps={steps.data.steps}
-            run={steps.data.run}
-            working={working}
-            agentName={name}
-            color={colorOf(dir.anyAgent(source.agentId))}
-          />
-        ) : (
-          <p className="tm-panel__none">{t("taskManager.panel.noSteps")}</p>
-        )}
+        <section>
+          <GroupHeading level={3} title={t("taskManager.panel.steps")} />
+          {steps.isLoading ? (
+            <LoadingList count={2} avatar={false} />
+          ) : steps.isError && !steps.data ? (
+            <ErrorState error={steps.error} onRetry={() => void refetch()} />
+          ) : steps.data && hasSteps ? (
+            <TaskStepsBlock
+              steps={steps.data.steps}
+              run={steps.data.run}
+              working={working}
+              agentName={name}
+              color={colorOf(dir.anyAgent(source.agentId))}
+            />
+          ) : (
+            <p className="tm-panel__none">{t("taskManager.panel.noSteps")}</p>
+          )}
+        </section>
       </div>
 
       <footer className="tm-panel__foot">

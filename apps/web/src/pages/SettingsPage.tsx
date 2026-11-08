@@ -394,7 +394,7 @@ function GeneralSection() {
               <span className="settings-row__label">{t("orgLogo.label")}</span>
             </div>
             <div className="settings-row__control">
-              <OrgMark logo={org.logo} size={40} className="settings__org-logo" />
+              <OrgMark logo={org.logo} size={32} className="settings__org-logo" />
               {editable && (
                 <Button size="sm" type="button" onClick={() => setLogo(true)}>
                   {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
@@ -579,7 +579,7 @@ function UsageStatisticsCard() {
               </InfoHint>
             </span>
             {data.envOff && (
-              <span className="settings-row__help" id="set-telemetry-help">
+              <span className="settings-row__status" id="set-telemetry-help">
                 {t(
                   data.report.install === "desktop" ? "settings.telemetry.envOffDesktop" : "settings.telemetry.envOff",
                 )}
@@ -1041,7 +1041,7 @@ export function KeyDialog({
                 label={t("settings.keyValue")}
                 id="key-value-set"
                 error={error}
-                help={<KeySite provider={provider} />}
+                example={<KeySite provider={provider} />}
               >
                 <Input
                   type="password"

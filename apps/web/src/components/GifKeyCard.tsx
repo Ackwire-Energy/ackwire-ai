@@ -107,7 +107,7 @@ function GifKeySteps({
             {t("common.cancel")}
           </Button>
         </span>
-        <p id={below} className={error ? "jev-steps__below ac-field__error" : "jev-steps__below ac-field__help"}>
+        <p id={below} className={error ? "jev-steps__below ac-field__error" : "jev-steps__below ac-field__example"}>
           {error ?? t("settings.media.giphy.steps.sealed")}
         </p>
       </Step>

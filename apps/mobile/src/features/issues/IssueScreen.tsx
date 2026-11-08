@@ -46,6 +46,7 @@ import { useOrg } from "@/providers/org";
 import {
   Button,
   Chip,
+  GroupedHeader,
   Icon,
   IconButton,
   type IconName,
@@ -53,6 +54,7 @@ import {
   Locked,
   OPTION_ROW,
   PixelOrbit,
+  SCREEN_X,
   Text,
   useReducedMotion,
   useToast,
@@ -530,9 +532,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View>
-      <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.groupTitle}>
-        {title.toLocaleUpperCase()}
-      </Text>
+      <GroupedHeader>{title}</GroupedHeader>
       {children}
     </View>
   );
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   centerText: { textAlign: "center" },
-  head: { paddingHorizontal: 16, paddingTop: 6, gap: 6, marginBottom: 14 },
+  head: { paddingHorizontal: SCREEN_X, paddingTop: 6, gap: 6, marginBottom: 14 },
   bigTitle: { marginVertical: 4 },
   number: { fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
@@ -1037,8 +1037,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   // A long name gives way to the state after it rather than pushing it off the card.
   shrink: { flexShrink: 1 },
-  groupTitle: { paddingTop: 24, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
-  desc: { paddingHorizontal: 16 },
+  desc: { paddingHorizontal: SCREEN_X },
   card: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
   crit: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   // Each list's hairline starts at its words: past the box, or the tile, and the row's gap.

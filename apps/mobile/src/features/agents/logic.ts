@@ -1,6 +1,7 @@
 import type {
   Agent,
   AgentAccess,
+  AgentBrainLine,
   AgentForYouItem,
   AgentGroup,
   AgentStatusLine,
@@ -14,9 +15,12 @@ import type {
 } from "@agenteschat/client";
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
+import { planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
+import { isAuto } from "@agenteschat/client/lib/providers";
 import { type WorkItem, workByAgent } from "@agenteschat/client/lib/working";
+import type { TFunction } from "i18next";
 import { daysAgo, previewOf } from "../shared/logic";
 
 /**
@@ -451,4 +455,16 @@ export function usesOf(access: AgentAccess | null | undefined): { lines: UseLine
     });
   }
   return { lines, asks };
+}
+
+/**
+ * A profile's Modelo row as the web's fact sheet says it: the model it thinks with, and how after it on the value's
+ * line ("Pela API", or the plan whose model it is).
+ */
+export function modelRow(t: TFunction, brain: AgentBrainLine | undefined, apiModel: string) {
+  if (!brain || brain.kind === "model") return { value: apiModel, valueNote: t("brain.foot.api") };
+  return {
+    value: isAuto(brain.model) ? t("brain.auto.label") : (brain.model ?? apiModel),
+    valueNote: planLabel(t, planOfAccount({ kind: brain.kind, provider: brain.provider ?? null })),
+  };
 }

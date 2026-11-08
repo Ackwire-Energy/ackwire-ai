@@ -9,11 +9,6 @@
   display: flex;
   flex-direction: column;
 }
-.db-group__hint {
-  margin-left: 8px;
-  font-weight: 500;
-  color: var(--muted);
-}
 /* With only "My Home": one muted line under it, pointing at "New dashboard". */
 .db-group__only {
   margin: 10px 2px 0;
@@ -129,14 +124,12 @@ html:not([data-pointer]) .db-card:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 20px;
 }
 .db-crumb {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   align-self: flex-start;
-  margin-left: -4px;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--muted);

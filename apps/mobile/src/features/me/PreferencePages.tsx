@@ -111,12 +111,26 @@ export function NotificationsPage() {
     <Page title={t("mobile.me.notifications")}>
       <View style={styles.gap} />
       <GroupedList>
-        <GroupedRow label={t("mobile.me.notificationsPhone")} toggle={on} onPress={() => void push.set(!on)} />
+        <GroupedRow
+          label={t("mobile.me.notificationsPhone")}
+          hint={{
+            name: t("common.about", { label: t("mobile.me.notificationsPhone") }),
+            text: on ? t("mobile.me.notificationsOnHint") : t("mobile.me.notificationsOffHint"),
+          }}
+          toggle={on}
+          onPress={() => void push.set(!on)}
+        />
       </GroupedList>
-      <GroupedFooter>{on ? t("mobile.me.notificationsOnHint") : t("mobile.me.notificationsOffHint")}</GroupedFooter>
       {prefs.data ? (
         <>
-          <GroupedHeader>{t("noticePrefs.whatTitle")}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("noticePrefs.whatTitle") }),
+              text: t("mobile.me.notificationsKindsHint"),
+            }}
+          >
+            {t("noticePrefs.whatTitle")}
+          </GroupedHeader>
           <View style={on ? null : styles.dimmed}>
             <GroupedList>
               {prefs.data.categories.map((c) => (
@@ -124,8 +138,10 @@ export function NotificationsPage() {
                   key={c.id}
                   icon={NOTICE_ICONS[c.id]}
                   label={t(`noticePrefs.category.${c.id}.title`)}
-                  sub={t(`noticePrefs.category.${c.id}.help`)}
-                  subLines={2}
+                  hint={{
+                    name: t("common.about", { label: t(`noticePrefs.category.${c.id}.title`) }),
+                    text: t(`noticePrefs.category.${c.id}.help`),
+                  }}
                   toggle={c.on}
                   onPress={() =>
                     set.mutate(
@@ -137,7 +153,6 @@ export function NotificationsPage() {
               ))}
             </GroupedList>
           </View>
-          <GroupedFooter>{t("mobile.me.notificationsKindsHint")}</GroupedFooter>
         </>
       ) : null}
     </Page>
@@ -216,11 +231,12 @@ export function ActivityPage() {
       <GroupedList>
         <GroupedRow
           label={t("mobile.me.activityShow")}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("mobile.me.activityShow") }), text: t("mobile.me.activityHint") }}
           toggle={on}
           onPress={() => set.mutate(!on, { onError: () => toast({ title: t("mobile.me.activityFailed"), icon: "x" }) })}
         />
       </GroupedList>
-      <GroupedFooter>{t("mobile.me.activityHint")}</GroupedFooter>
     </Page>
   );
 }
@@ -265,11 +281,11 @@ export function SoundsPage() {
       <GroupedList>
         <GroupedRow
           label={t("mobile.me.soundsOn")}
+          hint={{ name: t("common.about", { label: t("mobile.me.soundsOn") }), text: t("mobile.me.soundsHint") }}
           toggle={sounds !== "off"}
           onPress={() => setSoundChoice(sounds === "off" ? "tactile" : "off")}
         />
       </GroupedList>
-      <GroupedFooter>{t("mobile.me.soundsHint")}</GroupedFooter>
       {sounds !== "off" && (
         <>
           <GroupedHeader>{t("mobile.me.soundStyle")}</GroupedHeader>

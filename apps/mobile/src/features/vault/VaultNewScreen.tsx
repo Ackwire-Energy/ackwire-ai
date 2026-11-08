@@ -108,6 +108,10 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
           <GroupedList>
             <InputField
               label={t("mobile.vault.field.website")}
+              hint={{
+                name: t("common.about", { label: t("mobile.vault.field.website") }),
+                text: t("mobile.vault.field.loginHelp"),
+              }}
               value={form.website}
               onChange={(website) => set({ website })}
               maxLength={LIMITS.website}
@@ -141,9 +145,9 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               placeholder={hostOf(websiteOrigin(form.website)) || t("mobile.vault.field.titleOptional")}
             />
           </GroupedList>
-          <GroupedFooter>
-            {typedWebsite && !websiteOrigin(form.website) ? t(PROBLEM_KEY.website) : t("mobile.vault.field.loginHelp")}
-          </GroupedFooter>
+          {typedWebsite && !websiteOrigin(form.website) ? (
+            <GroupedFooter>{t(PROBLEM_KEY.website)}</GroupedFooter>
+          ) : null}
           <MatchRows match={form.match} website={form.website} editable onChange={(match) => set({ match })} />
         </>
       ) : null}

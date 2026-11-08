@@ -1,7 +1,7 @@
 import type { Mission, MissionCommand } from "@agenteschat/client";
 import { useMissionCommands, useMissionDecisions, useMissionList, useMissionReviews } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Chip, type IconName } from "@agenteschat/ui";
+import { Chip, GroupHeading, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -44,10 +44,7 @@ export function MissionCommandsPending({ missions, query = "" }: { missions: Mis
   if (asking.length === 0) return null;
   return (
     <section className="ap-mi" aria-label={t("approvals.missions.commands")}>
-      <div className="list-group-head">
-        <h2>{t("approvals.missions.commands")}</h2>
-        <span className="list-group-head__count">{pendingCommandCount(asking)}</span>
-      </div>
+      <GroupHeading title={t("approvals.missions.commands")} count={pendingCommandCount(asking)} />
       <div className="ap-cards">
         {asking.map((m) => (
           <MissionCommands key={m.id} mission={m} query={query} />
@@ -106,9 +103,7 @@ export function MissionsWaitingList({ missions, query = "" }: { missions: Missio
   if (waiting.length === 0) return null;
   return (
     <section className="ap-mi" aria-label={t("approvals.missions.waiting")}>
-      <div className="list-group-head">
-        <h2>{t("approvals.missions.waiting")}</h2>
-      </div>
+      <GroupHeading title={t("approvals.missions.waiting")} />
       <ul className="list-card ap-mi__list">
         {waiting.map((m) => (
           <MissionWaitingRows key={m.id} mission={m} query={query} />

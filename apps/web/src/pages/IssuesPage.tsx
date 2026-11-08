@@ -10,6 +10,7 @@ import {
   CriteriaPixels,
   cx,
   EmptyState,
+  GroupHeading,
   Icon,
   Kbd,
   Menu,
@@ -810,31 +811,40 @@ function IssueList({
   );
   if (stages)
     return (
-      <div className="issues-groups">
+      <div className="ac-groups">
         {stages.map(({ stage, columns: cols }) => {
           const count = cols.reduce((n, c) => n + dnd.count(c.id), 0);
           if (count === 0 && !dnd.active) return null;
           return (
             <section key={stage} className="issues-group" aria-label={stageName(stage)}>
-              <h2 className="issues-group__title">
-                <Icon name={STATUS_ICON[stage]} size={16} />
-                {stageName(stage)}
-                <span className="tabular" data-count={custom ? undefined : cols[0]?.id}>
-                  {count}
-                </span>
-              </h2>
+              <GroupHeading
+                title={
+                  <>
+                    <Icon name={STATUS_ICON[stage]} size={16} />
+                    {stageName(stage)}
+                  </>
+                }
+                count={
+                  <span className="tabular" data-count={custom ? undefined : cols[0]?.id}>
+                    {count}
+                  </span>
+                }
+              />
               {cols.map((c) => {
                 const g = byId.get(c.id);
                 if (!g || (dnd.count(c.id) === 0 && !dnd.active)) return null;
                 return zone(
                   g,
                   custom && stage !== "canceled" && (
-                    <h3 className="issues-group__sub">
-                      {title(c)}
-                      <span className="tabular" data-count={c.id}>
-                        {dnd.count(c.id)}
-                      </span>
-                    </h3>
+                    <GroupHeading
+                      level={3}
+                      title={title(c)}
+                      count={
+                        <span className="tabular" data-count={c.id}>
+                          {dnd.count(c.id)}
+                        </span>
+                      }
+                    />
                   ),
                 );
               })}
@@ -844,19 +854,25 @@ function IssueList({
       </div>
     );
   return (
-    <div className="issues-groups">
+    <div className="ac-groups">
       {groups.map((g) => {
         const count = dnd.count(g.id);
         if (count === 0 && !dnd.active) return null;
         return (
           <section key={g.id} className="issues-group" aria-label={g.name}>
-            <h2 className="issues-group__title">
-              {g.lead}
-              {g.name}
-              <span className="tabular" data-count={g.id}>
-                {count}
-              </span>
-            </h2>
+            <GroupHeading
+              title={
+                <>
+                  {g.lead}
+                  {g.name}
+                </>
+              }
+              count={
+                <span className="tabular" data-count={g.id}>
+                  {count}
+                </span>
+              }
+            />
             {zone(g)}
           </section>
         );

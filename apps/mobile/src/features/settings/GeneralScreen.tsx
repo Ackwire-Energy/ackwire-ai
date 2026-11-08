@@ -305,6 +305,7 @@ export function GeneralScreen() {
         </GroupedField>
         <GroupedField
           label={t("settings.timezone")}
+          hint={{ name: t("common.about", { label: t("settings.timezone") }), text: t("settings.timezoneHelp") }}
           {...(editable ? { onPress: () => router.push("/settings/zone") } : {})}
         >
           <Text variant="callout" numberOfLines={1}>
@@ -312,18 +313,17 @@ export function GeneralScreen() {
           </Text>
         </GroupedField>
       </GroupedList>
-      <GroupedFooter>{t("settings.timezoneHelp")}</GroupedFooter>
       <Gap />
       <GroupedList>
         <GroupedRow
           label={t("settings.actionCheck")}
           labelLines={2}
+          hint={{ name: t("common.about", { label: t("settings.actionCheck") }), text: t("settings.actionCheckHelp") }}
           toggle={settings.data?.actionCheck ?? true}
           disabled={!editable || !settings.data}
           onPress={() => save({ actionCheck: !(settings.data?.actionCheck ?? true) })}
         />
       </GroupedList>
-      <GroupedFooter>{t("settings.actionCheckHelp")}</GroupedFooter>
 
       <View style={styles.contextHead}>
         <InfoHint
@@ -397,13 +397,17 @@ function UsageStatistics() {
         <GroupedRow
           label={t("settings.telemetry.label")}
           labelLines={3}
+          hint={{
+            name: t("common.about", { label: t("settings.telemetry.label") }),
+            text: t("settings.telemetry.help"),
+          }}
           toggle={on}
           disabled={data.envOff || set.isPending}
           onPress={() => set.mutate(!on, { onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }) })}
         />
         <GroupedRow label={t("settings.telemetry.see")} chevron onPress={() => router.push("/settings/telemetry")} />
       </GroupedList>
-      <GroupedFooter>{[t("settings.telemetry.help"), envOff].filter(Boolean).join(" ")}</GroupedFooter>
+      {envOff ? <GroupedFooter>{envOff}</GroupedFooter> : null}
     </>
   );
 }

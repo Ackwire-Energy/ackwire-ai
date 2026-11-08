@@ -130,9 +130,10 @@
   /* A form's rhythm: fields sit `--form-gap` apart, and a label and help `--field-gap` from their control. */
   --form-gap: var(--space-4);
   --field-gap: var(--space-1);
-  /* Above and below the words of a card's list row (a settings row, a role, a limit) and of the card's foot, so every
-     hairline between them sits as far from the words on each side. */
-  --row-py: var(--space-3);
+  /* Above and below a list row's content (a settings row, a role, a limit) and the card's foot, so every hairline
+     between them sits as far from it on each side: one line 36, with a 24 face 40, with a 32 control 48 (12 on touch,
+     in the kit). */
+  --row-py: var(--space-2);
   /* The least a button with a plate stands from the edges of its row or card. */
   --action-clear: 8px;
   /* Between an icon and the words it leads (a button's, a pill's, a card's): measured from the glyph's box. */

@@ -507,13 +507,13 @@ describe("Equipe (ADR 0148)", () => {
     await go("team");
     expect(rows()).toEqual(["Ada", "Atlas"]);
     await act(async () =>
-      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar no time" }), {
         target: { value: "ops" },
       }),
     );
     expect(rows()).toEqual(["Atlas"]);
     await act(async () =>
-      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar no time" }), {
         target: { value: "" },
       }),
     );

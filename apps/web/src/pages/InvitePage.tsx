@@ -1847,7 +1847,7 @@ function AskForm({ token, preview }: { token: string; preview: InvitationPreview
       <Field
         label={t("invite.ask.name")}
         id="ask-name"
-        help={looksLikePassword(name) ? t("auth.flow.nameLooksLikePassword") : undefined}
+        example={looksLikePassword(name) ? t("auth.flow.nameLooksLikePassword") : undefined}
       >
         <Input
           className="auth__big"

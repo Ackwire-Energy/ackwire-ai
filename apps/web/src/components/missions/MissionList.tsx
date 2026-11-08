@@ -3,7 +3,7 @@ import { useChannels, useMissionList } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
 import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, EmptyState, Icon, Menu } from "@agenteschat/ui";
+import { Button, EmptyState, GroupHeading, Icon, Menu } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -80,18 +80,16 @@ export function MissionsTab({
     );
   }
   return (
-    <div className="mi-tab">
+    <div className="ac-groups">
       {active.length > 0 && (
         <section>
-          <h2 className="mi-section-title">
-            {t("missions.list.active")} · {counts?.active ?? active.length}
-            {(counts?.waitingYou ?? 0) > 0 && (
-              <span className="mi-section-title__aside">
-                {" "}
-                · {t("missions.list.waitingYouCount", { count: counts?.waitingYou ?? 0 })}
-              </span>
-            )}
-          </h2>
+          <GroupHeading
+            title={t("missions.list.active")}
+            count={counts?.active ?? active.length}
+            note={
+              (counts?.waitingYou ?? 0) > 0 && t("missions.list.waitingYouCount", { count: counts?.waitingYou ?? 0 })
+            }
+          />
           <div className="mi-mcs">
             {active.map((m) => (
               <MissionCard key={m.id} mission={m} />
@@ -101,9 +99,7 @@ export function MissionsTab({
       )}
       {ended.length > 0 && (
         <section>
-          <h2 className="mi-section-title">
-            {t("missions.list.ended")} · {counts?.closed ?? ended.length}
-          </h2>
+          <GroupHeading title={t("missions.list.ended")} count={counts?.closed ?? ended.length} />
           <div className="mi-mcs">
             {ended.map((m) => (
               <MissionCard key={m.id} mission={m} />

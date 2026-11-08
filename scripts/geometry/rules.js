@@ -311,19 +311,20 @@
     p.style.cssText = "all:unset;display:inline-block;width:0;height:1cap;vertical-align:baseline";
     return p;
   };
-  /** Its bottom is the line's baseline: where the capitals sit and their middle. */
+  /** Its bottom is the line's baseline: where the capitals sit, their middle and their top. */
   const capsOf = (probe) => {
     const r = probe.getBoundingClientRect();
     probe.remove();
-    return { base: r.bottom, mid: r.bottom - r.height / 2 };
+    return { base: r.bottom, mid: r.bottom - r.height / 2, top: r.top };
   };
   /**
    * The baseline and the capitals' middle of the line a text node starts on, by a probe right after its first letter: a
    * box of no width never moves to another line. A text node laid out straight in a flex or grid box is wrapped for
-   * the moment, so the probe joins its line instead of becoming an item of its own.
+   * the moment, so the probe joins its line instead of becoming an item of its own. With `end`, the line it ends on,
+   * by a probe before its last letter.
    */
-  const capsAt = (text, also) => {
-    const at = text.data.search(/\S/);
+  const capsAt = (text, also, end = false) => {
+    const at = text.data.search(end ? /\S\s*$/ : /\S/);
     if (at < 0) return null;
     const host = layoutParent(text);
     const wrap = host && /flex|grid/.test(style(host).display) ? document.createElement("geo-probe") : null;
@@ -332,7 +333,7 @@
       text.before(wrap);
       wrap.append(text);
     }
-    const rest = text.splitText(at + 1);
+    const rest = text.splitText(end ? at : at + 1);
     const probe = capProbe();
     rest.before(probe);
     // What is compared with the capitals, read while the probe is in: a probe in a line that fits exactly can push
@@ -411,6 +412,74 @@
             return { x, y, blur, spread, color };
           })
           .filter((l) => painted(l.color));
+  /** A length a token holds, as laid out: a custom property keeps its `calc()` unevaluated. */
+  const lengthOf = (token) => {
+    const p = document.createElement("geo-probe");
+    p.style.cssText = `all:unset;display:block;position:absolute;width:0;height:var(${token},0px)`;
+    document.body.append(p);
+    const h = p.getBoundingClientRect().height;
+    p.remove();
+    return h;
+  };
+  /**
+   * Whether a page's toolbar holds its parts on one row: each at its own width, the search at its floor, and the gaps
+   * between them. Mirrors `fitsOneRow` in packages/ui/src/components/Toolbar.tsx, which sets `data-stack` when they
+   * don't: a captured screen can't run it, so `detect` and `styles` do it here at each width.
+   */
+  const fitsOneRow = (bar) => {
+    const parts = [...bar.children].filter((p) => style(p).display !== "none");
+    let need = (parseFloat(style(bar).columnGap) || 0) * Math.max(0, parts.length - 1);
+    for (const p of parts)
+      need += p.classList.contains("ac-toolbar__search")
+        ? parseFloat(style(p).minWidth) || 0
+        : p.getBoundingClientRect().width;
+    return need <= bar.clientWidth + 0.5;
+  };
+  /** Stacked, whether the search at its floor and the actions share the top row. Mirrors `topRowFits` in Toolbar.tsx. */
+  const topRowFits = (bar) => {
+    const search = bar.querySelector(":scope > .ac-toolbar__search");
+    const actions = bar.querySelector(":scope > .ac-toolbar__actions");
+    if (!search || !actions) return true;
+    const gap = parseFloat(style(bar).columnGap) || 0;
+    const floor = parseFloat(style(search).minWidth) || 0;
+    return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+  };
+  const stackToolbars = () => {
+    for (const bar of document.querySelectorAll(".ac-toolbar:has(> .ac-toolbar__search)")) {
+      bar.removeAttribute("data-stack");
+      if (!fitsOneRow(bar)) bar.setAttribute("data-stack", topRowFits(bar) ? "" : "split");
+    }
+  };
+  /** What a toolbar's rows hold, each once: its search field, filters and toggles, a segmented control, buttons, selects. */
+  const TOOL =
+    ".ac-searchfield,.ac-seg,.ac-filter,.ac-filtertoggle,.ac-select__trigger,.ac-btn,button,[role=button],input,select";
+  const toolsOf = (bar) => {
+    const all = [...bar.querySelectorAll(TOOL)].filter(
+      (el) => seen(el) && !el.matches(".ac-searchfield__clear,.ac-filter__clear"),
+    );
+    return all.filter((el) => !all.some((o) => o !== el && o.contains(el)));
+  };
+  const CONTROL = "button,input,select,textarea,[role=button],[role=combobox],[role=switch],[role=tab],.ac-seg";
+  /** A page's own head, or what starts one: where `pagetop` stops looking for a page's first line. */
+  const HEADS = ".ac-pagehead,.ac-back,.settings__head,.issue-page__bar";
+  /** What a box shows first, in its flow: a head, a control, a line of words or a row of them. */
+  const firstLine = (root) => {
+    let box = root;
+    for (let depth = 0; depth < 16; depth++) {
+      const kids = [...box.children]
+        .flatMap((c) => (style(c).display === "contents" ? [...c.children] : [c]))
+        .filter((c) => seen(c) && !["absolute", "fixed"].includes(style(c).position));
+      const first = kids.find(
+        (k) => k.matches(CONTROL) || visibleText(k) || [...k.querySelectorAll(CONTROL)].some(seen),
+      );
+      if (!first) return box === root ? null : box;
+      if (first.matches(`${HEADS},${CONTROL}`) || ownText(first) || isRow(style(first))) return first;
+      box = first;
+    }
+    return box;
+  };
+  /** A label drawn as a pill beside a name: a chip, a tag, a badge. */
+  const PILL_LABEL = ".ac-chip,.agp-tag,[class*='pill'],[class*='badge']";
 
   const rules = {
     edge(out) {
@@ -1074,6 +1143,10 @@
         if (box.height > 1.25 * lineHeightOf(text.parentElement) + 0.5) continue;
         leads.add(mark);
         leads.add(lead);
+        // On the first line's capitals instead (a face line, a name that rises, an option card's face): `captop`'s.
+        const risen = text.parentElement.closest(".ac-captop");
+        if (row.matches(".ac-faceline") || (risen && risen !== row && row.contains(risen))) continue;
+        if (row.matches(".ac-option") && lead.matches(FACE)) continue;
         // A row that wrapped puts its words under the lead, not beside it: no line to share.
         const first = textRects(text)[0];
         if (!first || Math.min(first.bottom, box.bottom) <= Math.max(first.top, box.top)) continue;
@@ -1315,6 +1388,447 @@
         }
       }
     },
+    /**
+     * A page's first line (its head, a way back, Settings' heading) starts `--page-top` under its page's top and
+     * `--page-x` in from its side, within 0.5px: every page, Settings, the wiki and the calendar included. Side by side,
+     * Settings' section starts where its nav does. The agent page's sky is that page's own top.
+     */
+    pagetop(out) {
+      const want = { Top: lengthOf("--page-top"), Left: lengthOf("--page-x") };
+      const roots = [
+        ...document.querySelectorAll(".shell__main > .page:not(.agp),.settings,.wiki__center,.cal-page__header"),
+      ].map((root) => [root, ["Top", "Left"]]);
+      for (const body of document.querySelectorAll(".settings__body")) {
+        const nav = body.parentElement?.querySelector(":scope > .settings__nav");
+        if (nav && seen(nav) && body.getBoundingClientRect().top < nav.getBoundingClientRect().bottom)
+          roots.push([body, ["Top"]]);
+      }
+      for (const [root, sides] of roots) {
+        if (!seen(root)) continue;
+        const line = firstLine(root);
+        // An empty page's state sits in its middle, by design.
+        if (!line || line.closest(".ac-empty")) continue;
+        const a = line.getBoundingClientRect();
+        const b = root.getBoundingClientRect();
+        const s = style(root);
+        const at = {
+          Top: a.top - b.top - parseFloat(s.borderTopWidth),
+          Left: a.left - b.left - parseFloat(s.borderLeftWidth),
+        };
+        for (const side of sides) {
+          const px = at[side] - want[side];
+          if (Math.abs(px) > 0.5)
+            out.push({ rule: "pagetop", node: line, el: sig(line), box: sig(root), side, px: +px.toFixed(1) });
+        }
+      }
+    },
+    /**
+     * A list's heading (a GroupHeading, or one line of words right above a list or a card of rows) starts on the list's
+     * outer edge within 0.5px (the card's, or its rows' plates'), and ends 8 above it within 1. Right under a page's
+     * toolbar or head, it starts 16 under it. A card's own title over the rows inside it is the card's.
+     */
+    groupedge(out) {
+      const LIST = "ul,ol,[role=list],.list-card,.ac-list";
+      const inFlow = (n) => seen(n) && !["absolute", "fixed"].includes(style(n).position);
+      // A list, or a card of rows (its own children are rows, or it holds settings rows). A control is no list.
+      const isList = (el) => {
+        if (el.matches(LIST)) return true;
+        if (el.matches(`${CONTROL},a,[role=radiogroup],[role=tablist]`) || !hasSurface(style(el))) return false;
+        if (el.querySelector(":scope > .settings-rows")) return true;
+        const kids = flow(el);
+        return kids.length >= 2 && kids.every((k) => typeof k.className === "string" && ROW_ITEM.test(k.className));
+      };
+      const nextOf = (el) => {
+        for (let n = el.nextElementSibling; n; n = n.nextElementSibling) if (inFlow(n)) return n;
+        return null;
+      };
+      // The box before it, or before the group it opens (up to the page's column).
+      const prevOf = (el) => {
+        for (let at = el, up = 0; at && up < 4; at = at.parentElement, up++)
+          for (let n = at.previousElementSibling; n; n = n.previousElementSibling) if (inFlow(n)) return n;
+        return null;
+      };
+      for (const head of document.querySelectorAll(
+        ".ac-grouphead,h2,h3,h4,[role=heading],[class*='head'],[class*='title']",
+      )) {
+        // Not a list's heading: a page's or a dialog's head, a disclosure (its own button), a menu's heading (on its
+        // items' words by design), or words in a card or in rendered text.
+        if (
+          !seen(head) ||
+          head.matches(".ac-pagehead,.ac-dialog__head,button,a") ||
+          head.closest("svg,.md,[class*='card'],.ac-menu,.ac-popover,[role=menu],[role=listbox]")
+        )
+          continue;
+        const list = nextOf(head);
+        if (!list || !isList(list)) continue;
+        const lines = [];
+        const walker = document.createTreeWalker(head, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode())
+          if (n.textContent.trim() && seen(n.parentElement)) lines.push(...textRects(n));
+        const ink = lines.length && lineCount(lines) === 1 ? contentRect(head) : null;
+        if (!ink) continue;
+        const l = list.getBoundingClientRect();
+        const row = hasSurface(style(list)) ? null : flow(list)[0];
+        const edge = row ? row.getBoundingClientRect().left : l.left;
+        // A card's own title over the rows inside it, which run to the card's sides where no words start (a table's
+        // groups, an import's): the card's, whatever its class.
+        let host = head.parentElement;
+        while (host && host !== document.body && !hasSurface(style(host))) host = host.parentElement;
+        if (host && host !== document.body && host.contains(list)) {
+          const inner = host.getBoundingClientRect().left + parseFloat(style(host).borderLeftWidth);
+          if (Math.abs(edge - inner) <= 1) continue;
+          // A card's own head, its first line (a service's mark and name over its steps): the card's 12, not a list's.
+          if (flow(host)[0]?.contains(head)) continue;
+        }
+        const h = head.getBoundingClientRect();
+        const base = { rule: "groupedge", node: head, el: sig(head), box: sig(list) };
+        if (Math.abs(ink.left - edge) > 0.5) out.push({ ...base, side: "Left", px: +(ink.left - edge).toFixed(1) });
+        if (Math.abs(l.top - h.bottom - 8) > 1)
+          out.push({ ...base, side: "Bottom", px: +(l.top - h.bottom).toFixed(1) });
+        const prev = prevOf(head);
+        if (prev?.matches(".ac-toolbar,.ac-pagehead")) {
+          const gap = h.top - prev.getBoundingClientRect().bottom;
+          if (Math.abs(gap - 16) > 1) out.push({ ...base, side: "Top", px: +gap.toFixed(1) });
+        }
+      }
+    },
+    /**
+     * Menu rows are their kind's height, within 0.5px: a line 32, a name over its description 50, a list with faces 36
+     * (40, 58 and 44 on touch), a wrapped name or description by its extra lines. They stand 2 apart, the first
+     * `--menu-pad` under the menu's top. Headings, separators and the reactions' row keep their own.
+     */
+    menuitem(out) {
+      const touch = matchMedia("(pointer: coarse)").matches;
+      const MENU = ".ac-menu,[role=menu],[role=listbox]";
+      const ITEM = "[role^=menuitem],[role=option],.ac-menu__item";
+      const OWN = ".ac-menu__reactions,.ac-menu__heading,.ac-menu__separator,[role=separator]";
+      const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      for (const menu of document.querySelectorAll(MENU)) {
+        if (!seen(menu) || menu.parentElement?.closest(MENU)) continue;
+        const items = [...menu.querySelectorAll(ITEM)].filter(
+          (el) => seen(el) && !el.closest(OWN) && !el.parentElement.closest(ITEM),
+        );
+        if (!items.length) continue;
+        const faces = items.some((el) =>
+          el.querySelector(":scope > .ac-menu__leading > .ac-avatar, :scope > .ac-avatar"),
+        );
+        // The workspace menu (MenuOverlay) fills the screen in 15px type: its rows are the touch ones everywhere.
+        const roomy = touch || menu.matches(".ac-mo__group");
+        const own = [...menu.querySelectorAll(OWN)].filter((x) => style(x).display !== "none");
+        // A name or a description that wraps (a long one, a narrow window) adds its lines: words wrap, never cut.
+        const grown = (box) => {
+          if (!box || !seen(box)) return 0;
+          const lh = parseFloat(style(box).lineHeight);
+          return lh > 0 ? Math.max(0, Math.round(box.getBoundingClientRect().height / lh) - 1) * lh : 0;
+        };
+        for (const [i, el] of items.entries()) {
+          const desc = [...el.querySelectorAll(".ac-menu__desc")].some(seen);
+          const extra = desc
+            ? grown(el.querySelector(".ac-menu__label > :first-child:not(.ac-menu__desc)")) +
+              grown(el.querySelector(".ac-menu__desc"))
+            : 0;
+          const want = (faces ? (roomy ? 44 : 36) : desc ? (roomy ? 58 : 50) : roomy ? 40 : 32) + extra;
+          const r = el.getBoundingClientRect();
+          const base = { rule: "menuitem", node: el, el: sig(el), box: sig(menu) };
+          if (Math.abs(r.height - want) > 0.5) out.push({ ...base, side: "height", px: +r.height.toFixed(1), want });
+          const prev = items[i - 1];
+          if (prev && !own.some((x) => follows(prev, x) && follows(x, el))) {
+            const p = prev.getBoundingClientRect();
+            // Side by side (a grid of them) is no column.
+            if (r.top >= p.bottom - 1 && Math.abs(r.top - p.bottom - 2) > 0.5)
+              out.push({ ...base, side: "gap", px: +(r.top - p.bottom).toFixed(1), want: 2 });
+          }
+        }
+        // The first row on the menu's room, when nothing comes before it (a search field, a heading, a note).
+        const first = items[0];
+        const pad = parseFloat(style(menu).getPropertyValue("--menu-pad"));
+        const before = [...menu.querySelectorAll("*")].some(
+          (x) => seen(x) && !x.contains(first) && follows(x, first) && (visibleText(x) || x.matches(CONTROL)),
+        );
+        if (Number.isFinite(pad) && !before) {
+          const top =
+            first.getBoundingClientRect().top -
+            menu.getBoundingClientRect().top -
+            parseFloat(style(menu).borderTopWidth);
+          if (Math.abs(top - pad) > 0.5)
+            out.push({
+              rule: "menuitem",
+              node: first,
+              el: sig(first),
+              box: sig(menu),
+              side: "Top",
+              px: +top.toFixed(1),
+              want: pad,
+            });
+        }
+      }
+    },
+    /**
+     * A list's row (a settings row, a kit list row, any `-row` or `__row` with a hairline or a plate that holds a
+     * control) keeps as much room above what it holds as below, within 1px, and at least 8: its controls, faces, tiles
+     * and pills by their boxes, its words by their lines (a line that rises to a face's top, `.ac-captop`, by its
+     * capitals). A box taller than a row, or a card, is left to `inset`; a setting with no box (`.ac-setrow`) has no edge.
+     */
+    rowpad(out) {
+      const NAMED = ".settings-row,.ac-list__row";
+      const ROW = /(^|\s)[\w-]*[^\s-](-|__)row(\s|$|--)/;
+      const HOLDS =
+        "button,input,select,textarea,[role=button],[role=combobox],[role=switch],.ac-select__trigger,.ac-seg";
+      for (const row of document.querySelectorAll(`${NAMED},[class*='-row'],[class*='__row']`)) {
+        if (!seen(row) || row.closest("svg")) continue;
+        const s = style(row);
+        if (!row.matches(NAMED)) {
+          const lined = SIDES.some((d) => parseFloat(s[`border${d}Width`]) > 0 && s[`border${d}Style`] !== "none");
+          if (!ROW.test(row.className) || !(lined || hasSurface(s))) continue;
+          if (![...row.querySelectorAll(HOLDS)].some(seen)) continue;
+        }
+        const b = row.getBoundingClientRect();
+        const card =
+          hasSurface(s) && parseFloat(s.borderTopLeftRadius) > 0 && parseFloat(s.borderBottomRightRadius) > 0;
+        if (b.height > 160 || card) continue;
+        let top = Infinity;
+        let bottom = -Infinity;
+        const add = (t, u) => {
+          top = Math.min(top, t);
+          bottom = Math.max(bottom, u);
+        };
+        const walk = (node) => {
+          for (const n of node.childNodes) {
+            if (n.nodeType === 3) {
+              const rects = n.textContent.trim() && seen(layoutParent(n)) ? textRects(n) : [];
+              if (!rects.length) continue;
+              // Its lines' box: their words' box and half the leading, or the box they lay out in when it fits them
+              // (a cell's padding is the row's room; a box stretched past its lines isn't).
+              const lead = (r) => Math.max(0, (lineHeightOf(n.parentElement) - r.height) / 2);
+              const first = rects[0];
+              const last = rects[rects.length - 1];
+              let lines = { top: first.top - lead(first), bottom: last.bottom + lead(last) };
+              let host = n.parentElement;
+              while (host !== row && ["inline", "contents"].includes(style(host).display)) host = host.parentElement;
+              if (host !== row) {
+                const hs = style(host);
+                const r = host.getBoundingClientRect();
+                const inner = {
+                  top: r.top + parseFloat(hs.borderTopWidth) + parseFloat(hs.paddingTop),
+                  bottom: r.bottom - parseFloat(hs.borderBottomWidth) - parseFloat(hs.paddingBottom),
+                };
+                if (Math.abs(inner.bottom - inner.top - (lines.bottom - lines.top)) <= 2) lines = inner;
+              }
+              const risen = n.parentElement.closest(".ac-captop");
+              const caps = risen && row.contains(risen) ? capsAt(n) : null;
+              add(caps ? caps.top : lines.top, lines.bottom);
+              continue;
+            }
+            if (n.nodeType !== 1) continue;
+            // A `display: contents` box has no box of its own: its children lay out in the row (a settings line's
+            // name and status in its phone grid).
+            if (style(n).display === "contents") {
+              walk(n);
+              continue;
+            }
+            if (!seen(n) || ["absolute", "fixed"].includes(style(n).position)) continue;
+            // An ⓘ in a line of words counts by its glyph: its 24px target has no plate to see.
+            if (n.matches(".ac-hint")) {
+              walk(n);
+              continue;
+            }
+            // A plate or a control as tall as the row (its whole row a button) holds the row's content: look inside.
+            const full = n.getBoundingClientRect().height >= b.height - 1;
+            if ((n.matches(`${HOLDS},${FACE},svg`) || hasSurface(style(n))) && !full) {
+              const r = n.getBoundingClientRect();
+              add(r.top, r.bottom);
+              continue;
+            }
+            walk(n);
+          }
+        };
+        walk(row);
+        if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
+        const above = top - b.top - parseFloat(s.borderTopWidth);
+        const below = b.bottom - parseFloat(s.borderBottomWidth) - bottom;
+        if (Math.abs(above - below) > 1 || Math.min(above, below) < 7.5)
+          out.push({
+            rule: "rowpad",
+            node: row,
+            el: sig(row),
+            box: placeOf(row),
+            above: +above.toFixed(1),
+            below: +below.toFixed(1),
+          });
+      }
+    },
+    /** A select shows what it holds: words, a face or a mark, never an empty box (a value its options don't have). */
+    emptyselect(out) {
+      for (const el of document.querySelectorAll(".ac-select__trigger,[role=combobox][aria-haspopup=listbox]")) {
+        if (!seen(el) || el.matches("input,textarea")) continue;
+        const value = el.querySelector(".ac-select__value") ?? el;
+        const picture = [...value.querySelectorAll(`img,canvas,svg,${FACE}`)].some(
+          (p) => seen(p) && !p.matches("[class*='chev']") && !p.closest("[class*='chev']"),
+        );
+        if (!visibleText(value) && !picture) out.push({ rule: "emptyselect", node: el, el: sig(el), box: placeOf(el) });
+      }
+    },
+    /**
+     * From 761px, a page's toolbar on one row puts its search first and every other control at its end, packed: each
+     * the toolbar's gap from the next within 0.5px, the last on the toolbar's edge.
+     */
+    toolorder(out) {
+      if (innerWidth < 761) return;
+      for (const bar of document.querySelectorAll(".ac-toolbar:not([data-stack])")) {
+        const search = bar.querySelector(":scope > .ac-toolbar__search");
+        if (!seen(bar) || !search || !seen(search)) continue;
+        const tools = toolsOf(bar).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+        const base = { rule: "toolorder", box: sig(bar) };
+        if (tools[0] && !search.contains(tools[0])) {
+          out.push({ ...base, node: tools[0], el: sig(tools[0]), side: "first" });
+          continue;
+        }
+        const rest = tools.filter((t) => !search.contains(t));
+        const gap = parseFloat(style(bar).columnGap) || 0;
+        for (let i = 1; i < rest.length; i++) {
+          const px = rest[i].getBoundingClientRect().left - rest[i - 1].getBoundingClientRect().right;
+          if (Math.abs(px - gap) > 0.5)
+            out.push({ ...base, node: rest[i], el: sig(rest[i]), side: "gap", px: +px.toFixed(1) });
+        }
+        const last = rest[rest.length - 1];
+        if (last) {
+          const s = style(bar);
+          const edge = bar.getBoundingClientRect().right - parseFloat(s.borderRightWidth) - parseFloat(s.paddingRight);
+          const px = edge - last.getBoundingClientRect().right;
+          if (Math.abs(px) > 0.5) out.push({ ...base, node: last, el: sig(last), side: "end", px: +px.toFixed(1) });
+        }
+      }
+    },
+    /**
+     * A toolbar's controls by rows: a page's toolbar keeps one row from 761px, two at most once it stacks (under 761 or
+     * with `data-stack`), and no control sits alone on a row beside an empty stretch, unless it fills the row (a search,
+     * a stacked toolbar's control). From 761px a toolbar without a search wraps its chips, as a list of tags does.
+     */
+    toolrow(out) {
+      for (const bar of document.querySelectorAll(".ac-toolbar")) {
+        if (!seen(bar)) continue;
+        const rows = [];
+        for (const t of toolsOf(bar)) {
+          const r = t.getBoundingClientRect();
+          const row = rows.find((x) => Math.abs(x.top - r.top) <= 2);
+          if (row) row.items.push(t);
+          else rows.push({ top: r.top, items: [t] });
+        }
+        if (rows.length < 2) continue;
+        rows.sort((a, b) => a.top - b.top);
+        const base = { rule: "toolrow", box: sig(bar), rows: rows.length };
+        const stacked = bar.hasAttribute("data-stack") || innerWidth < 761;
+        const page = Boolean(bar.querySelector(":scope > .ac-toolbar__search"));
+        const second = rows[stacked ? 2 : 1]?.items[0];
+        if (second && (stacked || page)) out.push({ ...base, node: second, el: sig(second), side: "rows" });
+        for (const { items } of rows) {
+          const only = items.length === 1 ? items[0] : null;
+          if (!only) continue;
+          if (only.getBoundingClientRect().width >= 0.9 * bar.clientWidth || (!page && !stacked)) continue;
+          out.push({ ...base, node: only, el: sig(only), side: "alone" });
+        }
+      }
+    },
+    /**
+     * A picture taller than 1.25 lines leading two lines or more (an `.ac-faceline`, a face, a tile, a logo): the first
+     * line's capitals start at its top within 1px. A pill on that line (or ending the row on it, `.ac-captail`) doesn't
+     * rise: it never starts above the picture's top, and the name centres on it instead.
+     */
+    captop(out) {
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest("svg") || !isRow(style(row))) continue;
+        const nodes = flowNodes(row);
+        const pic = nodes[0];
+        if (pic?.nodeType !== 1 || pic.matches(`${CONTROL},a`)) continue;
+        const tile =
+          !pic.matches(PILL_LABEL) &&
+          hasSurface(style(pic)) &&
+          !visibleText(pic) &&
+          Math.abs(pic.getBoundingClientRect().width - pic.getBoundingClientRect().height) <= 1;
+        if (!pic.matches(FACE) && !pic.querySelector(":scope > img, :scope > canvas") && !tile) continue;
+        const text = nodes.slice(1).map(wordsOf).find(Boolean);
+        if (!text) continue;
+        const p = pic.getBoundingClientRect();
+        if (!row.matches(".ac-faceline") && p.height <= 1.25 * lineHeightOf(text.parentElement) + 0.5) continue;
+        const beside = [];
+        for (const node of nodes.slice(1)) {
+          if (node.nodeType === 3) {
+            beside.push(...textRects(node));
+            continue;
+          }
+          const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode())
+            if (n.textContent.trim() && seen(n.parentElement)) beside.push(...textRects(n));
+        }
+        if (lineCount(beside.filter((t) => t.left >= p.right - 1)) < 2) continue;
+        const line = textRects(text)[0];
+        const tail = [...row.querySelectorAll(":scope > .ac-captail")];
+        const pills = nodes
+          .slice(1)
+          .filter((n) => n.nodeType === 1)
+          .flatMap((n) => [...(n.matches(PILL_LABEL) ? [n] : []), ...n.querySelectorAll(PILL_LABEL)])
+          .filter(
+            (x) => seen(x) && (tail.some((c) => c.contains(x)) || (line && sameLine(x.getBoundingClientRect(), line))),
+          );
+        const base = { rule: "captop", node: pic, el: sig(pic), box: sig(row) };
+        if (pills.length) {
+          for (const x of pills) {
+            const px = x.getBoundingClientRect().top - p.top;
+            if (px < -0.5) out.push({ ...base, node: x, el: sig(x), part: "pill", px: +px.toFixed(1) });
+          }
+          continue;
+        }
+        const caps = capsAt(text);
+        if (caps && Math.abs(caps.top - p.top) > 1)
+          out.push({ ...base, part: "caps", px: +(caps.top - p.top).toFixed(1) });
+      }
+    },
+    /** A list's times (each row's `time`, `__time` or `.nt-tm` at its end) end on one right edge, within 0.5px. */
+    timeedge(out) {
+      const LIST = "ul,ol,.list-card,[role=list],[role=feed]";
+      const isTime = (el) => el.matches("time,.nt-tm") || /(^|\s)[\w-]+__time(\s|$)/.test(el.className);
+      for (const list of document.querySelectorAll(LIST)) {
+        if (!seen(list)) continue;
+        const ends = [];
+        for (const row of flow(list)) {
+          const r = row.getBoundingClientRect();
+          const times = [...row.querySelectorAll("*")].filter(
+            (t) => typeof t.className === "string" && isTime(t) && seen(t) && t.closest(LIST) === list,
+          );
+          const end = times
+            .map((t) => [t, t.getBoundingClientRect().right])
+            .filter(([, right]) => right > r.left + 0.6 * r.width)
+            .sort((a, b) => b[1] - a[1])[0];
+          if (end) ends.push(end);
+        }
+        if (ends.length < 2) continue;
+        const edge = Math.max(...ends.map(([, right]) => right));
+        for (const [t, right] of ends)
+          if (edge - right > 0.5)
+            out.push({ rule: "timeedge", node: t, el: sig(t), box: sig(list), px: +(edge - right).toFixed(1) });
+      }
+    },
+    /**
+     * What opens in a side pane (the side panel, an aside, a split's column) takes the pane's width: a box in it that
+     * holds the view's cards, sections or lists sets no px max-width, whether or not it binds at this width. The pane
+     * sizes its view: a split's column grows with the window, so a page's reading width that fits it at 1280 leaves the
+     * view short of the pane's edge at 1512. A conversation's own widths (its messages, its composer) are the chat's.
+     */
+    panefill(out) {
+      const PANE = "aside,.page-split > *";
+      const HOLDS = ":scope > :is(section,article,form,ul,ol,table,.ac-card)";
+      for (const pane of document.querySelectorAll(PANE)) {
+        if (!seen(pane)) continue;
+        for (const box of pane.querySelectorAll("*")) {
+          if (box.matches(PANE) || box.closest(".shell__main--chat") || box.parentElement.closest(PANE) !== pane)
+            continue;
+          const s = style(box);
+          if (!s.maxWidth.endsWith("px") || !/^(block|flex|grid|flow-root|list-item)$/.test(s.display)) continue;
+          if (!seen(box) || !box.querySelector(HOLDS)) continue;
+          out.push({ rule: "panefill", node: box, el: sig(box), box: sig(pane), maxWidth: s.maxWidth });
+        }
+      }
+    },
   };
 
   /**
@@ -1352,6 +1866,7 @@
       await document.fonts.ready;
     },
     detect() {
+      stackToolbars();
       seenOf = new Map();
       const out = [];
       for (const rule of Object.values(rules)) rule(out);
@@ -1362,6 +1877,7 @@
      * the screen laid out in two CSS orders, then the values of the ones that differ.
      */
     styles() {
+      stackToolbars();
       return rendered(() =>
         [...document.body.querySelectorAll("*")].map((el) => {
           const s = getComputedStyle(el);

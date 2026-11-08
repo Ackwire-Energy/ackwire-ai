@@ -19,6 +19,7 @@ import {
   GroupedRow,
   PersonAvatar,
   PixelOrbit,
+  SCREEN_X,
   Text,
   type ThemePreference,
   useTheme,
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 999, borderWidth: 3 },
   center: { textAlign: "center" },
-  groups: { paddingHorizontal: 16, paddingTop: 4 },
+  groups: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   gapBig: { height: 24 },
   working: { flexDirection: "row", alignItems: "center", gap: 4 },
   shrink: { flexShrink: 1, minWidth: 0 },

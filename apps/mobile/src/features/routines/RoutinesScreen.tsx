@@ -13,6 +13,7 @@ import {
   IconButton,
   LineIcon,
   ListRow,
+  SCREEN_X,
   SearchField,
   SectionHeader,
   SkeletonList,
@@ -259,8 +260,8 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1, minWidth: 0 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  search: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
-  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 14 },
+  search: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 10 },
+  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: SCREEN_X, paddingVertical: 14 },
   pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },
 });

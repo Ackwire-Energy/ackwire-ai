@@ -27,8 +27,8 @@ test("a grip is its row's height, so its dots share the row's middle", async () 
   expect(last(shipped, ".sidebar__grip", "top")).toBe("0");
   expect(last(shipped, ".sidebar__tool-grip", "top")).toBe("0");
   expect(last(shipped, ".sidebar__grip", "height")).toBe("28px");
-  expect(last(shipped, ".sidebar__block[data-section=tools]>.sidebar__grip", "height")).toBe("30px");
-  expect(last(shipped, ".sidebar:not([data-rail=true]) .sidebar__item", "min-height")).toBe("30px");
+  expect(last(shipped, ".sidebar__block[data-section=tools]>.sidebar__grip", "height")).toBe("32px");
+  expect(last(shipped, ".sidebar:not([data-rail=true]) .sidebar__item", "min-height")).toBe("32px");
   expect(last(shipped, ".sidebar__tool-grip", "bottom")).toBe("0");
   const touch = atRule(css, "@media (max-width: 760px), (pointer: coarse)");
   expect(last(touch, ".sidebar__block[data-section=tools]>.sidebar__grip", "height")).toBe("36px");

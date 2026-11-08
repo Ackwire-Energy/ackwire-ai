@@ -77,7 +77,14 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
   };
   return (
     <SettingsPage title={t("channelCategories.category")} {...(channel ? { subtitle: `#${channel.name}` } : {})}>
-      <GroupedHeader>{t("mobile.categories.where", { channel: channel?.name ?? "" })}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("mobile.categories.where", { channel: channel?.name ?? "" }) }),
+          text: t("mobile.categories.whereHelp"),
+        }}
+      >
+        {t("mobile.categories.where", { channel: channel?.name ?? "" })}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           label={t("channelCategories.noCategory")}
@@ -109,7 +116,6 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
           </GroupedList>
         </>
       ) : null}
-      <GroupedFooter>{t("mobile.categories.whereHelp")}</GroupedFooter>
       {channel ? (
         <>
           <GroupedHeader>{t("mobile.categories.order")}</GroupedHeader>

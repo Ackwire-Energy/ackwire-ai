@@ -88,11 +88,11 @@ export function RightHandSettingsSection() {
 function PlanLine({ kind, label, owner }: { kind: PlanKind; label?: string; owner?: string }) {
   const { t } = useTranslation();
   return (
-    <span className="rh-set__planline ac-iconline">
+    <>
       <BrainLogo kind={kind} size="xs" />
       <b>{label ?? t(`aiAccounts.connect.${kind}`)}</b>
-      {owner && <span className="muted">{t("rightHand.settings.planOwner", { owner })}</span>}
-    </span>
+      {owner && <span>{t("rightHand.settings.planOwner", { owner })}</span>}
+    </>
   );
 }
 
@@ -264,7 +264,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
             id="rh-name"
             icon="agent"
             label={t("rightHand.settings.name")}
-            help={t("rightHand.settings.nameHelp", { ...g, label })}
+            hint={t("rightHand.settings.nameHelp", { ...g, label })}
             control={
               <span className="rh-set__name">
                 <button
@@ -291,20 +291,18 @@ function RightHandForm({ agent }: { agent: Agent }) {
             id="rh-ai"
             icon="members"
             label={t("rightHand.settings.workspace")}
-            help={
-              <>
-                <span>{t(kind ? "rightHand.settings.planHelp" : "rightHand.settings.workspaceHelp", g)}</span>
-                {kind ? (
-                  <PlanLine kind={kind} label={signIn?.label} owner={ownerId !== me.user.id ? planOwner : undefined} />
-                ) : (
-                  key && (
-                    <span className="rh-set__planline ac-iconline">
-                      <ProviderLogo id={key.provider} size="sm" />
-                      <b>{key.label}</b>
-                    </span>
-                  )
-                )}
-              </>
+            hint={t(kind ? "rightHand.settings.planHelp" : "rightHand.settings.workspaceHelp", g)}
+            value={
+              kind ? (
+                <PlanLine kind={kind} label={signIn?.label} owner={ownerId !== me.user.id ? planOwner : undefined} />
+              ) : (
+                key && (
+                  <>
+                    <ProviderLogo id={key.provider} size="xs" />
+                    <b>{key.label}</b>
+                  </>
+                )
+              )
             }
             control={
               kind ? (
@@ -335,7 +333,8 @@ function RightHandForm({ agent }: { agent: Agent }) {
               id="rh-plan"
               icon="plug"
               label={t("rightHand.settings.workspacePlan")}
-              help={t(plans.length > 0 ? "rightHand.settings.workspacePlanHelp" : "rightHand.settings.noPlans", g)}
+              hint={plans.length > 0 ? t("rightHand.settings.workspacePlanHelp", g) : undefined}
+              status={plans.length > 0 ? undefined : t("rightHand.settings.noPlans", g)}
               control={
                 plans.length > 0 && (
                   <Select
@@ -367,7 +366,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
               id="rh-shares"
               icon={opened ? "audienceEveryone" : "audienceOwner"}
               label={t("aiAccounts.share.switch")}
-              help={
+              status={
                 <PlanTerms
                   line={t(
                     opened
@@ -396,7 +395,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
             id="rh-budget"
             icon="wallet"
             label={t("rightHand.settings.budget")}
-            help={t("rightHand.settings.budgetHelp", g)}
+            hint={t("rightHand.settings.budgetHelp", g)}
             control={
               <span className="rh-set__budget">
                 <AffixInput
@@ -488,7 +487,7 @@ function TeamWeekPref({ name }: { name: string }) {
       id="rh-team-week"
       icon="calendar"
       label={t(admin ? "teamWeek.settings.label" : "teamWeek.settings.dayLabel")}
-      help={t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
+      hint={t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
       control={
         <span className="rh-set__week">
           <TeamWeekSchedule

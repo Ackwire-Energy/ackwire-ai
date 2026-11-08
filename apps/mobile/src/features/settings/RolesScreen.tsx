@@ -290,8 +290,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
           <GroupedRow
             label={t("rolesPage.hoist")}
             labelLines={2}
-            sub={t("rolesPage.hoistDesc")}
-            subLines={2}
+            hint={{ name: t("common.about", { label: t("rolesPage.hoist") }), text: t("rolesPage.hoistDesc") }}
             toggle={role.hoist}
             disabled={Boolean(locked)}
             onPress={() => patch({ hoist: !role.hoist })}
@@ -746,7 +745,9 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
       action={{ label: t("common.save"), disabled: !ready, onPress: save }}
       locked={update.isPending}
     >
-      <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
+      <GroupedHeader hint={{ name: t("common.about", { label: t("rolesPage.name") }), text: t("rolesPage.nameDesc") }}>
+        {t("rolesPage.name")}
+      </GroupedHeader>
       <TextArea
         value={value}
         onChangeText={setDraft}
@@ -758,7 +759,6 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
         onSubmitEditing={save}
         accessibilityLabel={t("rolesPage.name")}
       />
-      <GroupedFooter>{t("rolesPage.nameDesc")}</GroupedFooter>
     </SettingsPage>
   );
 }

@@ -134,7 +134,14 @@ export function CorrectionDialog({
       >
         <Locked when={correct.isPending}>
           <DialogBody>
-            <Field label={t("channel.correctLabel")} id={`correct-${messageId}`} help={t("channel.correctHelp", g)}>
+            <Field
+              label={t("channel.correctLabel")}
+              id={`correct-${messageId}`}
+              hint={{
+                name: t("common.about", { label: t("channel.correctLabel") }),
+                text: t("channel.correctHelp", g),
+              }}
+            >
               <Textarea
                 rows={4}
                 value={text}

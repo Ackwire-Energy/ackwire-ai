@@ -100,11 +100,18 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
     },
     async callTool(name, args) {
       const res = (await client.callTool({ name, arguments: args })) as {
-        content?: { type: string; text?: string }[];
+        content?: { type: string; text?: string; resource?: { text?: unknown } }[];
         isError?: boolean;
         structuredContent?: unknown;
       };
-      const parts = (res.content ?? []).map((c) => (c.type === "text" ? (c.text ?? "") : `[${c.type}]`));
+      // GitHub's `get_file_contents` sends the file itself as an embedded resource next to a one-line text block.
+      const parts = (res.content ?? []).map((c) =>
+        c.type === "text"
+          ? (c.text ?? "")
+          : c.type === "resource" && typeof c.resource?.text === "string"
+            ? c.resource.text
+            : `[${c.type}]`,
+      );
       if (parts.length === 0 && res.structuredContent !== undefined) parts.push(JSON.stringify(res.structuredContent));
       return { content: parts.join("\n"), isError: res.isError === true };
     },

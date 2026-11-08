@@ -1034,10 +1034,10 @@ test("a Cursor sign-in on the phone: its own steps, or its API key when chosen, 
 });
 
 describe("Seus planos' rows", () => {
-  test("a list row has the same room at its top and bottom as at its sides", () => {
+  test("a list row keeps 14 above and below its words and a card's 16 at its sides", () => {
     const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
-    expect(row).toContain("padding: 14,");
-    expect(row).not.toContain("paddingVertical");
+    expect(row).toContain("paddingHorizontal: CARD_PAD,\n        paddingVertical: 14,");
+    expect(row).toContain("left: leading ? CARD_PAD + LEAD + 12 : CARD_PAD,");
   });
 });
 

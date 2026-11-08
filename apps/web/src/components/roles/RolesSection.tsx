@@ -52,6 +52,7 @@ import {
   ditherUrl,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   Locked,
   Menu,
@@ -650,10 +651,17 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
       <CardHeader id="role-look" icon="edit" title={t("rolesPage.lookTitle")} />
       <div className="roles-look">
         <div className="roles-look__row">
-          <label className="roles-look__text" htmlFor="role-name">
-            <b>{t("rolesPage.name")}</b>
-            <span>{base ? t("rolesPage.locked.everyone") : t("rolesPage.nameDesc")}</span>
-          </label>
+          <span className="roles-look__text">
+            <span className="ac-hintline">
+              <label htmlFor="role-name">
+                <b>{t("rolesPage.name")}</b>
+              </label>
+              {!base && (
+                <InfoHint name={t("common.about", { label: t("rolesPage.name") })}>{t("rolesPage.nameDesc")}</InfoHint>
+              )}
+            </span>
+            {base && <span className="roles-look__status">{t("rolesPage.locked.everyone")}</span>}
+          </span>
           <Input
             id="role-name"
             className="roles-look__name"
@@ -670,8 +678,10 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
         </div>
         <div className="roles-look__row">
           <span className="roles-look__text">
-            <b>{t("rolesPage.color")}</b>
-            <span>{t("rolesPage.colorDesc")}</span>
+            <span className="ac-hintline">
+              <b>{t("rolesPage.color")}</b>
+              <InfoHint name={t("common.about", { label: t("rolesPage.color") })}>{t("rolesPage.colorDesc")}</InfoHint>
+            </span>
           </span>
           <div className="roles-colors" role="radiogroup" aria-label={t("rolesPage.color")}>
             {data.colors.map((c) => (
@@ -693,8 +703,10 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
         {!base && (
           <div className="roles-look__row">
             <span className="roles-look__text">
-              <b>{t("rolesPage.icon")}</b>
-              <span>{t("rolesPage.iconDesc")}</span>
+              <span className="ac-hintline">
+                <b>{t("rolesPage.icon")}</b>
+                <InfoHint name={t("common.about", { label: t("rolesPage.icon") })}>{t("rolesPage.iconDesc")}</InfoHint>
+              </span>
             </span>
             <div className="roles-icons" role="radiogroup" aria-label={t("rolesPage.icon")}>
               {data.icons.map((n) => (
@@ -717,10 +729,16 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
         )}
         {!base && (
           <div className="roles-look__row roles-look__row--switch">
-            <label className="roles-look__text" htmlFor="role-hoist">
-              <b>{t("rolesPage.hoist")}</b>
-              <span>{t("rolesPage.hoistDesc")}</span>
-            </label>
+            <span className="roles-look__text">
+              <span className="ac-hintline">
+                <label htmlFor="role-hoist">
+                  <b>{t("rolesPage.hoist")}</b>
+                </label>
+                <InfoHint name={t("common.about", { label: t("rolesPage.hoist") })}>
+                  {t("rolesPage.hoistDesc")}
+                </InfoHint>
+              </span>
+            </span>
             <Switch
               id="role-hoist"
               checked={role.hoist}

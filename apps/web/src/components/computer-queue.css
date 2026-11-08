@@ -46,7 +46,7 @@ html:not([data-pointer]) .cq-link:focus-visible {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px 12px;
-  margin: 0 0 4px;
+  margin: 0 0 8px;
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
@@ -88,12 +88,12 @@ html:not([data-pointer]) .cq__open:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* The rows' 8px padding bleeds past the group's edge: faces line up with the group title. */
+/* The group's title sits on the rows' outer edge, a highlighted row's plate included, as every group heading's. */
 .cq__rows {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 0 -8px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -120,8 +120,9 @@ html:not([data-pointer]) .cq__open:focus-visible {
 }
 .cq__l1 {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 0 6px;
   align-self: stretch;
   min-width: 0;
   font-size: 14px;

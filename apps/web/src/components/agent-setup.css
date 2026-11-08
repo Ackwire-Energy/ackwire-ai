@@ -64,7 +64,7 @@
 /* One step, a MediaRow (the kit's `.ac-mediarow`): its icon (a check once done) in the face's place, what it is on the
    name's line with its button at the end, what the agent says of it under them. */
 .setup-row {
-  padding: 12px 16px;
+  padding: var(--row-py) 16px;
   border-top: 1px solid var(--line);
 }
 .setup-row > .ac-mediarow__face > .ac-icon {

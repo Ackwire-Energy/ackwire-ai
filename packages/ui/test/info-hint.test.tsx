@@ -234,7 +234,7 @@ describe("hints on fields and cards", () => {
       <Field
         label="Fuso horário"
         id="tz"
-        help="Muda para todo o workspace."
+        example="Muda para todo o workspace."
         hint={{ name: "Sobre Fuso horário", text: TEXT }}
       >
         <Input />

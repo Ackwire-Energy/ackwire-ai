@@ -109,7 +109,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 10px 14px;
+  padding: var(--row-py) 14px;
   font-size: 14px;
   line-height: 20px;
 }

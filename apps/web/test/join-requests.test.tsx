@@ -698,7 +698,7 @@ describe("Members › Esperando você", () => {
     setSystemTime(MIDDAY);
     const { state } = await members("", { joinRequests: [...requests(), suggestion()] });
     const section = screen().getByRole("region", { name: "Esperando você" });
-    expect(section.querySelector(".members-head .ac-countchip")?.textContent).toBe("3");
+    expect(section.querySelector(".ac-grouphead__count")?.textContent).toBe("3");
     const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
     expect(ana.querySelector(".members-row__name")?.textContent).toBe("Ana Souza");
     expect(ana.textContent).toContain("ana@estudio.com");

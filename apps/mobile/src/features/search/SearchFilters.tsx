@@ -27,9 +27,11 @@ import {
   Filters,
   Icon,
   PressScale,
+  SCREEN_X,
   SectionHeader,
   SkeletonList,
   Text,
+  TOOL_H,
   useReducedMotion,
 } from "@/ui";
 import { router } from "@/ui/navigation";
@@ -372,11 +374,17 @@ export function FilteredResults({
 }
 
 const styles = StyleSheet.create({
-  chips: { gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 999 },
+  chips: { gap: 8, paddingHorizontal: SCREEN_X, paddingBottom: 8 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: TOOL_H,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+  },
   // The operator's empty state, at the headers' text column.
-  hint: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
-  // The section headers run edge to edge (their text at 20); the lists under them keep the 16-point margin.
+  hint: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 6 },
   res: { paddingTop: 2 },
   list: { paddingHorizontal: 16 },
   failed: { marginTop: 14, gap: 8 },
@@ -385,7 +393,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: SCREEN_X,
     paddingTop: 8,
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },

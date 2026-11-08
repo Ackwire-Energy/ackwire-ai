@@ -95,6 +95,8 @@ describe("the agent page's one entry: its status line", () => {
       standing: "hold",
     });
     expect(line(row)).toBe("Em pausa por enquanto");
+    // Its pause icon on the first line's capitals when the words wrap; a line with no icon is just its words.
+    expect(row?.querySelector(".cmp-entry__line")?.className).toBe("cmp-entry__line ac-iconline");
     cleanup();
     expect(line(await entryOf({ desktop: { available: true, reason: null, held: true } }))).toBe(
       "Em pausa por enquanto",
@@ -137,6 +139,8 @@ describe("the agent page's one entry: its status line", () => {
     expect(line(row)).toBe("Sem computador ainda");
     expect(within(row as HTMLElement).getByRole("button", { name: "Escolher um computador" })).toBeTruthy();
     cleanup();
-    expect(line(await entryOf())).toBe("Disponível · ninguém usando agora");
+    const free = await entryOf();
+    expect(line(free)).toBe("Disponível · ninguém usando agora");
+    expect(free?.querySelector(".cmp-entry__line")?.className).toBe("cmp-entry__line");
   });
 });

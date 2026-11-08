@@ -42,8 +42,12 @@ export interface FieldProps {
   label: ReactNode;
   /** Defaults to a generated id. The control picks it up automatically. */
   id?: string;
-  help?: ReactNode;
-  /** Shown instead of `help`; marks the control `aria-invalid`. */
+  /**
+   * Under the control only a format example ("ex.: https://acme.com/webhook") or a line that must stay in sight while
+   * it is filled in. What the field is for goes behind the ⓘ (`hint`).
+   */
+  example?: ReactNode;
+  /** Shown instead of `example`; marks the control `aria-invalid`. */
   error?: ReactNode;
   /** Something next to the label (e.g. "Esqueci minha senha"). */
   labelAside?: ReactNode;
@@ -56,14 +60,14 @@ export interface FieldProps {
   children: ReactNode;
 }
 
-/** A form field: always-visible label, optional ⓘ hint, help or error, wired to its control. */
-export function Field({ label, id, help, error, labelAside, hint, group, className, style, children }: FieldProps) {
+/** A form field: always-visible label, optional ⓘ hint, a format example or an error under it, wired to its control. */
+export function Field({ label, id, example, error, labelAside, hint, group, className, style, children }: FieldProps) {
   const generated = useId();
   const controlId = id ?? `f${generated.replace(/:/g, "")}`;
   const helpId = `${controlId}-help`;
   const hintId = `${controlId}-hint`;
   const showError = error !== undefined && error !== null && error !== false;
-  const showHelp = !showError && help !== undefined && help !== null && help !== false;
+  const showHelp = !showError && example !== undefined && example !== null && example !== false;
   const describedBy = [showError || showHelp ? helpId : "", hint ? hintId : ""].filter(Boolean).join(" ");
   const labelId = `${controlId}-label`;
   const labelOnly = group ? (
@@ -106,8 +110,8 @@ export function Field({ label, id, help, error, labelAside, hint, group, classNa
         )}
         {children}
         {showHelp && (
-          <span id={helpId} className="ac-field__help">
-            {help}
+          <span id={helpId} className="ac-field__example">
+            {example}
           </span>
         )}
         {showError && (

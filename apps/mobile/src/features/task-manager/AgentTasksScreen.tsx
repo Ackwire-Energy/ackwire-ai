@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { EmptyState, haptics, Icon, SkeletonList, Text, useReducedMotion } from "@/ui";
+import { EmptyState, haptics, Icon, SCREEN_X, SkeletonList, Text, useReducedMotion } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
@@ -247,7 +247,7 @@ function ActionRow({
 
 const styles = StyleSheet.create({
   // Under the large title's words, as the manager's line.
-  summary: { paddingHorizontal: 16, marginTop: -4, paddingBottom: 8 },
+  summary: { paddingHorizontal: SCREEN_X, marginTop: -4, paddingBottom: 8 },
   row: {
     flexDirection: "row",
     alignItems: "center",

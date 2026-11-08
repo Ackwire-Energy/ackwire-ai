@@ -61,7 +61,10 @@ export function ChannelAccessChoice({
       <Field
         label={t("newChannel.visibility")}
         id={`${idPrefix}-vis`}
-        help={t(`newChannel.${value.mode}Desc`)}
+        hint={{
+          name: t("common.about", { label: t("newChannel.visibility") }),
+          text: t(`newChannel.${value.mode}Desc`),
+        }}
         labelAside={
           value.mode === "roles" && (
             <button type="button" className="ac-link ac-link--muted small" onClick={() => setChoosing(true)}>
@@ -273,7 +276,7 @@ export function NewChannelDialog({
             <Field
               label={t("newChannel.name")}
               id="ch-name"
-              help={t("newChannel.nameHelp", { name: name || "canal" })}
+              example={t("newChannel.nameHelp", { name: name || "canal" })}
               error={
                 touched || (name && error === "taken")
                   ? error === "invalid"
@@ -298,7 +301,14 @@ export function NewChannelDialog({
                 placeholder={t("newChannel.topicPlaceholder")}
               />
             </Field>
-            <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
+            <Field
+              label={t("channelCategories.category")}
+              id="ch-category"
+              hint={{
+                name: t("common.about", { label: t("channelCategories.category") }),
+                text: t("channelCategories.categoryHelp"),
+              }}
+            >
               <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
             </Field>
             <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />

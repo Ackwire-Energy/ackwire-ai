@@ -18,10 +18,12 @@ import {
   CardHeader,
   Checkbox,
   DatePicker,
+  InfoHint,
   Select,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
+
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
@@ -99,7 +101,7 @@ export function ApprovalsSection() {
                 id="cover-when"
                 icon="clock"
                 label={t("approvalCover.when")}
-                help={t("approvalCover.whenHelp")}
+                hint={t("approvalCover.whenHelp")}
                 control={
                   <Select
                     value={cover.mode}
@@ -139,13 +141,12 @@ export function ApprovalsSection() {
                 id="cover-risky"
                 icon="alert"
                 label={t("approvalCover.risky")}
-                help={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
+                hint={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
                 control={
                   <Switch
                     checked={cover.risky}
                     onCheckedChange={(risky) => save({ risky })}
                     aria-label={t("approvalCover.risky")}
-                    aria-describedby="cover-risky-help"
                   />
                 }
               />
@@ -172,7 +173,7 @@ export function ApprovalsSection() {
                 id={`covering-${c.userId}`}
                 lead={face(c.userId)}
                 label={dir.memberById.get(c.userId)?.name ?? ""}
-                help={coveringLine(t, i18n.language, c)}
+                status={coveringLine(t, i18n.language, c)}
                 control={
                   <Button
                     size="sm"
@@ -193,22 +194,25 @@ export function ApprovalsSection() {
 
 const USD = 1_000_000_000;
 
-/** A row whose box is the choice: the box on the label's first line, its help under it. */
+/** A row whose box is the choice: the box, then the label with an ⓘ for what it does, or why it is off under it. */
 function CheckRow({
   id,
   label,
-  help,
+  hint,
+  status,
   checked,
   disabled,
   onChange,
 }: {
   id: string;
   label: string;
-  help: ReactNode;
+  hint?: ReactNode;
+  status?: ReactNode;
   checked: boolean;
   disabled?: boolean;
   onChange: (on: boolean) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="settings-row ac-actrow rh-check">
       <Checkbox
@@ -219,12 +223,21 @@ function CheckRow({
         aria-describedby={`${id}-help`}
       />
       <span className="settings-row__text ac-actrow__text">
-        <label className="settings-row__label" htmlFor={id}>
-          {label}
-        </label>
-        <span className="settings-row__help" id={`${id}-help`}>
-          {help}
+        <span className="ac-hintline">
+          <label className="settings-row__label" htmlFor={id}>
+            {label}
+          </label>
+          {hint && (
+            <InfoHint id={`${id}-help`} name={t("common.about", { label })}>
+              {hint}
+            </InfoHint>
+          )}
         </span>
+        {status && (
+          <span className="settings-row__status" id={`${id}-help`}>
+            {status}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -278,7 +291,8 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
           <CheckRow
             id="rh-new"
             label={t("rightHandApprovals.newAgents")}
-            help={t(view.mayDecide.newAgents ? "rightHandApprovals.newAgentsHelp" : "rightHandApprovals.cantDecide")}
+            hint={view.mayDecide.newAgents ? t("rightHandApprovals.newAgentsHelp") : undefined}
+            status={view.mayDecide.newAgents ? undefined : t("rightHandApprovals.cantDecide")}
             checked={view.newAgents && view.mayDecide.newAgents}
             disabled={!view.mayDecide.newAgents}
             onChange={(newAgents) => save({ newAgents })}
@@ -286,20 +300,21 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
           <CheckRow
             id="rh-changes"
             label={t("rightHandApprovals.agentChanges")}
-            help={t(
-              view.mayDecide.agentChanges ? "rightHandApprovals.agentChangesHelp" : "rightHandApprovals.cantDecide",
-            )}
+            hint={view.mayDecide.agentChanges ? t("rightHandApprovals.agentChangesHelp") : undefined}
+            status={view.mayDecide.agentChanges ? undefined : t("rightHandApprovals.cantDecide")}
             checked={view.agentChanges && view.mayDecide.agentChanges}
             disabled={!view.mayDecide.agentChanges}
             onChange={(agentChanges) => save({ agentChanges })}
           />
           <div className="settings-row ac-actrow">
             <span className="settings-row__text ac-actrow__text">
-              <label className="settings-row__label" htmlFor="rh-budget">
-                {t("rightHandApprovals.budget")}
-              </label>
-              <span className="settings-row__help" id="rh-budget-help">
-                {t("rightHandApprovals.budgetHelp")}
+              <span className="ac-hintline">
+                <label className="settings-row__label" htmlFor="rh-budget">
+                  {t("rightHandApprovals.budget")}
+                </label>
+                <InfoHint id="rh-budget-help" name={t("common.about", { label: t("rightHandApprovals.budget") })}>
+                  {t("rightHandApprovals.budgetHelp")}
+                </InfoHint>
               </span>
             </span>
             <span className="settings-row__end rh-money">
@@ -318,11 +333,16 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
           </div>
           <div className="settings-row ac-actrow rh-guidance">
             <span className="settings-row__text ac-actrow__text">
-              <label className="settings-row__label" htmlFor="rh-guidance">
-                {t("rightHandApprovals.guidanceLabel", { name })}
-              </label>
-              <span className="settings-row__help" id="rh-guidance-help">
-                {t("rightHandApprovals.guidanceHelp", { name })}
+              <span className="ac-hintline">
+                <label className="settings-row__label" htmlFor="rh-guidance">
+                  {t("rightHandApprovals.guidanceLabel", { name })}
+                </label>
+                <InfoHint
+                  id="rh-guidance-help"
+                  name={t("common.about", { label: t("rightHandApprovals.guidanceLabel", { name }) })}
+                >
+                  {t("rightHandApprovals.guidanceHelp", { name })}
+                </InfoHint>
               </span>
             </span>
             <Textarea

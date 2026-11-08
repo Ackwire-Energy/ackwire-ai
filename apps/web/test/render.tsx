@@ -17,7 +17,7 @@ import type { RouterContext } from "@/app/router-context";
 import type { AuthClient } from "@/auth/client";
 import { OrgProvider } from "@/components/org-context";
 import { forgetComposerDrafts } from "@/hooks/useComposerDraft";
-import { createI18n } from "@/i18n";
+import { createI18n, type LocaleCode, setLocale } from "@/i18n";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { createToastStore } from "@/lib/toast";
 import { RealtimeProvider } from "@/realtime/context";
@@ -52,6 +52,17 @@ export async function settle(times = 3) {
 }
 
 export const screen = () => within(document.body);
+
+/**
+ * The app in another language, as a person's pick shows it, the page's `lang` too: CI's geometry capture keeps a
+ * screen per language, so a test's worst case in German or Japanese is measured there.
+ */
+export async function showIn(services: { i18n: AppServices["i18n"] }, lang: LocaleCode) {
+  await act(async () => setLocale(lang, services.i18n));
+  await settle(4);
+  // Only words changed, which the capture doesn't watch for: it saves the screen in this language now.
+  (globalThis as { geometrySnapshot?: () => void }).geometrySnapshot?.();
+}
 
 /**
  * Elements matching `selector` are on screen once observed, as a browser's IntersectionObserver says (happy-dom's
@@ -145,6 +156,8 @@ export async function renderApp(
     forgetComposerDrafts();
     sessionStore.remove(STORAGE_KEYS.flowReturn);
   }
+  // Each app starts in its own language (pt-BR), whatever page language a test before it showed (`showIn`).
+  document.documentElement.lang = "";
   const sockets = fakeSockets();
   const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
   const router = createRouter({

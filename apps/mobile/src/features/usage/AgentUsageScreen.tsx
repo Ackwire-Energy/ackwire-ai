@@ -23,7 +23,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Icon, ProviderLogo, Text } from "@/ui";
+import { Icon, InfoHint, ProviderLogo, Text } from "@/ui";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Loaded, PushedHeader } from "../shared/parts";
@@ -134,10 +134,18 @@ function Month({ data, name, tones }: { data: AgentPlanUsage; name: string; tone
                 t,
               ),
             })}
-            {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0
-              ? ` ${t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}`
-              : ""}
           </Text>
+          {typeof data.equivalentUsd === "number" && data.equivalentUsd > 0 ? (
+            <InfoHint
+              name={t("common.about", { label: t("usageViews.apiPrice") })}
+              text={t("usageViews.apiPriceHint")}
+              variant="small"
+            >
+              <Text variant="small" tone="muted">
+                {t("usageViews.agent.equivalent", { amount: formatUsd(i18n.language, data.equivalentUsd) })}
+              </Text>
+            </InfoHint>
+          ) : null}
           <UsageDays
             days={columns}
             label={t("usageViews.agent.daysLabel", { month })}
@@ -272,7 +280,17 @@ function BySource({
                 <Text variant="callout" tone="ink" style={[styles.bold, styles.tabular]}>
                   {formatTokensShort(t, i18n.language, s.tokens)}
                 </Text>
-                {money ? (
+                {money && s.type !== "api" && typeof s.equivalentUsd === "number" ? (
+                  <InfoHint
+                    name={t("common.about", { label: t("usageViews.apiPrice") })}
+                    text={t("usageViews.apiPriceHint")}
+                    variant="small"
+                  >
+                    <Text variant="small" tone="muted" style={styles.tabular}>
+                      {money}
+                    </Text>
+                  </InfoHint>
+                ) : money ? (
                   <Text variant="small" tone="muted" style={styles.tabular}>
                     {money}
                   </Text>

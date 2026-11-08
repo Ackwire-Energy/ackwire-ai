@@ -44,7 +44,7 @@
 }
 .cmp-entry__line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
@@ -52,10 +52,10 @@
   color: var(--muted);
   font-size: 12.5px;
 }
+/* Its status wraps whole, as every value beside it does ("Não usa tela neste momento"). */
 .cmp-entry__line > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The dialog: up to 96vw × 94vh. Its words never end on a word alone. */
