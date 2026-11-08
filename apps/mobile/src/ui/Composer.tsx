@@ -130,9 +130,10 @@ const INSET = (FIELD - SEND) / 2;
 const HOLD_SEND_MS = 600;
 const RING = 44;
 const RING_PATH = (() => {
-  const path = Skia.Path.Make();
+  // Paths are immutable in this Skia: they are made with a builder.
+  const path = Skia.PathBuilder.Make();
   path.addCircle(RING / 2, RING / 2, RING / 2 - 2);
-  return path;
+  return path.build();
 })();
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
