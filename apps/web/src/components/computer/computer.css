@@ -27,7 +27,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  padding: var(--row-py) 14px;
+  padding: 12px 14px;
 }
 .cmp-entry__row > .ac-btn {
   align-self: center;
