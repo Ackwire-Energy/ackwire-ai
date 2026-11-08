@@ -287,6 +287,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       leading={leading}
       title={name}
       time={meta ?? (r.at ? when.short(r.at) : null)}
+      pinned={pinned}
       dot={fresh && badge === 0}
       over={
         // A closed thread isn't marked here: it goes to the end of its list, and screen readers hear it.

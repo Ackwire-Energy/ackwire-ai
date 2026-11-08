@@ -466,6 +466,12 @@ export const MessageRow = memo(function MessageRow({
           <Text variant="caption" tone="danger" style={onRight ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
+          {/* Why, as it came: a voice note that never left says what stopped it instead of waiting in silence. */}
+          {typeof meta?.sendError === "string" ? (
+            <Text variant="caption" tone="faint" numberOfLines={2} style={onRight ? styles.meStatus : undefined}>
+              {meta.sendError}
+            </Text>
+          ) : null}
         </Pressable>
       ) : null}
     </>

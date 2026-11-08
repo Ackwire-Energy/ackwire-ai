@@ -224,7 +224,8 @@ function Home() {
                 divider={i > 0}
                 live={shown && live++ < LIVE_ROWS}
                 agent={agentStates.get(r.key)}
-                pinned={i < (s.pinned ?? 0)}
+                // The pin mark only for what the person pinned, not day one's default (every agent they made).
+                pinned={pins.chosen && i < (s.pinned ?? 0)}
                 onHold={menus.openRowMenu}
                 holdLabel={t("sidebarPins.pin")}
                 holdActions={menus.rowActionsOf}
