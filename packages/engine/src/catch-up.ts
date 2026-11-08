@@ -1,6 +1,6 @@
-import { and, asc, desc, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, desc, type Executor, eq, gt, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
 import { ago } from "./context";
-import { cutText } from "./format";
+import { cutText, possessive } from "./format";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
 
@@ -50,33 +50,50 @@ export async function catchUpText(
   now = Date.now(),
 ): Promise<string> {
   const threadId = replyThreadOf(run);
-  const rows = await db
-    .select({
-      id: messages.id,
-      body: messages.body,
-      at: messages.createdAt,
-      agentId: messages.authorAgentId,
-      person: users.name,
-      agent: agents.name,
-    })
-    .from(messages)
-    .leftJoin(users, eq(users.id, messages.authorUserId))
-    .leftJoin(agents, eq(agents.id, messages.authorAgentId))
-    .where(
-      and(
-        eq(messages.orgId, run.orgId),
-        eq(messages.channelId, run.channelId),
-        threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
-        gt(messages.createdAt, trigger.createdAt),
-        sql`${messages.id} <> ${run.triggerMessageId}::uuid`,
-        sql`not (${messages.id} = any(${`{${run.pendingMessageIds.join(",")}}`}::uuid[]))`,
-        isNull(messages.deletedAt),
-        sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
-      ),
-    )
-    .orderBy(desc(messages.createdAt))
-    .limit(CATCH_UP_MESSAGES);
-  rows.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const askIds = [run.triggerMessageId, ...run.pendingMessageIds];
+  const read = (where: SQL | undefined) =>
+    db
+      .select({
+        id: messages.id,
+        body: messages.body,
+        at: messages.createdAt,
+        threadId: messages.threadId,
+        agentId: messages.authorAgentId,
+        person: users.name,
+        agent: agents.name,
+      })
+      .from(messages)
+      .leftJoin(users, eq(users.id, messages.authorUserId))
+      .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          eq(messages.channelId, run.channelId),
+          where,
+          gt(messages.createdAt, trigger.createdAt),
+          sql`not (${messages.id} = any(${`{${askIds.join(",")}}`}::uuid[]))`,
+          isNull(messages.deletedAt),
+          sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(CATCH_UP_MESSAGES);
+  // Beside its conversation, the threads under what it was asked: another agent may have answered there.
+  const [here, underAsks, askers] = await Promise.all([
+    read(threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId)),
+    read(inArray(messages.threadId, askIds)),
+    db
+      .select({ id: messages.id, name: users.name })
+      .from(messages)
+      .leftJoin(users, eq(users.id, messages.authorUserId))
+      .where(and(eq(messages.orgId, run.orgId), inArray(messages.id, askIds))),
+  ]);
+  const rows = [...here, ...underAsks].sort((a, b) => a.at.getTime() - b.at.getTime());
+  const askerOf = new Map(askers.map((a) => [a.id, a.name]));
+  const where = (r: (typeof rows)[number]) =>
+    r.threadId && r.threadId !== threadId
+      ? `, in the thread under ${possessive(askerOf.get(r.threadId) ?? "someone")} message`
+      : "";
   const from = (r: (typeof rows)[number]) => (r.agentId === run.agentId ? "You" : (r.person ?? r.agent ?? "Someone"));
   const counts = new Map<string, number>();
   for (const r of rows) counts.set(from(r), (counts.get(from(r)) ?? 0) + 1);
@@ -103,7 +120,7 @@ export async function catchUpText(
       `Since you paused: ${rows.length} message${rows.length === 1 ? "" : "s"} (${who}).`,
       ...(w.brief ? [w.brief] : []),
       "",
-      ...rows.map((r) => `[${from(r)}, ${ago(r.at, now)}]: ${cutText(stripSentinel(r.body), 600)}`),
+      ...rows.map((r) => `[${from(r)}, ${ago(r.at, now)}${where(r)}]: ${cutText(stripSentinel(r.body), 600)}`),
     );
   }
   return lines.join("\n");

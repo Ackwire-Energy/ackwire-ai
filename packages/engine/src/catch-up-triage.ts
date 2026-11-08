@@ -1,6 +1,6 @@
-import { and, desc, type Executor, eq, gt, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, gt, inArray, isNull, ne, type SQL, schema, sql } from "@agenteschat/db";
 import { ago } from "./context";
-import { cutText } from "./format";
+import { andList, cutText, possessive } from "./format";
 import type { Judge, JudgeAnswer, JudgeQuestion } from "./judge";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
@@ -79,8 +79,19 @@ export interface TriageSnapshot {
   askers: TriageAsker[];
   /** Something asked by an agent, an app or nobody known: not a person's ask, so there is no check. */
   notPeople: boolean;
-  /** Posted since the pause by anyone but this agent (its usage notes and notices left out), oldest first. */
-  posts: { id: string; key: string | null; kind: "person" | "agent" | "app"; from: string; text: string; at: Date }[];
+  /**
+   * Posted since the pause by anyone but this agent (its usage notes and notices left out), oldest first. `under`: a
+   * reply in the thread under that asker's ask.
+   */
+  posts: {
+    id: string;
+    key: string | null;
+    kind: "person" | "agent" | "app";
+    from: string;
+    text: string;
+    at: Date;
+    under?: string;
+  }[];
   reactions: { on: string; reaction: string; key: string; at: Date }[];
   task: { title: string; status: string; changedAt: Date | null; changedBy: string | null } | null;
   participants: Participant[];
@@ -140,8 +151,9 @@ const conversation = (run: Pick<AgentRun, "orgId" | "channelId" | "threadRootId"
 };
 
 /**
- * What the check reads, only from the run's conversation (what the agent itself would read next): the asks (its
- * trigger and the messages that joined it), what was posted after the trigger, reactions on the asks, and its task.
+ * What the check reads, only from the run's conversation (what the agent itself would read next) and the threads under
+ * its asks (another agent may have answered one there): the asks (its trigger and the messages that joined it), what
+ * was posted after the trigger, reactions on the asks, and its task.
  */
 export async function triageSnapshot(
   db: Executor,
@@ -154,6 +166,14 @@ export async function triageSnapshot(
   since: number,
 ): Promise<TriageSnapshot> {
   const askIds = [run.triggerMessageId, ...run.pendingMessageIds];
+  const news = and(
+    isNull(messages.deletedAt),
+    sql`not (${messages.id} = any(${`{${askIds.join(",")}}`}::uuid[]))`,
+    sql`${messages.authorAgentId} is distinct from ${run.agentId}::uuid`,
+    // A promise ("I'll answer when it resets") is no answer, nor is a notice.
+    sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
+    gt(messages.createdAt, trigger.createdAt),
+  );
   const author = {
     id: messages.id,
     body: messages.body,
@@ -165,31 +185,26 @@ export async function triageSnapshot(
     person: users.name,
     agent: agents.name,
   };
-  const [asked, posted, reacted, task] = await Promise.all([
+  const postedWhere = (where: SQL | undefined) =>
+    db
+      .select({ ...author, threadId: messages.threadId })
+      .from(messages)
+      .leftJoin(users, eq(users.id, messages.authorUserId))
+      .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+      .where(and(where, news))
+      .orderBy(desc(messages.createdAt))
+      .limit(STATE_MESSAGES);
+  const [asked, here, underAsks, reacted, task] = await Promise.all([
     db
       .select(author)
       .from(messages)
       .leftJoin(users, eq(users.id, messages.authorUserId))
       .leftJoin(agents, eq(agents.id, messages.authorAgentId))
       .where(and(eq(messages.orgId, run.orgId), inArray(messages.id, askIds), isNull(messages.deletedAt))),
-    db
-      .select(author)
-      .from(messages)
-      .leftJoin(users, eq(users.id, messages.authorUserId))
-      .leftJoin(agents, eq(agents.id, messages.authorAgentId))
-      .where(
-        and(
-          conversation(run),
-          isNull(messages.deletedAt),
-          sql`not (${messages.id} = any(${`{${askIds.join(",")}}`}::uuid[]))`,
-          sql`${messages.authorAgentId} is distinct from ${run.agentId}::uuid`,
-          // A promise ("I'll answer when it resets") is no answer, nor is a notice.
-          sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
-          gt(messages.createdAt, trigger.createdAt),
-        ),
-      )
-      .orderBy(desc(messages.createdAt))
-      .limit(STATE_MESSAGES),
+    postedWhere(conversation(run)),
+    postedWhere(
+      and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), inArray(messages.threadId, askIds)),
+    ),
     db
       .select({
         messageId: messageReactions.messageId,
@@ -242,12 +257,13 @@ export async function triageSnapshot(
     }
     a.asks.push({ text: m.body, at: m.at, editedSincePause: (m.editedAt?.getTime() ?? 0) > since });
   }
-  posted.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const posted = [...here, ...underAsks].sort((a, b) => a.at.getTime() - b.at.getTime());
   const posts = posted.map((m): TriageSnapshot["posts"][number] => {
     const kind = m.via || (!m.userId && !m.agentId) ? ("app" as const) : m.userId ? ("person" as const) : "agent";
     const from = m.person ?? m.agent ?? "App";
     const key = kind === "app" ? null : keyOf(kind, (m.userId ?? m.agentId) as string, from, m.at.getTime());
-    return { id: m.id, key, kind, from, text: m.body, at: m.at };
+    const asker = askers.find((a) => asked.some((x) => x.id === m.threadId && x.userId === a.userId));
+    return { id: m.id, key, kind, from, text: m.body, at: m.at, ...(asker ? { under: asker.key } : {}) };
   });
   const reactions = reacted.flatMap((r) => {
     const on = askers.find((a) => asked.some((m) => m.id === r.messageId && m.userId === a.userId));
@@ -385,6 +401,8 @@ export function triageState(s: TriageSnapshot, now = Date.now()) {
       from: p.from,
       ...(p.key ? { from_id: p.key } : {}),
       kind: p.kind,
+      // A reply in the thread under that asker's ask.
+      ...(p.under ? { in_thread_of: p.under } : {}),
       text: neutralizeUntrusted(cutText(stripSentinel(p.text), MESSAGE_CHARS)),
       ago: ago(p.at, now),
     })),
@@ -533,8 +551,6 @@ export function closedNoteOf(s: TriageSnapshot, v: TriageVerdict, now = Date.now
   };
 }
 
-const possessive = (name: string) => `${name}'s`;
-
 /**
  * The line the agent reads in its catch-up block, by code (Jev writes no text): reactions on the asks, its task, and
  * how the check came out per asker. Empty: nothing to add to the facts the block already lists.
@@ -560,13 +576,11 @@ export function triageBrief(s: TriageSnapshot, v: TriageVerdict | null): string 
           : `${possessive(a.name)} handled by ${name.get(a.who ?? "") ?? "someone"}`,
       );
     lines.push(
-      `A quick check judged ${list(open)} ask still open${handled.length ? ` and ${list(handled)}` : ""}. It can be wrong, so read below.`,
+      `A quick check judged ${andList(open)} ask still open${handled.length ? ` and ${andList(handled)}` : ""}. It can be wrong, so read below.`,
     );
   } else if (v?.outcome === "unsure") lines.push("A quick check couldn't tell whether this is still open.");
   return lines.join(" ");
 }
-
-const list = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
 /** The transcript's and the run step's record of a verdict (no names, no text: ids and numbers). */
 export const triageRecordOf = (
