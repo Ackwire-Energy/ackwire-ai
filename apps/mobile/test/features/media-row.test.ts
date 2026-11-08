@@ -14,8 +14,9 @@ describe("MediaRow", () => {
   test("the name and what it is share one line beside the face; the rest goes under at the row's full width", () => {
     const row = src("ui/MediaRow.tsx");
     // One Text holds the name and the meta, so they wrap as words, never as two columns.
+    // A quieter name (a step done or waiting) takes its tone at the text's own weight.
     expect(row).toMatch(
-      /<Text variant="subhead" style=\{\[styles\.words, \{ paddingTop: axis\.words \}\]\}>\s*<Text variant="subhead" style=\{styles\.name\}>/,
+      /<Text variant="subhead" style=\{\[styles\.words, \{ paddingTop: axis\.words \}\]\}>\s*<Text variant="subhead" tone=\{quiet\} style=\{quiet \? undefined : styles\.name\}>/,
     );
     // The children come after the head's View, not inside it: under the face, not beside it.
     const head = row.indexOf("<View style={[styles.head, { gap }]}>");
