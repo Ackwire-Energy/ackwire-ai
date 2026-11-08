@@ -1,10 +1,10 @@
 import { type ArchivedChannel, useArchivedChannels, useUnarchiveChannel } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Button, EmptyState, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";

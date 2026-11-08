@@ -1,5 +1,5 @@
-import { router } from "expo-router";
 import { serverUrl } from "@/lib/server";
+import { router } from "@/ui/navigation";
 import { openOwnPage } from "../ai/parts";
 import { appLinkFromUrl } from "./app-links";
 
