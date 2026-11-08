@@ -9,6 +9,15 @@ import { AgentFace } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 
+/**
+ * The work the line may show: a run marked waiting stays only when something of that agent really waits on me (my
+ * requests, missions and questions); otherwise it waits on someone else, or the flag outlived the decision.
+ */
+export function alongWork(work: readonly WorkItem[], waitingOnMe: readonly { agentId: string | null }[]): WorkItem[] {
+  const mine = new Set(waitingOnMe.map((w) => w.agentId).filter((id): id is string => Boolean(id)));
+  return work.filter((w) => !w.waiting || mine.has(w.agentId));
+}
+
 /** A plain answer is over before it's worth a line: a run shows once it has gone on this long. */
 export const ALONG_AFTER_MS = 45_000;
 

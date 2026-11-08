@@ -230,12 +230,16 @@ export function AgentWho({
   size?: number;
   lead?: boolean;
 }) {
-  const side = { marginLeft: lead ? 0 : Math.round(size * 0.2), marginRight: Math.round(size * 0.4) };
+  // A view inside a line of text sits on the baseline and iOS drops its margins, so the face touched the name: the
+  // room around it is text (a narrow space before, unless it opens the line, and after), and it is lowered to sit on
+  // the words' middle (its bottom on the baseline put it a little high next to lowercase text).
   return (
     <RNText style={whoStyles.who}>
-      <View style={[whoStyles.face, { width: size, height: size }, side]}>
+      {lead ? "" : NARROW}
+      <View style={{ width: size, height: size, transform: [{ translateY: Math.round(size * 0.2) }] }}>
         <AgentFace agentId={agentId} size={size} live={false} />
       </View>
+      {NARROW}
       {name}
     </RNText>
   );
@@ -263,8 +267,10 @@ export function withAgentFaces(
   );
 }
 
+/** A narrow no-break space: the gap between an inline face and its name, as text. */
+const NARROW = "\u202F";
+
 const whoStyles = StyleSheet.create({
   who: { fontWeight: "600" },
-  face: { transform: [{ translateY: 2 }] },
   pressed: { opacity: 0.6 },
 });
