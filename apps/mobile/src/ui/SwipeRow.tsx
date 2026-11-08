@@ -119,7 +119,11 @@ function Pane({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={action.label}
-        style={({ pressed }) => [styles.pane, !fill && { backgroundColor: action.color }, pressed ? { opacity: 0.6 } : null]}
+        style={({ pressed }) => [
+          styles.pane,
+          !fill && { backgroundColor: action.color },
+          pressed ? { opacity: 0.6 } : null,
+        ]}
       >
         <Animated.View style={[styles.in, grow]}>
           <Icon name={action.icon} size={20} color={action.ink} />

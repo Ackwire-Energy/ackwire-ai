@@ -96,12 +96,7 @@ export default function Scan() {
         onBack={() => router.back()}
       >
         {permission.canAskAgain ? (
-          <Button
-            variant="primary"
-            wide
-            label={t("mobile.auth.scan.allow")}
-            onPress={() => void requestPermission()}
-          />
+          <Button variant="primary" wide label={t("mobile.auth.scan.allow")} onPress={() => void requestPermission()} />
         ) : (
           <Button
             variant="primary"
@@ -205,7 +200,12 @@ function Corner({ tone, at }: { tone: string; at: "tl" | "tr" | "br" | "bl" }) {
   const top = at === "tl" || at === "tr";
   const left = at === "tl" || at === "bl";
   // The L sits in its corner of the target, its arms along the two edges that meet there.
-  const place: ViewStyle = { top: top ? 0 : undefined, bottom: top ? undefined : 0, left: left ? 0 : undefined, right: left ? undefined : 0 };
+  const place: ViewStyle = {
+    top: top ? 0 : undefined,
+    bottom: top ? undefined : 0,
+    left: left ? 0 : undefined,
+    right: left ? undefined : 0,
+  };
   return (
     <View style={[styles.corner, place]}>
       <View style={[styles.arm, place, { width: PX * 3, height: PX, backgroundColor: tone }]} />

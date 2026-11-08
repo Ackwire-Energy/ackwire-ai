@@ -1,15 +1,7 @@
 import { type DashboardSummary, dashboardGroups, useDashboards } from "@agenteschat/client";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import {
-  Button,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  IconButton,
-  SkeletonList,
-  Text,
-} from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, SkeletonList, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useOrgId, usePullRefresh } from "../shared/hooks";

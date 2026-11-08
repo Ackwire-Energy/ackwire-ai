@@ -98,8 +98,6 @@ export function TaskManagerScreen() {
 
 function TaskManager() {
   const { t } = useTranslation();
-  const c = useColors();
-  const dir = useDirectory();
   const look = useEmptyLook();
   const meId = useMeId();
   const tasks = useTasksToday();
@@ -349,14 +347,7 @@ function AgentGroup({
       {open
         ? group.tasks.map((task, i) => (
             <Animated.View key={task.runId} {...fade} layout={layout}>
-              <TaskRow
-                task={task}
-                state={rowState(task, stopping)}
-                flat={flat}
-                divider={i > 0}
-                now={now}
-                meId={meId}
-              />
+              <TaskRow task={task} state={rowState(task, stopping)} flat={flat} divider={i > 0} now={now} meId={meId} />
             </Animated.View>
           ))
         : null}

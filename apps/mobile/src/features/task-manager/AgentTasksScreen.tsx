@@ -1,4 +1,5 @@
 import type { ManagedTask } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   agentCardLine,
   helpersOf,
@@ -8,7 +9,6 @@ import {
   taskTitle,
   taskWaitGroups,
 } from "@agenteschat/client/lib/task-manager";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -44,7 +44,6 @@ export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Pla
 
 function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) {
   const { t } = useTranslation();
-  const c = useColors();
   const dir = useDirectory();
   const now = useNow(10_000);
   const { stopping, stop } = useStopper();
@@ -249,7 +248,14 @@ function ActionRow({
 const styles = StyleSheet.create({
   // Under the large title's words, as the manager's line.
   summary: { paddingHorizontal: 16, marginTop: -4, paddingBottom: 8 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 60, paddingVertical: 10, paddingHorizontal: 16 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 60,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
   divider: { position: "absolute", top: 0, left: 16, right: 0, height: StyleSheet.hairlineWidth },
   text: { flex: 1, minWidth: 0, gap: 2 },
   grow: { flex: 1, minWidth: 0 },

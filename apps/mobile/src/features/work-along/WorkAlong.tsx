@@ -18,9 +18,7 @@ export const ALONG_AFTER_MS = 45_000;
  * away with it, so a quick reply never makes it flash.
  */
 export function workAlong(work: readonly WorkItem[], now: number): { lead: WorkItem; others: number } | null {
-  const long = work.filter(
-    (w) => w.waiting || w.kind !== "run" || now - new Date(w.since).getTime() >= ALONG_AFTER_MS,
-  );
+  const long = work.filter((w) => w.waiting || w.kind !== "run" || now - new Date(w.since).getTime() >= ALONG_AFTER_MS);
   if (long.length === 0) return null;
   const waiting = long.filter((w) => w.waiting);
   const pool = waiting.length > 0 ? waiting : long;

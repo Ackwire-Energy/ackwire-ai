@@ -174,7 +174,10 @@ export function ShareScreen() {
                   <Preview shared={shared} />
                 </Animated.View>
                 <View
-                  style={[styles.field, { backgroundColor: colors.raised, boxShadow: `0px 0px 0px 0.5px ${colors.line2}` }]}
+                  style={[
+                    styles.field,
+                    { backgroundColor: colors.raised, boxShadow: `0px 0px 0px 0.5px ${colors.line2}` },
+                  ]}
                 >
                   <TextInput
                     value={line}
@@ -367,7 +370,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  more: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0, 0, 0, 0.45)", alignItems: "center", justifyContent: "center" },
+  more: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   moreText: { color: "#fff", fontVariant: ["tabular-nums"] },
   fileLine: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 24 },
   field: { flexDirection: "row", alignItems: "center", minHeight: 44, paddingHorizontal: 14, borderRadius: 14 },

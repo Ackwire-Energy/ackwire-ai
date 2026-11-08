@@ -209,6 +209,7 @@ export function Constellation({ map, selected, height, onSelect, explore = true,
     drawn.value = withDelay(180, withTiming(1, { duration: 900, easing: EASE_OUT }));
   }, [play, width, assemble, lit, drawn]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `selected` is the trigger: a new selection draws its links again
   useEffect(() => {
     if (!chosenOnce.current || reduced) {
       chosenOnce.current = true;
@@ -294,32 +295,32 @@ export function Constellation({ map, selected, height, onSelect, explore = true,
       <Dither kind="sky" tones={NIGHT_TONES} pixel={4} style={StyleSheet.absoluteFill} />
       {/* A still sky waits for its width: it is laid out over the window, never drawn as a square first. */}
       {still && !width ? null : (
-      <Animated.View style={[styles.world, { width: worldW, height: worldH }, world]}>
-        <Canvas style={{ width: worldW, height: worldH }} pointerEvents="none">
-          <Path path={art.dim} color={LINE} opacity={0.26} end={drawn} />
-          <Path path={art.hot} color={LINE} opacity={0.85} end={hotDrawn} />
-          {art.stars.map((g) => (
-            <Path key={g.key} path={g.path} color={g.color} opacity={lit} />
-          ))}
-          <Path path={art.ring} color="#ffffff" opacity={lit} />
-        </Canvas>
-        <Pulse links={recent} at={at} />
-        <Animated.View style={[StyleSheet.absoluteFill, spots]} pointerEvents="box-none">
-          {map.stars.map((s) => {
-            const p = at.get(s.id);
-            return p ? (
-              <StarSpot
-                key={s.id}
-                star={s}
-                at={p}
-                named={named.has(s.id)}
-                selected={s.id === selected}
-                onPress={choose}
-              />
-            ) : null;
-          })}
+        <Animated.View style={[styles.world, { width: worldW, height: worldH }, world]}>
+          <Canvas style={{ width: worldW, height: worldH }} pointerEvents="none">
+            <Path path={art.dim} color={LINE} opacity={0.26} end={drawn} />
+            <Path path={art.hot} color={LINE} opacity={0.85} end={hotDrawn} />
+            {art.stars.map((g) => (
+              <Path key={g.key} path={g.path} color={g.color} opacity={lit} />
+            ))}
+            <Path path={art.ring} color="#ffffff" opacity={lit} />
+          </Canvas>
+          <Pulse links={recent} at={at} />
+          <Animated.View style={[StyleSheet.absoluteFill, spots]} pointerEvents="box-none">
+            {map.stars.map((s) => {
+              const p = at.get(s.id);
+              return p ? (
+                <StarSpot
+                  key={s.id}
+                  star={s}
+                  at={p}
+                  named={named.has(s.id)}
+                  selected={s.id === selected}
+                  onPress={choose}
+                />
+              ) : null;
+            })}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
       )}
     </View>
   );

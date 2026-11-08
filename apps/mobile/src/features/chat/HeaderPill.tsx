@@ -123,8 +123,7 @@ export function HeaderPill({
   const words = Math.max(nameWidth ?? 0, subtitle ? lineWidth : 0);
   // Closed, the pill is a circle around its lead (no lead to close around: it stays open).
   const closed = collapsed && Boolean(lead);
-  const target =
-    nameWidth === null ? null : closed ? HEIGHT : Math.min(room, Math.max(MIN_WIDTH, chrome + words));
+  const target = nameWidth === null ? null : closed ? HEIGHT : Math.min(room, Math.max(MIN_WIDTH, chrome + words));
 
   // -1 until the words are measured: the first width is set, not sprung.
   const pillWidth = useSharedValue(-1);

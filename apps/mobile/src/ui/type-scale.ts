@@ -87,7 +87,11 @@ export const APP_TEXT_SCALE = { xs: 13 / 17, sm: 15 / 17, md: 1, lg: 19 / 17, xl
 export type AppTextSize = keyof typeof APP_TEXT_SCALE;
 
 /** A size and its line at `k`, in whole points, the line keeping the style's own ratio to its size. */
-export function scaleMetrics(fontSize: number, lineHeight: number, k: number): { fontSize: number; lineHeight: number } {
+export function scaleMetrics(
+  fontSize: number,
+  lineHeight: number,
+  k: number,
+): { fontSize: number; lineHeight: number } {
   if (k === 1) return { fontSize, lineHeight };
   const size = Math.round(fontSize * k);
   return { fontSize: size, lineHeight: Math.round((size * lineHeight) / fontSize) };

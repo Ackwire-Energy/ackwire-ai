@@ -86,7 +86,6 @@ export function ConnectorsScreen() {
 
 function Gallery() {
   const { t, i18n } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
   const { org } = useOrg();
   const sheet = useSheet();

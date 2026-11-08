@@ -498,7 +498,6 @@ function WorkingLine({ color, text }: { color: Parameters<typeof PixelOrbit>[0][
   );
 }
 
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   band: { overflow: "hidden" },

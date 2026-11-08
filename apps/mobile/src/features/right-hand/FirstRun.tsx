@@ -38,9 +38,8 @@ import {
   teamStatus,
 } from "@agenteschat/client/lib/team-plan";
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { useFailed } from "../routines/hooks";
 import { useTranslation } from "react-i18next";
+import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, type IconName } from "@/ui";
 import { router } from "@/ui/navigation";
@@ -49,6 +48,7 @@ import { openSetupStep } from "../agents/setup/SetupStepScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
 import { useOpenDm } from "../new/useOpenDm";
+import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { successHaptic, tapHaptic } from "../shared/parts";
 import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";

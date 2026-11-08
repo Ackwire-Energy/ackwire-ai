@@ -259,9 +259,7 @@ function OrgChart({
                     pressed && { backgroundColor: c.sunken },
                   ]}
                 >
-                  {i > 0 ? (
-                    <View style={[styles.nodeLine, stem, { left: depth * INDENT + AGENT + 8 }]} />
-                  ) : null}
+                  {i > 0 ? <View style={[styles.nodeLine, stem, { left: depth * INDENT + AGENT + 8 }]} /> : null}
                   <AgentFace agentId={a.id} size={AGENT} mode={a.busy ? "run" : "idle"} live={false} />
                   <View style={styles.grow}>
                     <Text variant="footnote" tone="ink" style={styles.semibold} numberOfLines={1}>

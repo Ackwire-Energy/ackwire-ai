@@ -6,8 +6,8 @@ import { StyleSheet, View } from "react-native";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { serverUrl } from "@/lib/server";
 import { Button, LineIcon, Text } from "@/ui";
-import { RETRY_EVERY_MS, RetryWick } from "../server/ServerDown";
 import { problemText } from "../server";
+import { RETRY_EVERY_MS, RetryWick } from "../server/ServerDown";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { useSurface } from "../shared/parts";
@@ -80,7 +80,9 @@ export function HomeServerError({ retry }: { retry: () => Promise<unknown> }) {
   const dir = useDirectory();
   // The right hand when the directory has it; the app's own agent before anything loaded.
   const rightHand = dir.agents.find((a) => a.builtin === "right_hand");
-  const look = rightHand ? { ...agentLook(rightHand), id: rightHand.id } : { color: "sky" as const, eyes: "round" as const, id: "agentes" };
+  const look = rightHand
+    ? { ...agentLook(rightHand), id: rightHand.id }
+    : { color: "sky" as const, eyes: "round" as const, id: "agentes" };
   return (
     <View style={styles.full} accessibilityLiveRegion="polite">
       <AgentAvatar agent={look} size={96} mode="sleep" framed={false} />

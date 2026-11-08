@@ -143,7 +143,12 @@ function Line({
       ),
     });
   }
-  const kept = new Set([...all].sort((a, b) => a.rank - b.rank).slice(0, MAX_ACTIONS).map((a) => a.key));
+  const kept = new Set(
+    [...all]
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, MAX_ACTIONS)
+      .map((a) => a.key),
+  );
   const actions = all.filter((a) => kept.has(a.key)).map((a) => a.node);
   return (
     <View

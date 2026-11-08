@@ -58,12 +58,7 @@ export function Arrive({
   const shown = useSharedValue(armed ? 0 : 1);
   useEffect(() => {
     if (!play) return;
-    shown.set(
-      withDelay(
-        reduced ? 0 : delay,
-        withTiming(1, { duration: reduced ? 200 : duration, easing: EASE_OUT }),
-      ),
-    );
+    shown.set(withDelay(reduced ? 0 : delay, withTiming(1, { duration: reduced ? 200 : duration, easing: EASE_OUT })));
   }, [play, delay, duration, reduced, shown]);
   const look = useAnimatedStyle(() => ({
     opacity: shown.get(),

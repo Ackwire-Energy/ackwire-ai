@@ -9,8 +9,8 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeInUp, useReducedMotion } from "react-native-reanimated";
 import { StickerCanvas } from "@/agent/StickerCanvas";
-import { WorkspaceSky } from "@/sky/Sky";
 import { useOrg } from "@/providers/org";
+import { WorkspaceSky } from "@/sky/Sky";
 import { Button, EventPillAction, EventPillText, type IconName, LineIcon, Text } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
@@ -61,14 +61,19 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
           horizon, so arriving reads as one moment, not a new screen (the face leads, the sky is decoration). */}
       {waveFrom !== undefined ? (
         <View style={styles.arrival} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Animated.View entering={reduced ? FadeIn.duration(200) : FadeIn.duration(400)} style={StyleSheet.absoluteFill}>
+          <Animated.View
+            entering={reduced ? FadeIn.duration(200) : FadeIn.duration(400)}
+            style={StyleSheet.absoluteFill}
+          >
             <WorkspaceSky fadeTop={0.35} fade={0.6} style={StyleSheet.absoluteFill} />
           </Animated.View>
           <Animated.View
             entering={
               reduced
                 ? FadeIn.duration(200)
-                : FadeInUp.duration(420).delay(120).easing(Easing.bezier(0.23, 1, 0.32, 1))
+                : FadeInUp.duration(420)
+                    .delay(120)
+                    .easing(Easing.bezier(0.23, 1, 0.32, 1))
             }
           >
             <AgentFace agentId={agent.id} size={72} framed={false} expression="happy" />
@@ -207,7 +212,15 @@ function IntroCard({
 const styles = StyleSheet.create({
   intro: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 6 },
   // The arrival's band: full width past the intro's margin, the face's feet on its lower third.
-  arrival: { height: 160, marginHorizontal: -16, marginTop: -16, marginBottom: 8, alignItems: "center", justifyContent: "flex-end", paddingBottom: 16 },
+  arrival: {
+    height: 160,
+    marginHorizontal: -16,
+    marginTop: -16,
+    marginBottom: 8,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 16,
+  },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   text: { gap: 8 },
   bold: { fontWeight: "600" },

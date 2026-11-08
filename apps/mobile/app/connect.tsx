@@ -2,11 +2,11 @@ import { checkServer, normalizeServer, type ServerCheck, serverHost } from "@age
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Quiet } from "@/features/auth/AuthFlow";
 import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl, signedInServers } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { useSession } from "@/providers/session";
-import { Quiet } from "@/features/auth/AuthFlow";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";

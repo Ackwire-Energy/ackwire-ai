@@ -243,17 +243,21 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       const steps = screenSteps(run?.work);
       body = (
         <>
-        <Cover
-          art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
-          text={t("agentComputer.state.offline", { computer })}
-          help={t("agentComputer.state.offlineHelpPlain", g)}
-          action={
-            offersSwitch(f, manages, Boolean(outage)) ? (
-              <DockText icon="swap" label={t("mobile.outage.switch")} onPress={() => openSwitchComputer(machine.id)} />
-            ) : null
-          }
-        />
-        {steps.length > 0 ? <LiveTrail steps={steps} color={agentLook(agent).color} now={now} /> : null}
+          <Cover
+            art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
+            text={t("agentComputer.state.offline", { computer })}
+            help={t("agentComputer.state.offlineHelpPlain", g)}
+            action={
+              offersSwitch(f, manages, Boolean(outage)) ? (
+                <DockText
+                  icon="swap"
+                  label={t("mobile.outage.switch")}
+                  onPress={() => openSwitchComputer(machine.id)}
+                />
+              ) : null
+            }
+          />
+          {steps.length > 0 ? <LiveTrail steps={steps} color={agentLook(agent).color} now={now} /> : null}
         </>
       );
     }

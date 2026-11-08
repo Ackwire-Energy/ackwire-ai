@@ -95,11 +95,7 @@ export function AuthScaffold({
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* The keyboard library's view: with its provider on, Android no longer resizes the window by itself. With the
           bar over the keyboard, the content keeps clear of it too. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={toolbar ? TOOLBAR : 0}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={toolbar ? TOOLBAR : 0}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="none"

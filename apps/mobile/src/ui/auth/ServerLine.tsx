@@ -36,7 +36,9 @@ export function AuthFootLine() {
       >
         {/* A team's host is cut in the middle (its end says which team); the action never. */}
         <Text variant="footnote" tone="faint" numberOfLines={1} ellipsizeMode="middle" style={styles.host}>
-          {onCloud ? `${t("mobile.auth.server.footTeam")} ` : `${t("mobile.auth.server.footOn", { host: serverHost(server) })} · `}
+          {onCloud
+            ? `${t("mobile.auth.server.footTeam")} `
+            : `${t("mobile.auth.server.footOn", { host: serverHost(server) })} · `}
         </Text>
         <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.bold}>
           {onCloud ? t("mobile.auth.server.footTeamAction") : t("mobile.auth.server.footSwitch")}

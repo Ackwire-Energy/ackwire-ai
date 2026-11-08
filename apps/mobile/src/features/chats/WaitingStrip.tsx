@@ -144,7 +144,11 @@ function WaitingPill({ item, count, onPress }: { item: WaitingItem; count: numbe
         {left && item.createdAt && item.expiresAt ? (
           <View style={styles.deadline}>
             <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} style={styles.fuse} />
-            <RNText numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.left, { color: c.amber }]}>
+            <RNText
+              numberOfLines={1}
+              maxFontSizeMultiplier={CHROME_MAX_SCALE}
+              style={[styles.left, { color: c.amber }]}
+            >
               {left}
             </RNText>
           </View>
@@ -209,7 +213,15 @@ function WaitingOpenCard({ item, rest, faces }: { item: WaitingItem; rest: numbe
 const styles = StyleSheet.create({
   // Full width with the list's 16pt sides inside, so the clip leaves room for the shadows.
   box: { overflow: "hidden" },
-  measure: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
+  measure: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
   pill: {
     borderRadius: 999,
     boxShadow: "inset 0px 1px 0px 0px rgba(255, 255, 255, 0.08), 0px 4px 12px -6px rgba(0, 0, 0, 0.35)",

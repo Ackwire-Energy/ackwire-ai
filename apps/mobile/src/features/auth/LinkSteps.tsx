@@ -423,7 +423,9 @@ export function LinkSteps({
       overlay={human.view}
       footer={step === "email" || step === "you" ? <InviteTerms /> : null}
       // The team you're asking to join, on the sky, on the first step; the code and "you" keep the app's agent.
-      hero={step === "email" && (preview.agents?.length ?? 0) > 0 ? <InviteCrew agents={preview.agents ?? []} /> : undefined}
+      hero={
+        step === "email" && (preview.agents?.length ?? 0) > 0 ? <InviteCrew agents={preview.agents ?? []} /> : undefined
+      }
     >
       {body}
     </AuthScaffold>

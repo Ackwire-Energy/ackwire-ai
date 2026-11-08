@@ -11,7 +11,12 @@ import {
   type TextStyle,
   View,
 } from "react-native";
-import { GestureDetector, useExclusiveGestures, useLongPressGesture, useTapGesture } from "react-native-gesture-handler";
+import {
+  GestureDetector,
+  useExclusiveGestures,
+  useLongPressGesture,
+  useTapGesture,
+} from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
   Easing,

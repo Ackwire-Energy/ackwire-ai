@@ -24,15 +24,7 @@ import { routineHref, widgetHref } from "../links/logic";
 import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
-import {
-  useColors,
-  useDirectory,
-  useMeId,
-  useNamesComputers,
-  useNow,
-  useOrgId,
-  usePullRefresh,
-} from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNamesComputers, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useRoutineMenu, useSay, useWhenText } from "./hooks";
@@ -112,7 +104,7 @@ function RoutineList() {
       row += 1;
       return (
         <Animated.View key={r.id} {...fade} layout={layout}>
-          <RoutineListRow routine={r} now={now} divider={i > 0} live={row <= LIVE_ROWS} />
+          <RoutineListRow routine={r} divider={i > 0} live={row <= LIVE_ROWS} />
         </Animated.View>
       );
     });
@@ -210,12 +202,10 @@ function RoutineList() {
  */
 const RoutineListRow = memo(function RoutineListRow({
   routine: r,
-  now,
   divider,
   live,
 }: {
   routine: Routine;
-  now: number;
   divider: boolean;
   live: boolean;
 }) {

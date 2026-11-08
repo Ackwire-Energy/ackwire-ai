@@ -1,12 +1,5 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
-import {
-  AccessibilityInfo,
-  BackHandler,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { AccessibilityInfo, BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { hintBack, hintClosed, hintOpened, hintTouched } from "./hints";
 import { Icon } from "./Icon";

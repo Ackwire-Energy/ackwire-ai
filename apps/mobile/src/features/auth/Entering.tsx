@@ -70,7 +70,12 @@ export function Entering({ org }: { org: string | null }) {
           {team.map((a, i) => (
             <Animated.View key={a.id} entering={arrive(i, reducedMotion)} style={styles.member}>
               {/* The first one at work: the team is busy, not posed. */}
-              <AgentAvatar agent={{ ...agentLook(a), id: a.id }} size={36} framed={false} mode={i === 0 ? "run" : "idle"} />
+              <AgentAvatar
+                agent={{ ...agentLook(a), id: a.id }}
+                size={36}
+                framed={false}
+                mode={i === 0 ? "run" : "idle"}
+              />
               <Text variant="caption" tone="ink2" numberOfLines={1} style={styles.name}>
                 {a.name}
               </Text>

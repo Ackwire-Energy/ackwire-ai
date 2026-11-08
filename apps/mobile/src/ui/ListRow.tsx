@@ -1,12 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  Platform,
-  Pressable,
-  type PressableProps,
-  StyleSheet,
-  type TextStyle,
-  View,
-} from "react-native";
+import { Platform, Pressable, type PressableProps, StyleSheet, type TextStyle, View } from "react-native";
 import { Icon } from "./Icon";
 import { Text, textLineOf } from "./Text";
 import { useFontScale } from "./text-scale";
@@ -116,7 +109,11 @@ export function ListRow({
           )}
           {time ? (
             <View style={[styles.time, { minHeight: titleLine }]}>
-              <Text variant={TIME_VARIANT} tone={unread ? "ink2" : "faint"} style={[LIST_TIME, unread && styles.unreadTime]}>
+              <Text
+                variant={TIME_VARIANT}
+                tone={unread ? "ink2" : "faint"}
+                style={[LIST_TIME, unread && styles.unreadTime]}
+              >
                 {time}
               </Text>
             </View>

@@ -54,19 +54,19 @@ export function ArchivedChannelsScreen() {
       {list.isSuccess && channels.length === 0 ? <EmptyState icon="archive" title={t("channel.archivedNone")} /> : null}
       {channels.length > 0 ? (
         <View style={styles.in}>
-        <GroupedList>
-          {channels.map((ch) => (
-            <GroupedRow
-              key={ch.id}
-              icon={ch.visibility === "private" ? "lock" : "hash"}
-              label={`#${ch.name}`}
-              labelLines={3}
-              sub={t("channel.archivedOn", { date: formatShortDate(i18n.language, ch.archivedAt) })}
-              disabled={restore.isPending}
-              onPress={() => ask(ch)}
-            />
-          ))}
-        </GroupedList>
+          <GroupedList>
+            {channels.map((ch) => (
+              <GroupedRow
+                key={ch.id}
+                icon={ch.visibility === "private" ? "lock" : "hash"}
+                label={`#${ch.name}`}
+                labelLines={3}
+                sub={t("channel.archivedOn", { date: formatShortDate(i18n.language, ch.archivedAt) })}
+                disabled={restore.isPending}
+                onPress={() => ask(ch)}
+              />
+            ))}
+          </GroupedList>
         </View>
       ) : null}
     </PushedLargeTitle>

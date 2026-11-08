@@ -21,9 +21,7 @@ export function filterMap(map: StarMap, filter: MapFilter): StarMap {
   const keep = new Set(
     map.stars
       .filter((s) =>
-        filter === "agent"
-          ? Boolean(s.agentId)
-          : (s.folder ?? "").split("/")[0] === filter.slice("folder:".length),
+        filter === "agent" ? Boolean(s.agentId) : (s.folder ?? "").split("/")[0] === filter.slice("folder:".length),
       )
       .map((s) => s.id),
   );

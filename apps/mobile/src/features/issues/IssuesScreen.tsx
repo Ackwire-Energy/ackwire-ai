@@ -4,7 +4,6 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  
   Platform,
   RefreshControl,
   ScrollView,
@@ -36,8 +35,8 @@ import { Face } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { FocusLive, PushedHeader } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { FocusLive, PushedHeader } from "../shared/parts";
 import { type BoardColumn, issueBoard, issueState, taskListSections } from "./logic";
 import { BoardCard, ColumnHeader, useColumnLabel } from "./parts";
 
@@ -100,7 +99,6 @@ function TaskList({
   onNew: () => void;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
   const meId = useMeId();
   const issues = useIssues(orgId);

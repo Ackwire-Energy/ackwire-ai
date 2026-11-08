@@ -206,7 +206,7 @@ export function ChannelHello({
         {starts.length > 0 ? (
           <View style={styles.starts}>
             {starts.map((s, i) => (
-              <Animated.View key={`${s.agent.id}:${i}`} style={startIn[i]}>
+              <Animated.View key={`${s.agent.id}:${s.words}`} style={startIn[i]}>
                 <Button
                   variant="secondary"
                   size="sm"

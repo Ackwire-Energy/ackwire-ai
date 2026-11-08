@@ -21,7 +21,11 @@ export function SkeletonRow({ name = 42, preview = 80 }: { name?: number; previe
   const pulse = usePulse();
   const bone = { backgroundColor: colors.sunken };
   return (
-    <Animated.View style={[styles.row, pulse]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Animated.View
+      style={[styles.row, pulse]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <View style={[styles.avatar, bone]} />
       <View style={styles.tx}>
         <View style={[styles.line, styles.name, bone, { width: `${name}%` }]} />
@@ -75,7 +79,14 @@ function usePulse() {
 
 const styles = StyleSheet.create({
   // The same box as `ListRow`: 16 at the sides, the 52 avatar, 12 to the text, 76 tall.
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 76 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 76,
+  },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, borderRadius: Math.round(LIST_AVATAR * 0.3) },
   tx: { flex: 1, minWidth: 0, gap: 8 },
   line: { borderRadius: 6 },

@@ -142,7 +142,10 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
 
   const words = useMemo(() => hasWords(message), [message]);
   // The speed as the language writes it ("1,5×" in Portuguese).
-  const speedFormat = useMemo(() => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }), [i18n.language]);
+  const speedFormat = useMemo(
+    () => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }),
+    [i18n.language],
+  );
   const more = words && !open && (message.body.length > ONE_LINE || message.body.includes("\n"));
   if (!voice) return null;
   return (

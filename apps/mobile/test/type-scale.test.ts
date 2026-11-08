@@ -175,4 +175,3 @@ describe("the person's text size, for the whole app", () => {
     expect(src("providers/AppProviders.tsx")).toContain("<TextScaleProvider size={textSizeOf(org?.chatPrefs)}>");
   });
 });
-

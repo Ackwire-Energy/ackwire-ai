@@ -176,7 +176,14 @@ const styles = StyleSheet.create({
   // At the screen's 16, as the lists and cards under it.
   head: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 },
   // Above the content's top edge: only a pull-down brings it into view (the system's wheel sits there too).
-  pullMark: { position: "absolute", left: 0, right: 0, height: PULL_MARK, alignItems: "center", justifyContent: "center" },
+  pullMark: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: PULL_MARK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });

@@ -100,7 +100,9 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
   if (right)
     return (
       <View style={[styles.me, { marginTop: top }]}>
-        <View style={[bubbled ? lookRows.bubble : styles.bubble, { backgroundColor: (bubbled && look.fill) || c.bubble }]}>
+        <View
+          style={[bubbled ? lookRows.bubble : styles.bubble, { backgroundColor: (bubbled && look.fill) || c.bubble }]}
+        >
           <View style={bubbled ? styles.bubbleLine : undefined}>
             {words}
             {bubbled ? <View style={styles.stamp}>{stampTime}</View> : null}
@@ -125,7 +127,11 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
     <Text
       variant="footnote"
       tone="ink2"
-      style={[styles.name, nameSize, bubbled && !line.mine ? { color: nameInk(SAMPLE_COLOR, scheme === "dark") } : null]}
+      style={[
+        styles.name,
+        nameSize,
+        bubbled && !line.mine ? { color: nameInk(SAMPLE_COLOR, scheme === "dark") } : null,
+      ]}
       maxFontSizeMultiplier={CHAT_TEXT_MAX_SCALE}
       numberOfLines={1}
     >
@@ -314,7 +320,9 @@ function StylePicker({
             >
               {names[s]}
             </Text>
-            <View style={[styles.check, on ? { backgroundColor: c.ink, borderColor: c.ink } : { borderColor: c.line2 }]}>
+            <View
+              style={[styles.check, on ? { backgroundColor: c.ink, borderColor: c.ink } : { borderColor: c.line2 }]}
+            >
               {on ? <Icon name="check" size={13} color={c.raised} /> : null}
             </View>
           </Pressable>

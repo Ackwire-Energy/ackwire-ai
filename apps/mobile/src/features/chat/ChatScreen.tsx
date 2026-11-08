@@ -144,14 +144,14 @@ import { AgentTasksButton, useDmAgentTasks } from "../task-manager/AgentTasksBut
 import { agentTasksHref, tasksBadge } from "../task-manager/logic";
 import { useVoiceComposer } from "../voice/useVoiceComposer";
 import { AgentReceiptLine } from "./AgentReceipts";
+import { AttachmentStrip, MAX_PENDING, type PendingFile } from "./AttachmentStrip";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
 import { AskBar, AskProbes, AskStoreProvider, useAskWatch, useAwayAsk } from "./asks";
-import { AttachmentStrip, MAX_PENDING, type PendingFile } from "./AttachmentStrip";
 import { ChannelHello } from "./ChannelHello";
-import { ChannelWelcome } from "./ChannelWelcome";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ChannelPicker } from "./ChannelPicker";
+import { ChannelWelcome } from "./ChannelWelcome";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
 import { DATE_PILL_IDLE_MS, DatePill } from "./DatePill";
@@ -190,6 +190,7 @@ import { PinnedLines, PinsSheet } from "./PinsSheet";
 import { QuoteBar } from "./QuoteLine";
 import { AgentLocked, UnavailableLines } from "./ReachLines";
 import { RowSight } from "./row-sight";
+import { SwipeReply } from "./SwipeReply";
 import {
   appendedKeys,
   type HeldRun,
@@ -217,7 +218,6 @@ import {
   ThreadOptions,
 } from "./sheets";
 import { StoppedRunsContext, stoppedRunsKey, stoppedRunsOf } from "./stopped-runs";
-import { SwipeReply } from "./SwipeReply";
 import { turnOrder, turnRuns, withOpacity } from "./turn";
 import { JumpToMessageContext } from "./WorkLine";
 
@@ -1160,8 +1160,7 @@ function Chat({
     name: a.fileName ?? (a.type === "video" ? "video.mp4" : "photo.jpg"),
     type: a.mimeType ?? (a.type === "video" ? "video/mp4" : "image/jpeg"),
   });
-  const openPlus = () =>
-    sheet.open(<PlusActions media={mediaTabs.length > 0} onPick={(p) => void onPlus(p)} />);
+  const openPlus = () => sheet.open(<PlusActions media={mediaTabs.length > 0} onPick={(p) => void onPlus(p)} />);
   const onPlus = async (pick: PlusPick) => {
     // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
     // iOS took them away with it and the app waited for an answer that never came. The GIFs' sheet takes its place
@@ -1936,19 +1935,11 @@ function Chat({
       quiet,
       meId,
       channelId,
-      isThread,
-      linkThreads,
-      onLongPress,
-      onRetry,
-      onQuote,
       isFresh,
       openBrowsers,
       toggleBrowser,
       bodyOf,
-      seenId,
-      seenBy,
       receiptId,
-      markAt,
       receipt,
       connectInline,
       onResend,
@@ -2411,15 +2402,9 @@ function Chat({
                           <AttachmentStrip
                             files={pending}
                             onRemove={removePending}
-                            onAdd={
-                              pending.length < MAX_PENDING
-                                ? openPlus
-                                : undefined
-                            }
+                            onAdd={pending.length < MAX_PENDING ? openPlus : undefined}
                           />
-                          {quote ? (
-                            <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} />
-                          ) : null}
+                          {quote ? <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} /> : null}
                         </>
                       ) : undefined
                     }

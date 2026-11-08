@@ -92,9 +92,9 @@ export function ChoiceHost() {
             </Text>
             <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
               <GroupedList>
-                {ask.options.map((o, i) => (
+                {ask.options.map((o) => (
                   <GroupedRow
-                    key={`${i}-${o.label}`}
+                    key={o.label}
                     label={o.label}
                     danger={Boolean(o.destructive)}
                     {...(o.checked !== undefined ? { checked: o.checked } : {})}

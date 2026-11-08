@@ -104,7 +104,9 @@ export function RecentSearches({
         action={{ label: t("searchPage.clearRecent"), onPress: onClear, chevron: false }}
       />
       <View style={styles.list}>
-        <ActionList items={recent.map((r) => ({ key: r, icon: "clock", label: r, oneLine: true, onPress: () => onPick(r) }))} />
+        <ActionList
+          items={recent.map((r) => ({ key: r, icon: "clock", label: r, oneLine: true, onPress: () => onPick(r) }))}
+        />
       </View>
     </View>
   );

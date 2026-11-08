@@ -77,7 +77,16 @@ export function Dither({
   const { pal, last } = paletteUniform(tones);
   const moving = animated && !reduced && !paused;
   const clock = useClock();
-  const base = { size: [size.width, size.height], px: pixel, last, fade, fadeTop, clear: clear ? 1 : 0, pal, ...(extra ?? {}) };
+  const base = {
+    size: [size.width, size.height],
+    px: pixel,
+    last,
+    fade,
+    fadeTop,
+    clear: clear ? 1 : 0,
+    pal,
+    ...(extra ?? {}),
+  };
   const uniforms = useDerivedValue(() => ({
     ...base,
     ...(liveWidth ? { size: [Math.max(1, liveWidth.value), size.height] } : {}),

@@ -224,46 +224,46 @@ export function ConnectAiSheet() {
             sheetTitle={t("connectAi.title.any")}
             onChrome={onChrome}
             agents={agents}
-          hasAi={hasAi}
-          {...(params.agentId ? { startAgentId: params.agentId } : {})}
-          {...(params.email ? { email: params.email } : {})}
-          locked={locked}
-          bare={bare}
-          onAccount={() => {
-            setAccountAdded(true);
-            void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
-            void qc.invalidateQueries({ queryKey: keys.brainMachines(orgId) });
-            answer();
-          }}
-          {...(one && one.ownerUserId !== meId && mayAddKey && !rightHand
-            ? { theirs: { id: one.id, name: one.name } }
-            : {})}
-          justReady={params.ready === "1"}
-          mayAddKey={mayAddKey}
-          keyForm={form}
-          keySaved={keySaved}
-          onSaveKey={() =>
-            void form.save().then(async (key) => {
-              if (!key) return;
-              // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
-              // own DM goes back to it.
-              if (one && rightHand) {
-                const moved = await rightHandOnKey(api, orgId, one, key, models.data?.models ?? []).then(
-                  () => true,
-                  (error) => {
-                    toast({ title: errorText(t, error), icon: "x" });
-                    return false;
-                  },
-                );
-                if (moved && key.check !== "unchecked")
-                  form.setSavedNote(thinksWithLine(t, "workspace", one.name, key.label));
-                void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-                void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, one.id) });
-              }
-              setKeySaved(true);
+            hasAi={hasAi}
+            {...(params.agentId ? { startAgentId: params.agentId } : {})}
+            {...(params.email ? { email: params.email } : {})}
+            locked={locked}
+            bare={bare}
+            onAccount={() => {
+              setAccountAdded(true);
+              void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+              void qc.invalidateQueries({ queryKey: keys.brainMachines(orgId) });
               answer();
-            })
-          }
+            }}
+            {...(one && one.ownerUserId !== meId && mayAddKey && !rightHand
+              ? { theirs: { id: one.id, name: one.name } }
+              : {})}
+            justReady={params.ready === "1"}
+            mayAddKey={mayAddKey}
+            keyForm={form}
+            keySaved={keySaved}
+            onSaveKey={() =>
+              void form.save().then(async (key) => {
+                if (!key) return;
+                // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
+                // own DM goes back to it.
+                if (one && rightHand) {
+                  const moved = await rightHandOnKey(api, orgId, one, key, models.data?.models ?? []).then(
+                    () => true,
+                    (error) => {
+                      toast({ title: errorText(t, error), icon: "x" });
+                      return false;
+                    },
+                  );
+                  if (moved && key.check !== "unchecked")
+                    form.setSavedNote(thinksWithLine(t, "workspace", one.name, key.label));
+                  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+                  void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, one.id) });
+                }
+                setKeySaved(true);
+                answer();
+              })
+            }
             // Computers live in the app: no site opens for one.
             onComputer={() => router.push("/computer-setup" as never)}
             onPlanDone={(id) => {

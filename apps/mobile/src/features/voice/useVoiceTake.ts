@@ -110,7 +110,10 @@ export function useVoiceTake(target: VoiceTarget) {
     [inner, edge],
   );
   /** The whole take over the width it has now (a paused take's field is laid out differently from a live one's). */
-  const wholeWave = useCallback(() => setWave(wavePaths(peaksOf(levels.current, 96), width.current, LIVE_WAVE)), [setWave]);
+  const wholeWave = useCallback(
+    () => setWave(wavePaths(peaksOf(levels.current, 96), width.current, LIVE_WAVE)),
+    [setWave],
+  );
 
   const refused = useCallback(
     (reason: VoiceRefusal) => {

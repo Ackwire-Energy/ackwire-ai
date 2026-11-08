@@ -3,7 +3,16 @@ import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent
 import { type NativeStackNavigationOptions, useIsFocused, useNavigation } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BackHandler, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
+import {
+  BackHandler,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  View,
+} from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";

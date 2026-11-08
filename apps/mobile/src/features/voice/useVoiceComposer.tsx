@@ -8,8 +8,8 @@ import { GestureDetector, useExclusiveGestures, usePanGesture, useTapGesture } f
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   type WithSpringConfig,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -221,20 +221,21 @@ export function useVoiceComposer(
   const left = secondsLeft(take.seconds * 1000);
   const clock = left !== null && !paused ? t("voice.left", { seconds: left }) : voiceClock(take.seconds * 1000);
 
-  const mic = locked || paused ? null : (
-    <GestureDetector gesture={press}>
-      <Animated.View
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={t("voice.holdToRecord")}
-        style={[styles.button, holding && { backgroundColor: c.ink }, micStyle]}
-      >
-        <View style={styles.center}>
-          <Icon name="mic" size={20} color={holding ? c.bg : c.muted} />
-        </View>
-      </Animated.View>
-    </GestureDetector>
-  );
+  const mic =
+    locked || paused ? null : (
+      <GestureDetector gesture={press}>
+        <Animated.View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={t("voice.holdToRecord")}
+          style={[styles.button, holding && { backgroundColor: c.ink }, micStyle]}
+        >
+          <View style={styles.center}>
+            <Icon name="mic" size={20} color={holding ? c.bg : c.muted} />
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    );
 
   const wave = (handle: boolean) => (
     <PixelWave
@@ -301,7 +302,12 @@ export function useVoiceComposer(
           <Face who={{ type: "agent", id: agent.id }} size={22} framed={false} mode="run" />
         </View>
       ) : null}
-      <Text variant="subhead" tone="muted" numberOfLines={1} style={[styles.time, left !== null && { color: c.danger }]}>
+      <Text
+        variant="subhead"
+        tone="muted"
+        numberOfLines={1}
+        style={[styles.time, left !== null && { color: c.danger }]}
+      >
         {clock}
       </Text>
       {waveBox}
@@ -328,8 +334,10 @@ export function useVoiceComposer(
     </>
   ) : paused ? (
     <>
-      {control(take.listening ? "pause" : "play", take.listening ? t("voice.stop") : t("voice.listen"), () =>
-        void take.listen(),
+      {control(
+        take.listening ? "pause" : "play",
+        take.listening ? t("voice.stop") : t("voice.listen"),
+        () => void take.listen(),
       )}
       <View style={styles.gapWide} />
       {waveBox}
@@ -343,7 +351,9 @@ export function useVoiceComposer(
   ) : null;
 
   const leading =
-    locked || paused ? { icon: "trash" as const, label: t("voice.delete"), onPress: () => void take.cancel(true) } : null;
+    locked || paused
+      ? { icon: "trash" as const, label: t("voice.delete"), onPress: () => void take.cancel(true) }
+      : null;
 
   const above = holding ? (
     <Animated.View style={[styles.hint, hintStyle]} pointerEvents="none">
@@ -409,7 +419,14 @@ const styles = StyleSheet.create({
   },
   capsuleInk: { flexShrink: 0 },
   // Starts where the field's text starts: the "+" (48), the gap (8) and the field's own inset (14).
-  hint: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 20, paddingLeft: LEAD + 8 + 14, paddingBottom: 8 },
+  hint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minHeight: 20,
+    paddingLeft: LEAD + 8 + 14,
+    paddingBottom: 8,
+  },
   chev: { transform: [{ rotate: "90deg" }] },
   line: { flexDirection: "row", alignItems: "center", gap: 8, paddingBottom: 8 },
   lineGlass: {

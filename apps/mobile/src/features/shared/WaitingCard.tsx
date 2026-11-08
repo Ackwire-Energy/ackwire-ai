@@ -70,7 +70,13 @@ export function WaitingCard({
     (action ? (
       <AskButtons
         primary={
-          <Button variant={action.variant ?? "primary"} size="card" wide label={action.label} onPress={action.onPress} />
+          <Button
+            variant={action.variant ?? "primary"}
+            size="card"
+            wide
+            label={action.label}
+            onPress={action.onPress}
+          />
         }
       />
     ) : null);

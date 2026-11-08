@@ -183,8 +183,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
       ? [
           {
             label: folder ? t("wiki.audience") : t("wiki.audienceRootTitle"),
-            onPress: () =>
-              router.push({ pathname: "/wiki-audience", params: folder ? { folder } : { root: "1" } }),
+            onPress: () => router.push({ pathname: "/wiki-audience", params: folder ? { folder } : { root: "1" } }),
           },
         ]
       : []),
@@ -273,9 +272,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
               title={chosen.size ? t("wiki.bulk.selected", { count: chosen.size }) : t("wiki.bulk.select")}
               count={choosable.length}
             />
-            <Locked when={bulkDelete.pending}>
-              {choosable.map((p, i) => pageRow(p, i, p.folder || byLine(p)))}
-            </Locked>
+            <Locked when={bulkDelete.pending}>{choosable.map((p, i) => pageRow(p, i, p.folder || byLine(p)))}</Locked>
           </>
         ) : search ? (
           found.length === 0 ? (
@@ -654,8 +651,7 @@ function WikiPage({ slug }: { slug: string }) {
         .join(" · ")
     : "";
   // The band takes the writer's sky: an agent's color, the app's sky for a person.
-  const bandColor =
-    p?.updatedBy.type === "agent" ? agentLook(dir.anyAgent(p.updatedBy.id)).color : ("sky" as const);
+  const bandColor = p?.updatedBy.type === "agent" ? agentLook(dir.anyAgent(p.updatedBy.id)).color : ("sky" as const);
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader
@@ -824,7 +820,9 @@ function WikiPage({ slug }: { slug: string }) {
               <>
                 <SectionHeader title={t("mobile.wiki.usedBy")} />
                 <ListRow
-                  leading={<Face who={{ type: "agent", id: readers[0]?.agentId ?? null }} size={ROW_TILE} live={false} />}
+                  leading={
+                    <Face who={{ type: "agent", id: readers[0]?.agentId ?? null }} size={ROW_TILE} live={false} />
+                  }
                   title={readers.map((r) => dir.nameOf({ type: "agent", id: r.agentId })).join(", ")}
                   sub={t("mobile.wiki.readsWeek", { count: p.reads?.total ?? 0 })}
                   subLines={1}

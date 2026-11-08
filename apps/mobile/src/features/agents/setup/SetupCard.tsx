@@ -147,6 +147,12 @@ export function AgentSetupCard({
   const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
   const said = useDoneSay(ready, doneHere, (step) => t(`agentSetup.say.${step}`, agentGrammar(agent.name)));
 
+  // In the new agent's conversation its first card's steps arrive one after another, once per agent while the app
+  // runs: a first-time moment, never replayed when the conversation's list recycles the row or it opens again.
+  const [arrives] = useState(() => place === "dm" && !ARRIVED.has(agent.id));
+  useEffect(() => {
+    if (arrives) ARRIVED.add(agent.id);
+  }, [arrives, agent.id]);
   if (steps.length === 0 || (place === "profile" && all)) return null;
 
   const names = (list: typeof connectors) =>
@@ -198,12 +204,6 @@ export function AgentSetupCard({
 
   const title =
     place === "dm" ? (all ? t("agentSetup.ready", g) : t("agentSetup.title")) : t("agentSetup.titleProfile", g);
-  // In the new agent's conversation its first card's steps arrive one after another, once per agent while the app
-  // runs: a first-time moment, never replayed when the conversation's list recycles the row or it opens again.
-  const [arrives] = useState(() => place === "dm" && !ARRIVED.has(agent.id));
-  useEffect(() => {
-    if (arrives) ARRIVED.add(agent.id);
-  }, [arrives, agent.id]);
   return (
     <SetupCardView
       title={title}

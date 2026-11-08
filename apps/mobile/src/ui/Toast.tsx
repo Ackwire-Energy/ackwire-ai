@@ -2,13 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { AgentAvatar } from "@/agent/AgentAvatar";
@@ -192,7 +186,12 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
               hitSlop={10}
               style={({ pressed }) => [styles.action, pressed && styles.pressed]}
             >
-              <Text variant="subhead" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.actionText}>
+              <Text
+                variant="subhead"
+                numberOfLines={1}
+                maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                style={styles.actionText}
+              >
                 {item.action.label}
               </Text>
             </Pressable>

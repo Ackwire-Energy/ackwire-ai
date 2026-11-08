@@ -111,11 +111,7 @@ export function Button({
             ]}
           />
         ) : null}
-        {loading ? (
-          <ActivityIndicator size="small" color={textColor} />
-        ) : leading ? (
-          leading(textColor)
-        ) : null}
+        {loading ? <ActivityIndicator size="small" color={textColor} /> : leading ? leading(textColor) : null}
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}

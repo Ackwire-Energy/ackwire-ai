@@ -230,12 +230,7 @@ function Page({
         {line ? (
           <View style={styles.apart}>
             <GroupedList>
-              <GroupedRow
-                icon="laptop"
-                label={t("taskManager.queue.see")}
-                chevron
-                onPress={() => openQueue(line)}
-              />
+              <GroupedRow icon="laptop" label={t("taskManager.queue.see")} chevron onPress={() => openQueue(line)} />
             </GroupedList>
           </View>
         ) : null}

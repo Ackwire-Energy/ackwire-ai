@@ -37,7 +37,9 @@ test("Conversas asks the right hand from its own field under the greeting, never
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   const chats = src("chats/ChatsScreen.tsx");
   // Its face wakes as Conversas arrives after the splash (once per launch).
-  expect(chats).toContain("<RightHandAsk row={pinned.pin} onStart={startDm} faceMode={wake.mode} faceStyle={wake.style} />");
+  expect(chats).toContain(
+    "<RightHandAsk row={pinned.pin} onStart={startDm} faceMode={wake.mode} faceStyle={wake.style} />",
+  );
   expect(chats).toContain("after={ask}");
   expect(chats).not.toContain("kept: lead");
   expect(src("right-hand/Pin.tsx")).toContain('t("mobile.chat.messageTo", { name: row.with.name })');

@@ -42,7 +42,6 @@ export function PinnedLines({
   onPick: (pin: MessagePin) => void;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
   const c = useColors();
   const { list } = usePinsHere(channelId, threadId);
   if (list.length === 0) return null;

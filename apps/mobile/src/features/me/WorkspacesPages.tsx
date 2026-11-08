@@ -95,7 +95,13 @@ export function useOpenWorkspaceRow() {
  * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
  * page and the sheet.
  */
-export function WorkspaceGroups({ groups, onOpen }: { groups: ServerWorkspaces[]; onOpen: ReturnType<typeof useOpenWorkspaceRow> }) {
+export function WorkspaceGroups({
+  groups,
+  onOpen,
+}: {
+  groups: ServerWorkspaces[];
+  onOpen: ReturnType<typeof useOpenWorkspaceRow>;
+}) {
   const { t, i18n } = useTranslation();
   const org = useOrg();
   return (

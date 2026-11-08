@@ -182,11 +182,7 @@ export function AgentsScreen() {
         <FirstUse place="agentsForYou" acts={false} />
       ) : null}
       {showsManager ? (
-        <ManagerRow
-          working={working.length}
-          waiting={waiting.length}
-          onPress={() => router.push("/task-manager")}
-        />
+        <ManagerRow working={working.length} waiting={waiting.length} onPress={() => router.push("/task-manager")} />
       ) : null}
       {/* Equipe's org chart and channels (ADR 0148). */}
       {total > 0 ? <TeamEntry /> : null}
@@ -276,15 +272,7 @@ export function AgentsScreen() {
  * The task manager's row, fixed under the title: its tile, its name and how the team stands now ("1 trabalhando ·
  * 1 espera você"), a chevron since it opens a screen. The row highlights as the system's lists do.
  */
-function ManagerRow({
-  working,
-  waiting,
-  onPress,
-}: {
-  working: number;
-  waiting: number;
-  onPress: () => void;
-}) {
+function ManagerRow({ working, waiting, onPress }: { working: number; waiting: number; onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const line =
@@ -579,9 +567,7 @@ function useArrival(arriving: boolean, reduced: boolean) {
     if (!arriving) return;
     shown.set(0);
     shown.set(
-      reduced
-        ? withTiming(1, { duration: 200 })
-        : withDelay(120, withSpring(1, { duration: 520, dampingRatio: 0.72 })),
+      reduced ? withTiming(1, { duration: 200 }) : withDelay(120, withSpring(1, { duration: 520, dampingRatio: 0.72 })),
     );
   }, [arriving, reduced, shown]);
   return useAnimatedStyle(() => {

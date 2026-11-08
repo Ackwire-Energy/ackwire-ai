@@ -1,6 +1,6 @@
 import { knownErrorText } from "@agenteschat/client/lib/errors";
-import { webmailOf } from "@agenteschat/client/lib/text";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
+import { webmailOf } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
 
 /**

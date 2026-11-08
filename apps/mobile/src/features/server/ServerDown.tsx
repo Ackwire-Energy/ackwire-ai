@@ -145,7 +145,10 @@ export function ServerDownPanel({ down }: { down: ServerDown }) {
       />
       <View style={styles.links}>
         {back ? (
-          <AuthLink label={t("mobile.auth.server.backTo", { host: serverHost(back) })} onPress={() => void setServer(back)} />
+          <AuthLink
+            label={t("mobile.auth.server.backTo", { host: serverHost(back) })}
+            onPress={() => void setServer(back)}
+          />
         ) : null}
         <AuthLink label={t("mobile.auth.server.down.switchServer")} onPress={() => setSwitching(true)} />
         <AuthLink label={t("mobile.org.signOut")} onPress={() => void signOut()} />

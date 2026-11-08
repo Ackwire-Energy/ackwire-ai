@@ -25,8 +25,8 @@ import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstRunLine } from "./FirstRunLine";
-import { Arrive, useHomeEntrance, useWake } from "./HomeEntrance";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
+import { Arrive, useHomeEntrance, useWake } from "./HomeEntrance";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
 import { HomeWidgets } from "./HomeWidgets";
@@ -204,7 +204,12 @@ function Home() {
           <CollapsibleSection title={t("mobile.chats.section.agents")} count={0} collapsed={false} onToggle={() => {}}>
             <SkeletonList rows={4} />
           </CollapsibleSection>
-          <CollapsibleSection title={t("mobile.chats.section.channels")} count={0} collapsed={false} onToggle={() => {}}>
+          <CollapsibleSection
+            title={t("mobile.chats.section.channels")}
+            count={0}
+            collapsed={false}
+            onToggle={() => {}}
+          >
             <SkeletonList rows={2} />
           </CollapsibleSection>
         </>
@@ -230,7 +235,13 @@ function Home() {
             // Reativar) beside it, on panes; the row stays opaque over them (the hairline and the sky never show).
             const pin = menus.rowActionsOf(r).find((a) => a.key === "pin");
             if (!pin) return view;
-            const pinPane = { label: pin.label, icon: "pin" as const, color: c.agent, ink: c.onAgent, onAction: pin.run };
+            const pinPane = {
+              label: pin.label,
+              icon: "pin" as const,
+              color: c.agent,
+              ink: c.onAgent,
+              onAction: pin.run,
+            };
             const mutePane =
               r.kind === "channel"
                 ? {

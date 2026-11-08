@@ -99,7 +99,9 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
     // quiet Sair offers Sair and, after it, Apagar conta in red.
     const first = read("features/onboarding/OnboardingFlow.tsx");
     expect(first).not.toContain('label={t("deleteAccount.menu")}');
-    expect(first.indexOf('label: t("deleteAccount.menu")')).toBeGreaterThan(first.indexOf('label: t("mobile.org.signOut")'));
+    expect(first.indexOf('label: t("deleteAccount.menu")')).toBeGreaterThan(
+      first.indexOf('label: t("mobile.org.signOut")'),
+    );
     expect(first).toContain('openWebPath("/onboarding?account=delete")');
     expect(first).not.toContain("onboarding.deleteLink");
   });

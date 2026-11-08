@@ -5,8 +5,8 @@ import { Button, LargeTitleScreen, PULL_TINT, PullOrbit, SkeletonList } from "@/
 import { router } from "@/ui/navigation";
 import { usePullRefresh } from "../shared/hooks";
 import { useConversations } from "../shared/queries";
-import { useTabHeader } from "../shared/tabHeader";
 import { RetryLine, TeamSkyEmpty } from "../shared/TeamSkyEmpty";
+import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { CollapsibleSection, useCollapsedSections } from "./HomeSection";
 import { THREAD_SECTIONS, threadRows, threadSections } from "./logic";
@@ -39,10 +39,20 @@ export function ThreadsScreen() {
     >
       {list.loading ? (
         <>
-          <CollapsibleSection title={t("mobile.threads.section.missions")} count={0} collapsed={false} onToggle={() => {}}>
+          <CollapsibleSection
+            title={t("mobile.threads.section.missions")}
+            count={0}
+            collapsed={false}
+            onToggle={() => {}}
+          >
             <SkeletonList rows={2} />
           </CollapsibleSection>
-          <CollapsibleSection title={t("mobile.threads.section.threads")} count={0} collapsed={false} onToggle={() => {}}>
+          <CollapsibleSection
+            title={t("mobile.threads.section.threads")}
+            count={0}
+            collapsed={false}
+            onToggle={() => {}}
+          >
             <SkeletonList rows={3} />
           </CollapsibleSection>
         </>

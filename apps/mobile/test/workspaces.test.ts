@@ -114,7 +114,9 @@ describe("Workspaces", () => {
       false,
     );
     // Known but silent this time: its workspaces stay, faded.
-    expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).quiet).toBe(true);
+    expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).quiet).toBe(
+      true,
+    );
     expect(down.quiet).toBe(false);
   });
 

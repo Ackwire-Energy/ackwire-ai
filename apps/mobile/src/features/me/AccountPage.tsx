@@ -23,8 +23,8 @@ import {
   useToast,
 } from "@/ui";
 import { router } from "@/ui/navigation";
-import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { SheetHeader } from "../new/parts";
+import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { goBack, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import {
