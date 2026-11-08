@@ -293,6 +293,27 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A phone: the back and the actions keep the top row, and the faces, the title and its line take the row under it,
+   whole. Beside the back and three actions the line had 42px at 320 and cut its replies and time. */
+@media (max-width: 760px) {
+  .thread-head:has(> .thread-head__text) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  /* The break: a line of its own (so a row gap on each side), which keeps the faces with the title. */
+  .thread-head:has(> .thread-head__text)::after {
+    content: "";
+    order: 1;
+    flex-basis: 100%;
+  }
+  .thread-head > .thread-head__who,
+  .thread-head > .thread-head__text {
+    order: 2;
+  }
+  .thread-head > .thread-head__text + * {
+    margin-left: auto;
+  }
+}
 .thread-title__text,
 .thread-title__button {
   min-width: 0;
@@ -300,7 +321,9 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Capped at the title's width: a phone's title is a block, where the button wouldn't shrink and its "…" wouldn't show. */
 .thread-title__button {
+  max-width: 100%;
   margin: 0 -4px;
   padding: 0 4px;
   border: 0;

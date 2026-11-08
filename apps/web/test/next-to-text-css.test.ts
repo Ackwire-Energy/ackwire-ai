@@ -47,3 +47,16 @@ test("a thread floats over the window like a dialog, 10px in, over a scrim; a ph
   const slim = atRule(atRule(css, "@media (min-width: 861px)"), "@container thread-dock (max-width: 479px)");
   expect(last(slim, ".thread-head__meta>.thread-head__where", "display")).toBe("none");
 });
+
+test("on a phone a thread's head keeps its actions on top and gives the faces, the title and its line the row under them", async () => {
+  const css = await sheets();
+  const phone = atRule(css, "@media (max-width: 760px)");
+  expect(last(phone, ".thread-head:has(> .thread-head__text)", "flex-wrap")).toBe("wrap");
+  expect(last(phone, ".thread-head:has(> .thread-head__text)::after", "flex-basis")).toBe("100%");
+  expect(last(phone, ".thread-head:has(> .thread-head__text)::after", "order")).toBe("1");
+  for (const part of [".thread-head>.thread-head__who", ".thread-head>.thread-head__text"])
+    expect(last(phone, part, "order")).toBe("2");
+  expect(last(phone, ".thread-head>.thread-head__text+*", "margin-left")).toBe("auto");
+  // The title's own "…" where a phone makes the title a block, the editable title a button that wouldn't shrink.
+  expect(last(topLevel(css), ".thread-title__button", "max-width")).toBe("100%");
+});
