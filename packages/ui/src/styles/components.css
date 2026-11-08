@@ -543,6 +543,8 @@ html:not([data-pointer]) .ac-link:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
   text-wrap: pretty;
+  /* An address or a path breaks where it must instead of running past the form. */
+  overflow-wrap: anywhere;
 }
 /* A section's heading inside a picker's list (`PickerHeading`): its label, then what picking one means. */
 .ac-picker-head {
