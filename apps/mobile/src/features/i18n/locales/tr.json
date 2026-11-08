@@ -1596,6 +1596,11 @@
     "usedBy_one": "{{names}} kullanıyor",
     "usedBy_other": "{{names}} kullanıyor",
     "fromAgent": "Bir hizmet bağla",
+    "githubApp": {
+      "useApp": "agentes.chat uygulamasını kullan",
+      "useAccount": "Bir GitHub hesabı kullan",
+      "createInBrowser": "Tarayıcıda oluştur"
+    },
     "review": {
       "stepAbout": "Neler yapabilir",
       "saving": "Kaydediliyor…",

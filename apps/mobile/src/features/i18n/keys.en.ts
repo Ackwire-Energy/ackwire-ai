@@ -1598,6 +1598,13 @@ export const featureKeysEn = {
     usedBy_one: "{{names}} uses it",
     usedBy_other: "{{names}} use it",
     fromAgent: "Connect a service",
+    /** GitHub with the agentes.chat app (ADR 0153): the app first, an account as the other way. */
+    githubApp: {
+      useApp: "Use the agentes.chat app",
+      useAccount: "Use a GitHub account",
+      /** The server's owner makes the app on the web (GitHub's manifest flow needs the browser's session). */
+      createInBrowser: "Create in the browser",
+    },
     review: {
       stepAbout: "What it can do",
       saving: "Saving…",

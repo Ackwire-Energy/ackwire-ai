@@ -1596,6 +1596,11 @@
     "usedBy_one": "{{names}} nutzt es",
     "usedBy_other": "{{names}} nutzen es",
     "fromAgent": "Dienst verbinden",
+    "githubApp": {
+      "useApp": "agentes.chat-App nutzen",
+      "useAccount": "GitHub-Konto nutzen",
+      "createInBrowser": "Im Browser erstellen"
+    },
     "review": {
       "stepAbout": "Was es kann",
       "saving": "Wird gespeichert…",

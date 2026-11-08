@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import type { Connection, ConnectorDef, CustomServer } from "@agenteschat/client";
+import type { Connection, ConnectorDef, CustomServer, GitHubAppInfo, GitHubAppInstallation } from "@agenteschat/client";
 import { connectedItems, isMcpItem, itemName } from "@agenteschat/client/lib/connected";
+import {
+  appAccountsText,
+  githubAppPanel,
+  githubDisconnectNote,
+  installationReach,
+  removedText,
+  removeInstallationText,
+} from "@agenteschat/client/lib/github-app";
 import type { TFunction } from "i18next";
 import {
   accountActions,
@@ -12,6 +20,7 @@ import {
   doneFinishing,
   galleryTiles,
   iconUri,
+  installationIdOf,
   isFinishing,
   isHttpsUrl,
   markFinishing,
@@ -248,6 +257,31 @@ describe("the browser round trip", () => {
     expect(authAnswerOf("agenteschat://connectors/oauth?state=abc")).toBeNull();
   });
 
+  test("the agentes.chat GitHub app's install comes back with its installation, finished with the app's session", () => {
+    expect(authAnswerOf("agenteschat://connectors/oauth?state=abc&code=123&installation_id=42")).toEqual({
+      kind: "code",
+      state: "abc",
+      code: "123",
+      installationId: 42,
+    });
+    // Asked of the account's owner: no installation yet, said as news.
+    expect(authAnswerOf("agenteschat://connectors/oauth?error=requested")).toEqual({
+      kind: "error",
+      error: "requested",
+    });
+    // Only a whole positive number is an installation.
+    for (const bad of ["", "0", "-3", "4.5", "abc", "9007199254740993"]) {
+      expect(installationIdOf(bad)).toBeUndefined();
+      expect(authAnswerOf(`agenteschat://connectors/oauth?state=s&code=c&installation_id=${bad}`)).toEqual({
+        kind: "code",
+        state: "s",
+        code: "c",
+      });
+    }
+    expect(installationIdOf(undefined)).toBeUndefined();
+    expect(installationIdOf("7")).toBe(7);
+  });
+
   test("an authorization the sheet is finishing is left alone by the link route", () => {
     markFinishing("s1");
     expect(isFinishing("s1")).toBe(true);
@@ -297,5 +331,150 @@ describe("Ferramentas: what changed comes first, Salvar stays at hand", () => {
     // One helper for the web and the phone says what changed.
     expect(changes).toContain('from "@agenteschat/client/lib/tool-changes"');
     expect(changes).toContain('pathname: "/connectors/change"');
+  });
+});
+
+describe("GitHub through the agentes.chat app (ADR 0153), as the web shows it", () => {
+  const install = (login: string, over: Partial<GitHubAppInstallation> = {}): GitHubAppInstallation => ({
+    id: `i-${login}`,
+    installationId: login.length,
+    accountLogin: login,
+    accountType: "Organization",
+    repositorySelection: "all",
+    suspended: false,
+    manageUrl: `https://github.com/organizations/${login}/settings/installations/${login.length}`,
+    createdAt: "2026-11-01T12:00:00.000Z",
+    ...over,
+  });
+  const info = (over: Partial<GitHubAppInfo> = {}): GitHubAppInfo => ({
+    installable: true,
+    installations: [],
+    setup: null,
+    ownerCreates: false,
+    ...over,
+  });
+  const account = conn("github", { accountLabel: "acme" });
+  const appAlone = conn("github", { authType: "github_app", accountLabel: "acme" });
+
+  test("the group: install first or on another account, who agents are today, an account for the app alone", () => {
+    expect(githubAppPanel(undefined, true, account)).toBeNull();
+    // No app here and nothing installed: nothing to show, but an admin whose server owner can make one is told.
+    expect(githubAppPanel(info({ installable: false }), true, account)).toBeNull();
+    expect(githubAppPanel(info({ installable: false, ownerCreates: true }), false, account)).toBeNull();
+    expect(githubAppPanel(info({ installable: false, ownerCreates: true }), true, account)).toMatchObject({
+      ownerHint: true,
+      install: null,
+    });
+    // The owner gets the server's app instead of the hint.
+    const owner = info({
+      installable: false,
+      ownerCreates: true,
+      setup: { source: null, slug: null, htmlUrl: null, state: "off", canCreate: true },
+    });
+    expect(githubAppPanel(owner, true, account)).toBeNull();
+    expect(githubAppPanel(info(), true, account)).toEqual({
+      installations: [],
+      install: "first",
+      usingAccount: "acme",
+      connectAccount: false,
+      ownerHint: false,
+    });
+    const two = [install("acme"), install("octo-labs")];
+    expect(githubAppPanel(info({ installations: two }), true, appAlone)).toEqual({
+      installations: two,
+      install: "more",
+      usingAccount: null,
+      connectAccount: true,
+      ownerHint: false,
+    });
+    // Someone who can't manage connectors sees the accounts, never the buttons.
+    expect(githubAppPanel(info({ installations: two }), false, appAlone)).toMatchObject({
+      install: null,
+      connectAccount: false,
+    });
+  });
+
+  test("GitHub through the app alone has no sign-in to renew: only its name", () => {
+    const [github] = connectedItems([appAlone], [], [def("github")]);
+    expect(github?.viaGithubApp).toBe(true);
+    expect(accountActions(github as NonNullable<typeof github>)).toEqual(["rename"]);
+  });
+
+  test("its words in both languages: the state, the removal and what Desconectar does to the app", async () => {
+    for (const lng of ["pt-BR", "en"] as const) {
+      const tr = await translator(lng);
+      const said = {
+        reach: [
+          installationReach(tr, install("a")),
+          installationReach(tr, install("a", { repositorySelection: "selected" })),
+          installationReach(tr, install("a", { suspended: true })),
+        ],
+        remove: removeInstallationText(tr, "acme", false),
+        last: removeInstallationText(tr, "acme", true),
+        removed: [removedText(tr, "acme", true), removedText(tr, "acme", false)],
+        row: [
+          appAccountsText(tr, "acme"),
+          appAccountsText(tr, Array.from({ length: 12 }, (_, n) => `org-${n}`).join(", ")),
+        ],
+        appAlone: githubDisconnectNote(tr, { def: def("github"), viaGithubApp: true }, [install("acme")]),
+        account: githubDisconnectNote(tr, { def: def("github") }, [install("acme"), install("octo-labs")]),
+        none: githubDisconnectNote(tr, { def: def("github") }, []),
+        other: githubDisconnectNote(tr, { def: def("linear") }, [install("acme")]),
+      };
+      expect(said).toEqual(
+        lng === "pt-BR"
+          ? {
+              reach: ["Todos os repositórios", "Repositórios escolhidos", "Suspenso no GitHub"],
+              remove:
+                "O app agentes.chat é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
+              last: "O app agentes.chat é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele. É a última, então os agentes ficam sem GitHub até alguém instalar o app ou conectar uma conta.",
+              removed: [
+                "App removido de acme e desinstalado no GitHub.",
+                "App removido daqui, mas o GitHub não confirmou a desinstalação de acme. Desinstale lá.",
+              ],
+              row: ["Pelo app agentes.chat em acme", "Pelo app agentes.chat em org-0, org-1 e mais 10"],
+              appAlone: "O app agentes.chat também é desinstalado de acme no GitHub.",
+              account: "Os agentes continuam no GitHub pelo app agentes.chat em acme e octo-labs.",
+              none: null,
+              other: null,
+            }
+          : {
+              reach: ["All repositories", "Selected repositories", "Suspended on GitHub"],
+              remove:
+                "The agentes.chat app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it.",
+              last: "The agentes.chat app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it. It's the last one, so agents lose GitHub until someone installs the app or connects an account.",
+              removed: [
+                "App removed from acme and uninstalled on GitHub.",
+                "App removed here, but GitHub didn't confirm the uninstall from acme. Uninstall it there.",
+              ],
+              row: [
+                "Through the agentes.chat app on acme",
+                "Through the agentes.chat app on org-0, org-1, and 10 more",
+              ],
+              appAlone: "The agentes.chat app is also uninstalled from acme on GitHub.",
+              account: "Agents stay on GitHub through the agentes.chat app on acme and octo-labs.",
+              none: null,
+              other: null,
+            },
+      );
+    }
+  });
+
+  test("the sheet offers the app first and finishes its install itself; the link route finishes it with the app closed", async () => {
+    const read = (path: string) =>
+      Bun.file(new URL(`../../src/features/connectors/${path}`, import.meta.url).pathname).text();
+    const [sheet, back, app] = await Promise.all([
+      read("ConnectSheet.tsx"),
+      read("OAuthReturn.tsx"),
+      read("GitHubApp.tsx"),
+    ]);
+    expect(sheet).toContain("useInstallGitHubAppHere()");
+    expect(sheet.indexOf('t("githubApp.install")')).toBeLessThan(
+      sheet.indexOf('t("mobile.connectors.githubApp.useAccount")'),
+    );
+    expect(back).toContain("useCompleteGitHubApp(orgId)");
+    expect(back).toContain("installationIdOf(params.installation_id)");
+    // The server's own app is made in the browser, on Conectores of the web.
+    expect(app).toContain("/settings/connectors`)");
   });
 });

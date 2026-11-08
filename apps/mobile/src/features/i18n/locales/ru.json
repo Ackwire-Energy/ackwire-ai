@@ -1782,6 +1782,11 @@
     "usedBy_many": "Пользуются: {{names}}",
     "usedBy_other": "Пользуются: {{names}}",
     "fromAgent": "Подключить сервис",
+    "githubApp": {
+      "useApp": "Использовать приложение agentes.chat",
+      "useAccount": "Использовать аккаунт GitHub",
+      "createInBrowser": "Создать в браузере"
+    },
     "review": {
       "stepAbout": "Что он умеет",
       "saving": "Сохраняем…",

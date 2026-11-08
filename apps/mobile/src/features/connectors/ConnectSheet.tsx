@@ -12,6 +12,7 @@ import {
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
+  useGitHubApp,
   useGithubAccess,
   useStartOAuth,
 } from "@agenteschat/client";
@@ -54,8 +55,10 @@ import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { AgentLevelList, WaitTile } from "./Access";
 import { ConnectorIcon } from "./ConnectorIcon";
+import { useInstallGitHubAppHere } from "./GitHubApp";
 import { GithubOrgs } from "./GithubOrgs";
 import {
+  APP_RETURN_URL,
   type AuthAnswer,
   authAnswerOf,
   capabilityLines,
@@ -72,9 +75,6 @@ import { ADDRESS_STEPS, CATALOG_STEPS, firstStep, STEP_KEYS, type Step } from ".
 import { ReviewStep } from "./ToolReview";
 import { openTools } from "./ToolsScreen";
 
-/** Where the browser brings the answer back (APP_OAUTH_REDIRECT on the server). */
-const RETURN_URL = "agenteschat://connectors/oauth";
-
 /**
  * One service in a sheet over the gallery, in four steps as on the web: what agents could do there (what
  * always asks marked "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) →
@@ -82,7 +82,8 @@ const RETURN_URL = "agenteschat://connectors/oauth";
  * of their own; `item`: that connection, when the service is connected more than once; `start`, back from a
  * sign-in that finished elsewhere, with `fresh` saying it just connected). `mode` starts at connecting: `add`,
  * another account of the service (it goes on to its tools), or `reconnect`, a new sign-in for `item` (a toast
- * says it, and the sheet closes).
+ * says it, and the sheet closes). `account`: GitHub's sign-in alone, without the agentes.chat app first (GitHub
+ * through the app alone connecting an account).
  */
 export function ConnectSheet({
   def,
@@ -90,12 +91,14 @@ export function ConnectSheet({
   start,
   fresh = false,
   mode,
+  account = false,
 }: {
   def: ConnectorDef;
   item?: ConnectedItem;
   start?: Step;
   fresh?: boolean;
   mode?: "add" | "reconnect";
+  account?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -109,8 +112,9 @@ export function ConnectSheet({
   const existing =
     item ??
     connectionOf(def, connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]));
-  const [connectionId, setConnectionId] = useState<string | null>(mode ? null : (existing?.id ?? null));
-  const [step, setStep] = useState<Step>(() => (mode ? "connect" : firstStep(existing, admin, start)));
+  const connecting = Boolean(mode) || account;
+  const [connectionId, setConnectionId] = useState<string | null>(connecting ? null : (existing?.id ?? null));
+  const [step, setStep] = useState<Step>(() => (connecting ? "connect" : firstStep(existing, admin, start)));
   // Connected in this sheet: it says so on top of its tools (the list catching up must not take that away).
   const [justConnected, setJustConnected] = useState(fresh);
   const service = connectorName(t, def);
@@ -170,6 +174,7 @@ export function ConnectSheet({
           name={service}
           item={mode ? item : undefined}
           reconnect={mode === "reconnect"}
+          accountOnly={connecting}
           onConnected={(id) => {
             setConnectionId(id);
             setJustConnected(true);
@@ -410,7 +415,9 @@ function ConnectedNote({ name }: { name: string }) {
  * Connecting: sign in in the system browser (the server hands the answer back to the app, which finishes
  * with its own session) and/or paste a key. A catalog service that needs its server's address asks for it.
  * `item`: an account of a server by address (its address; `reconnect`: a new sign-in for it). A new account
- * goes on (`onConnected`); a new sign-in, or the same account again, ends with a toast (`onDone`).
+ * goes on (`onConnected`); a new sign-in, or the same account again, ends with a toast (`onDone`). GitHub, where
+ * the server has the agentes.chat app (ADR 0153), offers the app first and an account as the other way, unless
+ * `accountOnly` (a sign-in asked for as such).
  */
 function ConnectStep({
   def,
@@ -418,6 +425,7 @@ function ConnectStep({
   item,
   initialUrl,
   reconnect = false,
+  accountOnly = false,
   onConnected,
   onDone,
 }: {
@@ -427,6 +435,7 @@ function ConnectStep({
   /** The address already typed in (an agent's card in the chat). */
   initialUrl?: string;
   reconnect?: boolean;
+  accountOnly?: boolean;
   onConnected: (connectionId: string, name: string) => void;
   onDone: () => void;
 }) {
@@ -447,8 +456,12 @@ function ConnectStep({
   // Composio's page signs in: no key field of ours.
   const viaComposio = item ? item.viaComposio : def?.via === "composio";
   const connectionId = reconnect && item?.custom ? item.id : undefined;
-  const githubOrgs = reconnect && def?.id === "github" && !viaComposio;
+  const githubOrgs = reconnect && def?.id === "github" && !viaComposio && !item?.viaGithubApp;
   const access = useGithubAccess(orgId, githubOrgs);
+  const githubApp = useGitHubApp(orgId);
+  const installer = useInstallGitHubAppHere();
+  const appOffered = def?.id === "github" && !viaComposio && !accountOnly && githubApp.data?.installable === true;
+  const [via, setVia] = useState<"app" | "account">("app");
   const how = def ? connectHow(def) : "either";
   const [mode, setMode] = useState<"signIn" | "key">(how === "key" ? "key" : "signIn");
   const [url, setUrl] = useState(initialUrl ?? "");
@@ -458,7 +471,7 @@ function ConnectStep({
   );
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending;
+  const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending || installer.busy;
   const serverUrl = fixed ?? (def?.kind === "remote_mcp" ? def.serverUrl : url.trim());
   const shownName = name || serverUrl.replace(/^https:\/\//, "").split("/")[0] || "";
   const keyLabel = t("mobile.connectors.keyLabel", { name: shownName });
@@ -501,7 +514,7 @@ function ConnectStep({
     const state = stateOf(authorizeUrl);
     if (state) markFinishing(state);
     try {
-      const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, RETURN_URL);
+      const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, APP_RETURN_URL);
       if (result.type !== "success") return;
       const answer: AuthAnswer | null = authAnswerOf(result.url);
       if (!answer) return fail();
@@ -570,17 +583,54 @@ function ConnectStep({
     }
   };
 
+  const installApp = async () => {
+    setError(null);
+    const done = await installer.run();
+    if (done.installed) onDone();
+    else if (done.error) oops(done.error);
+  };
   const field = [styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
   const toEnter = () => {
     if (!isHttpsUrl(url.trim())) return oops(t("mobile.connectors.addressInvalid"));
     setError(null);
     setPhase("enter");
   };
+  if (appOffered && via === "app") {
+    return (
+      <>
+        <Text variant="small" tone="muted">
+          {t("connectFlow.github.appText")}
+        </Text>
+        <Button
+          variant="primary"
+          wide
+          label={busy ? t("mobile.connectors.working") : t("githubApp.install")}
+          disabled={busy}
+          onPress={() => void installApp()}
+        />
+        <Button
+          variant="text"
+          size="sm"
+          label={t("mobile.connectors.githubApp.useAccount")}
+          disabled={busy}
+          onPress={() => {
+            setError(null);
+            setVia("account");
+          }}
+        />
+        {error ? <Problem key={error} text={error} /> : null}
+      </>
+    );
+  }
   return (
     <>
       {viaComposio && def ? (
         <Text variant="small" tone="muted">
           {composioConnectText(t, def)}
+        </Text>
+      ) : appOffered ? (
+        <Text variant="small" tone="muted">
+          {t("connectFlow.github.accountText")}
         </Text>
       ) : null}
       {askUrl && phase === "address" ? (
@@ -699,6 +749,18 @@ function ConnectStep({
               label={mode === "signIn" ? t("mobile.connectors.useKey") : t("mobile.connectors.useSignIn")}
               disabled={busy}
               onPress={() => setMode(mode === "signIn" ? "key" : "signIn")}
+            />
+          ) : null}
+          {appOffered ? (
+            <Button
+              variant="text"
+              size="sm"
+              label={t("mobile.connectors.githubApp.useApp")}
+              disabled={busy}
+              onPress={() => {
+                setError(null);
+                setVia("app");
+              }}
             />
           ) : null}
           {error ? <Problem key={error} text={error} /> : null}

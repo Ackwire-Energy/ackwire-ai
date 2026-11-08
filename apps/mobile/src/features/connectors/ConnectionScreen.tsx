@@ -7,6 +7,7 @@ import {
   reconnectAddsText,
 } from "@agenteschat/client/lib/connected";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { appAccountsText } from "@agenteschat/client/lib/github-app";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
@@ -25,6 +26,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { AgentLevelList, DisconnectRow, WaitTile } from "./Access";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet } from "./ConnectSheet";
+import { GitHubAppGroup } from "./GitHubApp";
 import { accountActions } from "./logic";
 import { Problem } from "./Problem";
 import { openTools } from "./ToolsScreen";
@@ -37,7 +39,8 @@ export const openConnection = (id: string) => router.push(`/connectors/${id}`);
  * icon with the check, its name and account; who uses it and how far (one row per agent, the level as its value),
  * what always asks as that group's footer; its tools (what waits on you first, in amber, then all of them, a screen
  * of their own); the account itself (Renomear, Reconectar, another account of an MCP server, each in a sheet); and
- * Desconectar, alone in red, after a confirmation. Connecting a new service stays in its sheet.
+ * Desconectar, alone in red, after a confirmation. GitHub also lists its repositories through the agentes.chat app,
+ * under who uses it. Connecting a new service stays in its sheet.
  */
 export function ConnectionScreen({ id }: { id: string }) {
   return (
@@ -68,13 +71,15 @@ function Connection({ id }: { id: string }) {
   // The account when it says something the name doesn't (a server's host often is its name), else how it connects
   // through Composio (its address means nothing to people), else the category.
   const sub =
-    item?.account && item.account !== name
-      ? item.account
-      : item?.viaComposio
-        ? t("connectors.composio.via")
-        : item?.def
-          ? t(`connectors.category.${item.def.category}`)
-          : "";
+    item?.viaGithubApp && item.account
+      ? appAccountsText(t, item.account)
+      : item?.account && item.account !== name
+        ? item.account
+        : item?.viaComposio
+          ? t("connectors.composio.via")
+          : item?.def
+            ? t(`connectors.category.${item.def.category}`)
+            : "";
   const waiting = admin && item ? item.pending : 0;
 
   return (
@@ -117,6 +122,15 @@ function Connection({ id }: { id: string }) {
               </Text>
             ) : null}
             <AgentLevelList connectionId={id} />
+            {/* Everyone sees the accounts the app is installed on; only admins get its actions. */}
+            {item.def?.id === "github" && !item.viaComposio ? (
+              <GitHubAppGroup
+                onConnectAccount={() => {
+                  const def = item.def;
+                  if (def) sheet.open(<ConnectSheet def={def} account />);
+                }}
+              />
+            ) : null}
             {admin ? (
               <>
                 <GroupedHeader>{t("connectors.tools")}</GroupedHeader>

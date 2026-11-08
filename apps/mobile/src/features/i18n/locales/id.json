@@ -1503,6 +1503,11 @@
     "disconnected": "{{name}} diputus.",
     "usedBy_other": "{{names}} memakainya",
     "fromAgent": "Hubungkan layanan",
+    "githubApp": {
+      "useApp": "Pakai aplikasi agentes.chat",
+      "useAccount": "Pakai akun GitHub",
+      "createInBrowser": "Buat di browser"
+    },
     "review": {
       "stepAbout": "Yang bisa dilakukannya",
       "saving": "Menyimpan…",

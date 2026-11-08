@@ -1503,6 +1503,11 @@
     "disconnected": "{{name}}の接続を解除しました。",
     "usedBy_other": "{{names}}が使用中",
     "fromAgent": "サービスを接続",
+    "githubApp": {
+      "useApp": "agentes.chat アプリを使う",
+      "useAccount": "GitHubアカウントを使う",
+      "createInBrowser": "ブラウザで作成"
+    },
     "review": {
       "stepAbout": "できること",
       "saving": "保存中…",
