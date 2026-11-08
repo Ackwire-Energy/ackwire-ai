@@ -2263,6 +2263,11 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   min-width: var(--option-face);
   translate: none;
 }
+/* A row of that list led by a bare glyph (another group's, an action's): in the middle of a face's width, so its name
+   starts where the faces' names do. */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item > .ac-icon:first-child {
+  margin-inline: calc((var(--option-face) - 16px) / 2);
+}
 :is(.ac-menu, .ac-palette__list) .ac-menu__leading > .ac-avatar {
   width: var(--option-face);
   height: var(--option-face);
