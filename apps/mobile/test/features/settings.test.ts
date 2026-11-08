@@ -539,3 +539,10 @@ describe("Armazenamento", () => {
 test("the export's file name, as the web saves it", () => {
   expect(exportFileName(new Date("2026-10-28T12:00:00.000Z"))).toBe("agentes-chat-2026-10-28.json");
 });
+
+test("Auditoria's row screen: the call's title in words, and what the tool said only in the technical group", () => {
+  const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "settings", "AuditScreen.tsx"), "utf8");
+  expect(src).toContain("title={auditHint(t, row) ?? auditPhrase(t, row)}");
+  const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
+  expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
+});

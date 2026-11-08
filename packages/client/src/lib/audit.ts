@@ -1,10 +1,11 @@
 import type { TFunction } from "i18next";
 import type { AuditQuery, AuditRow } from "../api/types";
-import { toolActivity } from "./activity";
+import { serviceKey, toolActivity } from "./activity";
+import { approvalTitle } from "./approval-words";
 import { billingHoldOf } from "./billing";
 import { reviewFlaggedOf } from "./errors";
 import { lowerFirst } from "./format";
-import { stepLabel } from "./work";
+import { stepLabel, toolWhy } from "./work";
 
 /*
  * Configurações › Auditoria in words, for the web and the phone alike: the shortcuts on top, a row's sentence
@@ -31,11 +32,17 @@ export function auditQueryOf(show: AuditShow, agentId: string | null): AuditQuer
 
 export const auditStr = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
+/** A call that didn't go through: refused (by the Tool Gateway, a rule, a person) or failed. */
+const notThrough = (row: AuditRow) =>
+  row.action === TOOL_CALL && (row.outcome === "refused" || row.outcome === "failed");
+
 /**
  * A row's reason as its panel says it: a billing hold's code (ADR 0079) and the category an automatic review hold
- * names (`review.<category>`) in words, never as they come.
+ * names (`review.<category>`) in words, never as they come. A call that didn't go through says why only in words, by
+ * its refusal's code (`details.refusal`, as its line in the chat): what the tool said goes to the technical part.
  */
 export function auditReason(t: TFunction, row: AuditRow): string | null {
+  if (notThrough(row)) return toolWhy(t, { refusal: auditStr(row.details.refusal) });
   const reason = auditStr(row.details.reason);
   if (!reason || row.action !== "organization.standing_changed" || row.details.to !== "hold") return reason;
   const billing = billingHoldOf({ state: "hold", reason });
@@ -189,9 +196,23 @@ const AREAS = [
   "vault",
 ] as const;
 
-/** What the row is about in its own words (the call's title, a change's name). */
-export const auditHint = (row: AuditRow) =>
-  auditStr(row.details.title) ??
+/** What a call or a change didn't go through with, in the tool's own words (often English): the technical part's. */
+export const auditToolSaid = (row: AuditRow) => (notThrough(row) ? auditStr(row.details.reason) : null);
+
+/** A call's title as its approval card says it, in the person's language (the server's is English). */
+function auditCallTitle(t: TFunction, row: AuditRow) {
+  const title = auditStr(row.details.title);
+  if (!title) return null;
+  const input = row.details.input;
+  const params = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  // The row keeps the connection's label ("GitHub"): its key tells the tool's own name apart from it.
+  const label = auditStr(row.details.connector);
+  return approvalTitle(t, { tool: row.target.id ?? "", title, params, connector: label ? serviceKey(label) : null });
+}
+
+/** What the row is about in its own words (the call's title in the person's words, a change's name). */
+export const auditHint = (t: TFunction, row: AuditRow) =>
+  (row.action === TOOL_CALL ? auditCallTitle(t, row) : auditStr(row.details.title)) ??
   auditStr(row.details.name) ??
   auditStr(row.details.label) ??
   auditStr(row.details.subject) ??
@@ -224,7 +245,7 @@ export function auditBehind(t: TFunction, row: AuditRow) {
 
 /** The line under the sentence: about what · who asked · where. */
 export function auditSubLine(t: TFunction, row: AuditRow) {
-  return [auditHint(row), auditBehind(t, row), auditWhere(t, row)].filter(Boolean).join(" · ");
+  return [auditHint(t, row), auditBehind(t, row), auditWhere(t, row)].filter(Boolean).join(" · ");
 }
 
 /**
@@ -303,19 +324,11 @@ export function auditSecretText(t: TFunction, s: NonNullable<AuditRow["secret"]>
 /** A value the audit kept hidden (a secret-looking field's). */
 export const AUDIT_HIDDEN = "***";
 
-/** A change's details worth showing (ids and the call's own fields stay in the technical part). */
-const HIDDEN_DETAILS = new Set([
-  "approvalId",
-  "secretRequestId",
-  "agentId",
-  "kind",
-  "behind",
-  "input",
-  "reason",
-  "routine",
-]);
+/** A change's details worth showing: never an id (`connectionId`, `agentIds`…), nor the call's own fields. */
+const HIDDEN_DETAILS = new Set(["kind", "behind", "input", "reason", "refusal", "routine"]);
+const AN_ID = /(?:^ids?|Ids?|_ids?)$/;
 export function auditDetailEntries(details: Record<string, unknown>): [string, unknown][] {
-  return Object.entries(details).filter(([k, v]) => !HIDDEN_DETAILS.has(k) && v !== null && v !== "");
+  return Object.entries(details).filter(([k, v]) => !HIDDEN_DETAILS.has(k) && !AN_ID.test(k) && v !== null && v !== "");
 }
 
 /** A kept value as text (a nested one as JSON). */

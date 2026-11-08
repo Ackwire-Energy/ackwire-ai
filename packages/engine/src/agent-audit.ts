@@ -118,6 +118,8 @@ export async function recordToolCall(
     outcome: schema.AuditOutcome;
     /** Why it was refused or failed, or the agent's `why` for an approval. */
     reason?: string | null;
+    /** The Tool Gateway's own refusal, as a word the apps say (`data.refusal`): `reason` is the agent's English. */
+    refusal?: string | null;
     approvalId?: string | null;
     /** A call waiting for a person's secret (`request_secret`): the request. */
     secretRequestId?: string | null;
@@ -148,6 +150,7 @@ export async function recordToolCall(
         : {}),
       input: auditInput(input),
       ...(reason ? { reason: cutText(masked(reason), MAX_STRING) } : {}),
+      ...(call.refusal ? { refusal: call.refusal } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
       ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),

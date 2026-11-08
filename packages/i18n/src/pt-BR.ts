@@ -12342,6 +12342,7 @@ export const ptBR = {
       techAction: "Ação",
       techTool: "Ferramenta",
       techKind: "Tipo",
+      techSaid: "O que respondeu",
       techRun: "Execução",
       techId: "Registro",
       openConversation: "Abrir conversa",

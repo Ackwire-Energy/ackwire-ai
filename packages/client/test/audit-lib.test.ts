@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AuditRow } from "../src/api/types";
-import { auditOutcome, auditQueryOf, auditReason, auditSentence, auditSubLine } from "../src/lib/audit";
+import {
+  auditDetailEntries,
+  auditHint,
+  auditOutcome,
+  auditQueryOf,
+  auditReason,
+  auditSentence,
+  auditSubLine,
+  auditToolSaid,
+} from "../src/lib/audit";
 
 // The key and its values, so each test reads which words were picked.
 const t = ((key: string, o?: Record<string, unknown>) =>
@@ -56,13 +65,67 @@ describe("Auditoria in words (web and phone)", () => {
 
   test("who did what, then about what, who asked and where", () => {
     expect(auditSentence(t, row(), "en")).toEqual({ name: "Ada", text: "audit.call.used(Gmail)" });
-    expect(auditSubLine(t, row())).toBe("Gmail: Send · audit.behind.person(Bia) · #geral");
+    // About what, as the call's approval card says it, never the server's English title ("Gmail: Send").
+    expect(auditSubLine(t, row())).toBe("approval.titles.action.send · audit.behind.person(Bia) · #geral");
     const expired = row({ actor: { type: "system", id: null, name: null }, action: "approval.expired", details: {} });
     expect(auditSentence(t, expired, "en")).toEqual({ name: null, text: "audit.change.approval.expired" });
     const gone = row({ actor: { type: "person", id: "u1", name: "Bia" }, action: "channel.deleted", details: {} });
     expect(auditSentence(t, gone, "en").text).toBe(
       "audit.change.pattern(audit.change.verb.deleted,audit.change.area.channel)",
     );
+  });
+
+  test("a call's title in the person's words, as its approval card says it, never the server's English", () => {
+    const merge = row({
+      target: { type: "tool", id: "github_merge_pull_request" },
+      details: {
+        kind: "external",
+        connector: "GitHub",
+        title: "Merge PR #12 in acme/app",
+        behind: "person",
+        input: { owner: "acme", repo: "app", pullNumber: 12 },
+      },
+    });
+    const worded = "approval.titles.github.merge_pull_request(12,,acme/app,Merge PR #12 in acme/app)";
+    expect(auditHint(t, merge)).toBe(worded);
+    expect(auditSubLine(t, merge)).toBe(`${worded} · audit.behind.person(Bia) · #geral`);
+    // A change keeps its own name.
+    expect(auditHint(t, row({ action: "wiki.page_created", details: { title: "Onboarding" } }))).toBe("Onboarding");
+  });
+
+  test("a call that didn't go through says why only in words; what the tool said goes to the technical part", () => {
+    const base = row().details;
+    const refused = row({
+      outcome: "refused",
+      details: { ...base, reason: "Not allowed: this agent lacks the scope github:pr.merge", refusal: "noAccess" },
+    });
+    expect(auditReason(t, refused)).toBe("chat.work.refusal.noAccess()");
+    expect(auditToolSaid(refused)).toBe("Not allowed: this agent lacks the scope github:pr.merge");
+    const failed = row({
+      outcome: "failed",
+      details: { ...base, reason: "Failed: That person isn't in this conversation" },
+    });
+    expect(auditReason(t, failed)).toBeNull();
+    expect(auditToolSaid(failed)).toBe("Failed: That person isn't in this conversation");
+    // The reason an agent gave when it asked a person is its own words: it stays.
+    const asked = row({ outcome: "pending", details: { ...base, reason: "To ship the fix today" } });
+    expect(auditReason(t, asked)).toBe("To ship the fix today");
+    expect(auditToolSaid(asked)).toBeNull();
+  });
+
+  test("a change's details never list an id, in any spelling", () => {
+    const details = {
+      name: "Acme",
+      connectionId: "c-1",
+      machineId: "m-1",
+      agentIds: ["a"],
+      toStorageConfigId: "s",
+      delivery_id: "d",
+      id: "x",
+      paid: true,
+      reason: "r",
+    };
+    expect(auditDetailEntries(details).map(([k]) => k)).toEqual(["name", "paid"]);
   });
 
   test("a merge done without asking says where", () => {

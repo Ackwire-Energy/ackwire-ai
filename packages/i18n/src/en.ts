@@ -12247,6 +12247,8 @@ export const en = {
       techAction: "Action",
       techTool: "Tool",
       techKind: "Kind",
+      /** What the tool or the gateway answered a call that didn't go through, as it was written. */
+      techSaid: "What it answered",
       techRun: "Run",
       techId: "Record",
       openConversation: "Open conversation",

@@ -19,6 +19,7 @@ import {
   auditSentence,
   auditStr,
   auditSubLine,
+  auditToolSaid,
   auditValueText,
   auditWhere,
   TOOL_CALL,
@@ -276,6 +277,7 @@ export function AuditRowScreen({ id }: { id: string }) {
   const look = auditOutcome(t, row);
   const reason = auditReason(t, row);
   const reasonKey = auditReasonKey(row);
+  const said = auditToolSaid(row);
   const isCall = row.action === TOOL_CALL;
   const where = auditWhere(t, row);
   const connector = auditStr(row.details.connector);
@@ -289,7 +291,7 @@ export function AuditRowScreen({ id }: { id: string }) {
 
   return (
     <SettingsPage
-      title={auditHint(row) ?? auditPhrase(t, row)}
+      title={auditHint(t, row) ?? auditPhrase(t, row)}
       subtitle={`${name} · ${whenAt(t, i18n.language, row.at)}`}
     >
       <View style={styles.lead}>
@@ -375,6 +377,7 @@ export function AuditRowScreen({ id }: { id: string }) {
         {auditStr(row.details.kind) ? (
           <GroupedRow label={t("audit.panel.techKind")} sub={auditStr(row.details.kind) ?? ""} />
         ) : null}
+        {said ? <GroupedRow label={t("audit.panel.techSaid")} sub={said} subLines={6} /> : null}
         {row.runId ? <GroupedRow label={t("audit.panel.techRun")} sub={row.runId} /> : null}
         <GroupedRow label={t("audit.panel.techId")} sub={row.id} />
         <GroupedRow icon="copy" label={t("audit.panel.copyLink")} onPress={() => void copy()} />

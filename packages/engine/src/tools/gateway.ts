@@ -963,6 +963,7 @@ export function createToolGateway(deps: {
         outcome: AuditOutcome,
         extra: {
           reason?: string | null;
+          refusal?: string | null;
           approvalId?: string;
           secretRequestId?: string;
           about?: ToolCallSubject | null;
@@ -1006,8 +1007,12 @@ export function createToolGateway(deps: {
           ...(data ? { data } : {}),
           ...(autoApproved ? { autoApproved } : {}),
         });
+        const refusal = typeof output.data?.refusal === "string" ? output.data.refusal : null;
         if (outcome)
-          await audit(outcome, outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content) });
+          await audit(
+            outcome,
+            outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content), refusal },
+          );
         return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
