@@ -43,11 +43,11 @@ export function RoutineReachWarnings({
 function Warning({ agent, creator }: { agent: Agent; creator: string }) {
   const g = agentGrammar(agent.name);
   return (
-    <div className="ag-rc">
+    <div className="ag-rc ac-actrow">
       <span className="ag-rc__ic" aria-hidden="true">
         <Icon name="info" size={16} />
       </span>
-      <span className="ag-rc__tx">
+      <span className="ag-rc__tx ac-actrow__text">
         <span className="ag-rc__sentence">
           <Trans i18nKey="routines.reachWarning.blocked" values={g} components={{ b: <b /> }} />
         </span>

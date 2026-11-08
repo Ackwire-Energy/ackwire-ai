@@ -297,4 +297,43 @@ describe("where a status shows", () => {
     await settle(6);
     expect(screen().getByRole("dialog", { name: "Perfil" }).textContent).toContain("Offline · Sem IA conectada");
   });
+
+  test("an agent at work reads online, whatever its AI reads for this person: the list says so, or its run first", async () => {
+    // No AI here (the right hand thinks with each person's own), yet it answers someone.
+    const aiStatus = {
+      any: true,
+      agents: [
+        { agentId: ADA_ID, state: "no_ai" as const, reason: "no_key" as const },
+        { agentId: ATLAS_ID, state: "ready" as const },
+      ],
+    };
+    const row = (presence: AgentStatus["presence"], working: boolean): AgentStatus[] => [
+      { agentId: ADA_ID, presence, status: null, activeAt: working ? new Date().toISOString() : null, working },
+    ];
+    const working = seedState({ aiStatus, agentStatuses: row("online", true) });
+    seedDm(working, { type: "agent", id: ADA_ID });
+    await go(`c/${ENG_ID}`, working);
+    const ada = () => within(nav()).getByRole("link", { name: /^Ada/ });
+    expect(ada().getAttribute("data-presence")).toBe("online");
+    expect(badgeOf(ada())).toBe("online");
+    cleanup();
+
+    // The list still reads it idle: its run, as this tab hears it, is enough.
+    const idle = seedState({ aiStatus, agentStatuses: row("away", false) });
+    seedDm(idle, { type: "agent", id: ADA_ID });
+    const r = await go(`c/${ENG_ID}`, idle);
+    expect(badgeOf(ada())).toBe("offline");
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: { type: "agent.thinking", channelId: ENG_ID, threadId: null, runId: "r-now", agentId: ADA_ID },
+      }),
+    );
+    await settle();
+    expect(ada().getAttribute("data-presence")).toBe("online");
+    expect(badgeOf(ada())).toBe("online");
+  });
 });

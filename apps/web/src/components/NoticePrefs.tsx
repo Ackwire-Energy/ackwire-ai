@@ -139,7 +139,7 @@ export function PrefRow({
       <span className="settings-row__icon" aria-hidden="true">
         {lead ?? (icon && <Icon name={icon} size={16} />)}
       </span>
-      <span className="settings-row__text">
+      <span className="settings-row__text ac-actrow__text">
         <span className="settings-row__label">{label}</span>
         {help && (
           <span className="settings-row__help" id={`${id}-help`}>
@@ -155,10 +155,10 @@ export function PrefRow({
     </>
   );
   return onOpen ? (
-    <button type="button" className="settings-row settings-row--lead settings-row--open" onClick={onOpen}>
+    <button type="button" className="settings-row ac-actrow settings-row--lead settings-row--open" onClick={onOpen}>
       {body}
     </button>
   ) : (
-    <div className="settings-row settings-row--lead">{body}</div>
+    <div className="settings-row ac-actrow settings-row--lead">{body}</div>
   );
 }

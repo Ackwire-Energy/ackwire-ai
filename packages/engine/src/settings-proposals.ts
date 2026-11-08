@@ -14,6 +14,7 @@ import { publishAgentsChanged } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { can, getMembership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
+import { reportsToRefusal, setReportsTo } from "./reporting";
 import { isRightHand } from "./right-hand";
 import { canonicalJson } from "./tools/json-schema";
 
@@ -48,6 +49,8 @@ export const SETTING_GROUP: Record<SettingField, "admin" | "admin_or_owner" | "a
   reply_mode: "admin_or_owner",
   name: "admin",
   look: "admin_or_owner",
+  // Who manages agents sets a line, as on the page (ADR 0148 addendum).
+  reports_to: "admin",
   ai_account: "account",
 };
 
@@ -63,6 +66,7 @@ const ORDER: SettingField[] = [
   "reply_mode",
   "name",
   "look",
+  "reports_to",
   "archive",
   "delete",
 ];
@@ -95,6 +99,8 @@ async function valueNow(db: Executor, agent: Agent, line: Pick<ReceiptLine, "fie
       return agent.name;
     case "look":
       return agent.appearance;
+    case "reports_to":
+      return agent.reportsToAgentId ?? null;
     case "model":
       return agent.model;
     case "budget":
@@ -170,6 +176,10 @@ async function setValue(
         value as Parameters<typeof setAgentAppearance>[4],
         { pubsub },
       ));
+    case "reports_to":
+      return void (await setReportsTo(deps, actorId, orgId, [
+        { agentId, reportsToAgentId: typeof value === "string" ? value : null },
+      ]));
     case "model":
       return void (await updateAgent(db, actorId, orgId, agentId, { model: String(value) }, { pubsub }));
     case "budget":
@@ -312,7 +322,12 @@ export async function settingLines(
       skipped.push(`${who} already has that ${w.field.replace("_", " ")}.`);
       continue;
     }
-    lines.push({ ...w, to, from });
+    // The card names who it reported to: the agent's page knows only ids.
+    const label =
+      w.field === "reports_to" && typeof from === "string"
+        ? { ...w.label, from: (await getAgent(db, orgId, from))?.name }
+        : w.label;
+    lines.push({ ...w, to, from, ...(label ? { label } : {}) });
   }
   return { lines, skipped };
 }
@@ -366,6 +381,9 @@ async function refusal(db: Database, orgId: string, requesterId: string, agent: 
     }
     case "audience":
       return null;
+    case "reports_to":
+      if (w.to !== null && typeof w.to !== "string") return "say which agent, or none.";
+      return reportsToRefusal(db, orgId, agent.id, w.to);
     default: {
       const [channel] = await db
         .select()

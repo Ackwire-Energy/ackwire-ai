@@ -4,15 +4,15 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("the start card asks what the workspace does with business types as chips, the old ways in under them", () => {
-  const intro = src("right-hand/Intro.tsx");
-  expect(intro).toContain("BUSINESS_TYPES.map((b) => t(`teamPlan.business.$" + "{b}`))");
-  expect(intro).toContain('t("teamPlan.start.question", { org: org?.name ?? "" })');
-  for (const key of ["teamPlan.start.templates", "teamPlan.start.presets", "rightHand.intro.start.import"])
-    expect(intro).toContain(`t("${key}")`);
-  // "Outra coisa" writes in the composer instead of sending.
-  expect(intro).toContain('text === other ? requestComposerText(channelId, "") : send(text)');
-  expect(intro).toContain("<TeamTemplatesSheet");
+test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0155 §6)", () => {
+  const about = src("agents/setup/SetupStepScreen.tsx");
+  expect(about).toContain("BUSINESS_TYPES.map((b) => (");
+  expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');
+  expect(about).toContain("{ context: text }");
+  expect(about).toContain("openTemplatesAfterAbout(business && isTemplateBusiness(business) ? business : undefined)");
+  const run = src("right-hand/FirstRun.tsx");
+  expect(run).toContain("<TeamTemplatesSheet");
+  expect(run).toContain("initial={templates?.initial}");
   expect(BUSINESS_TYPES.at(-1)).toBe("other");
 });
 
@@ -27,7 +27,9 @@ test("a conversation draws the team card and the answers to tap under a right ha
     "rightHand.card.dismiss",
     "teamPlan.card.adjustName",
     "teamPlan.firstTask.open",
-    "teamPlan.templates.use",
+    "teamPlan.templates.create",
+    "teamPlan.templates.import",
+    "teamPlan.templates.scratch",
     "agentActions.undo",
   ])
     expect(card).toContain(`"${key}"`);

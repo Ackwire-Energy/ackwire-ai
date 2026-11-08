@@ -40,18 +40,3 @@ export const showWorkspace = (orgId: string | null) => {
 };
 /** Whether going to this workspace's bare address opens it: another workspace, or the first in this tab. */
 export const opensWorkspace = (orgId: string) => shown !== orgId;
-
-/** Workspaces whose "Primeiros passos" the person hid on Início, in this browser. */
-function hiddenSteps(): string[] {
-  try {
-    const list = JSON.parse(storage.get(STORAGE_KEYS.firstStepsHidden) ?? "[]") as unknown;
-    return Array.isArray(list) ? list.filter((id): id is string => typeof id === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-export const firstStepsHidden = (orgId: string) => hiddenSteps().includes(orgId);
-
-export const hideFirstSteps = (orgId: string) =>
-  storage.set(STORAGE_KEYS.firstStepsHidden, JSON.stringify([...new Set([...hiddenSteps(), orgId])]));

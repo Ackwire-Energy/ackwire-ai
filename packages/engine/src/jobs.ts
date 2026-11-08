@@ -724,8 +724,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (Array.isArray(message.meta.steeredRunIds)) return;
       // A reply in an agent's background work thread: its reply turn started with the message.
       if (message.meta.forWork) return;
-      // A template tapped on a billing hold: the card is the answer, and nobody can be woken.
-      if (message.meta.templateTap) return;
       const channel = where;
       if (channel?.kind === "dm") {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net

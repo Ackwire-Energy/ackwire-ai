@@ -89,7 +89,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 30px;
+  min-height: 30px;
   padding: 0 12px 0 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -99,13 +99,13 @@
   text-align: left;
   cursor: pointer;
 }
+/* A long name wraps under itself, never a "…" that hides which routine the lane is; its lane stays on its middle. */
 .routines-horizon__label b {
   font-size: 12.5px;
   font-weight: 600;
+  line-height: 16px;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .routines-horizon__label:hover b {
   color: var(--ink);
@@ -116,6 +116,7 @@ html:not([data-pointer]) .routines-horizon__label:focus-visible {
 }
 .routines-horizon__track {
   position: relative;
+  align-self: center;
   height: 30px;
   border-radius: var(--radius-sm);
 }
@@ -252,9 +253,7 @@ html:not([data-pointer]) .routines-horizon__label:focus-visible {
   font-size: 14.5px;
   letter-spacing: -0.01em;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -262,23 +261,28 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Its chips and its fix go under the words when they don't fit beside them, never squeeze them a word a line. */
 .routine-row__sub {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   max-width: 100%;
   min-width: 0;
   font-size: 12.5px;
   color: var(--muted);
-  white-space: nowrap;
 }
-.routine-row__sub > span:not(.ac-chip) {
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Who and where it delivers, whole: the words wrap with the icon on their first line (`.ac-iconline`), never "…". */
+.routine-row__to {
+  gap: 6px;
+  min-width: 0;
 }
-.routine-row__sub > svg {
+.routine-row__to > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.routine-row__to > svg {
   color: var(--faint);
-  flex: none;
 }
 .routine-row__chip {
   flex: none;
@@ -304,9 +308,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 }
 .routine-row__when-text b,
 .routine-row__when-text small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .routine-row__when-text b {
   font-size: 13px;
@@ -331,9 +333,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-row__runs small {
   font-size: 12px;
   color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .routine-row__actions {
   display: flex;
@@ -484,9 +484,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 }
 .routine-sel__text b,
 .routine-sel__text small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .routine-sel__text b {
   font-size: 14px;

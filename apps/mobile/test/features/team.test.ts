@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentGroup, Channel, Member, TeamAgent } from "@agenteschat/client";
+import { chartByPerson } from "@agenteschat/client/lib/team-views";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
-import { teamSections } from "../../src/features/team/logic";
+import { chartRows, lineContinues, teamSections } from "../../src/features/team/logic";
 
 const agent = (id: string, over: Partial<TeamAgent> = {}): TeamAgent => ({
   id,
@@ -57,5 +58,33 @@ describe("Equipe on the phone (ADR 0148)", () => {
     expect(featureKeysEn.team.mapHint).toContain("{{name}}");
     expect(featureKeysPtBR.team.mapHint).toContain("{{name}}");
     expect(featureKeysPtBR.agents.noGroupSection).toBe("Sem setor");
+  });
+});
+
+describe("Responde a on the phone (ADR 0148 addendum)", () => {
+  test("a supervisor's reports are indented rows under it, and each level's line runs while its rows go on", () => {
+    const nina = agent("Nina", { ownerUserId: "u-lukas" });
+    const team = [
+      nina,
+      agent("Bea", { reportsToAgentId: "Nina" }),
+      agent("Cid", { reportsToAgentId: "Bea" }),
+      agent("Dan", { reportsToAgentId: "Nina" }),
+      agent("Eva", { ownerUserId: "u-lukas" }),
+    ];
+    const [col] = chartByPerson(team, [], new Set(["u-lukas"]));
+    const rows = chartRows(col?.nodes ?? []);
+    expect(rows.map((r) => [r.agent.id, r.depth])).toEqual([
+      ["Nina", 0],
+      ["Bea", 1],
+      ["Cid", 2],
+      ["Dan", 1],
+      ["Eva", 0],
+    ]);
+    // Nina's line (level 0) runs on to Eva; Bea's level-1 line runs on to Dan; Cid ends its own.
+    expect(lineContinues(rows, 0, 0)).toBe(true);
+    expect(lineContinues(rows, 1, 1)).toBe(true);
+    expect(lineContinues(rows, 2, 2)).toBe(false);
+    expect(lineContinues(rows, 3, 1)).toBe(false);
+    expect(lineContinues(rows, 4, 0)).toBe(false);
   });
 });

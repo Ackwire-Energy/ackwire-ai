@@ -1184,10 +1184,14 @@ textarea.ac-input {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   visibility: hidden;
+  /* Unseen, it takes no room either: its line hangs past a row with nothing in it yet (a card still loading), and the
+     last row in the list would scroll the list by what hangs. */
+  content-visibility: hidden;
 }
 .ac-msg--grouped:hover .ac-msg__gutter-time,
 html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   visibility: visible;
+  content-visibility: visible;
 }
 .ac-msg__body {
   min-width: 0;
@@ -3280,6 +3284,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex-direction: column;
   gap: 4px;
   padding: var(--details-pad) var(--details-pad) 0;
+  container: ac-details-head / inline-size;
 }
 .ac-details__bar {
   display: flex;
@@ -3314,10 +3319,37 @@ html:not([data-pointer]) .ac-back:focus-visible {
 .ac-details__bar--titled > .ac-details__actions {
   height: 28px;
 }
+/*
+ * A head too narrow for both (a phone, a narrow pane): the buttons keep their line at the top right and the title takes
+ * the whole line under them, instead of wrapping a letter or two at a time beside them. A title the caller puts in the
+ * eyebrow (a heading, or its field while edited in place, as a task's) is a title too.
+ */
+@container ac-details-head (max-width: 520px) {
+  .ac-details__bar--titled,
+  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .ac-details__bar--titled > .ac-details__actions,
+  .ac-details__bar:has(> .ac-details__eyebrow :is(h1, h2, [data-inplace])) > .ac-details__actions {
+    order: -1;
+    margin-left: auto;
+  }
+  /* Over `.ac-actrow`'s width and cap at the words' length, later in the file, which would keep a short title on the
+     buttons' line, after them. */
+  .ac-details__bar--titled > .ac-details__heading.ac-actrow__text,
+  .ac-details__bar > .ac-details__eyebrow.ac-actrow__text:has(:is(h1, h2, [data-inplace])) {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
 .ac-details__heading {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  /* The title's size (its lines set their own): the 24 characters it keeps beside the buttons (`.ac-actrow`) are the
+     title's. */
+  font-size: 20px;
 }
 .ac-details__icon {
   flex: none;
@@ -5285,8 +5317,15 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
     --toast-button: var(--control-h-md);
   }
 }
+/* Its action and its × as one item after the words, which `.ac-actrow` moves under them together. */
+.ac-toast__acts {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--icon-gap);
+}
 /* The close's × stands as far from the right edge as the tone's icon from the left: it reaches out by its air. */
-.ac-toast > .ac-btn--icon:last-child {
+.ac-toast__acts > .ac-btn--icon:last-child {
   margin-inline-end: calc((var(--control-icon-sm) - var(--toast-button)) / 2);
 }
 .ac-toast > :is(.ac-icon, .ac-toast__text) {
@@ -5673,6 +5712,11 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   width: 118.75%;
   height: 200%;
   pointer-events: none;
+}
+/* That room is drawn, never laid out (layout containment makes it ink overflow): a face by a scroll area's edge doesn't
+   scroll the area by its accessories' reach. */
+.ac-avatar--agent {
+  contain: layout;
 }
 .ac-avatar--running::after {
   inset: -4px;
@@ -10738,4 +10782,28 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-track__step.is-more .ac-track__node {
   color: var(--muted);
+}
+
+/*
+ * A row of words and the action that ends it (a notice and "Deixar Ana falar com ela", a toast and "Desfazer", a banner
+ * and "Ver em português"): side by side while the words keep a line of 24 characters (or all of them, when shorter),
+ * else the action goes under them, at the row's end. The words never wrap a word a line. The row is `.ac-actrow`, its
+ * words `.ac-actrow__text`, what follows them its action; a lead icon before them stays on their first line. Mirrored
+ * by the phone app's `ACT_ROW` and the landing's copy of this file. Last in the file, so it wins over a component's
+ * own rules for the same boxes.
+ */
+.ac-actrow {
+  display: flex;
+  flex-wrap: wrap;
+}
+/* Through the row, so a component's own `flex: 1` on its words doesn't win. A line breaks on the words' 24 characters,
+   capped at their own length so a short title never sends its action down; then they grow, never wider than all of
+   them on one line. A basis, not a width: a row as wide as its content (a toast) still sizes to all of them. */
+.ac-actrow > .ac-actrow__text {
+  flex: 1 1 24ch;
+  max-width: max-content;
+  min-width: 0;
+}
+.ac-actrow > .ac-actrow__text + * {
+  margin-inline-start: auto;
 }

@@ -80,6 +80,11 @@ export interface AgentStatusView {
   status: AgentStatusLine | null;
   /** Its last run's end (or now while one is going), ISO; null = it never worked. */
   activeAt: string | null;
+  /**
+   * Something of its own is thinking now (a run, or long work at work): the apps draw it at work whatever they read of
+   * its AI, which for the right hand is each viewer's own.
+   */
+  working: boolean;
 }
 
 /** A run going this long is heavy work: the agent reads as busy. */
@@ -254,10 +259,10 @@ export async function loadAgentStatuses(
     // wait: one story for its status, its queue and its notes.
     const catchUps = runs.filter((r) => r.catchUp !== null && !r.background);
     const out = outs.get(a.id) ?? catchUpOut(catchUps, now);
-    const outNow =
-      out &&
-      !working.some((r) => r.status === "running") &&
-      !mine.some((w) => w.status === "live" && (w.state === null || w.state === "working"));
+    const thinking =
+      working.some((r) => r.status === "running") ||
+      mine.some((w) => w.status === "live" && (w.state === null || w.state === "working"));
+    const outNow = out && !thinking;
     if (outNow && stored?.line.by !== "self") status = outLine(out, catchUps.length);
     const presence: AgentPresence = a.heldAt
       ? "offline"
@@ -268,7 +273,7 @@ export async function loadAgentStatuses(
           : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
             ? "online"
             : "away";
-    return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null };
+    return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null, working: thinking };
   });
 }
 

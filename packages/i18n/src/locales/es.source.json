@@ -3893,6 +3893,15 @@
   "team.chart.responsible": {
     "value": "Responsible: {{names}}"
   },
+  "team.chart.lodi": {
+    "value": "follows everything with you"
+  },
+  "team.chart.supervisor": {
+    "value": "Supervisor: {{name}}"
+  },
+  "team.chart.dragSector": {
+    "value": "Drag onto an agent to make this sector's agents report to it"
+  },
   "team.map.lead": {
     "value": "Who looks after the agents, the channels they are in, what each one does on its own and what waits for a person. Dashed lines are agents that asked each other in the last day."
   },
@@ -3941,6 +3950,12 @@
   "team.map.others": {
     "value": "Other channels"
   },
+  "team.map.band": {
+    "value": "Supervisors"
+  },
+  "team.map.reportsTo": {
+    "value": "Reports to {{name}}"
+  },
   "team.sectors.lead": {
     "value": "Each department has a lead, a substitute, its agents and their channels and routines."
   },
@@ -3961,6 +3976,33 @@
   },
   "team.sectors.backupOf": {
     "value": "Substitute in {{name}}"
+  },
+  "team.sectors.supervisor": {
+    "value": "Supervisor"
+  },
+  "team.sectors.supervisorOf": {
+    "value": "Supervisor of {{name}}"
+  },
+  "team.sectors.unsupervised": {
+    "value": {
+      "one": "{{count}} agent without a supervisor",
+      "other": "{{count}} agents without a supervisor"
+    }
+  },
+  "team.sectors.apply": {
+    "value": "Apply"
+  },
+  "team.sectors.supervisorDone": {
+    "value": {
+      "one": "{{count}} agent of {{sector}} now reports to {{name}}",
+      "other": "{{count}} agents of {{sector}} now report to {{name}}"
+    }
+  },
+  "team.sectors.supervisorCleared": {
+    "value": {
+      "one": "{{count}} agent of {{sector}} no longer reports to a supervisor",
+      "other": "{{count}} agents of {{sector}} no longer report to a supervisor"
+    }
   },
   "team.sectors.nobody": {
     "value": "Nobody"
@@ -4000,6 +4042,24 @@
   },
   "team.sectors.emptyViewer": {
     "value": "Whoever manages the agents creates departments, and they show up here."
+  },
+  "team.reportsTo.label": {
+    "value": "Reports to"
+  },
+  "team.reportsTo.help": {
+    "value": "Only says who this agent answers to. It grants no permission."
+  },
+  "team.reportsTo.none": {
+    "value": "Nobody"
+  },
+  "team.reportsTo.done": {
+    "value": "{{agent}} now reports to {{to}}"
+  },
+  "team.reportsTo.cleared": {
+    "value": "{{agent}} no longer reports to an agent"
+  },
+  "team.reportsTo.reports": {
+    "value": "Who reports to {{name}}"
   },
   "team.usage.lead": {
     "value": "What each person uses of the agents this month, and the limits."
@@ -4736,24 +4796,6 @@
   "rightHand.intro.connect.action": {
     "value": "Connect"
   },
-  "rightHand.intro.start.question": {
-    "value": "How do you want to start?"
-  },
-  "rightHand.intro.start.createOne": {
-    "value": "Create {{name}}"
-  },
-  "rightHand.intro.start.team": {
-    "value": "Build a starter team"
-  },
-  "rightHand.intro.start.describe": {
-    "value": "Describe what I need"
-  },
-  "rightHand.intro.start.import": {
-    "value": "Import my agents"
-  },
-  "rightHand.intro.start.form": {
-    "value": "Fill in the form"
-  },
   "rightHand.intro.again.question": {
     "value": "Want to build the team with me?"
   },
@@ -4762,12 +4804,6 @@
   },
   "rightHand.intro.again.message": {
     "value": "Help me build the team."
-  },
-  "rightHand.intro.next.question": {
-    "value": "The team is here. What next?"
-  },
-  "rightHand.intro.next.invite": {
-    "value": "Invite people"
   },
   "rightHand.intro.next.firstTask": {
     "value": "Give {{name}} a first task"
@@ -4783,18 +4819,6 @@
   },
   "rightHand.intro.style.technical": {
     "value": "Technical, with the details"
-  },
-  "rightHand.intro.firstTask.theo": {
-    "value": "Plan our first week: what does each of us do first?"
-  },
-  "rightHand.intro.firstTask.ada": {
-    "value": "What could you build or automate for us first?"
-  },
-  "rightHand.intro.firstTask.lia": {
-    "value": "Who are our 5 closest competitors, and what do they do better than us?"
-  },
-  "rightHand.intro.firstTask.atlas": {
-    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
   },
   "rightHand.profile.how": {
     "value": "How it works"
@@ -5021,6 +5045,9 @@
   "rightHand.card.only.look": {
     "value": "Only admins and its owner change its look"
   },
+  "rightHand.card.only.reports_to": {
+    "value": "Only admins change who an agent reports to"
+  },
   "rightHand.card.only.many": {
     "value": "Only admins make these changes"
   },
@@ -5051,8 +5078,14 @@
   "rightHand.field.look": {
     "value": "Look"
   },
+  "rightHand.field.reports_to": {
+    "value": "Reports to"
+  },
   "rightHand.value.lookDefault": {
     "value": "The default look"
+  },
+  "rightHand.value.anAgent": {
+    "value": "An agent"
   },
   "rightHand.value.none": {
     "value": "None"
@@ -5158,6 +5191,9 @@
   },
   "teamWeek.title": {
     "value": "Team week"
+  },
+  "teamWeek.dayTitle": {
+    "value": "Daily summary"
   },
   "teamWeek.suggestions": {
     "value": {
@@ -5324,6 +5360,9 @@
   "teamWeek.every.sat": {
     "value": "Every Saturday at {{time}}"
   },
+  "teamWeek.every.day": {
+    "value": "Every day at {{time}}"
+  },
   "teamWeek.off": {
     "value": "Off"
   },
@@ -5342,11 +5381,20 @@
   "teamWeek.schedule.start": {
     "value": "Receive it again"
   },
+  "teamWeek.schedule.daily": {
+    "value": "Every day"
+  },
   "teamWeek.settings.label": {
     "value": "Team week"
   },
   "teamWeek.settings.help": {
     "value": "Every week {{name}} tells you in your DM how the team did and what to fix. Only admins get it."
+  },
+  "teamWeek.settings.dayLabel": {
+    "value": "Daily summary"
+  },
+  "teamWeek.settings.dayHelp": {
+    "value": "Every day {{name}} tells you in your DM what the team did and what waits for you, on days with something to say."
   },
   "routing.title": {
     "value": "Who picks the agents"
@@ -9036,77 +9084,14 @@
   "home.action.open": {
     "value": "Open"
   },
-  "home.steps.title": {
-    "value": "First steps"
-  },
-  "home.steps.progress": {
-    "value": "{{done}} of {{total}}"
-  },
-  "home.steps.hide": {
-    "value": "Hide"
-  },
-  "home.steps.done": {
-    "value": "Done"
-  },
-  "home.steps.agent.title": {
-    "value": "Create your first agent"
-  },
-  "home.steps.agent.text": {
-    "value": "Say what it does and it joins the team."
-  },
-  "home.steps.agent.action": {
-    "value": "Create agent"
-  },
-  "home.steps.plan.title": {
-    "value": "Choose an agentes.chat plan"
-  },
-  "home.steps.plan.text": {
-    "value": "The agents start working once the workspace has one."
-  },
-  "home.steps.plan.action": {
-    "value": "See plans"
-  },
-  "home.steps.ai.title": {
-    "value": "Connect an AI"
-  },
-  "home.steps.ai.text": {
-    "value": "It's what your agents think with."
-  },
-  "home.steps.ai.action": {
-    "value": "Connect"
-  },
-  "home.steps.ask.title": {
-    "value": "Ask an agent for something"
-  },
-  "home.steps.ask.text": {
-    "value": "Write below or in a conversation."
-  },
-  "home.steps.ask.action": {
-    "value": "Ask"
-  },
-  "home.steps.team.title": {
-    "value": "Invite your team"
-  },
-  "home.steps.team.text": {
-    "value": "People and agents work together here."
-  },
-  "home.steps.team.action": {
-    "value": "Invite"
-  },
-  "home.steps.routine.title": {
-    "value": "Create a routine"
-  },
-  "home.steps.routine.text": {
-    "value": "An agent does something on its own, on schedule."
-  },
-  "home.steps.routine.action": {
-    "value": "Create routine"
-  },
   "home.calm.title": {
     "value": "All caught up"
   },
   "home.calm.text": {
     "value": "Your agents will tell you here when they need you."
+  },
+  "home.firstRun": {
+    "value": "Pick up where you left off · {{done}} of {{total}}"
   },
   "notifications.title": {
     "value": "Notifications"
@@ -12372,6 +12357,384 @@
   "proposals.evidence.app": {
     "value": "Sent through an AI app"
   },
+  "agentSetup.greeting": {
+    "value": "Hi, {{person}}. I'm {{name}}."
+  },
+  "agentSetup.greetingRole": {
+    "value": "Hi, {{person}}. I'm {{name}}, the new {{role}} agent."
+  },
+  "agentSetup.asked": {
+    "value": "You asked me: “{{what}}”."
+  },
+  "agentSetup.lead": {
+    "value": "To get started, help me with a few quick things:"
+  },
+  "agentSetup.title": {
+    "value": "To get started"
+  },
+  "agentSetup.ready": {
+    "value": "I'm ready."
+  },
+  "agentSetup.titleProfile": {
+    "value": "For {{name}} to get started"
+  },
+  "agentSetup.count": {
+    "value": "{{done}} of {{total}}"
+  },
+  "agentSetup.change": {
+    "value": "Change"
+  },
+  "agentSetup.switch": {
+    "value": "Switch"
+  },
+  "agentSetup.choose": {
+    "value": "Choose"
+  },
+  "agentSetup.see": {
+    "value": "See"
+  },
+  "agentSetup.suggested": {
+    "value": "Suggested"
+  },
+  "agentSetup.ai.todo": {
+    "value": "Connect an AI"
+  },
+  "agentSetup.ai.todoDesc": {
+    "value": "So I can think."
+  },
+  "agentSetup.ai.action": {
+    "value": "Connect"
+  },
+  "agentSetup.ai.done": {
+    "value": "I have an AI to think with"
+  },
+  "agentSetup.apps.todo": {
+    "value": "Read {{apps}}"
+  },
+  "agentSetup.apps.todoDesc": {
+    "value": "Reading never changes anything."
+  },
+  "agentSetup.apps.action": {
+    "value": "Allow"
+  },
+  "agentSetup.apps.todoNone": {
+    "value": "Use the apps of {{org}}"
+  },
+  "agentSetup.apps.todoNoneDesc": {
+    "value": "The ones you already connected, like Gmail and Drive."
+  },
+  "agentSetup.apps.done": {
+    "value": "I use {{apps}}"
+  },
+  "agentSetup.apps.doneNone": {
+    "value": "No apps for now"
+  },
+  "agentSetup.apps.title": {
+    "value": "What {{name}} can use"
+  },
+  "agentSetup.apps.desc": {
+    "value": "Reading never changes anything. Sending, deleting and paying ask for your approval."
+  },
+  "agentSetup.apps.ok": {
+    "value": {
+      "one": "Allow {{count}} app",
+      "other": "Allow {{count}} apps"
+    }
+  },
+  "agentSetup.apps.okNone": {
+    "value": "Continue without apps"
+  },
+  "agentSetup.apps.empty": {
+    "value": "{{org}} has no apps connected yet."
+  },
+  "agentSetup.apps.connectOther": {
+    "value": "Connect another app"
+  },
+  "agentSetup.where.todo": {
+    "value": "Join {{channel}}"
+  },
+  "agentSetup.where.todoDesc": {
+    "value": "I answer when someone calls me there."
+  },
+  "agentSetup.where.action": {
+    "value": "Join"
+  },
+  "agentSetup.where.todoNone": {
+    "value": "Join a channel"
+  },
+  "agentSetup.where.done": {
+    "value": "I'm in {{channels}}"
+  },
+  "agentSetup.where.doneNone": {
+    "value": "I stay in our direct chat"
+  },
+  "agentSetup.where.title": {
+    "value": "Where {{name}} works"
+  },
+  "agentSetup.where.desc": {
+    "value": "It answers when someone calls it there. The direct chat always counts."
+  },
+  "agentSetup.where.okNone": {
+    "value": "Direct chat only"
+  },
+  "agentSetup.where.okOne": {
+    "value": "Join {{channel}}"
+  },
+  "agentSetup.where.ok": {
+    "value": {
+      "one": "Join {{count}} channel",
+      "other": "Join {{count}} channels"
+    }
+  },
+  "agentSetup.who.todo": {
+    "value": "Talk to everyone at {{org}}"
+  },
+  "agentSetup.who.todoDesc": {
+    "value": "Anyone can call me."
+  },
+  "agentSetup.who.todoPlan": {
+    "value": "Talk only to you"
+  },
+  "agentSetup.who.todoPlanDesc": {
+    "value": "Your plan is personal."
+  },
+  "agentSetup.who.doneEveryone": {
+    "value": "I talk to everyone at {{org}}"
+  },
+  "agentSetup.who.doneYou": {
+    "value": "I talk only to you"
+  },
+  "agentSetup.who.doneOwner": {
+    "value": "I talk only to {{name}}"
+  },
+  "agentSetup.who.donePeople": {
+    "value": "I talk to the people you picked"
+  },
+  "agentSetup.who.title": {
+    "value": "Who talks to {{name}}"
+  },
+  "agentSetup.who.people": {
+    "value": "People and roles"
+  },
+  "agentSetup.who.add": {
+    "value": "Choose people"
+  },
+  "agentSetup.who.addMore": {
+    "value": "Add someone else"
+  },
+  "agentSetup.who.you": {
+    "value": "you"
+  },
+  "agentSetup.who.youCap": {
+    "value": "You"
+  },
+  "agentSetup.who.ownerHelp": {
+    "value": "Gets its approval requests and alerts."
+  },
+  "agentSetup.how.todo": {
+    "value": "See how I work"
+  },
+  "agentSetup.how.todoDesc": {
+    "value": "I start from the {{role}} instructions."
+  },
+  "agentSetup.how.todoDescBlank": {
+    "value": "I start from what you wrote."
+  },
+  "agentSetup.how.done": {
+    "value": "I work your way"
+  },
+  "agentSetup.how.title": {
+    "value": "How {{name}} works"
+  },
+  "agentSetup.how.desc": {
+    "value": "Write as you would to someone new on the team."
+  },
+  "agentSetup.how.instructions": {
+    "value": "Instructions"
+  },
+  "agentSetup.how.budget": {
+    "value": "Monthly limit"
+  },
+  "agentSetup.how.budgetHelp": {
+    "value": "We let you know at 80%. At the limit, it pauses and tells you."
+  },
+  "agentSetup.how.more": {
+    "value": "More options"
+  },
+  "agentSetup.how.model": {
+    "value": "Model"
+  },
+  "agentSetup.say.ai": {
+    "value": "Now I can think."
+  },
+  "agentSetup.say.apps": {
+    "value": "Done, I can use the apps now."
+  },
+  "agentSetup.say.where": {
+    "value": "I'll keep an eye on it there."
+  },
+  "agentSetup.say.who": {
+    "value": "Got it, I know who to talk to."
+  },
+  "agentSetup.say.how": {
+    "value": "Got it, I know how you want me to work."
+  },
+  "agentSetup.tasksLead": {
+    "value": "We can start already. Ask me something:"
+  },
+  "agentSetup.tasksAllDone": {
+    "value": "All set. Ask me something:"
+  },
+  "agentSetup.tasks.a": {
+    "value": "What can you do for me?"
+  },
+  "agentSetup.tasks.b": {
+    "value": "Where do we start?"
+  },
+  "agentSetup.firstRun.title": {
+    "value": "Getting {{org}}'s team to work"
+  },
+  "agentSetup.firstRun.complete": {
+    "value": "All set."
+  },
+  "agentSetup.firstRun.notNow": {
+    "value": "Not now"
+  },
+  "agentSetup.firstRun.afterPlan": {
+    "value": "Opens with the plan."
+  },
+  "agentSetup.firstRun.about.todo": {
+    "value": "Tell me what {{org}} does."
+  },
+  "agentSetup.firstRun.about.todoDesc": {
+    "value": "Every agent reads this."
+  },
+  "agentSetup.firstRun.about.action": {
+    "value": "Tell"
+  },
+  "agentSetup.firstRun.about.done": {
+    "value": "I know what {{org}} does"
+  },
+  "agentSetup.firstRun.about.title": {
+    "value": "What does {{org}} do?"
+  },
+  "agentSetup.firstRun.about.desc": {
+    "value": "Every agent reads this. You can change it anytime."
+  },
+  "agentSetup.firstRun.about.line": {
+    "value": "In one sentence"
+  },
+  "agentSetup.firstRun.about.optional": {
+    "value": "Optional. Without one, the type you picked counts."
+  },
+  "agentSetup.firstRun.team.todo": {
+    "value": "Build the team."
+  },
+  "agentSetup.firstRun.team.todoDesc": {
+    "value": "A template for your business, you can change everything later."
+  },
+  "agentSetup.firstRun.team.action": {
+    "value": "See the team"
+  },
+  "agentSetup.firstRun.team.done": {
+    "value": {
+      "one": "{{count}} agent on the team",
+      "other": "{{count}} agents on the team"
+    }
+  },
+  "agentSetup.firstRun.team.card": {
+    "value": "Continue on the card below"
+  },
+  "agentSetup.firstRun.ai.todo": {
+    "value": "Connect an AI."
+  },
+  "agentSetup.firstRun.ai.todoDesc": {
+    "value": "The one you already pay for works."
+  },
+  "agentSetup.firstRun.ai.action": {
+    "value": "Connect"
+  },
+  "agentSetup.firstRun.ai.done": {
+    "value": "I think with {{label}}"
+  },
+  "agentSetup.firstRun.ai.doneAny": {
+    "value": "I think with an AI now"
+  },
+  "agentSetup.firstRun.ai.plan": {
+    "value": "Opens with the agentes.chat plan."
+  },
+  "agentSetup.firstRun.ai.planAction": {
+    "value": "See agentes.chat plans"
+  },
+  "agentSetup.firstRun.apps.todo": {
+    "value": "Connect your work apps."
+  },
+  "agentSetup.firstRun.apps.todoDesc": {
+    "value": "Reading never changes anything."
+  },
+  "agentSetup.firstRun.apps.action": {
+    "value": "Choose"
+  },
+  "agentSetup.firstRun.apps.done": {
+    "value": "I read {{apps}}"
+  },
+  "agentSetup.firstRun.apps.doneNone": {
+    "value": "No apps for now"
+  },
+  "agentSetup.firstRun.apps.title": {
+    "value": "Your work apps"
+  },
+  "agentSetup.firstRun.apps.desc": {
+    "value": "The ones the team you just made would use come first. Reading never changes anything, and sending, deleting and paying ask for your approval."
+  },
+  "agentSetup.firstRun.apps.connect": {
+    "value": "Connect"
+  },
+  "agentSetup.firstRun.apps.all": {
+    "value": "See all apps"
+  },
+  "agentSetup.firstRun.people.todo": {
+    "value": "Bring in the people you work with."
+  },
+  "agentSetup.firstRun.people.todoDesc": {
+    "value": "They talk to the agents too."
+  },
+  "agentSetup.firstRun.people.action": {
+    "value": "Invite"
+  },
+  "agentSetup.firstRun.people.done": {
+    "value": {
+      "one": "{{count}} person here",
+      "other": "{{count}} people here"
+    }
+  },
+  "agentSetup.firstRun.people.doneNone": {
+    "value": "Just you for now"
+  },
+  "agentSetup.firstRun.say.about": {
+    "value": "Noted. Every agent reads this."
+  },
+  "agentSetup.firstRun.say.team": {
+    "value": "The team is here."
+  },
+  "agentSetup.firstRun.say.ai": {
+    "value": "Now the team thinks."
+  },
+  "agentSetup.firstRun.say.apps": {
+    "value": "Done, I can read the apps now."
+  },
+  "agentSetup.firstRun.say.people": {
+    "value": "Good to have more people here."
+  },
+  "agentSetup.firstRun.asks.lead": {
+    "value": "Now ask me something:"
+  },
+  "agentSetup.firstRun.asks.fit": {
+    "value": "Fit the team to my business"
+  },
+  "agentSetup.firstRun.asks.who": {
+    "value": "Who on the team does what?"
+  },
   "newAgent.title": {
     "value": "Create agent"
   },
@@ -12462,6 +12825,15 @@
   "newAgent.roles.dev.instructions": {
     "value": "Investigates first: reads the code and the related tasks and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs. For big changes, opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review."
   },
+  "newAgent.roles.dev.tasks.a": {
+    "value": "What's the most frequent error right now?"
+  },
+  "newAgent.roles.dev.tasks.b": {
+    "value": "Review the latest open PR"
+  },
+  "newAgent.roles.dev.tasks.c": {
+    "value": "Pick up the oldest task in the backlog"
+  },
   "newAgent.roles.ops.name": {
     "value": "Ops"
   },
@@ -12473,6 +12845,15 @@
   },
   "newAgent.roles.ops.instructions": {
     "value": "Follows errors and deploys and writes incident reports.\nWhen an alert fires, investigates first (errors, logs, recent deploys) and posts in the channel what it found: since when, how big, the likely cause and the next step.\nRollback and deploy only with approval."
+  },
+  "newAgent.roles.ops.tasks.a": {
+    "value": "Anything odd since the last deploy?"
+  },
+  "newAgent.roles.ops.tasks.b": {
+    "value": "Summarize today's errors"
+  },
+  "newAgent.roles.ops.tasks.c": {
+    "value": "What changed in the latest release?"
   },
   "newAgent.roles.qa.name": {
     "value": "QA"
@@ -12486,6 +12867,15 @@
   "newAgent.roles.qa.instructions": {
     "value": "Reproduces every reported bug before opening a task. Writes clear steps and attaches evidence.\nIf it can't reproduce, first checks the errors, recent changes and related tasks. Asks for the environment and version only if they aren't there.\nPrioritizes what blocks customers."
   },
+  "newAgent.roles.qa.tasks.a": {
+    "value": "Reproduce the latest reported bug"
+  },
+  "newAgent.roles.qa.tasks.b": {
+    "value": "Which bugs have no steps?"
+  },
+  "newAgent.roles.qa.tasks.c": {
+    "value": "Any new error since the deploy?"
+  },
   "newAgent.roles.pm.name": {
     "value": "PM"
   },
@@ -12497,6 +12887,15 @@
   },
   "newAgent.roles.pm.instructions": {
     "value": "Looks things up first (tasks, threads, wiki, feedback) and only asks what's left.\nOrganizes tasks, summarizes long discussions and keeps the roadmap up to date."
+  },
+  "newAgent.roles.pm.tasks.a": {
+    "value": "Summarize what the team did this week"
+  },
+  "newAgent.roles.pm.tasks.b": {
+    "value": "Which tasks are stuck?"
+  },
+  "newAgent.roles.pm.tasks.c": {
+    "value": "Update the roadmap"
   },
   "newAgent.roles.support.name": {
     "value": "Support"
@@ -12510,6 +12909,15 @@
   "newAgent.roles.support.instructions": {
     "value": "Before answering, looks up the customer's history, past conversations and the help center, and comes back with a ready reply and where it came from.\nIf it's a product problem, opens a task with the steps and tells the team. Never promises a date or a fix that doesn't exist.\nMessages to customers, refunds and discounts only with approval."
   },
+  "newAgent.roles.support.tasks.a": {
+    "value": "Which customers have waited longest for an answer?"
+  },
+  "newAgent.roles.support.tasks.b": {
+    "value": "Summarize this week's complaints"
+  },
+  "newAgent.roles.support.tasks.c": {
+    "value": "Draft a reply to the latest customer email"
+  },
   "newAgent.roles.sales.name": {
     "value": "Sales"
   },
@@ -12521,6 +12929,15 @@
   },
   "newAgent.roles.sales.instructions": {
     "value": "Before talking to anyone, researches the company, the history with it and what was already agreed, and comes back with a summary and the next step.\nKeeps the list of leads up to date and reminds the team of what's stalled.\nNever makes up prices, discounts or terms: uses only what's in the price list. Sends a proposal or email to a customer only with approval."
+  },
+  "newAgent.roles.sales.tasks.a": {
+    "value": "Who has been quiet for over a week?"
+  },
+  "newAgent.roles.sales.tasks.b": {
+    "value": "Prepare a proposal for the latest lead"
+  },
+  "newAgent.roles.sales.tasks.c": {
+    "value": "How much came in from new customers this month?"
   },
   "newAgent.roles.marketing.name": {
     "value": "Marketing"
@@ -12534,6 +12951,15 @@
   "newAgent.roles.marketing.instructions": {
     "value": "Starts by looking at what was already done, the results and the brand's voice before suggesting something new.\nWrites drafts of campaigns, posts and pages, with one main idea and who it's for.\nNever makes up numbers or testimonials. Publishes on the website or social media only with approval."
   },
+  "newAgent.roles.marketing.tasks.a": {
+    "value": "Suggest 3 posts for this week"
+  },
+  "newAgent.roles.marketing.tasks.b": {
+    "value": "Plan the next campaign"
+  },
+  "newAgent.roles.marketing.tasks.c": {
+    "value": "Review the copy on the pricing page"
+  },
   "newAgent.roles.content.name": {
     "value": "Content"
   },
@@ -12545,6 +12971,15 @@
   },
   "newAgent.roles.content.instructions": {
     "value": "Before writing, reads what already exists on the subject (wiki, documents, conversations) and confirms who the text is for.\nDelivers clear, short drafts with the sources at the end. When editing, explains what changed and why.\nNever makes up data or quotes. Publishes or sends outside the team only with approval."
+  },
+  "newAgent.roles.content.tasks.a": {
+    "value": "Write this month's newsletter"
+  },
+  "newAgent.roles.content.tasks.b": {
+    "value": "Review the latest blog post"
+  },
+  "newAgent.roles.content.tasks.c": {
+    "value": "List 5 topics for articles"
   },
   "newAgent.roles.data.name": {
     "value": "Data"
@@ -12558,6 +12993,15 @@
   "newAgent.roles.data.instructions": {
     "value": "Gets the numbers from the source before answering and shows where they came from, the period and how it calculated them.\nIf the data isn't enough or looks wrong, says so instead of guessing. Never makes up a number.\nEvery Monday, posts a summary of the week's main numbers."
   },
+  "newAgent.roles.data.tasks.a": {
+    "value": "How did sales go this week?"
+  },
+  "newAgent.roles.data.tasks.b": {
+    "value": "Build this month's report"
+  },
+  "newAgent.roles.data.tasks.c": {
+    "value": "Which customers buy the most?"
+  },
   "newAgent.roles.finance.name": {
     "value": "Finance"
   },
@@ -12569,6 +13013,15 @@
   },
   "newAgent.roles.finance.instructions": {
     "value": "Checks payments, billing and spending at the source before answering and shows amounts with the date and where they came from.\nFlags what's out of the ordinary: failing charges, spending above what's expected, invoices coming due.\nPayments, refunds and any money movement only with approval. Never makes up amounts."
+  },
+  "newAgent.roles.finance.tasks.a": {
+    "value": "How much came in this month?"
+  },
+  "newAgent.roles.finance.tasks.b": {
+    "value": "Which charges failed?"
+  },
+  "newAgent.roles.finance.tasks.c": {
+    "value": "Summarize last month's spending"
   },
   "newAgent.roles.people.name": {
     "value": "People"
@@ -12582,6 +13035,15 @@
   "newAgent.roles.people.instructions": {
     "value": "Before answering, looks in the policies, the wiki and the team's documents, and says where it found the answer.\nOrganizes openings, interviews and new joiners' first days, with clear checklists.\nHandles personal data with care and shares it only with who needs it. Messages candidates only with approval."
   },
+  "newAgent.roles.people.tasks.a": {
+    "value": "Plan the first week of whoever starts Monday"
+  },
+  "newAgent.roles.people.tasks.b": {
+    "value": "What are the vacation rules?"
+  },
+  "newAgent.roles.people.tasks.c": {
+    "value": "Schedule this week's interviews"
+  },
   "newAgent.roles.research.name": {
     "value": "Research"
   },
@@ -12594,6 +13056,15 @@
   "newAgent.roles.research.instructions": {
     "value": "Looks first at what the team already has (wiki, documents, conversations), then at outside sources.\nDelivers a short summary with the main findings, what's still unknown and the sources for each point.\nKeeps facts apart from opinions and never makes up data or quotes."
   },
+  "newAgent.roles.research.tasks.a": {
+    "value": "Research the 5 biggest competitors"
+  },
+  "newAgent.roles.research.tasks.b": {
+    "value": "Summarize what we already know about the market"
+  },
+  "newAgent.roles.research.tasks.c": {
+    "value": "Compare the competitors' prices"
+  },
   "newAgent.roles.assistant.name": {
     "value": "Assistant"
   },
@@ -12605,6 +13076,15 @@
   },
   "newAgent.roles.assistant.instructions": {
     "value": "Before asking, checks the calendar, the emails and recent conversations, and comes back with what it found and a suggestion.\nOrganizes meetings, drafts replies and sends reminders at the right time.\nSending emails or messages on someone's behalf, accepting invites and making payments only with approval."
+  },
+  "newAgent.roles.assistant.tasks.a": {
+    "value": "Summarize my emails from today"
+  },
+  "newAgent.roles.assistant.tasks.b": {
+    "value": "What did I promise to answer this week?"
+  },
+  "newAgent.roles.assistant.tasks.c": {
+    "value": "Find the quarter's goals spreadsheet"
   },
   "newAgent.roles.custom.name": {
     "value": "From scratch"
@@ -24112,7 +24592,7 @@
     "value": "Where to keep files"
   },
   "storage.agentes": {
-    "value": "agentes storage"
+    "value": "agentes.chat storage"
   },
   "storage.agentesText": {
     "value": "Your files stay in our storage, kept apart per workspace."
@@ -24136,7 +24616,7 @@
     "value": "Show the folder"
   },
   "storage.place.agentes": {
-    "value": "agentes storage"
+    "value": "agentes.chat storage"
   },
   "storage.place.server": {
     "value": "this server"
@@ -33026,6 +33506,9 @@
   "chat.issueWork.agent": {
     "value": "With {{name}}"
   },
+  "chat.issueWork.chipLabel": {
+    "value": "Open the conversation of task #{{number}}, {{title}}"
+  },
   "chat.body.autonomy_proposal.pr": {
     "value": "Nobody asked for this directly. May I open a pull request?"
   },
@@ -33043,6 +33526,9 @@
   },
   "chat.body.team_week": {
     "value": "How the team's week went, {{from}} to {{to}}"
+  },
+  "chat.body.team_day": {
+    "value": "How the team's day went, up to {{day}}"
   },
   "chat.body.autonomy_loop": {
     "value": "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled."
@@ -35770,6 +36256,18 @@
   "agentComputer.status.outdated": {
     "value": "Needs an update on {{computer}}"
   },
+  "agentComputer.status.updating": {
+    "value": "Being updated · back by itself"
+  },
+  "agentComputer.status.screensOff": {
+    "value": "Screens are off on {{computer}}"
+  },
+  "agentComputer.status.screensMissing": {
+    "value": "{{computer}} can't show screens yet"
+  },
+  "agentComputer.status.browserOff": {
+    "value": "The browser is off on {{computer}}"
+  },
   "agentComputer.screen": {
     "value": "{{name}}'s screen, live"
   },
@@ -37381,20 +37879,8 @@
   "dashboards.errors.notTested": {
     "value": "Test it first: the widget is created once its test works."
   },
-  "teamPlan.start.question": {
-    "value": "What does {{org}} do? With that I build a ready team, and you just check it."
-  },
-  "teamPlan.start.orWrite": {
-    "value": "Or write it your way below, in one sentence."
-  },
-  "teamPlan.start.footer": {
-    "value": "Already know what you want?"
-  },
   "teamPlan.start.templates": {
     "value": "See team templates"
-  },
-  "teamPlan.start.presets": {
-    "value": "Ready-made agents"
   },
   "teamPlan.business.agency": {
     "value": "Agency"
@@ -37416,9 +37902,6 @@
   },
   "teamPlan.business.other": {
     "value": "Something else"
-  },
-  "teamPlan.answered": {
-    "value": "answered"
   },
   "teamPlan.step": {
     "value": "Question {{step}} of {{of}}"
@@ -37556,10 +38039,19 @@
     "value": "A ready team for your kind of business. Then {{name}} fits it with you."
   },
   "teamPlan.templates.heldLead": {
-    "value": "Pick the closest to your business. You can change every agent before creating them."
+    "value": "Pick the closest to your business. You can change everything later."
   },
-  "teamPlan.templates.use": {
-    "value": "Use this template"
+  "teamPlan.templates.create": {
+    "value": "Create the team"
+  },
+  "teamPlan.templates.import": {
+    "value": "Bring agents from another app"
+  },
+  "teamPlan.templates.scratch": {
+    "value": "Create an agent from scratch"
+  },
+  "teamPlan.templates.failed": {
+    "value": "The team wasn't created. The reason is on the card in the chat."
   },
   "teamPlan.templates.none": {
     "value": "None of these"
@@ -37568,7 +38060,7 @@
     "value": "Tell what you do and {{name}} builds it"
   },
   "teamPlan.templates.tailor": {
-    "value": "Then I ask 2 questions to fit it to your business."
+    "value": "Later, just ask me to fit it to your business."
   },
   "teamPlan.weekly.name": {
     "value": "The team's week"
@@ -37851,8 +38343,5 @@
   },
   "teamTemplates.approvals": {
     "value": "What goes out to customers waits for your approval. You can let it go later, once you trust them."
-  },
-  "teamTemplates.ask": {
-    "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
   }
 }

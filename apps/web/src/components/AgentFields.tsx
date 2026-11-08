@@ -1,6 +1,6 @@
 import type { Credential, Member } from "@agenteschat/client";
 import { apiPickOptions, type BrainPickOption, brainPickText } from "@agenteschat/client/lib/brain-picker";
-import { type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
+import { keyLine, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
   AGENT_ACCESSORIES,
@@ -188,7 +188,7 @@ export function keyOptions(
       .map((c) => ({
         value: c.id,
         label: c.label,
-        description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
+        description: keyLine(t, c),
         leading: <ProviderLogo id={c.provider} size="sm" />,
       })),
   ];

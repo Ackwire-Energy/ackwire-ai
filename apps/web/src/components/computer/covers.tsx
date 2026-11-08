@@ -1,4 +1,5 @@
 import type { Edition, Machine } from "@agenteschat/client";
+import { type CantShow, cantShowLine } from "@agenteschat/client/lib/agent-computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
 import type { AgentColor } from "@agenteschat/ui";
@@ -36,9 +37,9 @@ export function ScreenNotice({ name, machine }: { name: string; machine?: Machin
 }
 
 /**
- * The agent's screen can't be shown: on the Cloud only that, and to try again in a moment (nobody there can
- * fix it); on self-host the reason in plain words and, for its admins and whoever paired the computer, the fix
- * to run there. A Mac never gets this: it has no screens, and shows the agent's page instead.
+ * The agent's screen can't be shown: why, as the entry's line says it (`cause`), and to try again in a moment; on
+ * self-host, for its admins and whoever paired the computer, the fix to run there. A Mac never gets this: it has no
+ * screens, and shows the agent's page instead.
  */
 export function CantShowCover({
   edition,
@@ -47,6 +48,7 @@ export function CantShowCover({
   name,
   reason,
   detail,
+  cause,
   color,
   onRetry,
 }: {
@@ -57,6 +59,8 @@ export function CantShowCover({
   /** `GET …/desktop`'s reason, or the stream's: `not_allowed`, `desktop_unavailable`, `runner_outdated`… */
   reason: string | null;
   detail: string | null;
+  /** Why, as the entry's line says it (`cantShow`), where the dialog knows it. */
+  cause?: CantShow;
   color: AgentColor;
   onRetry: () => void;
 }) {
@@ -98,7 +102,7 @@ export function CantShowCover({
     <Cover
       color={color}
       icon="dash"
-      text={t("agentComputer.state.unavailable", g)}
+      text={(cause && cantShowLine(t, cause, { edition, computer })) || t("agentComputer.state.unavailable", g)}
       help={t("agentComputer.state.unavailableHelp")}
       action={again}
     />

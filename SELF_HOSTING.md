@@ -936,13 +936,14 @@ party only when you turn that service on:
 | agentes.chat push relay | An Android phone signed in to the instance, unless `FIREBASE_SERVICE_ACCOUNT` is set or `PUSH_SENDER` is `direct` or `off` | Once, to register the instance: its version. Then, for each push to that phone: its FCM token, a title (up to 80 characters), a line of text (up to 180) and what the notification opens (ids of the workspace, conversation or request), which the relay passes to Firebase Cloud Messaging without keeping them. |
 | Firebase Cloud Messaging (Google) | An Android phone signed in to the instance (through the relay above, or directly with `FIREBASE_SERVICE_ACCOUNT`) | For each push to that phone: its FCM token, the title, the line of text and what the notification opens. Directly, also a request signed with the service account's key, for an access token. |
 | Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
-| A Sentry-compatible server you choose | `SENTRY_DSN`, `SENTRY_WEB_DSN` | Error reports, below. |
+| A Sentry-compatible server you choose | `SENTRY_DSN`, `SENTRY_WEB_DSN`, `SENTRY_MOBILE_DSN` | Error reports, below. |
 | Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
 **Error reports (optional).** With `SENTRY_DSN` (a project's DSN on a Sentry-compatible server), the
 server reports its unexpected errors: crashes, requests that fail with a 500, background jobs that fail,
 socket handlers that fail, and a boot that fails. With `SENTRY_WEB_DSN`, the web app and the desktop app
-report theirs, and a page that breaks shows the code of its report. A report holds the error and its
+report theirs, and a page that breaks shows the code of its report. The phone app reports its own to
+`SENTRY_MOBILE_DSN`, else to `SENTRY_WEB_DSN`, including a view of an agent's screen that never opens. A report holds the error and its
 stack, the version (`APP_VERSION`, else the server's own), `SENTRY_ENVIRONMENT`, the route as a pattern
 (`/api/app/organizations/:orgId/channels`), the request id, the HTTP method and status, a job's kind and
 attempt, and internal ids of the workspace, person, agent, run and computer. It never holds messages or

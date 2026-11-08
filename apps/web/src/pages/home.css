@@ -209,3 +209,28 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
     justify-content: space-between;
   }
 }
+
+/* The right hand's first run while a row is left (ADR 0155 §6): one line back to its checklist. */
+.home-continue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.home-continue__text {
+  flex: 1;
+  min-width: 0;
+}
+.home-continue > .ac-icon {
+  color: var(--ink-muted);
+}
+html:not([data-pointer]) .home-continue:focus-visible {
+  box-shadow: var(--field-ring);
+}

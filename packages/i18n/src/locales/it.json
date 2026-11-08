@@ -1635,7 +1635,10 @@
       "subPerson": "Ogni agente sotto la persona responsabile, o sotto chi guida il suo reparto quando non ne ha una.",
       "subSector": "Ogni reparto con i suoi agenti. {{name}} lavora con tutti.",
       "workspace": "Spazio di lavoro",
-      "responsible": "Responsabili: {{names}}"
+      "responsible": "Responsabili: {{names}}",
+      "lodi": "segue tutto con te",
+      "supervisor": "Supervisore: {{name}}",
+      "dragSector": "Trascina su un agente perché gli agenti di questo settore rispondano a lui"
     },
     "map": {
       "lead": "Chi si occupa degli agenti, i canali in cui sono, cosa fa ognuno da solo e cosa aspetta una persona. Le linee tratteggiate sono agenti che si sono chiesti aiuto nell'ultimo giorno.",
@@ -1655,7 +1658,9 @@
       "emptyTitle": "Guarda dove lavora ogni agente",
       "emptyAction": "Aggiungi a un canale",
       "emptyViewer": "Chi gestisce gli agenti li aggiunge ai canali, e la mappa compare qui.",
-      "others": "Altri canali"
+      "others": "Altri canali",
+      "band": "Supervisori",
+      "reportsTo": "Risponde a {{name}}"
     },
     "sectors": {
       "lead": "Ogni reparto ha un responsabile, un sostituto, i suoi agenti e i loro canali e routine.",
@@ -1665,6 +1670,18 @@
       "backupLabel": "Sostituto",
       "leadOf": "Responsabile di {{name}}",
       "backupOf": "Sostituto in {{name}}",
+      "supervisor": "Supervisore",
+      "supervisorOf": "Supervisore di {{name}}",
+      "unsupervised_one": "{{count}} agente senza supervisore",
+      "unsupervised_many": "{{count}} agenti senza supervisore",
+      "unsupervised_other": "{{count}} agenti senza supervisore",
+      "apply": "Applica",
+      "supervisorDone_one": "{{count}} agente di {{sector}} ora risponde a {{name}}",
+      "supervisorDone_many": "{{count}} agenti di {{sector}} ora rispondono a {{name}}",
+      "supervisorDone_other": "{{count}} agenti di {{sector}} ora rispondono a {{name}}",
+      "supervisorCleared_one": "{{count}} agente di {{sector}} non risponde più a un supervisore",
+      "supervisorCleared_many": "{{count}} agenti di {{sector}} non rispondono più a un supervisore",
+      "supervisorCleared_other": "{{count}} agenti di {{sector}} non rispondono più a un supervisore",
       "nobody": "Nessuno",
       "none": "Nessuna",
       "channels": "Canali",
@@ -1680,6 +1697,14 @@
       "empty": "Ogni reparto ha un responsabile, così tutti vedono chi si occupa di cosa.",
       "emptyViewerTitle": "Vedi chi si occupa di cosa",
       "emptyViewer": "I reparti li crea chi gestisce gli agenti, e poi appaiono qui."
+    },
+    "reportsTo": {
+      "label": "Risponde a",
+      "help": "Dice solo a chi questo agente rende conto. Non dà nessun permesso.",
+      "none": "Nessuno",
+      "done": "{{agent}} ora risponde a {{to}}",
+      "cleared": "{{agent}} non risponde più a un agente",
+      "reports": "Chi risponde a {{name}}"
     },
     "usage": {
       "lead": "Quanto usa degli agenti ogni persona questo mese, e i limiti.",
@@ -1994,22 +2019,12 @@
         "text": "Gli agenti pensano con l’IA del workspace. Accedi con il tuo piano di Claude o di ChatGPT, senza chiave API.",
         "action": "Collega"
       },
-      "start": {
-        "question": "Come vuoi iniziare?",
-        "createOne": "Crea {{name}}",
-        "team": "Costruisci un team per iniziare",
-        "describe": "Descrivi di cosa ho bisogno",
-        "import": "Importa i miei agenti",
-        "form": "Compila il modulo"
-      },
       "again": {
         "question": "Vuoi costruire il team con me?",
         "action": "Costruisci il team",
         "message": "Aiutami a costruire il team."
       },
       "next": {
-        "question": "Il team è arrivato. E adesso?",
-        "invite": "Invita persone",
         "firstTask": "Dai un primo compito a {{name}}"
       },
       "style": {
@@ -2017,12 +2032,6 @@
         "text": "Vale per tutti gli agenti, e puoi cambiarlo quando vuoi nel tuo account.",
         "simple": "Semplice, senza termini tecnici",
         "technical": "Tecnico, con i dettagli"
-      },
-      "firstTask": {
-        "theo": "Prepara il piano della nostra prima settimana: cosa fa per primo ognuno di noi?",
-        "ada": "Cosa potresti costruire o automatizzare per noi per primo?",
-        "lia": "Chi sono i nostri 5 concorrenti più vicini, e cosa fanno meglio di noi?",
-        "atlas": "Cosa terrai d’occhio per primo tra i nostri errori, le code e i deploy, e come mi avvisi quando qualcosa si rompe?"
       }
     },
     "profile": {
@@ -2108,6 +2117,7 @@
         "ai_account": "Solo il proprietario dell’account lo assegna",
         "name": "Solo gli admin rinominano un agente",
         "look": "Solo gli admin e il responsabile cambiano il suo aspetto",
+        "reports_to": "Solo gli admin cambiano a chi risponde un agente",
         "many": "Solo gli admin fanno queste modifiche"
       }
     },
@@ -2120,10 +2130,12 @@
       "archive": "Stato",
       "channel": "Canale",
       "name": "Nome",
-      "look": "Aspetto"
+      "look": "Aspetto",
+      "reports_to": "Risponde a"
     },
     "value": {
       "lookDefault": "L'aspetto predefinito",
+      "anAgent": "Un agente",
       "none": "Nessuno",
       "budgetDefault": "Predefinito del workspace",
       "anAccount": "Un account di IA",
@@ -2174,6 +2186,7 @@
   },
   "teamWeek": {
     "title": "Settimana del team",
+    "dayTitle": "Riepilogo del giorno",
     "suggestions_one": "{{count}} suggerimento",
     "suggestions_many": "{{count}} suggerimenti",
     "suggestions_other": "{{count}} suggerimenti",
@@ -2252,7 +2265,8 @@
       "wed": "Ogni mercoledì alle {{time}}",
       "thu": "Ogni giovedì alle {{time}}",
       "fri": "Ogni venerdì alle {{time}}",
-      "sat": "Ogni sabato alle {{time}}"
+      "sat": "Ogni sabato alle {{time}}",
+      "day": "Ogni giorno alle {{time}}"
     },
     "off": "Spenta",
     "schedule": {
@@ -2260,11 +2274,14 @@
       "day": "Giorno",
       "hour": "Ora",
       "stop": "Non riceverla più",
-      "start": "Riceverla di nuovo"
+      "start": "Riceverla di nuovo",
+      "daily": "Ogni giorno"
     },
     "settings": {
       "label": "Settimana del team",
-      "help": "Ogni settimana {{name}} ti racconta nella tua DM com’è andato il team e cosa migliorare. La ricevono solo gli admin."
+      "help": "Ogni settimana {{name}} ti racconta nella tua DM com’è andato il team e cosa migliorare. La ricevono solo gli admin.",
+      "dayLabel": "Riepilogo del giorno",
+      "dayHelp": "Ogni giorno {{name}} ti racconta nella tua DM cosa ha fatto il team e cosa ti aspetta, solo nei giorni in cui c'è qualcosa da dire."
     }
   },
   "routing": {
@@ -3840,46 +3857,11 @@
       "answer": "Rispondi",
       "open": "Apri"
     },
-    "steps": {
-      "title": "Primi passi",
-      "progress": "{{done}} di {{total}}",
-      "hide": "Nascondi",
-      "done": "Fatto",
-      "agent": {
-        "title": "Crea il tuo primo agente",
-        "text": "Di' cosa fa ed entra nel team.",
-        "action": "Crea agente"
-      },
-      "plan": {
-        "title": "Scegli un piano agentes.chat",
-        "text": "Gli agenti iniziano a lavorare quando il workspace ne ha uno.",
-        "action": "Vedi i piani"
-      },
-      "ai": {
-        "title": "Collega un'IA",
-        "text": "È ciò con cui ragionano i tuoi agenti.",
-        "action": "Collega"
-      },
-      "ask": {
-        "title": "Chiedi qualcosa a un agente",
-        "text": "Scrivi qui sotto o in una conversazione.",
-        "action": "Chiedi"
-      },
-      "team": {
-        "title": "Invita il tuo team",
-        "text": "Qui persone e agenti lavorano insieme.",
-        "action": "Invita"
-      },
-      "routine": {
-        "title": "Crea una routine",
-        "text": "Un agente fa qualcosa da solo, a orari stabiliti.",
-        "action": "Crea routine"
-      }
-    },
     "calm": {
       "title": "Tutto in pari",
       "text": "I tuoi agenti ti avviseranno qui quando avranno bisogno di te."
-    }
+    },
+    "firstRun": "Riprendi da dove eri · {{done}} di {{total}}"
   },
   "notifications": {
     "title": "Notifiche",
@@ -5250,6 +5232,176 @@
       "app": "Inviata tramite un'app IA"
     }
   },
+  "agentSetup": {
+    "greeting": "Ciao, {{person}}. Sono {{name}}.",
+    "greeting_female": "Ciao, {{person}}. Sono {{name}}.",
+    "greetingRole": "Ciao, {{person}}. Sono {{name}}, il nuovo agente {{role}}.",
+    "greetingRole_female": "Ciao, {{person}}. Sono {{name}}, la nuova agente {{role}}.",
+    "asked": "Mi hai chiesto: «{{what}}».",
+    "lead": "Per iniziare, aiutami con qualche cosa veloce:",
+    "title": "Per iniziare",
+    "ready": "Sono pronto.",
+    "ready_female": "Sono pronta.",
+    "titleProfile": "Per far iniziare {{name}}",
+    "titleProfile_female": "Per far iniziare {{name}}",
+    "count": "{{done}} di {{total}}",
+    "change": "Cambia",
+    "switch": "Passa a",
+    "choose": "Scegli",
+    "see": "Vedi",
+    "suggested": "Suggerito",
+    "ai": {
+      "todo": "Collega un'IA",
+      "todoDesc": "Così posso ragionare.",
+      "action": "Collega",
+      "done": "Ho un'IA con cui ragionare"
+    },
+    "apps": {
+      "todo": "Leggi {{apps}}",
+      "todoDesc": "Leggere non cambia mai nulla.",
+      "action": "Consenti",
+      "todoNone": "Usa le app di {{org}}",
+      "todoNoneDesc": "Quelle che hai già collegato, come Gmail e Drive.",
+      "done": "Uso {{apps}}",
+      "doneNone": "Per ora nessuna app",
+      "title": "Cosa può usare {{name}}",
+      "title_female": "Cosa può usare {{name}}",
+      "desc": "Leggere non cambia mai nulla. Inviare, eliminare e pagare chiedono la tua approvazione.",
+      "ok_one": "Consenti {{count}} app",
+      "ok_many": "Consenti {{count}} app",
+      "ok_other": "Consenti {{count}} app",
+      "okNone": "Continua senza app",
+      "empty": "{{org}} non ha ancora app collegate.",
+      "connectOther": "Collega un'altra app"
+    },
+    "where": {
+      "todo": "Unisciti a {{channel}}",
+      "todoDesc": "Rispondo quando qualcuno mi chiama lì.",
+      "action": "Unisciti",
+      "todoNone": "Unisciti a un canale",
+      "done": "Sono in {{channels}}",
+      "doneNone": "Resto nella nostra chat diretta",
+      "title": "Dove lavora {{name}}",
+      "title_female": "Dove lavora {{name}}",
+      "desc": "Risponde quando qualcuno lo chiama lì. La chat diretta conta sempre.",
+      "okNone": "Solo chat diretta",
+      "okOne": "Unisciti a {{channel}}",
+      "ok_one": "Unisciti a {{count}} canale",
+      "ok_many": "Unisciti a {{count}} canali",
+      "ok_other": "Unisciti a {{count}} canali"
+    },
+    "who": {
+      "todo": "Parla con tutti in {{org}}",
+      "todoDesc": "Chiunque può chiamarmi.",
+      "todoPlan": "Parla solo con te",
+      "todoPlanDesc": "Il tuo piano è personale.",
+      "doneEveryone": "Parlo con tutti in {{org}}",
+      "doneYou": "Parlo solo con te",
+      "doneOwner": "Parlo solo con {{name}}",
+      "donePeople": "Parlo con le persone che hai scelto",
+      "title": "Chi parla con {{name}}",
+      "title_female": "Chi parla con {{name}}",
+      "people": "Persone e ruoli",
+      "add": "Scegli le persone",
+      "addMore": "Aggiungi qualcun altro",
+      "you": "tu",
+      "youCap": "Tu",
+      "ownerHelp": "Riceve le sue richieste di approvazione e gli avvisi.",
+      "ownerHelp_female": "Riceve le sue richieste di approvazione e gli avvisi."
+    },
+    "how": {
+      "todo": "Scopri come lavoro",
+      "todoDesc": "Parto dalle istruzioni di {{role}}.",
+      "todoDescBlank": "Parto da quello che hai scritto.",
+      "done": "Lavoro a modo tuo",
+      "title": "Come lavora {{name}}",
+      "title_female": "Come lavora {{name}}",
+      "desc": "Scrivi come faresti con qualcuno di nuovo nel team.",
+      "instructions": "Istruzioni",
+      "budget": "Limite mensile",
+      "budgetHelp": "Ti avvisiamo all'80%. Al limite, si ferma e te lo dice.",
+      "budgetHelp_female": "Ti avvisiamo all'80%. Al limite, si ferma e te lo dice.",
+      "more": "Altre opzioni",
+      "model": "Modello"
+    },
+    "say": {
+      "ai": "Ora posso ragionare.",
+      "apps": "Fatto, ora posso usare le app.",
+      "where": "Ci tengo d'occhio da lì.",
+      "who": "Ricevuto, so con chi parlare.",
+      "how": "Ricevuto, so come vuoi che lavori."
+    },
+    "tasksLead": "Possiamo già iniziare. Chiedimi qualcosa:",
+    "tasksAllDone": "Tutto pronto. Chiedimi qualcosa:",
+    "tasks": {
+      "a": "Cosa puoi fare per me?",
+      "b": "Da dove iniziamo?"
+    },
+    "firstRun": {
+      "title": "Perché il team di {{org}} inizi a lavorare",
+      "complete": "Tutto pronto.",
+      "notNow": "Non ora",
+      "afterPlan": "Si apre con il piano.",
+      "about": {
+        "todo": "Dimmi cosa fa {{org}}.",
+        "todoDesc": "Tutti gli agenti lo leggono.",
+        "action": "Racconta",
+        "done": "So cosa fa {{org}}",
+        "title": "Cosa fa {{org}}?",
+        "desc": "Tutti gli agenti lo leggono. Puoi cambiarlo quando vuoi.",
+        "line": "In una frase",
+        "optional": "Facoltativo. Senza frase vale il tipo che hai scelto."
+      },
+      "team": {
+        "todo": "Crea il team.",
+        "todoDesc": "Un modello per la tua attività, puoi cambiare tutto dopo.",
+        "action": "Vedi il team",
+        "done_one": "{{count}} agente nel team",
+        "done_other": "{{count}} agenti nel team",
+        "card": "Continua nella scheda qui sotto"
+      },
+      "ai": {
+        "todo": "Collega un'IA.",
+        "todoDesc": "Va bene quella che paghi già.",
+        "action": "Collega",
+        "done": "Penso con {{label}}",
+        "doneAny": "Penso con un'IA",
+        "plan": "Si apre con il piano di agentes.chat.",
+        "planAction": "Vedi i piani di agentes.chat"
+      },
+      "apps": {
+        "todo": "Collega le app di lavoro.",
+        "todoDesc": "Leggere non cambia mai nulla.",
+        "action": "Scegli",
+        "done": "Leggo {{apps}}",
+        "doneNone": "Nessuna app per ora",
+        "title": "Le app di lavoro",
+        "desc": "Prima quelle che userebbe il team appena creato. Leggere non cambia mai nulla, e inviare, eliminare e pagare chiedono la tua approvazione.",
+        "connect": "Collega",
+        "all": "Vedi tutte le app"
+      },
+      "people": {
+        "todo": "Chiama chi lavora con te.",
+        "todoDesc": "Parlano anche con gli agenti.",
+        "action": "Invita",
+        "done_one": "{{count}} persona qui",
+        "done_other": "{{count}} persone qui",
+        "doneNone": "Solo tu per ora"
+      },
+      "say": {
+        "about": "Annotato. Tutti gli agenti lo leggono.",
+        "team": "Il team è arrivato.",
+        "ai": "Ora il team pensa.",
+        "apps": "Fatto, ora leggo le app.",
+        "people": "Che bello avere più persone qui."
+      },
+      "asks": {
+        "lead": "Ora chiedimi qualcosa:",
+        "fit": "Adatta il team alla mia attività",
+        "who": "Chi nel team si occupa di cosa?"
+      }
+    }
+  },
   "newAgent": {
     "title": "Crea agente",
     "railOrg": "{{org}} · sei {{role}}",
@@ -5303,79 +5455,144 @@
         "name": "Dev",
         "agent": "Ada",
         "desc": "Scrive codice, rivede PR e indaga sui bug.",
-        "instructions": "Prima indaga: legge il codice e le attività e gli errori collegati prima di rispondere, e torna con ciò che ha trovato e una proposta concreta di PR con un test.\nLavora nei branch e apre PR piccole. Per i cambiamenti grandi, apre la PR come bozza e spiega lì il piano.\nNon fa mai merge da solo: chiede una revisione a una persona."
+        "instructions": "Prima indaga: legge il codice e le attività e gli errori collegati prima di rispondere, e torna con ciò che ha trovato e una proposta concreta di PR con un test.\nLavora nei branch e apre PR piccole. Per i cambiamenti grandi, apre la PR come bozza e spiega lì il piano.\nNon fa mai merge da solo: chiede una revisione a una persona.",
+        "tasks": {
+          "a": "Qual è l'errore più frequente in questo momento?",
+          "b": "Rivedi l'ultima PR aperta",
+          "c": "Prendi l'attività più vecchia del backlog"
+        }
       },
       "ops": {
         "name": "Ops",
         "agent": "Atlas",
         "desc": "Tiene d'occhio errori, code e deploy.",
-        "instructions": "Segue errori e deploy e scrive i report sugli incidenti.\nQuando scatta un avviso, prima indaga (errori, log, deploy recenti) e scrive nel canale cosa ha trovato: da quando, quanto è grave, la causa probabile e il prossimo passo.\nRollback e deploy solo con approvazione."
+        "instructions": "Segue errori e deploy e scrive i report sugli incidenti.\nQuando scatta un avviso, prima indaga (errori, log, deploy recenti) e scrive nel canale cosa ha trovato: da quando, quanto è grave, la causa probabile e il prossimo passo.\nRollback e deploy solo con approvazione.",
+        "tasks": {
+          "a": "Qualcosa di strano dall'ultimo deploy?",
+          "b": "Riassumi gli errori di oggi",
+          "c": "Cosa è cambiato nell'ultima versione?"
+        }
       },
       "qa": {
         "name": "QA",
         "agent": "Iris",
         "desc": "Testa i flussi e riproduce i bug segnalati.",
-        "instructions": "Riproduce ogni bug segnalato prima di aprire un'attività. Scrive passaggi chiari e allega le prove.\nSe non riesce a riprodurlo, prima controlla gli errori, le modifiche recenti e le attività collegate. Chiede ambiente e versione solo se mancano.\nDà priorità a ciò che blocca i clienti."
+        "instructions": "Riproduce ogni bug segnalato prima di aprire un'attività. Scrive passaggi chiari e allega le prove.\nSe non riesce a riprodurlo, prima controlla gli errori, le modifiche recenti e le attività collegate. Chiede ambiente e versione solo se mancano.\nDà priorità a ciò che blocca i clienti.",
+        "tasks": {
+          "a": "Riproduci l'ultimo bug segnalato",
+          "b": "Quali bug non hanno i passaggi?",
+          "c": "Ci sono nuovi errori dal deploy?"
+        }
       },
       "pm": {
         "name": "PM",
         "agent": "Theo",
         "desc": "Organizza attività e riepiloghi.",
-        "instructions": "Prima cerca da sé (attività, thread, wiki, feedback) e chiede solo ciò che manca.\nOrganizza le attività, riassume le discussioni lunghe e tiene aggiornata la roadmap."
+        "instructions": "Prima cerca da sé (attività, thread, wiki, feedback) e chiede solo ciò che manca.\nOrganizza le attività, riassume le discussioni lunghe e tiene aggiornata la roadmap.",
+        "tasks": {
+          "a": "Riassumi cosa ha fatto il team questa settimana",
+          "b": "Quali attività sono ferme?",
+          "c": "Aggiorna la roadmap"
+        }
       },
       "support": {
         "name": "Supporto",
         "agent": "Nina",
         "desc": "Risponde ai clienti e passa a una persona ciò che lo richiede.",
-        "instructions": "Prima di rispondere, cerca lo storico del cliente, le conversazioni passate e il centro assistenza, e torna con una risposta pronta e la sua fonte.\nSe è un problema del prodotto, apre un'attività con i passaggi e avvisa il team. Non promette mai una data o una soluzione che non esiste.\nMessaggi ai clienti, rimborsi e sconti solo con approvazione."
+        "instructions": "Prima di rispondere, cerca lo storico del cliente, le conversazioni passate e il centro assistenza, e torna con una risposta pronta e la sua fonte.\nSe è un problema del prodotto, apre un'attività con i passaggi e avvisa il team. Non promette mai una data o una soluzione che non esiste.\nMessaggi ai clienti, rimborsi e sconti solo con approvazione.",
+        "tasks": {
+          "a": "Quali clienti aspettano da più tempo una risposta?",
+          "b": "Riassumi i reclami di questa settimana",
+          "c": "Scrivi una bozza di risposta all'ultima email di un cliente"
+        }
       },
       "sales": {
         "name": "Vendite",
         "agent": "Leo",
         "desc": "Prepara proposte e segue i lead.",
-        "instructions": "Prima di parlare con qualcuno, studia l'azienda, lo storico con lei e ciò che è già stato concordato, e torna con un riepilogo e il prossimo passo.\nTiene aggiornato l'elenco dei lead e ricorda al team cosa è fermo.\nNon inventa mai prezzi, sconti o condizioni: usa solo ciò che c'è nel listino. Invia una proposta o un'email a un cliente solo con approvazione."
+        "instructions": "Prima di parlare con qualcuno, studia l'azienda, lo storico con lei e ciò che è già stato concordato, e torna con un riepilogo e il prossimo passo.\nTiene aggiornato l'elenco dei lead e ricorda al team cosa è fermo.\nNon inventa mai prezzi, sconti o condizioni: usa solo ciò che c'è nel listino. Invia una proposta o un'email a un cliente solo con approvazione.",
+        "tasks": {
+          "a": "Chi è in silenzio da più di una settimana?",
+          "b": "Prepara una proposta per l'ultimo lead",
+          "c": "Quanto è entrato da nuovi clienti questo mese?"
+        }
       },
       "marketing": {
         "name": "Marketing",
         "agent": "Mila",
         "desc": "Pianifica campagne, post e pagine del sito.",
-        "instructions": "Parte guardando ciò che è già stato fatto, i risultati e la voce del brand prima di proporre qualcosa di nuovo.\nScrive bozze di campagne, post e pagine, con un'idea principale e il pubblico a cui si rivolge.\nNon inventa mai numeri o testimonianze. Pubblica sul sito o sui social solo con approvazione."
+        "instructions": "Parte guardando ciò che è già stato fatto, i risultati e la voce del brand prima di proporre qualcosa di nuovo.\nScrive bozze di campagne, post e pagine, con un'idea principale e il pubblico a cui si rivolge.\nNon inventa mai numeri o testimonianze. Pubblica sul sito o sui social solo con approvazione.",
+        "tasks": {
+          "a": "Suggerisci 3 post per questa settimana",
+          "b": "Pianifica la prossima campagna",
+          "c": "Rivedi il testo della pagina dei prezzi"
+        }
       },
       "content": {
         "name": "Contenuti",
         "agent": "Bento",
         "desc": "Scrive e rivede testi, articoli e newsletter.",
-        "instructions": "Prima di scrivere, legge ciò che esiste già sull'argomento (wiki, documenti, conversazioni) e conferma a chi è rivolto il testo.\nConsegna bozze chiare e brevi, con le fonti alla fine. Quando rivede, spiega cosa ha cambiato e perché.\nNon inventa mai dati o citazioni. Pubblica o invia fuori dal team solo con approvazione."
+        "instructions": "Prima di scrivere, legge ciò che esiste già sull'argomento (wiki, documenti, conversazioni) e conferma a chi è rivolto il testo.\nConsegna bozze chiare e brevi, con le fonti alla fine. Quando rivede, spiega cosa ha cambiato e perché.\nNon inventa mai dati o citazioni. Pubblica o invia fuori dal team solo con approvazione.",
+        "tasks": {
+          "a": "Scrivi la newsletter di questo mese",
+          "b": "Rivedi l'ultimo post del blog",
+          "c": "Elenca 5 argomenti per articoli"
+        }
       },
       "data": {
         "name": "Dati",
         "agent": "Dora",
         "desc": "Risponde alle domande con i numeri e crea report.",
-        "instructions": "Prende i numeri dalla fonte prima di rispondere e mostra da dove vengono, il periodo e come li ha calcolati.\nSe i dati non bastano o sembrano sbagliati, lo dice invece di tirare a indovinare. Non inventa mai un numero.\nOgni lunedì pubblica un riepilogo dei numeri principali della settimana."
+        "instructions": "Prende i numeri dalla fonte prima di rispondere e mostra da dove vengono, il periodo e come li ha calcolati.\nSe i dati non bastano o sembrano sbagliati, lo dice invece di tirare a indovinare. Non inventa mai un numero.\nOgni lunedì pubblica un riepilogo dei numeri principali della settimana.",
+        "tasks": {
+          "a": "Come sono andate le vendite questa settimana?",
+          "b": "Prepara il report di questo mese",
+          "c": "Quali clienti comprano di più?"
+        }
       },
       "finance": {
         "name": "Finanza",
         "agent": "Otto",
         "desc": "Tiene traccia di pagamenti, fatturazione e spese.",
-        "instructions": "Controlla pagamenti, fatturazione e spese alla fonte prima di rispondere e mostra gli importi con la data e la provenienza.\nSegnala ciò che è fuori dal normale: addebiti che non vanno a buon fine, spese sopra il previsto, fatture in scadenza.\nPagamenti, rimborsi e qualsiasi movimento di denaro solo con approvazione. Non inventa mai importi."
+        "instructions": "Controlla pagamenti, fatturazione e spese alla fonte prima di rispondere e mostra gli importi con la data e la provenienza.\nSegnala ciò che è fuori dal normale: addebiti che non vanno a buon fine, spese sopra il previsto, fatture in scadenza.\nPagamenti, rimborsi e qualsiasi movimento di denaro solo con approvazione. Non inventa mai importi.",
+        "tasks": {
+          "a": "Quanto è entrato questo mese?",
+          "b": "Quali addebiti sono falliti?",
+          "c": "Riassumi le spese del mese scorso"
+        }
       },
       "people": {
         "name": "Persone",
         "agent": "Clara",
         "desc": "Aiuta con assunzioni, inserimento e le domande del team.",
-        "instructions": "Prima di rispondere, cerca nelle policy, nel wiki e nei documenti del team, e dice dove ha trovato la risposta.\nOrganizza posizioni aperte, colloqui e i primi giorni dei nuovi arrivati, con checklist chiare.\nTratta i dati personali con cura e li condivide solo con chi ne ha bisogno. Scrive ai candidati solo con approvazione."
+        "instructions": "Prima di rispondere, cerca nelle policy, nel wiki e nei documenti del team, e dice dove ha trovato la risposta.\nOrganizza posizioni aperte, colloqui e i primi giorni dei nuovi arrivati, con checklist chiare.\nTratta i dati personali con cura e li condivide solo con chi ne ha bisogno. Scrive ai candidati solo con approvazione.",
+        "tasks": {
+          "a": "Pianifica la prima settimana di chi inizia lunedì",
+          "b": "Quali sono le regole per le ferie?",
+          "c": "Programma i colloqui di questa settimana"
+        }
       },
       "research": {
         "name": "Ricerca",
         "agent": "Hugo",
         "desc": "Fa ricerche su un argomento e consegna un riepilogo con le fonti.",
-        "instructions": "Guarda prima ciò che il team ha già (wiki, documenti, conversazioni), poi le fonti esterne.\nConsegna un riepilogo breve con i risultati principali, ciò che resta da capire e le fonti di ogni punto.\nTiene separati i fatti dalle opinioni e non inventa mai dati o citazioni."
+        "instructions": "Guarda prima ciò che il team ha già (wiki, documenti, conversazioni), poi le fonti esterne.\nConsegna un riepilogo breve con i risultati principali, ciò che resta da capire e le fonti di ogni punto.\nTiene separati i fatti dalle opinioni e non inventa mai dati o citazioni.",
+        "tasks": {
+          "a": "Cerca i 5 maggiori concorrenti",
+          "b": "Riassumi cosa sappiamo già sul mercato",
+          "c": "Confronta i prezzi dei concorrenti"
+        }
       },
       "assistant": {
         "name": "Assistente",
         "agent": "Eva",
         "desc": "Si occupa di calendario, email e promemoria.",
-        "instructions": "Prima di chiedere, controlla il calendario, le email e le conversazioni recenti, e torna con ciò che ha trovato e un suggerimento.\nOrganizza riunioni, scrive bozze di risposta e invia promemoria al momento giusto.\nInviare email o messaggi per conto di qualcuno, accettare inviti e fare pagamenti solo con approvazione."
+        "instructions": "Prima di chiedere, controlla il calendario, le email e le conversazioni recenti, e torna con ciò che ha trovato e un suggerimento.\nOrganizza riunioni, scrive bozze di risposta e invia promemoria al momento giusto.\nInviare email o messaggi per conto di qualcuno, accettare inviti e fare pagamenti solo con approvazione.",
+        "tasks": {
+          "a": "Riassumi le mie email di oggi",
+          "b": "Cosa ho promesso di rispondere questa settimana?",
+          "c": "Trova il foglio con gli obiettivi del trimestre"
+        }
       },
       "custom": {
         "name": "Da zero",
@@ -10278,7 +10495,7 @@
   "storage": {
     "title": "Archiviazione",
     "options": "Dove conservare i file",
-    "agentes": "Archiviazione agentes",
+    "agentes": "Archiviazione agentes.chat",
     "agentesText": "I tuoi file restano nel nostro archivio, separati per spazio di lavoro.",
     "server": "Questo server",
     "serverText": {
@@ -10289,7 +10506,7 @@
     },
     "showFolder": "Mostra la cartella",
     "place": {
-      "agentes": "l'archiviazione agentes",
+      "agentes": "l'archiviazione agentes.chat",
       "server": "questo server"
     },
     "s3": "Il tuo bucket",
@@ -14031,7 +14248,8 @@
       "askedBy": "{{name}} ha chiesto l'attività",
       "view": "Vedi attività",
       "taken": "{{name}} ha preso l'attività",
-      "agent": "Con {{name}}"
+      "agent": "Con {{name}}",
+      "chipLabel": "Apri la conversazione dell'attività #{{number}}, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -14043,6 +14261,7 @@
       "autonomy_digest_many": "{{count}} avvisi sembravano noti o innocui, quindi non ci ho lavorato:",
       "autonomy_digest_other": "{{count}} avvisi sembravano noti o innocui, quindi non ci ho lavorato:",
       "team_week": "Com’è andata la settimana del team, dal {{from}} al {{to}}",
+      "team_day": "Com'è andata la giornata del team, fino al {{day}}",
       "autonomy_loop": "Ho smesso di lavorarci di mia iniziativa. È tornato {{count}} volte in un giorno ({{title}}). Dimmi come vuoi che lo gestisca.",
       "mission_plan": "Piano per “{{title}}” su {{computer}}",
       "mission_planNoComputer": "Piano per “{{title}}”",
@@ -15372,7 +15591,11 @@
       "paused": "In pausa su {{computer}} fino a {{time}}",
       "pausedPlain": "In pausa su {{computer}}",
       "noComputer": "Ancora nessun computer",
-      "outdated": "Serve un aggiornamento su {{computer}}"
+      "outdated": "Serve un aggiornamento su {{computer}}",
+      "updating": "In aggiornamento · torna da solo",
+      "screensOff": "Gli schermi sono disattivati su {{computer}}",
+      "screensMissing": "{{computer}} non può ancora mostrare gli schermi",
+      "browserOff": "Il browser è disattivato su {{computer}}"
     },
     "screen": "Lo schermo di {{name}}, in diretta",
     "screen_female": "Lo schermo di {{name}}, in diretta",
@@ -16072,11 +16295,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Che cosa fa {{org}}? Con questo preparo un team pronto, e tu devi solo controllarlo.",
-      "orWrite": "Oppure scrivilo a modo tuo qui sotto, in una frase.",
-      "footer": "Sai già cosa vuoi?",
-      "templates": "Vedi i modelli di team",
-      "presets": "Agenti pronti"
+      "templates": "Vedi i modelli di team"
     },
     "business": {
       "agency": "Agenzia",
@@ -16087,7 +16306,6 @@
       "services": "Studio di servizi",
       "other": "Altro"
     },
-    "answered": "risposta",
     "step": "Domanda {{step}} di {{of}}",
     "send": "Invia {{count}}",
     "card": {
@@ -16142,11 +16360,14 @@
     "templates": {
       "title": "Modelli di team",
       "lead": "Un team pronto per il tuo tipo di attività. Poi {{name}} lo adatta con te.",
-      "heldLead": "Scegli il più vicino alla tua attività. Puoi adattare ogni agente prima di crearlo.",
-      "use": "Usa questo modello",
+      "heldLead": "Scegli il più vicino alla tua attività. Puoi cambiare tutto dopo.",
+      "create": "Crea il team",
+      "import": "Porta agenti da un'altra app",
+      "scratch": "Crea un agente da zero",
+      "failed": "Il team non è stato creato. Il motivo è nella scheda della conversazione.",
       "none": "Nessuno di questi",
       "noneSub": "Racconta cosa fai e {{name}} lo prepara",
-      "tailor": "Poi faccio 2 domande per adattarlo alla tua attività."
+      "tailor": "Dopo, chiedimi solo di adattarlo alla tua attività."
     },
     "weekly": {
       "name": "La settimana del team"
@@ -16296,7 +16517,6 @@
         "line": "cosa controllare prima di aprire una PR"
       }
     },
-    "approvals": "Ciò che va ai clienti aspetta la tua approvazione. Puoi lasciarlo andare più avanti, quando ti fiderai di loro.",
-    "ask": "Ho usato il modello {{name}}. Per adattarlo alla tua attività: **cosa fa {{org}} di diverso?**"
+    "approvals": "Ciò che va ai clienti aspetta la tua approvazione. Puoi lasciarlo andare più avanti, quando ti fiderai di loro."
   }
 }

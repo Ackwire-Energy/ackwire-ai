@@ -282,7 +282,7 @@ import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { InPlaceProvider } from "@/components/InPlace";
-import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { HandedTaskChips, IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
 import { InviteOfferRow, useInviteDialog, useInviteOffer } from "@/components/invite/InviteDialog";
 import { useLeaveChannelWithUndo } from "@/components/LeaveChannelDialog";
@@ -2161,6 +2161,10 @@ function ChannelView({
     },
     resend: (body) => send(body),
     focusComposer: () => composer.current?.focus(),
+    fillComposer: (text) => {
+      setDraft(text);
+      composer.current?.focus();
+    },
     followBottom: () => {
       if (stick.current && Date.now() >= autoScrollUntil.current) follow();
     },
@@ -2220,6 +2224,7 @@ function ChannelView({
       retry: (local) => now().retry(local),
       resend: (body) => now().resend(body),
       focusComposer: () => now().focusComposer(),
+      fillComposer: (text) => now().fillComposer(text),
       followBottom: () => now().followBottom(),
       channelAgents,
       reply: replies ? (message) => now().reply(message) : undefined,
@@ -4529,6 +4534,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               </p>
             )}
             {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
+            {m.author.type === "agent" && !m.local && <HandedTaskChips message={m} />}
             {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
             {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
             {agent &&

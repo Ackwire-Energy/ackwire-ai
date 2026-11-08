@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   foreignKey,
@@ -166,6 +167,11 @@ export const agents = pgTable(
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**
+     * The setup checklist at the top of its chat (ADR 0155 §2): the ready-made role it started from (null: from
+     * scratch or made elsewhere) and the steps a person confirmed. Null = made before the checklist: none shows.
+     */
+    setup: jsonb().$type<{ role: string | null; done: string[] }>(),
+    /**
      * Its computer (ADR 0025): the connected machine it works on; null = none yet (the workspace's own computer
      * takes the agents with none once it connects).
      */
@@ -241,6 +247,12 @@ export const agents = pgTable(
     groupId: uuid().references(() => agentGroups.id, { onDelete: "set null" }),
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
+    /**
+     * "Responde a" (ADR 0148 addendum): the agent it reports to, in the same workspace (checked in code, as the right
+     * hand, loops and depth are). It says where its news goes by default and who it may always call; it grants nothing.
+     * Null: its owner, else its setor's lead.
+     */
+    reportsToAgentId: uuid().references((): AnyPgColumn => agents.id, { onDelete: "set null" }),
     /**
      * A built-in agent the product ships (ADR 0137): `right_hand` is the team's right hand, one per workspace (the
      * index below), never archived, deleted, exported or imported. Null = an agent people made.

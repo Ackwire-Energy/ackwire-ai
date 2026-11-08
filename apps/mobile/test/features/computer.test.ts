@@ -268,6 +268,19 @@ describe("the profile's Computador entry on the phone", () => {
     );
     // The phone hears no run here: at work, it says only that.
     expect(entryLine(t, entryState(facts({ working: true }), NOW), words)).toBe("Trabalhando");
+    // Nothing to show: why, never a bare "can't show it now".
+    const cant = (reason: string, over: Partial<AgentComputerFacts> = {}, w = words) =>
+      entryLine(t, entryState(facts({ desktop: { available: false, reason }, browser: false, ...over }), NOW), w);
+    expect(cant("runner_outdated")).toBe("Sendo atualizado · volta sozinho");
+    expect(cant("desktop_unavailable")).toBe("O Computador da Acme ainda não mostra telas");
+    expect(cant("no_computer", { machine: null })).toBe("Sendo preparado");
+    // A self-hoster's own computer: its switches are theirs to turn on, its program theirs to update.
+    const own: EntryWords = { ...words, edition: "selfhost", computer: "Box" };
+    expect(cant("not_allowed", { edition: "selfhost" }, own)).toBe("Telas desligadas no Box");
+    expect(cant("no_desktop", { edition: "selfhost", browserReason: "switched_off" }, own)).toBe(
+      "Navegador desligado no Box",
+    );
+    expect(cant("runner_outdated", { edition: "selfhost" }, own)).toBe("Precisa de uma atualização no Box");
   });
 
   test("no Trocar computador on the Cloud: there is no other computer there", () => {

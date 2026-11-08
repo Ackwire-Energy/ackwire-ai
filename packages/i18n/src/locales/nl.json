@@ -1584,7 +1584,10 @@
       "subPerson": "Elke agent onder de verantwoordelijke persoon, of onder het hoofd van zijn afdeling als hij er geen heeft.",
       "subSector": "Elke afdeling met haar agenten. {{name}} werkt met iedereen.",
       "workspace": "Werkruimte",
-      "responsible": "Verantwoordelijk: {{names}}"
+      "responsible": "Verantwoordelijk: {{names}}",
+      "lodi": "volgt alles met je",
+      "supervisor": "Supervisor: {{name}}",
+      "dragSector": "Sleep op een agent zodat de agenten van deze sector aan hem rapporteren"
     },
     "map": {
       "lead": "Wie voor de agenten zorgt, in welke kanalen ze zitten, wat elk zelfstandig doet en wat op een persoon wacht. Stippellijnen zijn agenten die elkaar de afgelopen dag om hulp vroegen.",
@@ -1602,7 +1605,9 @@
       "emptyTitle": "Zie waar elke agent werkt",
       "emptyAction": "Aan een kanaal toevoegen",
       "emptyViewer": "Wie de agents beheert, voegt ze toe aan kanalen, en de kaart verschijnt hier.",
-      "others": "Andere kanalen"
+      "others": "Andere kanalen",
+      "band": "Supervisors",
+      "reportsTo": "Rapporteert aan {{name}}"
     },
     "sectors": {
       "lead": "Elke afdeling heeft een hoofd, een vervanger, haar agenten en hun kanalen en routines.",
@@ -1612,6 +1617,15 @@
       "backupLabel": "Vervanger",
       "leadOf": "Hoofd van {{name}}",
       "backupOf": "Vervanger bij {{name}}",
+      "supervisor": "Supervisor",
+      "supervisorOf": "Supervisor van {{name}}",
+      "unsupervised_one": "{{count}} agent zonder supervisor",
+      "unsupervised_other": "{{count}} agenten zonder supervisor",
+      "apply": "Toepassen",
+      "supervisorDone_one": "{{count}} agent van {{sector}} rapporteert nu aan {{name}}",
+      "supervisorDone_other": "{{count}} agenten van {{sector}} rapporteren nu aan {{name}}",
+      "supervisorCleared_one": "{{count}} agent van {{sector}} rapporteert niet meer aan een supervisor",
+      "supervisorCleared_other": "{{count}} agenten van {{sector}} rapporteren niet meer aan een supervisor",
       "nobody": "Niemand",
       "none": "Geen",
       "channels": "Kanalen",
@@ -1627,6 +1641,14 @@
       "empty": "Elke afdeling heeft een hoofd, zodat iedereen ziet wie waarvoor zorgt.",
       "emptyViewerTitle": "Zie wie waarvoor zorgt",
       "emptyViewer": "Wie de agenten beheert, maakt de afdelingen. Ze verschijnen dan hier."
+    },
+    "reportsTo": {
+      "label": "Rapporteert aan",
+      "help": "Zegt alleen aan wie deze agent verantwoording aflegt. Geeft geen enkele toestemming.",
+      "none": "Niemand",
+      "done": "{{agent}} rapporteert nu aan {{to}}",
+      "cleared": "{{agent}} rapporteert niet meer aan een agent",
+      "reports": "Wie aan {{name}} rapporteert"
     },
     "usage": {
       "lead": "Wat elke persoon deze maand van de agenten gebruikt, en de limieten.",
@@ -1921,22 +1943,12 @@
         "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
         "action": "Koppelen"
       },
-      "start": {
-        "question": "Hoe wil je beginnen?",
-        "createOne": "{{name}} maken",
-        "team": "Een startteam samenstellen",
-        "describe": "Beschrijven wat ik nodig heb",
-        "import": "Mijn agents importeren",
-        "form": "Het formulier invullen"
-      },
       "again": {
         "question": "Wil je het team met mij samenstellen?",
         "action": "Team samenstellen",
         "message": "Help me het team samen te stellen."
       },
       "next": {
-        "question": "Het team is er. En nu?",
-        "invite": "Mensen uitnodigen",
         "firstTask": "{{name}} een eerste taak geven"
       },
       "style": {
@@ -1944,12 +1956,6 @@
         "text": "Het geldt voor alle agents, en je kunt het altijd wijzigen in je account.",
         "simple": "Eenvoudig, zonder vaktaal",
         "technical": "Technisch, met de details"
-      },
-      "firstTask": {
-        "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
-        "ada": "Wat zou je als eerste voor ons kunnen bouwen of automatiseren?",
-        "lia": "Wie zijn onze 5 naaste concurrenten, en wat doen ze beter dan wij?",
-        "atlas": "Wat ga je als eerste volgen in onze fouten, wachtrijen en deploys, en hoe laat je het me weten als er iets stukgaat?"
       }
     },
     "profile": {
@@ -2035,6 +2041,7 @@
         "ai_account": "Alleen de eigenaar van het account geeft het",
         "name": "Alleen admins hernoemen een agent",
         "look": "Alleen admins en de verantwoordelijke wijzigen het uiterlijk",
+        "reports_to": "Alleen admins veranderen aan wie een agent rapporteert",
         "many": "Alleen admins maken deze wijzigingen"
       }
     },
@@ -2047,10 +2054,12 @@
       "archive": "Status",
       "channel": "Kanaal",
       "name": "Naam",
-      "look": "Uiterlijk"
+      "look": "Uiterlijk",
+      "reports_to": "Rapporteert aan"
     },
     "value": {
       "lookDefault": "Het standaarduiterlijk",
+      "anAgent": "Een agent",
       "none": "Geen",
       "budgetDefault": "Standaard van de workspace",
       "anAccount": "Een AI-account",
@@ -2097,6 +2106,7 @@
   },
   "teamWeek": {
     "title": "Teamweek",
+    "dayTitle": "Dagoverzicht",
     "suggestions_one": "{{count}} suggestie",
     "suggestions_other": "{{count}} suggesties",
     "stat": {
@@ -2166,7 +2176,8 @@
       "wed": "Elke woensdag om {{time}}",
       "thu": "Elke donderdag om {{time}}",
       "fri": "Elke vrijdag om {{time}}",
-      "sat": "Elke zaterdag om {{time}}"
+      "sat": "Elke zaterdag om {{time}}",
+      "day": "Elke dag om {{time}}"
     },
     "off": "Uit",
     "schedule": {
@@ -2174,11 +2185,14 @@
       "day": "Dag",
       "hour": "Tijd",
       "stop": "Niet meer ontvangen",
-      "start": "Weer ontvangen"
+      "start": "Weer ontvangen",
+      "daily": "Elke dag"
     },
     "settings": {
       "label": "Teamweek",
-      "help": "Elke week vertelt {{name}} je in je DM hoe het team het deed en wat beter kan. Alleen admins krijgen hem."
+      "help": "Elke week vertelt {{name}} je in je DM hoe het team het deed en wat beter kan. Alleen admins krijgen hem.",
+      "dayLabel": "Dagoverzicht",
+      "dayHelp": "Elke dag vertelt {{name}} je in je DM wat het team deed en wat op je wacht, alleen op dagen met iets te zeggen."
     }
   },
   "routing": {
@@ -3732,46 +3746,11 @@
       "answer": "Beantwoorden",
       "open": "Openen"
     },
-    "steps": {
-      "title": "Eerste stappen",
-      "progress": "{{done}} van {{total}}",
-      "hide": "Verbergen",
-      "done": "Klaar",
-      "agent": {
-        "title": "Maak je eerste agent",
-        "text": "Zeg wat hij doet en hij hoort bij het team.",
-        "action": "Agent maken"
-      },
-      "plan": {
-        "title": "Kies een agentes.chat-abonnement",
-        "text": "De agents gaan aan het werk zodra de workspace er een heeft.",
-        "action": "Abonnementen bekijken"
-      },
-      "ai": {
-        "title": "Een AI koppelen",
-        "text": "Daar denken je agents mee.",
-        "action": "Koppelen"
-      },
-      "ask": {
-        "title": "Vraag een agent iets",
-        "text": "Schrijf hieronder of in een gesprek.",
-        "action": "Vragen"
-      },
-      "team": {
-        "title": "Nodig je team uit",
-        "text": "Mensen en agents werken hier samen.",
-        "action": "Uitnodigen"
-      },
-      "routine": {
-        "title": "Maak een routine",
-        "text": "Een agent doet zelf iets, volgens een schema.",
-        "action": "Routine maken"
-      }
-    },
     "calm": {
       "title": "Je bent helemaal bij",
       "text": "Je agents laten je hier weten als ze je nodig hebben."
-    }
+    },
+    "firstRun": "Ga verder waar je was · {{done}} van {{total}}"
   },
   "notifications": {
     "title": "Meldingen",
@@ -5094,6 +5073,174 @@
       "app": "Gestuurd via een AI-app"
     }
   },
+  "agentSetup": {
+    "greeting": "Hoi {{person}}. Ik ben {{name}}.",
+    "greeting_female": "Hoi {{person}}. Ik ben {{name}}.",
+    "greetingRole": "Hoi {{person}}. Ik ben {{name}}, de nieuwe {{role}}-agent.",
+    "greetingRole_female": "Hoi {{person}}. Ik ben {{name}}, de nieuwe {{role}}-agent.",
+    "asked": "Je vroeg me: “{{what}}”.",
+    "lead": "Help me om te beginnen met een paar snelle dingen:",
+    "title": "Om te beginnen",
+    "ready": "Ik ben klaar.",
+    "ready_female": "Ik ben klaar.",
+    "titleProfile": "Om {{name}} op weg te helpen",
+    "titleProfile_female": "Om {{name}} op weg te helpen",
+    "count": "{{done}} van {{total}}",
+    "change": "Wijzigen",
+    "switch": "Overstappen",
+    "choose": "Kiezen",
+    "see": "Bekijken",
+    "suggested": "Voorgesteld",
+    "ai": {
+      "todo": "Een AI koppelen",
+      "todoDesc": "Zodat ik kan denken.",
+      "action": "Koppelen",
+      "done": "Ik heb een AI om mee te denken"
+    },
+    "apps": {
+      "todo": "{{apps}} lezen",
+      "todoDesc": "Lezen verandert nooit iets.",
+      "action": "Toestaan",
+      "todoNone": "De apps van {{org}} gebruiken",
+      "todoNoneDesc": "De apps die je al hebt gekoppeld, zoals Gmail en Drive.",
+      "done": "Ik gebruik {{apps}}",
+      "doneNone": "Voorlopig geen apps",
+      "title": "Wat {{name}} kan gebruiken",
+      "title_female": "Wat {{name}} kan gebruiken",
+      "desc": "Lezen verandert nooit iets. Versturen, verwijderen en betalen vragen om jouw goedkeuring.",
+      "ok_one": "{{count}} app toestaan",
+      "ok_other": "{{count}} apps toestaan",
+      "okNone": "Doorgaan zonder apps",
+      "empty": "{{org}} heeft nog geen apps gekoppeld.",
+      "connectOther": "Een andere app koppelen"
+    },
+    "where": {
+      "todo": "Lid worden van {{channel}}",
+      "todoDesc": "Ik antwoord als iemand me daar aanroept.",
+      "action": "Lid worden",
+      "todoNone": "Lid worden van een kanaal",
+      "done": "Ik zit in {{channels}}",
+      "doneNone": "Ik blijf in onze directe chat",
+      "title": "Waar {{name}} werkt",
+      "title_female": "Waar {{name}} werkt",
+      "desc": "Antwoordt als iemand het daar aanroept. De directe chat telt altijd mee.",
+      "okNone": "Alleen directe chat",
+      "okOne": "Lid worden van {{channel}}",
+      "ok_one": "Lid worden van {{count}} kanaal",
+      "ok_other": "Lid worden van {{count}} kanalen"
+    },
+    "who": {
+      "todo": "Praten met iedereen bij {{org}}",
+      "todoDesc": "Iedereen kan me aanroepen.",
+      "todoPlan": "Alleen met jou praten",
+      "todoPlanDesc": "Je abonnement is persoonlijk.",
+      "doneEveryone": "Ik praat met iedereen bij {{org}}",
+      "doneYou": "Ik praat alleen met jou",
+      "doneOwner": "Ik praat alleen met {{name}}",
+      "donePeople": "Ik praat met de mensen die je hebt gekozen",
+      "title": "Wie met {{name}} praat",
+      "title_female": "Wie met {{name}} praat",
+      "people": "Mensen en rollen",
+      "add": "Mensen kiezen",
+      "addMore": "Iemand anders toevoegen",
+      "you": "jij",
+      "youCap": "Jij",
+      "ownerHelp": "Krijgt zijn goedkeuringsverzoeken en meldingen.",
+      "ownerHelp_female": "Krijgt haar goedkeuringsverzoeken en meldingen."
+    },
+    "how": {
+      "todo": "Zie hoe ik werk",
+      "todoDesc": "Ik begin met de instructies voor {{role}}.",
+      "todoDescBlank": "Ik begin met wat je hebt geschreven.",
+      "done": "Ik werk op jouw manier",
+      "title": "Hoe {{name}} werkt",
+      "title_female": "Hoe {{name}} werkt",
+      "desc": "Schrijf zoals je dat voor iemand nieuw in het team zou doen.",
+      "instructions": "Instructies",
+      "budget": "Maandlimiet",
+      "budgetHelp": "We laten het je weten bij 80%. Bij de limiet pauzeert de agent en laat het je weten.",
+      "budgetHelp_female": "We laten het je weten bij 80%. Bij de limiet pauzeert de agent en laat het je weten.",
+      "more": "Meer opties",
+      "model": "Model"
+    },
+    "say": {
+      "ai": "Nu kan ik denken.",
+      "apps": "Klaar, ik kan nu de apps gebruiken.",
+      "where": "Ik houd het daar in de gaten.",
+      "who": "Begrepen, ik weet met wie ik praat.",
+      "how": "Begrepen, ik weet hoe je wilt dat ik werk."
+    },
+    "tasksLead": "We kunnen al beginnen. Vraag me iets:",
+    "tasksAllDone": "Alles klaar. Vraag me iets:",
+    "tasks": {
+      "a": "Wat kun je voor me doen?",
+      "b": "Waar beginnen we?"
+    },
+    "firstRun": {
+      "title": "Zodat het team van {{org}} aan de slag kan",
+      "complete": "Alles klaar.",
+      "notNow": "Niet nu",
+      "afterPlan": "Opent met het abonnement.",
+      "about": {
+        "todo": "Vertel me wat {{org}} doet.",
+        "todoDesc": "Alle agenten lezen dit.",
+        "action": "Vertellen",
+        "done": "Ik weet wat {{org}} doet",
+        "title": "Wat doet {{org}}?",
+        "desc": "Alle agenten lezen dit. Je wijzigt het wanneer je wilt.",
+        "line": "In één zin",
+        "optional": "Optioneel. Zonder zin telt het type dat je koos."
+      },
+      "team": {
+        "todo": "Stel het team samen.",
+        "todoDesc": "Een sjabloon voor je bedrijf, je kunt later alles wijzigen.",
+        "action": "Team bekijken",
+        "done_one": "{{count}} agent in het team",
+        "done_other": "{{count}} agenten in het team",
+        "card": "Ga verder op de kaart hieronder"
+      },
+      "ai": {
+        "todo": "Koppel een AI.",
+        "todoDesc": "Die waar je al voor betaalt werkt.",
+        "action": "Koppelen",
+        "done": "Ik denk met {{label}}",
+        "doneAny": "Ik denk nu met een AI",
+        "plan": "Opent met het agentes.chat-abonnement.",
+        "planAction": "agentes.chat-abonnementen bekijken"
+      },
+      "apps": {
+        "todo": "Koppel je werk-apps.",
+        "todoDesc": "Lezen verandert nooit iets.",
+        "action": "Kiezen",
+        "done": "Ik lees {{apps}}",
+        "doneNone": "Voorlopig geen apps",
+        "title": "Je werk-apps",
+        "desc": "Die het net gemaakte team zou gebruiken staan bovenaan. Lezen verandert nooit iets, en versturen, verwijderen en betalen vragen jouw akkoord.",
+        "connect": "Koppelen",
+        "all": "Alle apps bekijken"
+      },
+      "people": {
+        "todo": "Haal de mensen erbij met wie je werkt.",
+        "todoDesc": "Zij praten ook met de agenten.",
+        "action": "Uitnodigen",
+        "done_one": "{{count}} persoon hier",
+        "done_other": "{{count}} mensen hier",
+        "doneNone": "Voorlopig alleen jij"
+      },
+      "say": {
+        "about": "Genoteerd. Alle agenten lezen dit.",
+        "team": "Het team is er.",
+        "ai": "Nu denkt het team.",
+        "apps": "Klaar, ik lees de apps nu.",
+        "people": "Fijn dat er meer mensen zijn."
+      },
+      "asks": {
+        "lead": "Vraag me nu iets:",
+        "fit": "Pas het team aan mijn bedrijf aan",
+        "who": "Wie in het team doet wat?"
+      }
+    }
+  },
   "newAgent": {
     "title": "Agent maken",
     "railOrg": "{{org}} · je bent {{role}}",
@@ -5147,79 +5294,144 @@
         "name": "Dev",
         "agent": "Ada",
         "desc": "Programmeert, reviewt PR's en onderzoekt bugs.",
-        "instructions": "Onderzoekt eerst: leest de code en de bijbehorende taken en fouten voordat hij antwoordt, en komt terug met wat hij vond en een concreet PR-voorstel met een test.\nWerkt in branches en opent kleine PR's. Bij grote wijzigingen opent hij de PR als concept en legt hij daar het plan uit.\nMerget nooit zelf: vraagt een persoon om een review."
+        "instructions": "Onderzoekt eerst: leest de code en de bijbehorende taken en fouten voordat hij antwoordt, en komt terug met wat hij vond en een concreet PR-voorstel met een test.\nWerkt in branches en opent kleine PR's. Bij grote wijzigingen opent hij de PR als concept en legt hij daar het plan uit.\nMerget nooit zelf: vraagt een persoon om een review.",
+        "tasks": {
+          "a": "Wat is op dit moment de meest voorkomende fout?",
+          "b": "Review de laatste open PR",
+          "c": "Pak de oudste taak in de backlog op"
+        }
       },
       "ops": {
         "name": "Ops",
         "agent": "Atlas",
         "desc": "Houdt fouten, wachtrijen en deploys in de gaten.",
-        "instructions": "Volgt fouten en deploys en schrijft incidentrapporten.\nAls er een alert afgaat, onderzoekt hij eerst (fouten, logs, recente deploys) en post hij in het kanaal wat hij vond: sinds wanneer, hoe groot, de waarschijnlijke oorzaak en de volgende stap.\nRollback en deploy alleen met goedkeuring."
+        "instructions": "Volgt fouten en deploys en schrijft incidentrapporten.\nAls er een alert afgaat, onderzoekt hij eerst (fouten, logs, recente deploys) en post hij in het kanaal wat hij vond: sinds wanneer, hoe groot, de waarschijnlijke oorzaak en de volgende stap.\nRollback en deploy alleen met goedkeuring.",
+        "tasks": {
+          "a": "Is er iets vreemds sinds de laatste deploy?",
+          "b": "Vat de fouten van vandaag samen",
+          "c": "Wat is er veranderd in de laatste release?"
+        }
       },
       "qa": {
         "name": "QA",
         "agent": "Iris",
         "desc": "Test flows en reproduceert gemelde bugs.",
-        "instructions": "Reproduceert elke gemelde bug voordat hij een taak opent. Schrijft duidelijke stappen en voegt bewijs toe.\nLukt reproduceren niet, dan controleert hij eerst de fouten, recente wijzigingen en bijbehorende taken. Vraagt alleen naar de omgeving en versie als die er niet bij staan.\nGeeft voorrang aan wat klanten blokkeert."
+        "instructions": "Reproduceert elke gemelde bug voordat hij een taak opent. Schrijft duidelijke stappen en voegt bewijs toe.\nLukt reproduceren niet, dan controleert hij eerst de fouten, recente wijzigingen en bijbehorende taken. Vraagt alleen naar de omgeving en versie als die er niet bij staan.\nGeeft voorrang aan wat klanten blokkeert.",
+        "tasks": {
+          "a": "Reproduceer de laatst gemelde bug",
+          "b": "Welke bugs hebben geen stappen?",
+          "c": "Zijn er nieuwe fouten sinds de deploy?"
+        }
       },
       "pm": {
         "name": "PM",
         "agent": "Theo",
         "desc": "Organiseert taken en samenvattingen.",
-        "instructions": "Zoekt eerst dingen op (taken, threads, wiki, feedback) en vraagt alleen wat overblijft.\nOrganiseert taken, vat lange discussies samen en houdt de roadmap bij."
+        "instructions": "Zoekt eerst dingen op (taken, threads, wiki, feedback) en vraagt alleen wat overblijft.\nOrganiseert taken, vat lange discussies samen en houdt de roadmap bij.",
+        "tasks": {
+          "a": "Vat samen wat het team deze week heeft gedaan",
+          "b": "Welke taken zitten vast?",
+          "c": "Werk de roadmap bij"
+        }
       },
       "support": {
         "name": "Support",
         "agent": "Nina",
         "desc": "Beantwoordt klanten en geeft door wat een persoon nodig heeft.",
-        "instructions": "Zoekt voor het antwoorden de geschiedenis van de klant, eerdere gesprekken en het helpcentrum op, en komt terug met een kant-en-klaar antwoord en waar het vandaan komt.\nIs het een productprobleem, dan opent hij een taak met de stappen en laat hij het team het weten. Belooft nooit een datum of oplossing die er niet is.\nBerichten aan klanten, terugbetalingen en kortingen alleen met goedkeuring."
+        "instructions": "Zoekt voor het antwoorden de geschiedenis van de klant, eerdere gesprekken en het helpcentrum op, en komt terug met een kant-en-klaar antwoord en waar het vandaan komt.\nIs het een productprobleem, dan opent hij een taak met de stappen en laat hij het team het weten. Belooft nooit een datum of oplossing die er niet is.\nBerichten aan klanten, terugbetalingen en kortingen alleen met goedkeuring.",
+        "tasks": {
+          "a": "Welke klanten wachten het langst op een antwoord?",
+          "b": "Vat de klachten van deze week samen",
+          "c": "Schrijf een concept-antwoord op de laatste e-mail van een klant"
+        }
       },
       "sales": {
         "name": "Sales",
         "agent": "Leo",
         "desc": "Maakt offertes en volgt leads op.",
-        "instructions": "Onderzoekt voor elk gesprek het bedrijf, de geschiedenis ermee en wat al is afgesproken, en komt terug met een samenvatting en de volgende stap.\nHoudt de lijst met leads bij en herinnert het team aan wat stilligt.\nVerzint nooit prijzen, kortingen of voorwaarden: gebruikt alleen wat in de prijslijst staat. Stuurt een offerte of mail naar een klant alleen met goedkeuring."
+        "instructions": "Onderzoekt voor elk gesprek het bedrijf, de geschiedenis ermee en wat al is afgesproken, en komt terug met een samenvatting en de volgende stap.\nHoudt de lijst met leads bij en herinnert het team aan wat stilligt.\nVerzint nooit prijzen, kortingen of voorwaarden: gebruikt alleen wat in de prijslijst staat. Stuurt een offerte of mail naar een klant alleen met goedkeuring.",
+        "tasks": {
+          "a": "Wie is al langer dan een week stil?",
+          "b": "Bereid een offerte voor de laatste lead voor",
+          "c": "Hoeveel is er deze maand binnengekomen van nieuwe klanten?"
+        }
       },
       "marketing": {
         "name": "Marketing",
         "agent": "Mila",
         "desc": "Plant campagnes, posts en webpagina's.",
-        "instructions": "Kijkt eerst naar wat al is gedaan, de resultaten en de stem van het merk voordat hij iets nieuws voorstelt.\nSchrijft concepten van campagnes, posts en pagina's, met één hoofdidee en voor wie het is.\nVerzint nooit cijfers of testimonials. Publiceert op de website of sociale media alleen met goedkeuring."
+        "instructions": "Kijkt eerst naar wat al is gedaan, de resultaten en de stem van het merk voordat hij iets nieuws voorstelt.\nSchrijft concepten van campagnes, posts en pagina's, met één hoofdidee en voor wie het is.\nVerzint nooit cijfers of testimonials. Publiceert op de website of sociale media alleen met goedkeuring.",
+        "tasks": {
+          "a": "Stel 3 posts voor deze week voor",
+          "b": "Plan de volgende campagne",
+          "c": "Controleer de tekst op de prijzenpagina"
+        }
       },
       "content": {
         "name": "Content",
         "agent": "Bento",
         "desc": "Schrijft en redigeert teksten, artikelen en nieuwsbrieven.",
-        "instructions": "Leest voor het schrijven wat er al over het onderwerp bestaat (wiki, documenten, gesprekken) en bevestigt voor wie de tekst is.\nLevert heldere, korte concepten met de bronnen aan het eind. Legt bij het redigeren uit wat er is veranderd en waarom.\nVerzint nooit gegevens of citaten. Publiceert of verstuurt buiten het team alleen met goedkeuring."
+        "instructions": "Leest voor het schrijven wat er al over het onderwerp bestaat (wiki, documenten, gesprekken) en bevestigt voor wie de tekst is.\nLevert heldere, korte concepten met de bronnen aan het eind. Legt bij het redigeren uit wat er is veranderd en waarom.\nVerzint nooit gegevens of citaten. Publiceert of verstuurt buiten het team alleen met goedkeuring.",
+        "tasks": {
+          "a": "Schrijf de nieuwsbrief van deze maand",
+          "b": "Controleer de laatste blogpost",
+          "c": "Noem 5 onderwerpen voor artikelen"
+        }
       },
       "data": {
         "name": "Data",
         "agent": "Dora",
         "desc": "Beantwoordt vragen met cijfers en maakt rapporten.",
-        "instructions": "Haalt de cijfers bij de bron voordat hij antwoordt en laat zien waar ze vandaan komen, over welke periode en hoe hij ze heeft berekend.\nZijn de gegevens niet genoeg of lijken ze niet te kloppen, dan zegt hij dat in plaats van te gokken. Verzint nooit een cijfer.\nPost elke maandag een samenvatting van de belangrijkste cijfers van de week."
+        "instructions": "Haalt de cijfers bij de bron voordat hij antwoordt en laat zien waar ze vandaan komen, over welke periode en hoe hij ze heeft berekend.\nZijn de gegevens niet genoeg of lijken ze niet te kloppen, dan zegt hij dat in plaats van te gokken. Verzint nooit een cijfer.\nPost elke maandag een samenvatting van de belangrijkste cijfers van de week.",
+        "tasks": {
+          "a": "Hoe ging de verkoop deze week?",
+          "b": "Maak het rapport van deze maand",
+          "c": "Welke klanten kopen het meest?"
+        }
       },
       "finance": {
         "name": "Financiën",
         "agent": "Otto",
         "desc": "Houdt betalingen, facturatie en uitgaven bij.",
-        "instructions": "Controleert betalingen, facturatie en uitgaven bij de bron voordat hij antwoordt en toont bedragen met de datum en waar ze vandaan komen.\nSignaleert wat afwijkt: mislukte afschrijvingen, uitgaven boven verwachting, facturen die vervallen.\nBetalingen, terugbetalingen en elke geldbeweging alleen met goedkeuring. Verzint nooit bedragen."
+        "instructions": "Controleert betalingen, facturatie en uitgaven bij de bron voordat hij antwoordt en toont bedragen met de datum en waar ze vandaan komen.\nSignaleert wat afwijkt: mislukte afschrijvingen, uitgaven boven verwachting, facturen die vervallen.\nBetalingen, terugbetalingen en elke geldbeweging alleen met goedkeuring. Verzint nooit bedragen.",
+        "tasks": {
+          "a": "Hoeveel is er deze maand binnengekomen?",
+          "b": "Welke betalingen zijn mislukt?",
+          "c": "Vat de uitgaven van vorige maand samen"
+        }
       },
       "people": {
         "name": "HR",
         "agent": "Clara",
         "desc": "Helpt met werving, onboarding en de vragen van het team.",
-        "instructions": "Zoekt voor het antwoorden in het beleid, de wiki en de documenten van het team, en zegt waar hij het antwoord vond.\nOrganiseert vacatures, sollicitatiegesprekken en de eerste dagen van nieuwe collega's, met duidelijke checklists.\nGaat zorgvuldig om met persoonsgegevens en deelt ze alleen met wie ze nodig heeft. Stuurt kandidaten alleen berichten met goedkeuring."
+        "instructions": "Zoekt voor het antwoorden in het beleid, de wiki en de documenten van het team, en zegt waar hij het antwoord vond.\nOrganiseert vacatures, sollicitatiegesprekken en de eerste dagen van nieuwe collega's, met duidelijke checklists.\nGaat zorgvuldig om met persoonsgegevens en deelt ze alleen met wie ze nodig heeft. Stuurt kandidaten alleen berichten met goedkeuring.",
+        "tasks": {
+          "a": "Plan de eerste week van wie maandag begint",
+          "b": "Wat zijn de regels voor vakantie?",
+          "c": "Plan de gesprekken van deze week in"
+        }
       },
       "research": {
         "name": "Onderzoek",
         "agent": "Hugo",
         "desc": "Onderzoekt een onderwerp en levert een samenvatting met bronnen.",
-        "instructions": "Kijkt eerst naar wat het team al heeft (wiki, documenten, gesprekken), daarna naar externe bronnen.\nLevert een korte samenvatting met de belangrijkste bevindingen, wat nog onbekend is en de bronnen bij elk punt.\nHoudt feiten en meningen gescheiden en verzint nooit gegevens of citaten."
+        "instructions": "Kijkt eerst naar wat het team al heeft (wiki, documenten, gesprekken), daarna naar externe bronnen.\nLevert een korte samenvatting met de belangrijkste bevindingen, wat nog onbekend is en de bronnen bij elk punt.\nHoudt feiten en meningen gescheiden en verzint nooit gegevens of citaten.",
+        "tasks": {
+          "a": "Onderzoek de 5 grootste concurrenten",
+          "b": "Vat samen wat we al weten over de markt",
+          "c": "Vergelijk de prijzen van de concurrenten"
+        }
       },
       "assistant": {
         "name": "Assistent",
         "agent": "Eva",
         "desc": "Regelt de agenda, mails en herinneringen.",
-        "instructions": "Bekijkt voor het vragen de agenda, de mails en recente gesprekken, en komt terug met wat hij vond en een voorstel.\nPlant vergaderingen, schrijft conceptantwoorden en stuurt herinneringen op het juiste moment.\nMails of berichten namens iemand versturen, uitnodigingen accepteren en betalingen doen alleen met goedkeuring."
+        "instructions": "Bekijkt voor het vragen de agenda, de mails en recente gesprekken, en komt terug met wat hij vond en een voorstel.\nPlant vergaderingen, schrijft conceptantwoorden en stuurt herinneringen op het juiste moment.\nMails of berichten namens iemand versturen, uitnodigingen accepteren en betalingen doen alleen met goedkeuring.",
+        "tasks": {
+          "a": "Vat mijn e-mails van vandaag samen",
+          "b": "Wat heb ik beloofd deze week te beantwoorden?",
+          "c": "Zoek de spreadsheet met de doelen van het kwartaal"
+        }
       },
       "custom": {
         "name": "Vanaf nul",
@@ -9943,7 +10155,7 @@
   "storage": {
     "title": "Opslag",
     "options": "Waar bestanden te bewaren",
-    "agentes": "agentes-opslag",
+    "agentes": "agentes.chat-opslag",
     "agentesText": "Je bestanden blijven in onze opslag, gescheiden per werkruimte.",
     "server": "Deze server",
     "serverText": {
@@ -9954,7 +10166,7 @@
     },
     "showFolder": "De map tonen",
     "place": {
-      "agentes": "agentes-opslag",
+      "agentes": "agentes.chat-opslag",
       "server": "deze server"
     },
     "s3": "Je eigen bucket",
@@ -13616,7 +13828,8 @@
       "askedBy": "{{name}} vroeg om taak",
       "view": "Taak bekijken",
       "taken": "{{name}} pakte taak op",
-      "agent": "Met {{name}}"
+      "agent": "Met {{name}}",
+      "chipLabel": "Gesprek van taak #{{number}} openen, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13627,6 +13840,7 @@
       "autonomy_digest_one": "{{count}} melding leek bekend of onschuldig, dus ik heb er niet aan gewerkt:",
       "autonomy_digest_other": "{{count}} meldingen leken bekend of onschuldig, dus ik heb er niet aan gewerkt:",
       "team_week": "Hoe de week van het team ging, {{from}} tot {{to}}",
+      "team_day": "Hoe de dag van het team ging, tot {{day}}",
       "autonomy_loop": "Ik ben er uit mezelf mee gestopt. Het kwam {{count}} keer op een dag terug ({{title}}). Zeg me hoe je wilt dat ik ermee omga.",
       "mission_plan": "Plan voor “{{title}}” op {{computer}}",
       "mission_planNoComputer": "Plan voor “{{title}}”",
@@ -14945,7 +15159,11 @@
       "paused": "Gepauzeerd op {{computer}} tot {{time}}",
       "pausedPlain": "Gepauzeerd op {{computer}}",
       "noComputer": "Nog geen computer",
-      "outdated": "Update nodig op {{computer}}"
+      "outdated": "Update nodig op {{computer}}",
+      "updating": "Wordt bijgewerkt · komt vanzelf terug",
+      "screensOff": "Schermen staan uit op {{computer}}",
+      "screensMissing": "{{computer}} kan nog geen schermen tonen",
+      "browserOff": "De browser staat uit op {{computer}}"
     },
     "screen": "Scherm van {{name}}, live",
     "screen_female": "Scherm van {{name}}, live",
@@ -15626,11 +15844,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Wat doet {{org}}? Daarmee stel ik een kant-en-klaar team samen, en jij controleert het alleen.",
-      "orWrite": "Of schrijf het hieronder op je eigen manier, in één zin.",
-      "footer": "Weet je al wat je wilt?",
-      "templates": "Teamsjablonen bekijken",
-      "presets": "Kant-en-klare agents"
+      "templates": "Teamsjablonen bekijken"
     },
     "business": {
       "agency": "Bureau",
@@ -15641,7 +15855,6 @@
       "services": "Dienstverlenend kantoor",
       "other": "Iets anders"
     },
-    "answered": "beantwoord",
     "step": "Vraag {{step}} van {{of}}",
     "send": "{{count}} versturen",
     "card": {
@@ -15696,11 +15909,14 @@
     "templates": {
       "title": "Teamsjablonen",
       "lead": "Een kant-en-klaar team voor jouw soort bedrijf. Daarna past {{name}} het met je aan.",
-      "heldLead": "Kies wat het dichtst bij je bedrijf ligt. Je kunt elke agent aanpassen voordat je hem maakt.",
-      "use": "Dit sjabloon gebruiken",
+      "heldLead": "Kies wat het dichtst bij je bedrijf ligt. Je kunt later alles wijzigen.",
+      "create": "Team maken",
+      "import": "Agenten uit een andere app halen",
+      "scratch": "Een agent vanaf nul maken",
+      "failed": "Het team is niet gemaakt. De reden staat op de kaart in het gesprek.",
       "none": "Geen van deze",
       "noneSub": "Vertel wat je doet en {{name}} stelt het samen",
-      "tailor": "Daarna stel ik 2 vragen om het op jouw bedrijf af te stemmen."
+      "tailor": "Vraag me later gewoon om het aan je bedrijf aan te passen."
     },
     "weekly": {
       "name": "De week van het team"
@@ -15849,7 +16065,6 @@
         "line": "wat je controleert voordat je een PR opent"
       }
     },
-    "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt.",
-    "ask": "Ik heb het sjabloon {{name}} gebruikt. Om het op jouw bedrijf af te stemmen: **wat doet {{org}} anders?**"
+    "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt."
   }
 }

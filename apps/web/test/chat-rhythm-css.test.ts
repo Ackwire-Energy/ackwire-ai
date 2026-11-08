@@ -134,6 +134,9 @@ test("the list's gap is what stands above a row, whatever the row sets outside t
 test("a row is as tall as what it shows", () => {
   // The hidden time beside a grouped row's one short line, and a line box around an inline card, both added height.
   expect(last(".ac-msg__gutter", "height")).toBe("0");
+  // Unseen, the time takes no room: its line hung past a row with nothing in it yet, and scrolled the list by it.
+  expect(last(".ac-msg__gutter-time", "content-visibility")).toBe("hidden");
+  expect(last(".ac-msg--grouped:hover .ac-msg__gutter-time", "content-visibility")).toBe("visible");
   expect(last(".choice-reply", "display")).toBe("flex");
   // A reply's quote stays 2px over its row at a phone's width: the narrow rule leaves the rows' gap alone.
   expect(atRule(css, "@media (max-width: 760px)")).not.toMatch(/\.channel__messages \.ac-msg\{[^}]*(?<!-)gap:/);

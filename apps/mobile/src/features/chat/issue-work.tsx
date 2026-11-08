@@ -1,10 +1,12 @@
 import { type Message, useIssue } from "@agenteschat/client";
-import { type IssueWorkRef, issueTakenOf } from "@agenteschat/client/lib/issues";
+import { type HandedTask, handedTasksOf, type IssueWorkRef, issueTakenOf } from "@agenteschat/client/lib/issues";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { EventPill, Icon, Text } from "@/ui";
 import { StateChip } from "../issues/parts";
+import { chatHref } from "../links/logic";
+import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { MSG_TEXT } from "./logic";
@@ -82,7 +84,62 @@ export function IssueTakenLine({ message, gap }: { message: Message; gap: number
   );
 }
 
+/**
+ * The tasks the right hand handed on in this reply (ADR 0137 §13), as on the web: one row each, "#42 Campanha de
+ * Natal", its agent and its live state. A tap opens the task's conversation, where the work happens.
+ */
+export function HandedTaskChips({ message }: { message: Message }) {
+  const tasks = handedTasksOf(message.meta);
+  if (tasks.length === 0) return null;
+  return (
+    <View style={styles.chips}>
+      {tasks.map((task) => (
+        <HandedTaskChip key={task.issueId} task={task} />
+      ))}
+    </View>
+  );
+}
+
+function HandedTaskChip({ task }: { task: HandedTask }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const surface = useSurface();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const issue = useIssue(orgId, task.number);
+  const current = issue.data?.id === task.issueId ? issue.data : null;
+  const agent = dir.agentById.get(task.agentId);
+  const title = current?.title ?? task.title;
+  return (
+    <Pressable
+      onPress={() => router.push(chatHref(task.channelId, task.rootId))}
+      accessibilityRole="button"
+      accessibilityLabel={t("chat.issueWork.chipLabel", { number: task.number, title })}
+      style={({ pressed }) => [styles.chip, surface, pressed && styles.pressed]}
+    >
+      <Icon name="issue" size={14} color={c.ink2} />
+      <Text variant="small" tone="ink" style={[styles.grow, styles.bold]} numberOfLines={1}>
+        #{task.number} {title}
+      </Text>
+      {agent ? <AgentFace agentId={agent.id} size={18} /> : null}
+      {current ? <StateChip issue={current} /> : null}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  chips: { gap: 6, marginTop: 6, alignItems: "flex-start" },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 40,
+    maxWidth: "100%",
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    borderRadius: 14,
+  },
   card: { padding: 14, borderRadius: 20, gap: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },

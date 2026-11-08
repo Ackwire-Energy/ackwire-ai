@@ -1,6 +1,6 @@
 # 0104. Error reports to a Sentry-compatible server
 
-- Status: Accepted (built: the server, the web app and the desktop app, not the phone app)
+- Status: Accepted (built: the server, the web app, the desktop app and, since 2026-11-07, the phone app's JavaScript)
 - Date: 2026-10-31
 - Code: `packages/adapters/src/error-reports.ts` (the reporter), `packages/adapters/src/error-scrub.ts` (what a report may carry), `apps/server/src/logger.ts`, `apps/server/src/start.ts`, `apps/server/src/workers.ts` (`logJobFailure`), `packages/engine/src/outbox.ts` (`JobContext.failed`), `apps/server/src/auth.ts` (`onAPIError`), `apps/server/src/realtime/ws.ts`, `apps/server/src/http/errors.ts` (`routeOf`, `isExpectedError`), `apps/web/src/lib/error-reports.ts`, `apps/web/src/lib/error-sdk.ts`, `apps/web/src/components/ErrorScreen.tsx`, `deploy/deploy.sh`
 
@@ -36,3 +36,7 @@ An error people hit was seen in the server's log at best. A web page that broke 
 ## Addendum (2026-11-02): learning's failures
 
 Learning (ADR 0120) fails where nothing logs an error: the turn-end judgment asks again without its `learn` question, the `context.learn` job's model call is refused, or queueing the job fails. These go to the reporter directly (`reportLearnFailure`, `ContextDeps.errors`), tagged `cause` (`judge_learn_question`, `learn_call`, `learn_queue`), `org_id`, `agent_id`, `run_id` and the call that failed, never with what the conversation said. The learning call names its `provider`, `model` and `account` (`plan_sign_in` or `api_key`). The judge's names `judge` and the model call it made (`judge_provider`, `judge_model`, which the judge puts on the error it throws: with Jev on and failing, the error reported is the fallback's), and the agent it judged sits apart as `agent_brain`, `agent_provider`, `agent_model` and `agent_account`, so a plan sign-in that was never part of the failing call isn't mistaken for it. At most one report per workspace and cause an hour, held in each process's memory, so a broken provider can't flood the server. A rate limit or an overload on the learning call isn't reported: the outbox tries it again.
+
+## Addendum (2026-11-07): the phone app
+
+The phone app reports with the server's own reporter (`createErrorReporter` from `@agenteschat/adapters/error-reports`, `@sentry/core` with a fetch transport, scrubbed by `scrubEvent`), which is MIT, so §7's license problem doesn't arise: what it gives up is native crashes, as the alternative above says. `auth-config`'s `mobileErrorReports` says where: `SENTRY_MOBILE_DSN`, a project of its own, else `SENTRY_WEB_DSN`, else nowhere and no reporting code loaded. The release is the app's (`mobile@<version>`), tagged with the phone's `os`, the workspace's and the person's ids. It reports what nothing caught (the global handler, before the system's), what a screen's error boundary shows (`ScreenError`), and a view of an agent's screen that never opened (`reportStuck`: `view` computer or card, `agent_id`, whether the page said `ready`, and its last state), since that one throws nothing. Errors from before the server answered wait for it, 20 at most (`apps/mobile/src/lib/error-reports.ts`).

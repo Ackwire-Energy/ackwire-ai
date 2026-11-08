@@ -75,6 +75,8 @@ The onboarding asks only the workspace's name (its logo and time zone), in Lodi'
 
 Amended 2026-11-06: on a billing hold (ADR 0079 §7) the cards are the start card and what's next alone, with no Connect AI and no style card. The greeting's lead says the agents start with the plan, a tap on the start card posts that business's template with no model call, "Outra coisa" opens the gallery, and the top card offers the plan instead of inviting. Lodi can't answer there: anything written gets the wall.
 
+Amended 2026-11-07 (ADR 0155 §6): for the workspace's owners the start card, the next card and Connect AI give way to one first-run checklist inside the greeting (what the workspace does, the team, an AI, apps, people), each row a dialog in place and read done from the data. Anyone else keeps Connect AI while there is none; how agents talk to them waits until the checklist is complete. Início's first steps give way to one line back to it.
+
 On a person's first visit to Lodi's DM (they never read it, on any device: no `channel_reads` row of theirs, `everRead` in the DM list), Lodi's waving sticker shows under the greeting: the agents' sticker drawn from its look (`wave`, since 2026-11-04 also a mood people and agents send, ADR 0091), playing once, still with reduced motion, decorative, never stored and with no model call. That visit marks the DM read, so the next one, after a message or not, has no wave.
 
 ### 7. Cost
@@ -184,6 +186,8 @@ A beginner found the app clear but got stuck deciding how many agents to make, w
 6. **Team templates** ("Ver modelos de time", on the start card's footer): six business types (agência de marketing, loja online, clínica ou consultório, software e apps, atendimento e suporte, escritório de serviços), each a team of the same few agents, kept in code (`team-templates.ts`) with their words in `@agenteschat/i18n` (`teamTemplates.*`, every language; a channel name that isn't a valid name in a language takes its English one). The gallery previews each as its card would propose it (`GET …/team-templates`); "Usar este modelo" (`POST …/team-templates/{id}/use`) posts it as the right hand's team card in the person's DM with it, with no model call, then its first question to fit it (1 of 2), whose answer starts its turn: it asks the second and proposes the team again.
 7. **The phone** draws the same: the start card's chips, the chips under a question, the team card as stacked rows with the same buttons (Ajustar opens a sheet), the receipt and first tasks, and the templates and the map as sheets.
 
+Amended 2026-11-07 (ADR 0155 §6): §1's start card is gone. Its question is the first run's row 1 ("O que a Acme faz?", the business types and one sentence, saved as the workspace's context), and §6's "Usar este modelo" is "Criar o time": the template's team is made at once, its card posted already created with Desfazer, with no question after and no model call. The interview of §2 and §3 stays for whoever types, its first question skipped once the context says it. Ajustar leaves the first run, since the card is never open there.
+
 ### Consequences
 
 - The card's state lives in its message (`meta.actionCard`), like the other cards: no migration. `team.proposal.updated` carries the whole card to the conversation.
@@ -278,3 +282,29 @@ After onboarding the right hand couldn't see the team: `search_context` and `rea
 
 - What a person may read now reaches a turn that can write cards, marked as data. `read_conversation` and `search_context` mark the run as outside, so a change right after them stays a card.
 - On an API key it has one budget for the whole workspace, sized for setup chat. One heavy person could stop it for everyone. ADR 0141's limits cover this but are off by default.
+
+## Amendment (2026-11-07): one thread per piece of work (§14)
+
+### Context
+
+§13 let the right hand hand work on with `tell_agent`, which runs in the two agents' DM that nobody reads. For real work the person wanted to follow it, talk to the agent about it, and keep their DM with the right hand a short log. A task already is that (ADR 0145): its own conversation, receipts, stop, and everyone who sees the task follows it.
+
+### Decision
+
+### 14. A task it hands on starts there, and comes back here
+
+- **`create_issue` assigned to an agent starts that agent in one step** (`askAgentToImplement` with `by`). The start message in the task's conversation is written as the right hand, from its run, never in the person's name. The checks come before the task is made: an agent the person may talk to directly (its audience, not `viaAgent`, since they read the conversation), one the right hand may call, never itself. A task with no agent, or a person, starts nothing.
+- **It is a `note` row of the right hand's run** (`agent_consultations`, its channel the task's conversation). The consulted run's end settles it as in an agents' DM (`answersHandOffs`), so what came of it reaches the person's DM by itself (`reportHandOffs`), and its cards go there (`consultationOrigin`). A stop in the task's conversation is heard the same way.
+- **The chip.** The tool returns `data.handedTask`, and the reply carries `meta.tasks`: one chip per task, "#42 Campanha de Natal · Ada · Em andamento", live, that opens the task's conversation beside the chat (web) or as a thread (phone). The `issue.created` receipt of that task is left out under it: the chip is the task.
+- **The audience** stays the person and administrators (§13), which they widen on the task (ADR 0151).
+- **Resumo do dia.** The weekly card (§9) can come every day at an hour instead (`team_week.daily`), over the last day, from the same builder with no model call, on days with something to say. Anyone may turn it on, telling the right hand (`set_team_week` `daily`) or in Settings › Lodi. Anyone but an administrator gets runs counted only where they read, no money and no budget row; a fix the card can't offer them leaves no proposal behind. The weekly card stays the default, for administrators.
+- **The prompt** names `create_issue` assigned to an agent for real work and `tell_agent` for a small thing, and that either reports back by itself.
+
+### Consequences
+
+- The work and any talk about it live in the task's conversation. The DM with the right hand reads as chips and reports.
+- A task's agent asking something lands its card in the person's DM, where they asked, not in the task's conversation.
+
+## Amendment (2026-11-07): out of the reporting line (§15)
+
+The right hand is nobody's supervisor and reports to nobody (ADR 0148's addendum refuses it at either end). It reaches what each person reaches already, so an agent with no supervisor needs nothing written. The Organograma draws it as a slim chip beside the workspace, "acompanha tudo com você", opening its DM, not above the people.

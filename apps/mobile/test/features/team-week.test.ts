@@ -33,11 +33,13 @@ test("stacked rows: every fix's button under its words, full width, and the foot
   expect(card).toContain("router.push(`/approval/");
 });
 
-test("Configurações › Lodi: on or off, the day and the hour, only for admins", () => {
+test("Configurações › Lodi: on or off, the day and the hour for admins, Resumo do dia for anyone", () => {
   const screen = src("right-hand/SettingsScreen.tsx");
   expect(screen).toContain("<TeamWeekRows name={agent.name} />");
   expect(screen).toContain('can(org, "administrator")');
-  expect(screen).toContain("toggle={!prefs.off}");
+  expect(screen).toContain("toggle={on}");
+  expect(screen).toContain("teamWeekOn(prefs, admin)");
+  expect(screen).toContain('"teamWeek.settings.dayLabel"');
 });
 
 test("the phone reads the same card and says its rows in the person's language", () => {

@@ -1174,12 +1174,13 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     {
       name: SET_TEAM_WEEK_TOOL,
       description:
-        "Stop, start again or move the weekly 'Semana da equipe' card you post in this person's DM (only admins get it; by default on Fridays at 17h in the workspace's time zone). Use it when they ask you to stop it ('para de mandar o resumo da semana'), to send it again, or on another day or hour. It changes only their card.",
+        "Stop, start again or move the card you post in this person's DM: the weekly 'Semana da equipe' (admins get it by default, Fridays at 17h in the workspace's time zone), or 'Resumo do dia', the same card every day at an hour, which anyone may ask for ('me manda isso todo dia às 9h'). Use it when they ask you to stop it, send it again, or on another day or hour. It changes only their card.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
         properties: {
           off: { type: "boolean", description: "True stops it; false starts it again." },
+          daily: { type: "boolean", description: "True: every day at `hour`; false: back to weekly." },
           day: { type: "string", enum: [...WEEK_DAYS] },
           hour: { type: "integer", minimum: 0, maximum: 23, description: "In the workspace's time zone." },
         },
@@ -1188,17 +1189,22 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
       async execute(input, ctx) {
         try {
           const forUserId = await personBehindCall(ctx);
-          if (!forUserId) return { content: "Only a person's request changes their weekly card.", isError: true };
+          if (!forUserId) return { content: "Only a person's request changes their card.", isError: true };
           const day = WEEK_DAYS.indexOf(str(input.day) as (typeof WEEK_DAYS)[number]);
           const next = await setTeamWeekPrefs(ctx.db, ctx.orgId, forUserId, {
             ...(typeof input.off === "boolean" ? { off: input.off } : {}),
+            ...(typeof input.daily === "boolean" ? { daily: input.daily } : {}),
             ...(day >= 0 ? { day } : {}),
             ...(typeof input.hour === "number" ? { hour: input.hour } : {}),
           });
+          const admin = can(await getMembership(ctx.db, forUserId, ctx.orgId), "administrator");
           return {
-            content: next.off
-              ? "Stopped: no weekly card for them until they ask again or turn it on in Settings › Lodi."
-              : `Their weekly card now comes every ${WEEK_DAYS[next.day]} at ${next.hour}:00 (${next.timezone}), when there is something to say.`,
+            content:
+              next.off || (!next.daily && !admin)
+                ? "Stopped: no card for them until they ask again or turn it on in Settings › Lodi."
+                : next.daily
+                  ? `Their 'Resumo do dia' now comes every day at ${next.hour}:00 (${next.timezone}), on days with something to say.`
+                  : `Their weekly card now comes every ${WEEK_DAYS[next.day]} at ${next.hour}:00 (${next.timezone}), when there is something to say.`,
           };
         } catch (error) {
           return failed(error);
@@ -1224,6 +1230,7 @@ interface SettingsChangeInput {
   replies?: unknown;
   name?: unknown;
   look?: unknown;
+  reports_to?: unknown;
   archive?: unknown;
 }
 
@@ -1316,6 +1323,15 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   if (typeof change.name === "string")
     lines.push({ field: "name", to: change.name.trim(), label: { to: change.name } });
   if (change.look) lines.push({ field: "look", to: change.look });
+  if (typeof change.reports_to === "string") {
+    const wanted = change.reports_to.trim().replace(/^@/, "").toLowerCase();
+    if (wanted === "none") lines.push({ field: "reports_to", to: null });
+    else {
+      const sup = (await agentsByHandle(ctx.db, ctx.orgId, [wanted])).rowOf(wanted);
+      if (!sup) return `No agent @${wanted} here.`;
+      lines.push({ field: "reports_to", to: sup.id, label: { to: sup.name } });
+    }
+  }
   if (change.archive === true) lines.push({ field: "archive", to: true });
   return lines;
 }
@@ -1330,7 +1346,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
   return {
     name: PROPOSE_SETTINGS_TOOL,
     description:
-      "Change teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
+      "Change teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
     scope: SETUP_SCOPE,
     inputSchema: {
       type: "object",
@@ -1392,6 +1408,13 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
                 },
                 required: ["color", "eyes"],
                 additionalProperties: false,
+              },
+              reports_to: {
+                type: "string",
+                minLength: 1,
+                maxLength: 64,
+                description:
+                  'Responde a: the @handle of the agent it reports to, or "none". It says who it tells, never what it may do.',
               },
               archive: { type: "boolean", description: "True: archive it (it stops working; Undo brings it back)." },
             },

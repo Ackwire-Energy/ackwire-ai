@@ -66,6 +66,8 @@ export interface PushStrings {
   usageRefusedTitle: (admin: string) => string;
   /** Lodi's weekly card (ADR 0137 §9): its message's text, so the push and the conversation list read it. */
   teamWeekReady: string;
+  /** Lodi's daily card ("Resumo do dia") came. */
+  teamDayReady: string;
 }
 
 export const en: PushStrings = {
@@ -143,4 +145,5 @@ export const en: PushStrings = {
   usageRaisedBody: "You can keep going.",
   usageRefusedTitle: (a) => `${a} declined your request for more usage`,
   teamWeekReady: "Your team's week is ready",
+  teamDayReady: "Your day's summary is ready",
 };

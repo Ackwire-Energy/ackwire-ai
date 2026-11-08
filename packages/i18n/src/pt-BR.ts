@@ -1571,6 +1571,10 @@ export const ptBR = {
       subSector: "Cada setor com seus agentes. {{name}} trabalha com todos.",
       workspace: "Workspace",
       responsible: "Responsáveis: {{names}}",
+      /** O Lodi ao lado do workspace, fora da linha de quem responde a quem. */
+      lodi: "acompanha tudo com você",
+      supervisor: "Supervisor: {{name}}",
+      dragSector: "Arraste até um agente para os agentes deste setor responderem a ele",
     },
     map: {
       lead: "Quem cuida dos agentes, os canais onde eles estão, o que cada um faz sozinho e o que espera uma pessoa. As linhas tracejadas são agentes que pediram ajuda um ao outro no último dia.",
@@ -1589,6 +1593,8 @@ export const ptBR = {
       emptyAction: "Colocar num canal",
       emptyViewer: "Quem gerencia os agentes coloca cada um nos canais, e o mapa aparece aqui.",
       others: "Outros canais",
+      band: "Supervisores",
+      reportsTo: "Responde a {{name}}",
     },
     sectors: {
       lead: "Cada setor tem um responsável, um substituto, seus agentes e os canais e rotinas deles.",
@@ -1598,6 +1604,15 @@ export const ptBR = {
       backupLabel: "Substituto",
       leadOf: "Responsável por {{name}}",
       backupOf: "Substituto em {{name}}",
+      supervisor: "Supervisor",
+      supervisorOf: "Supervisor de {{name}}",
+      unsupervised_one: "{{count}} agente sem supervisor",
+      unsupervised_other: "{{count}} agentes sem supervisor",
+      apply: "Aplicar",
+      supervisorDone_one: "{{count}} agente de {{sector}} agora responde a {{name}}",
+      supervisorDone_other: "{{count}} agentes de {{sector}} agora respondem a {{name}}",
+      supervisorCleared_one: "{{count}} agente de {{sector}} não responde mais a um supervisor",
+      supervisorCleared_other: "{{count}} agentes de {{sector}} não respondem mais a um supervisor",
       nobody: "Ninguém",
       none: "Nenhum",
       channels: "Canais",
@@ -1613,6 +1628,15 @@ export const ptBR = {
       empty: "Cada setor tem um responsável, e todo mundo vê quem cuida do quê.",
       emptyViewerTitle: "Veja quem cuida do quê",
       emptyViewer: "Quem gerencia os agentes cria os setores, e eles aparecem aqui.",
+    },
+    /** Responde a (ADR 0148 adendo): a quem um agente presta contas. Não dá nenhuma permissão. */
+    reportsTo: {
+      label: "Responde a",
+      help: "Só diz a quem este agente presta contas. Não dá nenhuma permissão.",
+      none: "Ninguém",
+      done: "{{agent}} agora responde a {{to}}",
+      cleared: "{{agent}} não responde mais a um agente",
+      reports: "Quem responde a {{name}}",
     },
     usage: {
       lead: "Quanto cada pessoa usa dos agentes este mês, e os limites.",
@@ -1919,15 +1943,6 @@ export const ptBR = {
         text: "Os agentes pensam com a IA do workspace. Entre com o seu plano do Claude ou do ChatGPT, sem chave de API.",
         action: "Conectar",
       },
-      start: {
-        question: "Como você quer começar?",
-        /** A ready-made agent's tile: creates it alone. */
-        createOne: "Criar {{name}}",
-        team: "Montar um time pra começar",
-        describe: "Descrever o que preciso",
-        import: "Importar meus agentes",
-        form: "Preencher o formulário",
-      },
       /** Under its greeting once the start card stopped asking; `message`: what the button sends, as the person. */
       again: {
         question: "Quer montar o time comigo?",
@@ -1935,8 +1950,6 @@ export const ptBR = {
         message: "Me ajuda a montar o time.",
       },
       next: {
-        question: "O time chegou. E agora?",
-        invite: "Convidar pessoas",
         firstTask: "Dar a primeira tarefa para o {{name}}",
         firstTask_female: "Dar a primeira tarefa para a {{name}}",
       },
@@ -1946,14 +1959,6 @@ export const ptBR = {
         text: "Vale para todos os agentes, e você muda quando quiser na sua conta.",
         simple: "Simples, sem termos técnicos",
         technical: "Técnico, com os detalhes",
-      },
-      /** Written in the ready-made agent's DM composer by "Dar a primeira tarefa", for the person to send or change. */
-      firstTask: {
-        theo: "Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?",
-        ada: "O que você poderia construir ou automatizar para a gente primeiro?",
-        lia: "Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?",
-        atlas:
-          "O que você vai acompanhar primeiro nos nossos erros, filas e deploys, e como me avisa quando algo quebrar?",
       },
     },
     profile: {
@@ -2055,6 +2060,7 @@ export const ptBR = {
         ai_account: "Só o dono da conta a escolhe",
         name: "Só admins mudam o nome de um agente",
         look: "Só admins e o responsável mudam a aparência",
+        reports_to: "Só admins mudam a quem um agente responde",
         many: "Só admins fazem essas mudanças",
       },
     },
@@ -2068,8 +2074,10 @@ export const ptBR = {
       channel: "Canal",
       name: "Nome",
       look: "Aparência",
+      reports_to: "Responde a",
     },
     value: {
+      anAgent: "Um agente",
       lookDefault: "A aparência padrão",
       none: "Nenhum",
       budgetDefault: "Padrão do workspace",
@@ -2113,6 +2121,7 @@ export const ptBR = {
   },
   teamWeek: {
     title: "Semana da equipe",
+    dayTitle: "Resumo do dia",
     suggestions_one: "{{count}} sugestão",
     suggestions_other: "{{count}} sugestões",
     stat: {
@@ -2188,6 +2197,7 @@ export const ptBR = {
       thu: "Toda quinta às {{time}}",
       fri: "Toda sexta às {{time}}",
       sat: "Todo sábado às {{time}}",
+      day: "Todo dia às {{time}}",
     },
     off: "Desligada",
     schedule: {
@@ -2196,12 +2206,19 @@ export const ptBR = {
       hour: "Hora",
       stop: "Parar de receber",
       start: "Voltar a receber",
+      daily: "Todo dia",
     },
     settings: {
       label: "Semana da equipe",
       help: "Toda semana o {{name}} conta na sua DM como foi o time e o que dá para melhorar. Só admins recebem.",
       help_female:
         "Toda semana a {{name}} conta na sua DM como foi o time e o que dá para melhorar. Só admins recebem.",
+      /** "Resumo do dia": o mesmo cartão todo dia, que qualquer pessoa pode ligar. */
+      dayLabel: "Resumo do dia",
+      dayHelp:
+        "Todo dia o {{name}} conta na sua DM o que o time fez e o que espera você, só nos dias com algo a dizer.",
+      dayHelp_female:
+        "Todo dia a {{name}} conta na sua DM o que o time fez e o que espera você, só nos dias com algo a dizer.",
     },
   },
   routing: {
@@ -3805,31 +3822,9 @@ export const ptBR = {
     mission: "<b>{{name}}</b> espera você numa missão",
     seeAll: "Ver tudo",
     action: { review: "Revisar", answer: "Responder", open: "Abrir" },
-    steps: {
-      title: "Primeiros passos",
-      progress: "{{done}} de {{total}}",
-      hide: "Ocultar",
-      done: "Feito",
-      agent: {
-        title: "Crie seu primeiro agente",
-        text: "Diga o que ele faz e ele entra na equipe.",
-        action: "Criar agente",
-      },
-      plan: {
-        title: "Escolher um plano do agentes.chat",
-        text: "Os agentes começam a trabalhar quando o workspace tiver um.",
-        action: "Ver planos",
-      },
-      ai: { title: "Conecte uma IA", text: "É com ela que os agentes pensam.", action: "Conectar" },
-      ask: { title: "Peça algo a um agente", text: "Escreva aqui embaixo ou numa conversa.", action: "Pedir" },
-      team: { title: "Convide seu time", text: "Pessoas e agentes trabalham juntos aqui.", action: "Convidar" },
-      routine: {
-        title: "Crie uma rotina",
-        text: "Um agente faz algo sozinho, na hora marcada.",
-        action: "Criar rotina",
-      },
-    },
     calm: { title: "Tudo em dia", text: "Seus agentes avisam aqui quando precisarem de você." },
+    /** One line back to the right hand's first-run checklist while a row is left (ADR 0155 §6). */
+    firstRun: "Continue de onde parou · {{done}} de {{total}}",
   },
   notifications: {
     title: "Notificações",
@@ -5153,6 +5148,188 @@ export const ptBR = {
       app: "Enviado por um app de IA",
     },
   },
+  /** A new agent's setup checklist at the top of its chat, in its voice (ADR 0155 §2). */
+  agentSetup: {
+    greeting: "Oi, {{person}}. Eu sou o {{name}}.",
+    greeting_female: "Oi, {{person}}. Eu sou a {{name}}.",
+    greetingRole: "Oi, {{person}}. Eu sou o {{name}}, o novo de {{role}}.",
+    greetingRole_female: "Oi, {{person}}. Eu sou a {{name}}, a nova de {{role}}.",
+    /** What an agent from scratch was asked, said back. */
+    asked: "Você me pediu: “{{what}}”.",
+    lead: "Pra eu começar, me ajuda com estas coisas rápidas:",
+    title: "Pra eu começar",
+    ready: "Estou pronto.",
+    ready_female: "Estou pronta.",
+    /** On its page. */
+    titleProfile: "Para o {{name}} começar",
+    titleProfile_female: "Para a {{name}} começar",
+    count: "{{done}} de {{total}}",
+    change: "Mudar",
+    switch: "Trocar",
+    choose: "Escolher",
+    see: "Ver",
+    suggested: "Sugerido",
+    ai: {
+      todo: "Conectar uma IA",
+      todoDesc: "Para eu conseguir pensar.",
+      action: "Conectar",
+      done: "Já tenho uma IA para pensar",
+    },
+    apps: {
+      todo: "Ler {{apps}}",
+      todoDesc: "Ler nunca muda nada.",
+      action: "Liberar",
+      todoNone: "Usar os apps de {{org}}",
+      todoNoneDesc: "Os que vocês já conectaram, como Gmail e Drive.",
+      done: "Uso {{apps}}",
+      doneNone: "Sem apps por enquanto",
+      title: "O que o {{name}} pode usar",
+      title_female: "O que a {{name}} pode usar",
+      desc: "Ler nunca muda nada. Enviar, apagar e pagar pedem a sua aprovação.",
+      ok_one: "Liberar {{count}} app",
+      ok_other: "Liberar {{count}} apps",
+      okNone: "Continuar sem apps",
+      empty: "Ainda não tem nenhum app conectado em {{org}}.",
+      connectOther: "Conectar outro app",
+    },
+    where: {
+      todo: "Entrar em {{channel}}",
+      todoDesc: "Respondo quando me chamam lá.",
+      action: "Entrar",
+      todoNone: "Entrar em um canal",
+      done: "Estou em {{channels}}",
+      doneNone: "Fico só na conversa direta",
+      title: "Onde o {{name}} trabalha",
+      title_female: "Onde a {{name}} trabalha",
+      desc: "Responde quando chamam por lá. A conversa direta vale sempre.",
+      okNone: "Só conversa direta",
+      okOne: "Entrar em {{channel}}",
+      ok_one: "Entrar em {{count}} canal",
+      ok_other: "Entrar em {{count}} canais",
+    },
+    who: {
+      todo: "Falar com todos de {{org}}",
+      todoDesc: "Qualquer um pode me chamar.",
+      todoPlan: "Falar só com você",
+      todoPlanDesc: "O seu plano é pessoal.",
+      doneEveryone: "Falo com todos de {{org}}",
+      doneYou: "Falo só com você",
+      doneOwner: "Falo só com {{name}}",
+      donePeople: "Falo com quem você escolheu",
+      title: "Quem fala com o {{name}}",
+      title_female: "Quem fala com a {{name}}",
+      people: "Pessoas e papéis",
+      add: "Escolher pessoas",
+      addMore: "Adicionar outra pessoa",
+      /** Who it answers in "Só {{owner}} fala com…", when that's the person reading. */
+      you: "você",
+      youCap: "Você",
+      ownerHelp: "Recebe os pedidos de aprovação e os avisos dele.",
+      ownerHelp_female: "Recebe os pedidos de aprovação e os avisos dela.",
+    },
+    how: {
+      todo: "Ver como eu trabalho",
+      todoDesc: "Começo pelas instruções de {{role}}.",
+      todoDescBlank: "Começo pelo que você escreveu.",
+      done: "Trabalho do seu jeito",
+      title: "Como o {{name}} trabalha",
+      title_female: "Como a {{name}} trabalha",
+      desc: "Escreva como falaria com alguém novo no time.",
+      instructions: "Instruções",
+      budget: "Limite por mês",
+      budgetHelp: "Avisamos aos 80%. No limite, ele pausa e avisa você.",
+      budgetHelp_female: "Avisamos aos 80%. No limite, ela pausa e avisa você.",
+      more: "Mais opções",
+      model: "Modelo",
+    },
+    /** Its line once a step is done. */
+    say: {
+      ai: "Agora eu já consigo pensar.",
+      apps: "Pronto, já posso usar os apps.",
+      where: "Vou ficar de olho por lá.",
+      who: "Combinado, já sei com quem falar.",
+      how: "Entendi como você quer que eu trabalhe.",
+    },
+    tasksLead: "Já dá para começar. Me peça algo:",
+    tasksAllDone: "Tudo pronto. Me peça algo:",
+    /** First tasks of an agent from scratch (a ready-made one has its role's). */
+    tasks: {
+      a: "O que você consegue fazer por mim?",
+      b: "Por onde a gente começa?",
+    },
+    /**
+     * The right hand's first run (ADR 0155 §6): its checklist card for the workspace's owners, one row per thing to set
+     * up, read done from the data; `{{org}}`: the workspace.
+     */
+    firstRun: {
+      title: "Para o time da {{org}} começar a trabalhar",
+      complete: "Tudo pronto.",
+      notNow: "Agora não",
+      /** Apps and people on a billing hold: no button, they open with the plan. */
+      afterPlan: "Abre com o plano.",
+      about: {
+        todo: "Me conte o que a {{org}} faz.",
+        todoDesc: "Todos os agentes leem isso.",
+        action: "Contar",
+        done: "Já sei o que a {{org}} faz",
+        title: "O que a {{org}} faz?",
+        desc: "Todos os agentes leem isso. Você muda quando quiser.",
+        line: "Em uma frase",
+        optional: "Opcional. Sem frase, vale o tipo que você marcou.",
+      },
+      team: {
+        todo: "Monte o time.",
+        todoDesc: "Um modelo para o seu negócio, você muda tudo depois.",
+        action: "Ver o time",
+        done_one: "{{count}} agente no time",
+        done_other: "{{count}} agentes no time",
+        /** While a team card the right hand proposed waits in the chat. */
+        card: "Continue no card abaixo",
+      },
+      ai: {
+        todo: "Conecte uma IA.",
+        todoDesc: "Serve a que você já paga.",
+        action: "Conectar",
+        done: "Penso com {{label}}",
+        doneAny: "Já penso com uma IA",
+        plan: "Abre com o plano do agentes.chat.",
+        planAction: "Ver planos do agentes.chat",
+      },
+      apps: {
+        todo: "Conecte os apps do trabalho.",
+        todoDesc: "Ler nunca muda nada.",
+        action: "Escolher",
+        done: "Leio {{apps}}",
+        doneNone: "Sem apps por enquanto",
+        title: "Os apps do trabalho",
+        desc: "Os que o time acabou de usar vêm primeiro. Ler nunca muda nada, e enviar, apagar e pagar pedem a sua aprovação.",
+        connect: "Conectar",
+        all: "Ver todos os apps",
+      },
+      people: {
+        todo: "Chame quem trabalha com você.",
+        todoDesc: "Eles falam com os agentes também.",
+        action: "Convidar",
+        done_one: "{{count}} pessoa aqui",
+        done_other: "{{count}} pessoas aqui",
+        doneNone: "Só você por enquanto",
+      },
+      /** Its line for a moment once a row is done. */
+      say: {
+        about: "Anotado. Todos os agentes leem isso.",
+        team: "O time chegou.",
+        ai: "Agora o time pensa.",
+        apps: "Pronto, já leio os apps.",
+        people: "Que bom ter mais gente aqui.",
+      },
+      /** Once the team can think: what the person may ask next. `fit` and `who` are sent to the right hand as written. */
+      asks: {
+        lead: "Agora me peça algo:",
+        fit: "Ajuste o time ao meu negócio",
+        who: "Quem do time cuida do quê?",
+      },
+    },
+  },
   newAgent: {
     title: "Criar agente",
     railOrg: "{{org}} · você é {{role}}",
@@ -5208,6 +5385,11 @@ export const ptBR = {
         desc: "Programa, revisa PRs e investiga bugs.",
         instructions:
           "Investiga primeiro: lê o código e as tarefas e erros relacionados antes de responder, e volta com o que encontrou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos. Em mudanças grandes, abre o PR como rascunho e explica o plano nele.\nNunca faz merge sozinho: pede revisão de uma pessoa.",
+        tasks: {
+          a: "Qual é o erro mais frequente agora?",
+          b: "Revise o último PR aberto",
+          c: "Pegue a tarefa mais antiga do backlog",
+        },
       },
       ops: {
         name: "Ops",
@@ -5215,6 +5397,11 @@ export const ptBR = {
         desc: "Monitora erros, filas e deploys.",
         instructions:
           "Acompanha erros e deploys e escreve relatórios de incidente.\nQuando um alerta dispara, investiga primeiro (erros, logs, deploys recentes) e avisa no canal com o que encontrou: desde quando, o tamanho, a causa provável e o próximo passo.\nRollback e deploy só com aprovação.",
+        tasks: {
+          a: "Algo estranho desde o último deploy?",
+          b: "Resuma os erros de hoje",
+          c: "O que mudou na última versão?",
+        },
       },
       qa: {
         name: "QA",
@@ -5222,6 +5409,11 @@ export const ptBR = {
         desc: "Testa fluxos e reproduz bugs relatados.",
         instructions:
           "Reproduz cada bug relatado antes de abrir uma tarefa. Escreve passos claros e anexa evidências.\nSe não conseguir reproduzir, olha primeiro os erros, as mudanças recentes e as tarefas relacionadas. Só pergunta o ambiente e a versão se não estiverem lá.\nPrioriza o que bloqueia cliente.",
+        tasks: {
+          a: "Reproduza o último bug relatado",
+          b: "Quais bugs estão sem passos?",
+          c: "Algum erro novo depois do deploy?",
+        },
       },
       pm: {
         name: "PM",
@@ -5229,6 +5421,7 @@ export const ptBR = {
         desc: "Organiza tarefas e resumos.",
         instructions:
           "Procura primeiro (tarefas, conversas, wiki, feedback) e só pergunta o que faltar.\nOrganiza tarefas, resume discussões longas e mantém o roadmap atualizado.",
+        tasks: { a: "Resuma o que o time fez esta semana", b: "Quais tarefas estão paradas?", c: "Atualize o roadmap" },
       },
       support: {
         name: "Atendimento",
@@ -5236,6 +5429,11 @@ export const ptBR = {
         desc: "Responde clientes e encaminha o que precisa de alguém.",
         instructions:
           "Antes de responder, procura o histórico do cliente, as conversas anteriores e a base de ajuda, e volta com uma resposta pronta e de onde tirou.\nSe for um problema do produto, abre uma tarefa com os passos e avisa o time. Não promete prazo nem solução que não existe.\nEnviar mensagem ao cliente, reembolso e desconto só com aprovação.",
+        tasks: {
+          a: "Quais clientes estão esperando resposta há mais tempo?",
+          b: "Resuma as reclamações desta semana",
+          c: "Rascunhe uma resposta para o último e-mail de cliente",
+        },
       },
       sales: {
         name: "Vendas",
@@ -5243,6 +5441,11 @@ export const ptBR = {
         desc: "Prepara propostas e acompanha os interessados.",
         instructions:
           "Antes de falar com alguém, pesquisa a empresa, o histórico com ela e o que já foi combinado, e volta com um resumo e o próximo passo.\nMantém a lista de interessados em dia e lembra o time do que está parado.\nNunca inventa preço, desconto ou condição: usa só o que está na tabela. Envia proposta ou email ao cliente só com aprovação.",
+        tasks: {
+          a: "Quem está parado há mais de uma semana?",
+          b: "Prepare uma proposta para o último interessado",
+          c: "Quanto entrou de clientes novos este mês?",
+        },
       },
       marketing: {
         name: "Marketing",
@@ -5250,6 +5453,11 @@ export const ptBR = {
         desc: "Planeja campanhas, posts e páginas do site.",
         instructions:
           "Começa olhando o que já foi feito, os resultados e o tom da marca antes de sugerir algo novo.\nEscreve rascunhos de campanhas, posts e páginas, com uma ideia principal e para quem é.\nNão inventa números nem depoimentos. Publica no site ou nas redes só com aprovação.",
+        tasks: {
+          a: "Sugira 3 posts para esta semana",
+          b: "Monte o plano da próxima campanha",
+          c: "Revise o texto da página de preços",
+        },
       },
       content: {
         name: "Conteúdo",
@@ -5257,6 +5465,11 @@ export const ptBR = {
         desc: "Escreve e revisa textos, artigos e newsletters.",
         instructions:
           "Antes de escrever, lê o que já existe sobre o assunto (wiki, documentos, conversas) e confirma para quem é o texto.\nEntrega rascunhos claros e curtos, com as fontes no fim. Quando revisa, explica o que mudou e por quê.\nNão inventa dados nem citações. Publica ou envia para fora só com aprovação.",
+        tasks: {
+          a: "Escreva a newsletter do mês",
+          b: "Revise o último artigo do blog",
+          c: "Liste 5 temas para artigos",
+        },
       },
       data: {
         name: "Dados",
@@ -5264,6 +5477,11 @@ export const ptBR = {
         desc: "Responde perguntas com números e monta relatórios.",
         instructions:
           "Busca os números na fonte antes de responder e mostra de onde vieram, o período e como calculou.\nSe os dados não bastam ou parecem errados, diz isso em vez de chutar. Nunca inventa um número.\nToda segunda, posta um resumo dos principais números da semana.",
+        tasks: {
+          a: "Como foram as vendas desta semana?",
+          b: "Monte o relatório do mês",
+          c: "Quais clientes compram mais?",
+        },
       },
       finance: {
         name: "Financeiro",
@@ -5271,6 +5489,7 @@ export const ptBR = {
         desc: "Acompanha pagamentos, cobranças e gastos.",
         instructions:
           "Confere os pagamentos, cobranças e gastos na fonte antes de responder e mostra os valores com a data e a origem.\nAvisa quando algo foge do normal: cobrança falhando, gasto acima do esperado, fatura vencendo.\nPagamento, reembolso e qualquer movimentação de dinheiro só com aprovação. Nunca inventa valores.",
+        tasks: { a: "Quanto entrou este mês?", b: "Quais cobranças falharam?", c: "Resuma os gastos do mês passado" },
       },
       people: {
         name: "Pessoas",
@@ -5278,6 +5497,11 @@ export const ptBR = {
         desc: "Ajuda com contratação, boas-vindas e dúvidas do time.",
         instructions:
           "Antes de responder, procura nas políticas, na wiki e nos documentos do time, e diz de onde tirou.\nOrganiza vagas, entrevistas e a chegada de quem entra, com checklists claros.\nTrata dados pessoais com cuidado e só compartilha com quem precisa. Manda mensagem a candidatos só com aprovação.",
+        tasks: {
+          a: "Monte a primeira semana de quem chega segunda",
+          b: "Quais são as regras de férias?",
+          c: "Organize as entrevistas desta semana",
+        },
       },
       research: {
         name: "Pesquisa",
@@ -5285,6 +5509,11 @@ export const ptBR = {
         desc: "Pesquisa um assunto e entrega um resumo com fontes.",
         instructions:
           "Procura primeiro no que o time já tem (wiki, documentos, conversas) e depois em fontes externas.\nEntrega um resumo curto com as principais conclusões, o que ainda não se sabe e as fontes de cada ponto.\nSepara fato de opinião e nunca inventa dados ou citações.",
+        tasks: {
+          a: "Pesquise os 5 maiores concorrentes",
+          b: "Resuma o que já sabemos sobre o mercado",
+          c: "Compare os preços dos concorrentes",
+        },
       },
       assistant: {
         name: "Assistente",
@@ -5292,6 +5521,11 @@ export const ptBR = {
         desc: "Cuida da agenda, dos emails e dos lembretes.",
         instructions:
           "Antes de perguntar, olha a agenda, os emails e as conversas recentes, e volta com o que encontrou e uma sugestão.\nOrganiza compromissos, prepara rascunhos de resposta e lembra das tarefas na hora certa.\nEnviar email ou mensagem em nome de alguém, aceitar convites e fazer pagamentos só com aprovação.",
+        tasks: {
+          a: "Resuma meus e-mails de hoje",
+          b: "O que eu prometi responder esta semana?",
+          c: "Ache a planilha de metas do trimestre",
+        },
       },
       custom: { name: "Do zero", desc: "Você escreve tudo. Sem acessos até você liberar.", instructions: "" },
     },
@@ -5920,7 +6154,7 @@ export const ptBR = {
     assigneeFilter: "Responsável",
     priorityFilter: "Prioridade",
     title: "Tarefas",
-    summary: "{{open}} abertas · {{agents}} com agentes",
+    summary: "{{open}} em aberto · {{agents}} com agentes",
     search: "Buscar tarefas",
     view: "Visualização",
     board: "Quadro",
@@ -9901,7 +10135,7 @@ export const ptBR = {
   storage: {
     title: "Armazenamento",
     options: "Onde guardar os arquivos",
-    agentes: "Armazenamento do agentes",
+    agentes: "Armazenamento do agentes.chat",
     agentesText: "Seus arquivos ficam no nosso armazenamento, separados por workspace.",
     server: "Este servidor",
     serverText: {
@@ -9913,7 +10147,7 @@ export const ptBR = {
     showFolder: "Mostrar a pasta",
     // `{{place}}` in the lines below: each is built so no preposition has to merge with it ("neste", "no").
     place: {
-      agentes: "o armazenamento do agentes",
+      agentes: "o armazenamento do agentes.chat",
       server: "este servidor",
     },
     s3: "Seu próprio bucket",
@@ -13369,6 +13603,8 @@ export const ptBR = {
       view: "Ver tarefa",
       taken: "{{name}} pegou a tarefa",
       agent: "Com {{name}}",
+      /** Uma tarefa que o braço direito passou adiante, como chip na resposta dele: abre a conversa da tarefa. */
+      chipLabel: "Abrir a conversa da tarefa #{{number}}, {{title}}",
     },
     body: {
       /** Os freios da autonomia (ADR 0131): o agente pede antes de trabalho caro que ninguém pediu, o resumo de ruído, a parada de repetição. */
@@ -13380,6 +13616,7 @@ export const ptBR = {
       autonomy_digest_one: "{{count}} alerta parecia conhecido ou inofensivo, então não trabalhei nele:",
       autonomy_digest_other: "{{count}} alertas pareciam conhecidos ou inofensivos, então não trabalhei neles:",
       team_week: "Como foi a semana do time, de {{from}} a {{to}}",
+      team_day: "Como foi o dia do time, até {{day}}",
       autonomy_loop:
         "Parei de trabalhar nisso por conta própria. Voltou {{count}} vezes em um dia ({{title}}). Me diz como você quer que eu trate.",
       mission_plan: "Plano para “{{title}}” no {{computer}}",
@@ -14811,6 +15048,10 @@ export const ptBR = {
       pausedPlain: "Pausado no {{computer}}",
       noComputer: "Sem computador ainda",
       outdated: "Precisa de uma atualização no {{computer}}",
+      updating: "Sendo atualizado · volta sozinho",
+      screensOff: "Telas desligadas no {{computer}}",
+      screensMissing: "O {{computer}} ainda não mostra telas",
+      browserOff: "Navegador desligado no {{computer}}",
     },
     screen: "Tela do {{name}}, ao vivo",
     screen_female: "Tela da {{name}}, ao vivo",
@@ -15468,11 +15709,7 @@ export const ptBR = {
   },
   teamPlan: {
     start: {
-      question: "O que a {{org}} faz? Com isso eu monto um time pronto, e você só confere.",
-      orWrite: "Ou escreva do seu jeito aqui embaixo, numa frase.",
-      footer: "Já sabe o que quer?",
       templates: "Ver modelos de time",
-      presets: "Agentes prontos",
     },
     business: {
       agency: "Agência",
@@ -15483,7 +15720,6 @@ export const ptBR = {
       services: "Escritório de serviços",
       other: "Outra coisa",
     },
-    answered: "respondida",
     step: "Pergunta {{step}} de {{of}}",
     send: "Enviar {{count}}",
     card: {
@@ -15539,11 +15775,14 @@ export const ptBR = {
     templates: {
       title: "Modelos de time",
       lead: "Um time pronto para o seu tipo de negócio. Depois o {{name}} ajusta com você.",
-      heldLead: "Escolha o mais perto do seu negócio. Você ajusta cada agente antes de criar.",
-      use: "Usar este modelo",
+      heldLead: "Escolha o mais perto do seu negócio. Você muda tudo depois.",
+      create: "Criar o time",
+      import: "Trazer agentes de outro app",
+      scratch: "Criar um agente do zero",
+      failed: "O time não foi criado. O motivo está no card da conversa.",
       none: "Nenhum desses",
       noneSub: "Conte o que você faz e o {{name}} monta",
-      tailor: "Depois eu faço 2 perguntas para ajustar ao seu caso.",
+      tailor: "Depois é só me pedir para ajustar ao seu negócio.",
     },
     weekly: {
       name: "A semana do time",
@@ -15693,6 +15932,5 @@ export const ptBR = {
       },
     },
     approvals: "O que sai para os clientes espera a sua aprovação. Dá para liberar depois, quando você confiar neles.",
-    ask: "Usei o modelo {{name}}. Para ajustar ao seu caso: **o que a {{org}} faz de diferente?**",
   },
 } satisfies LocaleStrings;

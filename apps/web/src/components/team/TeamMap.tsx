@@ -2,7 +2,13 @@ import type { Routine, Team, TeamAgent } from "@agenteschat/client";
 import { useAgentGroups, useApprovals, useProposeChannelMove, useRoutines } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { mapColumns } from "@agenteschat/client/lib/team-views";
+import {
+  mapColumns,
+  mayReportTo,
+  sharedSupervisor,
+  supervisorOf,
+  supervisors,
+} from "@agenteschat/client/lib/team-views";
 import { excerpt } from "@agenteschat/client/lib/text";
 import { Button, EmptyState, Icon } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -13,6 +19,7 @@ import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { useWhen } from "@/pages/RoutinesPage";
+import { useSetReportsTo } from "./ReportsTo";
 import { ChannelName, useTeamLookups } from "./shared";
 
 /** "What it does" on a card: its instructions' first line, in whole sentences while they fit. */
@@ -25,14 +32,17 @@ const AGENT_DRAG = "application/x-agentes-map-agent";
 interface Line {
   key: string;
   d: string;
-  kind: "owner" | "ask";
+  /** `line`: a supervisor to its report (solid, ADR 0148 addendum); `ask`: a recent consultation (dashed). */
+  kind: "owner" | "ask" | "line";
 }
 
 /**
  * Equipe › Mapa (ADR 0148): the people who look after the agents on top, one column per channel with its agents,
  * what each does on its own (routines) and what waits for a person, dashed lines between agents that asked each
- * other in the last day, and the right hand under them. Read-only: dropping an agent on another channel asks the
- * right hand for a settings card in my DM with it, applied there like any other.
+ * other in the last day, and the right hand under them. When an agent reports to another, a band of supervisors sits
+ * between the people and the channels, with a solid line to each report. Dropping an agent on another channel asks
+ * the right hand for a settings card in my DM with it, applied there like any other; dropping it on a supervisor in
+ * the band (who manages agents) makes it report there at once, with Desfazer.
  */
 export function TeamMap({ team }: { team: Team }) {
   const { t } = useTranslation();
@@ -46,6 +56,9 @@ export function TeamMap({ team }: { team: Team }) {
   const navigate = useNavigate();
   const propose = useProposeChannelMove(org.id);
   const columns = mapColumns(team.agents, look.channelOrder, look.isLodi);
+  const sups = supervisors(team.agents.filter((a) => !look.isLodi(a)));
+  const setReportsTo = useSetReportsTo();
+  const arranges = can(org, "manage_agents");
   const owners = [
     ...new Set(columns.flatMap((c) => c.agents.map((a) => a.ownerUserId)).filter((id): id is string => !!id)),
   ].filter((id) => look.members.has(id));
@@ -59,9 +72,25 @@ export function TeamMap({ team }: { team: Team }) {
       return here ? target === channelId : first;
     });
 
+  const [dragging, setDragging] = useState<{ agentId: string; from: string | null } | null>(null);
+  // While who manages agents drags one, the band also offers every agent it may report to: the first supervisor is
+  // made here too, not only on the Organograma.
+  const band =
+    dragging && arranges
+      ? [
+          ...sups,
+          ...team.agents.filter(
+            (a) =>
+              !look.isLodi(a) &&
+              a.id !== dragging.agentId &&
+              !sups.includes(a) &&
+              mayReportTo(team.agents, dragging.agentId, a.id),
+          ),
+        ]
+      : sups;
   const box = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
-  const shape = `${columns.map((c) => `${c.channelId}:${c.agents.map((a) => a.id).join()}`).join("|")}#${team.consultations.length}`;
+  const shape = `${band.map((a) => a.id).join()}#${columns.map((c) => `${c.channelId}:${c.agents.map((a) => a.id).join()}`).join("|")}#${team.consultations.length}#${team.agents.map((a) => a.reportsToAgentId ?? "").join()}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measured when the columns or the consultations change
   useLayoutEffect(() => {
     const el = box.current;
@@ -85,6 +114,25 @@ export function TeamMap({ team }: { team: Team }) {
           out.push({
             key: `o-${id}-${c.channelId}`,
             kind: "owner",
+            d: `M${x0},${y0} C${x0},${mid} ${x1},${mid} ${x1},${y1}`,
+          });
+        }
+      }
+      for (const s of sups) {
+        const p = rect(`[data-map-sup="${s.id}"]`);
+        if (!p) continue;
+        const x0 = p.left + p.width / 2 - base.left;
+        const y0 = p.bottom - base.top;
+        for (const a of team.agents) {
+          if (a.reportsToAgentId !== s.id) continue;
+          const card = rect(`[data-map-agent="${a.id}"]`);
+          if (!card) continue;
+          const x1 = card.left + card.width / 2 - base.left;
+          const y1 = card.top - base.top;
+          const mid = (y0 + y1) / 2;
+          out.push({
+            key: `l-${s.id}-${a.id}`,
+            kind: "line",
             d: `M${x0},${y0} C${x0},${mid} ${x1},${mid} ${x1},${y1}`,
           });
         }
@@ -125,8 +173,36 @@ export function TeamMap({ team }: { team: Team }) {
     return () => ro.disconnect();
   }, [shape, owners.join()]);
 
-  const [dragging, setDragging] = useState<{ agentId: string; from: string | null } | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  /** A supervisor in the band takes an agent that may report to it (who manages agents). */
+  const supZone = (supId: string) => {
+    const takes = () =>
+      !!dragging &&
+      arranges &&
+      team.agents.find((a) => a.id === dragging.agentId)?.reportsToAgentId !== supId &&
+      mayReportTo(team.agents, dragging.agentId, supId);
+    const key = `sup:${supId}`;
+    return {
+      "data-drop": over === key || undefined,
+      onDragOver: (e: DragEvent<HTMLElement>) => {
+        if (!takes()) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "link";
+        if (over !== key) setOver(key);
+      },
+      onDragLeave: (e: DragEvent<HTMLElement>) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver((o) => (o === key ? null : o));
+      },
+      onDrop: (e: DragEvent<HTMLElement>) => {
+        e.preventDefault();
+        const agentId = dragging?.agentId;
+        const ok = takes();
+        setDragging(null);
+        setOver(null);
+        if (agentId && ok) setReportsTo([{ agentId, reportsToAgentId: supId }]);
+      },
+    };
+  };
   const drop = (to: string) => {
     if (!dragging) return;
     const { agentId, from } = dragging;
@@ -233,9 +309,35 @@ export function TeamMap({ team }: { team: Team }) {
             })}
           </div>
         )}
+        {band.length > 0 && (
+          <section className="team-map__band" aria-label={t("team.map.band")}>
+            {band.map((s) => (
+              <Link
+                key={s.id}
+                to="/org/$orgId/agents/$agentId"
+                params={{ orgId: org.id, agentId: s.id }}
+                className="team-node team-map__sup"
+                data-map-sup={s.id}
+                draggable={false}
+                {...supZone(s.id)}
+              >
+                <AgentAvatar agentId={s.id} name={s.name} size="sm" />
+                <span className="team-node__text">
+                  <b className="ac-captop">{s.name}</b>
+                  <span className="muted">
+                    {sups.includes(s)
+                      ? t("team.agents", { count: team.agents.filter((a) => a.reportsToAgentId === s.id).length })
+                      : s.role}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </section>
+        )}
         <div className="team-map__cols">
           {columns.map((c) => {
             const channel = c.channelId ? look.channelById.get(c.channelId) : undefined;
+            const face = sups.length > 0 ? sharedSupervisor(c.agents, team.agents) : null;
             return (
               <section
                 key={c.channelId ?? NO_CHANNEL}
@@ -253,6 +355,11 @@ export function TeamMap({ team }: { team: Team }) {
                   ) : (
                     <span className="muted">{t("team.list.noChannel")}</span>
                   )}
+                  {face && (
+                    <span className="team-map__face" title={t("team.map.reportsTo", { name: face.name })}>
+                      <AgentAvatar agentId={face.id} name={face.name} size="xs" />
+                    </span>
+                  )}
                 </header>
                 {c.agents.map((a) => {
                   const first = !seen.has(a.id);
@@ -261,13 +368,15 @@ export function TeamMap({ team }: { team: Team }) {
                     <MapCard
                       key={a.id}
                       agent={a}
+                      reportsTo={supervisorOf(a, team.agents)?.name ?? null}
                       first={first}
                       routines={routinesIn(a, c.channelId, first)}
                       when={when}
                       waiting={first ? waiting(a.id) : 0}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(AGENT_DRAG, a.id);
-                        e.dataTransfer.effectAllowed = "move";
+                        // A channel moves it, a supervisor links it: a drop whose effect isn't allowed never fires.
+                        e.dataTransfer.effectAllowed = "linkMove";
                         setDragging({ agentId: a.id, from: c.channelId });
                       }}
                       onDragEnd={() => {
@@ -320,6 +429,7 @@ export function TeamMap({ team }: { team: Team }) {
 
 function MapCard({
   agent,
+  reportsTo,
   first,
   routines,
   when,
@@ -328,6 +438,8 @@ function MapCard({
   onDragEnd,
 }: {
   agent: TeamAgent;
+  /** Its supervisor's name: below 720 px, where the lines hide, the card says it. */
+  reportsTo: string | null;
   first: boolean;
   routines: Routine[];
   when: (r: Routine) => string;
@@ -360,6 +472,9 @@ function MapCard({
           {agent.role && <span className="muted">{agent.role}</span>}
         </span>
       </Link>
+      {reportsTo && (
+        <span className="team-map__reports-to muted small">{t("team.map.reportsTo", { name: reportsTo })}</span>
+      )}
       {first && summary && <p className="team-map__does">{summary}</p>}
       {(routines.length > 0 || waiting > 0) && (
         <ul className="team-map__facts">

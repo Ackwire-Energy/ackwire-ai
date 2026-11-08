@@ -237,6 +237,13 @@ describe("our scrollbars, never the browser's", () => {
     expect(value(layout, ".code-card__code", "max-height")).toBe("420px");
     expect(value(layout, ".ac-msg__text .code-card__code", "overflow-y")).toBe("auto");
   });
+
+  test("an agent's face by a scroller's edge never scrolls it: the room for its accessories is drawn, not laid out", async () => {
+    const kit = topLevel(await read(KIT));
+    // The canvas reaches past the face (ACCESSORY_REACH): as ink overflow, a scroller doesn't count it.
+    expect(value(kit, ".ac-avatar__canvas", "height")).toBe("200%");
+    expect(value(kit, ".ac-avatar--agent", "contain")).toBe("layout");
+  });
 });
 
 describe("the collapsed sidebar", () => {

@@ -91,6 +91,7 @@ export function useAgentComputer(
         machine,
         desktop,
         browser: browserQ.data?.available === true,
+        browserReason: browserQ.data?.reason ?? null,
         browserGranted: (scopesQ.data ?? []).some((s) => s.connectionId === null && s.scope === BROWSER_TOOL_SCOPE),
         handoff: browserOpen ?? screenOpen,
         userId: me.user.id,

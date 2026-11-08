@@ -59,7 +59,8 @@ export function usePresenceOf(): PresenceOf {
       agent: (agentId) => {
         if (!agents.data) return null;
         const status = byAgent.get(agentId);
-        const noAi = aiStateOf(ai.data, agentId) === "no_ai";
+        // At work it has an AI, whatever the AIs' list reads for this person (the right hand's is each person's own).
+        const noAi = aiStateOf(ai.data, agentId) === "no_ai" && status?.working !== true;
         const presence = agentPresenceShown(status, !noAi);
         // Without an AI it does nothing: no line either.
         const line = !noAi && status?.status ? agentStatusText(t, status.status, i18n.language) : null;
@@ -93,7 +94,9 @@ export function useDmStatusLine(
   if (who.type === "agent") {
     const a = of.agent(who.id);
     if (!a) return doing ?? rest;
-    return [t(`presence.${a.presence}`), a.line ? lineText(a.line) : (doing ?? rest)].filter(Boolean).join(" · ");
+    // Its run here is at work before the list's next read says so.
+    const presence = doing ? agentPresenceShown(a.status, true, true) : a.presence;
+    return [t(`presence.${presence}`), a.line ? lineText(a.line) : (doing ?? rest)].filter(Boolean).join(" · ");
   }
   const p = of.person(who.id);
   if (!p) return undefined;

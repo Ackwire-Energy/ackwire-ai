@@ -447,11 +447,8 @@ html:not([data-pointer]) .imp-link:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .imp-row {
-    flex-wrap: wrap;
-  }
+  /* Under its words when they need the width (the kit's `.ac-actrow`): whole there. */
   .imp-row__chip {
-    margin-left: 56px;
     max-width: none;
   }
   .imp-apply {

@@ -244,7 +244,11 @@ export function Cell({
       <span className="agp-cell__key">{icon}</span>
       <span className="agp-cell__text">
         <small>{label}</small>
-        <span className="agp-cell__value" data-muted={muted || undefined}>
+        <span
+          className="agp-cell__value"
+          data-muted={muted || undefined}
+          data-name={(typeof value === "string" && /^[#@]/.test(value)) || undefined}
+        >
           {value}
           {more && <span className="agp-cell__more"> · {more}</span>}
         </span>

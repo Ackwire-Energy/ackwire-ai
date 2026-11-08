@@ -29,7 +29,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
-import { providerLabel } from "@agenteschat/client/lib/providers";
+import { keyNamedAfterProvider, providerLabel } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -456,10 +456,12 @@ function KeysSection({ locale }: { locale: string }) {
                 leading={<ProviderLogo id={k.provider} size="sm" />}
                 label={k.label}
                 sub={[
-                  providerLabel(k.provider),
+                  keyNamedAfterProvider(k) ? null : providerLabel(k.provider),
                   t("settings.keyEndsIn", { hint: k.keyHint }),
                   t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) }),
-                ].join(" · ")}
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 value={isDefault ? t("settings.default") : undefined}
                 more
                 onPress={() => actions(k, isDefault)}

@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/client/lib/actions";
 import { ownActionName } from "@agenteschat/client/lib/approval-words";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { handedTasksOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -24,7 +25,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { ACT_ROW, LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -51,7 +52,9 @@ import {
  * history. Optimistic, rolled back with a toast when the server refuses.
  */
 export function Receipts({ message: m }: { message: Message }) {
-  const list = m.actions ?? [];
+  // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
+  const handed = new Set(handedTasksOf(m.meta).map((h) => h.issueId));
+  const list = (m.actions ?? []).filter((a) => !(a.kind === "issue.created" && handed.has(a.target.id)));
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
   if (layout === "none") return null;
@@ -132,11 +135,11 @@ function ReceiptList({
   if (!group) {
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
-      <View style={[styles.one, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      <View style={[styles.one, ACT_ROW.row, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <View style={styles.oneTx}>
           <LineIcon name={receiptIcon(a.kind)} size={15} color={c.muted} variant="small" />
         </View>
-        <View style={[styles.grow, styles.oneTx]}>
+        <View style={[ACT_ROW.text, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
           <OwnActions action={a} />
           {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
@@ -171,9 +174,9 @@ function ReceiptList({
         ) : null}
       </View>
       {rows.map(({ a, v }) => (
-        <View key={a.id} style={[styles.it, { borderTopColor: c.line2 }]}>
+        <View key={a.id} style={[styles.it, ACT_ROW.row, { borderTopColor: c.line2 }]}>
           <LineIcon name={receiptIcon(a.kind)} size={13} color={c.muted} variant="footnote" />
-          <View style={styles.grow}>
+          <View style={ACT_ROW.text}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
             {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}

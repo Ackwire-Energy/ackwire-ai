@@ -87,12 +87,11 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
+/* The task's title whole, on two lines when it needs them: cut, it read as another task. */
 .issues-now__text b {
   font-size: 13.5px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 .issues-now__step {
   margin-top: 4px;
@@ -161,7 +160,8 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   --menu-pad: var(--space-2);
   width: 344px;
   max-width: calc(100vw - 24px);
-  max-height: none;
+  /* All of it where it fits; on a short screen (a phone) it scrolls inside the room the trigger leaves, not off it. */
+  max-height: var(--radix-popover-content-available-height, none);
   padding: var(--menu-pad);
   gap: 14px;
 }
@@ -996,6 +996,10 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .ac-details__bar:has(.issue-bartitle) {
   align-items: flex-start;
 }
+/* The title in the eyebrow's place: the 24 characters it keeps beside the buttons (`.ac-actrow`) are the title's. */
+.ac-details__eyebrow:has(> .issue-bartitle) {
+  font-size: 20px;
+}
 .issue-bartitle {
   flex: 1;
   min-width: 0;
@@ -1450,11 +1454,20 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
-  /* Who works on it keeps a cap here too: as `auto`, an agent's live step line took its whole length before the
-     task's title got any. */
+  /* The title takes the row and wraps whole; who works on it goes under it, where an agent's live step line has the
+     width without taking any from the title. */
   .issue-list__row {
-    grid-template-columns: 44px minmax(0, 1fr) fit-content(40%);
-    gap: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 6px 10px;
+  }
+  .issue-list__title b {
+    white-space: normal;
+  }
+  .issue-list__who {
+    grid-column: 2;
+  }
+  .issue-list__who:empty {
+    display: none;
   }
   .issue-list__due {
     display: none;
@@ -1526,6 +1539,10 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 }
 .issue-new__props .ac-btn .ac-avatar {
   margin-left: -2px;
+}
+/* The due date is one more chip in the row, as wide as its words, not a field taking a line of its own. */
+.issue-new__props > .ac-date__trigger {
+  width: auto;
 }
 .issue-new__grow {
   flex: 1;

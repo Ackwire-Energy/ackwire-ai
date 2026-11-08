@@ -99,6 +99,7 @@ function AppStack() {
       <Stack.Screen name="agent-model/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-advanced/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-setup/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-step/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new" options={{ ...pushed, ...scrollUnder }} />

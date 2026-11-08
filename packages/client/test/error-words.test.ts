@@ -260,6 +260,8 @@ const PLAIN_LINE = new Set([
   "account.invalid_kind",
   "account.invalid_label",
   "account.invalid_plan",
+  // Every "Responde a" picker and drag offers only what `mayReportTo` allows, the server's own rules.
+  "agent.reports_to",
   "agent_proposal.yours",
   "analytics.connector",
   "analytics.range",

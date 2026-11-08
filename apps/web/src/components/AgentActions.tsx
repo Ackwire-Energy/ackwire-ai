@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/client/lib/actions";
 import { ownActionName } from "@agenteschat/client/lib/approval-words";
 import { joinNames, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { handedTasksOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -46,7 +47,11 @@ import "./agent-actions.css";
 export function AgentActionReceipts({ message }: { message: Message }) {
   // The right hand's settings card says what was applied and has its own Desfazer (ADR 0137).
   const onCard = actionCardOf(message.meta)?.kind === "settings_proposal";
-  const list = (message.actions ?? []).filter((a) => !(onCard && a.kind === "agent.settings_changed"));
+  // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
+  const handed = new Set(handedTasksOf(message.meta).map((h) => h.issueId));
+  const list = (message.actions ?? []).filter(
+    (a) => !(onCard && a.kind === "agent.settings_changed") && !(a.kind === "issue.created" && handed.has(a.target.id)),
+  );
   if (message.author.type !== "agent" || list.length === 0) return null;
   return <Receipts message={message} list={list} />;
 }
@@ -259,7 +264,7 @@ function Receipt({
   const hadButton = useRef(false);
   if (button) hadButton.current = true;
   return (
-    <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>
+    <div className={cx(single ? "ag-rc" : "ag-rcg__it", "ac-actrow", struck && "is-undone")} data-phase={phase}>
       {single ? (
         <span className="ag-rc__ic" aria-hidden="true">
           <Icon name={iconOf(a)} size={16} />
@@ -267,7 +272,7 @@ function Receipt({
       ) : (
         <Icon name={iconOf(a)} size={14} className="ag-rcg__ic" />
       )}
-      <span className="ag-rc__tx">
+      <span className="ag-rc__tx ac-actrow__text">
         <span className="ag-rc__sentence">
           <Trans
             // i18next contexts: `issue.assigned_self`, `routine.updated_paused`…

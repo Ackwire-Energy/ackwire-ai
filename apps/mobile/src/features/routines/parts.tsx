@@ -12,7 +12,7 @@ import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Icon, LineIcon, PixelOrbit, Text } from "@/ui";
+import { Button, Chip, LineIcon, PixelOrbit, Text } from "@/ui";
 import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
@@ -189,12 +189,13 @@ export const RoutineRow = memo(function RoutineRow({
       <View style={styles.top}>
         <AgentFace agentId={r.agentId} size={AVATAR} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
         <View style={styles.main}>
-          <Text variant="body" numberOfLines={2} style={[styles.title, muted ? { color: c.muted } : null]}>
+          {/* Whole, never cut with "…": a long name, where it delivers and when wrap. */}
+          <Text variant="body" style={[styles.title, muted ? { color: c.muted } : null]}>
             {title}
           </Text>
           <View style={styles.line}>
-            <Icon name={targetIcon(r.target)} size={13} color={c.faint} />
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+            <LineIcon variant="footnote" name={targetIcon(r.target)} size={13} color={c.faint} />
+            <Text variant="footnote" tone="muted" style={styles.shrink}>
               {delivery}
             </Text>
           </View>
@@ -218,7 +219,7 @@ export const RoutineRow = memo(function RoutineRow({
           {/* On the schedule's first line's reading middle (a fixed 2-point nudge sat it above the letters). */}
           <LineIcon variant="subhead" name={whenIcon(r)} size={14} color={c.muted} />
           <View style={styles.grow}>
-            <Text variant="subhead" tone={paused ? "muted" : "ink2"} numberOfLines={2}>
+            <Text variant="subhead" tone={paused ? "muted" : "ink2"}>
               {whenText(r)}
             </Text>
             {next ? (
@@ -236,7 +237,7 @@ export const RoutineRow = memo(function RoutineRow({
             label={words.label(r)}
             dim={muted}
           />
-          <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+          <Text variant="caption" tone="faint" style={styles.shrink}>
             {words.caption(r, at)}
           </Text>
         </View>
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
   main: { flex: 1, minWidth: 0, gap: 4, paddingTop: 1 },
   title: { fontWeight: "600" },
   // The delivery's words and the when's below start on one column: 13 + 8 = 14 + 7.
-  line: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 8, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },

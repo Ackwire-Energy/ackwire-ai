@@ -82,7 +82,7 @@ const budgetStop = (fx: Fixture, at: Date) =>
 describe("when it comes", () => {
   test("Friday at 17h in the workspace's zone by default; one card per person and week", () => {
     const prefs = teamWeekPrefsOf({});
-    expect(prefs).toEqual({ off: false, day: 5, hour: 17 });
+    expect(prefs).toEqual({ off: false, day: 5, hour: 17, daily: false });
     expect(teamWeekPrefsOf({ day: 9, hour: -1, off: "yes" })).toEqual(prefs);
     expect(lastTeamWeekSlot(prefs, ZONE, new Date(SLOT.getTime() + HOUR))?.toISOString()).toBe(SLOT.toISOString());
     // Before the slot: last week's.
@@ -90,7 +90,7 @@ describe("when it comes", () => {
       new Date(SLOT.getTime() - 7 * DAY).toISOString(),
     );
     // Moved to Monday 9h, the same week: the same key, so no second card.
-    const monday = lastTeamWeekSlot({ off: false, day: 1, hour: 9 }, ZONE, SLOT);
+    const monday = lastTeamWeekSlot({ off: false, day: 1, hour: 9, daily: false }, ZONE, SLOT);
     expect(monday && weekKey(monday, ZONE)).toBe(weekKey(SLOT, ZONE));
     expect(weekKey(SLOT, ZONE)).toBe("2026-11-02");
   });
@@ -387,5 +387,129 @@ describe("the card", () => {
       input: { off: false, day: "monday", hour: 9 },
     });
     expect(await getTeamWeekPrefs(f.db, f.org.id, f.owner.id)).toMatchObject({ off: false, day: 1, hour: 9 });
+  });
+});
+
+describe("Resumo do dia", () => {
+  /** Friday 2026-11-06, 09:00 in São Paulo (UTC-3). */
+  const NINE = new Date("2026-11-06T12:00:00Z");
+  const cardOf = async (fx: Fixture, messageId: string) => {
+    const [m] = await fx.db.select().from(schema.messages).where(eq(schema.messages.id, messageId));
+    const card = teamWeekCardOf(m?.meta);
+    if (!m || !card) throw new Error("no card");
+    return { m, card };
+  };
+
+  test("every day at its hour, over the last day, for anyone who asks; one card per person and day", async () => {
+    const prefs = teamWeekPrefsOf({ daily: true, hour: 9 });
+    expect(prefs.daily).toBe(true);
+    expect(lastTeamWeekSlot(prefs, ZONE, new Date(NINE.getTime() + HOUR))?.toISOString()).toBe(NINE.toISOString());
+    expect(lastTeamWeekSlot(prefs, ZONE, new Date(NINE.getTime() - HOUR))?.toISOString()).toBe(
+      new Date(NINE.getTime() - DAY).toISOString(),
+    );
+
+    f = await setup({ rightHand: true });
+    await inZone(f);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await setTeamWeekPrefs(f.db, f.org.id, f.owner.id, { off: true });
+    expect(await enqueueTeamWeeks(f.db, new Date(NINE.getTime() + HOUR))).toBe(0);
+    await setTeamWeekPrefs(f.db, f.org.id, bia.id, { daily: true, hour: 9 });
+    expect(await enqueueTeamWeeks(f.db, new Date(NINE.getTime() + HOUR))).toBe(1);
+    await enqueueTeamWeeks(f.db, new Date(NINE.getTime() + 2 * HOUR));
+    expect(await jobs(f)).toHaveLength(1);
+    expect(await enqueueTeamWeeks(f.db, new Date(NINE.getTime() + DAY + HOUR))).toBe(1);
+    expect(await jobs(f)).toHaveLength(2);
+  });
+
+  test("a member's card counts only work where they read and no money; a quiet day posts nothing", async () => {
+    f = await setup({ rightHand: true });
+    await inZone(f);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const slot = NINE.toISOString();
+    await setTeamWeekPrefs(f.db, f.org.id, bia.id, { daily: true, hour: 9 });
+    expect(await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, { userId: bia.id, slot })).toBeNull();
+
+    await run(f, f.agent.id, new Date(NINE.getTime() - 2 * HOUR), "done");
+    // A day earlier than the card's: outside it.
+    await run(f, f.agent.id, new Date(NINE.getTime() - 2 * DAY), "done");
+    const hidden = await f.db
+      .insert(schema.channels)
+      .values({ orgId: f.org.id, name: "diretoria", kind: "channel", visibility: "private" })
+      .returning();
+    await f.db.insert(schema.agentRuns).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: hidden[0]?.id ?? "",
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+      trigger: "mention",
+      hop: 1,
+      status: "done",
+      createdAt: new Date(NINE.getTime() - HOUR),
+    });
+    const id = await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, { userId: bia.id, slot });
+    expect(id).not.toBeNull();
+    const { m, card } = await cardOf(f, id as string);
+    expect(card.period).toBe("day");
+    expect(card.from).toBe("2026-11-05");
+    expect(card.to).toBe("2026-11-06");
+    expect(card.stats.done).toBe(1);
+    expect(card.stats.spentNanoUsd).toBe(0);
+    expect(card.stats.budgetNanoUsd).toBe(0);
+    expect(m.body).toBe("Seu resumo do dia está pronto");
+    // Once a day.
+    expect(await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, { userId: bia.id, slot })).toBeNull();
+    // Turned off: nothing.
+    await setTeamWeekPrefs(f.db, f.org.id, bia.id, { daily: false });
+    expect(
+      await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+        userId: bia.id,
+        slot: new Date(NINE.getTime() + DAY).toISOString(),
+      }),
+    ).toBeNull();
+  });
+
+  test("a member's card offers no budget raise and leaves no proposal it couldn't show", async () => {
+    f = await setup({ rightHand: true });
+    await inZone(f);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await setTeamWeekPrefs(f.db, f.org.id, bia.id, { daily: true, hour: 9 });
+    await run(f, f.agent.id, new Date(NINE.getTime() - 2 * HOUR), "done");
+    await budgetStop(f, new Date(NINE.getTime() - HOUR));
+    const id = await postTeamWeek({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+      userId: bia.id,
+      slot: NINE.toISOString(),
+    });
+    expect(id).not.toBeNull();
+    const { card } = await cardOf(f, id as string);
+    expect(card.rows.map((r) => r.kind)).not.toContain("budget");
+    expect(await f.db.select().from(schema.contextProposals)).toEqual([]);
+  });
+
+  test("asked of Lodi: set_team_week turns it on for the person behind the run", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const lodi = await lodiOf(f);
+    const dm = await openPersonAgentDm(f.db, f.org.id, bia.id, lodi.id);
+    const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, dm.id, {
+      body: "me manda isso todo dia às 9h",
+    });
+    const [r] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+    const gateway = createToolGateway({ sources: [createSetupToolSource({ pubsub: f.pubsub })] });
+    const res = await gateway.invoke(
+      {
+        db: f.db,
+        orgId: f.org.id,
+        agentId: lodi.id,
+        runId: r?.id ?? "",
+        channelId: dm.id,
+        threadRootId: r?.threadRootId ?? trigger.id,
+        triggerMessageId: trigger.id,
+      },
+      { toolUseId: "tu_1", name: SET_TEAM_WEEK_TOOL, input: { daily: true, hour: 9 } },
+    );
+    if (res.type !== "result") throw new Error(res.type);
+    expect((res.output as { content: string }).content).toContain("Resumo do dia");
+    expect(await getTeamWeekPrefs(f.db, f.org.id, bia.id)).toMatchObject({ off: false, daily: true, hour: 9 });
   });
 });

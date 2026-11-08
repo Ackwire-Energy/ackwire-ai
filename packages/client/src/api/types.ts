@@ -1,6 +1,7 @@
 /** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
 import type { ChatPrefs } from "../lib/chat-look";
+import type { RoleId } from "../lib/new-agent";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { AudienceChoice } from "../lib/who-sees";
 
@@ -105,6 +106,8 @@ export interface AuthConfig {
   turnstileSiteKey?: string | null;
   /** Where the app reports its own errors (a Sentry-compatible server, ADR 0104); null or absent: nowhere. */
   errorReports?: ErrorReportsConfig | null;
+  /** The same for the phone app; null or absent (a server from before it): nowhere. */
+  mobileErrorReports?: ErrorReportsConfig | null;
 }
 
 export interface ErrorReportsConfig {
@@ -629,6 +632,8 @@ export interface Agent {
   brain?: AgentBrainLine;
   /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null or absent for the others. */
   builtin?: "right_hand" | null;
+  /** Responde a (ADR 0148 addendum): the agent it reports to; null or absent = its owner, else its setor's lead. */
+  reportsToAgentId?: string | null;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
@@ -638,6 +643,27 @@ export interface Agent {
   mediaReplies?: boolean;
   /** Its autonomy brakes (ADR 0131); absent from an older server (the defaults). */
   brakes?: AgentBrakes;
+  /**
+   * Its setup checklist at the top of its chat (ADR 0155 §2): the ready-made role it started from and the steps a
+   * person confirmed. Null or absent: an agent made before it (none shows).
+   */
+  setup?: AgentSetupChecklist | null;
+}
+
+/**
+ * A step of a new agent's setup checklist (ADR 0155 §2), in `SETUP_STEPS`' order, or of the right hand's first run
+ * (§6: `about`, `team`, `ai`, `apps`, `people`, in `FIRST_RUN_STEPS`' order). Both in lib/setup-checklist.
+ */
+export type SetupStep = AgentSetupStep | "about" | "team" | "people";
+/** A new agent's own steps (ADR 0155 §2). */
+export type AgentSetupStep = "ai" | "apps" | "where" | "who" | "how";
+
+/** A new agent's setup checklist (ADR 0155 §2). */
+export interface AgentSetupChecklist {
+  /** The ready-made role it started from (a `RoleId`, "support"); null: from scratch or made elsewhere. */
+  role: string | null;
+  /** The steps a person confirmed (chose in its dialog, or skipped). */
+  done: SetupStep[];
 }
 
 /** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
@@ -717,6 +743,8 @@ export interface TeamAgent {
   role: string;
   appearance: AgentLookInput | null;
   ownerUserId: string | null;
+  /** Responde a: the agent it reports to (absent from an older server). */
+  reportsToAgentId?: string | null;
   /** What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…). */
   capabilities: string[];
   /** Working on something right now. */
@@ -726,6 +754,12 @@ export interface TeamAgent {
   canTalk: boolean;
   /** Whether I see how it works (absent = yes); without it `capabilities` is empty. */
   seesDetails?: boolean;
+}
+
+/** Responde a: one agent and the agent it reports to (null: nobody, its owner then). */
+export interface AgentLineChange {
+  agentId: string;
+  reportsToAgentId: string | null;
 }
 
 /** One agent asked another (`ask_agent`); the question itself stays private. */
@@ -788,6 +822,8 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
+  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2). */
+  setup?: { role: RoleId | null };
 }
 
 /** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */
@@ -2005,6 +2041,7 @@ export type ProposalSettingField =
   | "reply_mode"
   | "name"
   | "look"
+  | "reports_to"
   | "archive"
   | "delete";
 
@@ -2012,7 +2049,8 @@ export type ProposalSettingField =
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
  * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
  * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
- * mention); `name` its name; `look` `{ color, eyes, accessory }`; `archive` true. `label`: the server's names for ids.
+ * mention); `name` its name; `look` `{ color, eyes, accessory }`; `reports_to` an agent id or null (Responde a);
+ * `archive` true. `label`: the server's names for ids.
  */
 export interface ProposalSettingLine {
   field: ProposalSettingField;
@@ -2261,6 +2299,8 @@ export interface AgentStatus {
   status: AgentStatusLine | null;
   /** Its last run's end (now while one is going); null = it never worked. */
   activeAt: string | null;
+  /** Something of its own thinks now (a run, or long work at work). Absent from older servers. */
+  working?: boolean;
 }
 
 export interface InvitationWithStatus {

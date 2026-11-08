@@ -446,25 +446,29 @@ function RightHandForm({ agent }: { agent: Agent }) {
   );
 }
 
-/** "Semana da equipe" (ADR 0137 §9): the admin's own day and hour of Lodi's weekly card, or off. */
+/**
+ * "Semana da equipe" (ADR 0137 §9): an admin's own day and hour of Lodi's weekly card, every day instead, or off.
+ * Anyone else may get it every day ("Resumo do dia").
+ */
 function TeamWeekPref({ name }: { name: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "administrator");
-  const prefs = useTeamWeekPrefs(org.id, admin).data;
+  const prefs = useTeamWeekPrefs(org.id).data;
   const set = useSetTeamWeekPrefs(org.id);
   const toast = useToast();
-  if (!admin || !prefs) return null;
+  if (!prefs) return null;
   return (
     <PrefRow
       id="rh-team-week"
       icon="calendar"
-      label={t("teamWeek.settings.label")}
-      help={t("teamWeek.settings.help", agentGrammar(name))}
+      label={t(admin ? "teamWeek.settings.label" : "teamWeek.settings.dayLabel")}
+      help={t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
       control={
         <span className="rh-set__week">
           <TeamWeekSchedule
             prefs={prefs}
+            admin={admin}
             locale={i18n.language}
             onChange={(patch) => set.mutate(patch, { onError: (e) => toast.show(errorText(t, e), "error") })}
           />

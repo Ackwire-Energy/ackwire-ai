@@ -677,16 +677,22 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
 }
 
 /**
- * "Ver modelos de time": six business types, each team previewed as its card would propose it. "Usar este modelo"
- * posts it in the person's DM with the right hand, which then asks two questions to fit it; "Nenhum desses" goes back
- * to writing what they do.
+ * "Modelos de time": the templates by business type, one picked (`initial`: the business row 1 saved), and "Criar o
+ * time" makes it at once (ADR 0155 §6). Under the list, the other ways in: an import, or one agent from scratch.
  */
-export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TeamTemplatesDialog({
+  open,
+  onClose,
+  initial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initial?: string | undefined;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
-  const toast = useToast();
   const actions = useChannelActions();
   const held = usePlanHold() !== null;
   const lodi = dir.agents.find(isRightHand);
@@ -694,8 +700,9 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
   const list = useTeamTemplates(org.id, i18n.language, open);
   const use = useApplyTeamTemplate(org.id);
   const [picked, setPicked] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const templates = list.data ?? [];
-  const chosen = templates.find((x) => x.id === picked) ?? templates[0];
+  const chosen = templates.find((x) => x.id === (picked ?? initial)) ?? templates[0];
   let preview: ReactNode = <Spinner />;
   if (chosen) {
     preview = (
@@ -768,9 +775,33 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
             </ul>
             <div className="tp-gallery__preview">{preview}</div>
           </div>
+          <p className="tp-gallery__more">
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => {
+                onClose();
+                void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "import" } });
+              }}
+            >
+              {t("teamPlan.templates.import")}
+            </button>
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => {
+                onClose();
+                void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id } });
+              }}
+            >
+              {t("teamPlan.templates.scratch")}
+            </button>
+          </p>
         </DialogBody>
       </Locked>
-      <DialogFooter note={chosen ? countsText(t, chosen.team) : null}>
+      <DialogFooter
+        note={failed ? <span className="tp-gallery__error">{failed}</span> : chosen ? countsText(t, chosen.team) : null}
+      >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
@@ -781,17 +812,23 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
             use.mutate(
               { templateId: chosen.id, locale: i18n.language },
               {
-                onSuccess: () => {
+                onSuccess: (out) => {
+                  // A step that failed: its reason here, the card stays open in the right hand's DM.
+                  if (out.state !== "created")
+                    return setFailed(
+                      out.error ? teamFailureText(t, out.error, i18n.language) : t("teamPlan.templates.failed"),
+                    );
+                  setFailed(null);
                   onClose();
                   if (lodi)
                     void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: lodi.id } });
                 },
-                onError: (e) => toast.show(errorText(t, e), "error"),
+                onError: (e) => setFailed(errorText(t, e)),
               },
             )
           }
         >
-          {t("teamPlan.templates.use")}
+          {t("teamPlan.templates.create")}
         </Button>
       </DialogFooter>
     </Dialog>

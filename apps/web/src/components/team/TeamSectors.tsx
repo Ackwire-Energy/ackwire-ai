@@ -3,7 +3,7 @@ import { useAgentGroupAction, useRoutines } from "@agenteschat/client";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { sectorGap, sectorReach } from "@agenteschat/client/lib/team-views";
+import { sectorGap, sectorLineChanges, sectorReach, sectorSupervisor } from "@agenteschat/client/lib/team-views";
 import { AvatarStack, Button, Card, Icon, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
@@ -20,6 +20,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useToast } from "@/lib/toast";
 import { useWhen } from "@/pages/RoutinesPage";
+import { useSetReportsTo } from "./ReportsTo";
 import { ChannelName, NoSectors, SectorMark, sectorStyle, useTeamLookups } from "./shared";
 
 const NOBODY = "none";
@@ -230,6 +231,10 @@ function SectorCard({
           <span className="muted">{t("team.sectors.backupLabel")}</span>
           {person("backupUserId")}
         </dd>
+        <dt>{t("team.sectors.supervisor")}</dt>
+        <dd>
+          <SectorSupervisor group={group} team={team} groups={groups} arranges={arranges} />
+        </dd>
         <dt>{t("team.list.agents")}</dt>
         <dd>
           {reach.agents.length > 0 ? (
@@ -302,5 +307,74 @@ function SectorCard({
         </p>
       )}
     </Card>
+  );
+}
+
+/**
+ * A setor's "Supervisor" (ADR 0148 addendum): the agent its agents report to, set for all of them at once with
+ * Desfazer, and "1 agente sem supervisor · Aplicar" when one of them doesn't (an agent moved in later keeps its own).
+ */
+function SectorSupervisor({
+  group,
+  team,
+  groups,
+  arranges,
+}: {
+  group: AgentGroup;
+  team: Team;
+  groups: AgentGroup[];
+  arranges: boolean;
+}) {
+  const { t } = useTranslation();
+  const look = useTeamLookups(groups);
+  const setReportsTo = useSetReportsTo();
+  const now = sectorSupervisor(group, team.agents);
+  const apply = (supervisorId: string | null) => {
+    const changes = sectorLineChanges(group, team.agents, supervisorId, now?.supervisor.id);
+    if (changes.length === 0) return;
+    const name = supervisorId ? (team.agents.find((a) => a.id === supervisorId)?.name ?? "") : "";
+    setReportsTo(
+      changes,
+      supervisorId
+        ? t("team.sectors.supervisorDone", { count: changes.length, sector: group.name, name })
+        : t("team.sectors.supervisorCleared", { count: changes.length, sector: group.name }),
+    );
+  };
+  const off = now?.off.length ?? 0;
+  return (
+    <span className="team-sector-card__sup">
+      {arranges ? (
+        <Select
+          size="sm"
+          aria-label={t("team.sectors.supervisorOf", { name: group.name })}
+          value={now?.supervisor.id ?? NOBODY}
+          onValueChange={(v) => apply(v === NOBODY ? null : v)}
+          options={[
+            { value: NOBODY, label: t("team.sectors.none") },
+            ...team.agents.filter((a) => !look.isLodi(a)).map((a) => ({ value: a.id, label: a.name })),
+          ]}
+        />
+      ) : now ? (
+        <span className="team-who">
+          <AgentAvatar agentId={now.supervisor.id} name={now.supervisor.name} size="xs" />
+          {now.supervisor.name}
+        </span>
+      ) : (
+        <span className="muted">{t("team.sectors.none")}</span>
+      )}
+      {now && off > 0 && (
+        <span className="team-sector-card__off">
+          {t("team.sectors.unsupervised", { count: off })}
+          {arranges && (
+            <>
+              {" · "}
+              <button type="button" className="ac-link" onClick={() => apply(now.supervisor.id)}>
+                {t("team.sectors.apply")}
+              </button>
+            </>
+          )}
+        </span>
+      )}
+    </span>
   );
 }

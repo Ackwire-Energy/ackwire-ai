@@ -122,7 +122,11 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
     .where(and(eq(agents.orgId, orgId), eq(agents.builtin, RIGHT_HAND)));
   if (had) return null;
   const { freeHandle, takenHandles } = await import("./agents");
-  const taken = await takenHandles(db, orgId);
+  const { FIRST_RUN_SETUP } = await import("./setup-checklist");
+  const [taken, [other]] = await Promise.all([
+    takenHandles(db, orgId),
+    db.select({ id: agents.id }).from(agents).where(eq(agents.orgId, orgId)).limit(1),
+  ]);
   const handle = taken.has(RIGHT_HAND_DEFAULTS.handle)
     ? freeHandle(RIGHT_HAND_DEFAULTS.handle, taken)
     : RIGHT_HAND_DEFAULTS.handle;
@@ -137,6 +141,8 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
       brainModel: AUTO_MODEL,
       brainEffort: AUTO_MODEL,
       appearance: { ...RIGHT_HAND_DEFAULTS.appearance },
+      // A workspace with no agent yet opens on its first-run checklist (ADR 0155 §6).
+      ...(other ? {} : { setup: FIRST_RUN_SETUP }),
     })
     .onConflictDoNothing()
     .returning({ id: agents.id });
@@ -244,13 +250,17 @@ export async function rightHandReader(
   const [agent] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
   if (!isRightHand(agent)) return null;
   const person = await personBehindCall(ctx);
-  if (!person) return null;
-  const people = await ctx.db
+  return person && (await readsAlone(ctx.db, ctx.channelId, person)) ? person : null;
+}
+
+/** Whether `person` is the one person who reads `channelId`: their own DM with an agent, where nobody else reads a reply. */
+export async function readsAlone(db: Executor, channelId: string, person: string) {
+  const people = await db
     .select({ userId: channelMembers.userId })
     .from(channelMembers)
     .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-    .where(and(eq(channelMembers.channelId, ctx.channelId), eq(channels.kind, "dm"), isNotNull(channelMembers.userId)));
-  return people.length === 1 && people[0]?.userId === person ? person : null;
+    .where(and(eq(channelMembers.channelId, channelId), eq(channels.kind, "dm"), isNotNull(channelMembers.userId)));
+  return people.length === 1 && people[0]?.userId === person;
 }
 
 /** The right hand anywhere but a person's own DM with it: what only reads or writes for that person stays out. */

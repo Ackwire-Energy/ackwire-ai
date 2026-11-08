@@ -22,6 +22,9 @@ export interface ErrorReportsOptions {
   environment: string;
   release: string;
   fetch?: typeof fetch;
+  /** What runs the reporting code: the server's Bun, the phone app's JavaScript engine. */
+  platform?: string;
+  runtime: { name: string; version?: string };
 }
 
 /** Reports wait at most this long for the server that takes them. */
@@ -43,8 +46,8 @@ export async function createErrorReporter(
     dsn: options.dsn,
     environment: options.environment,
     release: options.release,
-    platform: "node",
-    runtime: { name: "bun", version: Bun.version },
+    platform: options.platform ?? "node",
+    runtime: options.runtime,
     _metadata: { sdk: { name: "sentry.javascript.core", version: sentry.SDK_VERSION } },
     integrations: [sentry.dedupeIntegration(), sentry.linkedErrorsIntegration()],
     stackParser: sentry.createStackParser(sentry.nodeStackLineParser()),
@@ -52,7 +55,8 @@ export async function createErrorReporter(
       sentry.createTransport(transport, async ({ body }) => {
         const res = await send(transport.url, {
           method: "POST",
-          body,
+          // A string, or bytes only for an attachment, which these reports never carry.
+          body: body as string,
           headers: transport.headers,
           signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
         });

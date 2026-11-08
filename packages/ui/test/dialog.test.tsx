@@ -99,7 +99,7 @@ describe("Dialog", () => {
     const head = body().getByRole("dialog").querySelector(".ac-dialog__head") as HTMLElement;
     expect([...head.children].map((c) => c.className)).toEqual([
       "ac-dialog__lead",
-      "ac-dialog__titles",
+      "ac-dialog__titles ac-actrow__text",
       "ac-dialog__acts ac-acts",
     ]);
     const acts = head.querySelector(".ac-dialog__acts") as HTMLElement;

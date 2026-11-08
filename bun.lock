@@ -39,6 +39,7 @@
       "name": "@agenteschat/mobile",
       "version": "0.0.0",
       "dependencies": {
+        "@agenteschat/adapters": "workspace:*",
         "@agenteschat/client": "workspace:*",
         "@agenteschat/i18n": "workspace:*",
         "@agenteschat/tokens": "workspace:*",

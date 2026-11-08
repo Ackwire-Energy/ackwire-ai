@@ -903,6 +903,12 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+/* A title and its count kept together, the words of a head whose actions wrap under them (`.ac-actrow`). */
+.list-group-head__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .list-card {
   border-radius: var(--radius-section);
   background: var(--raised);
@@ -1953,6 +1959,16 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   }
   .artifact-tile__table :is(th, td):nth-child(n + 3) {
     display: none;
+  }
+}
+/* Two to a row on a phone under 390px, a tile is too narrow for a document's words at their size: they'd wrap one or
+   two a line. The same cover, drawn smaller (as `.chat-look__mini` draws a conversation). */
+.artifact-tile__cover:has(> :is(.artifact-tile__doc, .artifact-tile__text)) {
+  container: tile-cover / inline-size;
+}
+@container tile-cover (max-width: 150px) {
+  :is(.artifact-tile__doc, .artifact-tile__text) {
+    zoom: 0.75;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -8963,6 +8979,12 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   min-width: 0;
   line-height: 1.3;
 }
+/* Each line in a field one control tall: one that doesn't fit ends in "…" (the open list has it whole), never cut
+   mid-word at the field's edge. */
+.newag__sel-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .newag__sel-text b {
   font-size: 14px;
   font-weight: 600;
@@ -9450,6 +9472,10 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 .agp-cell__value::first-letter {
   text-transform: uppercase;
+}
+/* A channel or a handle is a name as written: the "first letter" would take the # or @ with the one after it (#Conteudo). */
+.agp-cell__value[data-name]::first-letter {
+  text-transform: none;
 }
 .agp-cell__value[data-muted] {
   color: var(--muted);

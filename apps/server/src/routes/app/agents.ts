@@ -18,6 +18,7 @@ import {
   canViewCost,
   checkCredential,
   checkEndpoint,
+  confirmSetupStep,
   createAgent,
   createAgentFromProposal,
   createAgentGroup,
@@ -65,6 +66,7 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  setReportsTo,
   speakerOf,
   TEAM_TEMPLATES,
   undoTeam,
@@ -115,6 +117,7 @@ import {
   NewAgentSetup,
   PlanModelOut,
   ProviderId,
+  SetupStep,
   Usage,
 } from "./schemas";
 
@@ -779,6 +782,10 @@ export function agentRoutes(deps: AppDeps) {
                   })
                   .nullable(),
                 activeAt: z.string().nullable(),
+                working: z.boolean().openapi({
+                  description:
+                    "Something of its own thinks now (a run, or long work at work): drawn at work whatever its AI reads as for the viewer.",
+                }),
               }),
             ),
           }),
@@ -807,6 +814,7 @@ export function agentRoutes(deps: AppDeps) {
     role: z.string(),
     appearance: AgentAppearance.nullable(),
     ownerUserId: z.string().nullable(),
+    reportsToAgentId: z.uuid().nullable().openapi({ description: "Responde a: the agent it reports to, if any." }),
     capabilities: z.array(z.string()).openapi({
       description:
         "What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…); empty without `seesDetails`.",
@@ -910,6 +918,18 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "The Autonomia it starts with (ADR 0094, the last setup's). Default: low_risk_auto. Whoever may create it may set it: an admin, or its owner (without Manage agents, only your own agent).",
             }),
+            setup: z
+              .object({
+                role: z
+                  .string()
+                  .regex(/^[a-z][a-z_-]{0,31}$/)
+                  .nullable(),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0155 §2). Every new agent gets the checklist; without it, no role.",
+              }),
           }),
         ),
       },
@@ -1240,30 +1260,39 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/team-templates/{templateId}/use",
       tags,
       security,
-      summary: "Post a template's team as the right hand's card in your DM with it (\"Usar este modelo\")",
+      summary: 'Create a template\'s team at once ("Criar o time")',
       description:
-        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn. On a billing hold, no question, and `tap` (what the person tapped) is kept as their message with no run.",
+        "No model call, so it works on a billing hold too: the team is made, and its card in your DM with the right hand reads created, with Undo for a day (ADR 0155 §6). `state` is `pending` with the card's error when a step failed.",
       request: {
         params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
-        body: {
-          ...body(z.object({ locale: z.string().max(20).optional(), tap: z.string().min(1).max(200).optional() })),
-          required: false,
-        },
+        body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
       },
-      responses: { 200: json(z.object({ channelId: z.uuid(), messageId: z.uuid() })), ...errors },
+      responses: {
+        200: json(
+          z.object({
+            channelId: z.uuid(),
+            messageId: z.uuid(),
+            state: z.enum(["pending", "creating", "created", "denied", "superseded", "undone"]),
+            error: z
+              .object({
+                step: z.string(),
+                reason: z.string(),
+                status: z.number().int().optional(),
+                code: z.string().optional(),
+                params: z.record(z.string(), z.unknown()).optional(),
+              })
+              .nullable()
+              .openapi({ description: "The step that failed and why, as the card keeps it; null once created." }),
+          }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, templateId } = c.req.valid("param");
       const context = deps.extras?.context;
       const input = c.req.valid("json");
-      const out = await useTeamTemplate(
-        { db, pubsub: adapters.pubsub, context },
-        c.get("user").id,
-        orgId,
-        templateId,
-        input?.locale,
-        input?.tap,
-      );
+      const out = await useTeamTemplate({ ...teamDeps(), context }, c.get("user").id, orgId, templateId, input?.locale);
       return c.json(out, 200);
     },
   );
@@ -1470,6 +1499,42 @@ export function agentRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/setup/{step}",
+      tags,
+      security,
+      summary: "Confirm a step of a new agent's setup checklist",
+      description:
+        "Its owner or whoever manages agents chose (or skipped) one step of the checklist at the top of its chat (ADR 0155 §2). Confirming twice changes nothing; an agent with no checklist keeps none.",
+      request: { params: AgentParams.extend({ step: SetupStep }) },
+      responses: { 200: json(Agent), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId, step } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await confirmSetupStep(db, actor, orgId, agentId, step);
+      // Another device of theirs, or another admin, ticks the row at once.
+      await publishAgentsChanged(adapters.pubsub, orgId);
+      const agent = await getAgent(db, orgId, agentId);
+      if (!agent) throw new NotFoundError("Agent not found");
+      const [seesCost, brains, viewer, old] = await Promise.all([
+        canViewCost(db, actor, orgId),
+        agentBrainSummaries(db, actor, orgId, [agent]),
+        getMembership(db, actor, orgId),
+        oldHandlesByAgent(db, orgId),
+      ]);
+      return c.json(
+        {
+          ...toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), viewer),
+          previousHandles: old.get(agent.id) ?? [],
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/agents/{agentId}/audience/mail-loss",
       tags,
       security,
@@ -1628,6 +1693,42 @@ export function agentRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, groupId } = c.req.valid("param");
       return c.json({ groups: await deleteAgentGroup(groups, c.get("user").id, orgId, groupId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agent-lines",
+      tags,
+      security,
+      summary:
+        "Set who agents report to (Responde a), in order, all or none: one agent, a setor's agents, or Desfazer with what came back (who manages agents)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            changes: z
+              .array(z.object({ agentId: z.uuid(), reportsToAgentId: z.uuid().nullable() }))
+              .min(1)
+              .max(200),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            previous: z
+              .array(z.object({ agentId: z.uuid(), reportsToAgentId: z.uuid().nullable() }))
+              .openapi({ description: "What the changed agents reported to before: send it back to undo." }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await setReportsTo(groups, c.get("user").id, orgId, c.req.valid("json").changes), 200);
     },
   );
 

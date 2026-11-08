@@ -200,10 +200,10 @@ test("a server people outside can't reach attaches the pictures to each email", 
   await t.drain();
   const sent = t.email.sent.at(-1);
   expect(sent?.subject).toBe("Confirme seu e-mail no agentes.chat");
-  expect(sent?.html).toContain('src="cid:logo-ink@agentes.chat"');
+  expect(sent?.html).toContain('src="cid:logo-ink-tile@agentes.chat"');
   expect(sent?.html).not.toContain(`${ORIGIN}/email/`);
   expect(sent?.inline?.map((p) => [p.cid, p.filename, p.contentType])).toEqual([
-    ["logo-ink@agentes.chat", "logo-ink.png", "image/png"],
+    ["logo-ink-tile@agentes.chat", "logo-ink-tile.png", "image/png"],
     ["logo-bone@agentes.chat", "logo-bone.png", "image/png"],
     ["sky-band@agentes.chat", "sky-band.png", "image/png"],
   ]);

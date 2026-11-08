@@ -125,6 +125,14 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   height: 24px;
   padding-inline: 8px;
 }
+/* A touch screen's 40px button would overflow that 20px line by 10px each side, into the row's padding (on a phone,
+   where the tail wraps under the words, onto the card's bottom edge): the tail is as tall as its button there. */
+@media (pointer: coarse) {
+  .tp-agent__tail {
+    height: auto;
+    align-self: center;
+  }
+}
 /* The map's rows are one line: the face and the words share a centre. */
 .tp-map .ac-faceline {
   align-items: center;
@@ -291,4 +299,15 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
   border-radius: 12px;
   background: var(--card-well);
   box-shadow: var(--card-well-shadow);
+}
+
+/* Under the templates: the other ways in (an import, one agent from scratch). The dialog body's gap is its room above. */
+.tp-gallery__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+}
+.tp-gallery__error {
+  color: var(--danger);
 }

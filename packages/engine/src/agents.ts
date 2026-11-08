@@ -29,6 +29,7 @@ import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { isRightHand, RIGHT_HAND_EDITABLE, refuseRightHand, rightHandPermanent } from "./right-hand";
+import { newSetup, setupOf } from "./setup-checklist";
 import { DEFAULT_AGENT_SCOPES, dropForeignMailGrants, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
@@ -177,13 +178,18 @@ export async function createAgent(
   db: Database,
   actorId: string,
   orgId: string,
-  input: AgentInput & { autonomy?: CommandApproval; audienceMode?: Agent["audienceMode"] },
+  input: AgentInput & {
+    autonomy?: CommandApproval;
+    audienceMode?: Agent["audienceMode"];
+    /** The ready-made role it starts from, for its setup checklist's suggestions (ADR 0155 §2); null: none. */
+    setup?: { role: string | null };
+  },
   defaults: { model: string },
   /** `via`: the agent whose card it was created from (the audit's "via"). */
   options: { remember?: boolean; via?: string; pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
-  const { autonomy, audienceMode, ...fields } = input;
+  const { autonomy, audienceMode, setup, ...fields } = input;
   // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
   // So whoever gets this far may also set its Autonomia (ADR 0094): an admin or the new agent's owner.
   if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
@@ -225,6 +231,8 @@ export async function createAgent(
         machineId: home?.id ?? null,
         orgId,
         ownerUserId,
+        // Every new agent starts with its setup checklist, whichever way it was made (ADR 0155 §2).
+        setup: newSetup(setup?.role),
         ...(autonomy ? { missionCommandApproval: autonomy } : {}),
         ...(audienceMode ? { audienceMode } : {}),
       })
@@ -572,6 +580,10 @@ export const agentView = (a: Agent) => ({
   mediaReplies: a.mediaReplies,
   /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null for the others. */
   builtin: a.builtin ?? null,
+  /** "Responde a" (ADR 0148 addendum): the agent it reports to; null = its owner, else its setor's lead. */
+  reportsToAgentId: a.reportsToAgentId ?? null,
+  /** Its setup checklist (ADR 0155 §2): the role it started from and the steps confirmed; null = none. */
+  setup: setupOf(a.setup),
   /** Its autonomy brakes (ADR 0131), with the defaults filled in. */
   brakes: autonomySettings(a.autonomyBrakes),
   createdAt: a.createdAt,

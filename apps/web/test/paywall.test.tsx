@@ -253,29 +253,63 @@ test("a first task opens with the caret at its blank, in the box", async () => {
 
 describe("Lodi's DM on a hold", () => {
   const dm = `dm/agent/${LODI_ID}`;
-  const lodi = () => {
-    const state = withRightHand(held(seedState({ aiStatus: noAi(LODI_ID) })));
+  const lodi = (aiStatus: AiStatus = noAi(LODI_ID)) => {
+    const state = withRightHand(held(seedState({ aiStatus })), { setup: { role: null, done: [] } });
     state.agents = state.agents.filter((a) => a.id === LODI_ID);
+    state.members = state.members.slice(0, 1);
+    state.connections = [];
     return state;
   };
+  const row = (text: string) =>
+    [...document.querySelectorAll(".setup-row")].find((r) => r.textContent?.includes(text)) as HTMLElement;
 
-  test("its lead says the plan up front, the start card shows, and neither Connect nor the style card", async () => {
+  test("its lead says the plan up front, the checklist shows, and neither Connect nor the style card", async () => {
     await open(lodi(), dm);
     const text = document.body.textContent ?? "";
     expect(text).toContain("Escolha o que a sua empresa faz e o time aparece aqui.");
+    expect(text).toContain("Para o time da Acme começar a trabalhar");
     expect(text).not.toContain("Conecte uma IA para o time");
     expect(text).not.toContain("Como prefere que eu fale com você?");
-    expect(text).not.toContain("Ou escreva do seu jeito");
   });
 
-  test("a tap posts that business's template with what was tapped, sending no message", async () => {
+  test("with a team on a hold, its lead says what it does, not how the team comes", async () => {
+    await open(withRightHand(held(seedState()), { setup: { role: null, done: [] } }), dm);
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("Escolha o que a sua empresa faz");
+    expect(text).toContain("Crio os agentes, conecto os apps e convido as pessoas.");
+  });
+
+  test("rows 1 and 2 open; the AI row leads to the plan; apps and people wait for it; no asks (ADR 0155 §6)", async () => {
+    await open(lodi(), dm);
+    expect(within(row("Me conte o que a Acme faz.")).getByRole("button", { name: "Contar" })).toBeTruthy();
+    expect(within(row("Monte o time.")).getByRole("button", { name: "Ver o time" })).toBeTruthy();
+    expect(
+      within(row("Abre com o plano do agentes.chat.")).getByRole("button", { name: "Ver planos do agentes.chat" }),
+    ).toBeTruthy();
+    for (const waits of ["Conecte os apps do trabalho.", "Chame quem trabalha com você."]) {
+      expect(row(waits).textContent).toContain("Abre com o plano.");
+      expect(within(row(waits)).queryByRole("button")).toBeNull();
+    }
+    expect(document.body.textContent).not.toContain("Agora me peça algo:");
+  });
+
+  test("a saved key on a hold reads as ready, and still the AI row waits for the plan", async () => {
+    await open(lodi({ any: true, agents: [{ agentId: LODI_ID, state: "ready" }] }), dm);
+    expect(row("Abre com o plano do agentes.chat.")).toBeTruthy();
+    expect(document.querySelector(".setup-cl__head small")?.textContent).toBe("0 de 5");
+  });
+
+  test("row 1 saves what the workspace does on a hold, sending no message", async () => {
     const state = lodi();
     await open(state, dm);
-    await click(screen().getByRole("button", { name: "Loja online" }));
-    expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args)).toEqual([
-      [ORG_ID, "store", "pt-BR", "Loja online"],
-    ]);
+    await click(within(row("Me conte o que a Acme faz.")).getByRole("button", { name: "Contar" }));
+    const dialog = screen().getByRole("dialog", { name: "O que a Acme faz?" });
+    await click(within(dialog).getByRole("button", { name: "Loja online" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(calls(state, "orgs.updateSettings").map((c) => c.args[1])).toEqual([{ context: "Loja online" }]);
     expect(calls(state, "chat.send")).toHaveLength(0);
+    // Straight into the team, its template picked.
+    expect(screen().getByRole("dialog", { name: "Modelos de time" })).toBeTruthy();
   });
 });
 

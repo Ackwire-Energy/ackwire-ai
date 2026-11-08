@@ -598,6 +598,8 @@ function NewAgentFlow({
       role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
       instructions,
       model,
+      // Its setup checklist suggests from the ready-made role it started from (ADR 0155 §2).
+      setup: { role: role && role !== "custom" ? role : null },
       ownerUserId: ownerId,
       audience: {
         mode: audience.mode,

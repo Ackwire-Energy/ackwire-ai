@@ -89,7 +89,7 @@ import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
 import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import { ApprovalInline, QuestionCard, ThreadLink } from "./cards";
-import { IssueWorkCard } from "./issue-work";
+import { HandedTaskChips, IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
   approvalIdOf,
@@ -763,6 +763,7 @@ export const MessageRow = memo(function MessageRow({
               />
             ) : null}
             {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
+            {isAgent ? <HandedTaskChips message={m} /> : null}
             {isAgent ? <TeamChecks message={m} /> : null}
             {isAgent ? <ReachLines message={m} /> : null}
             {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}

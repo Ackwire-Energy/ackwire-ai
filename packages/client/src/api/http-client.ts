@@ -25,6 +25,7 @@ import type {
   AgentDetail,
   AgentForYou,
   AgentGroup,
+  AgentLineChange,
   AgentMailbox,
   AgentPlanUsage,
   AgentProposal,
@@ -699,6 +700,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
       planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
+      setLines: (orgId, changes) =>
+        request<{ previous: AgentLineChange[] }>(`${org(orgId)}/agent-lines`, { method: "PUT", json: { changes } }),
       proposeChannelMove: (orgId, input) => request(`${org(orgId)}/team/channel-move`, { json: input }),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
@@ -730,10 +733,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             ...(locale ? { query: { locale } } : {}),
           })
         ).templates,
-      applyTeamTemplate: (orgId, templateId, locale, tap) =>
-        request<{ channelId: string; messageId: string }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, {
-          json: { ...(locale ? { locale } : {}), ...(tap ? { tap } : {}) },
-        }),
+      applyTeamTemplate: (orgId, templateId, locale) =>
+        request<{
+          channelId: string;
+          messageId: string;
+          state: TeamProposalCard["state"];
+          error: TeamProposalCard["error"] | null;
+        }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, { json: locale ? { locale } : {} }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
           json: { decision },
@@ -742,6 +748,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
+      confirmSetup: (orgId, agentId, step) =>
+        request<Agent>(`${org(orgId)}/agents/${enc(agentId)}/setup/${enc(step)}`, { json: {} }),
       mailLoss: async (orgId, agentId, audience) =>
         (
           await request<{ mailboxes: ForeignMailbox[] }>(`${org(orgId)}/agents/${enc(agentId)}/audience/mail-loss`, {

@@ -75,7 +75,7 @@ describe("DetailsDialog", () => {
     const dialog = body().getByRole("dialog", { name: "tela.png" });
     const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
     expect(bar.classList.contains("ac-details__bar--titled")).toBe(true);
-    expect(bar.firstElementChild?.className).toBe("ac-details__heading");
+    expect(bar.firstElementChild?.className).toBe("ac-details__heading ac-actrow__text");
     expect(bar.lastElementChild?.className).toContain("ac-details__actions");
     expect(dialog.querySelector(".ac-details__eyebrow")).toBeNull();
     expect(dialog.querySelectorAll(".ac-details__heading")).toHaveLength(1);

@@ -1584,7 +1584,10 @@
       "subPerson": "Jeder Agent unter der verantwortlichen Person, oder unter der Leitung seiner Abteilung, wenn er keine hat.",
       "subSector": "Jede Abteilung mit ihren Agenten. {{name}} arbeitet mit allen.",
       "workspace": "Arbeitsbereich",
-      "responsible": "Verantwortlich: {{names}}"
+      "responsible": "Verantwortlich: {{names}}",
+      "lodi": "begleitet alles mit dir",
+      "supervisor": "Supervisor: {{name}}",
+      "dragSector": "Auf einen Agenten ziehen, damit die Agenten dieses Bereichs ihm berichten"
     },
     "map": {
       "lead": "Wer sich um die Agenten kümmert, in welchen Kanälen sie sind, was jeder selbstständig macht und was auf eine Person wartet. Gestrichelte Linien verbinden Agenten, die sich am letzten Tag um Hilfe gebeten haben.",
@@ -1602,7 +1605,9 @@
       "emptyTitle": "Sieh, wo jeder Agent arbeitet",
       "emptyAction": "Zu einem Kanal hinzufügen",
       "emptyViewer": "Wer die Agenten verwaltet, fügt sie zu Kanälen hinzu, und die Karte erscheint hier.",
-      "others": "Andere Kanäle"
+      "others": "Andere Kanäle",
+      "band": "Supervisoren",
+      "reportsTo": "Berichtet an {{name}}"
     },
     "sectors": {
       "lead": "Jede Abteilung hat eine Leitung, eine Vertretung, ihre Agenten und deren Kanäle und Routinen.",
@@ -1612,6 +1617,15 @@
       "backupLabel": "Vertretung",
       "leadOf": "Leitung von {{name}}",
       "backupOf": "Vertretung in {{name}}",
+      "supervisor": "Supervisor",
+      "supervisorOf": "Supervisor von {{name}}",
+      "unsupervised_one": "{{count}} Agent ohne Supervisor",
+      "unsupervised_other": "{{count}} Agenten ohne Supervisor",
+      "apply": "Anwenden",
+      "supervisorDone_one": "{{count}} Agent von {{sector}} berichtet jetzt an {{name}}",
+      "supervisorDone_other": "{{count}} Agenten von {{sector}} berichten jetzt an {{name}}",
+      "supervisorCleared_one": "{{count}} Agent von {{sector}} berichtet keinem Supervisor mehr",
+      "supervisorCleared_other": "{{count}} Agenten von {{sector}} berichten keinem Supervisor mehr",
       "nobody": "Niemand",
       "none": "Keine",
       "channels": "Kanäle",
@@ -1627,6 +1641,14 @@
       "empty": "Jede Abteilung hat eine Leitung, so sehen alle, wer sich um was kümmert.",
       "emptyViewerTitle": "Sieh, wer sich um was kümmert",
       "emptyViewer": "Wer die Agenten verwaltet, erstellt die Abteilungen. Sie erscheinen dann hier."
+    },
+    "reportsTo": {
+      "label": "Berichtet an",
+      "help": "Sagt nur, wem dieser Agent Rechenschaft gibt. Gibt keine Berechtigung.",
+      "none": "Niemand",
+      "done": "{{agent}} berichtet jetzt an {{to}}",
+      "cleared": "{{agent}} berichtet keinem Agenten mehr",
+      "reports": "Wer an {{name}} berichtet"
     },
     "usage": {
       "lead": "Was jede Person diesen Monat von den Agenten nutzt, und die Limits.",
@@ -1922,22 +1944,12 @@
         "text": "Die Agenten denken mit der KI des Workspace. Melde dich mit deinem Claude- oder ChatGPT-Abo an, ohne API-Schlüssel.",
         "action": "Verbinden"
       },
-      "start": {
-        "question": "Wie möchtest du anfangen?",
-        "createOne": "{{name}} erstellen",
-        "team": "Ein Startteam zusammenstellen",
-        "describe": "Beschreiben, was ich brauche",
-        "import": "Meine Agenten importieren",
-        "form": "Das Formular ausfüllen"
-      },
       "again": {
         "question": "Willst du das Team mit mir aufbauen?",
         "action": "Team aufbauen",
         "message": "Hilf mir, das Team aufzubauen."
       },
       "next": {
-        "question": "Das Team ist da. Und jetzt?",
-        "invite": "Leute einladen",
         "firstTask": "{{name}} eine erste Aufgabe geben"
       },
       "style": {
@@ -1945,12 +1957,6 @@
         "text": "Das gilt für alle Agenten, und du kannst es jederzeit in deinem Konto ändern.",
         "simple": "Einfach, ohne Fachbegriffe",
         "technical": "Technisch, mit den Details"
-      },
-      "firstTask": {
-        "theo": "Plane unsere erste Woche: Was macht jeder von uns zuerst?",
-        "ada": "Was könntest du als Erstes für uns bauen oder automatisieren?",
-        "lia": "Wer sind unsere 5 nächsten Wettbewerber, und was machen sie besser als wir?",
-        "atlas": "Was beobachtest du zuerst bei unseren Fehlern, Warteschlangen und Deploys, und wie sagst du mir Bescheid, wenn etwas kaputtgeht?"
       }
     },
     "profile": {
@@ -2036,6 +2042,7 @@
         "ai_account": "Nur die Person, der das Konto gehört, vergibt es",
         "name": "Nur Admins benennen einen Agenten um",
         "look": "Nur Admins und sein Verantwortlicher ändern sein Aussehen",
+        "reports_to": "Nur Admins ändern, an wen ein Agent berichtet",
         "many": "Nur Admins machen diese Änderungen"
       }
     },
@@ -2048,10 +2055,12 @@
       "archive": "Status",
       "channel": "Kanal",
       "name": "Name",
-      "look": "Aussehen"
+      "look": "Aussehen",
+      "reports_to": "Berichtet an"
     },
     "value": {
       "lookDefault": "Das Standardaussehen",
+      "anAgent": "Ein Agent",
       "none": "Keins",
       "budgetDefault": "Standard des Workspace",
       "anAccount": "Ein KI-Konto",
@@ -2098,6 +2107,7 @@
   },
   "teamWeek": {
     "title": "Teamwoche",
+    "dayTitle": "Tageszusammenfassung",
     "suggestions_one": "{{count}} Vorschlag",
     "suggestions_other": "{{count}} Vorschläge",
     "stat": {
@@ -2167,7 +2177,8 @@
       "wed": "Jeden Mittwoch um {{time}}",
       "thu": "Jeden Donnerstag um {{time}}",
       "fri": "Jeden Freitag um {{time}}",
-      "sat": "Jeden Samstag um {{time}}"
+      "sat": "Jeden Samstag um {{time}}",
+      "day": "Jeden Tag um {{time}}"
     },
     "off": "Aus",
     "schedule": {
@@ -2175,11 +2186,14 @@
       "day": "Tag",
       "hour": "Uhrzeit",
       "stop": "Nicht mehr erhalten",
-      "start": "Wieder erhalten"
+      "start": "Wieder erhalten",
+      "daily": "Jeden Tag"
     },
     "settings": {
       "label": "Teamwoche",
-      "help": "Jede Woche erzählt dir {{name}} in deiner DM, wie es im Team lief und was sich verbessern lässt. Nur Admins bekommen sie."
+      "help": "Jede Woche erzählt dir {{name}} in deiner DM, wie es im Team lief und was sich verbessern lässt. Nur Admins bekommen sie.",
+      "dayLabel": "Tageszusammenfassung",
+      "dayHelp": "Jeden Tag erzählt dir {{name}} in deiner DM, was das Team getan hat und was auf dich wartet, nur an Tagen mit etwas zu sagen."
     }
   },
   "routing": {
@@ -3729,46 +3743,11 @@
       "answer": "Antworten",
       "open": "Öffnen"
     },
-    "steps": {
-      "title": "Erste Schritte",
-      "progress": "{{done}} von {{total}}",
-      "hide": "Ausblenden",
-      "done": "Fertig",
-      "agent": {
-        "title": "Erstell deinen ersten Agent",
-        "text": "Sag, was er macht, und er wird Teil des Teams.",
-        "action": "Agent erstellen"
-      },
-      "plan": {
-        "title": "agentes.chat-Tarif wählen",
-        "text": "Die Agenten beginnen zu arbeiten, sobald der Workspace einen hat.",
-        "action": "Tarife ansehen"
-      },
-      "ai": {
-        "title": "Eine KI verbinden",
-        "text": "Damit denken deine Agenten.",
-        "action": "Verbinden"
-      },
-      "ask": {
-        "title": "Bitte einen Agent um etwas",
-        "text": "Schreib unten oder in einer Unterhaltung.",
-        "action": "Fragen"
-      },
-      "team": {
-        "title": "Lad dein Team ein",
-        "text": "Personen und Agenten arbeiten hier zusammen.",
-        "action": "Einladen"
-      },
-      "routine": {
-        "title": "Erstell eine Routine",
-        "text": "Ein Agent erledigt etwas selbstständig, nach Zeitplan.",
-        "action": "Routine erstellen"
-      }
-    },
     "calm": {
       "title": "Alles erledigt",
       "text": "Deine Agenten sagen dir hier Bescheid, wenn sie dich brauchen."
-    }
+    },
+    "firstRun": "Mach weiter, wo du aufgehört hast · {{done}} von {{total}}"
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -5053,6 +5032,174 @@
       "app": "Über eine KI-App gesendet"
     }
   },
+  "agentSetup": {
+    "greeting": "Hallo, {{person}}. Ich bin {{name}}.",
+    "greeting_female": "Hallo, {{person}}. Ich bin {{name}}.",
+    "greetingRole": "Hallo, {{person}}. Ich bin {{name}}, der neue {{role}}-Agent.",
+    "greetingRole_female": "Hallo, {{person}}. Ich bin {{name}}, die neue {{role}}-Agentin.",
+    "asked": "Du hast mich gebeten: „{{what}}“.",
+    "lead": "Zum Start helft mir bitte bei ein paar schnellen Dingen:",
+    "title": "Zum Start",
+    "ready": "Ich bin bereit.",
+    "ready_female": "Ich bin bereit.",
+    "titleProfile": "Zum Start von {{name}}",
+    "titleProfile_female": "Zum Start von {{name}}",
+    "count": "{{done}} von {{total}}",
+    "change": "Ändern",
+    "switch": "Wechseln",
+    "choose": "Auswählen",
+    "see": "Ansehen",
+    "suggested": "Vorgeschlagen",
+    "ai": {
+      "todo": "Eine KI verbinden",
+      "todoDesc": "Damit ich denken kann.",
+      "action": "Verbinden",
+      "done": "Ich habe eine KI zum Denken"
+    },
+    "apps": {
+      "todo": "{{apps}} lesen",
+      "todoDesc": "Lesen ändert nie etwas.",
+      "action": "Erlauben",
+      "todoNone": "Die Apps von {{org}} nutzen",
+      "todoNoneDesc": "Die, die du schon verbunden hast, etwa Gmail und Drive.",
+      "done": "Ich nutze {{apps}}",
+      "doneNone": "Vorerst keine Apps",
+      "title": "Was {{name}} nutzen kann",
+      "title_female": "Was {{name}} nutzen kann",
+      "desc": "Lesen ändert nie etwas. Senden, Löschen und Bezahlen brauchen deine Freigabe.",
+      "ok_one": "{{count}} App erlauben",
+      "ok_other": "{{count}} Apps erlauben",
+      "okNone": "Ohne Apps fortfahren",
+      "empty": "{{org}} hat noch keine Apps verbunden.",
+      "connectOther": "Weitere App verbinden"
+    },
+    "where": {
+      "todo": "{{channel}} beitreten",
+      "todoDesc": "Ich antworte, wenn mich dort jemand ruft.",
+      "action": "Beitreten",
+      "todoNone": "Einem Kanal beitreten",
+      "done": "Ich bin in {{channels}}",
+      "doneNone": "Ich bleibe in unserem direkten Chat",
+      "title": "Wo {{name}} arbeitet",
+      "title_female": "Wo {{name}} arbeitet",
+      "desc": "Er antwortet, wenn ihn dort jemand ruft. Der direkte Chat zählt immer.",
+      "okNone": "Nur direkter Chat",
+      "okOne": "{{channel}} beitreten",
+      "ok_one": "{{count}} Kanal beitreten",
+      "ok_other": "{{count}} Kanälen beitreten"
+    },
+    "who": {
+      "todo": "Mit allen bei {{org}} sprechen",
+      "todoDesc": "Jeder kann mich rufen.",
+      "todoPlan": "Nur mit dir sprechen",
+      "todoPlanDesc": "Dein Abo ist persönlich.",
+      "doneEveryone": "Ich spreche mit allen bei {{org}}",
+      "doneYou": "Ich spreche nur mit dir",
+      "doneOwner": "Ich spreche nur mit {{name}}",
+      "donePeople": "Ich spreche mit den Personen, die du ausgewählt hast",
+      "title": "Wer mit {{name}} spricht",
+      "title_female": "Wer mit {{name}} spricht",
+      "people": "Personen und Rollen",
+      "add": "Personen auswählen",
+      "addMore": "Jemand anderen hinzufügen",
+      "you": "du",
+      "youCap": "Du",
+      "ownerHelp": "Bekommt seine Freigabeanfragen und Hinweise.",
+      "ownerHelp_female": "Bekommt ihre Freigabeanfragen und Hinweise."
+    },
+    "how": {
+      "todo": "So arbeite ich",
+      "todoDesc": "Ich starte mit den Anweisungen für {{role}}.",
+      "todoDescBlank": "Ich starte mit dem, was du geschrieben hast.",
+      "done": "Ich arbeite auf deine Art",
+      "title": "Wie {{name}} arbeitet",
+      "title_female": "Wie {{name}} arbeitet",
+      "desc": "Schreib so, wie du es jemand Neuem im Team schreiben würdest.",
+      "instructions": "Anweisungen",
+      "budget": "Monatslimit",
+      "budgetHelp": "Wir sagen dir bei 80 % Bescheid. Beim Limit pausiert er und meldet sich.",
+      "budgetHelp_female": "Wir sagen dir bei 80 % Bescheid. Beim Limit pausiert sie und meldet sich.",
+      "more": "Weitere Optionen",
+      "model": "Modell"
+    },
+    "say": {
+      "ai": "Jetzt kann ich denken.",
+      "apps": "Fertig, ich kann jetzt die Apps nutzen.",
+      "where": "Ich behalte es dort im Auge.",
+      "who": "Verstanden, ich weiß, mit wem ich spreche.",
+      "how": "Verstanden, ich weiß, wie du mich arbeiten lassen willst."
+    },
+    "tasksLead": "Wir können schon loslegen. Frag mich etwas:",
+    "tasksAllDone": "Alles bereit. Frag mich etwas:",
+    "tasks": {
+      "a": "Was kannst du für mich tun?",
+      "b": "Womit fangen wir an?"
+    },
+    "firstRun": {
+      "title": "Damit das Team von {{org}} loslegt",
+      "complete": "Alles bereit.",
+      "notNow": "Jetzt nicht",
+      "afterPlan": "Öffnet mit dem Tarif.",
+      "about": {
+        "todo": "Erzähl mir, was {{org}} macht.",
+        "todoDesc": "Alle Agenten lesen das.",
+        "action": "Erzählen",
+        "done": "Ich weiß, was {{org}} macht",
+        "title": "Was macht {{org}}?",
+        "desc": "Alle Agenten lesen das. Du kannst es jederzeit ändern.",
+        "line": "In einem Satz",
+        "optional": "Optional. Ohne Satz zählt der Typ, den du gewählt hast."
+      },
+      "team": {
+        "todo": "Stell das Team zusammen.",
+        "todoDesc": "Eine Vorlage für dein Geschäft, du kannst später alles ändern.",
+        "action": "Team ansehen",
+        "done_one": "{{count}} Agent im Team",
+        "done_other": "{{count}} Agenten im Team",
+        "card": "Mach auf der Karte unten weiter"
+      },
+      "ai": {
+        "todo": "Verbinde eine KI.",
+        "todoDesc": "Die, für die du schon zahlst, funktioniert.",
+        "action": "Verbinden",
+        "done": "Ich denke mit {{label}}",
+        "doneAny": "Ich denke jetzt mit einer KI",
+        "plan": "Öffnet mit dem agentes.chat-Tarif.",
+        "planAction": "agentes.chat-Tarife ansehen"
+      },
+      "apps": {
+        "todo": "Verbinde deine Arbeits-Apps.",
+        "todoDesc": "Lesen ändert nie etwas.",
+        "action": "Auswählen",
+        "done": "Ich lese {{apps}}",
+        "doneNone": "Vorerst keine Apps",
+        "title": "Deine Arbeits-Apps",
+        "desc": "Die, die das neue Team nutzen würde, stehen oben. Lesen ändert nie etwas, und Senden, Löschen und Bezahlen brauchen deine Freigabe.",
+        "connect": "Verbinden",
+        "all": "Alle Apps ansehen"
+      },
+      "people": {
+        "todo": "Hol die Leute dazu, mit denen du arbeitest.",
+        "todoDesc": "Sie sprechen auch mit den Agenten.",
+        "action": "Einladen",
+        "done_one": "{{count}} Person hier",
+        "done_other": "{{count}} Personen hier",
+        "doneNone": "Vorerst nur du"
+      },
+      "say": {
+        "about": "Notiert. Alle Agenten lesen das.",
+        "team": "Das Team ist da.",
+        "ai": "Jetzt denkt das Team.",
+        "apps": "Fertig, ich lese jetzt die Apps.",
+        "people": "Schön, dass mehr Leute hier sind."
+      },
+      "asks": {
+        "lead": "Jetzt bitte mich um etwas:",
+        "fit": "Pass das Team an mein Geschäft an",
+        "who": "Wer im Team macht was?"
+      }
+    }
+  },
   "newAgent": {
     "title": "Agent erstellen",
     "railOrg": "{{org}} · du bist {{role}}",
@@ -5106,79 +5253,144 @@
         "name": "Entwicklung",
         "agent": "Ada",
         "desc": "Programmiert, prüft PRs und untersucht Bugs.",
-        "instructions": "Untersucht zuerst: liest den Code und die zugehörigen Aufgaben und Fehler, bevor er antwortet, und kommt mit dem Befund und einem konkreten PR-Vorschlag mit Test zurück.\nArbeitet in Branches und öffnet kleine PRs. Bei großen Änderungen öffnet er den PR als Entwurf und erklärt dort den Plan.\nMergt nie allein: bittet eine Person um ein Review."
+        "instructions": "Untersucht zuerst: liest den Code und die zugehörigen Aufgaben und Fehler, bevor er antwortet, und kommt mit dem Befund und einem konkreten PR-Vorschlag mit Test zurück.\nArbeitet in Branches und öffnet kleine PRs. Bei großen Änderungen öffnet er den PR als Entwurf und erklärt dort den Plan.\nMergt nie allein: bittet eine Person um ein Review.",
+        "tasks": {
+          "a": "Was ist gerade der häufigste Fehler?",
+          "b": "Prüfe den neuesten offenen PR",
+          "c": "Nimm die älteste Aufgabe im Backlog"
+        }
       },
       "ops": {
         "name": "Betrieb",
         "agent": "Atlas",
         "desc": "Überwacht Fehler, Warteschlangen und Deploys.",
-        "instructions": "Verfolgt Fehler und Deploys und schreibt Incident-Berichte.\nWenn ein Alarm ausgelöst wird, untersucht er zuerst (Fehler, Logs, letzte Deploys) und schreibt in den Kanal, was er gefunden hat: seit wann, wie groß, die wahrscheinliche Ursache und den nächsten Schritt.\nRollback und Deploy nur mit Freigabe."
+        "instructions": "Verfolgt Fehler und Deploys und schreibt Incident-Berichte.\nWenn ein Alarm ausgelöst wird, untersucht er zuerst (Fehler, Logs, letzte Deploys) und schreibt in den Kanal, was er gefunden hat: seit wann, wie groß, die wahrscheinliche Ursache und den nächsten Schritt.\nRollback und Deploy nur mit Freigabe.",
+        "tasks": {
+          "a": "Fällt dir seit dem letzten Deployment etwas Seltsames auf?",
+          "b": "Fasse die heutigen Fehler zusammen",
+          "c": "Was hat sich im letzten Release geändert?"
+        }
       },
       "qa": {
         "name": "Qualitätssicherung",
         "agent": "Iris",
         "desc": "Testet Abläufe und reproduziert gemeldete Bugs.",
-        "instructions": "Reproduziert jeden gemeldeten Bug, bevor er eine Aufgabe anlegt. Schreibt klare Schritte und hängt Belege an.\nWenn er ihn nicht reproduzieren kann, prüft er zuerst die Fehler, letzte Änderungen und zugehörige Aufgaben. Fragt nur nach Umgebung und Version, wenn sie fehlen.\nPriorisiert, was Kunden blockiert."
+        "instructions": "Reproduziert jeden gemeldeten Bug, bevor er eine Aufgabe anlegt. Schreibt klare Schritte und hängt Belege an.\nWenn er ihn nicht reproduzieren kann, prüft er zuerst die Fehler, letzte Änderungen und zugehörige Aufgaben. Fragt nur nach Umgebung und Version, wenn sie fehlen.\nPriorisiert, was Kunden blockiert.",
+        "tasks": {
+          "a": "Reproduziere den zuletzt gemeldeten Bug",
+          "b": "Welche Bugs haben keine Schritte?",
+          "c": "Gibt es neue Fehler seit dem Deployment?"
+        }
       },
       "pm": {
         "name": "Produkt",
         "agent": "Theo",
         "desc": "Organisiert Aufgaben und Zusammenfassungen.",
-        "instructions": "Schaut zuerst nach (Aufgaben, Threads, Wiki, Feedback) und fragt nur, was übrig bleibt.\nOrganisiert Aufgaben, fasst lange Diskussionen zusammen und hält die Roadmap aktuell."
+        "instructions": "Schaut zuerst nach (Aufgaben, Threads, Wiki, Feedback) und fragt nur, was übrig bleibt.\nOrganisiert Aufgaben, fasst lange Diskussionen zusammen und hält die Roadmap aktuell.",
+        "tasks": {
+          "a": "Fasse zusammen, was das Team diese Woche gemacht hat",
+          "b": "Welche Aufgaben hängen fest?",
+          "c": "Aktualisiere die Roadmap"
+        }
       },
       "support": {
         "name": "Kundenservice",
         "agent": "Nina",
         "desc": "Antwortet Kunden und gibt ab, was eine Person braucht.",
-        "instructions": "Schaut vor dem Antworten in die Historie des Kunden, frühere Unterhaltungen und das Hilfecenter und kommt mit einer fertigen Antwort und ihrer Quelle zurück.\nBei einem Produktproblem legt er eine Aufgabe mit den Schritten an und informiert das Team. Verspricht nie ein Datum oder eine Lösung, die es nicht gibt.\nNachrichten an Kunden, Erstattungen und Rabatte nur mit Freigabe."
+        "instructions": "Schaut vor dem Antworten in die Historie des Kunden, frühere Unterhaltungen und das Hilfecenter und kommt mit einer fertigen Antwort und ihrer Quelle zurück.\nBei einem Produktproblem legt er eine Aufgabe mit den Schritten an und informiert das Team. Verspricht nie ein Datum oder eine Lösung, die es nicht gibt.\nNachrichten an Kunden, Erstattungen und Rabatte nur mit Freigabe.",
+        "tasks": {
+          "a": "Welche Kunden warten am längsten auf eine Antwort?",
+          "b": "Fasse die Beschwerden dieser Woche zusammen",
+          "c": "Entwirf eine Antwort auf die letzte E-Mail eines Kunden"
+        }
       },
       "sales": {
         "name": "Vertrieb",
         "agent": "Leo",
         "desc": "Bereitet Angebote vor und fasst bei Leads nach.",
-        "instructions": "Recherchiert vor jedem Gespräch das Unternehmen, die bisherige Geschichte damit und was schon vereinbart wurde, und kommt mit einer Zusammenfassung und dem nächsten Schritt zurück.\nHält die Liste der Leads aktuell und erinnert das Team an das, was stockt.\nErfindet nie Preise, Rabatte oder Konditionen: nutzt nur, was in der Preisliste steht. Sendet ein Angebot oder eine E-Mail an Kunden nur mit Freigabe."
+        "instructions": "Recherchiert vor jedem Gespräch das Unternehmen, die bisherige Geschichte damit und was schon vereinbart wurde, und kommt mit einer Zusammenfassung und dem nächsten Schritt zurück.\nHält die Liste der Leads aktuell und erinnert das Team an das, was stockt.\nErfindet nie Preise, Rabatte oder Konditionen: nutzt nur, was in der Preisliste steht. Sendet ein Angebot oder eine E-Mail an Kunden nur mit Freigabe.",
+        "tasks": {
+          "a": "Wer ist seit über einer Woche still?",
+          "b": "Bereite ein Angebot für den letzten Lead vor",
+          "c": "Wie viel kam diesen Monat von Neukunden rein?"
+        }
       },
       "marketing": {
         "name": "Marketing",
         "agent": "Mila",
         "desc": "Plant Kampagnen, Posts und Website-Seiten.",
-        "instructions": "Schaut sich zuerst an, was schon gemacht wurde, die Ergebnisse und die Stimme der Marke, bevor er etwas Neues vorschlägt.\nSchreibt Entwürfe für Kampagnen, Posts und Seiten, mit einer Kernidee und einer klaren Zielgruppe.\nErfindet nie Zahlen oder Kundenstimmen. Veröffentlicht auf der Website oder in sozialen Medien nur mit Freigabe."
+        "instructions": "Schaut sich zuerst an, was schon gemacht wurde, die Ergebnisse und die Stimme der Marke, bevor er etwas Neues vorschlägt.\nSchreibt Entwürfe für Kampagnen, Posts und Seiten, mit einer Kernidee und einer klaren Zielgruppe.\nErfindet nie Zahlen oder Kundenstimmen. Veröffentlicht auf der Website oder in sozialen Medien nur mit Freigabe.",
+        "tasks": {
+          "a": "Schlage 3 Posts für diese Woche vor",
+          "b": "Plane die nächste Kampagne",
+          "c": "Prüfe den Text auf der Preisseite"
+        }
       },
       "content": {
         "name": "Inhalte",
         "agent": "Bento",
         "desc": "Schreibt und überarbeitet Texte, Artikel und Newsletter.",
-        "instructions": "Liest vor dem Schreiben, was es zum Thema schon gibt (Wiki, Dokumente, Unterhaltungen), und klärt, für wen der Text ist.\nLiefert klare, kurze Entwürfe mit den Quellen am Ende. Beim Überarbeiten erklärt er, was sich geändert hat und warum.\nErfindet nie Daten oder Zitate. Veröffentlicht oder sendet nach außen nur mit Freigabe."
+        "instructions": "Liest vor dem Schreiben, was es zum Thema schon gibt (Wiki, Dokumente, Unterhaltungen), und klärt, für wen der Text ist.\nLiefert klare, kurze Entwürfe mit den Quellen am Ende. Beim Überarbeiten erklärt er, was sich geändert hat und warum.\nErfindet nie Daten oder Zitate. Veröffentlicht oder sendet nach außen nur mit Freigabe.",
+        "tasks": {
+          "a": "Schreibe den Newsletter für diesen Monat",
+          "b": "Prüfe den neuesten Blogpost",
+          "c": "Liste 5 Themen für Artikel auf"
+        }
       },
       "data": {
         "name": "Daten",
         "agent": "Dora",
         "desc": "Beantwortet Fragen mit Zahlen und erstellt Berichte.",
-        "instructions": "Holt die Zahlen aus der Quelle, bevor er antwortet, und zeigt, woher sie kommen, den Zeitraum und wie er sie berechnet hat.\nWenn die Daten nicht reichen oder falsch aussehen, sagt er das, statt zu raten. Erfindet nie eine Zahl.\nPostet jeden Montag eine Zusammenfassung der wichtigsten Zahlen der Woche."
+        "instructions": "Holt die Zahlen aus der Quelle, bevor er antwortet, und zeigt, woher sie kommen, den Zeitraum und wie er sie berechnet hat.\nWenn die Daten nicht reichen oder falsch aussehen, sagt er das, statt zu raten. Erfindet nie eine Zahl.\nPostet jeden Montag eine Zusammenfassung der wichtigsten Zahlen der Woche.",
+        "tasks": {
+          "a": "Wie liefen die Verkäufe diese Woche?",
+          "b": "Erstelle den Bericht für diesen Monat",
+          "c": "Welche Kunden kaufen am meisten?"
+        }
       },
       "finance": {
         "name": "Finanzen",
         "agent": "Otto",
         "desc": "Behält Zahlungen, Abrechnung und Ausgaben im Blick.",
-        "instructions": "Prüft Zahlungen, Abrechnung und Ausgaben an der Quelle, bevor er antwortet, und zeigt Beträge mit Datum und Herkunft.\nMeldet, was aus dem Rahmen fällt: fehlschlagende Abbuchungen, Ausgaben über dem Erwarteten, fällig werdende Rechnungen.\nZahlungen, Erstattungen und jede Geldbewegung nur mit Freigabe. Erfindet nie Beträge."
+        "instructions": "Prüft Zahlungen, Abrechnung und Ausgaben an der Quelle, bevor er antwortet, und zeigt Beträge mit Datum und Herkunft.\nMeldet, was aus dem Rahmen fällt: fehlschlagende Abbuchungen, Ausgaben über dem Erwarteten, fällig werdende Rechnungen.\nZahlungen, Erstattungen und jede Geldbewegung nur mit Freigabe. Erfindet nie Beträge.",
+        "tasks": {
+          "a": "Wie viel kam diesen Monat rein?",
+          "b": "Welche Abbuchungen sind fehlgeschlagen?",
+          "c": "Fasse die Ausgaben des letzten Monats zusammen"
+        }
       },
       "people": {
         "name": "Personal",
         "agent": "Clara",
         "desc": "Hilft bei Einstellungen, Onboarding und Fragen des Teams.",
-        "instructions": "Schaut vor dem Antworten in die Richtlinien, das Wiki und die Dokumente des Teams und sagt, wo er die Antwort gefunden hat.\nOrganisiert offene Stellen, Vorstellungsgespräche und die ersten Tage neuer Leute, mit klaren Checklisten.\nGeht sorgsam mit persönlichen Daten um und teilt sie nur mit denen, die sie brauchen. Schreibt Bewerbern nur mit Freigabe."
+        "instructions": "Schaut vor dem Antworten in die Richtlinien, das Wiki und die Dokumente des Teams und sagt, wo er die Antwort gefunden hat.\nOrganisiert offene Stellen, Vorstellungsgespräche und die ersten Tage neuer Leute, mit klaren Checklisten.\nGeht sorgsam mit persönlichen Daten um und teilt sie nur mit denen, die sie brauchen. Schreibt Bewerbern nur mit Freigabe.",
+        "tasks": {
+          "a": "Plane die erste Woche für die Person, die Montag anfängt",
+          "b": "Wie sind die Urlaubsregeln?",
+          "c": "Plane die Vorstellungsgespräche dieser Woche"
+        }
       },
       "research": {
         "name": "Recherche",
         "agent": "Hugo",
         "desc": "Recherchiert ein Thema und liefert eine Zusammenfassung mit Quellen.",
-        "instructions": "Schaut zuerst, was das Team schon hat (Wiki, Dokumente, Unterhaltungen), dann in externe Quellen.\nLiefert eine kurze Zusammenfassung mit den wichtigsten Erkenntnissen, dem, was noch unklar ist, und den Quellen zu jedem Punkt.\nTrennt Fakten von Meinungen und erfindet nie Daten oder Zitate."
+        "instructions": "Schaut zuerst, was das Team schon hat (Wiki, Dokumente, Unterhaltungen), dann in externe Quellen.\nLiefert eine kurze Zusammenfassung mit den wichtigsten Erkenntnissen, dem, was noch unklar ist, und den Quellen zu jedem Punkt.\nTrennt Fakten von Meinungen und erfindet nie Daten oder Zitate.",
+        "tasks": {
+          "a": "Recherchiere die 5 größten Wettbewerber",
+          "b": "Fasse zusammen, was wir schon über den Markt wissen",
+          "c": "Vergleiche die Preise der Wettbewerber"
+        }
       },
       "assistant": {
         "name": "Assistenz",
         "agent": "Eva",
         "desc": "Kümmert sich um Kalender, E-Mails und Erinnerungen.",
-        "instructions": "Schaut vor dem Fragen in den Kalender, die E-Mails und letzte Unterhaltungen und kommt mit dem Befund und einem Vorschlag zurück.\nOrganisiert Meetings, entwirft Antworten und schickt Erinnerungen zur richtigen Zeit.\nE-Mails oder Nachrichten im Namen anderer senden, Einladungen annehmen und Zahlungen leisten nur mit Freigabe."
+        "instructions": "Schaut vor dem Fragen in den Kalender, die E-Mails und letzte Unterhaltungen und kommt mit dem Befund und einem Vorschlag zurück.\nOrganisiert Meetings, entwirft Antworten und schickt Erinnerungen zur richtigen Zeit.\nE-Mails oder Nachrichten im Namen anderer senden, Einladungen annehmen und Zahlungen leisten nur mit Freigabe.",
+        "tasks": {
+          "a": "Fasse meine heutigen E-Mails zusammen",
+          "b": "Welche Antworten habe ich diese Woche versprochen?",
+          "c": "Finde die Tabelle mit den Quartalszielen"
+        }
       },
       "custom": {
         "name": "Von Grund auf",
@@ -9878,7 +10090,7 @@
   "storage": {
     "title": "Speicher",
     "options": "Wo Dateien liegen",
-    "agentes": "agentes-Speicher",
+    "agentes": "agentes.chat-Speicher",
     "agentesText": "Deine Dateien bleiben in unserem Speicher, pro Workspace getrennt.",
     "server": "Dieser Server",
     "serverText": {
@@ -9889,7 +10101,7 @@
     },
     "showFolder": "Ordner anzeigen",
     "place": {
-      "agentes": "agentes-Speicher",
+      "agentes": "agentes.chat-Speicher",
       "server": "dieser Server"
     },
     "s3": "Dein eigener Bucket",
@@ -13549,7 +13761,8 @@
       "askedBy": "{{name}} hat um eine Aufgabe gebeten",
       "view": "Aufgabe ansehen",
       "taken": "{{name}} hat die Aufgabe übernommen",
-      "agent": "Mit {{name}}"
+      "agent": "Mit {{name}}",
+      "chipLabel": "Unterhaltung der Aufgabe #{{number}} öffnen, {{title}}"
     },
     "body": {
       "autonomy_proposal": {
@@ -13560,6 +13773,7 @@
       "autonomy_digest_one": "{{count}} Alarm wirkte bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
       "autonomy_digest_other": "{{count}} Alarme wirkten bekannt oder harmlos, deshalb habe ich nicht daran gearbeitet:",
       "team_week": "So lief die Woche des Teams, {{from}} bis {{to}}",
+      "team_day": "Wie der Tag des Teams lief, bis {{day}}",
       "autonomy_loop": "Ich habe aufgehört, von mir aus daran zu arbeiten. Es kam {{count}} Mal an einem Tag zurück ({{title}}). Sag mir, wie ich damit umgehen soll.",
       "mission_plan": "Plan für „{{title}}“ auf {{computer}}",
       "mission_planNoComputer": "Plan für „{{title}}“",
@@ -14783,7 +14997,11 @@
       "paused": "Pausiert auf {{computer}} bis {{time}}",
       "pausedPlain": "Pausiert auf {{computer}}",
       "noComputer": "Noch kein Computer",
-      "outdated": "Braucht ein Update auf {{computer}}"
+      "outdated": "Braucht ein Update auf {{computer}}",
+      "updating": "Wird aktualisiert · kommt von selbst zurück",
+      "screensOff": "Bildschirme sind auf {{computer}} aus",
+      "screensMissing": "{{computer}} kann noch keine Bildschirme zeigen",
+      "browserOff": "Der Browser ist auf {{computer}} aus"
     },
     "screen": "Bildschirm von {{name}}, live",
     "sub": {
@@ -15451,11 +15669,7 @@
   },
   "teamPlan": {
     "start": {
-      "question": "Was macht {{org}}? Damit baue ich ein fertiges Team, und du prüfst es nur.",
-      "orWrite": "Oder schreib es unten in deinen Worten, in einem Satz.",
-      "footer": "Weißt du schon, was du willst?",
-      "templates": "Team-Vorlagen ansehen",
-      "presets": "Fertige Agenten"
+      "templates": "Team-Vorlagen ansehen"
     },
     "business": {
       "agency": "Agentur",
@@ -15466,7 +15680,6 @@
       "services": "Dienstleistungsbüro",
       "other": "Etwas anderes"
     },
-    "answered": "beantwortet",
     "step": "Frage {{step}} von {{of}}",
     "send": "{{count}} senden",
     "card": {
@@ -15521,11 +15734,14 @@
     "templates": {
       "title": "Team-Vorlagen",
       "lead": "Ein fertiges Team für deine Art von Geschäft. Danach passt {{name}} es mit dir an.",
-      "heldLead": "Wähle das, was deinem Geschäft am nächsten kommt. Du kannst jeden Agenten vor dem Erstellen anpassen.",
-      "use": "Diese Vorlage nutzen",
+      "heldLead": "Wähl das, was deinem Geschäft am nächsten kommt. Du kannst später alles ändern.",
+      "create": "Team erstellen",
+      "import": "Agenten aus einer anderen App holen",
+      "scratch": "Einen Agenten von Grund auf erstellen",
+      "failed": "Das Team wurde nicht erstellt. Der Grund steht auf der Karte im Chat.",
       "none": "Keine davon",
       "noneSub": "Erzähl, was du machst, und {{name}} baut es",
-      "tailor": "Danach stelle ich 2 Fragen, um es an dein Geschäft anzupassen."
+      "tailor": "Später bitte mich einfach, es an dein Geschäft anzupassen."
     },
     "weekly": {
       "name": "Die Woche des Teams"
@@ -15674,7 +15890,6 @@
         "line": "was vor dem Öffnen eines PR zu prüfen ist"
       }
     },
-    "approvals": "Was an Kunden rausgeht, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust.",
-    "ask": "Ich habe die Vorlage {{name}} genutzt. Um sie an dein Geschäft anzupassen: **was macht {{org}} anders?**"
+    "approvals": "Was an Kunden rausgeht, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust."
   }
 }

@@ -9,6 +9,7 @@ import {
   autonomySettings,
   COST_KINDS,
   type CostKind,
+  inLine,
   LONG_STEPS,
   mayCall,
 } from "./autonomy-settings";
@@ -850,11 +851,16 @@ export async function callableAgents(
 ): Promise<Set<string>> {
   if (targetIds.length === 0) return new Set();
   const rows = await db
-    .select({ id: agents.id, autonomy: agents.autonomyBrakes })
+    .select({ id: agents.id, autonomy: agents.autonomyBrakes, reportsToAgentId: agents.reportsToAgentId })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, [...new Set([fromAgentId, ...targetIds])])));
-  const from = rows.find((r) => r.id === fromAgentId)?.autonomy;
-  return new Set(targetIds.filter((id) => mayCall(from, { id, autonomy: rows.find((r) => r.id === id)?.autonomy })));
+  const from = rows.find((r) => r.id === fromAgentId);
+  return new Set(
+    targetIds.filter((id) => {
+      const to = rows.find((r) => r.id === id);
+      return (!!from && !!to && inLine(from, to)) || mayCall(from?.autonomy, { id, autonomy: to?.autonomy });
+    }),
+  );
 }
 
 /** What an agent reads when its settings kept it from calling `handles`. */

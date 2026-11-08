@@ -7,6 +7,7 @@ import { screenSteps, usesScreen } from "../src/browser";
 import {
   type AgentComputerFacts,
   askLine,
+  cantShowLine,
   type EntryWords,
   entryButton,
   entryKind,
@@ -273,11 +274,28 @@ describe("the entry's status line, first match wins", () => {
 
   test("why nothing can show: the screen can't, it uses neither, no computer yet; else available", () => {
     const blocked = { desktop: { available: false, reason: "not_allowed" }, browser: false };
-    expect(entryState(facts(blocked), NOW)).toEqual({ kind: "unavailable", outdated: false });
-    expect(entryState(facts({ ...blocked, desktop: { available: false, reason: "runner_outdated" } }), NOW)).toEqual({
+    // Each with its cause: what its line says.
+    const cause = (over: Partial<AgentComputerFacts>) => entryState(facts({ ...blocked, ...over }), NOW);
+    expect(cause({})).toEqual({ kind: "unavailable", cause: "screensOff" });
+    expect(cause({ desktop: { available: false, reason: "runner_outdated" } })).toEqual({
       kind: "unavailable",
-      outdated: true,
+      cause: "outdated",
     });
+    expect(cause({ desktop: { available: false, reason: "desktop_unavailable" } })).toMatchObject({
+      cause: "screensMissing",
+    });
+    // Where only its browser could show, the browser's reason: off on the computer, or its program to update.
+    const browserOnly = { desktop: { available: false, reason: "browser_only" } };
+    expect(cause({ ...browserOnly, browserReason: "switched_off" })).toMatchObject({ cause: "browserOff" });
+    expect(cause({ ...browserOnly, browserReason: "outdated" })).toMatchObject({ cause: "outdated" });
+    expect(cause({ ...browserOnly, browserReason: "not_reported" })).toMatchObject({ cause: "unknown" });
+    // A Mac (no screens for agents) whose browser is off says the browser, not the screens.
+    const mac = { ...MAC, desktopUse: { available: false, reason: "Only on Linux" } };
+    expect(cause({ machine: mac, browserReason: "switched_off" })).toMatchObject({ cause: "browserOff" });
+    // The Cloud's computer ready, the agent not on it yet: it joins at the computer's next hello.
+    expect(cause({ edition: "cloud", machine: null })).toMatchObject({ cause: "joining" });
+    // The screen's state didn't load: nothing says why.
+    expect(cause({ desktop: null })).toMatchObject({ cause: "unknown" });
     // A Mac has no screens: its browser's page shows, so it is available.
     expect(entryState(facts({ desktop: { available: false, reason: "desktop_unavailable" } }), NOW)).toEqual({
       kind: "available",
@@ -359,10 +377,24 @@ describe("the entry's status line, first match wins", () => {
     expect(line({ kind: "working" }, { step: "Filled in a field" })).toBe(
       'agentComputer.status.working {"now":"filled in a field"}',
     );
-    expect(line({ kind: "unavailable", outdated: true })).toBe("agentComputer.status.unavailable");
-    expect(line({ kind: "unavailable", outdated: true }, { edition: "selfhost", computer: "Mac mini" })).toBe(
+    // Nothing to show: the cause. The Cloud's program updates by itself; a self-hoster updates theirs.
+    expect(line({ kind: "unavailable", cause: "outdated" })).toBe("agentComputer.status.updating");
+    expect(line({ kind: "unavailable", cause: "outdated" }, { edition: "selfhost", computer: "Mac mini" })).toBe(
       'agentComputer.status.outdated {"computer":"Mac mini"}',
     );
+    expect(line({ kind: "unavailable", cause: "screensMissing" }, { computer: "Mac mini" })).toBe(
+      'agentComputer.status.screensMissing {"computer":"Mac mini"}',
+    );
+    // Screens and the browser are switched at a self-hoster's computer; the Cloud's has them on.
+    for (const cause of ["screensOff", "browserOff"] as const) {
+      expect(line({ kind: "unavailable", cause }, { edition: "selfhost", computer: "Mac mini" })).toBe(
+        `agentComputer.status.${cause} {"computer":"Mac mini"}`,
+      );
+      expect(line({ kind: "unavailable", cause })).toBe("agentComputer.status.unavailable");
+      expect(cantShowLine(t, cause, { edition: "cloud", computer: "Oficina's computer" })).toBeNull();
+    }
+    expect(line({ kind: "unavailable", cause: "joining" })).toBe("agentComputer.status.preparingPlain");
+    expect(line({ kind: "unavailable", cause: "unknown" })).toBe("agentComputer.status.unavailable");
     expect(line({ kind: "noScreen" })).toBe("agentComputer.status.noScreen");
     expect(line({ kind: "noBrowser" })).toBe("agentComputer.status.noBrowser");
     expect(line({ kind: "noComputer" })).toBe("agentComputer.status.noComputer");

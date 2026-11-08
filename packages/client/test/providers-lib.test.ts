@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { PROVIDER_IDS } from "@agenteschat/providers";
+import type { TFunction } from "i18next";
 import {
+  keyLine,
   keyLooksValid,
   keyStepHint,
   PROVIDERS,
@@ -61,5 +63,20 @@ describe("whose key is it", () => {
     expect(hint("openai")).toBeUndefined();
     // OpenRouter passes what is sent on to other providers: its own privacy settings say who may keep it.
     expect(hint("openrouter")).toBe("connectAi.key.privacy");
+  });
+});
+
+describe("a saved key's line", () => {
+  const t = ((key: string, o?: Record<string, unknown>) => `${key} ${JSON.stringify(o)}`) as unknown as TFunction;
+  test("a key named after its provider says only how it ends, any other name says the provider too", () => {
+    expect(keyLine(t, { label: "Claude", provider: "anthropic", keyHint: "0000" })).toBe(
+      'vault.item.endsIn {"hint":"0000"}',
+    );
+    expect(keyLine(t, { label: " claude ", provider: "anthropic", keyHint: "0000" })).toBe(
+      'vault.item.endsIn {"hint":"0000"}',
+    );
+    expect(keyLine(t, { label: "Marketing", provider: "anthropic", keyHint: "0000" })).toBe(
+      'newAgent.otherKeyDesc {"provider":"Claude","hint":"0000"}',
+    );
   });
 });

@@ -14,7 +14,18 @@ import {
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { showWorkspace } from "@/lib/start";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ATLAS_ID,
+  createFakeApi,
+  ENG_ID,
+  type FakeState,
+  GENERAL_ID,
+  LODI_ID,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
@@ -261,8 +272,8 @@ describe("Início", () => {
         .getAttribute("href"),
     ).toBe(`/org/${ORG_ID}/routines?open=rt-week`);
 
-    // Everything is set up here: no first steps, no calm line.
-    expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();
+    // Everything is set up here: no line back to a checklist, no calm line.
+    expect(document.querySelector(".home-continue")).toBeNull();
     expect(screen().queryByText("Tudo em dia")).toBeNull();
 
     // A row opens where the inbox would, and reads the item.
@@ -272,82 +283,36 @@ describe("Início", () => {
     expect(state.calls).toContainEqual({ method: "notifications.read", args: [ORG_ID, "n-approval", true] });
   });
 
-  test("a new workspace starts with its first steps, and shows no empty sections", async () => {
-    const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
-      agentStatuses: [
-        { agentId: ADA_ID, presence: "online", status: null, activeAt: null },
-        { agentId: ATLAS_ID, presence: "online", status: null, activeAt: null },
-      ],
-    });
+  test("while Lodi's first-run checklist has a row left: one line back to it, never a second list (ADR 0155 §6)", async () => {
+    const state = withRightHand(seedState({ agents: [] }), { setup: { role: null, done: [] } });
     state.members = state.members.filter((m) => m.userId === "u-walter");
-    await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
-    await settle(4);
+    state.connections = [];
+    const { router } = await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
+    await settle(6);
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Seu workspace está pronto. Comece por aqui.",
     );
-    const steps = section("Primeiros passos");
-    expect(steps.textContent).toContain("1 de 5");
-    const items = within(steps).getAllByRole("listitem");
-    expect(items.map((li) => li.querySelector(".home-row__title")?.textContent)).toEqual([
-      "Crie seu primeiro agente",
-      "Conecte uma IA",
-      "Peça algo a um agente",
-      "Convide seu time",
-      "Crie uma rotina",
-    ]);
-    // The one done says so and offers nothing; each open one has the button that does it.
-    expect(within(items[0] as HTMLElement).getByRole("img", { name: "Feito" })).toBeTruthy();
-    expect(within(items[0] as HTMLElement).queryByRole("button")).toBeNull();
-    expect(within(items[1] as HTMLElement).getByRole("button", { name: "Conectar" })).toBeTruthy();
-    expect(
-      within(items[3] as HTMLElement)
-        .getByRole("link", { name: "Convidar" })
-        .getAttribute("href"),
-    ).toBe(`/org/${ORG_ID}/settings/members`);
-    // "Pedir" puts me in the composer, which asks the agent I may talk to.
-    await click(within(items[2] as HTMLElement).getByRole("button", { name: "Pedir" }));
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Mensagem para a Ada");
+    const line = document.querySelector(".home-continue") as HTMLElement;
+    expect(line.textContent).toBe("Continue de onde parou · 1 de 5");
+    expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();
     for (const empty of ["Desde a sua última visita", "Próximas rotinas"])
       expect(screen().queryByRole("region", { name: empty })).toBeNull();
-    // The mural's fixed tiles stay in their places, empty (ADR 0135).
-    for (const tile of ["Esperando você", "Trabalhando agora"])
-      expect(within(section(tile)).queryAllByRole("listitem")).toHaveLength(0);
-    expect(section("Trabalhando agora").textContent).toContain("Nenhum agente trabalhando agora.");
-    expect(screen().queryByText("Tudo em dia")).toBeNull();
-
-    // Hidden, the card stays hidden in this browser; nothing waits, so Início says all is calm.
-    await click(within(steps).getByRole("button", { name: "Ocultar" }));
-    expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();
-    expect(screen().getByText("Tudo em dia")).toBeTruthy();
-    cleanup();
-    await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
+    await click(line);
     await settle(4);
-    expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
   });
 
-  test("a workspace of one in use isn't new: nothing waits, while its team and routine steps stay open", async () => {
-    const state = seedState({
-      agentStatuses: [{ agentId: ADA_ID, presence: "online", status: null, activeAt: ago(60) }],
-    });
-    state.members = state.members.filter((m) => m.userId === "u-walter");
-    await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
-    await settle(4);
-    expect(section("Primeiros passos").textContent).toContain("3 de 5");
-    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Nada esperando você agora.");
-  });
-
-  test("a member is offered only the steps they can finish: no AI to connect for agents they don't own", async () => {
-    const state = seedState({
-      aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] },
-      agentStatuses: [{ agentId: ADA_ID, presence: "online", status: null, activeAt: null }],
-    });
-    const org = state.me?.organizations[0];
+  test("no line for a member, nor once the checklist is done or gone", async () => {
+    const member = withRightHand(seedState(), { setup: { role: null, done: [] } });
+    const org = member.me?.organizations[0];
     if (org) org.role = "member";
-    await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
+    await renderApp(`/org/${ORG_ID}/home`, { api: backend(member) });
     await settle(4);
-    const steps = within(section("Primeiros passos")).getAllByRole("listitem");
-    expect(steps.map((li) => li.querySelector(".home-row__title")?.textContent)).toEqual(["Peça algo a um agente"]);
+    expect(document.querySelector(".home-continue")).toBeNull();
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/home`, { api: backend(withRightHand(seedState())) });
+    await settle(4);
+    expect(document.querySelector(".home-continue")).toBeNull();
   });
 
   test("asking an agent sends the message in its DM, which opens with it", async () => {

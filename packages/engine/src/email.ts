@@ -44,7 +44,7 @@ import { billingHold } from "./standing";
 import { isAgentesCloud } from "./telemetry";
 import { budgetPercent } from "./usage";
 
-export { EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
+export { EMAIL_DARK_HEAD, EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
 
 const { users, organizations, organizationInvitations, agents, approvals } = schema;
 

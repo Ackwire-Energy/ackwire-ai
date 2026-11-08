@@ -10,7 +10,13 @@ export type Locale = "en" | "pt-BR";
 export const PHRASES: Record<Condition, Record<Locale, readonly RegExp[]>> = {
   /** The Cloud is run by us: our storage, we're on it, a computer that is always on. */
   cloud: {
-    en: [/\bour storage\b/i, /\bwe're on it\b/i, /\balways on\b/i, /\bday and night\b/i, /\bagentes storage\b/i],
+    en: [
+      /\bour storage\b/i,
+      /\bwe're on it\b/i,
+      /\balways on\b/i,
+      /\bday and night\b/i,
+      /\bagentes(\.chat)? storage\b/i,
+    ],
     "pt-BR": [
       /\bnosso armazenamento\b/i,
       /\bestamos cuidando\b/i,
@@ -221,6 +227,8 @@ export const ANYWHERE: readonly string[] = [
   "desktop.connect.",
   "desktop.link.",
   "desktop.servers.",
+  // The desktop app's workspaces by server: the line under a server that isn't agentes.chat, whichever server this is.
+  "shell.yourServer",
 ];
 
 /** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */

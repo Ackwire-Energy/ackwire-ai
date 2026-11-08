@@ -179,11 +179,21 @@ describe("the right hand's team setup tools", () => {
     expect(prompt).toContain(TEAM_INTERVIEW);
     expect(prompt).toContain("ONE propose_team card");
     expect(prompt).toContain("One thing at a time");
-    // With no team, nothing else is raised over the interview.
-    expect(prompt).toContain("build the first team with them");
+    // The owner's first-run card shows the setup: no gap is raised over it (ADR 0155 §6).
+    expect(prompt).toContain("The checklist card at the top of your DM");
+    expect(prompt).not.toContain("build the first team with them");
     expect(prompt).not.toContain("offer_invites).");
     expect(prompt).not.toContain("No computer is ready");
     expect(prompt).not.toContain("offer one the team needs");
+    // Without the card (a workspace that had a team before it): with no team, the interview first, nothing else.
+    await f.db.update(schema.agents).set({ setup: null }).where(eq(schema.agents.id, lodi.id));
+    const bare = await rightHandPrompt(
+      { db: f.db },
+      { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true },
+    );
+    expect(bare).toContain("build the first team with them");
+    expect(bare).not.toContain("offer_invites).");
+    expect(bare).not.toContain("No computer is ready");
   });
 
   test("with a team too: asked to build or redo it in its DM, it runs the interview", async () => {
@@ -436,15 +446,23 @@ describe("team templates", () => {
     expect(en.find((t) => t.id === "software")?.team.agents[0]?.channel).toBe("support");
   });
 
-  test("Usar este modelo posts its card and the first question to fit it, in the person's DM with Lodi", async () => {
+  test("Criar o time makes the template's team in one call: its card reads created, with no question after", async () => {
     f = await setup({ rightHand: true });
-    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
+    // What the conversation hears: the card once, already made, so no other device shows it open for a moment.
+    const heard: { type: string; message?: { meta: Record<string, unknown> } }[] = [];
+    const pubsub = { ...f.pubsub, publish: async (_topic: string, e: unknown) => void heard.push(e as never) };
+    const used = await useTeamTemplate({ db: f.db, pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
+    expect(used).toMatchObject({ state: "created", error: null });
+    const announced = heard.filter((e) => e.type === "message.created");
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.message?.meta.actionCard).toMatchObject({ state: "created" });
     const card = await cardOf(f, used.messageId);
     expect(card.params.template).toBe("clinic");
+    expect(card.state).toBe("created");
     expect(card.params.agents.map((a) => a.name)).toEqual(["Nina", "Caio", "Iara"]);
+    expect(card.created?.agentIds).toHaveLength(3);
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, used.channelId));
-    const question = rows.find((m) => m.meta.replyChips);
-    expect(question?.meta.replyChips).toEqual({ choices: [], multiple: false, step: 1, of: 2 });
-    expect(question?.body).toContain("Clínica ou consultório");
+    expect(rows.some((m) => m.meta.replyChips)).toBe(false);
+    expect(rows.filter((m) => m.authorType === "agent")).toHaveLength(1);
   });
 });

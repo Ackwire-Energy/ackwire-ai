@@ -86,7 +86,25 @@ export function sessionCookieScript(cookie: string, server: string): string {
   return `${sets.join("")}true;`;
 }
 
-type PageCalls = {
+/**
+ * What the app answers a page event with: the session cookie again, set in the page's own document, before each time
+ * its socket may open (`ready` comes before the app's first `set`, `changed` before the page opens again after a
+ * close). On Android the start script runs at `onPageStarted`, which may still be the document before this one, and
+ * any `incognito` WebView mounting clears every WebView's cookies, so the start script's cookie can't be counted on
+ * there: the socket opened with no session and the screen stayed on opening.
+ */
+export const sessionAnswer = (event: ScreenEvent, cookie: string, server: string): string | null =>
+  event.type === "ready" || event.type === "changed" ? sessionCookieScript(cookie, server) : null;
+
+/**
+ * Whether the agent's screen waits on something that may never come, so past its time it says it can't be shown and is
+ * reported: opening while the app is in front (its state never came, or its socket never opened) or a switch the stream
+ * never takes.
+ */
+export const screenWaits = (s: { active: boolean; shown: DesktopViewState; switching: boolean }) =>
+  s.active && (s.shown === "connecting" || (s.shown === "live" && s.switching));
+
+export type PageCalls = {
   set: [{ connect: boolean; mode: DesktopMode }];
   retry: [];
   pointer: [x: number, y: number, buttons: number];
@@ -97,6 +115,18 @@ type PageCalls = {
 /** A call on the page, for `injectJavaScript`. JSON keeps whatever a person typed a value, never code. */
 export const screenCall = <K extends keyof PageCalls>(method: K, ...args: PageCalls[K]) =>
   `window.agentScreen?.${method}(${args.map((a) => JSON.stringify(a)).join(",")});true;`;
+
+/**
+ * A call on the page as the app sends it: one the page may open its socket on at once (`set`, `retry`) has the session
+ * set just before it, since another WebView mounting meanwhile (a browser card's) may have cleared it (`sessionAnswer`).
+ */
+export const pageCall = <K extends keyof PageCalls>(
+  session: { cookie: string; server: string },
+  method: K,
+  ...args: PageCalls[K]
+) =>
+  (method === "set" || method === "retry" ? sessionCookieScript(session.cookie, session.server) : "") +
+  screenCall(method, ...args);
 
 /** The keys a phone keyboard lacks, on the row over it while typing on the screen (`SCREEN_KEYS` on the page). */
 export const SCREEN_ROW_KEYS = ["Escape", "Tab", "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight"] as const;

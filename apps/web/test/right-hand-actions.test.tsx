@@ -28,9 +28,12 @@ afterEach(() => {
 
 const DM = `dm-${LODI_ID}`;
 
-const withLodiCard = (state: FakeState, actionCard: Record<string, unknown>, id = "m-card") => {
-  withRightHand(state);
-  seedDm(state, { type: "agent", id: LODI_ID });
+/** A card of Lodi's in its DM, `ago` ms old. A second card joins the same DM: Lodi and the DM are seeded once. */
+const withLodiCard = (state: FakeState, actionCard: Record<string, unknown>, id = "m-card", ago = 60_000) => {
+  if (!state.agents.some((a) => a.id === LODI_ID)) {
+    withRightHand(state);
+    seedDm(state, { type: "agent", id: LODI_ID });
+  }
   const message: Message = {
     id,
     channelId: DM,
@@ -40,7 +43,7 @@ const withLodiCard = (state: FakeState, actionCard: Record<string, unknown>, id 
     mentionedAgentIds: [],
     agentRunId: `r-${id}`,
     meta: { actionCard },
-    createdAt: new Date(Date.now() - 60_000).toISOString(),
+    createdAt: new Date(Date.now() - ago).toISOString(),
   };
   state.messages.push(message);
   return state;
@@ -155,6 +158,8 @@ describe("opening a screen", () => {
         params: { page: "agent", agentId: ADA_ID, why: "As instruções dela." },
       },
       "m-ada",
+      // A minute older than the delete card: by a clock alone the two can fall in the same millisecond or not.
+      120_000,
     );
     const { router } = await go(state);
     const text = document.body.textContent ?? "";

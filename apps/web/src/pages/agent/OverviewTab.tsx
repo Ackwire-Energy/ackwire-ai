@@ -5,6 +5,7 @@ import { excerpt } from "@agenteschat/client/lib/text";
 import { Button, Card, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { AgentSetupCard } from "@/components/AgentSetup";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { CardHead, useAgentEdit } from "./context";
@@ -38,15 +39,17 @@ export function OverviewTab() {
   return (
     <>
       <ReadOnlyNote />
+      {/* A new agent's checklist (ADR 0155 §2), while something is left. */}
+      <AgentSetupCard agent={agent} place="profile" />
       <div className="agp-overview">
         {(approvals > 0 || pending.length > 0) && (
           <div className="agp-attns">
             {approvals > 0 && (
-              <div className="agp-attn ac-faceline">
+              <div className="agp-attn ac-faceline ac-actrow">
                 <span className="agp-ib agp-ib--warn">
                   <Icon name="lock" size={16} />
                 </span>
-                <span className="agp-attn__t">
+                <span className="agp-attn__t ac-actrow__text">
                   <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
                   <span>{decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}</span>
                 </span>
@@ -60,11 +63,11 @@ export function OverviewTab() {
               </div>
             )}
             {pending.map((p) => (
-              <div key={p.id} className="agp-attn ac-faceline">
+              <div key={p.id} className="agp-attn ac-faceline ac-actrow">
                 <span className="agp-ib agp-ib--warn">
                   <Icon name="document" size={16} />
                 </span>
-                <span className="agp-attn__t">
+                <span className="agp-attn__t ac-actrow__text">
                   <b className="ac-captop">{t("agentPage.overview.proposes", g)}</b>
                   <span>
                     {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}

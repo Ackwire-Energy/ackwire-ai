@@ -210,7 +210,7 @@ function CheckRow({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <div className="settings-row rh-check">
+    <div className="settings-row ac-actrow rh-check">
       <Checkbox
         id={id}
         checked={checked}
@@ -218,7 +218,7 @@ function CheckRow({
         onCheckedChange={onChange}
         aria-describedby={`${id}-help`}
       />
-      <span className="settings-row__text">
+      <span className="settings-row__text ac-actrow__text">
         <label className="settings-row__label" htmlFor={id}>
           {label}
         </label>
@@ -293,8 +293,8 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
             disabled={!view.mayDecide.agentChanges}
             onChange={(agentChanges) => save({ agentChanges })}
           />
-          <div className="settings-row">
-            <span className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <span className="settings-row__text ac-actrow__text">
               <label className="settings-row__label" htmlFor="rh-budget">
                 {t("rightHandApprovals.budget")}
               </label>
@@ -316,8 +316,8 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
               <span className="muted">{t("rightHandApprovals.perMonth")}</span>
             </span>
           </div>
-          <div className="settings-row rh-guidance">
-            <span className="settings-row__text">
+          <div className="settings-row ac-actrow rh-guidance">
+            <span className="settings-row__text ac-actrow__text">
               <label className="settings-row__label" htmlFor="rh-guidance">
                 {t("rightHandApprovals.guidanceLabel", { name })}
               </label>

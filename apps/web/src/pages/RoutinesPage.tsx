@@ -887,13 +887,15 @@ function RoutineRow({
           {title}
         </button>
         <span className="routine-row__sub">
-          <Icon name={targetIcon(r.target)} size={14} />
-          <span>
-            {widget
-              ? t("routines.widgetLine", { agent: actors.name(agent) })
-              : r.target.type === "conversation"
-                ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
-                : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
+          <span className="routine-row__to ac-iconline">
+            <Icon name={targetIcon(r.target)} size={14} />
+            <span>
+              {widget
+                ? t("routines.widgetLine", { agent: actors.name(agent) })
+                : r.target.type === "conversation"
+                  ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
+                  : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
+            </span>
           </span>
           {widget && (
             <Chip icon="grid" className="routine-row__chip">

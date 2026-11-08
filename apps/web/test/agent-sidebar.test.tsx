@@ -81,11 +81,19 @@ const openDm = async ({ state = seedState(), desktop, forbidden, agentId = ADA_I
 };
 
 describe("the computer section", () => {
-  test("a computer with nothing to show gets its one line, no empty picture", async () => {
+  test("a computer with nothing to show gets its one line saying why, the way to it, and no empty picture", async () => {
     widthIs(DM_SIDE_WIDE_QUERY);
     await openDm({ desktop: { available: false, reason: "desktop_unavailable", running: false } });
-    expect(side()?.textContent).toContain("Não dá para mostrar agora");
+    const computer = section("Computador") as HTMLElement;
+    expect(computer.textContent).toContain("O Box ainda não mostra telas");
+    expect(computer.textContent).not.toContain("Não dá para mostrar agora");
     expect(side()?.querySelector(".dm-side__noscreen")).toBeNull();
+    // The way out: its computer, whose cover says what to do there and tries again.
+    await act(async () => fireEvent.click(within(computer).getByRole("button", { name: "Abrir" })));
+    await settle(6);
+    const dialog = screen().getByRole("dialog");
+    expect(dialog.textContent).toContain("O Box ainda não mostra telas");
+    expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
   });
 });
 

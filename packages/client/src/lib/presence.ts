@@ -181,6 +181,14 @@ export function agentStatusShort(
   return { emoji: null, text: [t(`presence.agent.${line.kind}Short`), back].filter(Boolean).join(" · ") };
 }
 
-/** An agent's presence as the apps draw it: no AI to think with reads as offline (ADR 0084 §3). */
-export const agentPresenceShown = (status: AgentStatus | undefined, hasAi: boolean): AgentPresence =>
-  !hasAi ? "offline" : (status?.presence ?? "away");
+/**
+ * An agent's presence as the apps draw it: no AI to think with reads as offline (ADR 0084 §3). At work it is online
+ * (busy on heavy work) whatever this person reads of its AI, which for the right hand is their own, and before the
+ * list says it: `working` is a run of its this app hears. Held by the server's operators, it stays offline.
+ */
+export function agentPresenceShown(status: AgentStatus | undefined, hasAi: boolean, working = false): AgentPresence {
+  const presence = status?.presence ?? "away";
+  if (presence === "offline") return "offline";
+  if (working || status?.working) return presence === "busy" ? "busy" : "online";
+  return hasAi ? presence : "offline";
+}

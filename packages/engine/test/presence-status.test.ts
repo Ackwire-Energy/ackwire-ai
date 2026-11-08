@@ -136,10 +136,11 @@ const presenceOf = async (fx: Fixture, now = new Date()) =>
 
 test("an agent's presence follows its work: busy on long or background work, away idle, offline held", async () => {
   f = await setup();
-  expect((await presenceOf(f))?.presence).toBe("away");
+  expect(await presenceOf(f)).toMatchObject({ presence: "away", working: false });
 
   const run = await runOf(f);
-  expect((await presenceOf(f))?.presence).toBe("online");
+  // At work: the apps draw it so whatever its AI reads as for the one looking (the right hand's is each person's own).
+  expect(await presenceOf(f)).toMatchObject({ presence: "online", working: true });
   // Going for over 2 minutes with a live worker (fresh heartbeat): heavy work.
   await f.db
     .update(schema.agentRuns)
@@ -148,7 +149,7 @@ test("an agent's presence follows its work: busy on long or background work, awa
   expect((await presenceOf(f))?.presence).toBe("busy");
 
   await finish(f, run.id);
-  expect((await presenceOf(f))?.presence).toBe("online");
+  expect(await presenceOf(f)).toMatchObject({ presence: "online", working: false });
   expect((await presenceOf(f, new Date(Date.now() + AGENT_AWAY_AFTER_MS + 1000)))?.presence).toBe("away");
 
   await runOf(f, { background: true });
@@ -219,7 +220,11 @@ test("a waiting run says what it waits on, and keeps the agent online, not busy"
   f = await setup();
   const run = await runOf(f, { status: "waiting_approval" });
   await startRunStatus({ db: f.db }, run, [{ key: "c0", kind: "channel", subject: "general", text: "x" }], null);
-  expect(await presenceOf(f)).toMatchObject({ presence: "online", status: { by: "wait", kind: "waiting_approval" } });
+  expect(await presenceOf(f)).toMatchObject({
+    presence: "online",
+    working: false,
+    status: { by: "wait", kind: "waiting_approval" },
+  });
 });
 
 test("a run in line for room on its computer says so, not that the computer is gone", async () => {

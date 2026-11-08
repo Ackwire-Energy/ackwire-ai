@@ -152,7 +152,7 @@ export function ChatLookSettings() {
       <div className="settings-rows">
         <div className="chat-look__group">
           <div className="chat-look__top">
-            <span className="settings-row__text">
+            <span className="settings-row__text ac-actrow__text">
               <span className="settings-row__label">{t("settings.account.chat.density")}</span>
               <span className="settings-row__help">{t("settings.account.chat.densityHelp")}</span>
             </span>
@@ -185,8 +185,8 @@ export function ChatLookSettings() {
           </RadioGroup>
         </div>
         {style === "bubbles" && (
-          <div className="settings-row">
-            <span className="settings-row__text">
+          <div className="settings-row ac-actrow">
+            <span className="settings-row__text ac-actrow__text">
               <span className="settings-row__label">
                 {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
               </span>
@@ -209,7 +209,7 @@ export function ChatLookSettings() {
           </div>
         )}
         <div className="chat-look__group">
-          <span className="settings-row__text">
+          <span className="settings-row__text ac-actrow__text">
             <span className="settings-row__label">{t("settings.account.chat.openAt")}</span>
           </span>
           <RadioGroup

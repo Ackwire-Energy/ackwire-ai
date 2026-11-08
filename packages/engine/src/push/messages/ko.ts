@@ -76,4 +76,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedBody: "계속할 수 있어요.",
   usageRefusedTitle: (a) => `${a} 님이 사용량 추가 요청을 거절했어요`,
   teamWeekReady: "팀의 한 주 정리가 준비됐어요",
+  teamDayReady: "오늘의 정리가 준비됐어요",
 };
