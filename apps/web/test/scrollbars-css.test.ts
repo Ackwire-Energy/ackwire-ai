@@ -70,7 +70,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".ac-seg": "strip",
   ".ac-composer__format": "strip",
   ".ac-toolbar__filters": "strip",
-  ".ac-toolbar__filters>.ac-filterbar": "strip",
+  ".ac-toolbar[data-stack]>.ac-toolbar__filters": "strip",
   ".ac-carousel__track": "strip",
   ".dk-orgpick": "strip",
   ".wiki-doc .wiki-editor__bar": "strip",

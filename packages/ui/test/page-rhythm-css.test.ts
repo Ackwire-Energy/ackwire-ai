@@ -111,3 +111,45 @@ describe("one menu rhythm", () => {
     );
   });
 });
+
+describe("the toolbar", () => {
+  test("from 761px a page's toolbar keeps one row: the search giving way down to 160, the rest at the end", () => {
+    const wide = media("(min-width: 761px)");
+    expect(body(".ac-toolbar:has(> .ac-toolbar__search):not([data-stack])", wide)).toContain("flex-wrap: nowrap;");
+    expect(body(".ac-toolbar > .ac-toolbar__search", wide)).toContain("min-width: 160px;");
+    expect(body(".ac-toolbar__search")).toContain("flex: 0 1 280px;");
+    expect(body(".ac-toolbar > .ac-toolbar__search + *", wide)).toContain("margin-left: auto;");
+    expect(body(".ac-toolbar > .ac-toolbar__search + .ac-toolbar__filters + .ac-toolbar__actions", wide)).toContain(
+      "margin-left: 0;",
+    );
+    expect(body(".ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) > .ac-toolbar__filters", wide)).toContain(
+      "flex: none;",
+    );
+  });
+
+  test("two rows on a phone and when one doesn't fit: the search and the actions, then the filters in one scroller", () => {
+    const phone = media("(max-width: 760px)");
+    expect(body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions", phone)).toContain("order: 1;");
+    expect(body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters", phone)).toContain("order: 2;");
+    expect(body(".ac-toolbar[data-stack] > .ac-toolbar__actions")).toContain("order: 1;");
+    const stacked = body(".ac-toolbar[data-stack] > .ac-toolbar__filters");
+    expect(stacked).toContain("order: 2;");
+    expect(stacked).toContain("flex: 1 1 100%;");
+    expect(stacked).toContain("overflow-x: auto;");
+    // The filter bar inside the row doesn't scroll on its own, so the row's 4px keep its controls' rings whole.
+    expect(kit).not.toMatch(/\.ac-filterbar[^{}]*\{[^}]*overflow-x: auto/);
+    expect(body(".ac-toolbar__filters", phone)).toContain("padding: 2px 4px;");
+  });
+
+  test("an empty search field gives the hidden hint's room back to its words", () => {
+    expect(
+      body(".ac-searchfield:not(:has(> .ac-searchfield__clear, > .ac-searchfield__hint)) .ac-searchfield__input"),
+    ).toContain("padding-right: var(--control-px-sm);");
+    expect(
+      body(
+        ".ac-searchfield:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input",
+        media("(max-width: 760px), (pointer: coarse)"),
+      ),
+    ).toContain("padding-right: var(--control-px-sm);");
+  });
+});

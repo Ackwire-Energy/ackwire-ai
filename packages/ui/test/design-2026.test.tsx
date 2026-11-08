@@ -313,7 +313,9 @@ describe("list toolbars", () => {
     expect(rule(".ac-filtertoggle")).toContain("background: var(--field-bg)");
     expect(rule('.ac-filtertoggle[aria-pressed="true"]')).toContain("background: var(--ink)");
     expect(rule(".ac-filter--active")).toContain("background: var(--ink)");
-    expect(css).toMatch(/\.ac-toolbar__search \{\s*flex: 1 1 100%;/);
+    // A phone's toolbar: the search fills its row beside the actions, the filters under them scroll sideways.
+    expect(css).toMatch(/\.ac-toolbar > \.ac-toolbar__search \{\s*flex: 1 1 0;/);
+    expect(css).toMatch(/\.ac-toolbar__filters \{\s*max-width: calc\(100% \+ 8px\);[^}]*overflow-x: auto;/);
   });
 
   test("one height: the search, the toggles and the chips all read --tool-h, so a row lines up", async () => {

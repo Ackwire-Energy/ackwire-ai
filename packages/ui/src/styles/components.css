@@ -8935,31 +8935,97 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   font-size: var(--control-fs-sm);
   border-radius: var(--tool-r);
 }
+/*
+ * A page's toolbar (one with a search) keeps one row from 761px: the search on the left gives way first (280 down to
+ * 160), every other control sits at the end, 8 apart. When even that can't fit, Toolbar sets `data-stack` and it takes
+ * the phone's two rows. A toolbar without a search wraps.
+ */
+@media (min-width: 761px) {
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) {
+    flex-wrap: nowrap;
+  }
+  .ac-toolbar > .ac-toolbar__search {
+    min-width: 160px;
+  }
+  .ac-toolbar > .ac-toolbar__search + * {
+    margin-left: auto;
+  }
+  .ac-toolbar > .ac-toolbar__search + .ac-toolbar__filters + .ac-toolbar__actions {
+    margin-left: 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) > .ac-toolbar__filters,
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) > .ac-toolbar__filters > .ac-filterbar {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions {
+    flex: none;
+  }
+}
+/*
+ * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
+ * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
+ * and its 4px of room keep the controls' rings whole.
+ */
 @media (max-width: 760px) {
-  /* Phone: the search takes the line; the filters scroll sideways in one row. */
-  .ac-toolbar__search {
+  .ac-toolbar > .ac-toolbar__search {
+    flex: 1 1 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions {
+    order: 1;
+    margin-left: 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
+    order: 2;
     flex: 1 1 100%;
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
     flex-wrap: nowrap;
-    max-width: 100%;
+  }
+  .ac-toolbar__filters {
+    max-width: calc(100% + 8px);
+    margin: 0 -4px;
+    padding: 2px 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
   }
-  .ac-toolbar__filters {
-    margin: 0 -4px;
-    padding: 2px 4px;
-  }
-  .ac-toolbar__filters::-webkit-scrollbar,
-  .ac-toolbar__filters > .ac-filterbar::-webkit-scrollbar {
+  .ac-toolbar__filters::-webkit-scrollbar {
     display: none;
   }
   .ac-toolbar__filters > *,
   .ac-toolbar__filters > .ac-filterbar > * {
     flex: none;
   }
+}
+.ac-toolbar[data-stack] > .ac-toolbar__search {
+  flex: 1 1 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__actions {
+  order: 1;
+  margin-left: 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters {
+  order: 2;
+  flex: 1 1 100%;
+  flex-wrap: nowrap;
+  max-width: calc(100% + 8px);
+  margin: 0 -4px;
+  padding: 2px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters::-webkit-scrollbar {
+  display: none;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-filterbar {
+  flex-wrap: nowrap;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > *,
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-filterbar > * {
+  flex: none;
 }
 
 .ac-searchfield {
@@ -9035,6 +9101,16 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-toolbar .ac-searchfield__input {
   padding-left: 34px;
   font-size: var(--control-fs-sm);
+}
+/* The end's room is the × or the "/" hint's: while neither shows, the words take it ("Buscar arquivos" whole at 320). */
+.ac-searchfield:not(:has(> .ac-searchfield__clear, > .ac-searchfield__hint)) .ac-searchfield__input,
+.ac-searchfield:focus-within:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
+  padding-right: var(--control-px-sm);
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .ac-searchfield:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
+    padding-right: var(--control-px-sm);
+  }
 }
 .ac-toolbar .ac-searchfield__icon,
 .ac-searchfield--sm .ac-searchfield__icon {
