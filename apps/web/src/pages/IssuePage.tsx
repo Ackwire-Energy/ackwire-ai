@@ -43,6 +43,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { renderIdRef } from "@/chat/IdRef";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -404,7 +405,7 @@ function IssueDescription({ issue: i, hasFiles, onSaved }: { issue: Issue; hasFi
     <EditInPlace label={t("issues.edit.description")} onEdit={() => setDraft(description)}>
       {description ? (
         <div className="issue-description">
-          <Markdown source={description} variant="message" wikiLink={wikiLink} />
+          <Markdown source={description} variant="message" wikiLink={wikiLink} idRef={renderIdRef} />
         </div>
       ) : (
         // With the files it was created with and no text, the files say it all; the pencil still opens the box.

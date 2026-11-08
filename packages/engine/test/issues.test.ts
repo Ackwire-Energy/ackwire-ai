@@ -603,7 +603,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const run = (name: string, input: Record<string, unknown>) => {
       const tool = tools.find((t) => t.name === name);
       if (!tool) throw new Error(`no ${name}`);
@@ -681,7 +681,7 @@ describe("issues", () => {
     };
     await createIssue(deps, person(f.owner.id), f.org.id, { title: "Com prazo", dueDate: "2026-10-20" });
     await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem prazo" });
-    const list = (await createIssueToolSource(deps).tools(ctx)).find((t) => t.name === "list_issues");
+    const list = (await createIssueToolSource(f.artifactDeps).tools(ctx)).find((t) => t.name === "list_issues");
     const { content } = (await list?.execute({}, ctx)) ?? { content: "" };
     expect(content).toContain("Com prazo due 2026-10-20 id=");
     expect(content).toMatch(/Sem prazo id=/);
@@ -699,7 +699,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const update = tools.find((t) => t.name === "update_issue");
     if (!update) throw new Error("no update_issue");
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Corrigir o login" });
@@ -734,7 +734,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const tool = (name: string) => {
       const found = tools.find((t) => t.name === name);
       if (!found) throw new Error(name);

@@ -31,7 +31,7 @@ import {
 import { cutText } from "./format";
 import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
-import { getMessage, insertMessage, type MessageView, messageView, postPersonMessage } from "./messages";
+import { fileIdsOf, getMessage, insertMessage, type MessageView, messageView, postPersonMessage } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
 import { notifyIssueChanged } from "./notification-producers";
 import { can, getMembership, requireActiveMembership } from "./organizations";
@@ -710,13 +710,21 @@ const activityView = (a: typeof issueActivity.$inferSelect): IssueActivityView =
 function eventDetail(event: string | null, data: Record<string, unknown>) {
   const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : null);
   const out = (textCode: string, textParams: Record<string, string> = {}) => ({ textCode, textParams });
+  const titles = (list: unknown) =>
+    (Array.isArray(list) ? (list as { title?: unknown }[]) : [])
+      .flatMap((f) => (typeof f?.title === "string" ? [f.title] : []))
+      .join(", ");
   switch (event) {
     case "created":
     case "renamed":
     case "description_changed":
     case "criteria_changed":
-    case "artifact_linked":
       return out(event);
+    // By name; an older row says "attached a file".
+    case "artifact_linked":
+      return titles(data.attachments) ? out("files_attached", { names: titles(data.attachments) }) : out(event);
+    case "artifact_unlinked":
+      return titles(data.files) ? out("files_removed", { names: titles(data.files) }) : {};
     case "status_changed":
       return s(data.to) ? out(event, { status: s(data.to) as string }) : {};
     case "priority_changed":
@@ -797,6 +805,12 @@ export async function createIssue(
     parentIssueId?: string | null;
     /** Drive files uploaded from the new-issue box: linked to the issue and kept on its "created" event. */
     attachmentIds?: string[];
+    /**
+     * Files the caller checked and placed where whoever sees the task reads them: an agent's, brought by its tool
+     * (`bringFiles` in `issue-tools.ts`), or the message's own turned into the task. Linked and kept on its "created"
+     * event like a box's, but never moved: one in the shared Drive stays everyone's.
+     */
+    linkFileIds?: string[];
     /** Who sees it (ADR 0151); left out, where it's made decides. A step always follows its parent. */
     audience?: Audience;
   },
@@ -806,7 +820,8 @@ export async function createIssue(
   if (membership && !can(membership, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, 300);
   if (!title) throw new ValidationError("title is required");
-  const files = await ownFiles(db, actor, orgId, input.attachmentIds);
+  const uploaded = await ownFiles(db, actor, orgId, input.attachmentIds);
+  const files = await withLinked(db, orgId, uploaded, input.linkFileIds);
   if (input.priority && !PRIORITIES.includes(input.priority)) throw new ValidationError("invalid priority");
   const criteria = (input.criteria ?? [])
     .map((text) => text.trim().slice(0, 500))
@@ -887,7 +902,7 @@ export async function createIssue(
     deps,
     actor,
     row,
-    files.map((f) => f.id),
+    uploaded.map((f) => f.id),
   );
   const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps, orgId, view, "issue.created");
@@ -1046,7 +1061,13 @@ export async function updateIssue(
   actor: IssueActor,
   orgId: string,
   issueId: string,
-  patch: IssuePatch & { addPullRequest?: { number: number; url: string }; addArtifactId?: string },
+  patch: IssuePatch & {
+    addPullRequest?: { number: number; url: string };
+    /** Files to link, checked by the caller like `createIssue`'s `linkFileIds` (an agent's; Refazer). */
+    addFiles?: string[];
+    /** Files to unlink: Desfazer on an agent's attach. */
+    removeFiles?: string[];
+  },
 ): Promise<IssueView> {
   const { db } = deps;
   const current = await findVisible(db, actor, orgId, { id: issueId });
@@ -1149,9 +1170,28 @@ export async function updateIssue(
       data: { from: current.status, to: "in_review", auto: true },
     });
   }
-  if (patch.addArtifactId && !current.artifactIds.includes(patch.addArtifactId)) {
-    set.artifactIds = [...current.artifactIds, patch.addArtifactId];
-    events.push({ text: "attached a file", event: "artifact_linked", data: { artifactId: patch.addArtifactId } });
+  const added = await liveFiles(
+    db,
+    orgId,
+    [...new Set(patch.addFiles ?? [])].filter((id) => !current.artifactIds.includes(id)),
+  );
+  const removed = (patch.removeFiles ?? []).filter((id) => current.artifactIds.includes(id));
+  if (added.length || removed.length) {
+    set.artifactIds = [...current.artifactIds.filter((id) => !removed.includes(id)), ...added.map((f) => f.id)];
+    // Kept apart from `attachments`, which the task's Anexos list.
+    const files = removed.length ? await liveFiles(db, orgId, removed) : [];
+    if (added.length)
+      events.push({
+        text: added.length === 1 ? "attached a file" : `attached ${added.length} files`,
+        event: "artifact_linked",
+        data: { attachments: added },
+      });
+    if (removed.length)
+      events.push({
+        text: removed.length === 1 ? "removed a file" : `removed ${removed.length} files`,
+        event: "artifact_unlinked",
+        data: { artifactIds: removed, files },
+      });
   }
   const row = await db.transaction(async (tx) => {
     const [updated] = await tx.update(issues).set(set).where(eq(issues.id, current.id)).returning();
@@ -1290,8 +1330,21 @@ export async function listIssueActivity(db: Database, actor: IssueActor, orgId: 
  */
 async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachmentIds: string[] | undefined) {
   const ids = [...new Set(attachmentIds ?? [])].slice(0, 10);
+  const files = await liveFiles(db, orgId, ids, actorOf(actor));
+  if (files.length !== ids.length) throw new ValidationError("An attached file does not exist");
+  return files;
+}
+
+/** `files` and, after them, the live ones of `linkFileIds` (checked by the caller), each once. */
+async function withLinked(db: Executor, orgId: string, files: { id: string; title: string }[], linkFileIds?: string[]) {
+  const ids = [...new Set(linkFileIds ?? [])].filter((id) => !files.some((f) => f.id === id));
+  return [...files, ...(await liveFiles(db, orgId, ids))];
+}
+
+/** These files of the org not in the trash, in the order given; `by`: only the ones it uploaded. */
+async function liveFiles(db: Executor, orgId: string, ids: string[], by: WorkActor | null = null) {
   if (ids.length === 0) return [];
-  const files = await db
+  const rows = await db
     .select({ id: artifacts.id, title: artifacts.title })
     .from(artifacts)
     .where(
@@ -1299,13 +1352,10 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
         eq(artifacts.orgId, orgId),
         inArray(artifacts.id, ids),
         isNull(artifacts.deletedAt),
-        eq(artifacts.createdByType, actorOf(actor).type),
-        eq(artifacts.createdById, actorOf(actor).id),
+        ...(by ? [eq(artifacts.createdByType, by.type), eq(artifacts.createdById, by.id)] : []),
       ),
     );
-  if (files.length !== ids.length) throw new ValidationError("An attached file does not exist");
-  // In the order they were attached.
-  return ids.flatMap((id) => files.filter((f) => f.id === id));
+  return ids.flatMap((id) => rows.filter((f) => f.id === id));
 }
 
 /**
@@ -1351,12 +1401,15 @@ export async function commentIssue(
   orgId: string,
   issueId: string,
   text: string,
-  options: { attachmentIds?: string[] } = {},
+  /** `linkFileIds`: as `createIssue`'s. */
+  options: { attachmentIds?: string[]; linkFileIds?: string[] } = {},
 ): Promise<IssueActivityView> {
   const body = text.trim().slice(0, 20_000);
-  if (!body && (options.attachmentIds ?? []).length === 0) throw new ValidationError("Comment is empty");
+  if (!body && (options.attachmentIds ?? []).length + (options.linkFileIds ?? []).length === 0)
+    throw new ValidationError("Comment is empty");
   const issue = await findVisible(deps.db, actor, orgId, { id: issueId });
-  const files = await ownFiles(deps.db, actor, orgId, options.attachmentIds);
+  const uploaded = await ownFiles(deps.db, actor, orgId, options.attachmentIds);
+  const files = await withLinked(deps.db, orgId, uploaded, options.linkFileIds);
   const conversation = await ensureTaskConversation(deps.db, issue.id);
   const message = await postInConversation(
     deps,
@@ -1370,7 +1423,7 @@ export async function commentIssue(
     deps,
     actor,
     issue,
-    files.map((f) => f.id),
+    uploaded.map((f) => f.id),
   );
   const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
   await deps.db
@@ -1440,8 +1493,7 @@ export async function announceTaskConversation(deps: IssueDeps, orgId: string, m
     .from(issues)
     .where(and(eq(issues.orgId, orgId), eq(issues.conversationChannelId, message.channelId)));
   if (!issue) return;
-  const attached = Array.isArray(message.meta.artifacts) ? (message.meta.artifacts as { id?: unknown }[]) : [];
-  const files = attached.flatMap((f) => (typeof f.id === "string" && !issue.artifactIds.includes(f.id) ? [f.id] : []));
+  const files = fileIdsOf(message.meta).filter((id) => !issue.artifactIds.includes(id));
   const row = files.length
     ? ((
         await deps.db
@@ -1469,7 +1521,10 @@ export async function openTaskConversation(
   return ensureTaskConversation(db, issue.id);
 }
 
-/** "Turn into issue": a message becomes an issue that keeps its channel's visibility. */
+/**
+ * "Turn into issue": a message becomes an issue that keeps its channel's visibility, with the message's files (they
+ * live where it was said, which the task's readers read).
+ */
 export async function issueFromMessage(
   deps: IssueDeps,
   userId: string,
@@ -1493,6 +1548,7 @@ export async function issueFromMessage(
     source: { type: "message", channelId: message.channelId, messageId: message.id },
     channelId: made.tiedTo,
     ...(made.scope?.restricted ? { audience: { mode: "people", userIds: made.scope.audienceUserIds } } : {}),
+    linkFileIds: fileIdsOf(message.meta),
   });
 }
 

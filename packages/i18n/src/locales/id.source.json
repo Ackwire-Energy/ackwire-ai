@@ -6499,6 +6499,9 @@
   "agentActions.issue.assigned_self": {
     "value": "Took <b>#{{number}}</b> myself · {{title}}"
   },
+  "agentActions.issue.files": {
+    "value": "Attached {{names}}"
+  },
   "agentActions.memory.saved": {
     "value": "Saved to <b>memory</b>: {{text}}"
   },
@@ -6609,6 +6612,9 @@
   },
   "agentActions.issueFields.criteria": {
     "value": "the criteria"
+  },
+  "agentActions.issueFields.files": {
+    "value": "the attachments"
   },
   "agentActions.routineFields.name": {
     "value": "the name"
@@ -15379,8 +15385,11 @@
   "issues.files.grid": {
     "value": "Grid"
   },
+  "issues.files.emptyTitle": {
+    "value": "This task's files live here"
+  },
   "issues.files.empty": {
-    "value": "No attachments yet. Drop files here or paste a screenshot."
+    "value": "Drop files here, paste a screenshot or send them in the task's conversation."
   },
   "issues.files.fromCreation": {
     "value": "At creation · {{when}}"
@@ -15453,6 +15462,12 @@
   },
   "issues.event.artifact_linked": {
     "value": "attached a file"
+  },
+  "issues.event.files_attached": {
+    "value": "attached {{names}}"
+  },
+  "issues.event.files_removed": {
+    "value": "removed {{names}} from the attachments"
   },
   "issues.event.criterion_checked": {
     "value": "checked the criterion \"{{text}}\""

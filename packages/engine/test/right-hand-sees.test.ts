@@ -107,7 +107,7 @@ describe("what it may use", () => {
     const names = (
       await gateway(
         createTeamStatusToolSource(),
-        createIssueToolSource({ db: f.db, pubsub: f.pubsub }),
+        createIssueToolSource(f.artifactDeps),
         createAskAgentToolSource({ pubsub: f.pubsub }),
         createFollowUpToolSource({ pubsub: f.pubsub }),
         createContextToolSource(f.context),
@@ -137,7 +137,7 @@ describe("what it may use", () => {
     f = await setup({ rightHand: true });
     const lodi = await lodiOf();
     const ctx = await lodiRun(f.owner.id, "cria uma tarefa da campanha de Natal pra Dev");
-    const out = await use([createIssueToolSource({ db: f.db, pubsub: f.pubsub })], ctx, "create_issue", {
+    const out = await use([createIssueToolSource(f.artifactDeps)], ctx, "create_issue", {
       title: "Campanha de Natal",
       assignee: "@dev",
     });
@@ -151,7 +151,7 @@ describe("what it may use", () => {
 });
 
 describe("tasks stay in the person's DM, and go no further than they could", () => {
-  const issueTools = () => [createIssueToolSource({ db: f.db, pubsub: f.pubsub })];
+  const issueTools = () => [createIssueToolSource(f.artifactDeps)];
 
   test("called in a channel it neither lists nor makes one: others read that reply", async () => {
     f = await setup({ rightHand: true });

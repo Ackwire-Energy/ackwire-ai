@@ -2581,7 +2581,8 @@
       "updated_status": "<b>#{{number}}</b>を{{status}}に移動しました · {{title}}",
       "updated_priority": "<b>#{{number}}</b>の優先度を{{priority}}にしました · {{title}}",
       "assigned": "<b>#{{number}}</b>を{{assignee}}に割り当てました · {{title}}",
-      "assigned_self": "<b>#{{number}}</b>を自分で引き受けました · {{title}}"
+      "assigned_self": "<b>#{{number}}</b>を自分で引き受けました · {{title}}",
+      "files": "{{names}}を添付しました"
     },
     "memory": {
       "saved": "<b>メモリ</b>に保存しました: {{text}}",
@@ -2636,7 +2637,8 @@
       "labels": "ラベル",
       "dueDate": "期日",
       "githubUrl": "GitHub リンク",
-      "criteria": "完了条件"
+      "criteria": "完了条件",
+      "files": "添付ファイル"
     },
     "routineFields": {
       "name": "名前",
@@ -6130,7 +6132,8 @@
       "add": "ファイルを追加",
       "addHint": "またはここにドロップ",
       "grid": "グリッド",
-      "empty": "まだ添付ファイルはありません。ここにファイルをドロップするか、スクリーンショットを貼り付けてください。",
+      "emptyTitle": "このタスクのファイルはここに集まります",
+      "empty": "ここにファイルをドロップするか、スクリーンショットを貼り付けるか、タスクの会話で送ってください。",
       "fromCreation": "作成時 · {{when}}",
       "fromComment": "{{name}}のコメント · {{when}}",
       "linked": "{{name}}がリンク"
@@ -6159,6 +6162,8 @@
       "github_linked": "GitHub にリンクしました",
       "github_unlinked": "GitHub リンクを削除しました",
       "artifact_linked": "ファイルを添付しました",
+      "files_attached": "{{names}}を添付しました",
+      "files_removed": "{{names}}を添付ファイルから外しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",
       "agent_asked": "{{name}}に作業を頼みました"

@@ -367,15 +367,7 @@ export function NewIssueDialog({
                     </li>
                   </ul>
                 </DetailsSection>
-                <DetailsSection
-                  title={t("issues.files.title")}
-                  count={files.items.length || undefined}
-                  actions={
-                    <Button size="sm" variant="ghost" icon="attach" onClick={pick}>
-                      {t("issues.files.add")}
-                    </Button>
-                  }
-                >
+                <DetailsSection title={t("issues.files.title")} count={files.items.length || undefined}>
                   <div className="issue-files__grid">
                     {files.items.map((f) => (
                       <PendingTile key={f.key} file={f} onRemove={() => files.remove(f.key)} />

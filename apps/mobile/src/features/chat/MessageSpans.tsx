@@ -16,6 +16,7 @@ import { ownLinkHref } from "../links/app-links";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
+import { IdRefText } from "./IdRefText";
 import { LinkPillText } from "./LinkPillText";
 import {
   type Block,
@@ -31,7 +32,8 @@ import { useRowLook } from "./look";
 import { MessageRefText } from "./MessageRefText";
 
 /**
- * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, @mentions, #channels), inside a Text. `channelRefs`: the
+ * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, an internal id as what it names,
+ * @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
 export function Spans({
@@ -104,6 +106,17 @@ export function Spans({
           }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
+          case "id": {
+            const shown = (
+              <RNText
+                key={key}
+                style={s.code ? [styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }] : undefined}
+              >
+                {s.text}
+              </RNText>
+            );
+            return live ? shown : <IdRefText key={key} id={s.id} shown={shown} />;
+          }
           case "mention": {
             const handle = s.text.slice(1);
             const all = everyone && isEveryoneWord(handle);

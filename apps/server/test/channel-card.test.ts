@@ -117,3 +117,37 @@ test("a message link's pill: where it is and who wrote it, only for who can see 
   expect(await hidden.text()).not.toContain("diretoria");
   expect((await api(`/messages/${closed}/card`)).status).toBe(200);
 });
+
+test("an id written in a text: what it names, only for who can see it, and nothing for an id that isn't ours", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const diretoria = (
+    (await (await api("/channels", { json: { name: "diretoria", visibility: "private" } })).json()) as {
+      id: string;
+    }
+  ).id;
+  const closed = (
+    (await (await api(`/channels/${diretoria}/messages`, { json: { body: "o orçamento" } })).json()) as {
+      id: string;
+    }
+  ).id;
+  const task = (await (await api("/issues", { json: { title: "Widget flutuante" } })).json()) as {
+    id: string;
+    number: number;
+  };
+  expect(await (await api(`/refs/${task.id}`)).json()).toEqual({
+    kind: "task",
+    id: task.id,
+    number: task.number,
+    title: "Widget flutuante",
+  });
+  expect(await (await api(`/refs/${closed}`)).json()).toMatchObject({ kind: "message", message: { id: closed } });
+  expect((await api(`/refs/${crypto.randomUUID()}`)).status).toBe(404);
+  const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const hidden = await member(`/api/app/organizations/${orgId}/refs/${closed}`);
+  expect(hidden.status).toBe(404);
+  expect(await hidden.text()).not.toContain("diretoria");
+});

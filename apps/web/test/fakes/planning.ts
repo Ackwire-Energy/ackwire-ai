@@ -623,15 +623,21 @@ export function createMockPlanning(
         return clone(i);
       },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
-      comment: async (orgId, id, text, attachmentIds) =>
-        clone(
-          await log(orgId, await findIssue(orgId, id), {
+      comment: async (orgId, id, text, attachmentIds) => {
+        const i = await findIssue(orgId, id);
+        const author = await me();
+        // As the server does: a comment's files are linked to the task (its Anexos).
+        for (const a of attachmentIds ?? [])
+          if (!i.artifacts.some((f) => f.id === a)) i.artifacts.push({ id: a, title: a, createdBy: author });
+        return clone(
+          await log(orgId, i, {
             kind: "comment",
-            author: await me(),
+            author,
             text: text.trim(),
             ...(attachmentIds?.length ? { attachments: attachmentIds.map((a) => ({ id: a, title: a })) } : {}),
           }),
-        ),
+        );
+      },
       askAgent: async (orgId, id, agentId) => {
         const i = await findIssue(orgId, id);
         i.assignee = { type: "agent", id: agentId };

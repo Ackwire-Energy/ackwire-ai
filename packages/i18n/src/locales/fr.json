@@ -2785,7 +2785,8 @@
       "updated_status": "A déplacé <b>#{{number}}</b> vers {{status}} · {{title}}",
       "updated_priority": "A mis <b>#{{number}}</b> en priorité {{priority}} · {{title}}",
       "assigned": "A assigné <b>#{{number}}</b> à {{assignee}} · {{title}}",
-      "assigned_self": "J'ai pris <b>#{{number}}</b> moi-même · {{title}}"
+      "assigned_self": "J'ai pris <b>#{{number}}</b> moi-même · {{title}}",
+      "files": "A joint {{names}}"
     },
     "memory": {
       "saved": "Enregistré dans la <b>mémoire</b> : {{text}}",
@@ -2840,7 +2841,8 @@
       "labels": "les étiquettes",
       "dueDate": "l'échéance",
       "githubUrl": "le lien GitHub",
-      "criteria": "les critères"
+      "criteria": "les critères",
+      "files": "les pièces jointes"
     },
     "routineFields": {
       "name": "le nom",
@@ -6603,7 +6605,8 @@
       "add": "Ajouter des fichiers",
       "addHint": "ou glissez-les ici",
       "grid": "Grille",
-      "empty": "Aucune pièce jointe pour l'instant. Glissez des fichiers ici ou collez une capture.",
+      "emptyTitle": "Les fichiers de la tâche se retrouvent ici",
+      "empty": "Glissez des fichiers ici, collez une capture ou envoyez-les dans la conversation de la tâche.",
       "fromCreation": "À la création · {{when}}",
       "fromComment": "Commentaire de {{name}} · {{when}}",
       "linked": "Lié par {{name}}"
@@ -6632,6 +6635,8 @@
       "github_linked": "l'a lié à GitHub",
       "github_unlinked": "a retiré le lien GitHub",
       "artifact_linked": "a joint un fichier",
+      "files_attached": "a joint {{names}}",
+      "files_removed": "a retiré {{names}} des pièces jointes",
       "criterion_checked": "a coché le critère « {{text}} »",
       "criterion_unchecked": "a décoché le critère « {{text}} »",
       "agent_asked": "a demandé à {{name}} de la faire"

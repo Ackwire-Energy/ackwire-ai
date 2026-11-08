@@ -82,6 +82,12 @@ export const routineOwnActions = (a: Pick<AgentAction, "kind" | "params">): stri
     ? a.params.ownActions.filter((v): v is string => typeof v === "string")
     : [];
 
+/** The files an agent's task change brought (its receipt's `files`: their names), for the line under its sentence. */
+export const receiptFiles = (a: Pick<AgentAction, "kind" | "params">): string[] =>
+  a.kind.startsWith("issue.") && Array.isArray(a.params.files)
+    ? a.params.files.filter((v): v is string => typeof v === "string")
+    : [];
+
 /**
  * The values (and i18next `context`) for `t(actionTextKey(a), …)`: issue
  * number and title, the changed fields in words, the assignee ("você" when it

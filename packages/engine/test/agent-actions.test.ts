@@ -117,7 +117,7 @@ describe("act with undo: issues", () => {
   test("create_issue leaves a receipt on the reply; undo cancels it, redo brings it back; notes reach the agent", async () => {
     f = await setup();
     const ctx = await runContext(f);
-    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    const call = await toolsOf([createIssueToolSource(f.artifactDeps)], ctx);
     const created = await call("create_issue", {
       title: "Prompt de avaliação após a assinatura",
       assignee: "me",
@@ -166,7 +166,7 @@ describe("act with undo: issues", () => {
   test("update_issue: priority, labels, due date and assignee are receipts; a person's edit since blocks undo", async () => {
     f = await setup();
     const ctx = await runContext(f);
-    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    const call = await toolsOf([createIssueToolSource(f.artifactDeps)], ctx);
     const issue = await createIssue(deps(f), person(f.owner.id), f.org.id, { title: "Login quebra" });
     await call("update_issue", { issue: "#1", priority: "high", labels: ["bug"], due_date: "2026-11-01" });
     await call("update_issue", { issue: "#1", assignee: "me" });
@@ -197,7 +197,7 @@ describe("act with undo: issues", () => {
   test("update_issue: an agent's GitHub link is a receipt, and undo takes it off", async () => {
     f = await setup();
     const ctx = await runContext(f);
-    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    const call = await toolsOf([createIssueToolSource(f.artifactDeps)], ctx);
     const issue = await createIssue(deps(f), person(f.owner.id), f.org.id, { title: "Login quebra" });
     await call("update_issue", { issue: "#1", github_url: "https://github.com/acme/app/pull/9" });
     const m = await reply(f, ctx);
@@ -211,7 +211,7 @@ describe("act with undo: issues", () => {
   test("create_issue: a person's reply in the task's conversation since blocks undo", async () => {
     f = await setup();
     const ctx = await runContext(f);
-    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    const call = await toolsOf([createIssueToolSource(f.artifactDeps)], ctx);
     await call("create_issue", { title: "Uma" });
     const m = await reply(f, ctx);
     const [created] = (await actionsFor(f.db, f.org.id, [m.id])).get(m.id) ?? [];
@@ -225,7 +225,7 @@ describe("act with undo: issues", () => {
   test("who may undo; the window expires; Desfazer tudo goes newest first", async () => {
     f = await setup();
     const ctx = await runContext(f);
-    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    const call = await toolsOf([createIssueToolSource(f.artifactDeps)], ctx);
     await call("create_issue", { title: "Uma" });
     await call("update_issue", { issue: "#1", priority: "high" });
     const m = await reply(f, ctx);

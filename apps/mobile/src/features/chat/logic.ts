@@ -13,6 +13,7 @@ import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } 
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import type { ChatTextSize } from "@agenteschat/client/lib/chat-look";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
+import { loneIdRef, splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
@@ -656,6 +657,8 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
   | { kind: "link"; text: string; href: string }
+  /** An internal id (`splitIdRefs`, `code` when alone in a code span): the pill of what it names, or its text as written. */
+  | { kind: "id"; text: string; id: string; code?: true }
   /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
   | { kind: "channel"; text: string; name: string };
 export type Block =
@@ -718,11 +721,17 @@ export function mentionTint(
   return { color: tone.ink, backgroundColor: tone.background };
 }
 
-/** `#channel` references, then @mentions in the words between them. */
+/** Internal ids, then `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
-  for (const part of splitChannelRefs(text)) {
-    if (part.name === undefined) atMentions(part.text, out, kind);
-    else out.push({ kind: "channel", text: part.text, name: part.name });
+  for (const piece of splitIdRefs(text)) {
+    if (piece.id !== undefined) {
+      out.push({ kind: "id", text: piece.text, id: piece.id });
+      continue;
+    }
+    for (const part of splitChannelRefs(piece.text)) {
+      if (part.name === undefined) atMentions(part.text, out, kind);
+      else out.push({ kind: "channel", text: part.text, name: part.name });
+    }
   }
 }
 
@@ -773,8 +782,10 @@ export function parseInline(text: string): Inline[] {
     let tok = m[0];
     if (m[5]) tok = trimUrl(tok);
     if (at > last) mentions(text.slice(last, at), out, "text");
-    if (m[1]) out.push({ kind: "code", text: tok.slice(1, -1) });
-    else if (m[2]) {
+    if (m[1]) {
+      const id = loneIdRef(tok.slice(1, -1));
+      out.push(id ? { kind: "id", text: tok.slice(1, -1), id, code: true } : { kind: "code", text: tok.slice(1, -1) });
+    } else if (m[2]) {
       // An image shows its words; a link to anything but the web or e-mail is just its words.
       const label = m[3] ?? "";
       const href = m[4] ?? "";

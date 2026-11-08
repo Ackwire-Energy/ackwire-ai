@@ -1388,6 +1388,20 @@ export async function getArtifact(
   return detail(view(a, editableKind(a.kind)), v.version, await contentOf(deps, a, v));
 }
 
+/** What a file's pill in a text shows (`idRef`): its name and type, only for a person who may read it; else null. */
+export async function fileRefOf(db: Database, userId: string, orgId: string, artifactId: string) {
+  const a = await loadArtifact(db, orgId, artifactId);
+  if (!a || !(await personCanRead(db, userId, orgId, a))) return null;
+  const v = a.kind === "file" ? await versionRow(db, a).catch(() => null) : null;
+  return {
+    id: a.id,
+    title: a.title,
+    artifactKind: a.kind,
+    fileName: v?.fileName ?? null,
+    contentType: v?.contentType ?? null,
+  };
+}
+
 export async function listArtifactVersions(
   deps: ArtifactDeps,
   actor: ArtifactActor,

@@ -446,7 +446,15 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       // Runs nobody called by name may pass (offered only to them, as in production).
       createPassToolSource(),
       createContextToolSource(context),
-      ...(c.issues ? [createIssueToolSource({ db, pubsub })] : []),
+      ...(c.issues
+        ? [
+            createIssueToolSource({
+              db,
+              blobs: createBlobStoreResolver({ db, keyWrappers: [keyWrapper], platform: createMemoryBlobStore() }),
+              pubsub,
+            }),
+          ]
+        : []),
       ...(c.workspace ? [createWorkspaceToolSource({ pubsub })] : []),
       ...(c.chat
         ? [

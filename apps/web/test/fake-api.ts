@@ -41,6 +41,7 @@ import type {
   GitHubAppInfo,
   GitHubRepositories,
   HttpApi,
+  IdRef,
   ImportedSource,
   ImportItemKind,
   ImportItemResult,
@@ -441,6 +442,8 @@ export interface FakeState {
   sidebarOrder?: SidebarSection[];
   /** How I look at Tarefas (`orgs.issuesView`); unset = never changed (the default). */
   issuesView?: IssuesView;
+  /** What ids written in texts name (`chat.idRef`); an id not here is a 404. */
+  idRefs?: Record<string, IdRef>;
   /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
   sidebarToolOrder?: SidebarItem[];
   /** How my sidebar shows the agents and what I pinned (`orgs.sidebarView`); unset = never changed. */
@@ -2930,6 +2933,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: dm ? dm.with.name : (channel?.name ?? ""),
           author: author ?? "",
         };
+      },
+      idRef: async (_orgId, id) => {
+        const ref = state.idRefs?.[id];
+        if (!ref) throw new ApiError(404, "not_found", "Nothing here has this id");
+        return structuredClone(ref);
       },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
       archive: async (orgId, channelId) => {

@@ -10,6 +10,7 @@ import {
   canUndoAction,
   formatTimeLeft,
   hookToCopy,
+  receiptFiles,
   routineOwnActions,
   undoableNow,
 } from "@agenteschat/client/lib/actions";
@@ -259,6 +260,7 @@ function Receipt({
   });
   const struck = Boolean(a.undoneAt);
   const ownActions = routineOwnActions(a);
+  const files = struck ? [] : receiptFiles(a);
   // Once it had a button, its room stays: Desfazer turning into Refazer, or leaving when its time is up, never
   // rewraps the sentence.
   const hadButton = useRef(false);
@@ -289,6 +291,11 @@ function Receipt({
                 t,
               ),
             })}
+          </span>
+        )}
+        {files.length > 0 && (
+          <span className="ag-rc__by ag-rc__files">
+            {t("agentActions.issue.files", { names: joinNames(files, t) })}
           </span>
         )}
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}

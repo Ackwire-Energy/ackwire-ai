@@ -2687,7 +2687,8 @@
       "updated_status": "<b>#{{number}}</b> nach {{status}} verschoben · {{title}}",
       "updated_priority": "Priorität von <b>#{{number}}</b> auf {{priority}} gesetzt · {{title}}",
       "assigned": "<b>#{{number}}</b> {{assignee}} zugewiesen · {{title}}",
-      "assigned_self": "<b>#{{number}}</b> selbst übernommen · {{title}}"
+      "assigned_self": "<b>#{{number}}</b> selbst übernommen · {{title}}",
+      "files": "Angehängt: {{names}}"
     },
     "memory": {
       "saved": "Im <b>Gedächtnis</b> gespeichert: {{text}}",
@@ -2742,7 +2743,8 @@
       "labels": "die Labels",
       "dueDate": "das Fälligkeitsdatum",
       "githubUrl": "den GitHub-Link",
-      "criteria": "die Kriterien"
+      "criteria": "die Kriterien",
+      "files": "die Anhänge"
     },
     "routineFields": {
       "name": "den Namen",
@@ -6368,7 +6370,8 @@
       "add": "Dateien hinzufügen",
       "addHint": "oder hierher ziehen",
       "grid": "Raster",
-      "empty": "Noch keine Anhänge. Zieh Dateien hierher oder füg einen Screenshot ein.",
+      "emptyTitle": "Die Dateien der Aufgabe landen hier",
+      "empty": "Zieh Dateien hierher, füg einen Screenshot ein oder schick sie in der Unterhaltung der Aufgabe.",
       "fromCreation": "Beim Erstellen · {{when}}",
       "fromComment": "Kommentar von {{name}} · {{when}}",
       "linked": "Verknüpft von {{name}}"
@@ -6397,6 +6400,8 @@
       "github_linked": "hat es mit GitHub verknüpft",
       "github_unlinked": "hat den GitHub-Link entfernt",
       "artifact_linked": "hat eine Datei angehängt",
+      "files_attached": "hat {{names}} angehängt",
+      "files_removed": "hat {{names}} aus den Anhängen entfernt",
       "criterion_checked": "hat das Kriterium „{{text}}“ abgehakt",
       "criterion_unchecked": "hat das Kriterium „{{text}}“ wieder geöffnet",
       "agent_asked": "hat {{name}} gebeten, sie zu erledigen"

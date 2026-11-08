@@ -174,7 +174,7 @@ describe("what changing who sees a task reaches", () => {
     });
     const task = await createIssue(deps(), person(ana.id), f.org.id, { title: "Plano", attachmentIds: [mine.id] });
     expect((await getArtifact(f.artifactDeps, person(bia.id), f.org.id, mine.id)).id).toBe(mine.id);
-    await updateIssue(deps(), person(ana.id), f.org.id, task.id, { addArtifactId: theirs.id });
+    await updateIssue(deps(), person(ana.id), f.org.id, task.id, { addFiles: [theirs.id] });
     await setIssueAudience(deps(), person(ana.id), f.org.id, task.id, only(ana.id));
     expect((await getArtifact(f.artifactDeps, person(bia.id), f.org.id, theirs.id)).id).toBe(theirs.id);
     await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, mine.id)).rejects.toThrow();

@@ -2579,7 +2579,8 @@
       "updated_status": "<b>#{{number}}</b>을(를) {{status}}(으)로 옮겼어요 · {{title}}",
       "updated_priority": "<b>#{{number}}</b>의 우선순위를 {{priority}}(으)로 설정했어요 · {{title}}",
       "assigned": "<b>#{{number}}</b>을(를) {{assignee}}에게 배정했어요 · {{title}}",
-      "assigned_self": "<b>#{{number}}</b>을(를) 직접 맡았어요 · {{title}}"
+      "assigned_self": "<b>#{{number}}</b>을(를) 직접 맡았어요 · {{title}}",
+      "files": "{{names}}을(를) 첨부했어요"
     },
     "memory": {
       "saved": "<b>메모리</b>에 저장했어요: {{text}}",
@@ -2634,7 +2635,8 @@
       "labels": "라벨",
       "dueDate": "마감일",
       "githubUrl": "GitHub 링크",
-      "criteria": "기준"
+      "criteria": "기준",
+      "files": "첨부 파일"
     },
     "routineFields": {
       "name": "이름",
@@ -6127,7 +6129,8 @@
       "add": "파일 추가",
       "addHint": "또는 여기로 끌어다 놓기",
       "grid": "격자",
-      "empty": "아직 첨부 파일이 없어요. 여기로 파일을 끌어다 놓거나 스크린샷을 붙여 넣으세요.",
+      "emptyTitle": "이 작업의 파일은 여기에 모여요",
+      "empty": "여기로 파일을 끌어다 놓거나, 스크린샷을 붙여 넣거나, 작업 대화에서 보내세요.",
       "fromCreation": "만들 때 · {{when}}",
       "fromComment": "{{name}}의 댓글 · {{when}}",
       "linked": "{{name}}이(가) 연결함"
@@ -6156,6 +6159,8 @@
       "github_linked": "GitHub에 연결했습니다",
       "github_unlinked": "GitHub 링크를 삭제했습니다",
       "artifact_linked": "파일을 첨부했어요",
+      "files_attached": "{{names}}을(를) 첨부했어요",
+      "files_removed": "{{names}}을(를) 첨부 파일에서 뺐어요",
       "criterion_checked": "조건 \"{{text}}\"을(를) 체크했어요",
       "criterion_unchecked": "조건 \"{{text}}\"의 체크를 해제했어요",
       "agent_asked": "{{name}}에게 맡겼어요"

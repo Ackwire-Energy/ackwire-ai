@@ -28,6 +28,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { renderIdRef } from "@/chat/IdRef";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePreviewUrl } from "@/components/artifacts/FileView";
 import { MenuEntries } from "@/components/DesktopMenus";
@@ -1061,7 +1062,7 @@ export function WikiReader({
               />
               <div className="wiki-page__body wiki-prose">
                 {p.body.trim() ? (
-                  <Markdown source={p.body} wikiLink={wikiLink} embed={embed} title={p.title} />
+                  <Markdown source={p.body} wikiLink={wikiLink} embed={embed} idRef={renderIdRef} title={p.title} />
                 ) : (
                   <p className="muted">{t("wiki.emptyPage")}</p>
                 )}

@@ -102,6 +102,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  IdRef,
   ImportedFile,
   ImportedSource,
   ImportPlan,
@@ -944,6 +945,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       leave: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/leave`, { json: {} }),
       card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       messageCard: (orgId, messageId) => request<MessageCard>(`${org(orgId)}/messages/${enc(messageId)}/card`),
+      idRef: (orgId, id) => request<IdRef>(`${org(orgId)}/refs/${enc(id)}`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>

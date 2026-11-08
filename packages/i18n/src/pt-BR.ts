@@ -2739,6 +2739,8 @@ export const ptBR = {
       updated_priority: "Prioridade {{priority}} na <b>#{{number}}</b> · {{title}}",
       assigned: "Passei a <b>#{{number}}</b> para {{assignee}} · {{title}}",
       assigned_self: "Peguei a <b>#{{number}}</b> para mim · {{title}}",
+      /** Under the line: the files that went with the task (their names). */
+      files: "Anexei {{names}}",
     },
     memory: {
       saved: "Guardei na <b>memória</b>: {{text}}",
@@ -2796,6 +2798,7 @@ export const ptBR = {
       dueDate: "o prazo",
       githubUrl: "o link do GitHub",
       criteria: "os critérios",
+      files: "os anexos",
     },
     routineFields: {
       name: "o nome",
@@ -6473,7 +6476,8 @@ export const ptBR = {
       add: "Adicionar arquivos",
       addHint: "ou arraste para cá",
       grid: "Grade",
-      empty: "Nenhum anexo ainda. Arraste arquivos para cá ou cole um print.",
+      emptyTitle: "Os arquivos da tarefa ficam aqui",
+      empty: "Arraste arquivos para cá, cole um print ou mande na conversa da tarefa.",
       fromCreation: "Na criação · {{when}}",
       fromComment: "Comentário de {{name}} · {{when}}",
       linked: "Ligado por {{name}}",
@@ -6499,6 +6503,8 @@ export const ptBR = {
       github_linked: "ligou ao GitHub",
       github_unlinked: "removeu o link do GitHub",
       artifact_linked: "anexou um arquivo",
+      files_attached: "anexou {{names}}",
+      files_removed: "tirou {{names}} dos anexos",
       criterion_checked: 'marcou o critério "{{text}}"',
       criterion_unchecked: 'desmarcou o critério "{{text}}"',
       agent_asked: "pediu a {{name}} para fazer",
