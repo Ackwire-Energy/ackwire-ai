@@ -22,11 +22,17 @@ export const mobileEn = {
       network: "No connection. Check the internet and try again.",
       generic: "Something went wrong. Try again.",
     },
+    flow: {
+      /** The first question, alone: the keyboard is open under it from the start. */
+      email: "What's your e-mail?",
+      emailLead: "To sign in or create your account.",
+    },
     server: {
       line: "Server: {{host}} ·",
       change: "Change",
-      title: "Your server",
-      subtitle: "Your team's agentes.chat address, the same one you see in the browser.",
+      /** The question is the title; the keyboard's return key ("go") is the action. */
+      title: "Where is your agentes.chat?",
+      subtitle: "The address your team opens in the browser.",
       label: "Server address",
       placeholder: "agentes.yourteam.ts.net",
       use: "Use this server",
@@ -45,6 +51,10 @@ export const mobileEn = {
       down: {
         line: "{{host}} didn't answer.",
         text: "It may be down or outside your network. The app opens on its own once it's back.",
+        tryNow: "Try now",
+        /** Beside the wick burning down to the next automatic try. */
+        retryIn_one: "tries again in {{count}} s",
+        retryIn_other: "tries again in {{count}} s",
       },
     },
     connect: {
@@ -53,6 +63,7 @@ export const mobileEn = {
       on: "Server: {{host}}",
       leave: "You'll be signed out of the current account on this phone.",
       confirm: "Connect",
+      notNow: "Not now",
       checking: "Checking the server…",
       notALink: "This link isn't from an agentes.chat server.",
       tokenFailed: "The code expired or was already used. Sign in with your email, or show a new code on the computer.",
@@ -60,7 +71,7 @@ export const mobileEn = {
         "Signing in is taking longer than it should. Sign in with your email, or show a new code on the computer.",
     },
     scan: {
-      hint: "Point at the QR code on the computer.",
+      hint: "Point at the QR code on the computer",
       notOurs: "This QR code isn't from an agentes.chat server.",
       cameraTitle: "Use the camera",
       cameraText: "It's only used to read the QR code.",
@@ -87,6 +98,11 @@ export const mobileEn = {
   push: {
     channel: "Alerts",
     channelDescription: "What's waiting for you, mentions and conversations.",
+    /** One event line in the conversation, after an agent said it will take a while. */
+    offer: {
+      line: "Want to know when {{name}} is done?",
+      action: "Notify me",
+    },
     ask: {
       title: "Know when an agent needs you",
       text: "They work while you do something else. We'll tell you when they need your ok, finish what you asked or call you.",
@@ -121,6 +137,8 @@ export const mobileEn = {
     join: "Add to the task in progress",
     now: "Stop and send",
     choice: "How to send while the agent works",
+    /** Under the field while an agent works here, until the person has held the send button once. */
+    holdToStop: "Hold to stop and send",
   },
   search: {
     placeholder: "Search",

@@ -92,6 +92,13 @@ export const featureKeysPtBR = {
     hoursAgo_other: "há {{count}} h",
     daysAgo_one: "há {{count}} dia",
     daysAgo_other: "há {{count}} dias",
+    /** The time at a list row's right: one short figure, no "ago" ("4 min", "2 h", "3 d"). */
+    short: {
+      now: "agora",
+      minutes: "{{count}} min",
+      hours: "{{count}} h",
+      days: "{{count}} d",
+    },
   },
   names: {
     two: "{{first}} e {{second}}",
@@ -133,6 +140,16 @@ export const featureKeysPtBR = {
     tapNote: "Aprovar faz a ação na hora.",
     tapNoteAhead: "Aprovar agora vale para {{when}}.",
     refuseTitle: "Recusar o pedido",
+    refuseAsk: "Recusar o pedido?",
+    refuseWhyF: "A {{name}} aprende com o motivo. Opcional.",
+    refuseWhyM: "O {{name}} aprende com o motivo. Opcional.",
+    sheet: {
+      title: "Pedido",
+      request: "O pedido",
+      why: "Por quê",
+      service: "Serviço",
+      nextTime: "Da próxima vez",
+    },
     whyPlaceholderF: "Por quê? Opcional, mas a {{name}} aprende com isso",
     whyPlaceholderM: "Por quê? Opcional, mas o {{name}} aprende com isso",
     approved: "Aprovado",
@@ -235,6 +252,8 @@ export const featureKeysPtBR = {
     workingNowLine_one: "{{count}} agente trabalhando agora",
     workingNowLine_other: "{{count}} agentes trabalhando agora",
     nobodyWorking: "Nenhum agente trabalhando agora",
+    /** The greeting's line when one agent works: its name. */
+    workingOne: "{{name}} está trabalhando",
     first: {
       title: "Comece pelo seu primeiro agente",
       subtitle: "Dê um nome e diga o que ele faz. Ele aparece aqui, como uma conversa.",
@@ -264,6 +283,8 @@ export const featureKeysPtBR = {
     name: "Nome",
     channelFine: "Para um time ou assunto.",
     chatSearch: "Buscar pessoa ou agente",
+    /** The field on top of the New sheet, as a new message's: whom it is for. */
+    to: "Para:",
     people: "Pessoas",
     search: "Pessoa ou agente",
     create: "Criar",
@@ -278,6 +299,15 @@ export const featureKeysPtBR = {
     agent: {
       question: "O que esse agente vai fazer?",
     },
+  },
+  voice: {
+    slideToCancel: "deslize para cancelar",
+    slideUpToLock: "suba para travar",
+    locked: "Travado",
+    recording: "Gravando",
+    discard: "Apagar",
+    send: "Enviar",
+    seeAll: "Ver tudo",
   },
   chat: {
     someone: "Alguém",
@@ -395,6 +425,16 @@ export const featureKeysPtBR = {
     },
     uploading: "Enviando arquivo…",
     uploadFailed: "Não deu para enviar o arquivo.",
+    doubleTapHint: "Toque duplo = 👍",
+    react: "Reagir",
+    attach: {
+      more: "Mais uma foto ou arquivo",
+      remove: "Tirar {{name}}",
+      waiting: "{{name}}, esperando para enviar",
+      sending: "{{name}}, enviando",
+      tooMany: "Até {{count}} arquivos por mensagem.",
+    },
+    swipeReply: "Deslize para a direita para responder",
     // intentional: chat
     intent: {
       suggest: {
@@ -518,6 +558,8 @@ export const featureKeysPtBR = {
     bar_one: "Mensagens fixadas ({{count}})",
     bar_other: "Mensagens fixadas ({{count}})",
     unpinOf: "Desafixar a mensagem de {{name}}",
+    peek: "Fixadas",
+    peekHint: "Puxe para baixo para ver as fixadas",
   },
   thread: {
     threadIn: "Thread em #{{channel}}",
@@ -658,7 +700,7 @@ export const featureKeysPtBR = {
     },
   },
   threads: {
-    title: "Threads e missões",
+    title: "Threads",
     section: {
       missions: "Missões",
       threads: "Threads",
@@ -678,9 +720,26 @@ export const featureKeysPtBR = {
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     freeSection: "Livres",
     noGroupSection: "Sem setor",
+    workingSection: "Trabalhando",
+    /** The free agents, in no department: the team itself. */
+    teamSection: "Equipe",
+    /** Under the task manager's row when nothing runs or waits. */
+    managerQuiet: "Nada em andamento",
+    /** A row's state, as text in the state's color (amber only for what waits on the person). */
+    state: {
+      waitsYou: "espera seu ok",
+      noAi: "Sem IA ligada",
+      connect: "Conectar",
+      archived: "Arquivado",
+    },
+    /** Under the toast that says the agent joined: what it thinks with. */
+    thinksWith: "Pensa com {{label}}",
   },
   team: {
-    entry: "Lista, organograma e mapa",
+    entry: "Organograma e canais",
+    /** A department's row: who leads it and who stands in. */
+    sectorLead: "{{name}} cuida",
+    sectorBackup: "{{name}} substitui",
     mapHint: "Para mudar um agente de canal, use o mapa na web ou fale com {{name}}.",
   },
   agentEdit: {
@@ -696,6 +755,13 @@ export const featureKeysPtBR = {
     leaveTitle: "Sair sem criar?",
     leaveText: "O agente que você começou não será criado.",
     keepGoing: "Continuar criando",
+    /** The second step asks who the agent is: a question and one line, as the other steps. */
+    identityQuestion: "Quem é o agente?",
+    identityLead: "Nome, como chamar no chat e o rosto.",
+    handleMention: "Mencione @{{handle}} para chamar.",
+    reviewLead: "Toque numa linha para mudar.",
+    planHint: "Ou conecte o seu plano de IA: o {{name}} passa a pensar por ele, sem gastar a chave.",
+    planHint_female: "Ou conecte o seu plano de IA: a {{name}} passa a pensar por ele, sem gastar a chave.",
     partly: "O agente foi criado, mas parte do que o papel traz não entrou. Ajuste no perfil dele.",
     import: {
       where: {
@@ -750,11 +816,15 @@ export const featureKeysPtBR = {
     title: "Atividade",
     /** Under `plan_model_dropped`: opens the agent's model. */
     chooseModel: "Escolher outro modelo",
+    /** The pills over Atividade: short, no counts (the section and the tab's badge count). */
     filter: {
       all: "Tudo",
-      waiting: "Esperando você",
-      done: "Concluídas",
+      waiting: "Pedidos",
+      done: "Feitas",
     },
+    /** The toast after a swipe marked an item done, with the way back. */
+    doneToast: "Feito",
+    undo: "Desfazer",
     day: {
       today: "Hoje",
       yesterday: "Ontem",
@@ -887,6 +957,14 @@ export const featureKeysPtBR = {
       all: "Tudo",
     },
     nothing: "Nada com “{{q}}”.",
+    /** Over the recent conversations and the results: the filters in words, each starting its operator. */
+    filters: "Filtros",
+    filterWord: {
+      from: "De",
+      in: "Em",
+      has: "Com arquivo",
+      date: "Data",
+    },
     action: {
       newConversation: "Nova conversa",
       newTask: "Pedir uma tarefa",
@@ -972,6 +1050,19 @@ export const featureKeysPtBR = {
     notificationsOffHint: "Ligue para receber avisos aqui. Os tipos abaixo valem para todos os seus aparelhos.",
     notificationsKindsHint: "A Atividade guarda tudo. Vale para este workspace, em todos os seus aparelhos.",
     version: "agentes.chat · versão {{version}}",
+    edit: "Editar",
+    status: "Status",
+    workspace: "Workspace",
+    workspaceMore_one: "Mais {{count}}",
+    workspaceMore_other: "Mais {{count}}",
+    workspaceMoreElsewhere_one: "Mais {{count}}, em outro servidor",
+    workspaceMoreElsewhere_other: "Mais {{count}}, em outro servidor",
+    workspaceMoreServers_one: "Mais {{count}}, em outros servidores",
+    workspaceMoreServers_other: "Mais {{count}}, em outros servidores",
+    allAgents: "Ver todos",
+    work: "Trabalho",
+    dashboards: "Painéis",
+    agentStyle: "Como os agentes falam",
     workspaces: "Workspaces",
     workspacesIn: "Você está em",
     workspacesFoot: "Você continua conectado em cada um e recebe os avisos de todos. Toque num workspace para abrir.",
@@ -984,6 +1075,13 @@ export const featureKeysPtBR = {
     teamServer: "Servidor da equipe",
     teamServerLead: "O endereço do agentes.chat da sua equipe, o mesmo que aparece no navegador.",
     teamServerFoot: "Você não sai de nenhum workspace: o servidor da sua equipe entra na lista, com a sua conta de lá.",
+    /** The sheet from holding the workspace's mark in the bar, and its shorter words (ADR 0154). */
+    workspacesHoldHint: "Segure para trocar de workspace",
+    workspacesSheetFoot: "Você fica conectado em todos; os avisos de cada um chegam aqui.",
+    addWorkspaceTeamShort: "Entrar no servidor da equipe",
+    addWorkspaceTeamSubShort: "Endereço ou QR code do computador",
+    addWorkspaceFoot: "Você não sai de nenhum workspace.",
+    teamServerLeadShort: "O que o time abre no navegador.",
     account: {
       title: "Conta",
       save: "OK",
@@ -1080,6 +1178,17 @@ export const featureKeysPtBR = {
   issues: {
     title: "Tarefas",
     new: "Nova tarefa",
+    viewList: "Lista",
+    viewBoard: "Quadro",
+    search: "Buscar tarefas",
+    noMatch: "Nenhuma tarefa com esse nome.",
+    list: {
+      mine: "Para você",
+      in_progress: "Em andamento",
+      in_review: "Em revisão",
+      todo: "A fazer",
+      doneToday: "Feitas hoje",
+    },
     filters: "Filtrar tarefas",
     section: {
       todo: "A fazer",
@@ -1190,6 +1299,7 @@ export const featureKeysPtBR = {
   },
   wiki: {
     map: "Mapa das páginas",
+    more: "Mais opções",
     mapAgent: "Agente que leu páginas nesta semana",
     usedBy: "Agentes que usam",
     readsWeek_one: "{{count}} leitura nesta semana",
@@ -1225,6 +1335,14 @@ export const featureKeysPtBR = {
   taskManager: {
     loadFailed: "Não deu para carregar as tarefas.",
     gone: "Essa tarefa não está mais aqui.",
+    /** Under the title when nothing runs or waits. */
+    quiet: "Nada em andamento",
+    /** The group over who asked for the task, on its screen. */
+    request: "Pedido",
+    /** The system alert before stopping one task from its screen. */
+    stopTitle: "Parar “{{title}}”?",
+    stopBody: "O {{name}} para agora e conta o que já fez na conversa.",
+    stopBody_female: "A {{name}} para agora e conta o que já fez na conversa.",
   },
   // intentional: chats/activity/ui
   homeNow: {
@@ -1328,6 +1446,16 @@ export const featureKeysPtBR = {
       title_female: "O que ela sabe sobre você",
       footF: "Toque para corrigir ou esquecer.",
       footM: "Toque para corrigir ou esquecer.",
+      /** For who may edit: a tap corrects, a swipe forgets (the system's list gesture). */
+      footSwipe: "Toque para corrigir. Deslize para esquecer.",
+      forgetTitle: "Esquecer isso?",
+      forgetBody: "O {{name}} deixa de usar essa lembrança. As mensagens ficam.",
+      forgetBody_female: "A {{name}} deixa de usar essa lembrança. As mensagens ficam.",
+      forget: "Esquecer",
+      ruleTitle: "Tirar essa regra?",
+      ruleBody: "O {{name}} deixa de seguir essa regra. Quem a deu pode dar de novo.",
+      ruleBody_female: "A {{name}} deixa de seguir essa regra. Quem a deu pode dar de novo.",
+      ruleRemove: "Tirar",
       footOwner: "Só {{name}} ou quem administra pode corrigir.",
       footAdmins: "Só quem administra pode corrigir.",
       emptyF: "A {{name}} ainda não guardou nada sobre você.",
@@ -1350,6 +1478,8 @@ export const featureKeysPtBR = {
       forgotten: "Esquecido",
     },
     thinks: "Pensa com",
+    /** The kind line of the request card on the profile: the agent's name is right above it. */
+    asksApproval: "Pede sua aprovação",
     uses: {
       title: "O que ele pode usar",
       title_female: "O que ela pode usar",
@@ -1555,12 +1685,23 @@ export const featureKeysPtBR = {
       },
     },
   },
+  computer: {
+    pick: "Escolher computador",
+    pickHelp: "Escolha um dos computadores ligados.",
+  },
   connectors: {
-    title: "Conectores e MCPs",
-    search: "Buscar um serviço",
+    title: "Conectores",
+    search: "Buscar ou colar um endereço",
     mcps: "MCPs",
     mcpsNone: "Os servidores MCP que você conectar pelo endereço aparecem aqui.",
     addMcp: "Adicionar MCP",
+    add: "Adicionar",
+    allServices: "Todos os serviços",
+    waitLine_one: "{{count}} ferramenta precisa de você",
+    waitLine_other: "{{count}} ferramentas precisam de você",
+    toolsWait_one: "{{count}} precisa de você",
+    toolsWait_other: "{{count}} precisam de você",
+    connectedState: "Conectada",
     connected: "Conectados",
     suggested: "Sugeridos para a {{org}}",
     all: "Todos",
@@ -1596,16 +1737,16 @@ export const featureKeysPtBR = {
     needsReconnect: "A conta do {{name}} parou de funcionar. Os agentes não usam até alguém reconectar.",
     noTools:
       "Não deu para ler as ferramentas do {{name}}. Os agentes ficam sem elas até serem lidas de novo, em Ferramentas.",
-    accountTitle: "Esta conta",
+    accountTitle: "Conta",
     renameFailed: "Não deu para renomear. Tente de novo.",
-    whoTitle: "Quem usa e até onde",
+    whoTitle: "Quem usa",
     level: {
       none: "Não usa",
       read: "Só consulta",
       write: "Pode mudar",
       custom: "Do seu jeito",
     },
-    safe: "Apagar, publicar e responder clientes sempre pedem sua aprovação.",
+    safe: "Apagar e publicar sempre pedem você antes.",
     done: "Pronto",
     step: "Passo {{n}} de {{total}}: {{label}}",
     disconnect: "Desconectar",
@@ -1641,6 +1782,18 @@ export const featureKeysPtBR = {
     otherAccount: "Entrar com outra conta",
     failed: "Não deu para aceitar o convite. Tente de novo.",
     // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
+    /** Asking through a link: three screens (the e-mail, its code, you), the step named over the title. */
+    ask: {
+      called: "{{name}} chamou você para a {{org}}.",
+      calledNoName: "Este é o convite da {{org}}.",
+      approves: "Alguém da {{org}} aprova sua entrada.",
+      youTitle: "Só falta você.",
+      emailConfirmed: "E-mail confirmado",
+      stepOf: "{{n}} de {{total}} · {{name}}",
+      step: { email: "Seu e-mail", code: "Código", you: "Você" },
+      haveAccount: "Já tenho conta",
+      notePlaceholder: "Quer dizer algo para quem aprova? Opcional",
+    },
     join: {
       skip: "Pular",
       sharedBy: "{{name}} compartilhou este link",
@@ -1690,6 +1843,8 @@ export const featureKeysPtBR = {
     title: "Entrando na {{org}}…",
     titleNew: "Entrando…",
     lead: "Suas conversas já estão chegando.",
+    /** Under the title when the team's agents stand on the horizon. */
+    team: "O time já está lá.",
   },
   splash: {
     slow: "Conectando…",
@@ -1700,6 +1855,10 @@ export const featureKeysPtBR = {
     logoHelp: "Opcional.",
     logoPick: "Escolher",
     zone: "Fuso: {{zone}}",
+    /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
+    anotherTitle: "Como se chama o workspace novo?",
+    anotherLead: "No agentes.chat. Você continua na {{org}}; dá para trocar a qualquer hora.",
+    create: "Criar",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
     failed: "Não deu para salvar. Tente de novo.",
   },
@@ -1726,6 +1885,17 @@ export const featureKeysPtBR = {
     audience: "Quem ele atende",
     audience_female: "Quem ela atende",
     another: "Outra IA",
+    /** Connect an AI, first page: one question, then the two ways and what the workspace already has. */
+    question: "Como o {{name}} vai pensar?",
+    question_female: "Como a {{name}} vai pensar?",
+    questionAny: "Como os agentes vão pensar?",
+    questionLead: "Dá para trocar depois, no perfil.",
+    planRow: "Meu plano de IA",
+    planRowSub: "Entra pelo computador do agente, sem chave",
+    keyRow: "Uma chave",
+    keyRowSub: "Você paga pelo uso, direto ao provedor",
+    already: "Já na {{org}}",
+    stepOf: "{{step}} de {{total}}",
   },
   crash: {
     title: "Algo deu errado nesta tela",
@@ -1739,6 +1909,28 @@ export const featureKeysPtBR = {
   },
   settings: {
     edit: "Editar workspace",
+    editSub: "Nome, logo, fuso e o que os agentes sabem",
+    group: {
+      org: "Workspace",
+      people: "Pessoas",
+      agents: "Agentes",
+      costs: "Custos e dados",
+    },
+    section: {
+      members: "Membros",
+      roles: "Papéis",
+      access: "Acesso dos agentes",
+      connectors: "Conectores",
+      usage: "Uso e orçamento",
+    },
+    ofOnline: "{{online}} de {{count}}",
+    deleteName: "Apagar {{name}}",
+    deleteFoot: "Você tem 7 dias para voltar atrás.",
+    deleteAlert: "Todo mundo sai agora. Dá para restaurar por 7 dias.",
+    deleteAction: "Apagar",
+    deleteIntro: "{{name}} fecha para todos agora e é apagado de vez em 7 dias.",
+    holdDelete: "Segure para apagar",
+    deleteFailed: "Não deu para apagar o workspace. Tente de novo.",
     access: {
       how: "Toque numa linha para trocar o nível: Sem acesso, Ler, Ler e escrever.",
     },

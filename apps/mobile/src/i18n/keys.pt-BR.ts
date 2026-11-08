@@ -27,11 +27,17 @@ export const mobilePtBR = {
       network: "Sem conexão. Confira a internet e tente de novo.",
       generic: "Algo deu errado. Tente de novo.",
     },
+    flow: {
+      /** The first question, alone: the keyboard is open under it from the start. */
+      email: "Qual é o seu e-mail?",
+      emailLead: "Para entrar ou criar sua conta.",
+    },
     server: {
       line: "Servidor: {{host}} ·",
       change: "Trocar",
-      title: "Seu servidor",
-      subtitle: "O endereço do agentes.chat da sua equipe, o mesmo que aparece no navegador.",
+      /** The question is the title; the keyboard's return key ("ir") is the action. */
+      title: "Onde fica o seu agentes.chat?",
+      subtitle: "O endereço que o time abre no navegador.",
       label: "Endereço do servidor",
       placeholder: "agentes.suaequipe.ts.net",
       use: "Usar este servidor",
@@ -50,6 +56,10 @@ export const mobilePtBR = {
       down: {
         line: "{{host}} não respondeu.",
         text: "Ele pode estar fora do ar ou fora da sua rede. O app abre sozinho quando ele voltar.",
+        tryNow: "Tentar agora",
+        /** Beside the wick burning down to the next automatic try. */
+        retryIn_one: "tenta de novo em {{count}} s",
+        retryIn_other: "tenta de novo em {{count}} s",
       },
     },
     connect: {
@@ -58,6 +68,7 @@ export const mobilePtBR = {
       on: "Servidor: {{host}}",
       leave: "Você sai da conta atual neste celular.",
       confirm: "Conectar",
+      notNow: "Agora não",
       checking: "Conferindo o servidor…",
       notALink: "Este link não é de um servidor agentes.chat.",
       tokenFailed: "O código expirou ou já foi usado. Entre com seu e-mail, ou mostre um código novo no computador.",
@@ -65,7 +76,7 @@ export const mobilePtBR = {
         "Entrar está demorando mais que o normal. Entre com seu e-mail, ou mostre um código novo no computador.",
     },
     scan: {
-      hint: "Aponte para o QR code que aparece no computador.",
+      hint: "Aponte para o QR code do computador",
       notOurs: "Esse QR code não é de um servidor agentes.chat.",
       cameraTitle: "Usar a câmera",
       cameraText: "Ela só serve para ler o QR code.",
@@ -92,6 +103,11 @@ export const mobilePtBR = {
   push: {
     channel: "Avisos",
     channelDescription: "O que espera você, menções e conversas.",
+    /** One event line in the conversation, after an agent said it will take a while. */
+    offer: {
+      line: "Quer saber quando {{name}} terminar?",
+      action: "Avisar",
+    },
     ask: {
       title: "Saiba quando um agente precisar de você",
       text: "Eles trabalham enquanto você faz outra coisa. Avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
@@ -126,6 +142,7 @@ export const mobilePtBR = {
     join: "Juntar ao que está fazendo",
     now: "Parar e mandar",
     choice: "Como mandar enquanto o agente trabalha",
+    holdToStop: "Segure para parar e mandar",
   },
   search: {
     placeholder: "Buscar",
