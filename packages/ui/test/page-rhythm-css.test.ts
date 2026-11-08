@@ -115,6 +115,11 @@ describe("one menu rhythm", () => {
     expect(body(":is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item")).toContain(
       "min-height: var(--option-h);",
     );
+    // Its descriptions sit beside the names, one line: the leads centre in their rows, not on a first line.
+    const lead =
+      ":is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) :is(.ac-menu__item, .ac-search__option) > .ac-menu__leading";
+    expect(body(lead)).toContain("align-self: center;");
+    expect(body(lead)).toContain("translate: none;");
   });
 });
 

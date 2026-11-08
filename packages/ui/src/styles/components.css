@@ -2283,6 +2283,12 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
+/* A list of people puts each description beside its name (below): one line, so the lead centres in its row. */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) :is(.ac-menu__item, .ac-search__option)
+> .ac-menu__leading {
+  align-self: center;
+  translate: none;
+}
 /* A widget's format glyph (the format pickers) leads its option the same way, on the first line. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
   align-self: flex-start;
