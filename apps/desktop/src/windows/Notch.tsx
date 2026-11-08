@@ -20,7 +20,7 @@ import {
 } from "../control/notch";
 import { homeServer } from "../control/server";
 import { type Home, pairedHomes } from "../control/store";
-import { agentOf } from "../hooks";
+import { agentOf, usePending } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
@@ -365,13 +365,9 @@ function OpenList({ homes, state, done, now }: { homes: Home[]; state: NotchStat
   const store = useStore();
   const toast = useToast();
   const homeOf = (id: string) => homes.find((h) => h.homeId === id);
-  const resume = async () => {
-    try {
-      await store.requestAll({ type: "resume" });
-    } catch {
-      toast(t("desktop.common.error"), "alert");
-    }
-  };
+  const [pending, run] = usePending<"resume">();
+  const resume = () =>
+    run("resume", () => store.requestAll({ type: "resume" }).catch(() => toast(t("desktop.common.error"), "alert")));
   return (
     <>
       <div className="dk-notch__head">
@@ -383,7 +379,7 @@ function OpenList({ homes, state, done, now }: { homes: Home[]; state: NotchStat
             <b>{t("desktop.notch.pausedTitle")}</b>
             <small>{t("desktop.notch.pausedBody")}</small>
           </span>
-          <Button size="sm" variant="primary" icon="play" onClick={() => void resume()}>
+          <Button size="sm" variant="primary" icon="play" loading={pending === "resume"} onClick={() => void resume()}>
             {t("desktop.notch.resume")}
           </Button>
         </div>

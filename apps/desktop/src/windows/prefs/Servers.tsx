@@ -5,7 +5,7 @@ import { useHost, useSnapshot, useStore } from "../../app";
 import { isHereServer, type LocalServerStatus, type ReachStage, type ServeProblem } from "../../control/local-server";
 import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
 import { pairedHomes } from "../../control/store";
-import { useLocalServer, useOnShown, useTailnet } from "../../hooks";
+import { useLocalServer, useOnShown, usePending, useTailnet } from "../../hooks";
 import { ReachProblem, ReachProgress, ReachRow, ServerTile } from "../../ui/here";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
@@ -201,22 +201,14 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
   // What turning reach on or off is doing, said while it takes (Tailscale, its HTTPS page, the restart).
   const [stage, setStage] = useState<ReachStage | null>(null);
   const [reachProblem, setReachProblem] = useState<ServeProblem | null>(null);
-  const [busy, setBusy] = useState<"restart" | "stop" | "start" | "usage" | "backup" | null>(null);
+  const [busy, run] = usePending<"restart" | "stop" | "start" | "usage" | "backup">();
   const [stopping, setStopping] = useState(false);
   const address = local.publicUrl ?? local.url ?? "";
   const running = local.phase === "running";
   const up = running || local.phase === "starting" || local.phase === "updating";
 
-  const act = async (what: NonNullable<typeof busy>, run: () => Promise<unknown>) => {
-    setBusy(what);
-    try {
-      await run();
-    } catch {
-      toast(t("desktop.common.error"), "alert");
-    } finally {
-      setBusy(null);
-    }
-  };
+  const act = (what: NonNullable<typeof busy>, action: () => Promise<unknown>) =>
+    run(what, () => action().catch(() => toast(t("desktop.common.error"), "alert")));
   useEffect(() => host.onLocalReach(setStage), [host]);
   const reach = async (on: boolean) => {
     setReaching(true);
@@ -297,7 +289,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
               id="here-usage-prefs"
               aria-describedby="here-usage-prefs-hint here-usage-prefs-line"
               checked={local.usage}
-              disabled={busy === "usage"}
+              disabled={busy !== null}
               onCheckedChange={(on) => void act("usage", () => host.setLocalUsage(on))}
             />
           }
@@ -327,7 +319,7 @@ function HereServer({ local, current }: { local: LocalServerStatus; current: str
               <Button
                 size="sm"
                 loading={busy === "backup"}
-                disabled={!up}
+                disabled={!up || busy !== null}
                 onClick={() =>
                   void act("backup", async () => {
                     const file = await host.backupLocalServer();

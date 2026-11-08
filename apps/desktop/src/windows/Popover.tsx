@@ -29,7 +29,7 @@ import { homeServer, type ServerList, serverName } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
 import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
-import { agentOf, readPref, useLocalServer, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { agentOf, readPref, useLocalServer, useOnShown, usePending, useUpdateCheck, writePref } from "../hooks";
 import type { BadgeCounts } from "../host/types";
 import { AgentFace, Banner, BrandFace, Count, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { CopyDetails } from "../ui/here";
@@ -49,6 +49,7 @@ export function Popover() {
   const toast = useToast();
   const update = useUpdateCheck(true);
   const [pauseMenu, setPauseMenu] = useState(false);
+  const [pending, run] = usePending<"resume" | "reconnect" | "plus">();
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const card = useRef<HTMLElement>(null);
@@ -337,7 +338,9 @@ export function Popover() {
       toast(t("desktop.common.error"), "alert");
     }
   };
-  pauseRef.current = (choice) => void (choice === "resume" ? doResume() : doPause(choice));
+  const resume = () => void run("resume", doResume);
+  const reconnect = () => void run("reconnect", doReconnect);
+  pauseRef.current = (choice) => (choice === "resume" ? resume() : void doPause(choice));
   const plusHour = async () => {
     if (!pause) return;
     try {
@@ -526,7 +529,13 @@ export function Popover() {
                   : t("desktop.tray.offlineTitle")
               }
               actions={
-                <Button size="sm" icon="refresh" onClick={() => void doReconnect()}>
+                <Button
+                  size="sm"
+                  icon="refresh"
+                  loading={pending === "reconnect"}
+                  disabled={pending !== null}
+                  onClick={reconnect}
+                >
                   {t("desktop.tray.reconnect")}
                 </Button>
               }
@@ -544,11 +553,24 @@ export function Popover() {
               }
               actions={
                 <>
-                  <Button size="sm" variant="primary" icon="play" onClick={() => void doResume()}>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon="play"
+                    loading={pending === "resume"}
+                    disabled={pending !== null}
+                    onClick={resume}
+                  >
                     {t("desktop.tray.resumeNow")}
                   </Button>
                   {pause.until && (
-                    <Button size="sm" variant="ghost" onClick={() => void plusHour()}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={pending === "plus"}
+                      disabled={pending !== null}
+                      onClick={() => void run("plus", plusHour)}
+                    >
                       {t("desktop.tray.plusHour")}
                     </Button>
                   )}
@@ -600,7 +622,7 @@ export function Popover() {
         <div className="dk-pop__foot dk-pop__foot--ruled">
           <section className="dk-psec">
             {pause ? (
-              <MenuRow icon="play" onClick={() => void doResume()}>
+              <MenuRow icon="play" disabled={pending !== null} onClick={resume}>
                 {t("desktop.tray.resume")}
               </MenuRow>
             ) : (
@@ -632,7 +654,7 @@ export function Popover() {
               )
             )}
             {homes.length > 0 && (
-              <MenuRow icon="refresh" onClick={() => void doReconnect()}>
+              <MenuRow icon="refresh" disabled={pending !== null} onClick={reconnect}>
                 {t("desktop.tray.reconnect")}
               </MenuRow>
             )}
