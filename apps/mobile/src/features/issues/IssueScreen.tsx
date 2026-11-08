@@ -916,7 +916,10 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
     },
     {
       key: "assignee",
-      icon: "agent",
+      // Who it is, by their face, as a select shows its choice; a glyph only while nobody is.
+      ...(i.assignee
+        ? { leading: <Face who={i.assignee} size={OPTION_ROW.face} live={false} /> }
+        : { icon: "agent" as const }),
       label: t("mobile.issues.actions.assignee"),
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
       onPress: () => pick(assigneeItems()),

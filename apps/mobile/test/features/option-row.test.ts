@@ -38,6 +38,21 @@ describe("OptionRow (#46, A11)", () => {
     expect(src("features/issues/NewIssueForm.tsx")).not.toContain("size={26}");
   });
 
+  test("a task's Responsável shows who it is by their face, as a select shows its choice (#47)", () => {
+    const screen = src("features/issues/IssueScreen.tsx");
+    expect(screen).toMatch(
+      /key: "assignee",[\s\S]{0,160}leading: <Face who=\{i\.assignee\} size=\{OPTION_ROW\.face\} live=\{false\} \/>/,
+    );
+    expect(screen).toContain(': { icon: "agent" as const }),');
+    // The new task's Quem faz and a routine's agent lead with the chosen face too.
+    expect(src("features/issues/NewIssueForm.tsx")).toContain(
+      "leading={who ? <Face who={who} size={OPTION_ROW.face} live={false} /> : undefined}",
+    );
+    expect(src("features/routines/RoutineForm.tsx")).toContain(
+      "leading={agent ? <AgentFace agentId={agent.id} size={OPTION_ROW.face} live={false} /> : undefined}",
+    );
+  });
+
   test("screens import it from the design system", () => {
     expect(src("ui/index.ts")).toContain('export { OPTION_ROW } from "./option-row";');
   });
