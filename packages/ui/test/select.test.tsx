@@ -74,6 +74,36 @@ describe("Select", () => {
     expect(document.activeElement === trigger).toBe(true);
   });
 
+  test("an option whose value is empty (Ninguém) shows in the trigger when chosen, and picking it gives back the empty value", async () => {
+    const changes: string[] = [];
+    function Nobody() {
+      const [value, setValue] = useState("ada");
+      return (
+        <Select
+          aria-label="Responde a"
+          value={value}
+          onValueChange={(v) => {
+            setValue(v);
+            changes.push(v);
+          }}
+          options={[
+            { value: "", label: "Ninguém" },
+            { value: "ada", label: "Ada" },
+          ]}
+        />
+      );
+    }
+    render(<Nobody />);
+    const trigger = body().getByRole("combobox", { name: "Responde a" });
+    trigger.focus();
+    await key(trigger, "Enter");
+    await key(document.activeElement ?? document.body, "ArrowUp");
+    await key(document.activeElement ?? document.body, "Enter");
+    expect(changes).toEqual([""]);
+    expect(trigger.textContent).toContain("Ninguém");
+    expect(trigger.hasAttribute("data-placeholder")).toBe(false);
+  });
+
   test("Escape closes without changing the value", async () => {
     const changes: string[] = [];
     render(<Harness onChange={(v) => changes.push(v)} />);
