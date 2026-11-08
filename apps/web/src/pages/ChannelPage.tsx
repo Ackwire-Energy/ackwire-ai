@@ -372,6 +372,7 @@ import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
+import { typingInField } from "@/lib/keys";
 import { lookOf } from "@/lib/look";
 import { threadSearch, useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
@@ -834,6 +835,8 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      // An Esc in another field (the search, a card's answer) is that field's: the composer stops agents on its own.
+      if (typingInField(e.target)) return;
       // An Esc from a panel is that panel's, and one from the conversation beside a thread isn't the thread's.
       const inPanel = e.target instanceof Element && Boolean(e.target.closest(".thread-panel"));
       if (!stopTarget || inPanel !== Boolean(chrome?.panel)) return;
@@ -860,6 +863,8 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      // The composer's Esc lets go of the reply first; another field's (the search, a card's answer) is that field's.
+      if (typingInField(e.target) && !(e.target as Element).closest('[id^="composer-"]')) return;
       e.preventDefault();
       setQuote(null);
     };

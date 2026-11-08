@@ -41,6 +41,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
+import { typingInField } from "@/lib/keys";
 import { type EmbedRenderer, Markdown } from "@/lib/markdown";
 import { isAttachmentName } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
@@ -51,10 +52,6 @@ import { WikiAudienceDialog, WikiWhoSeesDialog } from "./WikiAudience";
 import { WikiBulkDeleteDialog } from "./WikiBulk";
 import { WikiFolderPicker, WikiTagsEdit } from "./WikiProps";
 import { WikiRichEditor, type WikiRichEditorHandle } from "./WikiRichEditor";
-
-/** Typing in a field: single-key shortcuts stay off. */
-export const typingIn = (el: Element | null) =>
-  !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || (el as HTMLElement).isContentEditable);
 
 /** The name of who wrote it, and for whom ("Theo", "Ana"). */
 function useNames() {
@@ -724,7 +721,8 @@ export function WikiReader({
   // E edits (when not typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "e" || e.metaKey || e.ctrlKey || e.altKey || typingIn(document.activeElement)) return;
+      if (e.key.toLowerCase() !== "e" || e.metaKey || e.ctrlKey || e.altKey || typingInField(document.activeElement))
+        return;
       if (!editing && p) {
         e.preventDefault();
         startEdit();

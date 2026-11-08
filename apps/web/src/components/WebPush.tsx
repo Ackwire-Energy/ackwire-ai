@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
+import { typingInField } from "@/lib/keys";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import {
@@ -138,10 +139,7 @@ const EXAMPLES = [
 const QUIET_PAGE = /\/(onboarding|agents\/new)\/?$/;
 
 /** Someone typing (the composer, a field) isn't interrupted: the dialog waits for the next page. */
-const typing = () => {
-  const el = typeof document === "undefined" ? null : document.activeElement;
-  return el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
-};
+const typing = () => typeof document !== "undefined" && typingInField(document.activeElement);
 
 const promptState = (): PushPermissionLike => {
   if (typeof Notification === "undefined") return "denied";
