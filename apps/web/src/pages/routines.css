@@ -452,6 +452,9 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   flex-direction: column;
   min-width: 0;
 }
+label.routine-onair__text {
+  cursor: pointer;
+}
 .routine-onair__text b {
   font-size: 14px;
   line-height: 20px;

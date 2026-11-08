@@ -5042,6 +5042,10 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   display: flex;
   flex-direction: column;
   font-weight: 600;
+  cursor: pointer;
+}
+.cflow-agent:has(.ac-switch:disabled) .cflow-agent__name {
+  cursor: default;
 }
 /* "Todos os agentes": the main choice, raised over the agents' own rows, which line up with its content. */
 .cflow-agent--all {
@@ -13426,7 +13430,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
-.ac-card:has(> .settings-rows > .settings-row--open) {
+.ac-card:has(> .settings-rows > :is(.settings-row--open, .settings-row--toggle)) {
   overflow: hidden;
 }
 .settings-row--open {
@@ -13441,6 +13445,14 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   transition: background-color 0.15s;
 }
 .settings-row--open:hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+/* A line with a switch is its label: a press anywhere on it toggles, as a line that opens something opens. */
+.settings-row--toggle:not(:has(.ac-switch:disabled)) {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.settings-row--toggle:not(:has(.ac-switch:disabled)):hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 html:not([data-pointer]) .settings-row--open:focus-visible {

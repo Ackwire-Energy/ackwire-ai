@@ -1734,16 +1734,27 @@ function RoutineAside({
       {value}
     </div>
   );
+  const onAirWords = (
+    <>
+      <b>{t(r.active ? "routines.panel.state.live" : "routines.panel.state.paused")}</b>
+      <small>{t(r.active ? "routines.panel.onAirLine" : "routines.panel.offAirLine")}</small>
+    </>
+  );
   return (
     <aside aria-label={t("routines.panel.label", { name: routineTitle(r) })} className="issue-aside">
       {!fired && (
         <div className="issue-aside__item routine-onair">
-          <span className="routine-onair__text">
-            <b>{t(r.active ? "routines.panel.state.live" : "routines.panel.state.paused")}</b>
-            <small>{t(r.active ? "routines.panel.onAirLine" : "routines.panel.offAirLine")}</small>
-          </span>
+          {/* Its words are the switch's label: a press on them toggles it. */}
+          {manage ? (
+            <label className="routine-onair__text" htmlFor={`rt-onair-${r.id}`}>
+              {onAirWords}
+            </label>
+          ) : (
+            <span className="routine-onair__text">{onAirWords}</span>
+          )}
           {manage && (
             <Switch
+              id={`rt-onair-${r.id}`}
               checked={r.active}
               onCheckedChange={(on) => controls.setActive(on, onSaved)}
               aria-label={t("routines.panel.state.live")}
