@@ -22,8 +22,8 @@ import {
   unarchiveChannel,
 } from "./channels";
 import { findMember } from "./chat-tools";
-import { ownWords } from "./context/learn";
 import { cardPlace, NO_PERSON_READS } from "./consultations";
+import { ownWords } from "./context/learn";
 import { continueRun } from "./continue-run";
 import { queueInvitationEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";

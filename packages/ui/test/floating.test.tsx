@@ -143,7 +143,9 @@ describe("floating layers", () => {
     expect(rule).toContain(`max-width: calc(100vw - ${2 * EDGE_ROOM}px)`);
     expect(rule).toContain("overflow-wrap: anywhere");
     // Wider than a phone, a time's details stop at a reading width; a phone keeps the window's.
-    expect(await css("components.css")).toMatch(/@media \(min-width: 641px\) \{\s*\.ac-msg__tip \{\s*max-width: 420px;/);
+    expect(await css("components.css")).toMatch(
+      /@media \(min-width: 641px\) \{\s*\.ac-msg__tip \{\s*max-width: 420px;/,
+    );
     await act(async () => fireEvent.pointerLeave(time, { pointerType: "mouse" }));
     expect(document.querySelector(".ac-tip")).toBeNull();
     unmount();

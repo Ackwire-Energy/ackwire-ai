@@ -39,7 +39,9 @@ describe("an internal id in a text on the phone", () => {
   test("its pill opens the file or the task, a message's is the message pill, and the id never shows while it loads", () => {
     const pill = source("IdRefText.tsx");
     // A file's is the file's pill, as a file's link shows it.
-    expect(pill).toContain('if (ref.kind === "file") return <FilePillText orgId={orgId} id={ref.id} title={ref.title} />;');
+    expect(pill).toContain(
+      'if (ref.kind === "file") return <FilePillText orgId={orgId} id={ref.id} title={ref.title} />;',
+    );
     expect(source("FileRefText.tsx")).toContain('router.push({ pathname: "/file/[id]", params: { id, ...(version ?');
     expect(pill).toMatch(/router\.push\(`\/issues\/\$\{ref\.number\}`\)/);
     expect(pill).toContain("<MessageRefText");

@@ -71,5 +71,7 @@ export function FileRef({ link }: { link: FileLink }) {
     );
   }
   const content = a.content.kind === "file" ? { fileName: a.content.name, contentType: a.content.contentType } : {};
-  return <FilePill orgId={link.orgId} file={{ id: a.id, title: a.title, kind: a.kind, ...content }} version={version} />;
+  return (
+    <FilePill orgId={link.orgId} file={{ id: a.id, title: a.title, kind: a.kind, ...content }} version={version} />
+  );
 }

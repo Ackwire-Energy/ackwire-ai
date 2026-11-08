@@ -57,7 +57,13 @@ export function IdRef({ id, text, shown }: { id: string; text: string; shown?: R
   return (
     <FilePill
       orgId={org.id}
-      file={{ id: ref.id, title: ref.title, kind: ref.artifactKind, fileName: ref.fileName, contentType: ref.contentType }}
+      file={{
+        id: ref.id,
+        title: ref.title,
+        kind: ref.artifactKind,
+        fileName: ref.fileName,
+        contentType: ref.contentType,
+      }}
     />
   );
 }
