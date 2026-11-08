@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
+import { z } from "@hono/zod-openapi";
+import { issueParams } from "../src/http/errors";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -126,6 +128,19 @@ describe("app API protections", () => {
       issue: "too_long",
       max: 100,
     });
+  });
+
+  test("a number out of its range reads as a value to check, never as text too long or missing", () => {
+    const first = (schema: z.ZodType, value: unknown) => issueParams(schema.safeParse(value).error?.issues[0]);
+    const fields = z.object({ timeout: z.number().int().min(1).max(60), names: z.array(z.string()).min(1).max(2) });
+    expect(first(fields, { timeout: 70, names: ["a"] })).toEqual({ field: "timeout", issue: "invalid" });
+    expect(first(fields, { timeout: 0, names: ["a"] })).toEqual({ field: "timeout", issue: "invalid" });
+    expect(first(fields, { timeout: 5, names: ["a", "b", "c"] })).toEqual({
+      field: "names",
+      issue: "too_many",
+      max: 2,
+    });
+    expect(first(fields, { timeout: 5, names: [] })).toEqual({ field: "names", issue: "missing" });
   });
 });
 

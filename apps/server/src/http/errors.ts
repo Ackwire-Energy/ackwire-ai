@@ -50,19 +50,22 @@ export const errorResponse = (description: string) => ({
 });
 
 /**
- * What the apps say of a validation failure, by its first problem: the field and its kind (`too_long`, `too_many`,
- * `missing`, else `invalid`), with the limit when there is one. The message is the validator's English, for developers.
+ * What the apps say of a validation failure, by its first problem: the field and its kind (`too_long` for text,
+ * `too_many` for a list, `missing` for an empty one of either, else `invalid`), with the limit when there is one. A
+ * number out of its range is `invalid`: "shorten it" or "fill it in" would mislead. The message is the validator's
+ * English, for developers.
  */
-function issueParams(
+export function issueParams(
   issue: { code: string; path: PropertyKey[]; maximum?: unknown; minimum?: unknown; origin?: unknown } | undefined,
 ) {
   if (!issue) return undefined;
   const field = issue.path.map(String).join(".") || "body";
-  if (issue.code === "too_big" && typeof issue.maximum === "number") {
-    const many = issue.origin === "array" || issue.origin === "set";
-    return { field, issue: many ? "too_many" : "too_long", max: issue.maximum };
+  const list = issue.origin === "array" || issue.origin === "set";
+  const sized = list || issue.origin === "string";
+  if (sized && issue.code === "too_big" && typeof issue.maximum === "number") {
+    return { field, issue: list ? "too_many" : "too_long", max: issue.maximum };
   }
-  if (issue.code === "too_small" && Number(issue.minimum) <= 1) return { field, issue: "missing" };
+  if (sized && issue.code === "too_small" && Number(issue.minimum) <= 1) return { field, issue: "missing" };
   return { field, issue: "invalid" };
 }
 
