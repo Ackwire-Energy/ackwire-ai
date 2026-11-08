@@ -220,7 +220,7 @@ import {
   ThreadOptions,
 } from "./sheets";
 import { StoppedRunsContext, stoppedRunsKey, stoppedRunsOf } from "./stopped-runs";
-import { turnOrder, turnRuns, withOpacity } from "./turn";
+import { turnRuns, turnsInPlace, withOpacity } from "./turn";
 import { JumpToMessageContext } from "./WorkLine";
 
 /** A run's messages this recent are asked whether a take over still holds the agent's browser. */
@@ -620,8 +620,9 @@ function Chat({
         return key ? { ...r, key } : r;
       });
     };
-    const runRowsOf = (live: LiveRun[]): Row[] =>
-      live.map((run) => ({ kind: "run" as const, key: turnKeyOf(run.runId) ?? `turn-${run.runId}`, run }));
+    const runRowOf = (run: LiveRun): Row => ({ kind: "run", key: turnKeyOf(run.runId) ?? `turn-${run.runId}`, run });
+    // Each block at work where its words first showed, with what people sent meanwhile below it; the others last.
+    const placed = (chatRows: ChatRow[]) => turnsInPlace(asTurns(chatRows), shownRuns, runRowOf);
     if (isThread && threadId) {
       const root = list.find((m) => m.id === threadId);
       const replies = list.filter((m) => m.id !== threadId);
@@ -653,23 +654,25 @@ function Chat({
               },
             ]
           : [];
+      const turns = placed(buildRows(replies, (m) => superseded.has(m.id), agentsAtWork));
       return [
         ...head,
-        ...asTurns(buildRows(replies, (m) => superseded.has(m.id), agentsAtWork)),
+        ...turns.rows,
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
         ...waitRows,
-        ...runRowsOf(turnOrder(shownRuns)),
+        ...turns.last,
       ];
     }
     // A thread's replies live in the thread; the channel shows its link.
     const hidden = (m: Message) => superseded.has(m.id) || Boolean(m.threadId);
+    const turns = placed(buildRows(list, hidden, agentsAtWork));
     return [
-      ...asTurns(buildRows(list, hidden, agentsAtWork)),
+      ...turns.rows,
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
       ...waitRows,
-      ...runRowsOf(turnOrder(shownRuns)),
+      ...turns.last,
     ];
   }, [
     isThread,
@@ -753,10 +756,15 @@ function Chat({
   // the end until the person gets there, sends, or takes the pill.
   const [readHold, setReadHold] = useState(false);
   const [seenKey, setSeenKey] = useState<string | null>(null);
+  // The blocks at work when the person was last at the end: the message each lands in its row is new to them too.
+  const [seenTurns, setSeenTurns] = useState<ReadonlySet<string>>(() => new Set());
   const latestSeen = lastSeenKey(scrollRows);
+  const turnsNow = scrollRows.flatMap((r) => (r.kind === "run" ? [r.key] : [])).join(" ");
   useEffect(() => {
-    if (atEnd) setSeenKey(latestSeen);
-  }, [atEnd, latestSeen]);
+    if (!atEnd) return;
+    setSeenKey(latestSeen);
+    setSeenTurns(new Set(turnsNow ? turnsNow.split(" ") : []));
+  }, [atEnd, latestSeen, turnsNow]);
   // More than a screen above the end: the round button shows even with nothing new below, and the header's pill
   // closes to the face.
   const [far, setFar] = useState(false);
@@ -764,8 +772,8 @@ function Chat({
     () =>
       atEnd
         ? { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false }
-        : unseenBelow(scrollRows, seenKey),
-    [atEnd, scrollRows, seenKey],
+        : unseenBelow(scrollRows, seenKey, seenTurns),
+    [atEnd, scrollRows, seenKey, seenTurns],
   );
   // "Novas": before the first new row while the person reads above; it fades a while after they reach it.
   const [divider, setDivider] = useState<{ beforeKey: string; fading: boolean } | null>(null);

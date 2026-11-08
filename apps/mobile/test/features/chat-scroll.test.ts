@@ -83,6 +83,19 @@ describe("what arrived below", () => {
     expect(unseenBelow([row("a"), row("b")], null).messages).toBe(0);
     expect(unseenBelow([row("a"), row("b")], "zz").firstKey).toBeNull();
   });
+  test("a reply that lands in its block's row above what I saw last is new too; the line goes before it", () => {
+    // At the end I saw "b" below a block at work; its reply took the block's row once I read above.
+    const rows = [row("a"), row("turn-1", "message", false, "agent:ada"), row("b", "message", false, "person:marina")];
+    expect(unseenBelow(rows, "b", new Set(["turn-1"]))).toEqual({
+      messages: 1,
+      firstKey: "turn-1",
+      authors: ["agent:ada"],
+      working: [],
+      mentionsMe: false,
+    });
+    // Still at work there: nothing new yet.
+    expect(unseenBelow([row("a"), row("turn-1", "run"), row("b")], "b", new Set(["turn-1"])).firstKey).toBeNull();
+  });
 });
 
 describe("turnKeys", () => {

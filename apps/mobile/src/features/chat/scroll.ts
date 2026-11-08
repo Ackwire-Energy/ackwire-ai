@@ -73,15 +73,24 @@ export interface Unseen {
   mentionsMe: boolean;
 }
 
-/** What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Theo escrevendo"). */
-export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null): Unseen {
+/**
+ * What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Atlas escrevendo"), and
+ * the messages of the blocks at work then (`turns`, their rows' keys): each takes its block's row, where its words first
+ * showed, so it can land above that last row and still be new.
+ */
+export function unseenBelow(
+  rows: readonly ScrollRow[],
+  seenKey: string | null,
+  turns: ReadonlySet<string> = new Set(),
+): Unseen {
   const none: Unseen = { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false };
   if (!seenKey) return none;
   const at = rows.findIndex((r) => r.key === seenKey);
   if (at < 0) return none;
   const out: Unseen = { ...none, authors: [], working: [] };
-  for (let i = at + 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const r = rows[i] as ScrollRow;
+    if (i <= at && !(r.kind === "message" && turns.has(r.key))) continue;
     if ((r.kind !== "message" && r.kind !== "run") || r.mine || r.silent) continue;
     out.firstKey ??= r.key;
     if (r.kind === "message") out.messages++;

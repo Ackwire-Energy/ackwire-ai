@@ -146,7 +146,7 @@ import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { hiddenCount, tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { blockPlaces, buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
@@ -231,7 +231,7 @@ import {
   sameSlots,
   waitingLast,
 } from "@/chat/run-slots";
-import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
+import { dividerIsFar, earlierKey, firstNewKey, landedKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
@@ -1249,12 +1249,12 @@ function ChannelView({
     return ungroupAfter(items, special);
   }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView, agentsAtWork]);
 
-  // The agents' blocks at the end of the conversation (one per run, from "pensando" to its final
-  // message: `chat/run-slots.ts`). They change when runs start or end, never on a streaming delta.
+  // The agents' blocks (one per run, from "pensando" to its final message: `chat/run-slots.ts`), each where its words
+  // first showed, else at the end. They change when runs start or end or their words first show, never on a delta.
   const liveRunsKey = useStreams((s) =>
     scopedRuns(s)
       .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))
-      .map((r) => `${r.runId}\t${r.agentId}\t${r.provisional ? 1 : 0}`)
+      .map((r) => `${r.runId}\t${r.agentId}\t${r.provisional ? 1 : 0}\t${r.shownAt ?? ""}`)
       .join("\n"),
   );
   const landedRuns = useMemo(
@@ -1270,8 +1270,8 @@ function ChannelView({
   const slots = useMemo(() => {
     const onScreen = liveRunsKey
       ? liveRunsKey.split("\n").map((line) => {
-          const [runId = "", agentId = "", provisional] = line.split("\t");
-          return { runId, agentId, provisional: provisional === "1" };
+          const [runId = "", agentId = "", provisional, shownAt] = line.split("\t");
+          return { runId, agentId, provisional: provisional === "1", ...(shownAt ? { shownAt } : {}) };
         })
       : [];
     // Its message is in a cache already (it lands in the timeline on the next render), or came without its body and
@@ -1398,9 +1398,12 @@ function ChannelView({
   );
   const unseenFromRef = useRef<string | null>(null);
   const dividerOn = useRef(false);
-  /** Something arrived out of view: the divider before `key` (the first one since the person left). */
-  const markUnseen = (key: string) => {
-    if (unseenFromRef.current !== null) return;
+  /**
+   * Something arrived out of view: the divider before `key` (the first one since the person left). `up`: it landed
+   * above the divider already drawn (a reply keeps the place where its first words showed), which moves there.
+   */
+  const markUnseen = (key: string, up = false) => {
+    if (unseenFromRef.current !== null && !up) return;
     unseenFromRef.current = key;
     dropDividerTimers();
     dividerOn.current = true;
@@ -1554,16 +1557,25 @@ function ChannelView({
     const settled = before !== undefined && Date.now() - openedAt.current > 1500;
     previousLastKey.current = lastKey;
     const blocks = previousSlots.current.split(" ");
-    const newBlock = slotsKey.split(" ").some((k) => k && !blocks.includes(k));
+    const shown = slotsKey.split(" ");
+    const newBlock = shown.some((k) => k && !blocks.includes(k));
+    // Runs whose block just went: each one's message took its place, which can be above rows that came after it.
+    const gone = new Set(
+      [...runKeys.current].flatMap(([runId, key]) => (blocks.includes(key) && !shown.includes(key) ? [runId] : [])),
+    );
     previousSlots.current = slotsKey;
     if (scroller.current) measureFar(scroller.current);
     if (stick.current) follow((newRow || newBlock) && settled);
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
-      const first = newRow ? firstNewKey(timeline, before) : null;
+      const landed = gone.size > 0 ? landedKey(timeline, blockRowByRun(timeline, new Set()), gone) : null;
+      const first = earlierKey(timeline, newRow ? firstNewKey(timeline, before) : null, landed);
       if (first) {
         const drawn = unseenFromRef.current !== null;
-        markUnseen(first);
+        markUnseen(
+          first,
+          drawn && first !== unseenFromRef.current && earlierKey(timeline, unseenFromRef.current, first) === first,
+        );
         // Nobody reading up there: go to what is new (as the pill would), once its divider is drawn.
         if (settled && idleAway()) {
           if (drawn) openUnseen();
@@ -2915,9 +2927,10 @@ function Parts({ resetKey, children }: { resetKey: unknown; children: ReactNode 
 }
 
 /**
- * Persisted rows, then the agents' live blocks (always last while they work: new messages go above
- * them). One flat keyed list: an answer seen live is drawn under its block's key, so the final message
- * takes the block's place without a remount. Memoized: streaming deltas don't re-render it.
+ * Persisted rows and the agents' live blocks: one whose words showed sits where they first did, with what people sent
+ * meanwhile below it, the others last (`blockPlaces`). One flat keyed list: an answer seen live is drawn under its
+ * block's key in that same place (its message is posted there), so the final message takes the block's place without
+ * a remount. Memoized: streaming deltas don't re-render it.
  */
 const Timeline = memo(function Timeline({
   items,
@@ -3046,6 +3059,8 @@ const Timeline = memo(function Timeline({
     const waiting = new Set(waitingKey.split(" "));
     return waitingLast(slots, (runId) => waiting.has(runId));
   }, [slots, waitingKey]);
+  // Each block where its words first showed (what people sent meanwhile reads below it), the others last.
+  const places = useMemo(() => blockPlaces(items, drawn, (slot) => slot.shownAt), [items, drawn]);
   // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
   const heldPlaces = useHeldPlaces();
   const held = useMemo(
@@ -3070,11 +3085,29 @@ const Timeline = memo(function Timeline({
   );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
+  const blockRow = (slot: RunSlot) => {
+    if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
+    return (
+      <RunBlock
+        key={slot.key}
+        runId={slot.runId}
+        grouped={false}
+        entering={blockEnters.current.get(slot.key) ?? false}
+        modelLabels={modelLabels}
+      />
+    );
+  };
   for (const [at, item] of items.entries()) {
-    const grouped = item.kind === "message" && item.grouped && !afterUnshown();
+    // A block drawn right before it: it starts its own run of rows, its header back.
+    const placed = places.before.get(at) ?? [];
+    const grouped = item.kind === "message" && item.grouped && !afterUnshown() && placed.length === 0;
     const after = items[at + 1];
     // Where it sits in its author's run: my own rows' bubbles square the corners they share.
-    const run = runPosition(grouped, after?.kind === "message" && after.grouped && !unshown.has(item.key));
+    const run = runPosition(
+      grouped,
+      after?.kind === "message" && after.grouped && !unshown.has(item.key) && !places.before.has(at + 1),
+    );
+    for (const slot of placed) rows.push(blockRow(slot));
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -3133,18 +3166,7 @@ const Timeline = memo(function Timeline({
     );
   }
   rows.push(<QueueWaitTurns key="queue-waits" channelId={channelId} messages={shownMessages} />);
-  drawn.forEach((slot) => {
-    if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
-    rows.push(
-      <RunBlock
-        key={slot.key}
-        runId={slot.runId}
-        grouped={false}
-        entering={blockEnters.current.get(slot.key) ?? false}
-        modelLabels={modelLabels}
-      />,
-    );
-  });
+  for (const slot of places.after) rows.push(blockRow(slot));
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
   // A row that fails to draw (data this build doesn't expect) is one quiet line: the rest of the conversation, the
   // sidebar and the composer keep working. Its message changing draws it again: a live block that broke has none,
@@ -3199,7 +3221,10 @@ const HELD_RECENT_MS = 12 * 60 * 60_000;
 /** Model names for the rows of "Ajustar trecho" (no usage line is shown there). */
 const NO_LABELS = new Map<string, string>();
 
-/** The live run as a message, while it has none (the block's text and header come from the run). */
+/**
+ * The live run as a message, while it has none (the block's text and header come from the run). Its time is its
+ * message's to be: when its words first showed, else when it started.
+ */
 function liveMessageOf(r: LiveRun): MessageType {
   return {
     id: `live:${r.runId}`,
@@ -3210,7 +3235,7 @@ function liveMessageOf(r: LiveRun): MessageType {
     mentionedAgentIds: [],
     agentRunId: r.runId,
     meta: {},
-    createdAt: new Date(r.startedAt ?? Date.now()).toISOString(),
+    createdAt: r.shownAt ?? new Date(r.startedAt ?? Date.now()).toISOString(),
   } as MessageType;
 }
 
@@ -3245,10 +3270,11 @@ function RunBlock({
   const liveChannel = live?.channelId;
   const liveThread = live?.threadId;
   const liveStart = live?.startedAt;
+  const liveShown = live?.shownAt;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the placeholder only depends on who and when
   const placeholder = useMemo(
     () => (live ? liveMessageOf(live) : null),
-    [liveId, liveAgent, liveChannel, liveThread, liveStart],
+    [liveId, liveAgent, liveChannel, liveThread, liveStart, liveShown],
   );
   // No words of its own yet: the bar above the composer speaks for it, and the block draws only for something to
   // show (`rowShows`). A run gone quiet meanwhile draws for "sem notícias · Atualizar": wake when that moment comes.
