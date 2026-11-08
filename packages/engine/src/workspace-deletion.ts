@@ -747,8 +747,9 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
  * Link it made for one (never revoked there: Composio's apps share one grant across toolkits and workspaces) and its
  * mailboxes (their triggers, and the accounts, which revokes them at Google or Microsoft unless another connection
  * still uses the same grant), MillionSend the webhooks of inboxes left from the withdrawn path whose boot cleanup
- * failed (their sealed keys go with the workspace), and GitHub its OAuth tokens and the app's installations. Each is marked as it goes, so a
- * retry skips it. Returns the ids of the mailboxes, connections and Composio accounts that failed; never a token.
+ * failed (their sealed keys go with the workspace), and GitHub its OAuth tokens and the app's installations. Each is
+ * marked as it goes, so a retry skips it. Returns the ids of the mailboxes, connections, Composio accounts and
+ * installations that failed; never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const { db } = deps;
