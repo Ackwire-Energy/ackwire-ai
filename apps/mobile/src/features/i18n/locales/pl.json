@@ -1894,7 +1894,7 @@
   },
   "crash": {
     "title": "Coś poszło nie tak na tym ekranie",
-    "subtitle": "Aplikacja napotkała błąd przy wyświetlaniu tego widoku. Spróbuj ponownie. Jeśli to się powtarza, wyślij nam tekst poniżej.",
+    "subtitle": "Aplikacja napotkała błąd przy wyświetlaniu tego widoku. Spróbuj ponownie.",
     "retry": "Spróbuj ponownie"
   },
   "notFound": {

@@ -1707,7 +1707,7 @@ export const featureKeysPtBR = {
   },
   crash: {
     title: "Algo deu errado nesta tela",
-    subtitle: "O app achou um erro ao mostrar isto. Tente de novo. Se continuar, mande o texto abaixo pra gente.",
+    subtitle: "O app achou um erro ao mostrar isto. Tente de novo.",
     retry: "Tentar de novo",
   },
   notFound: {

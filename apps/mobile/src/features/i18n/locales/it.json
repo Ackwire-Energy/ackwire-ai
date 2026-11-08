@@ -1798,7 +1798,7 @@
   },
   "crash": {
     "title": "Qualcosa è andato storto in questa schermata",
-    "subtitle": "L'app ha avuto un errore mostrando questo. Riprova. Se continua a succedere, mandaci il testo qui sotto.",
+    "subtitle": "L'app ha avuto un errore mostrando questo. Riprova.",
     "retry": "Riprova"
   },
   "notFound": {

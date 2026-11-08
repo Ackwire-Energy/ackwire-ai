@@ -1798,7 +1798,7 @@
   },
   "crash": {
     "title": "Un problème est survenu sur cet écran",
-    "subtitle": "L'app a rencontré une erreur en affichant ceci. Réessayez. Si ça continue, envoyez-nous le texte ci-dessous.",
+    "subtitle": "L'app a rencontré une erreur en affichant ceci. Réessayez.",
     "retry": "Réessayer"
   },
   "notFound": {

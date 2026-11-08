@@ -1702,7 +1702,7 @@
   },
   "crash": {
     "title": "Auf diesem Bildschirm ist etwas schiefgelaufen",
-    "subtitle": "Die App hatte einen Fehler beim Anzeigen. Versuch es noch einmal. Wenn es wieder passiert, schick uns den Text unten.",
+    "subtitle": "Die App hatte einen Fehler beim Anzeigen. Versuch es noch einmal.",
     "retry": "Erneut versuchen"
   },
   "notFound": {

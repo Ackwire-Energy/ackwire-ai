@@ -1702,7 +1702,7 @@
   },
   "crash": {
     "title": "Er ging iets mis op dit scherm",
-    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw. Gebeurt het vaker, stuur ons dan de tekst hieronder.",
+    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw.",
     "retry": "Opnieuw proberen"
   },
   "notFound": {

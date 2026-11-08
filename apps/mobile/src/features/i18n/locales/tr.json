@@ -1702,7 +1702,7 @@
   },
   "crash": {
     "title": "Bu ekranda bir şeyler ters gitti",
-    "subtitle": "Uygulama bunu gösterirken bir hatayla karşılaştı. Tekrar deneyin. Devam ederse aşağıdaki metni bize gönderin.",
+    "subtitle": "Uygulama bunu gösterirken bir hatayla karşılaştı. Tekrar deneyin.",
     "retry": "Tekrar deneyin"
   },
   "notFound": {

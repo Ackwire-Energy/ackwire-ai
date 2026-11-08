@@ -1798,7 +1798,7 @@
   },
   "crash": {
     "title": "Algo salió mal en esta pantalla",
-    "subtitle": "La app tuvo un error al mostrar esto. Inténtalo de nuevo. Si sigue pasando, envíanos el texto de abajo.",
+    "subtitle": "La app tuvo un error al mostrar esto. Inténtalo de nuevo.",
     "retry": "Reintentar"
   },
   "notFound": {

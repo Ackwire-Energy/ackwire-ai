@@ -1706,7 +1706,7 @@ export const featureKeysEn = {
   },
   crash: {
     title: "Something went wrong on this screen",
-    subtitle: "The app hit an error showing this. Try again. If it keeps happening, send us the text below.",
+    subtitle: "The app hit an error showing this. Try again.",
     retry: "Try again",
   },
   notFound: {

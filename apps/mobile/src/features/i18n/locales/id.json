@@ -1606,7 +1606,7 @@
   },
   "crash": {
     "title": "Ada yang salah di layar ini",
-    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi. Jika terus terjadi, kirimkan teks di bawah ke kami.",
+    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi.",
     "retry": "Coba lagi"
   },
   "notFound": {
