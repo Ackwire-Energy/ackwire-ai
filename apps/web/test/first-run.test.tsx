@@ -44,7 +44,8 @@ describe("the first-run checklist", () => {
     const state = fresh();
     await openDm(state);
     expect(card().getAttribute("aria-label")).toBe("Para o time da Acme começar a trabalhar");
-    expect(rows().map((r) => r.querySelector("b")?.textContent)).toEqual([
+    // Each row's name line (a MediaRow's head): the step, and a done one's way to change it after it.
+    expect(rows().map((r) => r.querySelector(".ac-mediarow__head")?.textContent)).toEqual([
       "Me conte o que a Acme faz.",
       "Monte o time.",
       "Penso com AutomáticoTrocar",

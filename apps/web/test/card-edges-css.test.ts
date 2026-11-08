@@ -19,8 +19,11 @@ test("on a phone a task row wraps its chips under its title and its face, never 
   const issues = await sheet("apps/web/src/pages/issues.css");
   // "Pede aprovação" beside the face ran 23px past its column and 9px past the row at 390px.
   const narrow = atRule(issues, "@media (max-width: 720px)");
-  for (const cell of [".issue-list__title", ".issue-list__who"])
-    expect(last(declarations(narrow, cell), "flex-wrap")).toBe("wrap");
+  // The title's chips are the row's own items there (the number inline in the title's words), so the row wraps them;
+  // who works on it wraps its own.
+  expect(last(declarations(narrow, ".issue-list__title"), "display")).toBe("contents");
+  for (const box of [".issue-list__row", ".issue-list__who"])
+    expect(last(declarations(narrow, box), "flex-wrap")).toBe("wrap");
 });
 
 test("a version's note longer than its line breaks instead of running past its card", async () => {
