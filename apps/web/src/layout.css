@@ -1961,6 +1961,16 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
     display: none;
   }
 }
+/* Two to a row on a phone under 390px, a tile is too narrow for a document's words at their size: they'd wrap one or
+   two a line. The same cover, drawn smaller (as `.chat-look__mini` draws a conversation). */
+.artifact-tile__cover:has(> :is(.artifact-tile__doc, .artifact-tile__text)) {
+  container: tile-cover / inline-size;
+}
+@container tile-cover (max-width: 150px) {
+  :is(.artifact-tile__doc, .artifact-tile__text) {
+    zoom: 0.75;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .artifact-tile {
     transition: none;
