@@ -271,6 +271,9 @@ export const SELF_TESTED = [
   "cascadeorder",
 ];
 
+/** Rules about a desktop layout only (panes floating beside the conversation): a phone has none to check. */
+export const DESKTOP_ONLY = ["floating"];
+
 type Tab = Awaited<ReturnType<typeof openTab>>;
 
 /**
@@ -305,19 +308,20 @@ async function orderFindings(tab: Tab, reverse: Tab): Promise<Finding[]> {
  */
 async function selfTest(tab: Tab, reverse: Tab) {
   const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
-  for (const t of [tab, reverse]) {
-    await t.resize(1280);
-    await t.run(`geometry.load(${JSON.stringify(fixture)})`);
-  }
-  const found = [...(await orderFindings(tab, reverse)), ...(await tab.run<Finding[]>("geometry.detect()"))];
-  const hit = (rule: string, cls: string) =>
-    found.some((f) => f.rule === rule && `${f.el} ${f.box ?? ""} ${f.at ?? ""}`.split(/[.\s]/).includes(cls));
+  for (const t of [tab, reverse]) await t.run(`geometry.load(${JSON.stringify(fixture)})`);
   const twins = [...new Set(fixture.match(/\b(?:bad|good)-[a-z]+(?:--[a-z]+)?\b/g))];
   const wrong: string[] = [];
-  for (const rule of SELF_TESTED) {
-    for (const cls of twins.filter((c) => c.replace(/^(bad|good)-|--.*$/g, "") === rule)) {
-      if (cls.startsWith("bad-") && !hit(rule, cls)) wrong.push(`${rule} missed ${cls}`);
-      if (cls.startsWith("good-") && hit(rule, cls)) wrong.push(`${rule} flagged ${cls}`);
+  // At every width the screens are checked at, a phone's touch sizes included.
+  for (const width of WIDTHS) {
+    await Promise.all([tab.resize(width), reverse.resize(width)]);
+    const found = [...(await orderFindings(tab, reverse)), ...(await tab.run<Finding[]>("geometry.detect()"))];
+    const hit = (rule: string, cls: string) =>
+      found.some((f) => f.rule === rule && `${f.el} ${f.box ?? ""} ${f.at ?? ""}`.split(/[.\s]/).includes(cls));
+    for (const rule of SELF_TESTED.filter((r) => width >= 640 || !DESKTOP_ONLY.includes(r))) {
+      for (const cls of twins.filter((c) => c.replace(/^(bad|good)-|--.*$/g, "") === rule)) {
+        if (cls.startsWith("bad-") && !hit(rule, cls)) wrong.push(`${rule}@${width} missed ${cls}`);
+        if (cls.startsWith("good-") && hit(rule, cls)) wrong.push(`${rule}@${width} flagged ${cls}`);
+      }
     }
   }
   if (wrong.length) throw new Error(`Self-test: ${wrong.join(", ")}`);

@@ -2,7 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bundleCss, compare, coverage, cssSheets, edgesOf, keyOf, playwrightChromes, SELF_TESTED } from "./check";
+import {
+  bundleCss,
+  compare,
+  coverage,
+  cssSheets,
+  DESKTOP_ONLY,
+  edgesOf,
+  keyOf,
+  playwrightChromes,
+  SELF_TESTED,
+} from "./check";
 
 describe("geometry check", () => {
   test("a new offender is new at its width, and words or size never make one", () => {
@@ -66,6 +76,13 @@ describe("geometry check", () => {
       expect(fixture).toContain(`good-${rule}`);
       expect(`${rules}${check}`).toContain(`rule: "${rule}"`);
     }
+  });
+
+  test("the self-test runs every rule at every checked width, but a desktop-only rule at the phone's", () => {
+    const check = readFileSync(join(import.meta.dir, "check.ts"), "utf8");
+    expect(check).toMatch(/async function selfTest[\s\S]*for \(const width of WIDTHS\)/);
+    expect(DESKTOP_ONLY).toEqual(["floating"]);
+    for (const rule of DESKTOP_ONLY) expect(SELF_TESTED).toContain(rule);
   });
 
   test("the reverse CSS order holds the same sheets: the page sheets backwards, then the app's entry last", () => {
