@@ -9871,6 +9871,16 @@ export const en = {
     installed: "GitHub app installed.",
     requested: "We asked the GitHub account's owner to install the app. It shows up here once they do.",
     notVisible: "Your GitHub account can't see that installation. Install it with an account that has access to it.",
+    /** The line under what an agent writes on GitHub (pull requests, issues, comments), in the workspace's language. */
+    signature: {
+      forPerson: "{{agent}}, agent for {{person}} on agentes.chat",
+      alone: "{{agent}}, an agent on agentes.chat",
+    },
+    /** The server's page that sends its owner to GitHub to create the app (it goes on by itself). */
+    manifestPage: {
+      title: "Creating the GitHub app",
+      continue: "Continue on GitHub",
+    },
   },
   oauthReturn: {
     cancelled: "The connection was cancelled. Nothing changed.",

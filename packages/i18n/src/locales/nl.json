@@ -10023,7 +10023,15 @@
     "removed": "{{account}} verwijderd. Het blijft geïnstalleerd op GitHub. Verwijder het daar als je wilt.",
     "installed": "GitHub-app geïnstalleerd.",
     "requested": "We hebben de eigenaar van het GitHub-account gevraagd de app te installeren. Hij verschijnt hier zodra dat gebeurd is.",
-    "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft."
+    "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft.",
+    "signature": {
+      "forPerson": "{{agent}}, agent van {{person}} op agentes.chat",
+      "alone": "{{agent}}, een agent op agentes.chat"
+    },
+    "manifestPage": {
+      "title": "GitHub-app wordt gemaakt",
+      "continue": "Doorgaan op GitHub"
+    }
   },
   "oauthReturn": {
     "cancelled": "Het koppelen is geannuleerd. Er is niets veranderd.",

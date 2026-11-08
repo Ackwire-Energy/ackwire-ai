@@ -9898,7 +9898,15 @@
     "removed": "{{account}} kaldırıldı. GitHub'da yüklü kalır. İsterseniz oradan kaldırın.",
     "installed": "GitHub uygulaması yüklendi.",
     "requested": "GitHub hesabının sahibinden uygulamayı yüklemesini istedik. Yüklediğinde burada görünür.",
-    "notVisible": "GitHub hesabınız o kurulumu göremiyor. Ona erişimi olan bir hesapla yükleyin."
+    "notVisible": "GitHub hesabınız o kurulumu göremiyor. Ona erişimi olan bir hesapla yükleyin.",
+    "signature": {
+      "forPerson": "{{agent}}, agentes.chat üzerinde {{person}} için çalışan ajan",
+      "alone": "{{agent}}, agentes.chat üzerinde bir ajan"
+    },
+    "manifestPage": {
+      "title": "GitHub uygulaması oluşturuluyor",
+      "continue": "GitHub üzerinde devam et"
+    }
   },
   "oauthReturn": {
     "cancelled": "Bağlantı iptal edildi. Hiçbir şey değişmedi.",

@@ -9599,7 +9599,15 @@
     "removed": "已移除 {{account}}。它仍安装在 GitHub 上，如有需要请在那里卸载。",
     "installed": "GitHub 应用已安装。",
     "requested": "我们已请该 GitHub 账号的所有者安装应用，安装后会显示在这里。",
-    "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。"
+    "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。",
+    "signature": {
+      "forPerson": "{{agent}}，{{person}} 在 agentes.chat 上的智能体",
+      "alone": "{{agent}}，agentes.chat 上的智能体"
+    },
+    "manifestPage": {
+      "title": "正在创建 GitHub 应用",
+      "continue": "在 GitHub 上继续"
+    }
   },
   "oauthReturn": {
     "cancelled": "连接已取消。没有任何改动。",

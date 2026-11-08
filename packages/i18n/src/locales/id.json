@@ -9588,7 +9588,15 @@
     "removed": "{{account}} dihapus. Aplikasinya tetap terpasang di GitHub. Copot di sana kalau kamu mau.",
     "installed": "Aplikasi GitHub terpasang.",
     "requested": "Kami sudah meminta pemilik akun GitHub itu memasang aplikasinya. Akan muncul di sini setelah dia memasangnya.",
-    "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana."
+    "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana.",
+    "signature": {
+      "forPerson": "{{agent}}, agen {{person}} di agentes.chat",
+      "alone": "{{agent}}, agen di agentes.chat"
+    },
+    "manifestPage": {
+      "title": "Membuat aplikasi GitHub",
+      "continue": "Lanjutkan di GitHub"
+    }
   },
   "oauthReturn": {
     "cancelled": "Koneksi dibatalkan. Tidak ada yang berubah.",

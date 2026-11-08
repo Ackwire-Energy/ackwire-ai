@@ -7,7 +7,7 @@ import {
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
-import type { ConnectorDeps } from "../connectors/connections";
+import { type ConnectorDeps, GITHUB_APP_AUTH } from "../connectors/connections";
 import { standingRefusal } from "../standing";
 import { CONNECTOR_ALL, freshGrantedKeys, grantKey, isAllowed, toolAccess } from "../tools/scopes";
 import {
@@ -24,6 +24,7 @@ import {
 } from "./branches";
 import { machineGitGen, verifyGitToken } from "./credential";
 import type { GitHubAppConfig } from "./github-app";
+import { appMissMessage } from "./github-call";
 import { parseReceivePackRequest, pkt, type RefCommand, readPack, walkToOld, ZERO_OID } from "./pack";
 import { agentRepositoryList, repoInList } from "./repos";
 
@@ -315,9 +316,14 @@ async function proxyGit(
     { db: deps.db, orgId: claims.orgId },
     connection,
     parsed,
-    write ? { contents: "write" } : { contents: "read" },
+    // Workflow files too where the installation grants it (ADR 0153): an older installation has contents alone.
+    write ? [{ contents: "write", workflows: "write" }, { contents: "write" }] : { contents: "read" },
   );
-  if (!bearer) return text(502, "agentes: the organization's GitHub connection has no usable token");
+  if (!bearer) {
+    return connection.authType === GITHUB_APP_AUTH
+      ? text(403, `agentes: ${appMissMessage(repoName, "not_installed")}`)
+      : text(502, "agentes: the organization's GitHub connection has no usable token");
+  }
   const upstreamAuth = `Basic ${Buffer.from(`x-access-token:${bearer}`).toString("base64")}`;
   const target = `${upstream.gitUrl}/${parsed.owner}/${parsed.repo}.git/${parsed.action}${url.search}`;
   const forward = (body?: Uint8Array) => {

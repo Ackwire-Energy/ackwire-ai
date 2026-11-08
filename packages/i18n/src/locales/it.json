@@ -10358,7 +10358,15 @@
     "removed": "{{account}} rimosso. Resta installato su GitHub. Disinstallalo lì, se vuoi.",
     "installed": "App GitHub installata.",
     "requested": "Abbiamo chiesto al titolare dell'account GitHub di installare l'app. Comparirà qui appena lo fa.",
-    "notVisible": "Il tuo account GitHub non vede quell'installazione. Installala con un account che vi abbia accesso."
+    "notVisible": "Il tuo account GitHub non vede quell'installazione. Installala con un account che vi abbia accesso.",
+    "signature": {
+      "forPerson": "{{agent}}, agente di {{person}} su agentes.chat",
+      "alone": "{{agent}}, un agente su agentes.chat"
+    },
+    "manifestPage": {
+      "title": "Creazione dell'app GitHub",
+      "continue": "Continua su GitHub"
+    }
   },
   "oauthReturn": {
     "cancelled": "Il collegamento è stato annullato. Non è cambiato niente.",

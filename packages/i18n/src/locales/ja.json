@@ -9534,7 +9534,15 @@
     "removed": "{{account}}を削除しました。GitHubにはインストールされたままです。必要ならGitHubでアンインストールしてください。",
     "installed": "GitHubアプリをインストールしました。",
     "requested": "GitHubアカウントのオーナーにアプリのインストールを依頼しました。インストールされると、ここに表示されます。",
-    "notVisible": "あなたのGitHubアカウントからは、そのインストールが見えません。アクセス権のあるアカウントでインストールしてください。"
+    "notVisible": "あなたのGitHubアカウントからは、そのインストールが見えません。アクセス権のあるアカウントでインストールしてください。",
+    "signature": {
+      "forPerson": "{{agent}}、agentes.chat の {{person}} のエージェント",
+      "alone": "{{agent}}、agentes.chat のエージェント"
+    },
+    "manifestPage": {
+      "title": "GitHub アプリを作成しています",
+      "continue": "GitHub で続ける"
+    }
   },
   "oauthReturn": {
     "cancelled": "接続はキャンセルされました。何も変更されていません。",

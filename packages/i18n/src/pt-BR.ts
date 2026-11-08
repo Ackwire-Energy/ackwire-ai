@@ -9985,6 +9985,16 @@ export const ptBR = {
     /** Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`). */
     requested: "Pedimos ao dono da conta do GitHub para instalar o app. Ele aparece aqui quando a pessoa instalar.",
     notVisible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
+    /** A linha no fim do que um agente escreve no GitHub (pull requests, issues, comentários). */
+    signature: {
+      forPerson: "{{agent}}, agente de {{person}} no agentes.chat",
+      alone: "{{agent}}, agente no agentes.chat",
+    },
+    /** A página do servidor que leva o dono ao GitHub para criar o app (ela segue sozinha). */
+    manifestPage: {
+      title: "Criando o app do GitHub",
+      continue: "Continuar no GitHub",
+    },
   },
   /** Back from a provider's sign-in that didn't connect (`?connector_error=`, `?github_app_error=`). */
   oauthReturn: {

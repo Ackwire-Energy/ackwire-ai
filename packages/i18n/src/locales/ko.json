@@ -9528,7 +9528,15 @@
     "removed": "{{account}}을(를) 제거했어요. GitHub에는 설치된 채로 남아 있어요. 원하면 GitHub에서 제거하세요.",
     "installed": "GitHub 앱을 설치했어요.",
     "requested": "GitHub 계정 소유자에게 앱 설치를 요청했어요. 설치하면 여기에 표시돼요.",
-    "notVisible": "내 GitHub 계정으로는 그 설치를 볼 수 없어요. 접근 권한이 있는 계정으로 설치하세요."
+    "notVisible": "내 GitHub 계정으로는 그 설치를 볼 수 없어요. 접근 권한이 있는 계정으로 설치하세요.",
+    "signature": {
+      "forPerson": "{{agent}}, agentes.chat에서 {{person}}의 에이전트",
+      "alone": "{{agent}}, agentes.chat의 에이전트"
+    },
+    "manifestPage": {
+      "title": "GitHub 앱을 만드는 중",
+      "continue": "GitHub에서 계속"
+    }
   },
   "oauthReturn": {
     "cancelled": "연결이 취소됐어요. 바뀐 것은 없어요.",

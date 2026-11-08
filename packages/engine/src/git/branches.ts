@@ -2,7 +2,7 @@ import { and, type Database, desc, type Executor, eq, gt, gte, inArray, schema }
 import { RULE_REMOVED_AUDIT } from "../approval-rules";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
-import { appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
+import { type AppPermissions, appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { parseRepo } from "./repos";
 
 const { approvalRules, approvals, auditLog } = schema;
@@ -54,7 +54,7 @@ export async function githubToken(
   tenant: { db: Database; orgId: string },
   connection: ConnectorConnection,
   repo: Repo,
-  permissions: Record<string, "read" | "write">,
+  permissions: AppPermissions | AppPermissions[],
 ): Promise<string | null> {
   const app = deps.app
     ? await appTokenForRepo(deps.app, http, tenant, repo.owner, repo.repo, permissions).catch(() => null)

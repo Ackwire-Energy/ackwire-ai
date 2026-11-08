@@ -24324,6 +24324,18 @@
   "githubApp.notVisible": {
     "value": "Your GitHub account can't see that installation. Install it with an account that has access to it."
   },
+  "githubApp.signature.forPerson": {
+    "value": "{{agent}}, agent for {{person}} on agentes.chat"
+  },
+  "githubApp.signature.alone": {
+    "value": "{{agent}}, an agent on agentes.chat"
+  },
+  "githubApp.manifestPage.title": {
+    "value": "Creating the GitHub app"
+  },
+  "githubApp.manifestPage.continue": {
+    "value": "Continue on GitHub"
+  },
   "oauthReturn.cancelled": {
     "value": "The connection was cancelled. Nothing changed."
   },
