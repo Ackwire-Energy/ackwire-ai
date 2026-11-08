@@ -29,6 +29,7 @@ describe("sign-up policy (self-host)", () => {
       supportEmail: null,
       passwordReset: true,
       workspaceComputer: false,
+      cloud: false,
     });
     await t.close();
     t = await createTestServer({

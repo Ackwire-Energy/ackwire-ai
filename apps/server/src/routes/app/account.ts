@@ -18,6 +18,7 @@ import {
   hasPassword,
   invitationLogoFile,
   invitationState,
+  isAgentesCloud,
   isEmailVerified,
   isValidTimeZone,
   joinStatus,
@@ -200,6 +201,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "The billing service (BILLING_URL, ADR 0079): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
             }),
+            cloud: z.boolean().openapi({
+              description:
+                "One of agentes.chat's own servers (`cloud` in `GET /api/instance`): the apps show no About screen there, which every other server shows.",
+            }),
             turnstileSiteKey: z.string().nullable().openapi({
               description:
                 "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
@@ -228,6 +233,7 @@ export function accountRoutes(deps: AppDeps) {
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
           billingUrl: config.BILLING_URL ?? null,
+          cloud: isAgentesCloud(config.PUBLIC_URL),
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
           errorReports: config.SENTRY_WEB_DSN
             ? { dsn: config.SENTRY_WEB_DSN, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) }

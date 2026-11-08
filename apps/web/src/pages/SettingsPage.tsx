@@ -62,7 +62,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AboutSection } from "@/components/AboutSettings";
 import { AccessMatrixSection } from "@/components/AccessLevels";
@@ -111,7 +111,12 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./sett
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
  * Members only see what they can open.
  */
-export function SettingsPage({
+export function SettingsPage(props: ComponentProps<typeof Settings>) {
+  // What this server offers decides the sections (`allowed`): the page waits for it, so none moves in afterwards.
+  return useAuthConfig().isPending ? null : <Settings {...props} />;
+}
+
+function Settings({
   section = "general",
   connected,
   outcome,

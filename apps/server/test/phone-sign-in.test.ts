@@ -136,5 +136,6 @@ describe("GET /api/instance", () => {
       url: "https://app.agentes.chat",
       cloud: true,
     });
+    expect(await (await browser(t)("/api/app/auth-config")).json()).toMatchObject({ cloud: true });
   });
 });
