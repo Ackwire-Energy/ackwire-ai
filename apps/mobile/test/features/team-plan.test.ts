@@ -4,7 +4,7 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0152 §6)", () => {
+test("row 1 asks what the workspace does with the business types, then opens their template (ADR 0153 §6)", () => {
   const about = src("agents/setup/SetupStepScreen.tsx");
   expect(about).toContain("BUSINESS_TYPES.map((b) => (");
   expect(about).toContain('t("agentSetup.firstRun.about.title", { org: org?.name ?? "" })');

@@ -62,7 +62,7 @@ import { TextArea } from "../../shared/TextArea";
 import { useAgentChannels } from "./useAgentChannels";
 
 /*
- * The screens behind the setup checklist's buttons (ADR 0152 §2), the web's small dialogs on the phone: one step each,
+ * The screens behind the setup checklist's buttons (ADR 0153 §2), the web's small dialogs on the phone: one step each,
  * the agent's role's suggestion marked, nothing saved until the word on the right of the bar. Each saves through the
  * same APIs as the agent's other screens, then confirms its step, and goes back to where the checklist was.
  */
@@ -76,7 +76,7 @@ export const openSetupStep = (agentId: string, step: SetupStep, text?: string | 
     params: { id: agentId, step, ...(text ? { text: text.slice(0, 500) } : {}) },
   });
 
-/** The right hand's first run has its own screens for these (ADR 0152 §6); a new agent's checklist, the rest. */
+/** The right hand's first run has its own screens for these (ADR 0153 §6); a new agent's checklist, the rest. */
 const FIRST_RUN_SCREENS: ReadonlySet<SetupStep> = new Set<SetupStep>(["about", "apps"]);
 
 export function SetupStepScreen({

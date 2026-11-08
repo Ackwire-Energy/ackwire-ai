@@ -208,7 +208,7 @@ describe("the team card", () => {
 });
 
 describe("team templates", () => {
-  test("the checklist's Ver o time lists them with a preview; Criar o time makes it at once (ADR 0152 §6)", async () => {
+  test("the checklist's Ver o time lists them with a preview; Criar o time makes it at once (ADR 0153 §6)", async () => {
     const state = withRightHand(seedState({ agents: [] }), { setup: { role: null, done: [] } });
     state.members = state.members.slice(0, 1);
     state.teamTemplates = [

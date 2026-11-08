@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { browser, createTestServer, signUp, type TestServer } from "./harness";
 
-/* The right hand's first run over HTTP (ADR 0152 §6): the checklist it starts with, a stored skip, a template's team in one call. */
+/* The right hand's first run over HTTP (ADR 0153 §6): the checklist it starts with, a stored skip, a template's team in one call. */
 
 let t: TestServer;
 afterEach(() => t.close());

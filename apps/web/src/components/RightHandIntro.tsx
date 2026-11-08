@@ -24,7 +24,7 @@ import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
- * any AI is connected: its greeting, then, for the workspace's owners, the first-run checklist (ADR 0152 §6), whose
+ * any AI is connected: its greeting, then, for the workspace's owners, the first-run checklist (ADR 0153 §6), whose
  * rows hold the whole setup. Anyone else gets one card at a time (`introCards`): Connect AI while there is none, then
  * how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With no card left,
  * a line to build the team with it, at any time. On the person's first visit, its waving sticker under the greeting,

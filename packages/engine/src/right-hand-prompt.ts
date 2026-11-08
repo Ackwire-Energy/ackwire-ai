@@ -12,7 +12,7 @@ const { agents, channelMembers, connectorConnections, machines, organizationMemb
 
 /**
  * How it builds a team (ADR 0137 §10) when someone asks it to: three questions with answers to tap, then one team card.
- * The first run's checklist (ADR 0152 §6) makes a template's team with no model call, so this is for whoever types.
+ * The first run's checklist (ADR 0153 §6) makes a template's team with no model call, so this is for whoever types.
  */
 export const TEAM_INTERVIEW = [
   "# Starting the team",
@@ -196,7 +196,7 @@ export async function rightHandPrompt(
       ? "An agent used 80% or more of its monthly budget: say so to someone who may raise it."
       : "",
   ].filter(Boolean);
-  // The first-run checklist at the top of an owner's DM (ADR 0152 §6) shows the setup rows: while one is open, this
+  // The first-run checklist at the top of an owner's DM (ADR 0153 §6) shows the setup rows: while one is open, this
   // names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
   const skipped = new Set(self[0]?.setup?.done ?? []);
   const cardOpen =

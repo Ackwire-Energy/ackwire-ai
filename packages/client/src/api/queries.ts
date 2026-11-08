@@ -836,7 +836,7 @@ export function useUpdateAgent(orgId: string, agentId: string) {
   });
 }
 
-/** Confirms a step of a new agent's setup checklist (ADR 0152 §2); the agent lists show it at once. */
+/** Confirms a step of a new agent's setup checklist (ADR 0153 §2); the agent lists show it at once. */
 export function useConfirmSetup(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();

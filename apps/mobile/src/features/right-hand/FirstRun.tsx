@@ -44,7 +44,7 @@ import { tapHaptic } from "../shared/parts";
 import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /*
- * The right hand's first run on the phone (ADR 0152 §6), as on the web: one checklist card inside its greeting for
+ * The right hand's first run on the phone (ADR 0153 §6), as on the web: one checklist card inside its greeting for
  * the workspace's owners, five rows, each a pushed screen (what the workspace does, the apps), a sheet (the team's
  * templates), Connect AI or the invite screen. On a billing hold the AI row says so in words (App Store 3.1.1).
  */

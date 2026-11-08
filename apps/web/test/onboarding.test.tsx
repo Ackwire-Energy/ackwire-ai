@@ -32,7 +32,7 @@ const openDm = async (state: FakeState) => {
   await settle(10);
   return r;
 };
-/** The first-run checklist (ADR 0152 §6): only for an owner whose Lodi has one. */
+/** The first-run checklist (ADR 0153 §6): only for an owner whose Lodi has one. */
 const checklist = () => document.querySelector(".setup-cl");
 
 describe("after the workspace's name", () => {

@@ -179,7 +179,7 @@ describe("the right hand's team setup tools", () => {
     expect(prompt).toContain(TEAM_INTERVIEW);
     expect(prompt).toContain("ONE propose_team card");
     expect(prompt).toContain("One thing at a time");
-    // The owner's first-run card shows the setup: no gap is raised over it (ADR 0152 §6).
+    // The owner's first-run card shows the setup: no gap is raised over it (ADR 0153 §6).
     expect(prompt).toContain("The checklist card at the top of your DM");
     expect(prompt).not.toContain("build the first team with them");
     expect(prompt).not.toContain("offer_invites).");

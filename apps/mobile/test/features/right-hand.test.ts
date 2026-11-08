@@ -66,7 +66,7 @@ test("the way to build the team: with a team, no card left and no open checklist
   expect(offersTeamSetup({ ...base, noAi: true })).toBe(false);
   expect(offersTeamSetup({ ...base, aiKnown: false })).toBe(false);
   expect(offersTeamSetup({ ...base, createsAgents: false })).toBe(false);
-  // Under the owner's checklist (ADR 0152 §6): only once it is complete.
+  // Under the owner's checklist (ADR 0153 §6): only once it is complete.
   expect(offersTeamSetup({ ...base, checklist: "open" })).toBe(false);
   expect(offersTeamSetup({ ...base, checklist: "complete" })).toBe(true);
 });
@@ -77,7 +77,7 @@ test("on a billing hold its greeting offers no line to build the team: that mess
   expect(offersTeamSetup({ ...s, held: true })).toBe(false);
 });
 
-test("its greeting's cards beside the checklist: one question at a time (ADR 0152 §6)", () => {
+test("its greeting's cards beside the checklist: one question at a time (ADR 0153 §6)", () => {
   const base = { noAi: false, aiKnown: true, askStyle: true };
   // The owner's open checklist holds the whole setup: nothing else asks, Connect included.
   expect(introCards({ ...base, noAi: true, checklist: "open" })).toEqual([]);

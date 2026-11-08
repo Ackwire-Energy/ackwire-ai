@@ -7,7 +7,7 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 
 /**
- * While the right hand's first-run checklist has a row left (ADR 0152 §6), Conversas has one line back to it, as
+ * While the right hand's first-run checklist has a row left (ADR 0153 §6), Conversas has one line back to it, as
  * Início on the web: never a second list that could disagree with the card.
  */
 export function FirstRunLine() {

@@ -4,7 +4,7 @@ import type { Level } from "./access-levels";
 import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
 
 /*
- * A new agent's setup checklist (ADR 0152 §2): the top of its chat, in its voice, lists what it still needs. The
+ * A new agent's setup checklist (ADR 0153 §2): the top of its chat, in its voice, lists what it still needs. The
  * server keeps the role it started from and the steps a person confirmed; a step is also done when the agent's data
  * says so (an AI that works, an app it may use, a channel it is in). These are the rules the apps share.
  */
@@ -193,7 +193,7 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
   }
 }
 
-/* ---------- The right hand's first run (ADR 0152 §6) ---------- */
+/* ---------- The right hand's first run (ADR 0153 §6) ---------- */
 
 /** Its rows, one order everywhere: AI after the team, because on the Cloud an AI opens only after the plan. */
 export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const satisfies readonly SetupStep[];

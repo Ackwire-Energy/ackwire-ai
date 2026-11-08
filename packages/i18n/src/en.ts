@@ -3822,7 +3822,7 @@ export const en = {
     seeAll: "See all",
     action: { review: "Review", answer: "Answer", open: "Open" },
     calm: { title: "All caught up", text: "Your agents will tell you here when they need you." },
-    /** One line back to the right hand's first-run checklist while a row is left (ADR 0152 §6). */
+    /** One line back to the right hand's first-run checklist while a row is left (ADR 0153 §6). */
     firstRun: "Pick up where you left off · {{done}} of {{total}}",
   },
   notifications: {
@@ -5089,7 +5089,7 @@ export const en = {
       app: "Sent through an AI app",
     },
   },
-  /** A new agent's setup checklist at the top of its chat, in its voice (ADR 0152 §2). */
+  /** A new agent's setup checklist at the top of its chat, in its voice (ADR 0153 §2). */
   agentSetup: {
     greeting: "Hi, {{person}}. I'm {{name}}.",
     greetingRole: "Hi, {{person}}. I'm {{name}}, the new {{role}} agent.",
@@ -5189,7 +5189,7 @@ export const en = {
       b: "Where do we start?",
     },
     /**
-     * The right hand's first run (ADR 0152 §6): its checklist card for the workspace's owners, one row per thing to set
+     * The right hand's first run (ADR 0153 §6): its checklist card for the workspace's owners, one row per thing to set
      * up, read done from the data; `{{org}}`: the workspace.
      */
     firstRun: {

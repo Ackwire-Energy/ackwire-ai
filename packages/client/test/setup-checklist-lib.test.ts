@@ -25,7 +25,7 @@ import {
   teamRole,
 } from "../src/lib/setup-checklist";
 
-// A new agent's setup checklist (ADR 0152 §2): who sees which steps, what counts as done, what it suggests.
+// A new agent's setup checklist (ADR 0153 §2): who sees which steps, what counts as done, what it suggests.
 
 const fresh = (role: string | null = "support"): AgentSetupChecklist => ({ role, done: [] });
 const agent = (setup: AgentSetupChecklist | null, ownerUserId: string | null = "u_owner") => ({
@@ -119,7 +119,7 @@ describe("setup checklist", () => {
   });
 });
 
-describe("the right hand's first run (ADR 0152 §6)", () => {
+describe("the right hand's first run (ADR 0153 §6)", () => {
   const lodi = (setup: AgentSetupChecklist | null = { role: null, done: [] }) => ({
     setup,
     builtin: "right_hand" as const,

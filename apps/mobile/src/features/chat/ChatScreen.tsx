@@ -366,7 +366,7 @@ function Chat({
   const rhythm = CHAT_RHYTHM[rowLook.style];
   // The right hand (ADR 0137): its own line and composer hint, no computer, and its greeting on top.
   const rightHand = isRightHand(dmAgent) && !isThread;
-  // A new agent's setup checklist (ADR 0152 §2) for whoever sets it up: its greeting and the checklist on top.
+  // A new agent's setup checklist (ADR 0153 §2) for whoever sets it up: its greeting and the checklist on top.
   const setupIntro = useSetupSteps(dmAgent).length > 0 && !rightHand && !isThread;
   // Its DM is open, from its row or any other way in: its row's "Novo" goes.
   useEffect(() => {

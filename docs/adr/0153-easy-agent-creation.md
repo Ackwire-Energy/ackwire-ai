@@ -1,4 +1,4 @@
-# 0152. Easy agent creation: two steps, then a setup checklist in the agent's chat
+# 0153. Easy agent creation: two steps, then a setup checklist in the agent's chat
 
 - Status: §2 accepted (the checklist, merged with the first run of ADR 0137 §10). §1, §3, §4 and §5 proposed, not built: their code stays on `feat/agent-easy-create`.
 - Date: 2026-11-05
@@ -22,7 +22,7 @@ Creating an agent took seven steps (role, identity, instructions, tools, where, 
 
 A new agent's chat starts with its greeting and a checklist in its voice, drawn by the app (never a stored message), for whoever may change the agent: think (connect an AI), apps (the role's suggestions marked), channels (the role's channel suggested), who talks to it, and how it works (instructions, the monthly limit when it pays per use). Each button opens a small dialog with the suggestion marked; nothing changes without confirming. A done line keeps a "Change" link. Once it can think, the card offers first tasks for its role. The agent's profile shows the same checklist.
 
-`agents.setup` (jsonb, null for agents made before; migration 0240) holds the role it started from and the steps confirmed. A step is also done when its data says so (an AI that works, an app granted, a channel joined).
+`agents.setup` (jsonb, null for agents made before; migration 0241) holds the role it started from and the steps confirmed. A step is also done when its data says so (an AI that works, an app granted, a channel joined).
 
 ### 3. Connect AI
 
@@ -43,7 +43,7 @@ Who talks to it and how it works start done (`newSetup`), since both have good d
 
 ### 6. The right hand's first run (2026-11-07)
 
-The same card, drawn by one shared component (`SetupCardView` on the web and the phone), sits inside the right hand's greeting for the workspace's owners while its `agents.setup` is set (new workspaces, and by migration 0240 the ones with no agent besides it). It replaces the start card, the next card and Connect AI there (ADR 0137 §6, §10). Five rows in one order, AI after the team because on the Cloud an AI opens only with the plan:
+The same card, drawn by one shared component (`SetupCardView` on the web and the phone), sits inside the right hand's greeting for the workspace's owners while its `agents.setup` is set (new workspaces, and by migration 0241 the ones with no agent besides it). It replaces the start card, the next card and Connect AI there (ADR 0137 §6, §10). Five rows in one order, AI after the team because on the Cloud an AI opens only with the plan:
 
 1. **What the workspace does**: a dialog with the business types and one sentence, saved as the workspace's context (what the person typed to it first comes filled in). Saving opens row 2 once, with that business's template picked.
 2. **The team**: the templates' dialog, whose "Criar o time" makes the team at once (`useTeamTemplate` posts its card and `createTeam` makes it, no model call, no question after). An import and one agent from scratch are links under the list. While a team card the right hand proposed waits in the chat, the row says to continue there.

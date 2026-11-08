@@ -1,6 +1,6 @@
 {
-  "id": "d26558d8-4697-47c0-a392-7135e5006711",
-  "prevId": "fe788bbf-cdb5-4e54-a607-0046f3c1fc7e",
+  "id": "fe788bbf-cdb5-4e54-a607-0046f3c1fc7e",
+  "prevId": "fd00d82c-6ef3-40c9-aee9-c12a958bcb37",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -256,12 +256,6 @@
         },
         "appearance": {
           "name": "appearance",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "setup": {
-          "name": "setup",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -13205,6 +13199,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "relay_url": {
+          "name": "relay_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relay_instance_id": {
+          "name": "relay_instance_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relay_secret": {
+          "name": "relay_secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp with time zone",
@@ -13354,6 +13366,66 @@
           "nullsNotDistinct": false,
           "columns": [
             "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.push_relay_instances": {
+      "name": "push_relay_instances",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "secret_hash": {
+          "name": "secret_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent": {
+          "name": "sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "blocked_at": {
+          "name": "blocked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_relay_instances_secretHash_unique": {
+          "name": "push_relay_instances_secretHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "secret_hash"
           ]
         }
       },

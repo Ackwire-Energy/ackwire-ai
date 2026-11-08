@@ -644,21 +644,21 @@ export interface Agent {
   /** Its autonomy brakes (ADR 0131); absent from an older server (the defaults). */
   brakes?: AgentBrakes;
   /**
-   * Its setup checklist at the top of its chat (ADR 0152 §2): the ready-made role it started from and the steps a
+   * Its setup checklist at the top of its chat (ADR 0153 §2): the ready-made role it started from and the steps a
    * person confirmed. Null or absent: an agent made before it (none shows).
    */
   setup?: AgentSetupChecklist | null;
 }
 
 /**
- * A step of a new agent's setup checklist (ADR 0152 §2), in `SETUP_STEPS`' order, or of the right hand's first run
+ * A step of a new agent's setup checklist (ADR 0153 §2), in `SETUP_STEPS`' order, or of the right hand's first run
  * (§6: `about`, `team`, `ai`, `apps`, `people`, in `FIRST_RUN_STEPS`' order). Both in lib/setup-checklist.
  */
 export type SetupStep = AgentSetupStep | "about" | "team" | "people";
-/** A new agent's own steps (ADR 0152 §2). */
+/** A new agent's own steps (ADR 0153 §2). */
 export type AgentSetupStep = "ai" | "apps" | "where" | "who" | "how";
 
-/** A new agent's setup checklist (ADR 0152 §2). */
+/** A new agent's setup checklist (ADR 0153 §2). */
 export interface AgentSetupChecklist {
   /** The ready-made role it started from (a `RoleId`, "support"); null: from scratch or made elsewhere. */
   role: string | null;
@@ -822,7 +822,7 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
-  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0152 §2). */
+  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0153 §2). */
   setup?: { role: RoleId | null };
 }
 

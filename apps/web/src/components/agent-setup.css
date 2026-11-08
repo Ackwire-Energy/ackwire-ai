@@ -1,4 +1,4 @@
-/* A new agent's setup checklist (ADR 0152 §2): the card under its greeting at the top of its DM, and on its page. */
+/* A new agent's setup checklist (ADR 0153 §2): the card under its greeting at the top of its DM, and on its page. */
 
 .setup-cl {
   position: relative;
@@ -300,7 +300,7 @@ html:not([data-pointer]) .setup-task:focus-visible {
   margin-top: 16px;
 }
 
-/* The right hand's first run (ADR 0152 §6): a row that waits for the plan, or for the team card in the chat. */
+/* The right hand's first run (ADR 0153 §6): a row that waits for the plan, or for the team card in the chat. */
 .setup-row[data-dim] .setup-row__text b,
 .setup-row[data-dim] > .ac-icon {
   color: var(--ink-muted);

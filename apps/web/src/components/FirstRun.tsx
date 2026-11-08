@@ -54,7 +54,7 @@ import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /*
- * The right hand's first run (ADR 0152 §6): one checklist card inside its greeting, drawn by the app and never stored,
+ * The right hand's first run (ADR 0153 §6): one checklist card inside its greeting, drawn by the app and never stored,
  * for the workspace's owners. Five rows, each opening a dialog in place, none needing a model: what the workspace
  * does, the team (a template, made in one click), an AI, apps, people. A row reads done from the data; only "Agora
  * não" is kept. On a billing hold the AI row leads to the plan and apps and people wait for it.
