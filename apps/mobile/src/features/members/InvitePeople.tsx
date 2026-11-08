@@ -19,7 +19,17 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GROUPED_ROW,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Text,
+  useToast,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { usePlanHold } from "../ai/parts";
 import { Page } from "../me/parts";
@@ -356,7 +366,7 @@ export function InviteNoteScreen() {
 }
 
 const styles = StyleSheet.create({
-  field: { minHeight: 50, paddingHorizontal: 14, justifyContent: "center" },
-  input: { paddingVertical: 12, paddingHorizontal: 0 },
+  field: { minHeight: GROUPED_ROW.minHeight, paddingHorizontal: GROUPED_ROW.padX, justifyContent: "center" },
+  input: { paddingVertical: GROUPED_ROW.tallPadY, paddingHorizontal: 0 },
   gap: { height: 14 },
 });

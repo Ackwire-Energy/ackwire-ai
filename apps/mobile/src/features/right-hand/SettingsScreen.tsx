@@ -25,6 +25,7 @@ import { useOrg } from "@/providers/org";
 import {
   EmptyState,
   fieldText,
+  GROUPED_ROW,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -540,7 +541,13 @@ const styles = StyleSheet.create({
   pill: { minHeight: 32, borderRadius: 10, borderBottomLeftRadius: 3 },
   // The whole pill presses: its padding is the press area's.
   pillIn: { paddingHorizontal: 12, justifyContent: "center" },
-  // One row of a group: GroupedRow's 50 high and 14 sides.
-  budget: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, minHeight: 50 },
-  amount: { flex: 1, paddingVertical: 12 },
+  // One row of a group, as GroupedRow's.
+  budget: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: GROUPED_ROW.padX,
+    minHeight: GROUPED_ROW.minHeight,
+  },
+  amount: { flex: 1, paddingVertical: GROUPED_ROW.tallPadY },
 });

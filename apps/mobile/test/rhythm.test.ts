@@ -59,3 +59,22 @@ test("a row's ⓘ sits right after its label, and a short fact about its value g
   expect(grouped).toMatch(/<View style=\{styles\.labelLine\}>\s*<Text variant="body"/);
   expect(grouped).toMatch(/\{valueNote \? \(\s*<Text variant="footnote" tone="faint" numberOfLines=\{1\}>/);
 });
+
+test("no screen keeps a grouped row of its own at the old 50: its rows and fields read GROUPED_ROW", () => {
+  // Not a grouped list's rows: the chat's receipt cards (a 50 row around a 32 action), a new channel's bordered name
+  // field and a sheet's title bar.
+  const CARD_ROWS = new Set([
+    "features/chat/TeamChecks.tsx",
+    "features/chat/ReachLines.tsx",
+    "features/new/NewChannelForm.tsx",
+    "features/new/parts.tsx",
+  ]);
+  const offenders = files(join(SRC, "features"))
+    .filter((path) => !CARD_ROWS.has(relative(SRC, path)))
+    .flatMap((path) =>
+      readFileSync(path, "utf8")
+        .split("\n")
+        .flatMap((line, i) => (/\bminHeight: 50\b/.test(line) ? [`${relative(SRC, path)}:${i + 1}`] : [])),
+    );
+  expect(offenders).toEqual([]);
+});

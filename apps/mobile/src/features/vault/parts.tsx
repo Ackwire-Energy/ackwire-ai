@@ -2,7 +2,17 @@ import { useRoles, type VaultAccess, type VaultScope } from "@agenteschat/client
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import { Button, fieldText, GroupedField, GroupedHeader, GroupedList, GroupedRow, OPTION_ROW, Text } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GROUPED_ROW,
+  GroupedField,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  OPTION_ROW,
+  Text,
+} from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -254,9 +264,9 @@ export function SavedValue({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
-  readOnly: { paddingVertical: 12 },
+  input: { flex: 1, paddingVertical: GROUPED_ROW.tallPadY, paddingHorizontal: 0 },
+  readOnly: { paddingVertical: GROUPED_ROW.tallPadY },
   mono: { fontFamily: MONO, fontSize: 14 },
   grow: { flex: 1, minWidth: 0 },
-  valueRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 50 },
+  valueRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: GROUPED_ROW.minHeight },
 });

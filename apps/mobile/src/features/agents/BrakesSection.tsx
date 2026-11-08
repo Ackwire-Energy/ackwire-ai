@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput } from "react-native";
 import { useOrg } from "@/providers/org";
-import { fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow } from "@/ui";
+import { fieldText, GROUPED_ROW, GroupedFooter, GroupedHeader, GroupedList, GroupedRow } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 
@@ -139,5 +139,9 @@ export function BrakesSection({ agent }: { agent: Agent }) {
 
 const styles = StyleSheet.create({
   // A field row of a group, as "Create agent"'s.
-  field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
+  field: {
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.tallPadY,
+  },
 });

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput } from "react-native";
-import { fieldText, GroupedHeader, GroupedList, Text } from "@/ui";
+import { fieldText, GROUPED_ROW, GroupedHeader, GroupedList, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -55,5 +55,5 @@ export function RoleInput({
 const styles = StyleSheet.create({
   label: { marginTop: 10 },
   input: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
-  row: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
+  row: { minHeight: GROUPED_ROW.minHeight, paddingHorizontal: GROUPED_ROW.padX, paddingVertical: GROUPED_ROW.tallPadY },
 });
