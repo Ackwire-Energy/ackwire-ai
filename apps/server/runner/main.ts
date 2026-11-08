@@ -513,11 +513,15 @@ function hostFlags(p: Parsed, defaultState = defaultHostState()) {
 /** Whether this computer can be the server's computer, and why not. */
 function hostRefusal(): string | null {
   if (process.platform === "win32") return "The server's computer runs on Linux or macOS.";
-  if (process.platform === "linux" && process.getuid?.() !== 0) {
-    return "On Linux the server's computer runs each agent as its own user: run it as root (its service does).";
-  }
   return null;
 }
+
+/**
+ * Whether `host` runs its agents each as its own user (system mode): on Linux as root. On Linux as another user it is
+ * the simple mode the self-host setup offers where system mode can't run (no BPF_FRAMEWORK, ADR 0153 §5): its agents
+ * share that user, as on a Mac.
+ */
+const hostSystemMode = () => process.platform === "linux" && process.getuid?.() === 0;
 
 /** `agentes-runner host`: this server's own computer (`host.ts`). */
 async function host(p: Parsed): Promise<number> {
@@ -542,7 +546,7 @@ async function host(p: Parsed): Promise<number> {
     console.error(lockedMessage(flags.state, lock.holder));
     return 4;
   }
-  const system = process.platform === "linux";
+  const system = hostSystemMode();
   const computer = new HostComputer({
     server: flags.server,
     token: () => (flags.tokenFile ? readTokenFile(flags.tokenFile) : envToken),
@@ -640,7 +644,7 @@ function installHost(p: Parsed, print: (line: string) => void): number {
     ...(flags.name ? ["--name", flags.name] : []),
     ...(flags.exec ? [] : ["--no-exec"]),
   ];
-  if (process.platform === "linux") return installSystemService({ print, args, start: !p.flags.has("no-start") });
+  if (hostSystemMode()) return installSystemService({ print, args, start: !p.flags.has("no-start") });
   return installService({ print, args });
 }
 

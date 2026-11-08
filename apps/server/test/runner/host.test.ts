@@ -123,7 +123,7 @@ test("a home per organization (mode 600, kept by the host) and a runner in each;
     orgId: A,
     orgName: "Acme",
     managedBy: "host",
-    access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+    access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true, desktop: true } },
   });
   expect(existsSync(path.join(state, "work", "acme"))).toBe(true);
   expect(readStoredConfig(home(B))?.workspace).toBe(path.join(state, "work", "beta"));
@@ -202,14 +202,14 @@ test("turned off (404) or refused (401): nothing runs; back on when the server s
   expect(off.children.started).toEqual([]);
 });
 
-test("--no-exec turns commands off in new homes; Claude Code, Codex and the browser stay on, on a Mac and on Linux", async () => {
+test("--no-exec turns commands off in new homes; Claude Code, Codex, the browser and screens stay on, on a Mac and on Linux", async () => {
   for (const system of [false, true]) {
     const { host, server, home } = makeHost({ exec: false, system });
     server.answer([org(A, MA, "agm_a")]);
     await host.sync();
     expect(readStoredConfig(home(A))).toMatchObject({
       exec: false,
-      access: { folders: [], tools: { claude: true, codex: true, commands: false, browser: true } },
+      access: { folders: [], tools: { claude: true, codex: true, commands: false, browser: true, desktop: true } },
     });
   }
 });

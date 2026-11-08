@@ -1,7 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -678,6 +687,20 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
     if (v !== undefined && k !== "WAYLAND_DISPLAY" && k !== "DBUS_SESSION_BUS_ADDRESS") env[k] = v;
   }
   return { ...env, DISPLAY: `:${on.display}`, XAUTHORITY: on.xauthority };
+}
+
+/**
+ * `on` for a snap's Chromium (`confinedChrome`): it can't read the desktop's Xauthority under the runner's hidden
+ * home, so it gets a copy beside the agent's profile (`.agentes/Xauthority`, owner only), made at each start since the
+ * desktop writes a new one when it starts again (ADR 0153 §2).
+ */
+export function readableDisplay(on: ChromeDisplay, folder: string): ChromeDisplay {
+  const dir = path.join(folder, path.dirname(AGENT_BROWSER_PROFILE));
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const xauthority = path.join(dir, "Xauthority");
+  copyFileSync(on.xauthority, xauthority);
+  chmodSync(xauthority, 0o600);
+  return { ...on, xauthority };
 }
 
 /** The version of Chrome that last ran on `profile` (its `extensions.last_chrome_version`), or null. */
@@ -2529,7 +2552,8 @@ export class BrowserManager {
           this.opts.privateNetwork?.(),
         );
         try {
-          const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+          const display = on && confinedChrome(exe) ? readableDisplay(on, session.folder) : on;
+          const started = await start(exe, args, profile, display ? chromeEnv(display) : undefined);
           if (on) started.display = on.display;
           return started;
         } catch (err) {

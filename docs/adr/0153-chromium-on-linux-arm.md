@@ -1,12 +1,18 @@
-# 0153. Agent browsers on Linux ARM run the distribution's Chromium
+# 0153. Agent browsers on Linux ARM run Chromium; the self-host setup's simple mode and requirements
 
 - Status: Accepted
 - Date: 2026-11-07
-- Amends: 0133 §1 ("One browser: Google Chrome stable, no fallback"), on Linux on ARM only
+- Amends: 0133 §1 ("One browser: Google Chrome stable, no fallback"), on Linux on ARM only; the self-host setup's
+  agents' computer, which needed systemd's BPF_FRAMEWORK on Linux
 - Code: adapters `machine-protocol.ts` (`CHROMIUM_LINUX`, `usesChromium`, `CHROMIUM_NEEDED`, `browserNeeded`,
   `CHROME_FAILURES.missingChromium`); runner `browser.ts` (`chromeCandidates`, `findChrome`, `chromeName`,
-  `confinedChrome`, `BrowserManager.startDir`), `main.ts` (`update`), `install-script.ts` (`on_arm_linux`,
-  `get_browser`, `get_chromium`, `install_chromium`, `update_timer`, `chrome_or_warn`, `CHROMIUM_DESKTOP_ENTRY`)
+  `confinedChrome`, `readableDisplay`, `BrowserManager.startDir`), `main.ts` (`update`, `hostSystemMode`,
+  `installHost`), `host.ts` (`writeHome`), `install-script.ts` (`on_arm_linux`, `get_browser`, `get_chromium`,
+  `install_chromium`, `update_timer`, `chrome_or_warn`, `CHROMIUM_DESKTOP_ENTRY`, `REQUIREMENTS`,
+  `install_requirements`, `install_claude`, `install_codex`, `get_cli`, `desktop_packages`); setup `lib.ts`
+  (`computerOffer`, `SIMPLE_*`, `computerInstall`, `computerFiles`, `REQUIREMENTS`, `parseRequirements`,
+  `checkRequirements`, `askableRequirements`, `planSteps`), `cli.ts` (`chooseRequirements`, `prepareSimpleUser`,
+  `setUpComputer`)
 
 ## Context
 
@@ -56,9 +62,55 @@ mode needs Debian, which has no snap Chromium).
 On Linux on ARM a missing browser is `CHROME_FAILURES.missingChromium`. It starts like `missing`, so
 `chromeFailureKind` and the reports stay as they are.
 
+### 5. Simple mode where agents can't each be a user of their own
+
+System mode (each agent its own OS user) needs systemd built with BPF_FRAMEWORK, which keeps each agent's user off
+the others' browser ports. Ubuntu's isn't, so the setup skipped the agents' computer there, and a self-hosted
+Ubuntu server (a free ARM VM, say) had none. Now, as root on Linux without BPF_FRAMEWORK, the setup offers simple
+mode, saying what it means: every agent works as one user, `agentes` (`SIMPLE_USER`), made without sudo or a
+password, so agents see each other's folders but not the person's or the server's. It is yes by default (with
+apt-get and 4 GB of memory, as system mode), since a self-hosted server is one team's.
+
+- The setup makes the user when missing, keeps its services running without a login (`loginctl enable-linger`),
+  copies the token to `/home/agentes/host-computer-token` (owner only), and runs the computers' installer as that
+  user (`runuser`), with `--host-token-file` alone. The installer took `--host-token-file` alone only on a Mac; now
+  also on Linux as a user other than root, and as root it still needs `--system`.
+- The runner's `host` runs as that user in user mode (as on a Mac): `hostSystemMode` is Linux as root only, and
+  `service install --host` writes a user unit there. Its journal is read with `_SYSTEMD_USER_UNIT`, and whether it
+  runs with `systemctl --user -M agentes@`.
+- A machine whose `agentes` user already runs a connected runner is refused, as system mode refuses a connected
+  root runner.
+
+### 6. The setup checks what the agents need, and asks
+
+After the agents' computer, on Linux, the setup checks the agents' browser (where the runner looks: Google Chrome,
+and on ARM Chromium), the packages for their screens (`Xtigervnc`, `xfce4-session`), Claude Code and Codex (on an
+agent's PATH, `/usr/local/bin` or `/usr/bin`), says what's there, and asks about each one missing, yes by default.
+System mode's own installer brings the browser and the screens, so only the coding CLIs are asked about there.
+`--requirements all|none|<list>` answers for all; without a terminal the answers are yes.
+
+What it installs goes through the computers' installer, as root: `install.sh --requirements <list>`, alone, which
+installs only those and stops (it works by hand too). The browser is `get_chrome` (Google's apt repository, or on
+ARM Debian's `chromium`, else Ubuntu's snap, which refreshes itself, so no timer); the screens are
+`DESKTOP_APT_PACKAGES` and the extras, without system mode's isolation packages; Claude Code is Anthropic's installer
+run in a home that is thrown away, its binary copied to `/usr/local/bin/claude`; Codex is the latest release's static
+build for the processor (`codex-<arch>-unknown-linux-musl.tar.gz` from GitHub), to `/usr/local/bin/codex`. Neither
+is pinned: Claude's installer checks what it downloads against its own manifest, and Codex's release is fetched over
+HTTPS from OpenAI's repository. One already there is kept.
+
+The organizations' homes of the server's own computer now start with the agents' screens on (`access.tools.desktop`),
+with the browser: the setup offered each agent its own screen, and before this the person had to run
+`agentes-runner tools enable desktop` on the machine to see one. Homes made before keep what they have.
+
+A snap's Chromium on an agent's screen can't read the screen's Xauthority either (it lives under the runner's
+hidden home), so it gets a copy beside the agent's profile (`readableDisplay`, `.agentes/Xauthority`, owner only),
+made at each start.
+
 ## Consequences
 
 - An arm64 Linux computer (a Debian server, an Ubuntu VM in user mode) gives its agents a browser.
+- An Ubuntu server becomes its agents' computer from the setup, in simple mode, with what they need installed,
+  where before it was skipped. Its agents aren't kept apart from each other: the question says so.
 - Chromium's client hints say "Chromium" where Chrome's say "Google Chrome"; the emulated brands
   (`browser-traffic.ts`) are unchanged.
 - The notice people get when a computer has no browser (`machines.chromeMissingNotice`) still names Google Chrome;

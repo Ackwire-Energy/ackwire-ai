@@ -42,8 +42,12 @@ removes the old one's container.
 5. **Email** for invitations and password resets, optional: an SMTP server or a Resend-compatible
    API.
 6. **The agents' computer:** this machine, by default where it can be (Linux as root with systemd built
-   with `BPF_FRAMEWORK`, apt-get and 4 GB of memory or more, each agent a user of its own with a screen; a
-   Mac, agents working as you with a browser, Claude Code and Codex, commands off unless you say yes).
+   with `BPF_FRAMEWORK`, apt-get and 4 GB of memory or more, each agent a user of its own with a screen; on
+   Linux without `BPF_FRAMEWORK`, such as Ubuntu, simple mode: every agent as one user, `agentes`, without
+   sudo; a Mac, agents working as you with a browser, Claude Code and Codex, commands off unless you say yes).
+   Then **what the agents need there**: it checks for their browser (Google Chrome, or Chromium on ARM), the
+   packages for their screens, Claude Code and Codex, says what's there, and asks about each one missing
+   (yes by default; `--requirements all|none|<list>` answers for all).
 7. **Usage statistics:** whether to send anonymous usage statistics to agentes.chat (yes by
    default), written to `.env` as `TELEMETRY=on|off`.
 8. **Start:** downloads `docker-compose.yml` when the directory has none, runs `docker compose up -d`,

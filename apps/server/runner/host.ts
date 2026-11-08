@@ -32,8 +32,9 @@ import type { FetchLike } from "./push";
  * On Linux it runs as root and each child is a system-mode runner (each agent
  * its own OS user): each organization's agents get uids from their
  * own block of the range, so two children never hand out the same uid, and
- * one loopback guard covers all of them (`agentUids`). On a Mac the children
- * run as the person who installed it.
+ * one loopback guard covers all of them (`agentUids`). On a Mac, and on Linux
+ * as another user (the self-host setup's simple mode, where system mode can't
+ * run: ADR 0153 §5), the children run as the user who installed it.
  *
  * A server that turned it off (404) or refuses its token (401) leaves it idle,
  * asking again every minute, with its children stopped. While the server
@@ -72,7 +73,7 @@ export interface HostOptions {
   name: string;
   /** Linux as root: every child in system mode. */
   system: boolean;
-  /** Commands on in the homes `sync` makes (`--no-exec`: off); Claude Code, Codex and the browser are on either way. */
+  /** Commands on in the homes `sync` makes (`--no-exec`: off); Claude Code, Codex, the browser and screens are on either way. */
   exec: boolean;
   log: (line: string) => void;
   start: StartChild;
@@ -291,7 +292,8 @@ export class HostComputer {
 
   /**
    * Brings the organization's home up to date (mode 600, written only when it changes). False: it can't run yet.
-   * A new home gets Claude Code, Codex, the browser and commands (`exec`), or with `tools` false none of them.
+   * A new home gets Claude Code, Codex, the browser, the agents' screens and commands (`exec`), or with `tools` false
+   * none of them: the setup that made this the server's computer offered each agent its own screen (ADR 0153 §6).
    */
   private writeHome(home: string, org: SyncedOrg, tools = true): boolean {
     let prev: StoredConfig = {};
@@ -325,7 +327,7 @@ export class HostComputer {
             exec,
             access: {
               folders: [],
-              tools: { claude: tools, codex: tools, commands: exec, browser: tools },
+              tools: { claude: tools, codex: tools, commands: exec, browser: tools, desktop: tools },
             },
           }),
       ...(uids ? { mode: "system" as const, agentUidRange: uids } : {}),

@@ -22,13 +22,14 @@ import {
   CHROMIUM_LINUX,
   CHROMIUM_NEEDED,
 } from "@agenteschat/adapters/machine-protocol";
-import { lastLine } from "@agenteschat/setup/src/lib";
+import { lastLine, REQUIREMENTS as SETUP_REQUIREMENTS } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
   GOOGLE_APT,
   GOOGLE_CHROME_LINUX,
   installScript,
   RUNNER_BUN_SHA256,
+  REQUIREMENTS,
   RUNNER_BUN_VERSION,
   SYSTEM_BROWSER_DIR,
   shQuote,
@@ -410,7 +411,7 @@ test.skipIf(process.platform === "win32")("--enroll-file reaches pair, also in a
 });
 
 test.skipIf(process.platform === "win32")(
-  "this server's computer: alone on a Mac, as the person and never paired; on Linux only with --system",
+  "this server's computer: alone on a Mac or on Linux as another user (simple mode), never paired; as root only with --system",
   () => {
     const mac = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) }, "Darwin");
     const token = path.join(mac.home, "host-computer-token");
@@ -436,8 +437,18 @@ test.skipIf(process.platform === "win32")(
     expect(refused.out).toContain("already connected to agentes.chat as a computer");
     expect(refused.log).toBe("");
 
-    const linux = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
-    const alone = linux.install(installScript("https://agentes.test"), ["--host-token-file", token]);
+    // Linux as a user other than root: the setup's simple mode, the agents sharing that user (ADR 0153 §5).
+    const user = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    writeFileSync(path.join(user.fake, "id"), "#!/bin/sh\necho 1001\n", { mode: 0o755 });
+    const simple = user.install(installScript("https://agentes.test"), args);
+    expect(simple.status).toBe(0);
+    expect(simple.log).toContain(`service install --host --server http://127.0.0.1:3000 --token-file ${token} --no-exec`);
+    expect(simple.log).not.toContain(" pair ");
+
+    // As root on Linux, each agent its own user: --system.
+    const root = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    writeFileSync(path.join(root.fake, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
+    const alone = root.install(installScript("https://agentes.test"), ["--host-token-file", token]);
     expect(alone.status).toBe(1);
     expect(alone.out).toContain("go with --system");
     expect(alone.log).toBe("");
@@ -476,6 +487,7 @@ function rootLinux() {
     .replace(/^CHROME_UPDATES=.*$/m, `CHROME_UPDATES=${shQuote(at("systemd/agentes-chrome-update"))}`)
     .replace(/^CHROME_DESKTOP=.*$/m, `CHROME_DESKTOP=${shQuote(at("applications/google-chrome.desktop"))}`)
     .replace(/^CHROMIUM_EXE=.*$/m, `CHROMIUM_EXE=${shQuote(at("chromium/chromium"))}`)
+    .replace(/^CHROMIUM_SNAP=.*$/m, `CHROMIUM_SNAP=${shQuote(at("snap/chromium"))}`)
     .replace(/^CHROMIUM_DESKTOP=.*$/m, `CHROMIUM_DESKTOP=${shQuote(at("applications/chromium.desktop"))}`);
   return { ...pc, at, script };
 }
@@ -840,6 +852,104 @@ test.skipIf(process.platform === "win32")(
   },
   30_000,
 );
+
+test("the setup asks about the requirements the installer installs, by the same names", () => {
+  expect([...SETUP_REQUIREMENTS]).toEqual([...REQUIREMENTS]);
+});
+
+test.skipIf(process.platform === "win32")(
+  "--requirements: Ubuntu on ARM gets the snap's Chromium, the screens' packages, Claude Code and Codex in its PATH",
+  () => {
+    const pc = rootArm({ aptFails: true });
+    const fake = (name: string, text: string) => writeFileSync(path.join(pc.fake, name), text, { mode: 0o755 });
+    for (const tool of ["tar", "gzip", "readlink", "bash", "ln", "mktemp", "rm", "cp"]) {
+      const real = Bun.which(tool);
+      if (real && !existsSync(path.join(pc.sys, tool))) symlinkSync(real, path.join(pc.sys, tool));
+    }
+    // Codex's release: a tar.gz with the binary named for this processor.
+    const release = path.join(pc.home, "codex-release");
+    mkdirSync(release);
+    writeFileSync(path.join(release, "codex-aarch64-unknown-linux-musl"), '#!/bin/sh\necho "codex-cli 0.167.0"\n', {
+      mode: 0o755,
+    });
+    const tarball = path.join(pc.home, "codex.tar.gz");
+    spawnSync("tar", ["-czf", tarball, "-C", release, "codex-aarch64-unknown-linux-musl"]);
+    fake(
+      "curl",
+      `#!/bin/sh
+while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift 2 ;; -*) shift ;; *) url=$1; shift ;; esac; done
+echo "curl $url" >> "$LOG"
+case "$url" in
+  https://claude.ai/install.sh) printf '%s\\n' 'mkdir -p "$HOME/.local/share" "$HOME/.local/bin"' \\
+    'printf "#!/bin/sh\\\\necho 2.1.319 \\\\(Claude Code\\\\)\\\\n" > "$HOME/.local/share/claude-2.1.319"' \\
+    'chmod 755 "$HOME/.local/share/claude-2.1.319"' 'ln -s "$HOME/.local/share/claude-2.1.319" "$HOME/.local/bin/claude"' \\
+    'echo "claude install as $CLAUDE_INSTALL_ALLOW_SUDO" >> "$LOG"' > "$out" ;;
+  *codex-aarch64-unknown-linux-musl.tar.gz) cp '${tarball}' "$out" ;;
+  *) printf '#!/usr/bin/env node\\n' > "$out" ;;
+esac
+`,
+    );
+    fake(
+      "snap",
+      `#!/bin/sh
+echo "snap $*" >> "$LOG"
+mkdir -p '${pc.at("snap")}'
+printf '#!/bin/sh\\necho "Chromium 157.0.8103.38 snap"\\n' > '${pc.at("snap/chromium")}' && chmod 755 '${pc.at("snap/chromium")}'
+`,
+    );
+    const script = pc.script
+      .replace(/^CLAUDE_EXE=.*$/m, `CLAUDE_EXE=${shQuote(pc.at("bin/claude"))}`)
+      .replace(/^CODEX_EXE=.*$/m, `CODEX_EXE=${shQuote(pc.at("bin/codex"))}`);
+    mkdirSync(pc.at("bin"), { recursive: true });
+    const r = pc.install(script, ["--requirements", "browser,desktop,claude,codex"]);
+    expect(r.status).toBe(0);
+    // Ubuntu's apt has no Chromium of its own: the snap, which updates itself (no timer).
+    expect(r.log).toContain("install -y --no-install-recommends chromium\n");
+    expect(r.log).toContain("snap install chromium\n");
+    expect(r.out).toContain("Chromium 157.0.8103.38 (snap), updated by snap");
+    expect(existsSync(pc.at("systemd/agentes-chrome-update.timer"))).toBe(false);
+    // The screens' packages alone: --system's isolation isn't installed.
+    expect(r.log).toContain("install -y --no-install-recommends tigervnc-standalone-server");
+    expect(r.log).not.toContain("nftables");
+    expect(r.out).toContain("The packages for the agents' screens");
+    // Claude Code: Anthropic's installer in a home thrown away, its binary copied to the agents' PATH.
+    expect(r.log).toContain("curl https://claude.ai/install.sh\n");
+    expect(r.log).toContain("claude install as 1\n");
+    expect(lstatSync(pc.at("bin/claude")).isFile()).toBe(true);
+    expect(r.out).toContain(`Claude Code 2.1.319, in ${pc.at("bin/claude")}`);
+    // Codex: the latest release's build for this processor.
+    expect(r.log).toContain(
+      "curl https://github.com/openai/codex/releases/latest/download/codex-aarch64-unknown-linux-musl.tar.gz\n",
+    );
+    expect(r.out).toContain(`Codex 0.167.0, in ${pc.at("bin/codex")}`);
+    // Nothing of the runner: it stops there.
+    expect(r.log).not.toContain("agentes-runner.mjs");
+
+    // Again: all there, nothing installed.
+    const again = pc.install(script, ["--requirements", "browser,claude,codex"]);
+    expect(again.status).toBe(0);
+    expect(again.log.split("snap install").length).toBe(2);
+    expect(again.out).toContain("Chromium 157.0.8103.38, updated by this computer's own updates");
+    expect(again.out).toContain("Claude Code 2.1.319\n");
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")("--requirements goes alone, as root, with names it knows", () => {
+  const root = rootArm();
+  const unknown = root.install(root.script, ["--requirements", "browser,chrome"]);
+  expect(unknown.status).toBe(1);
+  expect(unknown.out).toContain("--requirements takes browser, desktop, claude, codex: not chrome");
+  expect(unknown.log).toBe("");
+  const withSystem = root.install(root.script, ["--requirements", "claude", "--system"]);
+  expect(withSystem.status).toBe(1);
+  expect(withSystem.out).toContain("--requirements goes alone");
+  const user = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+  writeFileSync(path.join(user.fake, "id"), "#!/bin/sh\necho 1001\n", { mode: 0o755 });
+  const notRoot = user.install(installScript("https://agentes.test"), ["--requirements", "claude"]);
+  expect(notRoot.status).toBe(1);
+  expect(notRoot.out).toContain("--requirements installs packages: run it as root");
+});
 
 test.skipIf(process.platform === "win32")(
   "as a person on arm64 Linux: without Chromium told how to install it, with Debian's or Ubuntu's snap not",

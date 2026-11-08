@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -53,6 +53,7 @@ import {
   launchChrome,
   NAME_CONTROLS,
   type OwnChrome,
+  readableDisplay,
   relayCommands,
   type StreamSocket,
   selectFieldScript,
@@ -2095,6 +2096,22 @@ function fakeDesktop(startMs = 0): NonNullable<BrowserManagerOptions["desktops"]
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const headless = (c?: FakeChrome) => !!c?.args.includes("--headless=new");
+
+test.if(posix)("Ubuntu's snap Chromium on a desktop: a copy of its Xauthority it can read, the agent's alone", () => {
+  const home = tempDir("xauth-");
+  dirs.push(home);
+  const source = path.join(home, ".agentes-runner", "desktop", "d1", "Xauthority");
+  mkdirSync(path.dirname(source), { recursive: true });
+  writeFileSync(source, "cookie 1", { mode: 0o600 });
+  const folder = path.join(home, "agentes", "plano");
+  const on = readableDisplay({ display: 7, xauthority: source }, folder);
+  expect(on).toEqual({ display: 7, xauthority: path.join(folder, ".agentes", "Xauthority") });
+  expect(readFileSync(on.xauthority, "utf8")).toBe("cookie 1");
+  expect(statSync(on.xauthority).mode & 0o777).toBe(0o600);
+  // The desktop started again with a new cookie: the next start copies it again.
+  writeFileSync(source, "cookie 2");
+  expect(readFileSync(readableDisplay({ display: 7, xauthority: source }, folder).xauthority, "utf8")).toBe("cookie 2");
+});
 
 test.if(posix)(
   "Ubuntu's snap Chromium: the start page goes in the agent's own folder, which the snap can read (ADR 0153)",
