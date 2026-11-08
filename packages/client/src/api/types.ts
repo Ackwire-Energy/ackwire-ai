@@ -1502,6 +1502,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+      /** A failed run's reason by its code, as `run.finished` says it (`runErrorDetail`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** The message that started the run (anchors its live row). */
       triggerMessageId?: string | null;
       startedAt?: string | null;

@@ -272,6 +272,15 @@ export function createStreamsStore(
             }
           : state.continued;
       const streaming = event.type === "agent.delta" || event.type === ("agent.tool.output" as string);
+      let streams = applyChannelEvent(state.streams, event, now());
+      // Tentar de novo: a new run took a message whose run failed (the server deleted that one), so its failed row goes
+      // and only the new run's shows.
+      if (event.type === "message.claimed" || event.type === ("agent.run.steered" as string)) {
+        const taken = event as { messageId: string; agentId?: string; runId?: string };
+        const before = taken.agentId ? state.receipts[taken.messageId]?.runOf?.[taken.agentId] : undefined;
+        if (before && before !== taken.runId && streams.runs[before]?.status === "failed")
+          streams = dismissRun(streams, before);
+      }
       set(
         {
           ...state,
@@ -279,7 +288,7 @@ export function createStreamsStore(
           questions,
           secrets,
           memory,
-          streams: applyChannelEvent(state.streams, event, now()),
+          streams,
           consults: applyConsultEvent(state.consults, event, now()),
           receipts: applyReceiptEvent(
             event.type === "message.created" && event.message

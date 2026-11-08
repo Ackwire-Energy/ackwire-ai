@@ -714,6 +714,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return upsert(s, event, {
         status,
         error: event.error,
+        // Its reason in words from the first event that says it failed, never its stored code until `run.finished`.
+        ...(event.errorCode ? { errorCode: event.errorCode, errorParams: event.errorParams } : {}),
         ...(event.triggerMessageId ? { triggerMessageId: event.triggerMessageId } : {}),
         ...(event.startedAt ? { startedAt: Date.parse(event.startedAt) } : {}),
       });
