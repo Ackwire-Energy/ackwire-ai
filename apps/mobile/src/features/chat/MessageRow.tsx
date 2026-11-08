@@ -453,7 +453,8 @@ export const MessageRow = memo(function MessageRow({
         </View>
       ) : null}
       {readOnly ? null : <Reactions message={m} meId={meId} end={onRight} />}
-      {m.local === "pending" || (m.local === "failed" && offline) ? (
+      {m.local === "pending" && meta?.voiceAccepted === true ? null : m.local === "pending" ||
+        (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
         // A 16-point caption: 14 of slop gives the retry its 44-point target.

@@ -29,6 +29,8 @@ export interface VoiceSend {
   /** Why the last try didn't go (an HTTP status or the network's error), kept with the recording to tell it apart. */
   lastError?: string;
   tries?: number;
+  /** The server took it: what's left is its own (the words, then the message). */
+  accepted?: boolean;
 }
 
 export type VoiceRefusal = "limit" | "refused";
@@ -80,6 +82,9 @@ export const localVoiceMessage = (item: VoiceSend): Message => ({
     voice: { clipId: `local:${item.clientId}`, durationMs: item.durationMs, peaks: item.peaks },
     // Why it didn't go yet, under "Não foi enviada" once it failed: a sender is never left guessing.
     ...(item.lastError ? { sendError: item.lastError } : {}),
+    // The server has it (it answered 202): it posts the message once the words are made out, which can take a moment;
+    // the bubble stops saying "Enviando…" meanwhile (the recording is safe there).
+    ...(item.accepted ? { voiceAccepted: true } : {}),
   },
   clientId: item.clientId,
   local: (item.tries ?? 0) >= FAILED_AFTER ? "failed" : "pending",
@@ -193,7 +198,10 @@ export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefus
             return;
           }
           forget(item);
-          if (verdict === "done") continue;
+          if (verdict === "done") {
+            showBubble(qc, { ...item, accepted: true, lastError: undefined, tries: 0 });
+            continue;
+          }
           removeBubble(qc, item);
           onRefused(verdict === "limit" ? "limit" : "refused");
         }
