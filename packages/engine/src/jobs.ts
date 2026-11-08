@@ -55,7 +55,7 @@ import {
   sendQueuedEmail,
 } from "./email";
 import { forgetCodeEmail } from "./email-codes";
-import { type DecidedBy, publishRouted } from "./events";
+import { type DecidedBy, publishListChanged, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
@@ -832,13 +832,18 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "context.reflect": async (job) => {
       if (!deps.context) return;
-      await reflectThread(deps.context, { orgId: orgOf(job), threadRootId: String(job.payload.threadRootId) });
+      const res = await reflectThread(deps.context, {
+        orgId: orgOf(job),
+        threadRootId: String(job.payload.threadRootId),
+      });
+      if (res.results.length > 0) await publishListChanged(deps.pubsub, orgOf(job), "memory");
     },
     [LEARN_JOB]: async (job) => {
       if (!deps.context) return;
       const res = await learnRun(deps.context, { orgId: orgOf(job), runId: String(job.payload.runId) });
       // Its run went on after the turn that queued it: the outbox's backoff brings it back once the run ends.
       if (res.skipped === "running") throw Object.assign(new Error("its run is still going"), { retryable: true });
+      if (res.saved.length > 0) await publishListChanged(deps.pubsub, orgOf(job), "memory");
     },
     // A reply a while ago: the thread's title and "resolved?" suggestion, unless a newer reply came.
     "threads.assess": async (job) => {
@@ -1063,7 +1068,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;
-      await consolidateOrg(deps.context, orgOf(job));
+      const res = await consolidateOrg(deps.context, orgOf(job));
+      if (Object.values(res).some((n) => n > 0)) await publishListChanged(deps.pubsub, orgOf(job), "memory");
     },
     // The right hand looks at a card for the person behind it (ADR 0139 §2).
     [RIGHT_HAND_DECIDE_JOB]: async (job) => {

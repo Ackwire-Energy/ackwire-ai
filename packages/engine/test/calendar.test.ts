@@ -101,12 +101,12 @@ describe("calendar", () => {
     expect(emails.find((e) => JSON.stringify(e.payload).includes("calendar_invite"))?.payload).toMatchObject({
       template: { url: `https://chat.example.com/org/${f.org.id}/calendar?open=${event.id}&day=2026-10-20` },
     });
-    expect((await respondToEvent(f.db, bia.id, f.org.id, event.id, "accepted")).rsvp).toContainEqual({
+    expect((await respondToEvent(deps, bia.id, f.org.id, event.id, "accepted")).rsvp).toContainEqual({
       type: "person",
       id: bia.id,
       status: "accepted",
     });
-    await expect(respondToEvent(f.db, outsider.id, f.org.id, event.id, "accepted")).rejects.toThrow("not invited");
+    await expect(respondToEvent(deps, outsider.id, f.org.id, event.id, "accepted")).rejects.toThrow("not invited");
 
     await createIssue(deps, { type: "person", userId: f.owner.id }, f.org.id, {
       title: "Entrega",

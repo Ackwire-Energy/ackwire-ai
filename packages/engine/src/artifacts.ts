@@ -30,7 +30,7 @@ import { answersAgentsOnly, peopleSee } from "./consultations";
 import { isAgentOnlyDm, openDm } from "./dms";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishChannelEvent, publishListChanged } from "./events";
 import { textOfBytes } from "./format";
 import { assertStorageRoom } from "./limits";
 import { can, getMembership, requireActiveMembership } from "./organizations";
@@ -903,6 +903,7 @@ async function insertArtifact(
   if (row.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.created", channelId: row.channelId, artifact });
   }
+  if (row.inDrive) await publishListChanged(deps.pubsub, orgId, "artifacts");
   return { artifact, blob };
 }
 
@@ -964,6 +965,7 @@ export async function insertVersion(
   if (row.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: row.channelId, artifact });
   }
+  if (row.inDrive) await publishListChanged(deps.pubsub, orgId, "artifacts");
   return { artifact, blob, version };
 }
 
@@ -1034,6 +1036,7 @@ export async function keepBlock(deps: ArtifactDeps, userId: string, orgId: strin
   if (row.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: row.channelId, artifact });
   }
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
   return artifact;
 }
 
@@ -1233,6 +1236,7 @@ export async function moveToSharedDrive(
   });
   const artifact = view(row, editableKind(row.kind));
   await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: a.channelId, artifact });
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
 }
 
 const SHARED_DRIVE_HINT = "To put it there: update_artifact with shared_drive: true.";
@@ -1876,6 +1880,7 @@ export async function deleteArtifact(deps: ArtifactDeps, userId: string, orgId: 
   if (a.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.deleted", channelId: a.channelId, artifactId: a.id });
   }
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
 }
 
 /** A deleted file as the trash shows it. */
@@ -1981,6 +1986,7 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
     return updated;
   });
   if (!row) throw new NotFoundError("Artifact not found", "artifact.not_found");
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
   return view(row, true);
 }
 
@@ -2047,6 +2053,7 @@ export async function purgeArtifactNow(deps: ArtifactDeps, userId: string, orgId
     .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
     .where(eq(artifactVersions.artifactId, a.id));
   await dropVersions(deps, versions);
+  await publishListChanged(deps.pubsub, orgId, "artifacts");
 }
 
 /** Message attachments (`meta.artifacts`) of deleted files, as `{ id, deleted: true, title }`. */

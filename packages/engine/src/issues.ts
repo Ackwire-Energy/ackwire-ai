@@ -21,7 +21,13 @@ import { recordAudit } from "./audit";
 import { runAuthorityById, runPerson } from "./authority";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated, publishOrgEvent, publishUserEvent } from "./events";
+import {
+  publishChannelEvent,
+  publishListChanged,
+  publishMessageCreated,
+  publishOrgEvent,
+  publishUserEvent,
+} from "./events";
 import { cutText } from "./format";
 import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
@@ -771,7 +777,8 @@ export async function publishToTaskReaders(
   const admins = rowsOf<{ user_id: string }>(
     await deps.db.execute(membersWhoMaySql(sql`${orgId}::uuid`, "administrator")),
   ).map((r) => r.user_id);
-  const named = task.channelId ? [] : task.audience.userIds;
+  // The board hears no conversation: a task tied to a DM or a private channel reaches its people on their own topics.
+  const named = task.audience.userIds;
   for (const userId of new Set([...admins, ...named])) await publishUserEvent(deps.pubsub, orgId, userId, event);
 }
 
@@ -876,7 +883,7 @@ export async function createIssue(
     return issue;
   });
   await keepFilesWithTask(
-    db,
+    deps,
     actor,
     row,
     files.map((f) => f.id),
@@ -1305,12 +1312,13 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
  * workspace's in the Drive, so it moves to the task's conversation, read by who sees the task (ADR 0151).
  */
 async function keepFilesWithTask(
-  db: Database,
+  deps: IssueDeps,
   actor: IssueActor,
   task: Pick<IssueRow, "id" | "orgId" | "restricted">,
   fileIds: string[],
 ) {
   if (!task.restricted || fileIds.length === 0) return;
+  const { db } = deps;
   const { channelId } = await ensureTaskConversation(db, task.id);
   const by = actorOf(actor);
   const moved = await db
@@ -1327,6 +1335,7 @@ async function keepFilesWithTask(
     )
     .returning({ id: artifacts.id });
   for (const f of moved) await enqueueIndex(db, { orgId: task.orgId, kind: "file", sourceId: f.id });
+  if (moved.length > 0) await publishListChanged(deps.pubsub, task.orgId, "artifacts");
 }
 
 /**
@@ -1357,7 +1366,7 @@ export async function commentIssue(
     files.map((f) => f.id),
   );
   await keepFilesWithTask(
-    deps.db,
+    deps,
     actor,
     issue,
     files.map((f) => f.id),
@@ -1928,7 +1937,7 @@ export async function setIssueAudience(
         and n.source->>'issueId' = t.id::text and not ${taskSeenSql("t", sql`n.user_id`)}`);
     return updated;
   });
-  await keepFilesWithTask(db, actor, row, row.artifactIds);
+  await keepFilesWithTask(deps, actor, row, row.artifactIds);
   const still = await conversationReaders(db, orgId, changed);
   for (const reader of readers) {
     if (still.has(reader)) continue;

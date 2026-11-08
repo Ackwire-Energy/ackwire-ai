@@ -270,7 +270,7 @@ export function calendarRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, eventId } = c.req.valid("param");
-      return c.json(await respondToEvent(db, c.get("user").id, orgId, eventId, c.req.valid("json").status), 200);
+      return c.json(await respondToEvent(calendar, c.get("user").id, orgId, eventId, c.req.valid("json").status), 200);
     },
   );
 
