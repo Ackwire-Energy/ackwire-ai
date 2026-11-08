@@ -1735,7 +1735,7 @@ describe("the dialog's size (computer.css)", () => {
     ).text();
     // The kit's button reaches a leading icon out by the air its drawing leaves before it and lifts it as far as asked.
     // Unset, the icon's box places it, and at no weight, so any rule of a page's own still wins.
-    const lead = rule(kit, ":where(.ac-btn > .ac-icon:first-child)");
+    const lead = rule(kit, ":where(.ac-btn > .ac-icon:first-child, .ac-btn > .ac-swap > * > .ac-icon:first-child)");
     expect(lead).toContain("margin-inline-start: calc(-1 * var(--lead-air))");
     expect(lead).toContain("translate: 0 calc(-1 * var(--lead-rise))");
     // One move only: the build's minifier drops a `translate` declared beside a `transform`.
