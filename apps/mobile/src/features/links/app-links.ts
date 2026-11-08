@@ -34,6 +34,11 @@ export const SETTINGS_SCREENS: Record<string, string> = {
   usage: "/usage",
   import: "/settings/import",
   media: "/settings/media",
+  approvals: "/me/approvals",
+  right_hand: "/settings/right-hand",
+  roles: "/settings/roles",
+  vault: "/settings/vault",
+  about: "/me/about",
 };
 
 /**
@@ -111,6 +116,8 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
     }
     case "proposals":
       return "/proposals";
+    case "task-manager":
+      return isSafeId(q.task) ? `/task-manager/${q.task}` : "/task-manager";
     case "routines":
       return open ? `/routines/${open}` : "/routines";
     case "search":
@@ -152,6 +159,18 @@ export function appLinkFromUrl(url: string): AppLink {
   // `web`: the address itself, opened in the browser when the person isn't in that workspace.
   const at = { org: parts[1], web: web.web };
   return { href: linkHref(typeof screen === "string" ? { ...at, to: screen } : { ...at, ...screen }) };
+}
+
+/**
+ * A link in a message to a page of this server (`server`): the app's screen for it, through `/link`; null for any other
+ * site, or a page the app has no screen for (it opens as a web page).
+ */
+export function ownLinkHref(url: string, server: string): string | null {
+  const origin = (u: string) => /^https?:\/\/[^/?#]+/i.exec(u.trim())?.[0].toLowerCase() ?? null;
+  const here = origin(server);
+  if (!here || origin(url) !== here) return null;
+  const link = appLinkFromUrl(url);
+  return link && "href" in link ? link.href : null;
 }
 
 /**

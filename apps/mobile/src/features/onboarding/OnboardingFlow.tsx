@@ -11,7 +11,6 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
-import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
 import {
   AgentAvatar,
@@ -28,9 +27,9 @@ import {
 import { WholeAccount } from "@/ui/auth/WholeAccount";
 import { leadBox } from "@/ui/type-scale";
 import { fullLook } from "../agents/edit";
-import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
+import { openWebPath } from "../links/open-web";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { phoneTimezone, stepFailedText, zoneLabel } from "./logic";
 
@@ -217,7 +216,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
             wide
             label={t("onboarding.deleteLink")}
             disabled={pending}
-            onPress={() => openPage(`${serverUrl()}/onboarding?delete=1`)}
+            onPress={() => openWebPath("/onboarding?delete=1")}
           />
         ) : null}
         <Button
@@ -231,7 +230,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           <WholeAccount
             orgs={me.data.organizations}
             disabled={pending}
-            onDelete={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
+            onDelete={() => openWebPath("/onboarding?account=delete")}
           />
         ) : null}
       </View>

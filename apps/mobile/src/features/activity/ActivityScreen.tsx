@@ -21,7 +21,6 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -39,7 +38,6 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
-import { openPage } from "../ai/parts";
 import { approvalAction } from "../approvals/logic";
 import { ApprovalMark, ApprovalWhy, useApprovalSource, useApproveNow } from "../approvals/parts";
 import type { AskKind } from "../chat/ask-store";
@@ -47,6 +45,7 @@ import { ASK_ICON, AskButtons } from "../chat/asks";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
+import { openWebPath } from "../links/open-web";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
 import { LoadFailed, useEmptyLook } from "../shared/FirstUse";
@@ -245,7 +244,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const open = () => {
     if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
-    else if (web) openPage(`${serverUrl()}${web}`);
+    else if (web) openWebPath(web);
   };
   // Whoever asks leads the card: an agent (with its sky), a person, the people asking to join, or the server.
   const leading =
@@ -506,7 +505,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
-    else if (web) openPage(`${serverUrl()}${web}`);
+    else if (web) openWebPath(web);
   };
   const faces = n.actors.slice(0, n.count > 1 ? 2 : 1);
   const leading =

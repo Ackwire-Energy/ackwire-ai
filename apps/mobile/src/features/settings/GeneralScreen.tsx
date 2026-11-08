@@ -22,7 +22,6 @@ import {
   type TextInputInstance,
   View,
 } from "react-native";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -36,7 +35,8 @@ import {
   Text,
   useToast,
 } from "@/ui";
-import { Note, openPage } from "../ai/parts";
+import { Note } from "../ai/parts";
+import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
@@ -376,7 +376,7 @@ export function GeneralScreen() {
               label={t("deleteOrg.card.title")}
               danger
               chevron
-              onPress={() => openPage(`${serverUrl()}/org/${orgId}/settings/general?delete=1`)}
+              onPress={() => openWebPath(`/org/${orgId}/settings/general?delete=1`)}
             />
           </GroupedList>
           <GroupedFooter>{t("deleteOrg.card.text", { name: org.name })}</GroupedFooter>

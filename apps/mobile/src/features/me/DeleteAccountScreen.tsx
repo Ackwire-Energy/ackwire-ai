@@ -21,11 +21,10 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
-import { serverUrl } from "@/lib/server";
 import { Button, Card, HoldButton, type IconName, LineIcon, Locked, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
-import { openPage } from "../ai/parts";
+import { openWebPath } from "../links/open-web";
 import { useColors, useNow } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { preflightMissing } from "./logic";
@@ -81,7 +80,7 @@ export function DeleteAccountScreen() {
   useNow(left > 0 ? 1000 : 60_000);
   const toSend = proof ? proofToSend(proof, { sent: sent !== null, code, password }) : null;
   const ready = toSend === null || toSend.ready;
-  const web = (path: string) => openPage(`${serverUrl()}${path}`);
+  const web = openWebPath;
   const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
   const named = (o: { id: string; name: string }) => workspaceLabel(o.name, notes.get(o.id));
   const lines = plan.data

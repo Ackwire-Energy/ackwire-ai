@@ -26,12 +26,11 @@ import { connectorName } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { EventPillAction, EventPillText, type IconName, Text } from "@/ui";
 import { AskDone, AskWaiting } from "../chat/asks";
+import { openWebPath } from "../links/open-web";
 import { PersonLimitNote } from "../usage/people";
-import { openPage } from "./parts";
 
 /**
  * The web's cards to connect an app or an MCP server (`offer_connect_app`) and to invite people (`offer_invites`) in
@@ -221,7 +220,7 @@ function OpenScreen({ card }: { card: Extract<Card, { kind: "open_page" }> }) {
       why={card.why}
       done={null}
       action={allowed && (here || web) ? t(here ? "rightHand.open.open" : "rightHand.open.web") : null}
-      onAction={() => (here ? router.push(here as never) : openPage(`${serverUrl()}/org/${orgId}${web ?? ""}`))}
+      onAction={() => (here ? router.push(here as never) : openWebPath(`/org/${orgId}${web ?? ""}`))}
       blocked={t("rightHand.open.notAllowed")}
     />
   );
