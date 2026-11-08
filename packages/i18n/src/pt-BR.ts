@@ -13696,7 +13696,7 @@ export const ptBR = {
         runningRoutine: "Rodou uma rotina agora",
         proposingTeam: "Propôs um time",
         proposingChange: "Propôs uma mudança",
-        workingOnWorkspace: "Mexeu no workspace",
+        workingOnWorkspace: "Alterou o workspace",
         updatingThread: "Atualizou uma thread",
         addingAgent: "Adicionou um agente a um canal",
         readingConversation: "Leu a conversa",
