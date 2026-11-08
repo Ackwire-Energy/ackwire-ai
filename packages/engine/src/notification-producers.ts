@@ -7,7 +7,7 @@ import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
-import { previewMediaKind, previewMeta, readableBody } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { isQuietNotice } from "./notices";
 import {
   dropRunFailure,
@@ -744,6 +744,8 @@ export async function notifyMissionEnded(
   kind: "mission_finished" | "mission_stopped",
   actor: NotificationActor | null,
   text?: string | null,
+  /** `text` is the server's English: the apps word it by its code, as the chat's message (`previewMeta`). */
+  written?: PreviewMeta,
 ) {
   const parts = await deps.db
     .select({ userId: missionParticipants.userId })
@@ -764,6 +766,7 @@ export async function notifyMissionEnded(
     latest: {
       title: mission.title,
       ...(text ? { text: notificationSnippet(text) } : {}),
+      ...(text && written ? { meta: written } : {}),
       ...(mission.planTotal > 0 ? { steps: { done: mission.planDone, total: mission.planTotal } } : {}),
     },
   });
