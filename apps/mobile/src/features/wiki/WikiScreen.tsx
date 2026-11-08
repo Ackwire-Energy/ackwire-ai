@@ -5,7 +5,6 @@ import {
   useWikiGraph,
   useWikiHistory,
   useWikiPage,
-  useWikiReads,
   useWikiTree,
   type WikiBacklink,
   type WikiPageSummary,
@@ -16,12 +15,15 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { titleOfSlug, toggleTask, wikiImportOf } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { readValueSync, STORED, writeValueSync } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
+import { Sky } from "@/sky/Sky";
 import {
   Button,
   DiffView,
@@ -29,7 +31,6 @@ import {
   fieldText,
   Icon,
   IconButton,
-  LineIcon,
   ListRow,
   Locked,
   Row,
@@ -41,18 +42,27 @@ import {
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
-import { StarCard, StarStrip } from "../constellation/Constellation";
-import { aroundStar, wikiMap } from "../constellation/logic";
+import { Constellation, StarCard } from "../constellation/Constellation";
+import { aroundStar, linkCount, linksOutOf, mostLinked, pagesMap, strongest } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { chooseAction } from "../settings/parts";
 import { Face } from "../shared/Face";
 import { FirstUse, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import { foldersIn, searchWiki, wikiHome } from "./logic";
+import {
+  continueReading,
+  foldersIn,
+  parseRecents,
+  searchWiki,
+  wikiHome,
+  withoutTitleHeading,
+  withRecent,
+} from "./logic";
 import { openWikiAgents, openWikiTrash, useWikiBulkDelete } from "./WikiBulk";
 import { WikiDoc } from "./WikiDoc";
 
@@ -65,15 +75,23 @@ export const newWikiPage = (params: { title?: string; folder?: string } = {}) =>
 export const writeWikiPage = (params: { slug: string } | { title: string; folder: string }) =>
   router.push({ pathname: "/wiki-write", params });
 
+/** The whole graph of the wiki, as the web's "Grafo". */
+export const openWikiMap = () => router.push("/wiki-map");
+
+/** The pages last opened on this phone, per workspace ("Continuar lendo"), read again whenever a screen asks. */
+const readRecents = () => parseRecents(readValueSync(STORED.wikiRecent));
+
 /** A page by the `[[title]]` of a link: opens it, or offers to create it. */
 export const openWikiLink = (title: string, page: WikiPageSummary | undefined) =>
   page ? openWikiPage(page.slug) : newWikiPage({ title });
 
 /**
  * The wiki, pushed from Você, as Tarefas and Rotinas: the large title and the search, "+" (Nova página) in the bar
- * and "…" for the rest (who sees it, the map of the pages, choosing pages, the trash). One list, each page once:
- * Fixadas, Pastas (with how many pages), Páginas; every row a tile of 52 with its text at 80, who changed it last and
- * when. `folder`: the same screen for one folder (its folders and pages).
+ * and "…" for the rest (who sees it, choosing pages, the trash). Under the search, the wiki's connections as the
+ * web's graph draws them (pages and their [[links]], the most linked bigger): it lights up the first time it is seen,
+ * a tap lights a page's links and a second tap opens it, "Ver o grafo" opens it whole. Then one list, each page once:
+ * Continuar lendo (the last pages opened here), Fixadas, Pastas (with how many pages), Páginas; every row a tile of 52
+ * with its text at 80, who changed it last and when. `folder`: the same screen for one folder (its folders and pages).
  */
 export function WikiScreen({ folder = "" }: { folder?: string }) {
   const { t, i18n } = useTranslation();
@@ -86,11 +104,11 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
-  const reads = useWikiReads(orgId, folder === "");
   const graph = useWikiGraph(orgId, folder === "");
   const [picked, setPicked] = useState<string | null>(null);
-  // The map of the pages, asked for from "…": the home is the list, the map is there when wanted.
-  const [showMap, setShowMap] = useState(false);
+  // Read again each time the home shows: a page opened from here is first when coming back.
+  const [recents, setRecents] = useState(readRecents);
+  useFocusEffect(useCallback(() => setRecents(readRecents()), []));
   // Choosing pages to delete them or set their agents at once.
   const [selecting, setSelecting] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -107,14 +125,12 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
     () => searchWiki(folder ? pages.filter((p) => inFolder(p, folder)) : pages, search),
     [pages, folder, search],
   );
-  const map = useMemo(
-    () => (graph.data ? wikiMap(graph.data, reads.data ?? [], dir.agents) : null),
-    [graph.data, reads.data, dir.agents],
-  );
-  const star =
-    map?.stars.find((s) => s.id === picked) ??
-    map?.stars.find((s) => s.id === home?.pinned[0]?.slug) ??
-    map?.stars.find((s) => s.kind === "page");
+  const map = useMemo(() => (graph.data ? pagesMap(graph.data) : null), [graph.data]);
+  // The home's sky keeps the most linked pages (the whole graph is one tap away); it opens on the most linked of
+  // all, the heart of the wiki, where its lines start drawing from.
+  const sky = useMemo(() => (map ? strongest(map, HOME_STARS) : null), [map]);
+  const heart = sky ? mostLinked(sky) : null;
+  const star = sky?.stars.find((s) => s.id === (picked ?? heart));
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
   const title = folder ? (folder.split("/").pop() ?? folder) : t("wiki.title");
   // The home and the search's results cross-fade as a search starts and ends, and fade in when they load.
@@ -148,11 +164,19 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
     );
   };
   const inThisFolder = folder ? pages.filter((p) => inFolder(p, folder)).length : 0;
-  // Each page once: a pinned page is under Fixadas only.
+  // Each page once: a pinned page is under Fixadas only, a page read lately under Continuar lendo only.
   const pinnedIds = new Set((home?.pinned ?? []).map((p) => p.id));
-  const loose = (home?.pages ?? []).filter((p) => !pinnedIds.has(p.id));
+  const reading = folder
+    ? []
+    : continueReading(
+        pages.filter((p) => !pinnedIds.has(p.id)),
+        recents[orgId] ?? [],
+      );
+  const readingIds = new Set(reading.map((p) => p.id));
+  const loose = (home?.pages ?? []).filter((p) => !pinnedIds.has(p.id) && !readingIds.has(p.id));
   const choosable = search ? found : (home?.pages ?? []);
-  const hasMap = Boolean(map && star && !folder && map.stars.length > 1);
+  // Only with links: a sky of lone dots says nothing.
+  const hasMap = Boolean(sky && star && !folder && sky.links.length > 0);
   // "…": what the home no longer shows, each a line of the system's list.
   const menu = [
     ...(choosesAudience
@@ -164,7 +188,6 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           },
         ]
       : []),
-    ...(hasMap ? [{ label: t("mobile.wiki.map"), onPress: () => setShowMap((v) => !v) }] : []),
     ...(writes && pages.length > 0 ? [{ label: t("wiki.bulk.select"), onPress: () => setSelecting(true) }] : []),
     ...(!folder && writes ? [{ label: t("wiki.trash.title"), onPress: openWikiTrash }] : []),
     ...(folder && writes
@@ -273,21 +296,36 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           )
         ) : home ? (
           <Animated.View key="home" {...fade}>
-            {showMap && hasMap && map && star ? (
-              <StarCard
-                label={t("mobile.wiki.map")}
-                count={pages.length}
-                map={map}
-                selected={star.id}
-                onSelect={setPicked}
-                title={star.title}
-                subtitle={
-                  star.kind === "agent"
-                    ? t("mobile.wiki.mapAgent")
-                    : [star.folder, t("mobile.wiki.reads", { count: star.weight })].filter(Boolean).join(" · ")
-                }
-                onOpen={() => (star.kind === "agent" ? router.push(`/agent/${star.id}`) : openWikiPage(star.id))}
-              />
+            {hasMap && map && sky && star ? (
+              <>
+                <SectionHeader
+                  title={t("mobile.wiki.graph")}
+                  count={map.links.length}
+                  action={{ label: t("wiki.openGraph"), onPress: openWikiMap, chevron: true }}
+                />
+                <StarCard
+                  accessibilityLabel={t("mobile.wiki.map")}
+                  map={sky}
+                  selected={star.id}
+                  height={GRAPH_HEIGHT}
+                  explore={false}
+                  assemble={`wiki:${orgId}`}
+                  // A first tap lights the page's links; a tap on the lit page opens it.
+                  onSelect={(id) => (id === star.id ? openWikiPage(id) : setPicked(id))}
+                  title={star.title}
+                  subtitle={[star.folder, t("mobile.wiki.links", { count: linkCount(map, star.id) })]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  onOpen={() => openWikiPage(star.id)}
+                  style={styles.graphCard}
+                />
+              </>
+            ) : null}
+            {reading.length > 0 ? (
+              <>
+                <SectionHeader title={t("mobile.wiki.continue")} />
+                {reading.map((p, i) => pageRow(p, i, byLine(p)))}
+              </>
             ) : null}
             {home.pinned.length > 0 ? (
               <>
@@ -362,6 +400,12 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
 
 /** The rows' tile, in the 52 column of a list row (the text at 80). */
 const ROW_TILE = 52;
+/** The home's graph: tall enough to read a cluster, short enough that the list starts above the fold. */
+const GRAPH_HEIGHT = 220;
+/** How many pages the home's graph draws: past this, names collide and stars crowd the card. */
+const HOME_STARS = 24;
+/** A page's small sky of itself and its neighbours. */
+const AROUND_HEIGHT = 168;
 
 const inFolder = (p: WikiPageSummary, folder: string) => p.folder === folder || p.folder.startsWith(`${folder}/`);
 
@@ -381,9 +425,11 @@ interface MenuItem {
 }
 
 /**
- * A page: its folder, the title, who wrote it (and at whose request) with the version, the text
- * (links open or create; tasks check with a tap for whoever may edit), "Mencionada em" and the history. The bar:
- * "Editar" (writing, the B layout) and ⋯ (Copiar link, Renomear ou mover, Fixar, Trancar, Histórico, Lixeira).
+ * A page: its own sky band with who wrote it, its folder, the title once, who wrote it (and at whose request) and
+ * when, the text (links open or create; tasks check with a tap for whoever may edit), then its connections: the page
+ * and its neighbours as a small sky (a tapped neighbour lights its lines, then opens), "Liga para", "Mencionada em",
+ * the agents that use it and the history. The bar: "Editar" (writing, the B layout) and ⋯ (Copiar link, Renomear ou
+ * mover, Fixar, Trancar, Histórico, Lixeira).
  */
 export function WikiPageScreen({ slug }: { slug: string }) {
   return (
@@ -419,14 +465,35 @@ function WikiPage({ slug }: { slug: string }) {
   const editable = p ? writes && (!p.locked || admin) : false;
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
   const readers = useMemo(() => p?.reads?.agents ?? [], [p?.reads?.agents]);
+  // The page and the pages it touches, as the home's sky: drawn when it has two neighbours or more (one line alone
+  // says less than the rows under it).
   const around = useMemo(() => {
     if (!graph.data || !p) return null;
-    const near = aroundStar(
-      wikiMap(graph.data, [{ slug: p.slug, total: p.reads?.total ?? 0, agents: readers }], dir.agents),
-      p.slug,
-    );
-    return near.stars.length > 1 ? near : null;
-  }, [graph.data, p, readers, dir.agents]);
+    const near = aroundStar(pagesMap(graph.data), p.slug);
+    return near.stars.length > 2 ? near : null;
+  }, [graph.data, p]);
+  const linksOut = useMemo(() => {
+    if (!graph.data || !p) return [];
+    const bySlug = new Map(pages.map((x) => [x.slug, x]));
+    return linksOutOf(graph.data, p.slug).flatMap((slug) => bySlug.get(slug) ?? []);
+  }, [graph.data, p, pages]);
+  const body = useMemo(() => (p ? withoutTitleHeading(p.body, p.title) : ""), [p]);
+  // A neighbour tapped in the small sky: its lines light, then it opens; back here, the page is the heart again.
+  const [neighbour, setNeighbour] = useState<string | null>(null);
+  useFocusEffect(useCallback(() => setNeighbour(null), []));
+  const reducedMotion = useReducedMotion();
+  const opening = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (opening.current) clearTimeout(opening.current);
+    },
+    [],
+  );
+  // Opened: first under the wiki home's Continuar lendo.
+  const opened = p?.slug;
+  useEffect(() => {
+    if (opened) writeValueSync(STORED.wikiRecent, JSON.stringify(withRecent(readRecents(), orgId, opened)));
+  }, [opened, orgId]);
 
   const toggle = (line: number) => {
     if (!p) return;
@@ -575,11 +642,20 @@ function WikiPage({ slug }: { slug: string }) {
   };
 
   const person = p?.updatedBy.onBehalfOf ? dir.memberById.get(p.updatedBy.onBehalfOf)?.name : undefined;
+  // "Theo a pedido de Walter · 3 de nov.": the version lives in Histórico, under the page.
+  // A writer that no longer exists (a deleted agent) leaves just when.
+  const writer = p ? dir.nameOf(p.updatedBy) : "";
   const by = p
-    ? person
-      ? t("wiki.byFor", { name: dir.nameOf(p.updatedBy), person })
-      : t("wiki.by", { name: dir.nameOf(p.updatedBy) })
+    ? [
+        writer && person ? `${writer} ${t("wiki.atRequestOf")} ${person}` : writer,
+        relativeTime(t, i18n.language, p.updatedAt),
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : "";
+  // The band takes the writer's sky: an agent's color, the app's sky for a person.
+  const bandColor =
+    p?.updatedBy.type === "agent" ? agentLook(dir.anyAgent(p.updatedBy.id)).color : ("sky" as const);
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader
@@ -651,25 +727,25 @@ function WikiPage({ slug }: { slug: string }) {
         ) : null}
         {p ? (
           <>
-            {around ? <StarStrip map={around} selected={p.slug} /> : null}
+            {/* The page's own sky, its writer's face framed on the horizon, low and to the left. */}
+            <View style={styles.band} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <Sky color={bandColor} fade={0.45} style={StyleSheet.absoluteFill} />
+              <View style={styles.bandFace}>
+                <Face who={p.updatedBy} size={36} framed live={false} />
+              </View>
+            </View>
             <View style={styles.page}>
               {p.folder ? (
-                <Text variant="subhead" tone="faint">
+                <Text variant="footnote" tone="faint" numberOfLines={1} ellipsizeMode="middle">
                   {p.folder}
                 </Text>
               ) : null}
-              <Text variant="display2" accessibilityRole="header">
+              <Text variant="display2" accessibilityRole="header" style={styles.title}>
                 {p.title}
               </Text>
-              {/* Top-aligned, the face on the first line: a long "by … for …" line wraps under it. */}
-              <View style={[styles.byline, styles.top]}>
-                <LineIcon variant="footnote" size={18}>
-                  <Face who={p.updatedBy} size={18} />
-                </LineIcon>
-                <Text variant="footnote" tone="faint" style={styles.grow}>
-                  {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
-                </Text>
-              </View>
+              <Text variant="footnote" tone="muted" style={styles.byline}>
+                {by}
+              </Text>
               {p.audience || p.agentIds ? (
                 <View style={styles.note}>
                   <Note icon="eye">{p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}</Note>
@@ -686,9 +762,9 @@ function WikiPage({ slug }: { slug: string }) {
                 </View>
               ) : null}
               <View style={styles.body}>
-                {p.body.trim() ? (
+                {body.trim() ? (
                   <WikiDoc
-                    body={p.body}
+                    body={body}
                     pages={pages}
                     onOpenLink={openWikiLink}
                     onToggleTask={editable ? toggle : undefined}
@@ -700,14 +776,40 @@ function WikiPage({ slug }: { slug: string }) {
                 )}
               </View>
             </View>
-            {readers.length > 0 ? (
+            {around ? (
               <>
-                <SectionHeader title={t("mobile.wiki.usedBy")} />
-                <Row
-                  leading={<Face who={{ type: "agent", id: readers[0]?.agentId ?? null }} size={36} live={false} />}
-                  title={readers.map((r) => dir.nameOf({ type: "agent", id: r.agentId })).join(", ")}
-                  subtitle={t("mobile.wiki.readsWeek", { count: p.reads?.total ?? 0 })}
-                />
+                <SectionHeader title={t("mobile.wiki.graph")} />
+                <View style={styles.around}>
+                  <Constellation
+                    map={around}
+                    selected={neighbour ?? p.slug}
+                    height={AROUND_HEIGHT}
+                    explore={false}
+                    onSelect={(id) => {
+                      if (id === p.slug || neighbour) return;
+                      setNeighbour(id);
+                      // Its lines draw bright (240 ms), then the page opens on them; at once with reduced motion.
+                      opening.current = setTimeout(() => openWikiPage(id), reducedMotion ? 0 : 260);
+                    }}
+                  />
+                </View>
+              </>
+            ) : null}
+            {linksOut.length > 0 ? (
+              <>
+                <SectionHeader title={t("mobile.wiki.linksOut")} count={linksOut.length} />
+                {linksOut.map((x, i) => (
+                  <ListRow
+                    key={x.id}
+                    divider={i > 0}
+                    leading={<PageTile page={x} />}
+                    title={x.title}
+                    sub={x.folder || t("wiki.root")}
+                    subLines={1}
+                    chevron
+                    onPress={() => openWikiPage(x.slug)}
+                  />
+                ))}
               </>
             ) : null}
             <SectionHeader title={t("wiki.backlinks")} count={p.backlinks.length} />
@@ -718,12 +820,23 @@ function WikiPage({ slug }: { slug: string }) {
             ) : (
               p.backlinks.map((b, i) => <BacklinkRow key={backlinkKey(b)} link={b} divider={i > 0} />)
             )}
+            {readers.length > 0 ? (
+              <>
+                <SectionHeader title={t("mobile.wiki.usedBy")} />
+                <ListRow
+                  leading={<Face who={{ type: "agent", id: readers[0]?.agentId ?? null }} size={ROW_TILE} live={false} />}
+                  title={readers.map((r) => dir.nameOf({ type: "agent", id: r.agentId })).join(", ")}
+                  sub={t("mobile.wiki.readsWeek", { count: p.reads?.total ?? 0 })}
+                  subLines={1}
+                />
+              </>
+            ) : null}
             <SectionHeader title={t("wiki.history")} />
-            <Row
-              leading={<Tile icon="clock" />}
+            <ListRow
+              leading={<Tile icon="clock" size={ROW_TILE} />}
               title={t("wiki.allVersions", { count: p.version })}
-              subtitle={t("wiki.historyText")}
-              subtitleLines={2}
+              sub={t("wiki.historyText")}
+              subLines={2}
               chevron
               onPress={() => router.push({ pathname: "/wiki-history", params: { slug: p.slug } })}
             />
@@ -737,43 +850,40 @@ function WikiPage({ slug }: { slug: string }) {
 const backlinkKey = (b: WikiBacklink) =>
   b.kind === "page" ? `page:${b.slug}` : b.kind === "message" ? `message:${b.messageId}` : `issue:${b.number}`;
 
-/** Where a page is mentioned: another page, a conversation (opens there) or a task. */
+/** Where a page is mentioned: another page, a conversation (opens there) or a task; the list's 52 rows. */
 function BacklinkRow({ link: b, divider }: { link: WikiBacklink; divider: boolean }) {
   switch (b.kind) {
     case "page":
       return (
-        <Row
+        <ListRow
           divider={divider}
-          leading={<Tile icon="file" />}
+          leading={<Tile icon="file" size={ROW_TILE} />}
           title={b.title}
-          {...(b.excerpt ? { subtitle: b.excerpt, subtitleLines: 2 } : {})}
+          {...(b.excerpt ? { sub: b.excerpt, subLines: 2 } : {})}
           chevron
           onPress={() => openWikiPage(b.slug)}
         />
       );
     case "message":
       return (
-        <Row
+        <ListRow
           divider={divider}
-          leading={<Tile icon="chat" />}
+          leading={<Tile icon="chat" size={ROW_TILE} />}
           title={`#${b.channelName}`}
-          subtitle={b.excerpt}
-          subtitleLines={2}
+          sub={b.excerpt}
+          subLines={2}
           chevron
           onPress={() => router.push(chatHref(b.channelId))}
         />
       );
     default:
       return (
-        <Row
+        <ListRow
           divider={divider}
-          leading={<Tile icon="checkc" />}
+          leading={<Tile icon="checkc" size={ROW_TILE} />}
           title={b.title}
-          meta={
-            <Text variant="subhead" tone="faint">
-              #{b.number}
-            </Text>
-          }
+          sub={`#${b.number}`}
+          subLines={1}
           chevron
           onPress={() => router.push(`/issues/${b.number}`)}
         />
@@ -985,15 +1095,20 @@ export function FolderChips({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
-  lead: { paddingHorizontal: 20, marginTop: -4 },
+  lead: { paddingHorizontal: 16, marginTop: -4 },
   search: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pressed: { opacity: 0.85 },
   pressedWord: { opacity: 0.6 },
-  byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  top: { alignItems: "flex-start" },
+  // Folder 4 over the title, the title 8 over who wrote it (the 8 rhythm, tighter inside one heading group).
+  title: { marginTop: 4 },
+  byline: { marginTop: 8 },
+  band: { height: 96, marginHorizontal: 16, marginTop: 8, borderRadius: 20, overflow: "hidden" },
+  bandFace: { position: "absolute", left: 16, bottom: 12 },
+  around: { marginHorizontal: 16, borderRadius: 20, overflow: "hidden" },
+  graphCard: { marginTop: 0 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },
@@ -1009,10 +1124,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  page: { paddingHorizontal: 20, paddingTop: 8, gap: 4 },
-  note: { paddingTop: 10 },
-  body: { paddingTop: 14 },
-  diffWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
+  page: { paddingHorizontal: 16, paddingTop: 16 },
+  note: { paddingTop: 8 },
+  body: { paddingTop: 24 },
+  diffWrap: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
   formFields: { gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },

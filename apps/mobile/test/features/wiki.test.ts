@@ -1,15 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import type { WikiPageSummary } from "@agenteschat/client";
 import {
+  continueReading,
   docBlocks,
   docRuns,
   foldersIn,
   isWikiSlug,
+  parseRecents,
   RECENT_COUNT,
   searchWiki,
   suggestPages,
   wikiHome,
   wikiSlugOf,
+  withoutTitleHeading,
+  withRecent,
 } from "../../src/features/wiki/logic";
 
 const page = (title: string, over: Partial<WikiPageSummary> = {}): WikiPageSummary => ({
@@ -122,5 +126,38 @@ describe("wiki text", () => {
     expect(wikiSlugOf("processos%2Fonboarding")).toBe("processos/onboarding");
     expect(wikiSlugOf("%E0")).toBeNull();
     expect(wikiSlugOf(undefined)).toBeNull();
+  });
+});
+
+describe("Continuar lendo", () => {
+  test("the last page opened goes first, once, per workspace, and only pages that still exist show", () => {
+    let r = withRecent({}, "acme", "a");
+    r = withRecent(r, "acme", "b");
+    r = withRecent(r, "acme", "a");
+    r = withRecent(r, "other", "z");
+    expect(r).toEqual({ acme: ["a", "b"], other: ["z"] });
+    const pages = [page("A", { slug: "a" }), page("B", { slug: "b" }), page("C", { slug: "c" })];
+    expect(continueReading(pages, ["gone", "b", "a", "c"], 2).map((p) => p.slug)).toEqual(["b", "a"]);
+  });
+
+  test("what storage holds is read safely", () => {
+    expect(parseRecents(null)).toEqual({});
+    expect(parseRecents("not json")).toEqual({});
+    expect(parseRecents("[1,2]")).toEqual({});
+    expect(parseRecents('{"acme":["a",3,"b"],"x":"y"}')).toEqual({ acme: ["a", "b"], x: [] });
+  });
+});
+
+describe("the title once", () => {
+  test("the body's first heading goes when it is the title again, its line kept blank", () => {
+    const body = "\n# Product Overview\n\nText\n- [ ] task";
+    const out = withoutTitleHeading(body, "product overview");
+    expect(out).toBe("\n\n\nText\n- [ ] task");
+    expect(out.split("\n")).toHaveLength(body.split("\n").length);
+  });
+
+  test("a different first heading, or text first, stays", () => {
+    expect(withoutTitleHeading("# Other\nText", "Product")).toBe("# Other\nText");
+    expect(withoutTitleHeading("Intro\n# Product", "Product")).toBe("Intro\n# Product");
   });
 });

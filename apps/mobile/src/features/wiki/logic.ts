@@ -180,3 +180,49 @@ export function wikiSlugOf(raw: unknown): string | null {
 /** The page's folders for "Nova página" and "Renomear ou mover": every folder path in use, sorted. */
 export const foldersIn = (pages: WikiPageSummary[]) =>
   [...new Set(pages.map((p) => p.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+/** How many pages "Continuar lendo" shows, and how many this phone remembers per workspace. */
+export const CONTINUE_COUNT = 3;
+const RECENT_KEPT = 12;
+
+/** The remembered recents (org id → slugs, newest first), from what storage holds; anything else reads as none. */
+export function parseRecents(raw: string | null): Record<string, string[]> {
+  if (!raw) return {};
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([org, slugs]) => [
+        org,
+        Array.isArray(slugs) ? slugs.filter((s): s is string => typeof s === "string") : [],
+      ]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+/** The recents after opening `slug` in `orgId`: first, once, the oldest let go past what is kept. */
+export function withRecent(recents: Record<string, string[]>, orgId: string, slug: string) {
+  const list = [slug, ...(recents[orgId] ?? []).filter((s) => s !== slug)].slice(0, RECENT_KEPT);
+  return { ...recents, [orgId]: list };
+}
+
+/** "Continuar lendo": the pages last opened that still exist, newest first. */
+export function continueReading(pages: WikiPageSummary[], slugs: string[], count = CONTINUE_COUNT) {
+  const bySlug = new Map(pages.map((p) => [p.slug, p]));
+  return slugs.flatMap((s) => bySlug.get(s) ?? []).slice(0, count);
+}
+
+/**
+ * A page's text without its first heading when that heading is only the title again (the title is already above
+ * it). The line stays, blank, so a task's line number still points at the same line.
+ */
+export function withoutTitleHeading(body: string, title: string) {
+  const lines = body.split("\n");
+  const first = lines.findIndex((l) => l.trim() !== "");
+  const heading = first >= 0 ? /^#{1,2}\s+(.+?)\s*#*\s*$/.exec(lines[first] ?? "") : null;
+  if (!heading?.[1] || heading[1].trim().toLowerCase() !== title.trim().toLowerCase()) return body;
+  lines[first] = "";
+  return lines.join("\n");
+}

@@ -176,8 +176,9 @@ function Runs({
 }
 
 const styles = StyleSheet.create({
-  doc: { gap: 10 },
-  heading: { marginTop: 10 },
+  // 12 between blocks, 24 over a heading (its 12 on the gap), so a section starts as one group with its text.
+  doc: { gap: 12 },
+  heading: { marginTop: 12 },
   item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   mark: { minWidth: 14 },
   grow: { flex: 1, minWidth: 0 },
