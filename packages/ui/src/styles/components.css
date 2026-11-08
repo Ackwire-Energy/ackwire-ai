@@ -538,7 +538,6 @@ html:not([data-pointer]) .ac-link:focus-visible {
   align-items: baseline;
   gap: var(--space-2);
 }
-.ac-field__help,
 .ac-field__example {
   font-size: 13px;
   line-height: 18px;
@@ -8862,6 +8861,33 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   font-weight: 500;
   color: var(--faint);
 }
+.ac-grouphead__note {
+  min-width: 0;
+  font-weight: 500;
+}
+/* A heading that folds its group (Concluídos, a channel's threads): its words and their chevron are the button. */
+.ac-grouphead__title > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ac-grouphead__title > button:hover {
+  color: var(--ink);
+}
+.ac-grouphead__title > button > .ac-icon {
+  color: var(--faint);
+}
+html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
 .ac-grouphead__aside {
   margin-left: auto;
 }
@@ -8869,6 +8895,10 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+/* With no group to show it takes no room, nor its page's gap. */
+.ac-groups:empty {
+  display: none;
 }
 
 /*
@@ -10311,7 +10341,6 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 label.ac-setrow__title {
   cursor: pointer;
 }
-.ac-setrow__desc,
 .ac-setrow__status {
   display: block;
   font-size: 13px;

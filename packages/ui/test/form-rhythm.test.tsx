@@ -113,9 +113,9 @@ describe("a form's rhythm", () => {
 });
 
 describe("the pieces", () => {
-  test("a group field names its Segmented by the visible label and describes it by the help", () => {
+  test("a group field names its Segmented by the visible label and describes it by the example", () => {
     render(
-      <Field label="Formato" help="Como o servidor fala" group>
+      <Field label="Formato" example="Como o servidor fala" group>
         <Segmented
           label="Formato do servidor"
           value="a"

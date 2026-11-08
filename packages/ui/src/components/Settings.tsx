@@ -74,7 +74,6 @@ export function SettingRow({
   title,
   hint,
   status,
-  description,
   htmlFor,
   children,
 }: {
@@ -83,8 +82,6 @@ export function SettingRow({
   hint?: { name: string; text: ReactNode };
   /** Why the control is off or what it waits on: stays in sight under the title. */
   status?: ReactNode;
-  /** @deprecated What the setting does goes behind the ⓘ (`hint`), what must stay in sight in `status`. */
-  description?: ReactNode;
   /** The control's id: the title becomes its label. */
   htmlFor?: string;
   children?: ReactNode;
@@ -109,7 +106,6 @@ export function SettingRow({
           label
         )}
         {status && <small className="ac-setrow__status">{status}</small>}
-        {description && <small className="ac-setrow__desc">{description}</small>}
       </span>
       {children && <span className="ac-setrow__end">{children}</span>}
     </div>
