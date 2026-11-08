@@ -111,8 +111,12 @@ describe("the server's GitHub App (ADR 0153)", () => {
       apiUrl: API,
       fetch: (async (input: string | URL | Request) => {
         const url = String(input);
+        const acme = { id: 50, login: "acme", type: "Organization" };
         if (url.endsWith("/user/installations?per_page=100&page=1")) {
-          return Response.json({ installations: [{ id: 5, account: { login: "acme", type: "Organization" } }] });
+          return Response.json({ installations: [{ id: 5, account: acme }] });
+        }
+        if (url.endsWith("/app/installations/5")) {
+          return Response.json({ id: 5, account: acme, created_at: new Date().toISOString() });
         }
         if (url.endsWith("/login/oauth/access_token")) return Response.json({ access_token: "user-token" });
         if (url.endsWith("/repos/acme/app/installation")) return Response.json({ id: 5 });
@@ -152,16 +156,17 @@ describe("GitHub's manifest flow", () => {
       request_oauth_on_install: true,
       public: true,
       hook_attributes: { url: "https://chat.example.com/api/github-app/webhook", active: true },
-      default_permissions: {
-        contents: "write",
-        pull_requests: "write",
-        issues: "write",
-        workflows: "write",
-        checks: "read",
-        statuses: "read",
-        actions: "read",
-        metadata: "read",
-      },
+    });
+    // Exactly agentes.chat's own app: write on the repository permissions agents use, metadata read.
+    expect(manifest.default_permissions).toEqual({
+      actions: "write",
+      checks: "write",
+      contents: "write",
+      issues: "write",
+      pull_requests: "write",
+      statuses: "write",
+      workflows: "write",
+      metadata: "read",
     });
     // GitHub can't deliver to plain http; a long host keeps the name within GitHub's 34 characters.
     expect(githubAppManifest("http://192.168.0.10:3000").hook_attributes.active).toBe(false);

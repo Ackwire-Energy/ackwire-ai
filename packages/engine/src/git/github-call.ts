@@ -38,7 +38,7 @@ const SCOPE_PERMISSIONS: Record<string, AppPermissions[]> = {
   "issues.read": [{ issues: "read" }],
   "issues.write": [{ issues: "write" }],
   "actions.read": [{ actions: "read" }],
-  // The app isn't granted it: GitHub refuses, and an account's connection runs it.
+  // An installation that hasn't accepted it refuses, and an account's connection runs it.
   "actions.run": [{ actions: "write" }],
 };
 

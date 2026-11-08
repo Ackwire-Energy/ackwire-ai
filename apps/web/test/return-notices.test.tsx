@@ -37,6 +37,8 @@ describe("back from a provider's sign-in that didn't connect", () => {
         not_visible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
         other_workspace:
           "Essa conta do GitHub já está ligada a outro workspace. Remova o app de lá antes de instalar aqui.",
+        installed_outside:
+          "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
         failed: "Não deu para conectar. Tente de novo em instantes.",
         "Some words from the server": "Não deu para conectar. Tente de novo em instantes.",
       },
@@ -50,6 +52,8 @@ describe("back from a provider's sign-in that didn't connect", () => {
           "Your GitHub account can't see that installation. Install it with an account that has access to it.",
         other_workspace:
           "That GitHub account is already linked to another workspace. Remove the app there before installing it here.",
+        installed_outside:
+          "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
         failed: "Couldn't connect. Try again in a moment.",
         "Some words from the server": "Couldn't connect. Try again in a moment.",
       },
@@ -80,15 +84,21 @@ describe("back from a provider's sign-in that didn't connect", () => {
     ]);
   });
 
-  test("the GitHub account's owner was asked to install: news, not an error", () => {
+  test("the GitHub account's owner was asked to install: news, not an error, with where the owner installs it", () => {
     expect(open(`${CONNECTORS}?github_app_error=requested`)).toEqual({
       shown: [
-        ["Pedimos ao dono da conta do GitHub para instalar o app. Ele aparece aqui quando a pessoa instalar.", "info"],
+        [
+          "Só o dono da conta do GitHub pode instalar o app. Peça para essa pessoa instalar em Conectores › GitHub neste workspace.",
+          "info",
+        ],
       ],
       left: CONNECTORS,
     });
     expect(open("/?github_app_error=requested", "en").shown).toEqual([
-      ["We asked the GitHub account's owner to install the app. It shows up here once they do.", "info"],
+      [
+        "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace.",
+        "info",
+      ],
     ]);
   });
 

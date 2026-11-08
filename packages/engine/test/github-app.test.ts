@@ -38,7 +38,9 @@ const WEB = "https://github.test";
  * Fake GitHub: `repos` maps "owner/repo" → installation id; `visible` maps a user token → installation ids that user
  * can see; codes → user tokens. `lacks` lists permissions an installation wasn't granted (asking for one is a 422);
  * `gone` installations answer 404; `uninstall` is the status `DELETE /app/installations/{id}` answers. `personal` maps
- * an installation on a personal account → that account's GitHub id; `ids` maps a user token → its GitHub id.
+ * an installation on a personal account → that account's GitHub id; `ids` maps a user token → its GitHub id. `made`
+ * is when GitHub made an installation (else the moment it's asked); `moved` the account id the app sees it on, when
+ * not the one people see.
  */
 function fakeGitHub(state: {
   repos: Record<string, number>;
@@ -50,9 +52,15 @@ function fakeGitHub(state: {
   uninstall?: number;
   bot?: number | null;
   accounts?: Record<number, { login: string; selection: string; suspended?: string }>;
+  made?: Record<number, string>;
+  moved?: Record<number, number>;
 }) {
   const calls: string[] = [];
   const bodies: { url: string; body: Record<string, unknown> }[] = [];
+  const accountOf = (id: number) =>
+    state.personal?.[id] === undefined
+      ? { id: 1000 + id, login: `acct${id}`, type: "Organization" }
+      : { id: state.personal[id], login: `acct${id}`, type: "User" };
   const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -89,11 +97,13 @@ function fakeGitHub(state: {
       if (method === "DELETE") return new Response(null, { status: state.uninstall ?? 204 });
       if (state.gone?.includes(id)) return new Response("not found", { status: 404 });
       const account = state.accounts?.[id] ?? { login: `acct${id}`, selection: "selected" };
+      const owner = accountOf(id);
       return Response.json({
         id,
-        account: { login: account.login, type: "Organization" },
+        account: { ...owner, id: state.moved?.[id] ?? owner.id, login: account.login },
         repository_selection: account.selection,
         suspended_at: account.suspended ?? null,
+        created_at: state.made?.[id] ?? new Date().toISOString(),
       });
     }
     if (/\/users\/[^/]+%5Bbot%5D$/.test(url)) {
@@ -105,10 +115,7 @@ function fakeGitHub(state: {
       return Response.json({
         installations: ids.map((id) => ({
           id,
-          account:
-            state.personal?.[id] === undefined
-              ? { login: `acct${id}`, type: "Organization" }
-              : { id: state.personal[id], login: `acct${id}`, type: "User" },
+          account: accountOf(id),
           repository_selection: "selected",
           suspended_at: null,
         })),
@@ -147,6 +154,8 @@ async function world() {
     uninstall: 204,
     bot: 4242 as number | null,
     accounts: {} as Record<number, { login: string; selection: string; suspended?: string }>,
+    made: {} as Record<number, string>,
+    moved: {} as Record<number, number>,
   };
   const fake = fakeGitHub(gh);
   let clock = Date.now();
@@ -158,11 +167,17 @@ async function world() {
     now: () => new Date(clock),
   };
   /** Installs `installationId` for `org` as `user` (their GitHub user can see `visible`). */
-  const install = async (user: { id: string }, orgId: string, installationId: number, visible = [installationId]) => {
+  const install = async (
+    user: { id: string },
+    orgId: string,
+    installationId: number,
+    visible = [installationId],
+    setupAction?: string,
+  ) => {
     const { state, installUrl } = await startGitHubAppInstall(deps, user.id, orgId, { returnTo: "/conectores" });
     expect(installUrl).toBe(`${WEB}/apps/agentes-chat/installations/new?state=${encodeURIComponent(state)}`);
     gh.visible[`user-${user.id}`] = visible;
-    return completeGitHubAppInstall(deps, user, { state, code: `code-${user.id}`, installationId });
+    return completeGitHubAppInstall(deps, user, { state, code: `code-${user.id}`, installationId, setupAction });
   };
   const github = async (orgId: string) => {
     const rows = await db
@@ -294,6 +309,52 @@ describe("GitHub App installations are bound to one organization", () => {
   });
 });
 
+describe("only an installation made from an install started here links (ADR 0153)", () => {
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
+
+  test("made on GitHub before the install started: refused, whoever sees it; made after, or a minute off, links", async () => {
+    const w = await world();
+    // Installed on GitHub itself: every member who reads one of its repositories sees it.
+    w.gh.made[1] = minutesAgo(3);
+    await expect(w.install(w.ana, w.orgA.id, 1)).rejects.toMatchObject({ code: "github_app.installed_outside" });
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toEqual([]);
+    expect((await w.github(w.orgA.id)).all).toEqual([]);
+    // GitHub's clock a minute behind ours.
+    w.gh.made[3] = minutesAgo(1);
+    expect((await w.install(w.ana, w.orgA.id, 3)).installation).toMatchObject({ orgId: w.orgA.id, installationId: 3 });
+    expect((await w.install(w.bia, w.orgB.id, 2)).installation).toMatchObject({ orgId: w.orgB.id, installationId: 2 });
+  });
+
+  test("GitHub must answer, on the account the person sees it on", async () => {
+    const w = await world();
+    w.gh.moved[1] = 4242;
+    await expect(w.install(w.ana, w.orgA.id, 1)).rejects.toMatchObject({ code: "github_app.not_visible" });
+    w.gh.gone.push(3);
+    await expect(w.install(w.ana, w.orgA.id, 3)).rejects.toMatchObject({ code: "github_app.not_visible" });
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toEqual([]);
+  });
+
+  test("an update refreshes an installation linked to this workspace, never links one", async () => {
+    const w = await world();
+    await w.install(w.ana, w.orgA.id, 1);
+    w.gh.made[1] = minutesAgo(60);
+    const { installation } = await w.install(w.ana, w.orgA.id, 1, [1], "update");
+    expect(installation).toMatchObject({ orgId: w.orgA.id, installationId: 1 });
+    const audit = await w.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, w.orgA.id));
+    expect(audit.filter((a) => a.action === "github_app.updated")).toHaveLength(1);
+    // Another workspace's update of it: still the one it is linked to.
+    await expect(w.install(w.bia, w.orgB.id, 1, [1], "update")).rejects.toMatchObject({
+      code: "github_app.other_workspace",
+    });
+    // Linked nowhere, even made a moment ago: an update is of an installation that was already there.
+    await expect(w.install(w.bia, w.orgB.id, 2, [2], "update")).rejects.toMatchObject({
+      code: "github_app.installed_outside",
+    });
+    expect(await listGitHubAppInstallations(w.db, w.bia.id, w.orgB.id)).toEqual([]);
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toHaveLength(1);
+  });
+});
+
 describe("the app's installation is the workspace's GitHub (ADR 0153)", () => {
   test("a first installation without a GitHub connection is one: every agent's, its accounts as the account", async () => {
     const w = await world();
@@ -345,7 +406,7 @@ describe("the app's installation is the workspace's GitHub (ADR 0153)", () => {
     );
   });
 
-  test("GitHub refusing the uninstall still removes it here, and says so", async () => {
+  test("GitHub refusing the uninstall still removes it here, and says so; what stays there doesn't link again", async () => {
     const w = await world();
     const { installation } = await w.install(w.ana, w.orgA.id, 1);
     w.gh.uninstall = 500;
@@ -353,8 +414,11 @@ describe("the app's installation is the workspace's GitHub (ADR 0153)", () => {
       uninstalled: false,
     });
     expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toEqual([]);
+    // Still on GitHub, made before any install started since: Bia's workspace sees it too, and can't link it.
+    w.gh.made[1] = new Date(Date.now() - 10 * 60_000).toISOString();
+    await expect(w.install(w.bia, w.orgB.id, 1)).rejects.toMatchObject({ code: "github_app.installed_outside" });
     // Already uninstalled there (404) is done.
-    const again = await w.install(w.ana, w.orgA.id, 1);
+    const again = await w.install(w.ana, w.orgA.id, 3);
     w.gh.uninstall = 404;
     expect(await removeGitHubAppInstallation(w.deps, w.ana.id, w.orgA.id, again.installation.id)).toEqual({
       uninstalled: true,

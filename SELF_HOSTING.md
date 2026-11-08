@@ -985,8 +985,8 @@ There are two ways to set the app up:
     installation** on.
   - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
     installations with GitHub when it opens.
-  - Repository permissions: Contents, Pull requests, Issues and Workflows read and write; Checks, Commit statuses
-    and Actions read; Metadata read. Installable by any account.
+  - Repository permissions: Actions, Checks, Commit statuses, Contents, Issues, Pull requests and Workflows read and
+    write; Metadata read. Installable by any account.
 
 Then an admin of each workspace installs it on the repositories its agents may use: connecting GitHub offers
 **The agentes.chat app** first, and **GitHub repositories** in **Settings → Connectors** has **Install the agentes.chat
@@ -994,7 +994,9 @@ app** (on the web and the phone). Each account it's installed on has **Manage on
 account's repositories are picked, and **Remove**, which also uninstalls the app from that GitHub account. Without a
 GitHub account connected, the app alone is the workspace's GitHub (**Connect a GitHub account** adds one). GitHub
 Projects need an account. Admins who aren't the server's owner are told the owner can create the app while it's
-missing.
+missing. Only an installation made from a workspace's install links to it: one installed on GitHub directly, or
+approved there from a member's request, is refused until it is removed on GitHub and installed again from
+**Settings → Connectors**.
 
 </details>
 

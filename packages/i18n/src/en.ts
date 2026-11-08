@@ -9885,10 +9885,15 @@ export const en = {
     /** That toast's button, short enough to leave its words room beside it on a phone. */
     openPage: "Open",
     installed: "agentes.chat app installed.",
-    requested: "We asked the GitHub account's owner to install the app. It shows up here once they do.",
+    /** An installation approved on GitHub never links here: the account's owner installs it from agentes.chat. */
+    requested:
+      "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace.",
     notVisible: "Your GitHub account can't see that installation. Install it with an account that has access to it.",
     otherWorkspace:
       "That GitHub account is already linked to another workspace. Remove the app there before installing it here.",
+    /** The app was installed on GitHub itself, not from agentes.chat (`github_app_error=installed_outside`). */
+    installedOutside:
+      "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
     /** GitHub is the app alone: an account too (agents use it where the app isn't installed, and for GitHub Projects). */
     connectAccount: "Connect a GitHub account",
     /** For admins who aren't the server's owner, on a server without the app (never on agentes.chat). */

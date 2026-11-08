@@ -244,22 +244,29 @@ export interface InstallationFacts {
   suspendedAt: Date | null;
 }
 
+/** `GET /app/installations/{id}`, signed as the app: its body, `gone` (uninstalled), or null when GitHub didn't answer. */
+async function appInstallation(app: GitHubAppConfig, http: GitHubHttp, installationId: number) {
+  const res = await http
+    .fetch(`${http.apiUrl}/app/installations/${installationId}`, { headers: appHeaders(app) })
+    .catch(() => null);
+  if (res?.status === 404) return "gone";
+  if (!res?.ok) return null;
+  return (await res.json().catch(() => null)) as {
+    account?: { id?: number; login?: string; type?: string } | null;
+    repository_selection?: string;
+    suspended_at?: string | null;
+    created_at?: string;
+  } | null;
+}
+
 /** What GitHub says of an installation now: `gone` (uninstalled), its facts, or null when it didn't answer. */
 export async function installationStatus(
   app: GitHubAppConfig,
   http: GitHubHttp,
   installationId: number,
 ): Promise<InstallationFacts | "gone" | null> {
-  const res = await http
-    .fetch(`${http.apiUrl}/app/installations/${installationId}`, { headers: appHeaders(app) })
-    .catch(() => null);
-  if (res?.status === 404) return "gone";
-  if (!res?.ok) return null;
-  const body = (await res.json().catch(() => null)) as {
-    account?: { login?: string; type?: string } | null;
-    repository_selection?: string;
-    suspended_at?: string | null;
-  } | null;
+  const body = await appInstallation(app, http, installationId);
+  if (body === "gone") return body;
   if (!body?.account?.login) return null;
   return {
     accountLogin: body.account.login,
@@ -267,4 +274,20 @@ export async function installationStatus(
     repositorySelection: body.repository_selection ?? "selected",
     suspendedAt: body.suspended_at ? new Date(body.suspended_at) : null,
   };
+}
+
+/**
+ * When GitHub made an installation and the id of the account it is on, which binding one checks (ADR 0153): `gone`
+ * (uninstalled), or null when GitHub didn't answer or didn't say.
+ */
+export async function installationOrigin(
+  app: GitHubAppConfig,
+  http: GitHubHttp,
+  installationId: number,
+): Promise<{ createdAt: Date; accountId: number } | "gone" | null> {
+  const body = await appInstallation(app, http, installationId);
+  if (body === "gone") return body;
+  const createdAt = new Date(body?.created_at ?? Number.NaN);
+  const accountId = body?.account?.id;
+  return typeof accountId === "number" && !Number.isNaN(createdAt.getTime()) ? { createdAt, accountId } : null;
 }

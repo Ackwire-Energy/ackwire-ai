@@ -11,6 +11,7 @@ import {
   forgetInstallationTokens,
   type GitHubAppConfig,
   type GitHubHttp,
+  installationOrigin,
   installationStatus,
   uninstallInstallation,
 } from "./github-app";
@@ -95,6 +96,7 @@ export async function startGitHubAppInstall(
   const id = crypto.randomUUID();
   // `oauth_states` requires a sealed verifier; this flow has none, so a random one stands in.
   const sealed = await sealSecret(wrapper, randomToken(16), `oauth-state|${orgId}|${id}`);
+  const at = deps.now?.() ?? new Date();
   await deps.db.insert(oauthStates).values({
     id,
     orgId,
@@ -105,7 +107,8 @@ export async function startGitHubAppInstall(
     wrappedDataKey: sealed.wrappedDataKey,
     kekId: sealed.kekId,
     returnTo,
-    expiresAt: new Date((deps.now?.() ?? new Date()).getTime() + OAUTH_STATE_TTL_MS),
+    createdAt: at,
+    expiresAt: new Date(at.getTime() + OAUTH_STATE_TTL_MS),
   });
   const url = new URL(`${http(deps).webUrl}/apps/${encodeURIComponent(app.slug)}/installations/new`);
   url.searchParams.set("state", state);
@@ -141,17 +144,24 @@ async function userInstallations(h: ReturnType<typeof http>, token: string): Pro
   return found;
 }
 
+/** GitHub's clock and ours may disagree by this much (and its `created_at` drops the milliseconds). */
+const CLOCK_SKEW_MS = 2 * 60_000;
+
 /**
  * GitHub's redirect after installing (user authorization during installation on): checks the state (exists, unused,
  * not expired, same person, still an admin), exchanges the code for the person's token and requires the installation
  * to be one they can see, and a personal account's to be theirs — so nobody can claim another account's installation
  * by its id. Then binds it to the organization, whose GitHub it becomes when it has no connection yet (ADR 0153); an
- * installation bound to another organization is refused (`github_app.other_workspace`).
+ * installation bound to another organization is refused (`github_app.other_workspace`). A new binding needs an
+ * installation GitHub made after this state was issued: one made on GitHub itself, or kept there when its uninstall
+ * was refused, shows to every member of its account who reads one of its repositories, so seeing it gives no right to
+ * link it (`github_app.installed_outside`). `setupAction` is GitHub's `setup_action`: an `update` (an existing
+ * installation whose repositories changed) only refreshes one already bound here.
  */
 export async function completeGitHubAppInstall(
   deps: GitHubAppInstallDeps,
   user: { id: string },
-  input: { state: string; code: string; installationId: number },
+  input: { state: string; code: string; installationId: number; setupAction?: string },
 ): Promise<{ installation: GitHubAppInstallation; returnTo: string }> {
   const app = deps.app;
   if (!githubAppInstallable(app)) throw notConfigured();
@@ -198,6 +208,10 @@ export async function completeGitHubAppInstall(
     const { id } = (await me.json()) as { id?: unknown };
     if (typeof id !== "number" || id !== seen.account.id) throw notVisible();
   }
+  const origin = await installationOrigin(app, h, input.installationId);
+  if (origin === "gone") throw notVisible();
+  if (!origin) throw new ValidationError("GitHub didn't say when that installation was made");
+  if (origin.accountId !== seen.account?.id) throw notVisible();
 
   const values = {
     accountLogin: seen.account?.login ?? "",
@@ -218,6 +232,10 @@ export async function completeGitHubAppInstall(
         "This GitHub installation is already connected to another organization",
         "github_app.other_workspace",
       );
+    }
+    const madeHere = origin.createdAt.getTime() >= row.createdAt.getTime() - CLOCK_SKEW_MS;
+    if (!existing && (input.setupAction === "update" || !madeHere)) {
+      throw new ForbiddenError("This installation was made outside agentes.chat", "github_app.installed_outside");
     }
     const [saved] = existing
       ? await tx

@@ -24,3 +24,5 @@ ADR 0024 lets the git proxy and `open_pull_request` use a GitHub App installatio
 - The user token from the callback is used once and never stored.
 - Unbinding in the app doesn't uninstall on GitHub (the app can't); the UI says so.
 - If GitHub redirects with an error, or the callback fails before the state is known, the person lands on `/?github_app_error=…` rather than the settings page.
+
+Amended by ADR 0153. An installation made on GitHub itself never binds, configured from the app or not: a new binding also needs GitHub to say (`GET /app/installations/{id}`, signed as the app) that it made the installation after the install's state was issued, and an `update` only refreshes one already bound to the organization. One made outside is refused as `github_app.installed_outside`: it is removed on GitHub and installed again from the app. Removing an installation now also uninstalls it from GitHub.

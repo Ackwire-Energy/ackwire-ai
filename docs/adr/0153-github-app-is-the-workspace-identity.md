@@ -2,10 +2,12 @@
 
 - Status: Accepted
 - Date: 2026-11-07
-- Amends: 0033 (the app is a connection by itself, removing an installation uninstalls it, the panel reconciles),
+- Amends: 0033 (the app is a connection by itself, removing an installation uninstalls it, the panel reconciles, only
+  an installation made from agentes.chat links),
   0024 (the proxy's upstream permissions), 0116 (agents' commits are the app's bot's)
 - Code: `packages/engine/src/git/github-app.ts` (tokens by permission sets, `installationToken`, `botIdentity`,
-  `uninstallInstallation`, `installationStatus`), `github-app-installs.ts` (binding, removal, reconcile, webhook),
+  `uninstallInstallation`, `installationStatus`, `installationOrigin`), `github-app-installs.ts` (binding, removal,
+  reconcile, webhook),
   `github-app-settings.ts` (the server's app: env or made with GitHub's manifest flow, the manifest, its state),
   `github-call.ts` (`githubCallAuth`, `githubListingHeaders`, `appPermissionsFor`), `signature.ts`;
   `connectors/connections.ts` (`syncGitHubAppConnection`, `GITHUB_APP_AUTH`, `revokeConnection`), `connectors/mcp.ts`,
@@ -30,8 +32,9 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    proxy pushes and fetches already did. Pull requests, issues, comments, reviews, merges and API commits then come
    from `<slug>[bot]`. Where no installation covers the call, the workspace's account connection is used, as before.
    Permission sets are asked most first: a push asks for `workflows: write` and falls back to contents alone on an
-   installation that lacks it; `actions.run` asks for `actions: write`, which the app isn't granted, so GitHub refuses
-   and the account runs it. Projects never go through the app (GitHub Apps can't reach a person's Projects).
+   installation that lacks it; `actions.run` asks for `actions: write`, which an installation that hasn't accepted it
+   yet refuses, and the account runs it. Projects never go through the app (GitHub Apps can't reach a person's
+   Projects).
 2. **The app alone is a GitHub connection.** Binding a workspace's first installation without a GitHub connection
    makes one (`auth_type = github_app`, no secret, the installations' accounts as `account_label`), every agent's
    like any first connection, so grants, "Aprovar sempre", the proxy URL, repository lists and approvals work
@@ -55,12 +58,13 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    noreply address, so GitHub shows them as the app's; pushes already went through the proxy with the app's token.
    Fetch tokens stay read-only. No token is handed to `gh` (below).
 6. **The server's own app.** `GITHUB_APP_*` win. Without them the server's pinned owner, never on agentes.chat, creates
-   the app from Settings with GitHub's manifest flow: a server page posts the manifest (the same permissions and
-   addresses, from `PUBLIC_URL`; the webhook off without https) to GitHub, which creates the app under their account
-   and returns a code; `POST /app-manifests/{code}/conversions` gives its id, slug, client id and secret, private key
-   and webhook secret, kept sealed in `instance_secrets` (`github_app`, AAD `instance-secret|github_app`, the slug as
-   hint) and read again a minute after the last read. The flow is bound to the owner's session: a leaked state with
-   someone else's code can't plant their app. The owner's account deletion removes it, like the Jev key.
+   the app from Settings with GitHub's manifest flow: a server page posts the manifest (agentes.chat's own app's
+   permissions, write on actions, checks, contents, issues, pull requests, commit statuses and workflows and metadata
+   read; its addresses from `PUBLIC_URL`; the webhook off without https) to GitHub, which creates the app under their
+   account and returns a code; `POST /app-manifests/{code}/conversions` gives its id, slug, client id and secret,
+   private key and webhook secret, kept sealed in `instance_secrets` (`github_app`, AAD `instance-secret|github_app`,
+   the slug as hint) and read again a minute after the last read. The flow is bound to the owner's session: a leaked
+   state with someone else's code can't plant their app. The owner's account deletion removes it, like the Jev key.
 7. **Remove means uninstall.** Removing an installation from a workspace also uninstalls the app from that GitHub
    account (`DELETE /app/installations/{id}`, best effort; the response says when GitHub didn't). Deleting the
    workspace uninstalls its installations with its other outside grants (`org.delete` retries one GitHub refused).
@@ -83,11 +87,39 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    server's own app is a card for its pinned owner (`setup`), made in the web's browser session; the other admins
    are told the owner can make it (`ownerCreates`, false on agentes.chat).
 
+10. **Only an installation made from agentes.chat links.** Seeing an installation proves little:
+    `GET /user/installations` shows an organization's installation to every member who can read one of its
+    repositories, so a read-only member could link one made on GitHub itself (or kept there when its uninstall was
+    refused) to their own workspace and write to every repository it covers. A new link therefore also needs GitHub's
+    own word on the installation (`GET /app/installations/{id}`, signed as the app, `installationOrigin`): made at or
+    after the install's state was issued (`oauth_states.created_at`, two minutes allowed for the clocks and GitHub's
+    whole seconds), on the account the person sees. `setup_action=update` (an existing installation whose
+    repositories changed) only refreshes one already linked to this workspace, never links one. Anything else is
+    refused as `github_app.installed_outside` (`github_app_error=installed_outside`), whose words give the way out:
+    remove the app on GitHub and install it again from Conectores › GitHub. An install that comes back without a
+    state of ours (started on GitHub's own page, or approved there) is told the same. The phone's return doesn't carry
+    `setup_action`, so there the creation time alone decides, which already refuses every installation older than
+    the state.
+    - **Why not Members: read.** The other way was to ask GitHub for the organization permission Members (read) and
+      link only for an owner of the organization. Every installation would have to accept a new permission before it
+      linked, and a role says who may install, not that this installation was meant for this workspace. The state,
+      issued to this person in this workspace minutes before GitHub made the installation, says exactly that, with no
+      new permission, and it covers personal accounts and refused uninstalls the same way.
+    - **The request flow.** A member without rights on the account asks its owner (`setup_action=request`). The owner
+      approves later on GitHub, after the member's state expired, so that installation is older than every state and
+      never links: an owner starting the install from agentes.chat is shown the existing installation and refused. The
+      account's owner installs from Conectores › GitHub in the workspace instead (as one of its admins), after
+      removing an installation already approved on GitHub. The member's notice says who installs it and where.
+
 ## Consequences
 
 - An agent's writing on GitHub says whose agent it is, on repositories the app doesn't cover too.
 - One GitHub account's installation still belongs to one workspace (ADR 0033); a second one is refused with
   `other_workspace`.
+- An installation made on GitHub itself never links, configured from agentes.chat or not (ADR 0033 bound it then): it
+  is removed on GitHub and installed again from agentes.chat. So is one whose uninstall GitHub refused, or one approved
+  from a request.
+- The server's clock must stay within two minutes of GitHub's, or fresh installations are refused as made outside.
 - Branch protections that restrict who may push or merge must allow the app.
 - Display names are public in signatures on public repositories.
 - The remote MCP server must accept installation tokens (github-mcp-server#1610, fixed 2025-12-17): checked with one

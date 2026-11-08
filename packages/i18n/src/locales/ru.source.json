@@ -24346,13 +24346,16 @@
     "value": "agentes.chat app installed."
   },
   "githubApp.requested": {
-    "value": "We asked the GitHub account's owner to install the app. It shows up here once they do."
+    "value": "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace."
   },
   "githubApp.notVisible": {
     "value": "Your GitHub account can't see that installation. Install it with an account that has access to it."
   },
   "githubApp.otherWorkspace": {
     "value": "That GitHub account is already linked to another workspace. Remove the app there before installing it here."
+  },
+  "githubApp.installedOutside": {
+    "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
   },
   "githubApp.connectAccount": {
     "value": "Connect a GitHub account"

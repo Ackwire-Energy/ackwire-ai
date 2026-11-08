@@ -20,16 +20,26 @@ const env = {
 /** What the fake GitHub was asked, as "METHOD url". */
 const asked: string[] = [];
 
-/** GitHub: the code exchange, the installations the person can see (only 7), and the manifest's conversion. */
+/**
+ * The installations the person's GitHub account can see: 7, made the moment it's asked about, and 9, installed on
+ * GitHub itself long ago.
+ */
+const SEEN = [
+  { id: 7, account: { id: 70, login: "acme", type: "Organization" }, repository_selection: "all" },
+  {
+    id: 9,
+    account: { id: 90, login: "old-co", type: "Organization" },
+    repository_selection: "all",
+    created_at: "2020-01-01T00:00:00Z",
+  },
+];
+
+/** GitHub: the code exchange, the installations the person can see (`SEEN`), and the manifest's conversion. */
 const http = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input);
   asked.push(`${init?.method ?? "GET"} ${url}`);
   if (url === "https://github.com/login/oauth/access_token") return Response.json({ access_token: "ghu_person" });
-  if (url.startsWith("https://api.github.com/user/installations")) {
-    return Response.json({
-      installations: [{ id: 7, account: { login: "acme", type: "Organization" }, repository_selection: "all" }],
-    });
-  }
+  if (url.startsWith("https://api.github.com/user/installations")) return Response.json({ installations: SEEN });
   if (url === "https://api.github.com/app-manifests/made-code/conversions" && init?.method === "POST") {
     return Response.json(
       {
@@ -44,10 +54,13 @@ const http = (async (input: string | URL | Request, init?: RequestInit) => {
       { status: 201 },
     );
   }
-  if (/^https:\/\/api\.github\.com\/app\/installations\/\d+$/.test(url)) {
-    return init?.method === "DELETE"
-      ? new Response(null, { status: 204 })
-      : Response.json({ id: 7, account: { login: "acme", type: "Organization" }, repository_selection: "all" });
+  const installation = /^https:\/\/api\.github\.com\/app\/installations\/(\d+)$/.exec(url);
+  if (installation) {
+    if (init?.method === "DELETE") return new Response(null, { status: 204 });
+    const found = SEEN.find((i) => i.id === Number(installation[1]));
+    return found
+      ? Response.json({ created_at: new Date().toISOString(), ...found })
+      : new Response("not found", { status: 404 });
   }
   return new Response("unexpected", { status: 500 });
 }) as unknown as typeof fetch;
@@ -221,6 +234,10 @@ test("GitHub's return that didn't install: why as a code where it started, never
   expect(await back(owner, "code=c&installation_id=7&setup_action=request")).toBe(
     "http://localhost:3000/?github_app_error=requested",
   );
+  // Installed from GitHub's own page (or approved there from a request): no state of ours, made outside.
+  expect(await back(owner, "code=c&installation_id=7&setup_action=install")).toBe(
+    "http://localhost:3000/?github_app_error=installed_outside",
+  );
   // Repositories changed on GitHub's own page, which comes back on its own: no failure to show.
   expect(await back(owner, "code=c&installation_id=7&setup_action=update")).toBe("http://localhost:3000/");
 });
@@ -241,6 +258,35 @@ test("an installation bound to another workspace comes back as other_workspace",
   };
   expect(await install(owner, first.orgId)).toBe("http://localhost:3000/c?github_app=installed");
   expect(await install(neighbor, second.orgId)).toBe("http://localhost:3000/c?github_app_error=other_workspace");
+});
+
+test("only an installation GitHub made after the install started here binds; an update only refreshes one", async () => {
+  t = await createTestServer({ http, env });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const start = async (returnTo: string) => {
+    const res = await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: { returnTo } });
+    return new URL(((await res.json()) as { installUrl: string }).installUrl).searchParams.get("state") ?? "";
+  };
+  const back = async (installationId: number, setupAction: string) => {
+    const query = `state=${await start("/c")}&code=c&installation_id=${installationId}&setup_action=${setupAction}`;
+    return (await owner(`/api/app/github-app/callback?${query}`)).headers.get("location");
+  };
+  // 9 was installed on GitHub itself: the person's account sees it, but nobody started it here.
+  expect(await back(9, "install")).toBe("http://localhost:3000/c?github_app_error=installed_outside");
+  // An update is of an installation that was already there: it never binds one.
+  expect(await back(7, "update")).toBe("http://localhost:3000/c?github_app_error=installed_outside");
+  expect(await back(7, "install")).toBe("http://localhost:3000/c?github_app=installed");
+  expect(await back(7, "update")).toBe("http://localhost:3000/c?github_app=installed");
+  // The phone's finish refuses it by the same code.
+  const phone = await owner(`/api/app/organizations/${orgId}/github-app/complete`, {
+    json: { state: await start("app:connectors"), code: "c", installationId: 9 },
+  });
+  expect(phone.status).toBe(403);
+  expect(((await phone.json()) as { error: { code: string } }).error.code).toBe("github_app.installed_outside");
+  const listed = (await (await owner(`/api/app/organizations/${orgId}/github-app`)).json()) as Info;
+  expect(listed.installations.map((i) => i.installationId)).toEqual([7]);
 });
 
 test("from the phone: the return goes back to the app with installation_id, which finishes it with its session", async () => {

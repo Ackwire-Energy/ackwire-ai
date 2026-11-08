@@ -232,7 +232,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "Finish installing the GitHub App the phone app started (admins)",
       description:
-        "The phone app opened the install link in the system browser (`returnTo: \"app:connectors\"`); the callback handed `state`, `code` and `installation_id` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired. Refusals as on the web: `github_app.not_visible`, `github_app.other_workspace` (409), `oauth.other_account`.",
+        "The phone app opened the install link in the system browser (`returnTo: \"app:connectors\"`); the callback handed `state`, `code` and `installation_id` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired. Refusals as on the web: `github_app.not_visible`, `github_app.other_workspace` (409), `github_app.installed_outside`, `oauth.other_account`.",
       request: {
         params: OrgParams,
         body: body(
@@ -347,7 +347,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "GitHub's redirect after installing (browser navigation)",
       description:
-        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `not_allowed` or `failed`. `setup_action=update` without a state (repositories changed on GitHub's own page) lands on the web app with nothing to finish. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
+        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `installed_outside`, `not_allowed` or `failed`. A new binding needs an installation GitHub made after the state was issued (`installed_outside` otherwise, also for `setup_action=update` of one not bound here, and for `setup_action=install` without a state: installed from GitHub's own page). `setup_action=update` without a state (repositories changed on GitHub's own page) lands on the web app with nothing to finish. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
       request: {
         query: z.object({
           state: z.string().optional(),
@@ -376,6 +376,8 @@ export function githubAppRoutes(deps: AppDeps) {
       const fail = (reason: string) =>
         c.redirect(oauthFailedUrl(base, started?.returnTo ?? "/", "github_app_error", reason), 302);
       if (refused) return fail(refused);
+      // Installed from GitHub's own page, or approved there from a request: no install of ours started it.
+      if (!q.state && q.installation_id && q.setup_action === "install") return fail("installed_outside");
       if (!q.state || !q.code || !q.installation_id) return fail("failed");
       const user = c.get("user") ?? (await sessionUser(deps.auth, c.req.raw.headers));
       if (!user) return c.redirect(signInPage(deps.config.PUBLIC_URL, c.req.url), 302);
@@ -384,6 +386,7 @@ export function githubAppRoutes(deps: AppDeps) {
           state: q.state,
           code: q.code,
           installationId: q.installation_id,
+          setupAction: q.setup_action,
         });
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}github_app=installed`, 302);

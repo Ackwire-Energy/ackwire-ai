@@ -488,6 +488,7 @@ const KNOWN = {
   "oauth.other_account": "oauthReturn.otherAccount",
   "github_app.not_visible": "githubApp.notVisible",
   "github_app.other_workspace": "githubApp.otherWorkspace",
+  "github_app.installed_outside": "githubApp.installedOutside",
   github_app_env: "githubApp.server.line.env",
 } as const;
 
@@ -806,6 +807,8 @@ const OAUTH_RETURNS = {
   "github_app.not_visible": "githubApp.notVisible",
   other_workspace: "githubApp.otherWorkspace",
   "github_app.other_workspace": "githubApp.otherWorkspace",
+  installed_outside: "githubApp.installedOutside",
+  "github_app.installed_outside": "githubApp.installedOutside",
   requested: "githubApp.requested",
 } as const;
 

@@ -9998,10 +9998,17 @@ export const ptBR = {
     /** O botão desse aviso, curto para deixar espaço às palavras ao lado dele no celular. */
     openPage: "Abrir",
     installed: "App agentes.chat instalado.",
-    /** Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`). */
-    requested: "Pedimos ao dono da conta do GitHub para instalar o app. Ele aparece aqui quando a pessoa instalar.",
+    /**
+     * Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`).
+     * Approving it on GitHub never links it here: the owner installs it from agentes.chat.
+     */
+    requested:
+      "Só o dono da conta do GitHub pode instalar o app. Peça para essa pessoa instalar em Conectores › GitHub neste workspace.",
     notVisible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
     otherWorkspace: "Essa conta do GitHub já está ligada a outro workspace. Remova o app de lá antes de instalar aqui.",
+    /** O app foi instalado no próprio GitHub, não pelo agentes.chat (`github_app_error=installed_outside`). */
+    installedOutside:
+      "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
     /** O GitHub é só o app: conectar uma conta também (os agentes usam onde o app não está e no GitHub Projects). */
     connectAccount: "Conectar uma conta do GitHub",
     /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no agentes.chat). */
