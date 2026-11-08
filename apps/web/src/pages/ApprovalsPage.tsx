@@ -428,7 +428,7 @@ export function ApprovalsPage() {
                   return (
                     <section key={first.messageId ?? first.id} className="ap-group" aria-label={agent?.name}>
                       <div className="ap-group__head">
-                        <span>
+                        <span className="ap-group__who">
                           <Trans
                             i18nKey="approvals.groupHead"
                             count={items.length}
@@ -439,8 +439,9 @@ export function ApprovalsPage() {
                             {...TYPED_VALUES}
                           />
                         </span>
-                        <span className="ap-grow" />
-                        <ApproveAll items={items} />
+                        <span className="ap-group__acts ac-acts">
+                          <ApproveAll items={items} />
+                        </span>
                       </div>
                       {partial && <p className="ap-group__note">{partial}</p>}
                       {rows}
@@ -914,12 +915,12 @@ function ReqRow({ approval: a, selected, onOpen }: { approval: Approval; selecte
   return (
     <button
       type="button"
-      className={cx("ap-li", selected && "is-selected")}
+      className={cx("ap-li ac-mediarow ac-mediarow--row", selected && "is-selected")}
       data-id={a.id}
       aria-current={selected || undefined}
       onClick={onOpen}
     >
-      <span className="ap-li__face">
+      <span className="ac-mediarow__face">
         <AgentAvatar
           agentId={a.agentId}
           name={name}
@@ -928,28 +929,31 @@ function ReqRow({ approval: a, selected, onOpen }: { approval: Approval; selecte
           expression={p === "done" ? "happy" : p === "refused" || p === "expired" ? "closed" : undefined}
         />
       </span>
-      <span className="ap-li__line">
-        {p === "waiting" || p === "running" ? (
-          <Trans
-            i18nKey="notifications.wait.wants"
-            values={{ name, action: approvalDoing(t, a, i18n.language) }}
-            components={{ b: <b /> }}
-            {...TYPED_VALUES}
-          />
-        ) : (
-          <b>{approvalTitle(t, a)}</b>
-        )}
-      </span>
-      <span className="ap-li__meta">
-        <ViaGlyph via={via} />
-        {where && <span className="ap-li__where">{where}</span>}
-        <span className="ap-li__when">
-          {p === "waiting" || p === "running"
-            ? relativeTime(t, i18n.language, a.createdAt)
-            : decisionLabel(t, i18n.language, a, me.user.id, dir.memberById)}
+      <span className="ac-mediarow__head">
+        <span className="ap-li__line">
+          {p === "waiting" || p === "running" ? (
+            <Trans
+              i18nKey="notifications.wait.wants"
+              values={{ name, action: approvalDoing(t, a, i18n.language) }}
+              components={{ b: <b /> }}
+              {...TYPED_VALUES}
+            />
+          ) : (
+            <b>{approvalTitle(t, a)}</b>
+          )}
         </span>
-        <span className="ap-grow" />
-        {end}
+      </span>
+      <span className="ac-mediarow__end">{end}</span>
+      <span className="ac-mediarow__body">
+        <span className="ap-li__meta">
+          <ViaGlyph via={via} />
+          {where && <span className="ap-li__where">{where}</span>}
+          <span className="ap-li__when">
+            {p === "waiting" || p === "running"
+              ? relativeTime(t, i18n.language, a.createdAt)
+              : decisionLabel(t, i18n.language, a, me.user.id, dir.memberById)}
+          </span>
+        </span>
       </span>
       {p === "waiting" && <ExpiryFuse left={Math.max(0, leftMs) / TTL_MS} color={colorOf(agent)} />}
     </button>
@@ -992,12 +996,14 @@ function RunRow({
   const leftMs = new Date(deadline).getTime() - Date.now();
   return (
     <section className="ap-run" data-burst="" aria-label={head}>
-      <div className="ap-run__head">
-        <AgentAvatar agentId={first.agentId} name={name} size="sm" state="waiting" />
-        <span className="ap-li__line">
-          <b>{head}</b>
+      <div className="ac-mediarow ac-mediarow--row">
+        <span className="ac-mediarow__face">
+          <AgentAvatar agentId={first.agentId} name={name} size="sm" state="waiting" />
         </span>
-        <span className={cx("ap-li__left", leftMs <= URGENT_MS && "is-urgent")}>
+        <span className="ac-mediarow__head">
+          <b className="ap-li__line">{head}</b>
+        </span>
+        <span className={cx("ac-mediarow__end ap-li__left", leftMs <= URGENT_MS && "is-urgent")}>
           {expiryText(t, { expiresAt: deadline })}
         </span>
       </div>
@@ -1046,19 +1052,22 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
     .filter(Boolean)
     .join(" · ");
   return (
-    <header className="ap-review__head">
-      <AgentAvatar
-        agentId={a.agentId}
-        name={name}
-        size="md"
-        state={p === "running" ? "writing" : p === "waiting" ? "waiting" : "idle"}
-        running={p === "running"}
-        expression={p === "done" ? "happy" : undefined}
-      />
-      <div className="ap-review__headText">
-        <p className="ap-review__by ac-captop">
-          <b>{name}</b> · {by}
-        </p>
+    <header className="ap-review__head ac-mediarow">
+      <span className="ac-mediarow__face">
+        <AgentAvatar
+          agentId={a.agentId}
+          name={name}
+          size="md"
+          state={p === "running" ? "writing" : p === "waiting" ? "waiting" : "idle"}
+          running={p === "running"}
+          expression={p === "done" ? "happy" : undefined}
+        />
+      </span>
+      <p className="ap-review__by ac-mediarow__head">
+        <b>{name}</b>
+        <span className="ac-mediarow__meta">{by}</span>
+      </p>
+      <div className="ac-mediarow__body">
         <h2 className="ap-review__title" title={title}>
           {title}
         </h2>

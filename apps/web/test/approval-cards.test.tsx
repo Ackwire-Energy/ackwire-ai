@@ -40,6 +40,15 @@ describe("Aprovações: requests sharing a card", () => {
     expect(ids(group)).toEqual(["ap-g1", "ap-g2"]);
     // The request without a card stands alone.
     expect(row("ap-deploy").closest(".ap-group")).toBeNull();
+    // Its two buttons are one group: at the head's end, or together under its words, never one under the other.
+    const acts = group.querySelector(".ap-group__head > .ap-group__acts") as HTMLElement;
+    expect(within(acts).getByRole("button", { name: "Aprovar tudo" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Agora não para todos" })).toBeTruthy();
+    // Each request a MediaRow: what it wants on the face's line, where and when under them.
+    const first = row("ap-g1");
+    expect(first.classList.contains("ac-mediarow")).toBe(true);
+    expect(first.querySelector(":scope > .ac-mediarow__head .ap-li__line")).toBeTruthy();
+    expect(first.querySelector(":scope > .ac-mediarow__body .ap-li__meta")).toBeTruthy();
     await click(within(group).getByRole("button", { name: "Aprovar tudo" }));
     expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
       ORG_ID,

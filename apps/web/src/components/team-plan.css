@@ -75,6 +75,7 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   gap: 14px;
   margin-top: 12px;
 }
+/* The rows' ends drop under their words by the list's width, not the window's: a thread is narrow on a desktop too. */
 .tp-agents {
   display: flex;
   flex-direction: column;
@@ -82,55 +83,22 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   margin: 12px 0 0;
   padding: 0;
   list-style: none;
+  container-type: inline-size;
 }
 .tp-body .tp-agents {
   margin-top: 0;
 }
-/* The face and the name's line start together, the channel and "Adjust" centred on that line however long the
-   description runs. No rise on the words (`ac-captop`): it would lift the chips into the row's top padding. */
-/* Too narrow for the words beside the channel and "Adjust" (~220px: a thread or the agent's page docked beside the
-   chat, a phone), those go under the words, on the same side, instead of leaving the words a sliver. */
+/* A MediaRow (the kit's `.ac-mediarow`) on a well. */
 .tp-agent {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
   padding: 12px;
   border-radius: 12px 12px 12px 4px;
   background: var(--card-well);
   box-shadow: var(--card-well-shadow);
 }
-.tp-agent__text {
-  display: flex;
-  flex: 1 1 180px;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 20px;
-}
 .tp-agent__line {
+  line-height: 20px;
   color: var(--ink2, var(--ink));
   overflow-wrap: anywhere;
-}
-/* One line box as tall as the name's, the same rise: what is taller than it overflows evenly, so it sits centred on
-   that line. */
-.tp-agent__tail {
-  display: flex;
-  flex: none;
-  max-width: 100%;
-  margin-left: auto;
-  align-items: center;
-  gap: 8px;
-  height: 20px;
-  line-height: 20px;
-}
-/* Barely taller than the name's line, so what overflows it doesn't eat the row's top padding. */
-.tp-agent__tail .ac-btn {
-  height: 24px;
-  padding-inline: 8px;
-}
-/* The map's rows are one line: the face and the words share a centre. */
-.tp-map .ac-faceline {
-  align-items: center;
 }
 .tp-pill {
   display: inline-flex;
@@ -287,9 +255,6 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
   margin: 12px 0 0;
 }
 .tp-example__message {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   padding: 12px;
   border-radius: 12px;
   background: var(--card-well);

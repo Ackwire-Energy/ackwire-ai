@@ -709,12 +709,12 @@ function AskAgent({ issue }: { issue: Issue }) {
   const g = agentGrammar(agent.name);
   return (
     <section aria-label={t("issues.askSection")} className="issue-ask">
-      <div className="issue-ask__row ac-iconline">
-        {avatar({ type: "agent", id: agent.id }, "sm")}
-        <span className="issue-ask__text">
+      <div className="issue-ask__row ac-mediarow ac-mediarow--row">
+        <span className="ac-mediarow__face">{avatar({ type: "agent", id: agent.id }, "sm")}</span>
+        <span className="ac-mediarow__head">
           <b>{t("issues.askTitle", { context: g.context, name: agent.name })}</b>
-          <span className="small muted">{t("issues.askText", g)}</span>
         </span>
+        <span className="ac-mediarow__body small muted">{t("issues.askText", g)}</span>
       </div>
       <div className="issue-ask__actions">
         <Locked when={action.isPending}>

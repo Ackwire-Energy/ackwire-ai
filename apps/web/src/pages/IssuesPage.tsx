@@ -496,25 +496,30 @@ function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) =
             <button
               key={i.id}
               type="button"
-              className={cx("issues-now__card", stall && "is-stalled", waiting && "is-waiting")}
+              className={cx("issues-now__card ac-mediarow", stall && "is-stalled", waiting && "is-waiting")}
               onClick={() => onOpen(i.number)}
             >
-              <AgentAvatar
-                agentId={i.assignee.id}
-                name={name}
-                size="md"
-                state={stall ? "idle" : waiting ? "idle" : "writing"}
-                running={!stall && !waiting}
-                expression={stall ? "closed" : undefined}
-              />
-              <span className="issues-now__text">
-                <span className="issues-now__who ac-captop">
-                  {name} · #{i.number} ·{" "}
+              <span className="ac-mediarow__face">
+                <AgentAvatar
+                  agentId={i.assignee.id}
+                  name={name}
+                  size="md"
+                  state={stall ? "idle" : waiting ? "idle" : "writing"}
+                  running={!stall && !waiting}
+                  expression={stall ? "closed" : undefined}
+                />
+              </span>
+              <span className="ac-mediarow__head">
+                <b>{name}</b>
+                <span className="ac-mediarow__meta">
+                  #{i.number} ·{" "}
                   {stall
                     ? t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })
                     : relativeTime(t, i18n.language, w.since)}
                 </span>
-                <b>{i.title}</b>
+              </span>
+              <span className="ac-mediarow__body">
+                <span className="issues-now__task">{i.title}</span>
                 <span className={cx("issues-now__step", !stall && !waiting && "is-live")}>
                   {stall
                     ? step
