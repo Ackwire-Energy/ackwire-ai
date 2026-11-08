@@ -253,11 +253,11 @@ describe("artifact viewer", () => {
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: "materia.html" });
     const actions = [...(dialog.querySelector(".ac-details__actions")?.children ?? [])].map((b) => b.textContent);
-    expect(actions.slice(0, 3)).toEqual(["Baixar", "Copiar texto", "Enviar nova versão"]);
+    expect(actions.slice(0, 4)).toEqual(["Baixar", "Compartilhar", "Copiar texto", "Enviar nova versão"]);
     // On a phone each is its icon alone (its words hidden, still its name): the file's name keeps the room to read.
     expect(
       [...dialog.querySelectorAll(".ac-details__actions .artifact-action__label")].map((l) => l.textContent),
-    ).toEqual(["Baixar", "Copiar texto", "Enviar nova versão"]);
+    ).toEqual(["Baixar", "Compartilhar", "Copiar texto", "Enviar nova versão"]);
     expect(within(dialog).getByRole("button", { name: "Enviar nova versão" }).getAttribute("title")).toBe(
       "Enviar nova versão",
     );
