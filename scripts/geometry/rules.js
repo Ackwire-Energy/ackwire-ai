@@ -310,7 +310,7 @@
    * box of no width never moves to another line. A text node laid out straight in a flex or grid box is wrapped for
    * the moment, so the probe joins its line instead of becoming an item of its own.
    */
-  const capsAt = (text) => {
+  const capsAt = (text, also) => {
     const at = text.data.search(/\S/);
     if (at < 0) return null;
     const host = layoutParent(text);
@@ -323,7 +323,10 @@
     const rest = text.splitText(at + 1);
     const probe = capProbe();
     rest.before(probe);
-    const caps = capsOf(probe);
+    // What is compared with the capitals, read while the probe is in: a probe in a line that fits exactly can push
+    // the line's last item onto the next one, and a caller can tell by it.
+    const beside = also?.();
+    const caps = { ...capsOf(probe), beside };
     text.appendData(rest.data);
     rest.remove();
     if (wrap) {
@@ -967,8 +970,9 @@
         // A row that wrapped puts its words under the lead, not beside it: no line to share.
         const first = textRects(text)[0];
         if (!first || Math.min(first.bottom, box.bottom) <= Math.max(first.top, box.top)) continue;
-        const caps = capsAt(text);
-        if (!caps) continue;
+        const caps = capsAt(text, () => mark.getBoundingClientRect());
+        // The probe moved the lead (a line that fit exactly and wrapped): this layout can't be measured this way.
+        if (!caps || Math.abs(caps.beside.top - box.top) > 0.5) continue;
         const px = (box.top + box.bottom) / 2 - caps.mid;
         if (Math.abs(px) > 1) push(lead, "lead", px, row);
       }
@@ -1210,6 +1214,13 @@
    * With everything rendered: a box skipped by `content-visibility: auto` (a conversation's rows) has its placeholder
    * size in one layout and its own in another, which no CSS order explains.
    */
+  /**
+   * A picture's own size (an image, a video, a canvas) waits on its file decoding, so the two tabs can catch it at
+   * different moments: it is never a tie between two sheets, and `cascadeorder` leaves it out.
+   */
+  const LOADED = "img,image,video,canvas,iframe,object,embed";
+  const orderValue = (el, s, p) =>
+    (p === "width" || p === "height") && el.matches(LOADED) ? "" : s.getPropertyValue(p);
   const rendered = (measure) => {
     const pin = document.createElement("style");
     pin.textContent = "*{content-visibility:visible!important}";
@@ -1249,7 +1260,7 @@
           const s = getComputedStyle(el);
           let h = 0x811c9dc5;
           for (const p of ORDER_PROPS) {
-            const v = s.getPropertyValue(p);
+            const v = orderValue(el, s, p);
             for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v.charCodeAt(i), 16777619);
             h = Math.imul(h ^ 0x7c, 16777619);
           }
@@ -1270,7 +1281,7 @@
             at: kitOnly(signature) ? placeOf(el) : undefined,
             parent: index.get(el.parentElement) ?? -1,
             props: ORDER_PROPS,
-            values: ORDER_PROPS.map((p) => s.getPropertyValue(p)),
+            values: ORDER_PROPS.map((p) => orderValue(el, s, p)),
           };
         });
       });
