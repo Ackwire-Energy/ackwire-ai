@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Message, PeopleUsage, PersonUsage } from "@agenteschat/client";
+import type { Message, OrgRole, PeopleUsage, PersonUsage } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
 
@@ -190,6 +190,50 @@ describe("Orçamento e uso › Pessoas", () => {
       onLimit: "block",
       warn: true,
     });
+  });
+
+  // The worst case for CI's geometry check: a long role and an exception, every select with a value, German then
+  // Japanese words. Each row's control stays on the label's line, its ⓘ beside the label.
+  test("Limites in German and Japanese, a long role and an exception: every row keeps its control on its line", async () => {
+    const state = seedState();
+    state.peopleUsage = { ...people, limitsOn: false };
+    state.roles = [
+      ...seedRoles(),
+      {
+        ...(seedRoles()[0] as OrgRole),
+        id: "role-qa",
+        name: "Kundenbetreuung und Qualitätssicherung",
+        icon: "person",
+        color: "teal",
+        position: 1,
+        permissions: [],
+        hoist: false,
+      },
+    ];
+    state.personLimits = {
+      defaultUsd: 25,
+      roles: { [ADMIN_ROLE_ID]: null, "role-qa": 40 },
+      people: { "u-joao": 30 },
+      onLimit: "notify",
+      warn: false,
+    };
+    const { services } = await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(state) });
+    await settle(5);
+    await tab("Pessoas");
+    await click(screen().getByRole("button", { name: "Defina um limite por pessoa em Limites" }));
+    const limits = document.querySelector(".pu-limits") as HTMLElement;
+    for (const [lang, byRole] of [
+      ["de", "Nach Rolle"],
+      ["ja", "ロール別"],
+    ] as const) {
+      await act(async () => {
+        await services.i18n.changeLanguage(lang);
+      });
+      await settle(4);
+      expect(limits.querySelectorAll(".settings-rows > .ac-grouphead")).toHaveLength(2);
+      expect(text(limits)).toContain(byRole);
+      expect(text(limits)).toContain("Kundenbetreuung und Qualitätssicherung");
+    }
   });
 
   test("members: only Seu uso, in percentages, never money", async () => {

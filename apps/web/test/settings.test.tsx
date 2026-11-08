@@ -820,3 +820,27 @@ test("changing Settings language saves the account before updating the local lan
     auto: false,
   });
 });
+
+// The worst case for CI's geometry check (the capture keeps each screen): settings rows whose labels, ⓘ and statuses
+// run longest, in German, then in Japanese. Each row's ⓘ stays beside its label and its control centred on it.
+test("Sua conta and Notificações in German and Japanese: every row keeps its ⓘ beside its label", async () => {
+  for (const path of ["settings/account", "settings/notifications"]) {
+    const { services } = await go(seedState(), path);
+    for (const [lang, title] of [
+      ["de", "Einstellungen"],
+      ["ja", "設定"],
+    ] as const) {
+      await act(async () => {
+        await services.i18n.changeLanguage(lang);
+      });
+      await settle(4);
+      expect(document.body.textContent).toContain(title);
+      const rows = [...document.querySelectorAll(".settings-row")];
+      expect(rows.length).toBeGreaterThan(2);
+      // An ⓘ lives in its label's line, never in a paragraph under it.
+      for (const hint of document.querySelectorAll(".settings-row .ac-hint"))
+        expect(hint.closest(".ac-hintline")).not.toBeNull();
+    }
+    cleanup();
+  }
+});

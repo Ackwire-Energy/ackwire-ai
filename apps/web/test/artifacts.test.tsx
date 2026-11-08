@@ -624,6 +624,50 @@ describe("Drive", () => {
     expect(screen().getByRole("button", { name: "2 canais" })).toBeTruthy();
   });
 
+  // The worst case for CI's geometry check (the capture keeps each of these screens): German words, a long channel,
+  // every filter in use and Typ open, then Japanese. One toolbar, on two rows only where one can't hold it.
+  test("German and Japanese with every filter in use: still one toolbar, Typ among its filters", async () => {
+    const state = seedState();
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) eng.name = "produkteinfuehrung-herbstkampagne-2026";
+    const { services, api } = await goDrive({ api: createFakeApi(state, { seed: true }) });
+    await act(async () => {
+      await services.i18n.changeLanguage("de");
+    });
+    await settle(4);
+    const trigger = (name: RegExp) =>
+      screen()
+        .getAllByRole("button")
+        .find((b) => b.classList.contains("ac-filter__trigger") && name.test(b.textContent ?? "")) as HTMLElement;
+    // Typ first, while every kind is there to pick.
+    await click(trigger(/^Typ/));
+    const kinds = screen().getByRole("listbox", { name: "Typ" });
+    for (const kind of [/^Dokumente/, /^Codeänderungen/])
+      await click(within(kinds).getByRole("option", { name: kind }));
+    await pressEscape();
+    await settle(4);
+    await click(trigger(/Kanal/));
+    await click(
+      within(screen().getByRole("listbox", { name: "Kanal" })).getByRole("option", {
+        name: "#produkteinfuehrung-herbstkampagne-2026",
+      }),
+    );
+    await pressEscape();
+    await settle(4);
+    const me = (await api.account.me())?.user.name ?? "";
+    await click(trigger(/Person oder Agent/));
+    await click(within(screen().getByRole("listbox", { name: "Person oder Agent" })).getByRole("option", { name: me }));
+    await pressEscape();
+    await settle(4);
+    expect(trigger(/Typen/).textContent).toContain("2 Typen");
+    expect(document.querySelectorAll(".drive .ac-toolbar")).toHaveLength(1);
+    await act(async () => {
+      await services.i18n.changeLanguage("ja");
+    });
+    await settle(4);
+    expect(screen().getByRole("searchbox", { name: "ファイルを検索" })).toBeTruthy();
+  });
+
   test("empty state when there is nothing yet", async () => {
     await goDrive({ seed: false });
     expect(screen().getByText("Tudo o que o time cria, num só lugar")).toBeTruthy();
