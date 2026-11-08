@@ -9377,6 +9377,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A count (Tipo's kinds) ends the row before the check, on one right edge. */
+.ac-filter__option > .ac-countchip {
+  margin-left: auto;
+}
+.ac-filter__option > .ac-countchip + .ac-tz__check {
+  margin-left: var(--space-2);
+}
 @media (prefers-reduced-motion: reduce) {
   .ac-filter {
     transition: none;

@@ -3,8 +3,10 @@ import { setupDom } from "../testing/dom";
 
 setupDom();
 
-import { act, render } from "@testing-library/react";
-import { Toolbar } from "../src";
+import { act, fireEvent, render, within } from "@testing-library/react";
+import { FilterChip, Toolbar } from "../src";
+
+const body = () => within(document.body);
 
 describe("Toolbar", () => {
   /** A ResizeObserver whose callbacks the test calls, as a window or a filter changing width would. */
@@ -74,5 +76,33 @@ describe("Toolbar", () => {
     } finally {
       ro.restore();
     }
+  });
+});
+
+describe("FilterChip", () => {
+  test("an option says how many there are of it, before the check (Tipo: each kind)", async () => {
+    render(
+      <FilterChip
+        label="Tipo"
+        icon="file"
+        clearLabel="Limpar Tipo"
+        multiple
+        value={["docs"]}
+        onChange={() => {}}
+        options={[
+          { value: "docs", label: "Documentos", count: 3 },
+          { value: "tables", label: "Tabelas", count: 1 },
+          { value: "pages", label: "Páginas HTML" },
+        ]}
+      />,
+    );
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Tipo: Documentos" })));
+    const options = within(body().getByRole("listbox", { name: "Tipo" })).getAllByRole("option");
+    expect(options.map((o) => [...o.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["ac-filter__label", "ac-countchip", "ac-tz__check"],
+      ["ac-filter__label", "ac-countchip", "ac-tz__check"],
+      ["ac-filter__label", "ac-tz__check"],
+    ]);
+    expect(options.map((o) => o.querySelector(".ac-countchip")?.textContent ?? null)).toEqual(["3", "1", null]);
   });
 });

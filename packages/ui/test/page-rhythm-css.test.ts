@@ -152,4 +152,9 @@ describe("the toolbar", () => {
       ),
     ).toContain("padding-right: var(--control-px-sm);");
   });
+
+  test("a filter's option ends with its count, then the check", () => {
+    expect(body(".ac-filter__option > .ac-countchip")).toContain("margin-left: auto;");
+    expect(body(".ac-filter__option > .ac-countchip + .ac-tz__check")).toContain("margin-left: var(--space-2);");
+  });
 });
