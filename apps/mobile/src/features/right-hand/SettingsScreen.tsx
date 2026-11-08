@@ -15,7 +15,7 @@ import { agentsReach, audienceOf, audiencePatch } from "@agenteschat/client/lib/
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
-import { rightHandFallback, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { mineStatus, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { dayText, hourText } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -66,8 +66,10 @@ export function RightHandSettingsScreen() {
 }
 
 /**
- * "Sua IA" (ADR 0137 §11): the plan the person's own DM with the right hand thinks with, theirs or one shared with them,
- * and, without one, what the workspace's does for them. Everyone has it: here and on its profile.
+ * "Sua IA" (ADR 0137 §11) as one status, as on the web (`mineStatus`): the logo of what answers the person in their own
+ * DM with the right hand, its name and what it is to them (Claude, chave do workspace), and its action at the row's end
+ * (Usar meu plano; Trocar and Usar a do workspace on a plan of theirs). When nothing answers them it is the call to
+ * connect a plan. Why it is theirs alone is the row's ⓘ. Everyone has it, on the right hand's profile.
  */
 export function RightHandMine({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -78,15 +80,9 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   const dir = useDirectory();
   const meId = useMeId();
   const view = useAgentBrain(orgId, agent.id).data;
-  const g = agentGrammar(agent.name);
-  const kind = view && view.brain !== "model" ? view.brain : null;
-  const signIn = view?.accounts.find((a) => a.id === view.account);
-  const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0];
   const platform = usePlatformKey(orgId).data === true;
-  const fallback = view?.workspaceAi
-    ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first, platform)
-    : "";
-  const shared = signIn?.ownerId && signIn.ownerId !== meId ? first(signIn.ownerId) : undefined;
+  const status = mineStatus(view, meId ?? "", platform);
+  const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
   const back = () =>
     void api.agents
       .setBrain(orgId, agent.id, { scope: "mine", brain: "model" })
@@ -95,25 +91,59 @@ export function RightHandMine({ agent }: { agent: Agent }) {
         void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
       })
       .catch(failed);
+  if (!status) return null;
+  const row = {
+    chevron: true,
+    onPress: () => openConnectAi({ agentId: agent.id }),
+    hint: {
+      name: t("common.about", { label: t("rightHand.settings.mine") }),
+      text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),
+    },
+  };
   return (
-    <>
-      <GroupedList>
+    <GroupedList>
+      {status.kind === "own" ? (
         <GroupedRow
-          {...(kind ? { leading: <ProviderLogo id={kind} size="sm" /> } : { icon: "bolt" as const })}
-          label={kind ? (signIn?.label ?? t(`aiAccounts.connect.${kind}`)) : t("rightHand.settings.connectMine")}
-          {...(shared ? { sub: t("rightHand.settings.planOwner", { owner: shared }) } : {})}
-          {...(kind ? { value: t("rightHand.settings.change") } : {})}
-          chevron
-          onPress={() => openConnectAi({ agentId: agent.id })}
+          {...row}
+          leading={<ProviderLogo id={status.brain} size="sm" />}
+          label={status.label ?? t(`aiAccounts.connect.${status.brain}`)}
+          sub={
+            status.ownerId
+              ? t("rightHand.settings.mineOf", { owner: first(status.ownerId) })
+              : t("rightHand.settings.mineYours")
+          }
+          value={t("rightHand.settings.change")}
         />
-        {kind ? <GroupedRow icon="members" label={t("rightHand.settings.useWorkspace")} onPress={back} /> : null}
-      </GroupedList>
-      <GroupedFooter>
-        {kind
-          ? t("rightHand.settings.mineHelp", g)
-          : t("common.joinSentences", { a: t("rightHand.settings.mineHelp", g), b: fallback })}
-      </GroupedFooter>
-    </>
+      ) : status.kind === "key" ? (
+        <GroupedRow
+          {...row}
+          {...(status.provider
+            ? { leading: <ProviderLogo id={status.provider} size="sm" /> }
+            : { icon: "key" as const })}
+          label={status.label ?? t("rightHand.settings.mineKeyName")}
+          sub={t("rightHand.settings.mineKey")}
+          value={t("rightHand.settings.useMine")}
+        />
+      ) : status.kind === "plan" ? (
+        <GroupedRow
+          {...row}
+          leading={<ProviderLogo id={status.brain} size="sm" />}
+          label={t(`aiAccounts.connect.${status.brain}`)}
+          sub={t("rightHand.settings.minePlan")}
+          value={t("rightHand.settings.useMine")}
+        />
+      ) : (
+        <GroupedRow
+          {...row}
+          icon="bolt"
+          label={t("rightHand.settings.connectMine")}
+          sub={t("rightHand.settings.mineNobody")}
+        />
+      )}
+      {status.kind === "own" ? (
+        <GroupedRow icon="members" label={t("rightHand.settings.useWorkspace")} onPress={back} />
+      ) : null}
+    </GroupedList>
   );
 }
 
@@ -289,9 +319,6 @@ function Form({ agent }: { agent: Agent }) {
         />
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.nameHelp", { ...g, label: t("rightHand.label") })}</GroupedFooter>
-
-      <GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>
-      <RightHandMine agent={agent} />
 
       <GroupedHeader>{t("rightHand.settings.workspace")}</GroupedHeader>
       {planKind ? (
