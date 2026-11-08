@@ -27,7 +27,7 @@
   gap: 14px;
   width: calc(100% + 20px);
   margin: 0 -10px;
-  padding: 10px;
+  padding: var(--row-py) 10px;
   border: 0;
   border-radius: var(--radius-item);
   background: none;

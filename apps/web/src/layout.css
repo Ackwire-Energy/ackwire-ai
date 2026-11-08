@@ -1127,9 +1127,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 52px;
   box-sizing: border-box;
-  padding: 6px 8px;
+  padding: var(--row-py) 8px;
   margin: 0 -8px;
   border-radius: var(--radius-sm);
 }
@@ -1145,9 +1144,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-.archived-channels .member-row {
-  padding-block: var(--space-2);
 }
 .archived-channels .list-col b {
   overflow-wrap: anywhere;
@@ -10021,7 +10017,7 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   top: 0;
   right: 12px;
   bottom: auto;
-  left: 54px;
+  left: 48px;
   width: auto;
   height: 1px;
   background: var(--line);
@@ -10036,7 +10032,14 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
 }
 .agp-ficha__card .agp-frow .agp-cell__key {
   grid-area: key;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px 8px 8px 3px;
   translate: none;
+}
+.agp-ficha__card .agp-frow .agp-cell__key > :is(.ac-avatar, .ac-brand) {
+  width: 24px;
+  height: 24px;
 }
 .agp-ficha__card .agp-frow .agp-cell__text {
   display: contents;
@@ -10053,11 +10056,17 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
 .agp-ficha__card .agp-frow__value {
   grid-area: value;
   min-width: 0;
-  font-size: 14.5px;
+  font-size: 14px;
   line-height: 20px;
 }
-.agp-ficha__card .agp-frow .agp-cell__sub {
-  grid-area: sub;
+.agp-ficha__card .agp-frow .agp-cell__value > .agp-cell__sub {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.agp-ficha__card .agp-frow__tail .ac-btn {
+  height: var(--control-h-sm);
 }
 .agp-ficha__card .agp-frow .agp-cell__chev,
 .agp-ficha__card .agp-frow__tail {
@@ -10097,13 +10106,15 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
    them at the row's width. */
 @container (max-width: 520px) {
   .agp-ficha__card .agp-frow {
-    grid-template-columns: 30px minmax(0, 1fr) auto;
-    grid-template-rows: auto auto auto;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     grid-template-areas:
       "key label tail"
-      "value value value"
-      "sub sub sub";
+      "value value value";
     row-gap: 2px;
+  }
+  /* The usage's words stay, its bar goes: a narrow card has no room for both on the value's line. */
+  .agp-frow__usage .ac-meter {
+    display: none;
   }
 }
 /* The routines' dialog: each name a link to its page. */
@@ -13158,7 +13169,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 .ai-accounts__row,
 .key-row {
-  padding: var(--space-4);
+  padding: var(--row-py) var(--space-4);
 }
 .key-row__tail {
   gap: var(--space-3);

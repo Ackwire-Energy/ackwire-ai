@@ -234,6 +234,10 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
+/* The chips 4 under the headline, the snippet the body's 8 under them. */
+.nt-item:has(> .ac-mediarow__body > .nt-tags:first-child) {
+  row-gap: var(--space-1);
+}
 /* In the body its parts stand the body's gap apart. */
 .nt-item > .ac-mediarow__body > * {
   margin-block: 0;
@@ -261,6 +265,7 @@ html:not([data-pointer]) .nt-item:focus-visible {
 .nt-tm {
   font-size: 12px;
   color: var(--faint);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .nt-tags {
@@ -420,10 +425,6 @@ html:not([data-pointer]) .nt-more:focus-visible {
   line-height: 1.5;
 }
 /* Reactions: quieter. */
-.nt-item--rx {
-  padding-top: 10px;
-  padding-bottom: 11px;
-}
 .nt-item--rx > .ac-mediarow__head {
   font-size: 13px;
 }

@@ -185,15 +185,18 @@ test("every hairline between a card's rows, and over its foot, has one step of r
   expect(last(roles, ".roles-row", "padding")).toBe("var(--row-py) 20px");
   expect(last(roles, ".roles-area", "padding")).toBe("var(--row-py) 0");
   expect(last(roles, ".roles-look__row", "padding")).toBe("var(--row-py) 0");
+  // Limites are settings rows: every select on one right edge.
   const people = topLevel(await read(join(SRC, "components/people-usage.css")));
-  expect(last(people, ".pu-limits__row", "padding")).toBe("var(--row-py) 0");
+  expect(declarations(people, ".pu-limits__row")).toEqual([]);
+  expect(last(people, ".pu-pick__select", "width")).toBe("200px");
   const plan = topLevel(await read(join(SRC, "components/plan-usage.css")));
   expect(last(plan, ".plan-block", "padding")).toBe("var(--row-py) 0");
 });
 
-test("Seus planos and the API keys: each row has the same room at its top and bottom as at its sides", async () => {
+test("Seus planos and the API keys: each row has the rows' room above and below, 16 at its sides", async () => {
   const layout = topLevel(await read(join(SRC, "layout.css")));
-  for (const row of [".ai-accounts__row", ".key-row"]) expect(last(layout, row, "padding")).toBe("var(--space-4)");
+  for (const row of [".ai-accounts__row", ".key-row"])
+    expect(last(layout, row, "padding")).toBe("var(--row-py) var(--space-4)");
 });
 
 test("the settings sidebar's links are the ruler's compact step, the default one under a finger", async () => {

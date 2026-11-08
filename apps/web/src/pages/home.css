@@ -58,7 +58,7 @@ html:not([data-pointer]) .home-sec__more:focus-visible {
 .home-row {
   box-sizing: border-box;
   width: 100%;
-  padding: 12px 16px;
+  padding: var(--row-py) 16px;
   border: 0;
   border-top: 1px solid var(--line);
   background: none;

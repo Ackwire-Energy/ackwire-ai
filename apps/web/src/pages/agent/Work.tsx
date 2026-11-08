@@ -139,6 +139,7 @@ import {
   SettingNote,
   Switch,
 } from "@agenteschat/ui";
+
 import { extraUsageOn } from "@agenteschat/ui/plan-state";
 import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
@@ -247,8 +248,10 @@ export function Cell({
         >
           {value}
           {more && <span className="agp-cell__more"> · {more}</span>}
+          {/* A row of the fact sheet says its note on the value's line. */}
+          {row && sub && <span className="agp-cell__sub">{sub}</span>}
         </span>
-        {sub && <span className="agp-cell__sub">{sub}</span>}
+        {!row && sub && <span className="agp-cell__sub">{sub}</span>}
       </span>
     </>
   );
