@@ -1966,6 +1966,10 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-select__value > span:has(> .ac-select__lead) {
   gap: var(--space-2);
 }
+/* A lead taller than the value's line (a face, a stack of faces) shows whole: the name cuts itself (`.ac-select__text`). */
+.ac-select__value:has(> span > .ac-select__lead) {
+  overflow: visible;
+}
 .ac-select__lead {
   display: inline-flex;
   flex: none;
@@ -2179,6 +2183,11 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item[aria-selected="true"] .ac-menu__check,
 .ac-menu__item[data-state="checked"] .ac-menu__check {
   visibility: visible;
+}
+/* On a one-line row's name, in its middle as the name is, however tall the lead beside them (a logo's tile). */
+.ac-menu__item:not(:has(> .ac-menu__label > .ac-menu__desc)) > .ac-menu__check {
+  align-self: center;
+  margin-top: 0;
 }
 .ac-menu__label {
   display: flex;
