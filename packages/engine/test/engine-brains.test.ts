@@ -1433,6 +1433,9 @@ test("a Claude Code turn's provider failure is kept on its account and told the 
     ]);
     const finished = (await events("run.finished")) as { status: string; failure?: unknown }[];
     expect(finished.find((e) => e.status === "failed")?.failure).toEqual({ code: "claude_failed", cause: "unknown" });
+    // The run keeps whose failure it was and what Claude Code said: never "the computer had a problem".
+    const [failed] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.status, "failed"));
+    expect(failed?.error).toBe("cli_failed: Claude Code: boom");
     expect(finished.filter((e) => e.status === "done").every((e) => e.failure === undefined)).toBe(true);
 
     // Not the provider's: nothing kept nor told.

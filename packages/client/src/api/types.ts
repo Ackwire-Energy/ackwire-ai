@@ -1317,6 +1317,7 @@ export interface AiStatus {
       | "cli_missing"
       | "computer_away"
       | "computer_failed"
+      | "cli_failed"
       | "plan_limit"
       | "model_limit"
       | "model_region"

@@ -1196,6 +1196,28 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     expect(line.querySelector("[title]")?.getAttribute("title")).toBe("runner_error");
   });
 
+  test("her Claude Code's own failure names it and what it said, never her computer, with nothing more on hover", async () => {
+    const { socket } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const run = { threadId: null, runId: "r-cli", agentId: ADA_ID };
+    await push(socket, { type: "agent.thinking", ...run });
+    const failure = {
+      status: "failed",
+      error: "cli_failed: Claude Code: prompt is too long",
+      errorCode: "run.cli_failed",
+      errorParams: { brain: "Claude Code", detail: "prompt is too long" },
+    };
+    await push(socket, { type: "agent.run", ...run, status: "failed", error: failure.error });
+    await push(socket, { type: "run.finished", ...run, ...failure });
+    await settle();
+    const line = document.querySelector(".ac-msg__error") as HTMLElement;
+    expect(line.textContent).toContain(
+      "Ada não conseguiu responder: o Claude Code parou com um erro: prompt is too long",
+    );
+    expect(line.textContent).not.toContain("computador");
+    expect(line.querySelector("[title]")).toBeNull();
+  });
+
   test("a run that had already done things can't start over: the words go again", async () => {
     const state = seedState({ aiStatus: aiStatus(true) });
     state.messages.push(failed());

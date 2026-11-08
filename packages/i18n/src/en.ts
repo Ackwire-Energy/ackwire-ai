@@ -2361,6 +2361,8 @@ export const en = {
     rightHand: {
       computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
       computer_failed: "{{name}} can't answer now: the computer the plan is signed in on had a problem.",
+      /** The plan's CLI on that computer failed, not the computer. */
+      cli_failed: "{{name}} can't answer now: the plan's AI stopped with an error.",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
       runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
@@ -5004,9 +5006,15 @@ export const en = {
         org_deleting: "The workspace is being deleted.",
         agent_paused: "The agent is paused.",
         computer_busy: "The computer stayed busy with other tasks.",
-        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        /** The computer's own program (the one that runs the agent's CLI there) failed; its code shows only on hover. */
         computer_failed: "The computer ran into a problem and stopped.",
         computer_timeout: "The computer took too long to answer.",
+        /** The agent's CLI on its computer (`brain`: Claude Code, Codex…) stopped on an error; `detail`: what it said. */
+        cli_failed: "The {{brain}} program stopped with an error: {{detail}}",
+        /** The same, when it said nothing about it. */
+        cli_stopped: "The {{brain}} program stopped with an error.",
+        /** The agent's CLI ended without its answer and without a word (it crashed or was killed). */
+        cli_closed: "The {{brain}} program closed unexpectedly.",
         account_missing:
           "The account chosen for this agent isn't on its computer anymore. Choose another one in the agent's settings, or add it again.",
         our_error: "Something went wrong on our side and it stopped. Ask again in a little while.",
@@ -7158,6 +7166,8 @@ export const en = {
       computer_busy: "The computer stayed busy with other tasks",
       computer_failed: "The computer had a problem and stopped",
       computer_timeout: "The computer took too long to answer",
+      /** The agent's CLI on its computer (Claude Code, Codex…) stopped on an error of its own. */
+      cli_failed: "The AI program on the computer stopped with an error",
       account_missing: "The agent's account isn't on its computer anymore",
       our_error: "Something went wrong on our side",
     },
@@ -14317,6 +14327,7 @@ export const en = {
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
       no_ai_computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
+      no_ai_cli_failed: "I can't answer now: my plan's AI stopped with an error.",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared:
         "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",

@@ -1,14 +1,33 @@
 import { expect, test } from "bun:test";
 import { ProviderError } from "@agenteschat/providers";
 import { routineFailureCode } from "../src/routine-ledger";
-import { OUR_ERROR, providerFailure, providerFailureOf, providerFailureText, runErrorDetail } from "../src/runs";
+import {
+  cliFailureText,
+  OUR_ERROR,
+  providerFailure,
+  providerFailureOf,
+  providerFailureText,
+  runErrorDetail,
+} from "../src/runs";
+import { cliErrorWords } from "../src/tool-detail";
 
-test("a failed run's reason: a CLI's failed turn is the computer's, a missing account and our own error say so", () => {
-  for (const code of ["codex_failed", "opencode_failed", "antigravity_failed", "brain_failed"]) {
+test("a failed run's reason: a CLI's failed turn is its CLI's, the computer's own the computer's, ours ours", () => {
+  // Older rows kept only the CLI's code: whose CLI it was, never "the computer had a problem".
+  for (const [code, brain] of [
+    ["claude_failed", "Claude Code"],
+    ["codex_failed", "Codex"],
+    ["opencode_failed", "OpenCode"],
+    ["antigravity_failed", "Antigravity CLI"],
+  ] as const) {
+    expect(runErrorDetail(code)).toEqual({ errorCode: "run.cli_stopped", errorParams: { brain } });
+    expect(routineFailureCode(code)).toBe("cli_failed");
+  }
+  for (const code of ["runner_error", "runner_failed", "brain_failed"]) {
     expect(runErrorDetail(code)).toEqual({ errorCode: "run.computer_failed", errorParams: { code } });
     expect(routineFailureCode(code)).toBe("computer_failed");
   }
-  expect(routineFailureCode("runner_error")).toBe("computer_failed");
+  // The runner refused a request of ours.
+  expect(runErrorDetail("bad_request")).toEqual({ errorCode: "run.our_error" });
   expect(routineFailureCode("timeout")).toBe("computer_timeout");
   expect(runErrorDetail("account_missing")).toEqual({ errorCode: "run.account_missing" });
   expect(routineFailureCode("account_missing")).toBe("account_missing");
@@ -89,4 +108,93 @@ test("on the server's own key the person's account isn't what failed: it reads a
   expect(providerFailureOf(down).cause).toBe("down");
   // A provider nobody registered on this server is ours too.
   expect(runErrorDetail("No provider registered for acme")).toEqual({ errorCode: "run.our_error" });
+});
+
+const cli = (message: string, provider?: { cause?: string; httpStatus?: number }, code = "claude_failed") => ({
+  code,
+  message,
+  ...(provider ? { provider } : {}),
+});
+
+test("a CLI's failure says who failed it: the provider as a key's failure reads, else the CLI and what it said", () => {
+  // Claude Code's result said it failed and nothing more (`error_during_execution`).
+  const bare = cliFailureText(cli("Claude Code ended with error_during_execution", { cause: "unknown" }));
+  expect(bare).toBe("cli_failed: Claude Code");
+  expect(runErrorDetail(bare)).toEqual({ errorCode: "run.cli_stopped", errorParams: { brain: "Claude Code" } });
+  // What it said, as anyone in the conversation may read it.
+  const full = cliFailureText(
+    cli(
+      "Error: ENOSPC: no space left on device, write '/home/runner/agents/nina/.claude/projects/x/abc.jsonl'\n" +
+        "    at writeSync (node:fs:933:3)\n    at Object.<anonymous> (/usr/lib/node_modules/claude/cli.js:10:20)\n" +
+        "Node.js v22.11.0",
+      { cause: "unknown" },
+    ),
+  );
+  expect(full).toBe("cli_failed: Claude Code: ENOSPC: no space left on device, write 'abc.jsonl'");
+  expect(runErrorDetail(full)).toEqual({
+    errorCode: "run.cli_failed",
+    errorParams: { brain: "Claude Code", detail: "ENOSPC: no space left on device, write 'abc.jsonl'" },
+  });
+  expect(routineFailureCode(full)).toBe("cli_failed");
+  // Ended without its answer: its error line when it left one, else how it ended.
+  const crashed = cliFailureText(
+    cli("Claude Code ended without an answer (exit 1): TypeError: Cannot read properties of undefined (reading 'x')"),
+  );
+  expect(runErrorDetail(crashed)?.errorParams?.detail).toBe(
+    "TypeError: Cannot read properties of undefined (reading 'x')",
+  );
+  const killed = cliFailureText(cli("Claude Code ended without an answer (signal SIGKILL)"));
+  expect(killed).toBe("cli_closed: Claude Code: signal SIGKILL");
+  expect(runErrorDetail(killed)).toEqual({ errorCode: "run.cli_closed", errorParams: { brain: "Claude Code" } });
+  // An older runner's: its last lines, a stack with nothing in it.
+  const older = cliFailureText(
+    cli(
+      "Claude Code ended without an answer (exit ?): at Module._compile (node:internal/modules/cjs/loader:1554:14) Node.js v22.11.0",
+    ),
+  );
+  expect(older).toBe("cli_closed: Claude Code: exit ?");
+  // The provider answered with an error: worded as a key's on that plan, with the provider's own words.
+  const tooLong = cliFailureText(
+    cli(
+      'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 215000 tokens > 200000 maximum"},"request_id":"req_011"}',
+      { cause: "unknown" },
+    ),
+  );
+  expect(runErrorDetail(tooLong)).toEqual({
+    errorCode: "run.provider_said",
+    errorParams: { provider: "Claude", detail: "prompt is too long: 215000 tokens > 200000 maximum" },
+  });
+  // A 429 that isn't the plan's limit, or a billing refusal on a coding plan's key, with no status from the CLI.
+  expect(runErrorDetail(cliFailureText(cli("Request rejected (429)", { cause: "quota" })))?.errorCode).toBe(
+    "run.provider_rate_limit",
+  );
+  expect(
+    runErrorDetail(cliFailureText(cli("Insufficient balance", { cause: "billing" }), { provider: "zai" })),
+  ).toMatchObject({ errorCode: "run.provider_no_credit", errorParams: { provider: "Z.ai" } });
+  // After the outage's waits.
+  expect(
+    runErrorDetail(cliFailureText(cli("Overloaded", { cause: "provider_transient" }), {}, "gave_up")),
+  ).toMatchObject({ errorCode: "run.provider_down", errorParams: { provider: "Claude" } });
+  // Another CLI's, and what isn't a CLI's.
+  expect(cliFailureText(cli("Cursor exited with code 2: error: unknown model", undefined, "cursor_failed"))).toBe(
+    "cli_failed: Cursor: Cursor exited with code 2: error: unknown model",
+  );
+  expect(cliFailureText(cli("boom", undefined, "runner_error"))).toBeNull();
+});
+
+test("what a CLI said is safe to show anyone: no secrets, no sign-ins, no folders, one short line", () => {
+  const words = cliErrorWords(
+    "Error: request failed: Authorization: Bearer sk-ant-oat01-FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE reading C:\\Users\\ana\\notes\\todo.md and ~/work/acme/.env",
+  );
+  expect(words).not.toContain("sk-ant");
+  expect(words).not.toContain("Users");
+  expect(words).not.toContain("acme");
+  expect(words).toContain("todo.md");
+  expect(words).toContain(".env");
+  // A URL keeps its address; a long line is cut.
+  expect(cliErrorWords("Error: could not reach https://api.anthropic.com/v1/messages")).toBe(
+    "could not reach https://api.anthropic.com/v1/messages",
+  );
+  expect(cliErrorWords(`Error: ${"x".repeat(500)}`)).toHaveLength(200);
+  expect(cliErrorWords("first line\nsecond line")).toBe("second line");
 });

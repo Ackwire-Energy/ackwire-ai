@@ -63,6 +63,7 @@ export interface NoAiCard {
 export type RightHandPlanLine =
   | "computer_away"
   | "computer_failed"
+  | "cli_failed"
   | "plan_limit"
   | "model_limit"
   | "model_region"
@@ -75,6 +76,7 @@ export type RightHandPlanLine =
 export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>([
   "computer_away",
   "computer_failed",
+  "cli_failed",
   "plan_limit",
   "model_limit",
   "model_region",
@@ -133,7 +135,7 @@ export function keptCardState(s: { hold: BillingHold | null; paid: boolean; read
 
 /** A plan line that passes by itself: once the agent can think again, its card offers "Responder agora". */
 export const planLinePasses = (line: RightHandPlanLine | undefined) =>
-  line === "computer_away" || line === "computer_failed";
+  line === "computer_away" || line === "computer_failed" || line === "cli_failed";
 
 /**
  * The key of a card's line while the agent still can't think (`agentGrammar(name)` fills it): the computer's own

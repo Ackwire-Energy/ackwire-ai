@@ -378,6 +378,9 @@ test("its DM's line names the real cause: a model's own limit or region, command
     expect(rightHandNoAiReason(code)).toBe("cli_missing");
   // A failure that may pass is a problem on the computer: never "no AI connected", nor that it's away.
   expect(rightHandNoAiReason("runner_error")).toBe("computer_failed");
+  // The plan's CLI failing (a provider error through it, its own crash) is the plan's AI's, not its computer's.
+  for (const code of ["claude_failed", "codex_failed", "cursor_failed", "grok_failed"])
+    expect(rightHandNoAiReason(code)).toBe("cli_failed");
 });
 
 test("an OpenCode turn of it goes out as the chat profile with no checkout; an older runner gets nothing", async () => {

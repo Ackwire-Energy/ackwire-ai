@@ -13,3 +13,21 @@ export function redactCommon(text: string): string {
     .replace(/\b(AKIA[0-9A-Z]{16})\b/g, "AKIA***")
     .replace(/((?:password|passwd|secret|token|api[_-]?key)\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi, "$1***");
 }
+
+/** A crash's stack frame (`at fn (/x/y.js:1:2)`, `at /x/y.js:1:2`) or the Node.js version line it ends with. */
+const STACK_FRAME = /\s*\bat (?:async |new )?(?:[^\s()]+ \([^)]*\)|\/\S+|file:\/\/\S+|node:\S+)|\s*\bNode\.js v[\d.]+/g;
+/** A line that names what went wrong (`Error: …`, `TypeError: …`, `ENOSPC: …`, `error: …`). */
+const ERROR_LINE = /(?:\w*Error|\bE[A-Z]{3,}|\berror)\b:/;
+
+/**
+ * The line of a command-line tool's output that says what went wrong: its last line naming an error, else its last
+ * line, without the stack frames and the Node.js version a crash ends with. Empty when it said nothing else.
+ */
+export function errorLineOf(output: string): string {
+  const lines = output
+    .replace(STACK_FRAME, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return lines.filter((l) => ERROR_LINE.test(l)).at(-1) ?? lines.at(-1) ?? "";
+}

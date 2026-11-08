@@ -11,7 +11,7 @@ import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
 import { personBehindCall } from "./requester";
 import { runnerUpdateWay } from "./runner-update";
-import type { AgentRun } from "./runs";
+import { type AgentRun, isCliFailure } from "./runs";
 import { scrubSignIns } from "./tool-detail";
 import type { ToolContext } from "./tools/types";
 
@@ -409,6 +409,7 @@ export function rightHandNoAiReason(code: string, scope?: ModelScope): NoAiReaso
   if (code === "no_computer" || code === "no_session") return "no_computer";
   if (code === "not_logged_in") return "not_signed_in";
   if (code === "cli_missing" || code.endsWith("_missing")) return "cli_missing";
-  // Only a failure that may pass is left (a retryable one): its card offers "Responder agora" once it can think.
-  return "computer_failed";
+  // Only a failure that may pass is left (a retryable one): its card offers "Responder agora" once it can think. The
+  // plan's CLI failing is its own, not its computer's.
+  return isCliFailure(code) ? "cli_failed" : "computer_failed";
 }

@@ -74,6 +74,33 @@ describe("a failed run as one line (runFailureLine)", () => {
     );
   });
 
+  test("a CLI's own failure names the CLI and what it said, never the computer that ran it", () => {
+    const cli = (code: string, params: Record<string, string>) =>
+      runFailureLine(real, "Nick", { code, params }, "pt-BR");
+    expect(cli("run.cli_failed", { brain: "Claude Code", detail: "prompt is too long: 215000 tokens" })).toBe(
+      "Nick não conseguiu responder: o Claude Code parou com um erro: prompt is too long: 215000 tokens",
+    );
+    expect(cli("run.cli_stopped", { brain: "Claude Code" })).toBe(
+      "Nick não conseguiu responder: o Claude Code parou com um erro",
+    );
+    expect(cli("run.cli_closed", { brain: "Codex" })).toBe("Nick não conseguiu responder: o Codex fechou de repente");
+    for (const code of ["run.cli_failed", "run.cli_stopped", "run.cli_closed"])
+      expect(cli(code, { brain: "Claude Code", detail: "x" })).not.toContain("computador");
+    // The computer's own failure still says so.
+    expect(cli("run.computer_failed", { code: "runner_error" })).toContain("o computador teve um problema");
+    // English keeps the CLI's capitals, though the reason goes on as part of the sentence.
+    const en = i18next.createInstance();
+    void en.init({ lng: "en", resources, initAsync: false });
+    expect(
+      runFailureLine(
+        en.t.bind(en) as TFunction,
+        "Nick",
+        { code: "run.cli_stopped", params: { brain: "Claude Code" } },
+        "en",
+      ),
+    ).toBe("Nick couldn't answer: the Claude Code program stopped with an error");
+  });
+
   test("a provider's failure names it and keeps its name's capitals; a wait note says the same in the chat", () => {
     const params = { provider: "OpenRouter", detail: "Insufficient credits" };
     expect(runFailureLine(real, "Ada", { code: "run.provider_no_credit", params }, "pt-BR")).toBe(

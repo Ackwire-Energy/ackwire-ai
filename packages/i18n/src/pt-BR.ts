@@ -2370,6 +2370,8 @@ export const ptBR = {
     rightHand: {
       computer_away: "{{name}} não consegue responder agora: o computador do plano está fora do ar.",
       computer_failed: "{{name}} não consegue responder agora: o computador do plano teve um problema.",
+      /** The plan's CLI on that computer failed, not the computer. */
+      cli_failed: "{{name}} não consegue responder agora: a IA do plano parou com um erro.",
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared:
         "Conecte o seu plano para conversar com {{name}}: o plano do workspace só atende o próprio dono.",
@@ -5030,9 +5032,15 @@ export const ptBR = {
         org_deleting: "O workspace está sendo apagado.",
         agent_paused: "O agente está pausado.",
         computer_busy: "O computador continuou ocupado com outras tarefas.",
-        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        /** The computer's own program (the one that runs the agent's CLI there) failed; its code shows only on hover. */
         computer_failed: "O computador teve um problema e parou.",
         computer_timeout: "O computador demorou demais para responder.",
+        /** The agent's CLI on its computer (`brain`: Claude Code, Codex…) stopped on an error; `detail`: what it said. */
+        cli_failed: "O {{brain}} parou com um erro: {{detail}}",
+        /** The same, when it said nothing about it. */
+        cli_stopped: "O {{brain}} parou com um erro.",
+        /** The agent's CLI ended without its answer and without a word (it crashed or was killed). */
+        cli_closed: "O {{brain}} fechou de repente.",
         account_missing:
           "A conta escolhida para este agente não está mais no computador dele. Escolha outra nas configurações do agente ou adicione de novo.",
         our_error: "Algo deu errado do nosso lado e a tarefa parou. Peça de novo daqui a pouco.",
@@ -7241,6 +7249,8 @@ export const ptBR = {
       computer_busy: "O computador continuou ocupado com outras tarefas",
       computer_failed: "O computador teve um problema e parou",
       computer_timeout: "O computador demorou demais para responder",
+      /** The agent's CLI on its computer (Claude Code, Codex…) stopped on an error of its own. */
+      cli_failed: "A IA do computador parou com um erro",
       account_missing: "A conta do agente não está mais no computador dele",
       our_error: "Algo deu errado do nosso lado",
     },
@@ -14432,6 +14442,7 @@ export const ptBR = {
       no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
       no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
       no_ai_computer_failed: "Agora não consigo responder: o computador do meu plano teve um problema.",
+      no_ai_cli_failed: "Agora não consigo responder: a IA do meu plano parou com um erro.",
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared:
         "Não consigo te responder pelo plano do workspace: ele só atende o próprio dono. Conecte o seu plano e eu respondo.",

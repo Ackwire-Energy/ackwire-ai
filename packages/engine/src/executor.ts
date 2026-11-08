@@ -295,6 +295,8 @@ import {
 import {
   type AgentRun,
   addRunStep,
+  cliFailureOf,
+  cliFailureText,
   isTerminal,
   NO_AI,
   OUR_ERROR,
@@ -315,7 +317,7 @@ import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
 import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
-import { carriesCredential, maskCredentials, maskCredentialsExcept, scrubSignIns } from "./tool-detail";
+import { carriesCredential, cliErrorWords, maskCredentials, maskCredentialsExcept, scrubSignIns } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
   EVERY_TOOL,
@@ -848,9 +850,14 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
-/** The run's error when a provider's or a computer's failure outlasted every retry. */
-const gaveUp = (error: ProviderError | BrainFailure) =>
-  error instanceof ProviderError ? providerFailureText("gave_up", error) : `gave_up: ${error.message}`;
+/**
+ * The run's error when a provider's or a computer's failure outlasted every retry: a CLI's by who failed it
+ * (`cliFailureText`), anything else in words safe to show (`account`: the turn's sign-in, whose plan names the provider).
+ */
+const gaveUp = (error: ProviderError | BrainFailure, account?: { provider?: string }) =>
+  error instanceof ProviderError
+    ? providerFailureText("gave_up", error)
+    : (cliFailureText(error, account, "gave_up") ?? `gave_up: ${cliErrorWords(error.message)}`);
 
 /** A provider (or brain) failure that may pass by itself: the run waits it out (`OUTAGE_PARK`), anything else fails. */
 const retryableOutage = (error: unknown) =>
@@ -867,8 +874,12 @@ const PROVIDER_BACK_TEXT = "My AI is back.";
 /** Causes a run waits out. Any other that still came as retryable reads by the provider's own words. */
 const OUTAGE_CAUSES: ReadonlySet<string> = new Set(["rate_limit", "down", "timeout", "unreachable", "ours"]);
 
-const outageNote = (error: unknown) => {
-  const failure = error instanceof ProviderError ? providerFailureOf(error) : null;
+const outageNote = (error: unknown, account?: { provider?: string }) => {
+  // A CLI that failed on its own isn't its provider: the wait is said as the CLI's.
+  const cli = error instanceof BrainFailure ? cliFailureOf(error, account) : null;
+  if (cli && "brain" in cli) return bodyCode("brain_unavailable", { brain: cli.brain });
+  const failure =
+    error instanceof ProviderError ? providerFailureOf(error) : cli ? providerFailureOf(cli.provider) : null;
   if (!failure?.provider) return bodyCode("provider_unavailable");
   const { cause, provider, detail } = failure;
   return bodyCode(`provider_wait_${OUTAGE_CAUSES.has(cause) ? cause : "said"}`, { provider, detail });
@@ -2244,7 +2255,14 @@ async function executeRunInner(
     const note =
       n === 0 && !run.background && viaRoutine === null
         ? await db.transaction(async (tx) => {
-            const m = await post(tx, replyThreadId, PROVIDER_UNAVAILABLE_TEXT, outageNote(error), undefined, true);
+            const m = await post(
+              tx,
+              replyThreadId,
+              PROVIDER_UNAVAILABLE_TEXT,
+              outageNote(error, plan.account),
+              undefined,
+              true,
+            );
             t.postedCount++;
             t.postedUpTo = t.messages.length;
             return m;
@@ -3163,11 +3181,13 @@ async function executeRunInner(
     const t = transcript as Transcript;
     const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
     const said = stripSentinel(partial);
-    const note = `_${name} stopped before finishing (${failure.message}). Already done, not repeated: ${executed.join(", ")}._`;
+    // What the CLI said goes where everyone in the conversation reads it: without its paths, stack or secrets.
+    const why = cliErrorWords(failure.message);
+    const note = `_${name} stopped before finishing (${why}). Already done, not repeated: ${executed.join(", ")}._`;
     await addRunStep(db, run, "error", {
       reason: "brain_interrupted",
       code: failure.code,
-      message: failure.message,
+      message: why,
       executed,
     });
     // A background run posts nothing (ADR 0053 §5): it fails with the brain's code, its ledger says so.
@@ -3176,12 +3196,12 @@ async function executeRunInner(
         t.messages.push({ role: "assistant", content: [{ type: "text", text: said }] });
       t.postedUpTo = t.messages.length;
       await saveTranscript(db, t);
-      return fail(`brain_interrupted: ${failure.message}`, { code: failure.code, detail: failure.message });
+      return fail(`brain_interrupted: ${why}`, { code: failure.code, detail: why });
     }
     const reply = await db.transaction(async (tx) => {
       const m = await post(tx, workThread(), said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
-        brainInterrupted: { brain: from, code: failure.code, message: failure.message, text: said, tools: executed },
+        brainInterrupted: { brain: from, code: failure.code, message: why, text: said, tools: executed },
         ...workEnd("run.brain_interrupted"),
       });
       t.postedUpTo = t.messages.length;
@@ -4322,11 +4342,15 @@ async function executeRunInner(
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
         const paused = await standingRefusal(db, run.orgId, run.agentId);
         if (paused) return fail(paused.message);
-        const reason = userFacing(error);
+        // A CLI's failure says who failed it and what it said; the computer only ran it.
+        const cli = error instanceof BrainFailure && !error.retryable ? cliFailureText(error, turnPlan.account) : null;
+        const reason = cli ?? userFacing(error);
         if (reason) {
-          // Refused on the server's own key, the account is ours: nobody else will tell us.
+          // Refused on the server's own key, the account is ours: nobody else will tell us. A CLI's own error has no
+          // words of ours yet: reported, so it gets some.
           if (error instanceof ProviderError && (error.platformKey || !ACCOUNT_REFUSALS.has(error.status ?? 0)))
             options.failed?.(error);
+          if (cli?.startsWith("cli_")) options.failed?.(error);
           return fail(reason);
         }
         // Back from a park and refused again: one try per wake, or a line's head would hit the limit on every job retry.
@@ -4334,7 +4358,8 @@ async function executeRunInner(
           const line = rateLimited(error) ? keyLineOf(thinker) : undefined;
           if (retryableOutage(error) && (await parkOutage(error, line))) return;
           options.failed?.(error);
-          if (error instanceof ProviderError || error instanceof BrainFailure) return fail(gaveUp(error));
+          if (error instanceof ProviderError || error instanceof BrainFailure)
+            return fail(gaveUp(error, turnPlan.account));
           // Neither the provider's nor the computer's: the run's catch words it as ours.
           throw error;
         }

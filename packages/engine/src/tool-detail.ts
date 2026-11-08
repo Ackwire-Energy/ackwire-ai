@@ -1,6 +1,7 @@
 import {
   commandOf,
   commandWords,
+  errorLineOf,
   KEY_SHAPES,
   normalizedCommand,
   PERMISSION_TOOL,
@@ -9,6 +10,7 @@ import {
   SIGNED_SHAPES,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { cutText } from "./format";
 
 const MAX = 80;
 
@@ -240,6 +242,39 @@ const SECRET_OPTION =
  */
 export const redactCredentials = (text: string) =>
   redactCommon(maskCredentials(text).replace(USERINFO, "$1***@")).replace(SECRET_OPTION, "$1***");
+
+/** An absolute path two parts deep or more (`/home/ada/x.jsonl`, `~/x/y`, `C:\Users\x`), never a URL's. */
+const ABSOLUTE_PATH = /(?<![\w:/.~\\-])(?:~|[A-Za-z]:)?(?:[\\/][^\s\\/:"'()<>,;]+){2,}[\\/]?/g;
+
+/**
+ * What a command-line tool said when it failed, as anyone in the conversation may read it: a provider's JSON answer's
+ * own `message`, else its last line that names an error, else its last line. No stack frames, credentials and sign-ins
+ * masked, absolute paths cut to their last part (they name people's folders), one line of at most 200 characters.
+ */
+export function cliErrorWords(text: string): string {
+  let said = "";
+  const json = text.indexOf("{");
+  if (json >= 0) {
+    try {
+      const o = JSON.parse(text.slice(json, text.lastIndexOf("}") + 1)) as {
+        error?: { message?: unknown };
+        message?: unknown;
+      };
+      const message = o.error?.message ?? o.message;
+      if (typeof message === "string") said = message;
+    } catch {
+      // Not JSON: its lines say it.
+    }
+  }
+  if (!said) said = errorLineOf(text);
+  const safe = scrubSignIns(redactCredentials(said.replace(/file:\/\//g, "")), "••••").text;
+  const short = safe
+    .replace(ABSOLUTE_PATH, (path) => path.split(/[\\/]/).filter(Boolean).at(-1) ?? "")
+    .replace(/^(?:Uncaught )?Error:\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cutText(short, 200);
+}
 
 export const PREVIEW_CODE_CHARS = 4096;
 

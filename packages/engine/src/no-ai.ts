@@ -41,6 +41,7 @@ const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
   no_computer: "I can't answer yet: my AI needs a computer and I have none.",
   computer_away: "I can't answer now: the computer my plan is signed in on is away.",
   computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
+  cli_failed: "I can't answer now: my plan's AI stopped with an error.",
   plan_limit: "I can't answer now: the plan I think with reached its limit.",
   model_limit: "I can't answer now: the model I think with reached its own limit on my plan.",
   model_region: "I can't answer: the model I think with needs the Global region on in OpenCode (Settings › Privacy).",

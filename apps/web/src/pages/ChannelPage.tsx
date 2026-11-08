@@ -4429,8 +4429,9 @@ export const TimelineMessage = memo(function TimelineMessage({
               <div className="ac-msg__error-row" role="alert">
                 <p className="ac-msg__error ac-iconline">
                   <Icon name="alert" size={16} />
-                  {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
-                  <span title={!refusal && failedWhy ? live.error : undefined}>
+                  {/* A known code is said in words; the stored error (a computer's code) only on hover, unless the
+                      words already say what it said. */}
+                  <span title={!refusal && failedWhy && !live.errorParams?.detail ? live.error : undefined}>
                     {runFailureLine(t, name, { code: live.errorCode, params: live.errorParams }, i18n.language) ??
                       (live.error
                         ? t("channel.runFailed", { agent: name, reason: live.error })
