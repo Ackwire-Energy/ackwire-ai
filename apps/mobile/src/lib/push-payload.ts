@@ -6,6 +6,8 @@
 export type PushData = Partial<Record<(typeof FIELDS)[number], string>>;
 
 const FIELDS = [
+  // The server it came from (ADR 0154): a phone signed in to several opens it there.
+  "server",
   "orgId",
   "kind",
   "notificationId",

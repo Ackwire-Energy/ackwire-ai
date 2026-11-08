@@ -6,7 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Candidate } from "../control/first-run";
 import type { LocalServerStatus, ReachResult, ReachStage, StepChange, Tailnet } from "../control/local-server";
 import { platformOf } from "../control/platform";
-import type { ServerList } from "../control/server";
+import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import {
@@ -56,6 +56,8 @@ export function createTauriHost(): Host {
     servers: () => invoke<ServerList>("servers_get"),
     chooseServer: (server, page) => invoke<void>("server_choose", { server, page: page ?? null }),
     removeServer: (server) => invoke<void>("server_remove", { server }),
+    workspaces: () => invoke<ServerWorkspaces[]>("workspaces_get"),
+    welcomeMode: () => invoke<string | null>("welcome_mode_take").then((m) => (m === "add" ? "add" : null)),
     discover: () => invoke<Candidate[]>("discover"),
     // From the web view itself: every server answers `/api/instance` to any origin (it is public).
     checkServer: (server) => checkServer(server),

@@ -192,6 +192,10 @@ describe("the menu bar and the labels Rust shows", () => {
         }
         expect(labels.pairTitle).toContain("{org}");
         expect(labels.pairBody).toContain("{host}");
+        // Another server's new notifications (ADR 0154): Rust fills the count in.
+        expect(labels.workspaceNewsMany).toContain("{count}");
+        expect(labels.workspaceNewsOne).not.toContain("{count}");
+        expect(labels.serversCloud).toBe("agentes.chat");
       }
     }
   });

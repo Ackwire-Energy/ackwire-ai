@@ -669,6 +669,8 @@ export function buildEngine(o: EngineOptions) {
     webPush: adapters.webPush,
     // A push not waiting on the person holds while they have the app open (ADR 0071 §7).
     presence: adapters.presence,
+    // Phones signed in to several servers open the push's workspace on this one (ADR 0154).
+    pushServer: new URL(config.PUBLIC_URL).origin,
     storage,
     artifacts,
     sandbox,

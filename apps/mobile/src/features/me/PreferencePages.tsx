@@ -10,10 +10,9 @@ import {
   useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
-import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { type AppLocale, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -33,7 +32,6 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
-import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
 /**
@@ -83,34 +81,6 @@ export function usePushSwitch() {
     } else await unregisterPush();
   };
   return { on, set };
-}
-
-/** Workspaces: the ones you are in; another one switches to it and goes home. */
-export function WorkspacesPage() {
-  const { t, i18n } = useTranslation();
-  const org = useOrg();
-  const notes = workspaceNotes(t, i18n.language, org.orgs);
-  return (
-    <Page title={t("mobile.me.workspaces")}>
-      <GroupedHeader>{t("mobile.me.workspacesIn")}</GroupedHeader>
-      <GroupedList>
-        {org.orgs.map((o) => (
-          <GroupedRow
-            key={o.id}
-            leading={<OrgAvatar logo={o.logo} />}
-            label={o.name}
-            sub={notes.get(o.id)}
-            checked={o.id === org.orgId}
-            onPress={() => {
-              if (o.id === org.orgId) return;
-              org.setOrgId(o.id);
-              router.dismissTo("/");
-            }}
-          />
-        ))}
-      </GroupedList>
-    </Page>
-  );
 }
 
 const NOTICE_ICONS: Record<NoticeCategory, IconName> = {

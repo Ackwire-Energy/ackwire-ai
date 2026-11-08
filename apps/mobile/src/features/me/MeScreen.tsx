@@ -41,6 +41,7 @@ import { MyStatusRow } from "../status/MyStatusRow";
 import { PlanMeter } from "../usage/parts";
 import { openIssuesWithMe } from "./logic";
 import { usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
+import { useWorkspacesAcross } from "./WorkspacesPages";
 
 /** Opens a screen over this page with the platform's push (back comes here). */
 const open = (href: string) => router.push(href as never);
@@ -59,6 +60,7 @@ export function MeScreen() {
   const me = useMe();
   const meId = useMeId();
   const org = useOrg();
+  const { elsewhere } = useWorkspacesAcross();
   const theme = useTheme();
   const dir = useDirectory();
   const issues = useIssues(org.orgId);
@@ -229,14 +231,14 @@ export function MeScreen() {
             label={t("mobile.me.editProfile")}
             onPress={() => open("/me/account")}
           />
-          {org.orgs.length > 1 ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              label={t("mobile.me.switchWorkspace")}
-              onPress={() => open("/me/workspaces")}
-            />
-          ) : null}
+          {/* Always there (ADR 0154): another workspace may be on another server, or added from there. */}
+          <Button
+            size="sm"
+            variant="secondary"
+            // With what's unread in the other workspaces (ADR 0154).
+            label={elsewhere > 0 ? `${t("mobile.me.workspaces")} · ${elsewhere}` : t("mobile.me.workspaces")}
+            onPress={() => open("/me/workspaces")}
+          />
         </>
       }
     >

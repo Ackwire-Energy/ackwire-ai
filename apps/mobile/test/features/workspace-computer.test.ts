@@ -110,7 +110,8 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
   });
 
   test("the lists and the deletion screen say closed and same-named apart", () => {
-    expect(read("features/me/PreferencePages.tsx")).toContain("sub={notes.get(o.id)}");
+    // Workspaces, every server's (ADR 0154): the note first, else the role.
+    expect(read("features/me/WorkspacesPages.tsx")).toContain("sub={notes.get(o.id) ?? ");
     const screen = read("features/me/DeleteAccountScreen.tsx");
     expect(screen).toContain('t("deleteAccount.title")');
     expect(screen).toContain('t("deleteAccount.intro")');

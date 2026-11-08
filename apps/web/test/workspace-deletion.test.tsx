@@ -276,6 +276,73 @@ describe("the workspace menu tells closed and same-named workspaces apart", () =
   });
 });
 
+describe("the desktop app lists every server's workspaces (ADR 0154)", () => {
+  const OWN = "https://agentes.exemplo.com.br";
+  const menuRows = async () => {
+    await act(async () => {
+      fireEvent.click(screen().getByRole("button", { name: /^Menu do workspace/ }));
+    });
+    await settle(4);
+    return within(screen().getByRole("menu", { name: "Seus workspaces" }));
+  };
+
+  test("by server with unread counts; another server's opens there; Adicionar workspace opens the app's window", async () => {
+    const app = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+    const asked: Record<string, unknown>[] = [];
+    app.__agentesDesktop = { version: "0.6.0", workspaces: true };
+    app.__TAURI_INTERNALS__ = {
+      invoke: async (_cmd: string, args?: { request?: Record<string, unknown> }) => {
+        const request = args?.request;
+        if (request) asked.push(request);
+        if (request?.kind === "workspaces") {
+          return {
+            servers: [
+              {
+                server: OWN,
+                signedIn: true,
+                orgs: [{ id: "oficina", name: "Oficina", logo: null, unread: 4, waiting: 0 }],
+              },
+            ],
+          };
+        }
+        return {};
+      },
+    };
+    try {
+      await open(`/org/${ORG_ID}/issues`);
+      const menu = await menuRows();
+      expect(menu.getByText("agentes.exemplo.com.br").parentElement?.textContent).toContain("Seu servidor");
+      const items = menu.getAllByRole("menuitem");
+      expect(items.map((i) => i.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+        expect.stringContaining("Acme"),
+        expect.stringContaining("Beta"),
+        expect.stringMatching(/Oficina.*4/),
+        expect.stringContaining("Adicionar workspace"),
+      ]);
+      expect(menu.queryByText("Novo workspace")).toBeNull();
+      await click(items[2] as Element);
+      expect(asked).toContainEqual({ kind: "openWorkspace", server: OWN, orgId: "oficina" });
+      const again = await menuRows();
+      await click(again.getByText("Adicionar workspace"));
+      expect(asked).toContainEqual({ kind: "addWorkspace" });
+    } finally {
+      delete app.__agentesDesktop;
+      delete app.__TAURI_INTERNALS__;
+    }
+  });
+
+  test("in a browser, the menu is as it was", async () => {
+    await open(`/org/${ORG_ID}/issues`);
+    const menu = await menuRows();
+    expect(menu.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      expect.stringContaining("Acme"),
+      expect.stringContaining("Beta"),
+      expect.stringContaining("Novo workspace"),
+    ]);
+    expect(menu.queryByText("Adicionar workspace")).toBeNull();
+  });
+});
+
 describe("adding a password (the account menu)", () => {
   test("its dialog is kept in the address, so signing in again comes back to it", async () => {
     const state = seedState();

@@ -158,6 +158,8 @@ export interface JobDeps extends RunExecutorDeps {
   appleRevoke?: Parameters<typeof purgeAccount>[0]["appleRevoke"];
   /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
   presence?: Presence | null;
+  /** This server's address, sent with phone pushes (`PushDeps.server`, ADR 0154). */
+  pushServer?: string | null;
   /** GIF search (ADR 0091): an agent's GIF after its reply (job `agents.media`); absent = its own stickers only. */
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
@@ -1042,7 +1044,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A notification for a person's phones and browsers (ADR 0035, 0071): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {
       await deliverPush(
-        { db: deps.db, push: deps.push, webPush: deps.webPush, presence: deps.presence },
+        { db: deps.db, push: deps.push, webPush: deps.webPush, presence: deps.presence, server: deps.pushServer },
         String(job.payload.notificationId),
         { held: job.payload.held === true },
       );

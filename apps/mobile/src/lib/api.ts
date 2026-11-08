@@ -6,4 +6,4 @@ import { appHeaders, readCookie } from "./auth";
  * `X-Agentes-Client: mobile` (ADR 0035 §3). Screens reach it through `useApi()`.
  */
 export const createApi = (server: string): ApiClient =>
-  createHttpApi({ baseUrl: server, headers: async () => appHeaders(await readCookie()) });
+  createHttpApi({ baseUrl: server, headers: async () => appHeaders(await readCookie(server)) });

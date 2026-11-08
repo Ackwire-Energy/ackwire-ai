@@ -4,7 +4,8 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { authedFetch } from "./auth";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData, systemToken } from "./push-payload";
-import { serverUrl } from "./server";
+import { serverUrl, signedInServers } from "./server";
+import { pushPlace } from "./server-choice";
 import { readValue, STORED, writeValue } from "./storage";
 
 /**
@@ -41,13 +42,15 @@ export const setIslandLive = (live: boolean) => {
 
 /**
  * Notifications shown while the app is open: the island's, or else a banner with no sound; nothing for the
- * conversation on screen.
+ * conversation on screen. The island only draws the server open now: another server's push keeps its banner
+ * (ADR 0154).
  */
 export function configureForegroundPush() {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-      const quiet =
-        islandLive || quietWhileOpen(readPushData(notification.request.content.data), openConversation.get());
+      const data = readPushData(notification.request.content.data);
+      const here = pushPlace(data.server, serverUrl(), signedInServers()).kind === "here";
+      const quiet = here && (islandLive || quietWhileOpen(data, openConversation.get()));
       return { shouldShowBanner: !quiet, shouldShowList: !quiet, shouldPlaySound: false, shouldSetBadge: false };
     },
   });
@@ -127,23 +130,39 @@ async function register({ ask, locale, token: given }: Registration): Promise<bo
   if (permission !== "granted") return false;
   const token = given ?? (await phoneToken());
   if (!token) return false;
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), REGISTER_WAIT_MS);
-  const res = await authedFetch(`${serverUrl()}/api/app/push/devices`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(deviceBody(token, Platform.OS, locale)),
-    signal: abort.signal,
-  }).catch(() => null);
-  clearTimeout(timer);
-  if (!res?.ok) return false;
+  // On every server this phone is signed in to, so pushes come from all of them (ADR 0154).
+  const results = await Promise.all(pushServers().map((server) => registerOn(server, token, locale)));
+  if (!results.some(Boolean)) return false;
   // A token this phone registered before (the system rolled it, or an Expo token from an older Android build) is
-  // forgotten on the server, so pushes don't go to a token nothing answers.
+  // forgotten on the servers, so pushes don't go to a token nothing answers.
   const previous = await readValue(STORED.pushToken);
   await writeValue(STORED.pushToken, token);
   await writeValue(STORED.pushOff, null);
-  if (previous && previous !== token) await forgetToken(previous);
+  if (previous && previous !== token) await Promise.all(pushServers().map((server) => forgetToken(previous, server)));
   return true;
+}
+
+/** The servers that push to this phone: every one signed in to, or the current one before any session is known. */
+const pushServers = () => {
+  const list = signedInServers();
+  return list.length ? [...list] : [serverUrl()];
+};
+
+async function registerOn(server: string, token: string, locale: string): Promise<boolean> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), REGISTER_WAIT_MS);
+  const res = await authedFetch(
+    `${server}/api/app/push/devices`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(deviceBody(token, Platform.OS, locale)),
+      signal: abort.signal,
+    },
+    server,
+  ).catch(() => null);
+  clearTimeout(timer);
+  return Boolean(res?.ok);
 }
 
 /**
@@ -175,23 +194,31 @@ export const pushTurnedOff = async () => (await readValue(STORED.pushOff)) === "
 /** How long signing out waits for each answer: a server that doesn't answer must not hold the phone. */
 export const SIGN_OUT_WAIT_MS = 5000;
 
-/** Deletes a token from the server, waiting at most `SIGN_OUT_WAIT_MS`. Never throws. */
-async function forgetToken(token: string): Promise<void> {
+/** Deletes a token from a server, waiting at most `SIGN_OUT_WAIT_MS`. Never throws. */
+async function forgetToken(token: string, server: string): Promise<void> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), SIGN_OUT_WAIT_MS);
-  await authedFetch(`${serverUrl()}${devicePath(token)}`, { method: "DELETE", signal: abort.signal }).catch(() => null);
+  await authedFetch(`${server}${devicePath(token)}`, { method: "DELETE", signal: abort.signal }, server).catch(
+    () => null,
+  );
   clearTimeout(timer);
 }
 
 /**
- * Removes this phone's token from the server. Never throws. By default this is the person turning
- * notifications off (remembered, so the app doesn't register again on its own); sign-out passes
- * `{ optOut: false }` (it forgets everything anyway).
+ * Removes this phone's token from every server it pushes from. Never throws. By default this is the person turning
+ * notifications off (remembered, so the app doesn't register again on its own); signing out of the last server
+ * passes `{ optOut: false }` (it forgets everything anyway).
  */
 export async function unregisterPush({ optOut = true }: { optOut?: boolean } = {}): Promise<void> {
   if (optOut) await writeValue(STORED.pushOff, "1");
   const token = await readValue(STORED.pushToken);
   if (!token) return;
-  await forgetToken(token);
+  await Promise.all(pushServers().map((server) => forgetToken(token, server)));
   await writeValue(STORED.pushToken, null);
+}
+
+/** Signing out of one server while others stay (ADR 0154): only that one stops pushing to this phone. Never throws. */
+export async function unregisterPushOn(server: string): Promise<void> {
+  const token = await readValue(STORED.pushToken);
+  if (token) await forgetToken(token, server);
 }
