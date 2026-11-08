@@ -202,25 +202,27 @@ function BySource({ data }: { data: AgentPlanUsage }) {
               {s.account ? (
                 <AccountHead account={s.account} extra={when} />
               ) : (
-                <div className="plan-acct ac-faceline">
-                  {s.type === "api" && keyProvider ? (
-                    <ProviderLogo id={keyProvider} size="sm" />
-                  ) : s.type === "api" ? (
-                    <span className="plan-source__key" aria-hidden="true">
-                      <Icon name="key" size={16} />
-                    </span>
-                  ) : (
-                    <ProviderLogo id={s.kind ?? "claude_code"} size="sm" off />
-                  )}
-                  <span className="plan-acct__text">
-                    <span className="plan-acct__name ac-captop">{usageSourceName(t, s)}</span>
-                    <span className="plan-acct__sub">
-                      {s.type === "api"
-                        ? t(onApi ? "usageViews.agent.apiMain" : "usageViews.agent.apiFallback", g)
-                        : s.removed
-                          ? t("usageViews.agent.removedSub")
-                          : t("usageViews.agent.oldSub")}
-                    </span>
+                <div className="plan-acct ac-mediarow ac-mediarow--row">
+                  <span className="ac-mediarow__face">
+                    {s.type === "api" && keyProvider ? (
+                      <ProviderLogo id={keyProvider} size="sm" />
+                    ) : s.type === "api" ? (
+                      <span className="plan-source__key" aria-hidden="true">
+                        <Icon name="key" size={16} />
+                      </span>
+                    ) : (
+                      <ProviderLogo id={s.kind ?? "claude_code"} size="sm" off />
+                    )}
+                  </span>
+                  <span className="ac-mediarow__head">
+                    <span className="plan-acct__name">{usageSourceName(t, s)}</span>
+                  </span>
+                  <span className="ac-mediarow__body plan-acct__sub">
+                    {s.type === "api"
+                      ? t(onApi ? "usageViews.agent.apiMain" : "usageViews.agent.apiFallback", g)
+                      : s.removed
+                        ? t("usageViews.agent.removedSub")
+                        : t("usageViews.agent.oldSub")}
                   </span>
                 </div>
               )}

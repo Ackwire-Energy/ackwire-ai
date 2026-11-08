@@ -782,17 +782,19 @@ function KeysSection() {
         </EmptyState>
       )}
       {live.length > 0 && (
-        <List>
+        <List className="key-list">
           {live.map((c) => {
             const isDefault = settings.data?.defaultCredentialId === c.id;
             return (
-              <div key={c.id} className="ac-list__row key-row">
-                <ProviderLogo id={c.provider} size="sm" />
-                <span className="list-col">
-                  <span className="ac-captop" style={{ fontWeight: 600 }}>
-                    {c.label}
-                  </span>
-                  <span className="small muted">
+              <div key={c.id} className="ac-list__row key-row ac-mediarow ac-mediarow--row">
+                <span className="ac-mediarow__face">
+                  <ProviderLogo id={c.provider} size="sm" />
+                </span>
+                <span className="ac-mediarow__head">
+                  <b>{c.label}</b>
+                </span>
+                <span className="ac-mediarow__body small muted">
+                  <span>
                     {c.endpoint
                       ? `${c.endpoint.baseURL} · `
                       : `${keyNamedAfterProvider(c) ? "" : `${providerLabel(c.provider)} · `}${t("settings.keyEndsIn", { hint: c.keyHint })} · `}
@@ -801,7 +803,7 @@ function KeysSection() {
                     </span>
                   </span>
                 </span>
-                <span className="key-row__tail ac-captail ac-captop">
+                <span className="key-row__tail ac-mediarow__end ac-mediarow__end--wrap">
                   {c.endpoint ? (
                     <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "models", cred: c })}>
                       {t("endpoint.models")}

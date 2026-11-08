@@ -295,18 +295,22 @@ export function ChannelThreadsButton({ channelId, channelName }: { channelId: st
       {threads.length === 0 && <p className="thread-pop__empty">{t("threads.popover.empty")}</p>}
       <div className="thread-pop__list">
         {threads.map((thread) => (
-          <button key={thread.id} type="button" className="thread-pop__row" onClick={() => go(thread.id)}>
-            <span className="thread-kind" aria-hidden="true">
-              <Icon name="thread" size={14} />
+          <button key={thread.id} type="button" className="thread-pop__row ac-mediarow" onClick={() => go(thread.id)}>
+            <span className="ac-mediarow__face">
+              <span className="thread-kind" aria-hidden="true">
+                <Icon name="thread" size={14} />
+              </span>
             </span>
-            <span className="thread-pop__text">
+            <span className="ac-mediarow__head thread-pop__name">
               <b>{threadTitle(thread)}</b>
-              <small>
-                {t("threads.messages", { count: threadMessageCount(thread) })} ·{" "}
-                {relativeTime(t, i18n.language, thread.lastActivityAt)}
-              </small>
             </span>
-            <ThreadStatusChip thread={thread} />
+            <span className="ac-mediarow__end">
+              <ThreadStatusChip thread={thread} />
+            </span>
+            <small className="ac-mediarow__body thread-pop__sub">
+              {t("threads.messages", { count: threadMessageCount(thread) })} ·{" "}
+              {relativeTime(t, i18n.language, thread.lastActivityAt)}
+            </small>
           </button>
         ))}
       </div>

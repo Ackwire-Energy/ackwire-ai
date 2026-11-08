@@ -3,12 +3,8 @@
  * marker and stub a range leaves in its channel, a closed thread's line, the
  * "Threads (N)" popover, the thread view's header and context block, and the
  * "Ajustar trecho" selection (neutral: ink and gray only; blue is for agents).
- * `--thread-indent` lines quiet rows up with the messages' text column.
+ * `--thread-indent` lines quiet rows up with the messages' text column (set per look, in chat/looks.css).
  */
-/* The messages' side padding, 36px face and gap (`.ac-msg`). */
-.channel__messages {
-  --thread-indent: 64px;
-}
 
 /* ── In the channel ────────────────────────────────────────────────────── */
 .msg--context::before {
@@ -146,12 +142,9 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
-/* A face or a kind tile at the members column's 32px, with a row's usual room on each side. */
+/* A MediaRow: a face or a kind tile (32), the name with its time or state at the line's end, what it says under them,
+   two lines at most, with a row's usual room on each side. */
 .thread-pop__row {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
   width: 100%;
   padding: 8px 12px;
   border: 0;
@@ -162,36 +155,25 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-/* A face is 36px by default: held to the column's 32px, as the members column holds it. */
-.thread-pop__row > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: var(--text-sm);
-}
 .thread-pop__row:hover,
 html:not([data-pointer]) .thread-pop__row:focus-visible {
   outline: none;
   background: var(--plate);
 }
-.thread-pop__text {
-  min-width: 0;
-}
-.thread-pop__text b {
-  display: block;
+.thread-pop__name b {
   font-size: 13.5px;
   font-weight: 500;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
-.thread-pop__text small {
-  display: block;
+.thread-pop__sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: 12px;
   color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 /*
  * "Fixadas": a row goes to the message, its Desafixar a button of its own (never inside the row's button), both in
@@ -237,12 +219,6 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   background: var(--sunken);
   color: var(--ink2);
 }
-/* Where the messages' side padding narrows to 12px (`responsive.css`). */
-@media (max-width: 760px) {
-  .channel__messages {
-    --thread-indent: 58px;
-  }
-}
 
 /* ── Thread view ───────────────────────────────────────────────────────── */
 .thread-head__text {
@@ -254,12 +230,13 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
 .thread-title {
   min-width: 0;
 }
-/* A question between two agents opened in the same panel: "Theo ⇄ Iris", the arrows quiet between the names. */
+/* A question between two agents opened in the same panel: "Theo ⇄ Iris", one line of words that wraps as words do,
+   the arrows quiet between the names, on their capitals. */
 .consult-title {
-  gap: 6px;
+  display: block;
 }
 .consult-title > .ac-icon {
-  flex: none;
+  margin-inline: 6px;
   color: var(--faint);
 }
 /* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
@@ -365,16 +342,18 @@ html:not([data-pointer]) .thread-title__button:focus-visible {
   color: var(--faint);
 }
 .thread-context {
-  margin: 6px 8px 10px;
+  margin-inline: 8px;
   border-radius: 16px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
 }
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .thread-context {
+  margin-block: 6px 10px;
+}
+/* A MediaRow: the tile, what it is and the chevron on one line, how it came under them. */
 .thread-context__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   width: 100%;
   padding: 10px 12px;
   border: 0;
@@ -393,9 +372,6 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
 .thread-context__icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -403,27 +379,19 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   background: var(--sunken);
   color: var(--ink2);
 }
-.thread-context__title {
-  flex: 1;
-  min-width: 0;
-}
-.thread-context__title b {
-  display: block;
-  font-size: 14px;
+.thread-context__head .thread-context__title {
   font-weight: 650;
   letter-spacing: -0.01em;
 }
-.thread-context__title small {
-  display: flex;
+.thread-context__sub {
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  margin-top: 1px;
   font-size: 12.5px;
   color: var(--faint);
 }
 .thread-context__chev {
-  flex: none;
   color: var(--faint);
   transition: transform 0.25s var(--out);
 }
@@ -434,7 +402,7 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
-  padding: 0 12px 10px 52px;
+  padding: 0 12px 10px;
   font-size: 12.5px;
 }
 .thread-context__link {
@@ -888,8 +856,9 @@ html:not([data-pointer]) .thread-line:focus-visible {
   display: inline-flex;
   flex: none;
 }
-/* Framed faces, agents and people one size: they barely overlap, so none is cut. */
-.thread-line__who .ac-avatar-stack > .ac-avatar + .ac-avatar {
+/* Framed faces, agents and people one size: they barely overlap, so none is cut. Not after a person's initials, which
+   fill their tile (the kit's `.ac-avatar-stack` keeps the next face past it). */
+.thread-line__who .ac-avatar-stack > .ac-avatar:where(:not([data-kind="person"]:not(:has(img)))) + .ac-avatar {
   margin-left: -3px;
 }
 .thread-line__state {

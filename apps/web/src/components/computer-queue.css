@@ -174,8 +174,11 @@ html:not([data-pointer]) .cq__open:focus-visible {
 
 /* The waiting agent's turn after the message it answers, where "thinking" shows otherwise. */
 .cq-turn__say {
-  margin: 0;
   color: var(--ink-muted);
+}
+/* A paragraph's own margins out, except where the conversation's rhythm sets them (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .cq-turn__say {
+  margin: 0;
 }
 .cq-turn__acts {
   display: flex;

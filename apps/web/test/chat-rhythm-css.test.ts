@@ -56,7 +56,7 @@ const PARTS = [
   "consult-pair",
   "channel__unread",
 ];
-/** These also stand outside a message, so they keep their own top there: in a message the body's rule outranks it. */
+/** These also stand outside a message, so they keep their own top there, and only there. */
 const OUTSIDE_TOO = ["rq", "brw-ac", "mi-card", "ag-rcs"];
 const subject = (selector: string) =>
   selector
@@ -185,13 +185,15 @@ test("in Compacta a pill's time stays one line in the clock's column, however lo
   expect(last(time, "width")).toBe("40px");
 });
 
-test("a card that also stands alone is outranked in a message", () => {
-  // `.ac-msg .ac-msg__body>*` is two classes: a part's own rule has one.
+test("a card that also stands alone keeps its own margin only outside a message", () => {
+  // The body's rule (`.ac-msg .ac-msg__body>*`) is the kit's, in a layer under the page sheets, so it can't outrank a
+  // card's own rule: the card's margin is scoped out of a message body, at its one class's weight.
   for (const cls of OUTSIDE_TOO) {
     const own = rules(css)
       .filter((r) => r.declarations.some(setsVertical))
-      .flatMap((r) => r.selectors.filter((s) => s === `.${cls}`));
-    expect(own.length).toBeGreaterThan(0);
+      .flatMap((r) => r.selectors);
+    expect(own).toContain(`:where(:not(.ac-msg__body))>.${cls}`);
+    expect(own).not.toContain(`.${cls}`);
   }
 });
 

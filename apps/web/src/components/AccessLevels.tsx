@@ -196,13 +196,31 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row ac-faceline" data-changed={changed || undefined}>
-      {icon}
-      <span className="level-row__text">
-        <span className="level-row__name ac-captop">
+    <li className="level-row ac-mediarow" data-changed={changed || undefined}>
+      <span className="ac-mediarow__face">{icon}</span>
+      <span className="ac-mediarow__head">
+        <span className="level-row__name">
           {name}
           {tag}
         </span>
+      </span>
+      <span className="ac-mediarow__end ac-mediarow__end--wrap">
+        {onChange ? (
+          <Segmented
+            size="sm"
+            className="level-row__choice"
+            label={t("access.levelOf", { name })}
+            value={value}
+            onValueChange={(l) => l !== "custom" && onChange(l)}
+            options={options}
+          />
+        ) : (
+          <Chip icon={value === "none" ? "dash" : value === "custom" ? "settings" : "check"}>
+            {t(`access.level.${value}`)}
+          </Chip>
+        )}
+      </span>
+      <span className="ac-mediarow__body level-row__text">
         {description && <span className="small muted">{description}</span>}
         {asks.length > 0 && (
           <span className="level-row__asks">
@@ -215,22 +233,8 @@ export function LevelRow({
           </span>
         )}
         {extra}
+        {below && <div className="level-row__below">{below}</div>}
       </span>
-      {onChange ? (
-        <Segmented
-          size="sm"
-          className="level-row__choice"
-          label={t("access.levelOf", { name })}
-          value={value}
-          onValueChange={(l) => l !== "custom" && onChange(l)}
-          options={options}
-        />
-      ) : (
-        <Chip icon={value === "none" ? "dash" : value === "custom" ? "settings" : "check"}>
-          {t(`access.level.${value}`)}
-        </Chip>
-      )}
-      {below && <div className="level-row__below">{below}</div>}
     </li>
   );
 }

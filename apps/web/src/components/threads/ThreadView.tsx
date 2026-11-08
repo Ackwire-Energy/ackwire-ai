@@ -327,28 +327,32 @@ export function ContextBlock({ thread }: { thread: ThreadInfo }) {
     <section className="thread-context" aria-label={t("threads.context.label")}>
       <button
         type="button"
-        className="thread-context__head"
+        className="thread-context__head ac-mediarow"
         aria-expanded={open}
         aria-controls={`thread-context-${thread.id}`}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="thread-context__icon" aria-hidden="true">
-          <Icon name="layers" size={16} />
+        <span className="ac-mediarow__face">
+          <span className="thread-context__icon" aria-hidden="true">
+            <Icon name="layers" size={16} />
+          </span>
         </span>
-        <span className="thread-context__title">
-          <b>
+        <span className="ac-mediarow__head">
+          <b className="thread-context__title">
             {span
               ? t("threads.context.title", { count: ctx.count, channel, span })
               : t("threads.context.titleNoSpan", { count: ctx.count, channel })}
           </b>
-          <small>
-            <Chip icon={ctx.moved ? "thread" : "link"}>
-              {ctx.moved ? t("threads.context.moved") : t("threads.context.reference")}
-            </Chip>
-            <span>{t("threads.context.agentsRead")}</span>
-          </small>
         </span>
-        <Icon name="chevronRight" size={16} className={cx("thread-context__chev", open && "is-open")} />
+        <span className="ac-mediarow__end">
+          <Icon name="chevronRight" size={16} className={cx("thread-context__chev", open && "is-open")} />
+        </span>
+        <small className="ac-mediarow__body thread-context__sub">
+          <Chip icon={ctx.moved ? "thread" : "link"}>
+            {ctx.moved ? t("threads.context.moved") : t("threads.context.reference")}
+          </Chip>
+          <span>{t("threads.context.agentsRead")}</span>
+        </small>
       </button>
       {canChange && (
         <div className="thread-context__actions">

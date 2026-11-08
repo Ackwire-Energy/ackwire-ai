@@ -146,11 +146,6 @@
   .channel__header > .ac-acts {
     flex: none;
   }
-  /* Its buttons all show their plates: the header's own 8px between them, as in a DM, leaves the title its room
-     (the touch row's 24px gap left "# lancamento" 6px wide at 360). */
-  .channel__header > .channel__acts {
-    column-gap: 8px;
-  }
   .channel__title {
     display: block;
     min-width: 0;

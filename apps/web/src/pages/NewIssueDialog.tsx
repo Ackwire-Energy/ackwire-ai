@@ -201,12 +201,14 @@ export function NewIssueDialog({
   };
   const pick = () => picker.current?.click();
   const agentNote = agent && (
-    <p className="issue-agent-note">
+    <p className="issue-agent-note ac-iconline">
       <Icon name="shield" size={14} />
-      {t(
-        files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts",
-        agentGrammar(agent.name),
-      )}
+      <span>
+        {t(
+          files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts",
+          agentGrammar(agent.name),
+        )}
+      </span>
     </p>
   );
   const priorityLabel = (p: IssuePriority) => t(`issues.priority.${p}`);
@@ -395,7 +397,7 @@ export function NewIssueDialog({
                   </Field>
                 )}
                 <Field label={t("whoSees.label")} id="ni-sees">
-                  <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
+                  <WhoSeesButton select value={audience} onClick={() => setChoosing(true)} />
                 </Field>
                 <Field label={t("issues.form.priority")} id="ni-pri">
                   <Select
@@ -461,7 +463,7 @@ export function NewIssueDialog({
                     </Button>
                   }
                 >
-                  {actors.options(true, undefined, "xs").map((o) => (
+                  {actors.options(true).map((o) => (
                     <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
                       {o.label}
                     </MenuItem>

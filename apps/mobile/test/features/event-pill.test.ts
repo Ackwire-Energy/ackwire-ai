@@ -69,6 +69,14 @@ describe("the event pill", () => {
     expect(src("ui/index.ts")).toContain('} from "./EventPill";');
   });
 
+  test("a sentence that wraps keeps its mark and its time on its first line, not between two lines (#8)", () => {
+    const pill = src("ui/EventPill.tsx");
+    // The row tops its parts; the mark sits where the eye reads the words' first line, the time is one such line.
+    expect(pill).toMatch(/main: \{\s*flexDirection: "row",\s*alignItems: "flex-start",/);
+    expect(pill).toContain('variant="small" text={WORDS} />');
+    expect(pill).toContain("time: { lineHeight: WORDS.lineHeight,");
+  });
+
   test("the automatic lines use it: notices, stops, decided requests, the task taken, the speed fallback", () => {
     for (const file of [
       "features/chat/EventLine.tsx",

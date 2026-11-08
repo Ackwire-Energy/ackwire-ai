@@ -44,23 +44,54 @@ export function useWhoSeesLabel() {
     whoSeesLabel(t, a, me.user.id, (id) => dir.members.find((m) => m.userId === id)?.name);
 }
 
-/** Who sees it, as a button: the setting itself, and the way to change it. */
+/**
+ * Who sees it, as a button: the setting itself, and the way to change it. A field's control (`select`) is drawn as
+ * the select it stands with, its chevron opening the dialog.
+ */
 export function WhoSeesButton({
   value,
   onClick,
   disabled,
+  select,
 }: {
   value: { mode: "everyone" | "people"; userIds?: readonly string[] };
   onClick: () => void;
   disabled?: boolean;
+  select?: boolean;
 }) {
   const { t } = useTranslation();
   const label = useWhoSeesLabel()(value);
+  const icon = value.mode === "everyone" ? "audienceEveryone" : "lock";
+  if (select)
+    return (
+      <div className="ac-select ac-select--sm">
+        <button
+          type="button"
+          className="ac-select__trigger"
+          aria-haspopup="dialog"
+          aria-label={`${t("whoSees.label")}: ${label}`}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          <span className="ac-select__value">
+            <span>
+              <span className="ac-select__lead" aria-hidden="true">
+                <Icon name={icon} size={16} />
+              </span>
+              <span className="ac-select__text">{label}</span>
+            </span>
+          </span>
+          <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m6 8 4 4 4-4" />
+          </svg>
+        </button>
+      </div>
+    );
   return (
     <Button
       size="sm"
       className="who-sees__button"
-      icon={value.mode === "everyone" ? "audienceEveryone" : "lock"}
+      icon={icon}
       aria-label={`${t("whoSees.label")}: ${label}`}
       disabled={disabled}
       onClick={onClick}

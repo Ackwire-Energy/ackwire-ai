@@ -109,7 +109,7 @@ export function ConsultationPanel({
           <div className="thread-head__text">
             <h1 className="channel__title thread-title consult-title">
               {from.name}
-              <Icon name="swap" size={16} label={t("newAgent.and")} />
+              <Icon name="swap" size={16} label={t("newAgent.and")} inline />
               {to.name}
             </h1>
             <span className="channel__topic thread-head__meta">

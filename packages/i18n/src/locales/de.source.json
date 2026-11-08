@@ -4943,6 +4943,27 @@
   "rightHand.settings.useWorkspace": {
     "value": "Use the workspace's"
   },
+  "rightHand.settings.useMine": {
+    "value": "Use my plan"
+  },
+  "rightHand.settings.mineYours": {
+    "value": "your plan"
+  },
+  "rightHand.settings.mineOf": {
+    "value": "{{owner}}'s plan"
+  },
+  "rightHand.settings.mineKey": {
+    "value": "workspace key"
+  },
+  "rightHand.settings.mineKeyName": {
+    "value": "API key"
+  },
+  "rightHand.settings.minePlan": {
+    "value": "workspace plan"
+  },
+  "rightHand.settings.mineNobody": {
+    "value": "Nobody answers you here yet"
+  },
   "rightHand.settings.fallbackKey": {
     "value": "Without your own plan, it uses the workspace's API key."
   },
@@ -4974,7 +4995,7 @@
     "value": "A plan in place of the key. It serves other people only when its owner lets it."
   },
   "rightHand.settings.noPlans": {
-    "value": "Connect a plan under Your AI to use it here."
+    "value": "Connect a plan in AI accounts to use it here."
   },
   "rightHand.settings.pickPlan": {
     "value": "Choose a plan"

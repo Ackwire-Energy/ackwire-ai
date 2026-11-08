@@ -106,13 +106,15 @@ function PinsPopover({
           const name = dir.authorName(author);
           return (
             <div key={p.messageId} className="pins-pop__item">
-              <button type="button" className="thread-pop__row" onClick={() => go(p)}>
-                {author.id ? <ActorAvatar actor={{ type: author.type, id: author.id }} name={name} /> : <span />}
-                <span className="thread-pop__text">
-                  <b>{name}</b>
-                  <small>{pinPreview(t, p)}</small>
+              <button type="button" className="thread-pop__row ac-mediarow" onClick={() => go(p)}>
+                <span className="ac-mediarow__face">
+                  {author.id ? <ActorAvatar actor={{ type: author.type, id: author.id }} name={name} /> : <span />}
                 </span>
-                <small className="pins-pop__time">{clockAt(i18n.language, p.message.createdAt)}</small>
+                <span className="ac-mediarow__head thread-pop__name">
+                  <b>{name}</b>
+                </span>
+                <small className="ac-mediarow__end pins-pop__time">{clockAt(i18n.language, p.message.createdAt)}</small>
+                <small className="ac-mediarow__body thread-pop__sub">{pinPreview(t, p)}</small>
               </button>
               {mayUnpin && (
                 <Button

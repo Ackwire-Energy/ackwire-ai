@@ -109,19 +109,21 @@ export function InstructionsTab() {
             </Card>
           )}
           {pending.length > 0 && (
-            <div className="agp-attn ac-faceline ac-actrow">
-              <span className="agp-ib agp-ib--warn">
-                <Icon name="document" size={16} />
+            <div className="agp-attn ac-mediarow">
+              <span className="ac-mediarow__face">
+                <span className="agp-ib agp-ib--warn">
+                  <Icon name="document" size={16} />
+                </span>
               </span>
-              <span className="agp-attn__t ac-actrow__text">
-                <b className="ac-captop">{t("agentPage.instructions.proposals", { count: pending.length })}</b>
-                <span>{t("agentPage.overview.proposes", g)}</span>
+              <span className="ac-mediarow__head">
+                <b>{t("agentPage.instructions.proposals", { count: pending.length })}</b>
               </span>
-              <span className="agp-attn__tail">
+              <span className="ac-mediarow__end ac-mediarow__end--wrap">
                 <Button size="sm" onClick={() => goTo("memory")}>
                   {t("agentPage.overview.review")}
                 </Button>
               </span>
+              <span className="ac-mediarow__body agp-attn__sub">{t("agentPage.overview.proposes", g)}</span>
             </div>
           )}
         </div>

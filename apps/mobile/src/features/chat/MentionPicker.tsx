@@ -5,7 +5,7 @@ import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { Icon, PressScale, Text, useTheme, useToast } from "@/ui";
+import { Icon, OPTION_ROW, PressScale, Text, useTheme, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { type MentionOption, mentionOptions, splitMatch } from "./mentions";
@@ -25,7 +25,8 @@ export function useMentionMembers(channelId: string, enabled: boolean): Readonly
 /**
  * The "@" picker: a floating card above the composer with "Neste canal" and
  * "Fora do canal", faces, the matched part underlined, "@handle · role". Tapping a row inserts "@handle ";
- * an agent outside the channel offers "Adicionar" (adds it, then inserts). Nothing when nobody matches.
+ * an agent outside the channel offers "Adicionar" (adds it, then inserts). Nothing when nobody matches. Its rows are
+ * OptionRows, every one one size: the face 24, the name and, muted on its line, the handle and the role.
  */
 export function MentionPicker({
   query,
@@ -90,16 +91,17 @@ export function MentionPicker({
           style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
         >
           <View style={[styles.everyone, { backgroundColor: c.sunken }]}>
-            <Icon name="members" size={18} color={c.ink2} />
+            <Icon name="members" size={14} color={c.ink2} />
           </View>
-          <View style={styles.tx}>
-            <Text variant="body" numberOfLines={1} style={styles.name}>
+          <Text variant="body" numberOfLines={1} style={styles.tx}>
+            <Text variant="body" style={styles.name}>
               @{all}
             </Text>
-            <Text variant="footnote" tone="muted" numberOfLines={1}>
+            <Text variant="footnote" tone="muted">
+              {"  "}
               {t("mentions.everyone")}
             </Text>
-          </View>
+          </Text>
         </Pressable>
       ) : null}
       {options.map((o, i) => {
@@ -124,18 +126,18 @@ export function MentionPicker({
             >
               {i > 0 && !heading ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
               <Face who={{ type: o.type, id: o.id }} size={FACE} />
-              <View style={styles.tx}>
-                <Text variant="body" numberOfLines={1} style={styles.name}>
+              <Text variant="body" numberOfLines={1} style={styles.tx}>
+                <Text variant="body" style={styles.name}>
                   {nb}
                   {nm ? <RNText style={styles.mark}>{nm}</RNText> : null}
                   {na}
                 </Text>
-                <Text variant="footnote" tone="muted" numberOfLines={1}>
-                  @{hb}
+                <Text variant="footnote" tone="muted">
+                  {"  "}@{hb}
                   {hm ? <RNText style={[styles.mark, { color: c.ink }]}>{hm}</RNText> : null}
                   {ha} · {kind}
                 </Text>
-              </View>
+              </Text>
               {outside ? (
                 <PressScale
                   to={0.94}
@@ -162,7 +164,7 @@ export function MentionPicker({
 
 /** A row's inset, its face and the gap to the name: the hairline above starts where the name does. */
 const INSET = 14;
-const FACE = 30;
+const FACE = OPTION_ROW.face;
 const GAP = 10;
 
 const styles = StyleSheet.create({
@@ -172,13 +174,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: GAP,
-    paddingVertical: 8,
+    paddingVertical: OPTION_ROW.pad,
     paddingHorizontal: INSET,
-    minHeight: 48,
+    minHeight: OPTION_ROW.height,
   },
   divider: { position: "absolute", top: 0, left: INSET + FACE + GAP, right: 0, height: StyleSheet.hairlineWidth },
   tx: { flex: 1, minWidth: 0 },
-  everyone: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  everyone: { width: FACE, height: FACE, borderRadius: FACE / 2, alignItems: "center", justifyContent: "center" },
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },
   // A button, so a rounded rectangle rather than a pill; 26 tall with 9 of slop: the 44-point target.

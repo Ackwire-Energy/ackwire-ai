@@ -407,11 +407,15 @@ export function ExistingRows({
           pressed={false}
           disabled={busy}
           onClick={() => void pickKey(k)}
-          className="ai-picker__key ac-iconline"
+          className="ai-picker__key ac-mediarow ac-mediarow--row"
         >
-          <ProviderLogo id={k.provider} size="sm" />
-          <span className="ac-option__text">
+          <span className="ac-mediarow__face">
+            <ProviderLogo id={k.provider} size="sm" />
+          </span>
+          <span className="ac-mediarow__head">
             <span className="ac-option__title">{k.label}</span>
+          </span>
+          <span className="ac-mediarow__body">
             <span className="ac-option__desc">{keyLine(t, k)}</span>
             <span className="ac-option__desc">{t("agentPage.work.brain.modelText", g)}</span>
           </span>
@@ -432,13 +436,17 @@ export function ExistingRows({
         pressed={signIn?.from === a.id}
         disabled={r.act === "locked" || busy || gateDims(gates.gateOf(choice))}
         onClick={pick}
-        className="ai-picker__key ac-iconline"
+        className="ai-picker__key ac-mediarow ac-mediarow--row"
       >
-        {option.leading}
-        <span className="ac-option__text">
+        <span className="ac-mediarow__face">{option.leading}</span>
+        <span className="ac-mediarow__head">
           <span className="ac-option__title">{option.label}</span>
-          {option.description && <span className="ac-option__desc">{option.description}</span>}
         </span>
+        {option.description && (
+          <span className="ac-mediarow__body">
+            <span className="ac-option__desc">{option.description}</span>
+          </span>
+        )}
       </OptionCard>
     );
   });
@@ -531,13 +539,13 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
  */
 function PanelHead({ lead, title, sub, aside }: { lead: ReactNode; title: string; sub: string; aside?: ReactNode }) {
   return (
-    <div className="ai-panel__head ac-faceline">
-      {lead}
-      <span className="ai-panel__title">
-        <b className="ac-captop">{title}</b>
-        <span>{sub}</span>
+    <div className="ai-panel__head ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">{lead}</span>
+      <span className="ac-mediarow__head">
+        <b className="ai-panel__name">{title}</b>
       </span>
-      {aside}
+      {aside && <span className="ac-mediarow__end ac-mediarow__end--wrap">{aside}</span>}
+      <span className="ac-mediarow__body ai-panel__sub">{sub}</span>
     </div>
   );
 }
@@ -763,8 +771,8 @@ export function PlanPanel(props: PlanPanelProps) {
 /** "For [All agents ▾]": every agent of "All agents" first, with their faces and names, then each agent. */
 function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agents" | "all" | "target" | "onTarget">) {
   const { t } = useTranslation();
-  const face = (a: PlanAgent) => (
-    <AgentAvatar key={a.id} name={a.name} initials={a.initials} appearance={a.appearance} size="xs" />
+  const face = (a: PlanAgent, size: "xs" | "sm" = "xs") => (
+    <AgentAvatar key={a.id} name={a.name} initials={a.initials} appearance={a.appearance} size={size} />
   );
   return (
     <span className="ai-panel__agent">
@@ -786,11 +794,11 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
                     all.map((a) => a.name),
                     NAMES_SHOWN,
                   ),
-                  leading: <AvatarStack>{all.slice(0, 3).map(face)}</AvatarStack>,
+                  leading: <AvatarStack>{all.slice(0, 3).map((a) => face(a))}</AvatarStack>,
                 },
               ]
             : []),
-          ...agents.map((a) => ({ value: a.id, label: a.name, leading: face(a) })),
+          ...agents.map((a) => ({ value: a.id, label: a.name, leading: face(a, "sm") })),
         ]}
       />
     </span>

@@ -359,17 +359,21 @@ export function ToolReview({
         data-open
         aria-label={t("toolReview.decideTitle", { count: pending.length })}
       >
-        <div className="tr-decide__h">
-          <AskPixels />
-          <span className="tr-decide__t">
+        <div className="tr-decide__h ac-mediarow">
+          <span className="ac-mediarow__face">
+            <AskPixels />
+          </span>
+          <span className="ac-mediarow__head tr-decide__t">
             <b>{t("toolReview.decideTitle", { count: pending.length })}</b>
-            <small>{t("toolReview.decideHelp")}</small>
           </span>
           {!query.trim() && (
-            <button type="button" className="tr-link" onClick={acceptAll}>
-              {t("toolReview.acceptAll")}
-            </button>
+            <span className="ac-mediarow__end ac-mediarow__end--wrap">
+              <button type="button" className="tr-link" onClick={acceptAll}>
+                {t("toolReview.acceptAll")}
+              </button>
+            </span>
           )}
+          <small className="ac-mediarow__body tr-decide__help">{t("toolReview.decideHelp")}</small>
         </div>
         <div className="tr-subj__b">
           {hits.map(({ tool, tech }) => (

@@ -34,7 +34,19 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, EventPillAction, fieldText, Icon, LineIcon, Locked, Sheet, Text } from "@/ui";
+import {
+  AgentAvatar,
+  Button,
+  EventPillAction,
+  fieldText,
+  Icon,
+  LineIcon,
+  Locked,
+  MEDIA_ROW,
+  MediaRow,
+  Sheet,
+  Text,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
@@ -154,7 +166,8 @@ export function ReplyChips({ message: m }: { message: Message }) {
 
 /**
  * The team: a row per agent, its routines, its skills and what waits for approval. Flat on the card that holds it
- * (rows divided by hairlines, icons on the first line), never a plate or a box in a card.
+ * (rows divided by hairlines, icons on the first line), never a plate or a box in a card. An agent's row is a MediaRow:
+ * its face, name and role on one line, what it does, its channel and "Ajustar" under them at the card's width.
  */
 function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgentDraft) => void }) {
   const { t, i18n } = useTranslation();
@@ -164,15 +177,12 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
   return (
     <View style={styles.rows}>
       {plan.agents.map((a, i) => (
-        <View key={a.handle} style={[styles.agentHead, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
-          <AgentAvatar agent={fullLook(a.appearance)} size={32} name={a.name} live={false} />
-          <View style={styles.fill}>
-            <Text variant="body" style={styles.bold}>
-              {a.name}{" "}
-              <Text variant="small" tone="muted">
-                {a.role}
-              </Text>
-            </Text>
+        <View key={a.handle} style={i > 0 && [styles.divided, { borderTopColor: c.line2 }]}>
+          <MediaRow
+            face={<AgentAvatar agent={fullLook(a.appearance)} size={MEDIA_ROW.card.face} name={a.name} live={false} />}
+            name={a.name}
+            meta={a.role}
+          >
             <Text variant="small" tone="ink2">
               {a.line}
             </Text>
@@ -195,7 +205,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
                 />
               ) : null}
             </View>
-          </View>
+          </MediaRow>
         </View>
       ))}
       {teamRoutines(plan).length > 0 ? (
@@ -460,12 +470,14 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
       body={
         <View style={styles.rows}>
           {tasks.map((f, i) => (
-            <View key={f.agentId} style={[styles.agentHead, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
-              <AgentAvatar agent={fullLook(f.appearance)} size={32} name={f.name} live={false} />
-              <View style={styles.fill}>
-                <Text variant="body" style={styles.bold}>
-                  {f.name}
-                </Text>
+            <View key={f.agentId} style={i > 0 && [styles.divided, { borderTopColor: c.line2 }]}>
+              {/* The task under the name at the card's width, its one action under it at its start. */}
+              <MediaRow
+                face={
+                  <AgentAvatar agent={fullLook(f.appearance)} size={MEDIA_ROW.card.face} name={f.name} live={false} />
+                }
+                name={f.name}
+              >
                 <Text variant="small" tone="ink2">
                   {f.task}
                 </Text>
@@ -477,7 +489,7 @@ function FirstTasks({ message: m, card, held }: { message: Message; card: TeamPr
                     onPress={() => void openDm({ agentId: f.agentId }, { compose: true, text: `${f.task} ` })}
                   />
                 </View>
-              </View>
+              </MediaRow>
             </View>
           ))}
           {example && tasks[0] ? (
@@ -654,22 +666,24 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
               </Text>
             </View>
             {col.agents.map((a) => (
-              <View key={a.handle} style={styles.agentHead}>
-                <AgentAvatar agent={fullLook(a.appearance)} size={28} name={a.name} live={false} />
-                <View style={styles.fill}>
-                  <Text variant="small" style={styles.bold}>
-                    {a.name}{" "}
-                    <Text variant="caption" tone="muted">
-                      {a.role}
-                    </Text>
-                  </Text>
-                  {a.routines.map((r) => (
-                    <Text key={r.name} variant="caption" tone="muted">
+              <MediaRow
+                key={a.handle}
+                size="row"
+                face={
+                  <AgentAvatar agent={fullLook(a.appearance)} size={MEDIA_ROW.row.face} name={a.name} live={false} />
+                }
+                name={a.name}
+                meta={a.role}
+              >
+                {a.routines.map((r) => (
+                  <View key={r.name} style={styles.line}>
+                    <LineIcon name="clock" size={14} color={c.muted} variant="footnote" />
+                    <Text variant="footnote" tone="muted" style={styles.fill}>
                       {proposedRoutineWhen(t, i18n.language, r)}
                     </Text>
-                  ))}
-                </View>
-              </View>
+                  </View>
+                ))}
+              </MediaRow>
             ))}
           </View>
         ))}
@@ -868,11 +882,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   rows: { gap: 8 },
-  agentHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // 12 above the hairline (with the rows' gap) and 12 under it.
   divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  // Under the agent's words, in their column.
-  agentFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
+  // Under the agent's words, at the row's width.
+  agentFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   section: { gap: 6, marginTop: 4 },
   // An icon on the first line of its words, as the conversation's event lines.
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },

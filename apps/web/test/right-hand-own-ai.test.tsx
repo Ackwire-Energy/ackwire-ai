@@ -51,8 +51,10 @@ test("Lodi's settings: the face opens the look, the plan is its logo and name on
   expect(screen().getByRole("dialog", { name: "Mudar visual" })).toBeTruthy();
   await act(async () => fireEvent.click(screen().getByRole("button", { name: "Cancelar" })));
   await settle(2);
+  // Sua IA isn't here: these are the team's settings, the workspace's AI names the plan.
+  expect(body.querySelector(".rh-mine")).toBeNull();
   const lines = [...body.querySelectorAll(".rh-set__planline")];
-  expect(lines.length).toBe(2);
+  expect(lines.length).toBe(1);
   for (const line of lines) {
     expect(line.querySelector(".ac-provider-logo, svg, img")).toBeTruthy();
     expect(line.textContent).toContain("Trabalho");
@@ -64,7 +66,7 @@ test("Lodi's settings: the face opens the look, the plan is its logo and name on
   expect(share.closest(".settings-row")?.querySelector(".settings-row__icon svg")).toBeTruthy();
 });
 
-test("a member's Lodi page has Sua IA: what their DM thinks with without a plan, and Conectar meu plano", async () => {
+test("a member's Lodi page has Sua IA: nothing answers them yet, so its one action is Conectar meu plano", async () => {
   const state = withRightHand(seedState());
   const me = state.me?.organizations[0];
   if (me) me.role = "member";
@@ -79,15 +81,18 @@ test("a member's Lodi page has Sua IA: what their DM thinks with without a plan,
     });
   await renderApp(`/org/${ORG_ID}/agents/${LODI_ID}`, { api });
   await settle(8);
-  const row = document.querySelector(".settings-row") as HTMLElement;
-  expect(row.textContent).toContain("Sua IA");
-  expect(row.textContent).toContain("o plano do workspace só atende");
+  const card = screen().getByRole("region", { name: "Sua IA" });
+  const row = card.querySelector(".rh-mine") as HTMLElement;
+  expect(row.classList.contains("ac-mediarow")).toBe(true);
+  expect(row.querySelector(".ac-mediarow__head")?.textContent).toBe("Ninguém te responde aqui ainda");
+  // Why it is theirs alone: the title's ⓘ, not a paragraph under it.
+  expect(within(card).getByRole("button", { name: "Sobre Sua IA" })).toBeTruthy();
   await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Conectar meu plano" })));
   await settle(6);
   expect(screen().getByRole("dialog", { name: /Lodi/ })).toBeTruthy();
 });
 
-test("after a key is chosen and the page reloads, Lodi's settings name it: Sua IA says it's the workspace's, the workspace's AI shows it", async () => {
+test("after a key is chosen, Sua IA on Lodi's page is that key, the workspace's, with Usar meu plano; Lodi's settings name it", async () => {
   const state = withRightHand(seedState());
   const api = createFakeApi(state);
   const key = { provider: "openai", label: "OpenAI da Acme" };
@@ -99,10 +104,20 @@ test("after a key is chosen and the page reloads, Lodi's settings name it: Sua I
       canUsePlans: true,
       workspaceAi: { brain: "model", ownerId: null, servesYou: true, key },
     });
+  const me = state.me?.organizations[0];
+  if (me) me.role = "member";
+  await renderApp(`/org/${ORG_ID}/agents/${LODI_ID}`, { api });
+  await settle(8);
+  const row = screen().getByRole("region", { name: "Sua IA" }).querySelector(".rh-mine") as HTMLElement;
+  expect(row.querySelector(".ac-mediarow__face .ac-brand")).toBeTruthy();
+  expect(row.querySelector(".ac-mediarow__head")?.textContent).toBe("OpenAI da Acmechave do workspace");
+  expect(within(row).getByRole("button", { name: "Usar meu plano" })).toBeTruthy();
+  cleanup();
+  if (me) me.role = "owner";
   await renderApp(`/org/${ORG_ID}/settings/right_hand`, { api });
   await settle(8);
   const rows = [...document.querySelectorAll(".settings-row")].map((r) => r.textContent ?? "");
-  expect(rows.find((r) => r.includes("Sua IA"))).toContain("a chave do workspace: OpenAI da Acme");
+  expect(rows.find((r) => r.includes("Sua IA"))).toBeUndefined();
   expect(rows.find((r) => r.includes("IA do workspace"))).toContain("OpenAI da Acme");
 });
 

@@ -1621,7 +1621,7 @@ function ChannelView({
     Boolean(chrome?.dmAgentId || chrome?.dmPersonId || thread?.channelKind === "dm"),
     dmAgent ? colorOf(dmAgent) : undefined,
   );
-  const namedLook = useMemo(() => ({ ...look, names: true }), [look]);
+  const namedLook = useMemo(() => ({ ...look, names: true, faces: true }), [look]);
   const draftAgents = useMemo(
     () =>
       [
@@ -2369,6 +2369,7 @@ function ChannelView({
                           ref={scroller}
                           className="channel__messages"
                           data-look={look.style}
+                          data-faces={look.faces ? undefined : "false"}
                           data-fresh={fresh || undefined}
                           aria-label={t("channel.messages")}
                           aria-live="polite"

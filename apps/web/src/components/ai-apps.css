@@ -50,23 +50,13 @@
   min-width: 0;
 }
 
-/* A face line: the name's capitals at the mark's top, the menu on the name's line (`.ac-captop`, `.ac-captail`), with
-   room above that risen line for the 32px menu centred on it. */
+/* A MediaRow: the mark, the name and its access on one line with the menu at its end, the facts under them. */
 .app-row {
-  flex-wrap: nowrap;
-  align-items: flex-start;
   padding-block: var(--row-py);
-}
-.app-row__main {
-  flex: 1;
-  min-width: 0;
 }
 .app-row__name {
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-.app-row > .ac-brand {
-  margin-top: 0;
 }
 
 /* "Conectar um app": the apps two by two (one column on a phone), each a button with its mark, name and where it runs. */
@@ -76,9 +66,6 @@
   gap: 8px;
 }
 .apps-client {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   min-width: 0;
   padding: 12px;
   border: 0;
@@ -100,15 +87,7 @@ html:not([data-pointer]) .apps-client:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.apps-client > .list-col {
-  flex: 1;
-  min-width: 0;
-}
-.apps-client__name {
-  font-weight: 600;
-}
 .apps-client__go {
-  flex: none;
   color: var(--faint);
 }
 @media (max-width: 520px) {
@@ -185,12 +164,16 @@ html:not([data-pointer]) .apps-client:focus-visible {
   flex-direction: column;
   gap: 20px;
 }
+/* The app's mark on a line of its own, what it asks under it at the column's width: a mark never owns a column beside
+   a title that wraps. */
 .consent__app {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
 .consent__app > .list-col {
+  align-self: stretch;
   min-width: 0;
   gap: 4px;
 }

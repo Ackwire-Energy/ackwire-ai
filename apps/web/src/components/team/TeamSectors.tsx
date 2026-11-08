@@ -102,12 +102,14 @@ export function TeamSectors({ team, groups }: { team: Team; groups: AgentGroup[]
               aria-label={t("agentGroups.none")}
               {...(arranges ? drag.zone(null) : {})}
             >
-              <header className="team-sector-card__head">
-                <Icon name="members" size={20} />
-                <span className="team-sector-card__title">
-                  <h3>{t("agentGroups.none")}</h3>
-                  <span className="muted">{t("team.agents", { count: outside.length })}</span>
+              <header className="team-sector-card__head ac-mediarow">
+                <span className="ac-mediarow__face">
+                  <Icon name="members" size={20} />
                 </span>
+                <div className="ac-mediarow__head team-sector-card__title">
+                  <h3>{t("agentGroups.none")}</h3>
+                </div>
+                <span className="ac-mediarow__body muted">{t("team.agents", { count: outside.length })}</span>
               </header>
               <AgentChips agents={outside} drag={arranges ? drag : null} />
               {arranges && <p className="muted small">{t("team.sectors.placeHint")}</p>}
@@ -214,15 +216,17 @@ function SectorCard({
       aria-label={group.name}
       {...(arranges ? drag.zone(group.id) : {})}
     >
-      <header className="team-sector-card__head">
-        <SectorMark group={group} size={32} />
-        <span className="team-sector-card__title">
-          <h3>{group.name}</h3>
-          <span className="muted">
-            {t("team.people", { count: reach.people.length })} · {t("team.agents", { count: reach.agents.length })}
-          </span>
+      <header className="team-sector-card__head ac-mediarow">
+        <span className="ac-mediarow__face">
+          <SectorMark group={group} size={32} />
         </span>
-        {menu}
+        <div className="ac-mediarow__head team-sector-card__title">
+          <h3>{group.name}</h3>
+        </div>
+        {menu && <span className="ac-mediarow__end">{menu}</span>}
+        <span className="ac-mediarow__body muted">
+          {t("team.people", { count: reach.people.length })} · {t("team.agents", { count: reach.agents.length })}
+        </span>
       </header>
       <dl className="team-sector-card__rows">
         <dt>{t("team.sectors.leadLabel")}</dt>

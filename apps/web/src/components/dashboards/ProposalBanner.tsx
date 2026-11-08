@@ -43,13 +43,17 @@ export function ProposalBanner({ board }: { board: Dashboard }) {
     );
   return (
     <section
-      className="db-proposal"
+      className="db-proposal ac-mediarow ac-mediarow--row"
       aria-label={t("dashboards.proposal.title", { name })}
       style={widgetTileVars(colorOf(agent), dark)}
     >
-      <AgentAvatar agentId={proposal.agentId} name={name} size="sm" />
-      <div className="db-proposal__text">
+      <span className="ac-mediarow__face">
+        <AgentAvatar agentId={proposal.agentId} name={name} size="sm" />
+      </span>
+      <span className="ac-mediarow__head">
         <b>{t("dashboards.proposal.title", { name })}</b>
+      </span>
+      <div className="ac-mediarow__body db-proposal__text">
         <span>
           {proposal.audience === "workspace"
             ? t("dashboards.proposal.workspace")
@@ -58,7 +62,7 @@ export function ProposalBanner({ board }: { board: Dashboard }) {
         {proposal.why && <span className="db-proposal__why">{proposal.why}</span>}
       </div>
       {proposal.canDecide && (
-        <div className="db-proposal__acts">
+        <div className="db-proposal__acts ac-mediarow__end ac-mediarow__end--wrap">
           <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => run("keep")}>
             {t("dashboards.proposal.keep")}
           </Button>

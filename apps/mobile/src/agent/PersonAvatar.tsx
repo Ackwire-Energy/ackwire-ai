@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Image, Text as RNText, StyleSheet } from "react-native";
 import type { PhotoSource } from "@/lib/photo";
 import { useTheme } from "@/ui/theme";
+import { initialText } from "@/ui/type-scale";
 
 export interface PersonAvatarProps {
   name: string;
@@ -44,7 +45,7 @@ export function PersonAvatar({ name, size, photo }: PersonAvatarProps) {
     >
       <RNText
         allowFontScaling={false}
-        style={{ fontWeight: "600", fontSize: size * 0.42, color: dark ? "#efefec" : "#2a2a28" }}
+        style={{ ...initialText(size), fontWeight: "600", color: dark ? "#efefec" : "#2a2a28" }}
       >
         {initial}
       </RNText>

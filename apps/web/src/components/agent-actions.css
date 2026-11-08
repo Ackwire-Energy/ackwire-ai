@@ -5,7 +5,8 @@
  * corner, the same width), flat icons, the countdown in tabular figures. The sentence wraps, whole; the icon and the
  * button sit on its first line. Undone rows are struck through and dimmed.
  */
-.ag-rcs {
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .ag-rcs {
   margin-top: 8px;
 }
 /* Several rows of their own (team checks, ADR 0064): one under the other. */

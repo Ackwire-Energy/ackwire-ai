@@ -635,12 +635,16 @@ function AiAppImport({ orgId }: { orgId: string }) {
   };
   return (
     <>
-      <OptionCard pressed={open} onClick={() => setOpen(!open)} className="imp-aiapp">
-        <span className="imp-mark" aria-hidden="true">
-          <Icon name="agent" />
+      <OptionCard pressed={open} onClick={() => setOpen(!open)} className="imp-aiapp ac-mediarow">
+        <span className="ac-mediarow__face">
+          <span className="imp-mark" aria-hidden="true">
+            <Icon name="agent" />
+          </span>
         </span>
-        <span className="ac-option__text">
+        <span className="ac-mediarow__head">
           <span className="ac-option__title">{t("onboarding.import.aiApp.title")}</span>
+        </span>
+        <span className="ac-mediarow__body">
           <span className="ac-option__desc">{t("onboarding.import.aiApp.lead")}</span>
         </span>
       </OptionCard>
@@ -795,21 +799,27 @@ function Preview({
 
   return (
     <section className="imp-preview" aria-labelledby="imp-preview-title">
-      <header className="imp-head ac-actrow">
-        <SourceMark card={origin.card} />
-        <div className="imp-head__text ac-actrow__text">
+      <header className="imp-head ac-mediarow">
+        <span className="ac-mediarow__face">
+          <SourceMark card={origin.card} />
+        </span>
+        <div className="ac-mediarow__head">
           <Heading level={level} id="imp-preview-title" ref={heading} tabIndex={-1} className="imp-head__title">
             {bundle.source.name}
           </Heading>
+        </div>
+        <span className="ac-mediarow__end">
+          <Button variant="ghost" size="sm" onClick={flow.reset} disabled={applying}>
+            {t("onboarding.import.change")}
+          </Button>
+        </span>
+        <div className="ac-mediarow__body">
           <p className="imp-head__sub">
             {[origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther"), summary]
               .filter(Boolean)
               .join(" · ")}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={flow.reset} disabled={applying}>
-          {t("onboarding.import.change")}
-        </Button>
       </header>
       {bundle.source.ref === `agenteschat:${orgId}` && (
         <Alert tone="neutral">{t("onboarding.import.sameWorkspace")}</Alert>
@@ -1352,16 +1362,20 @@ export function ImportReport({
 
   return (
     <section className="imp-report" aria-labelledby="imp-report-title">
-      <header className="imp-head ac-actrow">
-        <span className="imp-mark imp-mark--done" aria-hidden="true">
-          <Icon name={missed.length ? "alert" : "check"} />
+      <header className="imp-head ac-mediarow">
+        <span className="ac-mediarow__face">
+          <span className="imp-mark imp-mark--done" aria-hidden="true">
+            <Icon name={missed.length ? "alert" : "check"} />
+          </span>
         </span>
-        <div className="imp-head__text ac-actrow__text">
+        <div className="ac-mediarow__head">
           <Heading level={level} id="imp-report-title" ref={heading} tabIndex={-1} className="imp-head__title">
             {missed.length
               ? t("onboarding.import.report.partial", { done: report.length - missed.length, total: report.length })
               : t("onboarding.import.report.title")}
           </Heading>
+        </div>
+        <div className="ac-mediarow__body">
           <p className="imp-head__sub">{bundle.source.name}</p>
         </div>
       </header>
@@ -1371,28 +1385,29 @@ export function ImportReport({
           const list = made.filter((i) => i.kind === kind);
           if (list.length === 0) return null;
           return (
-            <li key={kind}>
-              <span className="imp-made__icon" aria-hidden="true">
-                <Icon name={KIND_ICON[kind]} size={16} />
+            <li key={kind} className="ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <span className="imp-made__icon" aria-hidden="true">
+                  <Icon name={KIND_ICON[kind]} size={16} />
+                </span>
               </span>
-              <span className="imp-made__text">
+              <span className="ac-mediarow__head">
                 <b>{t(`onboarding.import.report.kinds.${kind}`, { count: list.length })}</b>
-                <span className="imp-made__links">{links(kind, list)}</span>
               </span>
+              <span className="ac-mediarow__body imp-made__links">{links(kind, list)}</span>
             </li>
           );
         })}
         {copy && (
-          <li>
-            <span className="imp-made__icon" aria-hidden="true">
-              <Icon name="drive" size={16} />
+          <li className="ac-mediarow ac-mediarow--row">
+            <span className="ac-mediarow__face">
+              <span className="imp-made__icon" aria-hidden="true">
+                <Icon name="drive" size={16} />
+              </span>
             </span>
-            <span className="imp-made__text">
+            <span className="ac-mediarow__head">
               {copy.running ? (
-                <>
-                  <b role="status">{t("onboarding.import.files.copying", { done: copy.done, total: copy.total })}</b>
-                  <span>{t("onboarding.import.files.keepOpen")}</span>
-                </>
+                <b role="status">{t("onboarding.import.files.copying", { done: copy.done, total: copy.total })}</b>
               ) : (
                 <b role="status">
                   {copy.result?.copied
@@ -1400,6 +1415,9 @@ export function ImportReport({
                     : t("onboarding.import.files.none")}
                 </b>
               )}
+            </span>
+            <span className="ac-mediarow__body">
+              {copy.running && <span>{t("onboarding.import.files.keepOpen")}</span>}
               <span className="imp-made__links">
                 {[...(copy.result?.folders ?? [])].map(([key, folder]) => {
                   const id = flow.agentIds.get(key);

@@ -262,10 +262,15 @@ export function MissionHead({
 }) {
   const parts = meta.filter(Boolean);
   return (
-    <div className="mi-head">
-      <AgentAvatar agentId={agentId} name={agentName} size="md" running={running} />
-      <div className="mi-head__t">
+    <div className="mi-head ac-mediarow">
+      <span className="ac-mediarow__face">
+        <AgentAvatar agentId={agentId} name={agentName} size="md" running={running} />
+      </span>
+      <div className="ac-mediarow__head mi-head__t">
         <h3>{title}</h3>
+      </div>
+      {right && <div className="mi-head__r ac-mediarow__end ac-mediarow__end--wrap">{right}</div>}
+      <div className="ac-mediarow__body">
         {parts.length > 0 && (
           <p className="mi-head__meta">
             {parts.map((part, i) => (
@@ -282,7 +287,6 @@ export function MissionHead({
           </p>
         )}
       </div>
-      {right && <div className="mi-head__r">{right}</div>}
     </div>
   );
 }

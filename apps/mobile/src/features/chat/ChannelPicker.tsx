@@ -3,7 +3,7 @@ import { channelOptions } from "@agenteschat/client/lib/channel-refs";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { Icon, Text, useTheme } from "@/ui";
+import { Icon, OPTION_ROW, Text, useTheme } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 
 /**
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     gap: GAP,
     paddingVertical: 8,
     paddingHorizontal: INSET,
-    minHeight: 48,
+    minHeight: OPTION_ROW.height,
   },
   divider: { position: "absolute", top: 0, left: INSET + MARK + GAP, right: 0, height: StyleSheet.hairlineWidth },
   tx: { flex: 1, minWidth: 0 },

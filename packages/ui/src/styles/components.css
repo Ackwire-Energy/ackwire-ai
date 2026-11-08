@@ -181,6 +181,12 @@ html[data-pointer] :focus-visible {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* A glyph inside a line of words (after a name, in a sentence): its middle on the words' capitals' middle, as an inline
+   face's (`.ac-who > .ac-avatar`). An inline box sits on the baseline, which floats a glyph above the capitals.
+   `--glyph` is its size (`Icon inline` sets it). */
+.ac-icon--inline {
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--glyph, 20px) / 2);
+}
 
 /*
  * A line of text led by an icon (or a mark, a spinner, a stack of logos): the lead's middle sits on the first line's
@@ -212,10 +218,11 @@ html[data-pointer] :focus-visible {
 }
 
 /*
- * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two or more lines: the first line's
- * capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes on the box that holds the
- * first line (block-level, in that line's font size and line height): it rises by the air above its capitals. One
- * line beside a picture centres on it instead (`.ac-iconline`).
+ * A picture more than 1.25 lines tall (a face, a logo tile, a portrait) beside two lines at most (a name and one line
+ * under it): the first line's capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes
+ * on the box that holds the first line (block-level, in that line's font size and line height): it rises by the air
+ * above its capitals. One line beside a picture centres on it instead (`.ac-iconline`). Three lines or more beside a
+ * picture are a MediaRow (at the end of this file): a face never owns a column while the words beside it are squeezed.
  */
 .ac-faceline {
   display: flex;
@@ -498,6 +505,13 @@ html:not([data-pointer]) .ac-link:focus-visible {
    each side of a small note). A class with margins of its own keeps them. */
 :where(.ac-form, .ac-field, .ac-dialog__body, .ac-card, .ac-details__section) > :where(p, ul, ol) {
   margin-block: 0;
+}
+/* A field's control fills its stack: every control in a form is as wide as the form. A button that shows a value is
+   drawn as a select (`.ac-select__trigger`), never a plain button dropped into a field. */
+.ac-field > :is(.ac-select, .ac-select__trigger, .ac-input, .ac-input-affix, .ac-seg, textarea) {
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
 }
 .ac-form__actions {
   display: flex;
@@ -946,6 +960,17 @@ textarea.ac-input {
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
+}
+/* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
+   (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
+   capitals' middle sits --cap-mid above the line's. */
+.ac-avatar__initials {
+  text-box: trim-both cap alphabetic;
+}
+@supports not (text-box: trim-both cap alphabetic) {
+  .ac-avatar__initials {
+    translate: 0 var(--cap-mid);
+  }
 }
 .ac-avatar--agent {
   background: var(--agent);
@@ -1663,10 +1688,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 18px;
   color: var(--ink2);
 }
+/* The mark on the sentence's first line's capitals and the time on its baseline, however the sentence wraps: never
+   floating in the middle of two lines. */
 .ac-eventpill__main {
   display: inline-flex;
   flex: 1 1 auto;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--icon-gap);
   min-width: 0;
   padding: 6px 12px;
@@ -1675,12 +1702,21 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   display: inline-flex;
   flex: none;
   color: var(--faint);
+  /* Browsers without the lh unit: the frame's 18px line. */
+  translate: 0 calc(9px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-eventpill__mark {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-eventpill__text {
+  align-self: baseline;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .ac-eventpill__time {
+  align-self: baseline;
   flex: none;
   font-size: 12px;
   color: var(--faint);
@@ -1957,6 +1993,32 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The chosen option's lead before its name, as the list draws it smaller: a person's or an agent's face (20, 8 from
+   the trigger's edge and 8 before the name), a maker's logo or an icon (16). */
+.ac-select__value > span:has(> .ac-select__lead) {
+  gap: var(--space-2);
+}
+/* A lead taller than the value's line (a face, a stack of faces) shows whole: the name cuts itself (`.ac-select__text`). */
+.ac-select__value:has(> span > .ac-select__lead) {
+  overflow: visible;
+}
+.ac-select__lead {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.ac-select__lead > .ac-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+.ac-select__lead .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.ac-select__trigger:has(.ac-select__lead > .ac-avatar) {
+  padding-inline-start: var(--space-2);
+}
 .ac-select__trigger[data-placeholder] .ac-select__value {
   color: var(--ink-muted);
 }
@@ -1992,6 +2054,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   --menu-item-h: 28px;
   --menu-item-px: 8px;
   --menu-pad: var(--space-1);
+}
+/* A row led by a face (OptionRow, below): the face, and the row around it, 44 on touch. */
+:root {
+  --option-face: 24px;
+  --option-h: 36px;
 }
 .ac-menu {
   z-index: var(--z-floating);
@@ -2152,6 +2219,11 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item[data-state="checked"] .ac-menu__check {
   visibility: visible;
 }
+/* On a one-line row's name, in its middle as the name is, however tall the lead beside them (a logo's tile). */
+.ac-menu__item:not(:has(> .ac-menu__label > .ac-menu__desc)) > .ac-menu__check {
+  align-self: center;
+  margin-top: 0;
+}
 .ac-menu__label {
   display: flex;
   flex-direction: column;
@@ -2199,30 +2271,6 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
-/*
- * People and agents in a picker ("Responsável", an agent to ask): their face as the channel's members column draws it
- * (32px), centred on the name and the line under it, and more air between the rows than a list of words has (every
- * row of that list, so a row with an icon tile instead lines up with the faces).
- */
-.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__item {
-  gap: var(--space-3);
-  padding-block: var(--space-2);
-}
-.ac-menu--select .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-avatar) {
-  align-self: center;
-  translate: none;
-}
-.ac-menu--select .ac-menu__leading > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: var(--text-sm);
-}
-/* The empty choice ("Sem responsável", any agent) leads with a glyph: in the middle of the faces' 32px column, so its
-   name starts where theirs do. */
-.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__leading:has(> .ac-icon) {
-  justify-content: center;
-  width: 32px;
-}
 /* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
   padding-block: var(--menu-item-px);
@@ -2238,6 +2286,53 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   font-weight: 400;
   color: var(--ink-muted);
   white-space: normal;
+}
+/*
+ * OptionRow: a list with people or agents in it (a select's, a menu's, the mentions', search's, the palette's). The
+ * face is 24, 6 from the row's top and bottom (10 on touch) and 8 from its start, so it never touches the highlight,
+ * which is the whole row, in the list's own concentric corner. The name, then the muted role on the same line, the
+ * check at the end. Every row of that list takes the same room and a lead as wide as a face (the glyph of "Sem
+ * responsável" too), so every option is one size: a long description goes behind the option's ⓘ (`hint`), never on a
+ * second line.
+ */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item {
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--option-h);
+  padding: calc((var(--option-h) - var(--option-face)) / 2) var(--menu-item-px);
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item > .ac-menu__leading {
+  align-self: center;
+  justify-content: center;
+  min-width: var(--option-face);
+  translate: none;
+}
+/* A row of that list led by a bare glyph (another group's, an action's): in the middle of a face's width, so its name
+   starts where the faces' names do. */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item > .ac-icon:first-child {
+  margin-inline: calc((var(--option-face) - 16px) / 2);
+}
+:is(.ac-menu, .ac-palette__list) .ac-menu__leading > .ac-avatar {
+  width: var(--option-face);
+  height: var(--option-face);
+  font-size: 11px;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item :is(.ac-icon, .ac-menu__check) {
+  margin-top: 0;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label {
+  flex-direction: row;
+  align-items: baseline;
+  column-gap: 0.4em;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__label > :first-child {
+  flex: none;
+}
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__desc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ac-menu__heading {
   padding: 6px var(--menu-item-px) 2px;
@@ -5520,11 +5615,26 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-card__foot > .ac-icon {
   color: var(--faint);
 }
+/* Its words take the line, so an action among them can reach its end. */
+.ac-card__foot > span {
+  flex: 1;
+  min-width: 0;
+}
 .ac-list {
   border: 0;
   border-radius: var(--radius-lg);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
+}
+/* The list clips its rows at its rounded corners: its first and last rows take them, so a row's ring there (focus)
+   is drawn whole, not cut square. */
+.ac-list > .ac-list__row:first-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.ac-list > .ac-list__row:last-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 
 /*
@@ -9112,6 +9222,15 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-filter__option[aria-selected="true"] .ac-filter__label {
   font-weight: 600;
 }
+/* A filter with people or agents in it is an OptionRow list: every row the faces' room around them (6, 10 on touch). */
+.ac-filter__list:has(.ac-filter__option > .ac-avatar) .ac-filter__option {
+  min-height: var(--option-h);
+  padding-block: calc((var(--option-h) - var(--option-face)) / 2);
+}
+.ac-filter__option > .ac-avatar {
+  width: var(--option-face);
+  height: var(--option-face);
+}
 .ac-filter__label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9339,6 +9458,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   }
   :root {
     --menu-item-h: 40px;
+    --option-h: 44px;
   }
   .ac-menu__reaction {
     width: 40px;
@@ -10791,8 +10911,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
  * and "Ver em português"): side by side while the words keep a line of 24 characters (or all of them, when shorter),
  * else the action goes under them, at the row's end. The words never wrap a word a line. The row is `.ac-actrow`, its
  * words `.ac-actrow__text`, what follows them its action; a lead icon before them stays on their first line. Mirrored
- * by the phone app's `ACT_ROW` and the landing's copy of this file. Last in the file, so it wins over a component's
- * own rules for the same boxes.
+ * by the phone app's `ACT_ROW` and the landing's copy of this file. After every component's rules but MediaRow's, so
+ * it wins over a component's own rules for the same boxes.
  */
 .ac-actrow {
   display: flex;
@@ -10808,4 +10928,122 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-actrow > .ac-actrow__text + * {
   margin-inline-start: auto;
+}
+
+/*
+ * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else
+ * (the text, chips, actions) under them at the row's full width, never in a column beside the face. Classes, not a
+ * component: the row is whatever its markup is (a button, a link, an `li`, a label).
+ *   .ac-mediarow > .ac-mediarow__face, .ac-mediarow__head (<b>name</b> <span .ac-mediarow__meta>role</span>),
+ *   .ac-mediarow__end (on the name's line, at its end), .ac-mediarow__body (under, full width).
+ * `__end--wrap` drops what ends the head under the body, at its start, when the box holding the rows (with
+ * `container-type: inline-size`: a card, a list) is under 480px: a thread or a side panel counts as narrow. A task's
+ * number sits inline before its title, in the title's own words (`.ac-mediarow__num`), never in a column.
+ */
+/* Last in the file: on a row it is mixed with (an `.ac-list__row`, an option) its grid wins at the same weight. The
+   name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
+   (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
+.ac-mediarow {
+  --mediarow-face: 32px;
+  /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
+  --mediarow-axis: var(--mediarow-face);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+}
+.ac-mediarow--row {
+  --mediarow-face: 24px;
+  column-gap: var(--space-2);
+}
+/* A button with its plate, a select or a segmented control ending the name's line: the line's axis is its middle, so it
+   keeps the row's padding above and below (a small button grows to 40 on touch). */
+.ac-mediarow:has(> .ac-mediarow__end :is(.ac-btn--sm:not(.ac-btn--ghost), .ac-select, .ac-seg)) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
+}
+.ac-mediarow:has(> .ac-mediarow__end .ac-btn:not(.ac-btn--sm, .ac-btn--ghost)) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
+}
+@media (pointer: coarse) {
+  .ac-mediarow:has(> .ac-mediarow__end .ac-btn--sm:not(.ac-btn--ghost)) {
+    --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
+  }
+}
+/* As wide and tall as a face at least, so a glyph in a face's place (a check, an icon) keeps the names in line. */
+.ac-mediarow__face {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--mediarow-face);
+  height: var(--mediarow-face);
+  margin-block-start: calc((var(--mediarow-axis) - var(--mediarow-face)) / 2);
+}
+/* Whatever leads it (a face, a role's mark, a maker's tile) takes the face's size; a glyph keeps its own. */
+.ac-mediarow > .ac-mediarow__face > :not(svg) {
+  width: var(--mediarow-face);
+  height: var(--mediarow-face);
+}
+.ac-mediarow__head {
+  grid-area: 1 / 2;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4em;
+  padding-block-start: max(0px, calc((var(--mediarow-axis) - 20px) / 2));
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.ac-mediarow__head > b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-mediarow__meta,
+.ac-mediarow__num {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+.ac-mediarow__num {
+  font-variant-numeric: tabular-nums;
+}
+.ac-mediarow__end {
+  grid-area: 1 / 3;
+  display: flex;
+  align-items: center;
+  column-gap: var(--space-2);
+  height: var(--mediarow-axis);
+}
+/* A row of actions keeps its own gap (`.ac-acts`: its ghosts' words as far apart as two boxes). */
+.ac-mediarow__end.ac-acts {
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.ac-mediarow__body {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* Nothing under the name's line: no row, no gap. */
+.ac-mediarow__body:empty {
+  display: none;
+}
+@container (max-width: 479px) {
+  .ac-mediarow__end--wrap {
+    grid-area: auto / 1 / auto / -1;
+    order: 1;
+    justify-self: start;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    max-width: 100%;
+    height: auto;
+  }
+  /* Its control left the name's line: the face's middle is that line's axis again. */
+  .ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head) {
+    --mediarow-axis: var(--mediarow-face);
+  }
 }

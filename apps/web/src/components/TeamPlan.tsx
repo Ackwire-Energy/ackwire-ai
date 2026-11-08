@@ -161,16 +161,15 @@ export function TeamPlanBody({
     <div className="tp-body">
       <ul className="tp-agents">
         {plan.agents.map((a) => (
-          <li key={a.handle} className="tp-agent">
-            <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
-            <span className="tp-agent__text">
-              <span>
-                <b>{a.name}</b> <span className="muted">{a.role}</span>
-              </span>
-              <span className="tp-agent__line">{a.line}</span>
+          <li key={a.handle} className="tp-agent ac-mediarow">
+            <span className="ac-mediarow__face">
+              <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
             </span>
-            {/* On the name's line, whatever the description's length. */}
-            <span className="tp-agent__tail">
+            <span className="ac-mediarow__head">
+              <b>{a.name}</b>
+              <span className="ac-mediarow__meta">{a.role}</span>
+            </span>
+            <span className="ac-mediarow__end ac-mediarow__end--wrap">
               <span className="tp-pill">
                 <Icon name="channel" size={14} />
                 <span>{a.channel}</span>
@@ -187,6 +186,9 @@ export function TeamPlanBody({
                   {t("teamPlan.card.adjust")}
                 </Button>
               )}
+            </span>
+            <span className="ac-mediarow__body">
+              <span className="tp-agent__line">{a.line}</span>
             </span>
           </li>
         ))}
@@ -460,14 +462,14 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
           <>
             <ul className="tp-agents">
               {tasks.map((f) => (
-                <li key={f.agentId} className="tp-agent">
-                  <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
-                  <span className="tp-agent__text">
-                    <b>{f.name}</b>
-                    <span className="tp-agent__line">{f.task}</span>
+                <li key={f.agentId} className="tp-agent ac-mediarow">
+                  <span className="ac-mediarow__face">
+                    <AgentAvatar agentId={f.agentId} name={f.name} size="md" />
                   </span>
-                  {/* On the name's line, as on the team card's rows, however long the task runs. */}
-                  <span className="tp-agent__tail">
+                  <span className="ac-mediarow__head">
+                    <b>{f.name}</b>
+                  </span>
+                  <span className="ac-mediarow__end ac-mediarow__end--wrap">
                     <Button
                       size="sm"
                       onClick={() => {
@@ -482,6 +484,9 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
                       {t("teamPlan.firstTask.open")}
                     </Button>
                   </span>
+                  <span className="ac-mediarow__body">
+                    <span className="tp-agent__line">{f.task}</span>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -490,9 +495,14 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
                 <figcaption className="small muted">
                   {t("teamPlan.firstTask.example", { name: tasks[0].name })}
                 </figcaption>
-                <span className="tp-example__message">
-                  <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
-                  <span>{example}</span>
+                <span className="tp-example__message ac-mediarow ac-mediarow--row">
+                  <span className="ac-mediarow__face">
+                    <AgentAvatar agentId={tasks[0].agentId} name={tasks[0].name} size="sm" />
+                  </span>
+                  <span className="ac-mediarow__head">
+                    <b>{tasks[0].name}</b>
+                  </span>
+                  <span className="ac-mediarow__body">{example}</span>
                 </span>
               </figure>
             )}
@@ -643,9 +653,9 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
               </h4>
               {col.agents.map((a) => (
                 <div key={a.handle} className="tp-map__agent">
-                  <span className="ac-faceline">
+                  <span className="ac-iconline">
                     <AgentAvatar name={a.name} appearance={lookOf(a)} size="sm" />
-                    <span className="ac-captop">
+                    <span>
                       <b>{a.name}</b> <span className="small muted">{a.role}</span>
                     </span>
                   </span>
@@ -661,9 +671,9 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
           ))}
         </div>
         {plan.weekly && lodi && (
-          <p className="tp-map__lodi ac-faceline">
+          <p className="tp-map__lodi ac-iconline">
             <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-            <span className="ac-captop">{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
+            <span>{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
           </p>
         )}
         {plan.approvals && (

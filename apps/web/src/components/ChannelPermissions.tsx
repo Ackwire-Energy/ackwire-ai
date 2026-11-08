@@ -110,7 +110,7 @@ export function ChannelPermissions({ channelId }: { channelId: string }) {
         value: `role:${r.id}`,
         label: r.name,
         group: t("channel.perms.groupRoles"),
-        leading: <RoleMark color={r.color} icon={r.icon} size={18} />,
+        leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
         disabled: !r.givable,
       })),
     ...dir.members
@@ -120,7 +120,7 @@ export function ChannelPermissions({ channelId }: { channelId: string }) {
         label: m.name,
         description: m.email,
         group: t("channel.perms.groupPeople"),
-        leading: <Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />,
+        leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
       })),
   ];
   return (

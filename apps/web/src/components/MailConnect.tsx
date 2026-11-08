@@ -932,10 +932,12 @@ export function MailRow({
     relativeTime(t, i18n.language, account.createdAt),
   ];
   return (
-    <div className="ac-list__row connected-row">
-      <MailIcon choice={choice} size="lg" />
-      <span className="list-col connected-row__text">
-        <span className="list-title ac-captop">
+    <div className="ac-list__row connected-row ac-mediarow">
+      <span className="ac-mediarow__face">
+        <MailIcon choice={choice} />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span>{mailChoiceName(t, choice)}</span>
           {account.status === "needs_reconnect" ? (
             <Chip icon="alert" tone="waiting">
@@ -951,46 +953,53 @@ export function MailRow({
             </Chip>
           )}
         </span>
+      </span>
+      <div className="ac-mediarow__body">
         <span className="small muted">{meta.join(" · ")}</span>
-      </span>
-      <span className="connected-row__who small muted">
-        {using.length > 0 && (
-          <AvatarStack>
-            {using.slice(0, 5).map((a) => (
-              <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
-            ))}
-          </AvatarStack>
-        )}
-        {using.length > 0
-          ? t("connectors.usedBy", { count: using.length, total: agents.length })
-          : t("connectors.usedByNone")}
-      </span>
-      {admin && (
-        <div className="connected-row__actions">
-          {account.status === "needs_reconnect" && (
-            <Button size="sm" variant="primary" aria-label={t("mail.reconnectName", { name })} onClick={onReconnect}>
-              {t("mail.reconnect")}
-            </Button>
+        <span className="connected-row__who small muted">
+          {using.length > 0 && (
+            <AvatarStack>
+              {using.slice(0, 5).map((a) => (
+                <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
+              ))}
+            </AvatarStack>
           )}
-          <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
-            {t("connectors.who")}
-          </Button>
-          <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
-            {t("connectors.tools")}
-          </Button>
-          <Button size="sm" variant="ghost" aria-label={t("mail.addresses.buttonName", { name })} onClick={onAddresses}>
-            {t("mail.addresses.button")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("connectors.disconnectName", { name })}
-            onClick={onDisconnect}
-          >
-            {t("connectors.disconnect")}
-          </Button>
-        </div>
-      )}
+          {using.length > 0
+            ? t("connectors.usedBy", { count: using.length, total: agents.length })
+            : t("connectors.usedByNone")}
+        </span>
+        {admin && (
+          <div className="connected-row__actions">
+            {account.status === "needs_reconnect" && (
+              <Button size="sm" variant="primary" aria-label={t("mail.reconnectName", { name })} onClick={onReconnect}>
+                {t("mail.reconnect")}
+              </Button>
+            )}
+            <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
+              {t("connectors.who")}
+            </Button>
+            <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
+              {t("connectors.tools")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("mail.addresses.buttonName", { name })}
+              onClick={onAddresses}
+            >
+              {t("mail.addresses.button")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("connectors.disconnectName", { name })}
+              onClick={onDisconnect}
+            >
+              {t("connectors.disconnect")}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

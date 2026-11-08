@@ -687,9 +687,11 @@ export const MessageRow = memo(function MessageRow({
             {when.time(m.createdAt)}
           </Text>
         ) : null}
-        <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
-          {grouped ? null : <Face who={m.author} size={compact ? 18 : bubbled ? 30 : 34} live={false} />}
-        </View>
+        {look.faces ? (
+          <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
+            {grouped ? null : <Face who={m.author} size={compact ? 18 : bubbled ? 30 : 34} live={false} />}
+          </View>
+        ) : null}
         <View style={[styles.body, { gap: rhythm.part }]}>
           <RowPartContext.Provider value={cardTop}>
             {nameOrWords ? (

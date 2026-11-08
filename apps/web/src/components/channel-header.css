@@ -51,6 +51,13 @@
   align-items: center;
   gap: 14px;
 }
+@media (max-width: 760px) {
+  /* Its buttons all show their plates: the header's own 8px between them, as in a DM, leaves the title its room
+     (the touch row's 24px gap left "# lancamento" 6px wide at 360). */
+  .channel__header > .channel__acts {
+    column-gap: 8px;
+  }
+}
 /* No plate on hover, pressed or open: the icon's own color says it, as Discord's header does. */
 /* Each box is a square that reaches 7px into the gap on both sides, so 14px of gap reads as the glyphs' own air: one
    glyph every 26px. Its target keeps the header's 40px height (`::after`). */

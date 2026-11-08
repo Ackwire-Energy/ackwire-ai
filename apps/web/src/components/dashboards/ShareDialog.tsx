@@ -99,13 +99,15 @@ function ShareBody({ board, onClose }: { board: DashboardSummary; onClose: () =>
                 );
                 const line = m.role === "owner" ? t("dashboards.share.owner") : roleNames(roles, m.roleIds ?? []);
                 return (
-                  <li key={m.userId} data-on={access !== "none"}>
-                    <PersonAvatar id={m.userId} name={m.name} size="sm" />
-                    <span className="db-people__who">
-                      <b>{m.userId === me.user.id ? t("dashboards.share.you", { name: m.name }) : m.name}</b>
-                      {line && <small>{line}</small>}
+                  <li key={m.userId} className="ac-mediarow ac-mediarow--row" data-on={access !== "none"}>
+                    <span className="ac-mediarow__face">
+                      <PersonAvatar id={m.userId} name={m.name} size="sm" />
                     </span>
-                    <span className="db-people__can">{t(`dashboards.share.${access}`)}</span>
+                    <span className="ac-mediarow__head">
+                      <b>{m.userId === me.user.id ? t("dashboards.share.you", { name: m.name }) : m.name}</b>
+                      {line && <span className="ac-mediarow__meta">{line}</span>}
+                    </span>
+                    <span className="ac-mediarow__end db-people__can">{t(`dashboards.share.${access}`)}</span>
                   </li>
                 );
               })}

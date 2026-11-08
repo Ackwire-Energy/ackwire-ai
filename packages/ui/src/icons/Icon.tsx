@@ -1,4 +1,4 @@
-import { createElement, type SVGProps } from "react";
+import { type CSSProperties, createElement, type SVGProps } from "react";
 import { PixelSpinner } from "../components/PixelSpinner";
 import { cx } from "../cx";
 import { extraIcons } from "./extra";
@@ -22,6 +22,8 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   size?: 14 | 16 | 18 | 20;
   /** Accessible name. Without it the icon is decorative (`aria-hidden`). */
   label?: string;
+  /** In a line of words (after a name, inside a sentence): its middle on the words' capitals' middle. */
+  inline?: boolean;
 }
 
 /**
@@ -30,15 +32,16 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
  * buttons): the pixel orbit (`PixelSpinner`) in the text's color, never a
  * generic ring. Pass an agent's color with `PixelSpinner` itself.
  */
-export function Icon({ name, size = 20, label, className, style, ...rest }: IconProps) {
+export function Icon({ name, size = 20, label, inline, className, style, ...rest }: IconProps) {
   if (name === "spinner") {
     return <PixelSpinner size={size === 14 ? 14 : 16} label={label} className={cx("ac-icon--orbit", className)} />;
   }
+  const sized = size === 20 ? style : { width: size, height: size, ...style };
   return (
     <svg
       viewBox="0 0 20 20"
-      className={cx("ac-icon", className)}
-      style={size === 20 ? style : { width: size, height: size, ...style }}
+      className={cx("ac-icon", inline && "ac-icon--inline", className)}
+      style={inline ? ({ "--glyph": `${size}px`, ...sized } as CSSProperties) : sized}
       aria-hidden={label ? undefined : true}
       role={label ? "img" : undefined}
       aria-label={label}

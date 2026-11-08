@@ -143,7 +143,7 @@ export function CommandPalette({
                       onClick={() => choose(item)}
                       onKeyDown={() => {}}
                     >
-                      <span className="ac-palette__mark">{item.mark}</span>
+                      <span className="ac-menu__leading ac-palette__mark">{item.mark}</span>
                       <span className="ac-palette__label">{item.label}</span>
                       {item.sub && <span className="ac-palette__sub">{item.sub}</span>}
                       {i === current && <Kbd className="ac-palette__enter">↵</Kbd>}

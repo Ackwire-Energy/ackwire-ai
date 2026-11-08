@@ -414,13 +414,15 @@ describe("the pinned bar under the channel header", () => {
     await settle(2);
     const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
     const rows = [...list.querySelectorAll(".pins-pop__item")] as HTMLElement[];
-    expect(rows.map((row) => row.querySelector(".thread-pop__text b")?.textContent)).toEqual(["Ada", "João"]);
-    // The face at the usual 32px (no size class), the × inside the row's card.
+    expect(rows.map((row) => row.querySelector(".thread-pop__name b")?.textContent)).toEqual(["Ada", "João"]);
+    // A MediaRow: the face at 32px (no size class), the name and its time on one line, what it says under them; the ×
+    // inside the row's card.
+    expect(rows[0]?.querySelector(".thread-pop__row")?.classList.contains("ac-mediarow")).toBe(true);
     expect(rows[0]?.querySelector(".ac-avatar")?.className).not.toMatch(/ac-avatar--(xs|sm)/);
     expect(rows[0]?.querySelector("button[aria-label='Desafixar a mensagem de Ada']")?.parentElement).toBe(rows[0]);
     const css = await Bun.file(new URL("../src/components/threads/threads.css", import.meta.url).pathname).text();
     expect(css.split("\n.pins-pop__item:hover,")[1]?.split("}")[0]).toContain("background: var(--plate);");
-    expect(rows[0]?.querySelector(".thread-pop__text small")?.textContent).toContain("Achei a causa");
+    expect(rows[0]?.querySelector(".ac-mediarow__body.thread-pop__sub")?.textContent).toContain("Achei a causa");
     expect(rows[0]?.querySelector(".pins-pop__time")?.textContent).toBeTruthy();
 
     await act(async () => fireEvent.click(rows[1]?.querySelector(".thread-pop__row") as HTMLElement));

@@ -640,11 +640,11 @@ function Row({
     </span>
   ) : group ? (
     <span className="nt-stk">
-      <Face actor={first} dir={dir} size="sm" className="nt-av22" />
+      <Face actor={first} dir={dir} size="sm" className="nt-av20" />
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
   ) : first ? (
-    <Face actor={first} dir={dir} className="nt-av28" name={joiner} />
+    <Face actor={first} dir={dir} className="nt-av24" name={joiner} />
   ) : (
     <SystemFace n={n} />
   );
@@ -695,11 +695,13 @@ function Row({
     : "";
   const agentColor = first?.type === "agent" ? colorOf(dir.anyAgent(first.id)) : undefined;
   const channel = channelOf(n);
+  const statusMove = n.kind === "issue_status" && (l.statusFrom || l.statusTo);
+  const tags = !reaction && (sourceOf(t, n, channelName) || statusMove);
   return (
     // biome-ignore lint/a11y/useSemanticElements: a row of the inbox, not a fieldset
     <div
       className={cx(
-        "nt-item",
+        "nt-item ac-mediarow ac-mediarow--row",
         reaction && "nt-item--rx",
         unread && "is-unread",
         s.cur && "is-cur",
@@ -717,24 +719,24 @@ function Row({
       onAuxClick={(e) => clickRow(e, n, h)}
       onKeyDown={() => {}}
     >
-      <span className="nt-who">{face}</span>
-      <div className="nt-c">
-        <div className="nt-l1">
-          <span className="nt-what">
-            <Headline n={n} dir={dir} channelName={channelName} />
+      <span className="ac-mediarow__face">{face}</span>
+      <span className="ac-mediarow__head">
+        <span className="nt-what">
+          <Headline n={n} dir={dir} channelName={channelName} />
+        </span>
+      </span>
+      <span className="ac-mediarow__end nt-tm">{whenText(t, i18n.language, n.updatedAt)}</span>
+      <div className="ac-mediarow__body">
+        {tags && (
+          <span className="nt-tags">
+            <SourceChip n={n} channelName={channelName} />
+            {statusMove && (
+              <Chip icon="arrowRight" className="nt-chip-ink">
+                {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
+              </Chip>
+            )}
           </span>
-          {!reaction && (
-            <span className="nt-tags">
-              <SourceChip n={n} channelName={channelName} />
-              {n.kind === "issue_status" && (l.statusFrom || l.statusTo) && (
-                <Chip icon="arrowRight" className="nt-chip-ink">
-                  {t("notifications.status", { from: statusName(t, l.statusFrom), to: statusName(t, l.statusTo) })}
-                </Chip>
-              )}
-            </span>
-          )}
-          <span className="nt-tm">{whenText(t, i18n.language, n.updatedAt)}</span>
-        </div>
+        )}
         {reaction ? (
           <>
             {l.quote && (
@@ -925,9 +927,9 @@ function WaitCard({
       ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
       : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   const face = first ? (
-    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av28" />
+    <Face actor={first} dir={dir} state={resolving ? "writing" : "waiting"} className="nt-av24" />
   ) : (
-    <SystemFace n={n} className="nt-av28" />
+    <SystemFace n={n} />
   );
   const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
   // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.

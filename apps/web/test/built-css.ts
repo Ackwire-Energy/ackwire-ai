@@ -23,7 +23,11 @@ export async function builtCss(...inputs: string[]) {
     .join("\n");
 }
 
-/** A stylesheet without its comments and its at-rule blocks (`@media`, `@supports`…): what applies at every width. */
+/**
+ * A stylesheet without its comments and its at-rule blocks (`@media`, `@supports`…): what applies at every width. A
+ * cascade layer's block (`@layer base { … }`: the kit and the app's base sheets) applies at every width, so it keeps
+ * what applies at every width inside it.
+ */
 export function topLevel(css: string) {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
   let out = "";
@@ -39,10 +43,13 @@ export function topLevel(css: string) {
       continue;
     }
     let depth = 0;
-    for (i = open; i < text.length; i++) {
-      if (text[i] === "{") depth++;
-      else if (text[i] === "}" && --depth === 0) break;
+    let end = open;
+    for (; end < text.length; end++) {
+      if (text[end] === "{") depth++;
+      else if (text[end] === "}" && --depth === 0) break;
     }
+    if (/^@layer\b/.test(text.slice(i, open))) out += topLevel(text.slice(open + 1, end));
+    i = end;
   }
   return out;
 }

@@ -22,13 +22,32 @@ test("Connect for it offers every plan the phone offers, ChatGPT's too, and its 
   expect(steps).toContain("options={PLAN_CHOICES.map((c) => ({");
 });
 
-test("Settings › Lodi: Sua IA opens Connect, the workspace's plan keeps Atende outras pessoas for whoever sets its AI", () => {
+test("Sua IA is one status: what answers me, by its logo and what it is to me, and its action; Lodi's settings drop it", () => {
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
-  // Each person's own AI (ADR 0137 §11), its plan by its maker's logo; back to the workspace's in one tap.
-  expect(screen).toContain("export function RightHandMine(");
-  expect(screen).toContain('leading: <ProviderLogo id={kind} size="sm" />');
-  expect(screen).toContain("openConnectAi({ agentId: agent.id })");
+  const profile = readFileSync(join(import.meta.dir, "../../src/features/agents/AgentProfileScreen.tsx"), "utf8");
+  // The four states come from the client's rule, as on the web (ADR 0137 §11).
+  expect(screen).toContain('const status = mineStatus(view, meId ?? "", platform);');
+  for (const kind of ["own", "key", "plan"]) expect(screen).toContain(`status.kind === "${kind}"`);
+  // A plan of mine or lent to me: its maker's logo, whose it is, Trocar, and back to the workspace's in one tap.
+  expect(screen).toContain('leading={<ProviderLogo id={status.brain} size="sm" />}');
+  expect(screen).toContain('t("rightHand.settings.mineOf", { owner: first(status.ownerId) })');
   expect(screen).toContain('{ scope: "mine", brain: "model" }');
+  // The workspace's key or plan answers me: what it is, and Usar meu plano.
+  expect(screen).toContain('sub={t("rightHand.settings.mineKey")}');
+  expect(screen).toContain('sub={t("rightHand.settings.minePlan")}');
+  expect(screen.match(/value=\{t\("rightHand\.settings\.useMine"\)\}/g)).toHaveLength(2);
+  // Nobody answers me: the call to connect my plan, and why it is mine alone behind the ⓘ, not a paragraph under it.
+  expect(screen).toContain('sub={t("rightHand.settings.mineNobody")}');
+  expect(screen).toContain('text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),');
+  expect(screen).not.toContain("rightHandFallback");
+  expect(screen).toContain("openConnectAi({ agentId: agent.id })");
+  // On the right hand's profile; Configurações › Lodi is the team's settings and drops it.
+  expect(profile).toContain("<RightHandMine agent={agent} />");
+  expect(screen.match(/<RightHandMine/g)).toBeNull();
+});
+
+test("Settings › Lodi: the workspace's plan keeps Atende outras pessoas for whoever sets its AI", () => {
+  const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
   // The workspace's AI is read and saved as such; the look opens from the row, with no "Mudar visual" on it.
   expect(screen).toContain('useAgentBrain(orgId, agent.id, true, false, "workspace")');
   expect(screen).toContain('{ scope: "workspace", ...input }');

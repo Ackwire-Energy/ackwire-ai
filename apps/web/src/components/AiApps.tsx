@@ -241,16 +241,20 @@ function AppRow({ app, onDisconnect }: { app: ConnectedApp; onDisconnect: () => 
   const { t, i18n } = useTranslation();
   const facts = appFacts(t, i18n.language, app);
   return (
-    <div className="ac-list__row app-row">
-      <AppMark app={app} />
-      <span className="list-col app-row__main">
-        <span className="list-title ac-captop">
+    <div className="ac-list__row app-row ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">
+        <AppMark app={app} />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span className="app-row__name">{app.name}</span>
           <AccessChip access={app.access} />
         </span>
-        <span className="small muted">{facts}</span>
       </span>
-      <RowMenu name={app.name} label={t("apps.disconnect")} onSelect={onDisconnect} />
+      <span className="ac-mediarow__end">
+        <RowMenu name={app.name} label={t("apps.disconnect")} onSelect={onDisconnect} />
+      </span>
+      <span className="ac-mediarow__body small muted">{facts}</span>
     </div>
   );
 }
@@ -259,18 +263,22 @@ function TokenRow({ token, onRevoke }: { token: PersonalToken; onRevoke: () => v
   const { t, i18n } = useTranslation();
   const facts = tokenFacts(t, i18n.language, token);
   return (
-    <div className="ac-list__row app-row">
-      <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
-        <Icon name="key" />
+    <div className="ac-list__row app-row ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">
+        <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
+          <Icon name="key" />
+        </span>
       </span>
-      <span className="list-col app-row__main">
-        <span className="list-title ac-captop">
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span className="app-row__name">{token.name}</span>
           <AccessChip access={token.access} />
         </span>
-        <span className="small muted">{facts}</span>
       </span>
-      <RowMenu name={token.name} label={t("apps.tokens.revoke")} onSelect={onRevoke} />
+      <span className="ac-mediarow__end">
+        <RowMenu name={token.name} label={t("apps.tokens.revoke")} onSelect={onRevoke} />
+      </span>
+      <span className="ac-mediarow__body small muted">{facts}</span>
     </div>
   );
 }
@@ -414,20 +422,24 @@ export function ConnectAppDialog({
                     <button
                       key={c.id}
                       type="button"
-                      className="apps-client"
+                      className="apps-client ac-mediarow ac-mediarow--row"
                       onClick={() => {
                         setClient(c.id);
                         setSince(Date.now());
                       }}
                     >
-                      <ClientMark mark={c.mark} />
-                      <span className="list-col">
-                        <span className="apps-client__name">{nameOf(c)}</span>
-                        <span className="small muted">
-                          {c.site ?? t(`apps.dialog.clientText.${c.kind ?? "other"}`)}
-                        </span>
+                      <span className="ac-mediarow__face">
+                        <ClientMark mark={c.mark} />
                       </span>
-                      <Icon name="chevronRight" size={16} className="apps-client__go" />
+                      <span className="ac-mediarow__head">
+                        <b className="apps-client__name">{nameOf(c)}</b>
+                      </span>
+                      <span className="ac-mediarow__end">
+                        <Icon name="chevronRight" size={16} className="apps-client__go" />
+                      </span>
+                      <span className="ac-mediarow__body small muted">
+                        {c.site ?? t(`apps.dialog.clientText.${c.kind ?? "other"}`)}
+                      </span>
                     </button>
                   ))}
                 </div>

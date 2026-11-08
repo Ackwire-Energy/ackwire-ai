@@ -40,6 +40,34 @@ export function rightHandFallback(
 }
 
 /**
+ * "Sua IA" as one status, web and phone alike: what answers the person in their own DM with the right hand. `own`: a
+ * plan of theirs or one shared with them (`ownerId` when it isn't theirs); `key`: the workspace's API key, or this
+ * server's own where the workspace has none (`label` absent); `plan`: the workspace's plan, which serves them;
+ * `nobody`: nothing does yet. Null while the view loads.
+ */
+export type MineStatus =
+  | { kind: "own"; brain: AgentBrain["brain"]; label?: string; ownerId?: string }
+  | { kind: "key"; label?: string; provider?: string }
+  | { kind: "plan"; brain: AgentBrain["brain"] }
+  | { kind: "nobody" };
+
+export function mineStatus(view: AgentBrain | undefined, meId: string, platform: boolean): MineStatus | null {
+  if (!view) return null;
+  if (view.brain !== "model") {
+    const signIn = view.accounts.find((a) => a.id === view.account);
+    const ownerId = signIn?.ownerId && signIn.ownerId !== meId ? signIn.ownerId : undefined;
+    return { kind: "own", brain: view.brain, label: signIn?.label, ownerId };
+  }
+  const ai = view.workspaceAi;
+  if (!ai) return { kind: "nobody" };
+  if (ai.brain === "model") {
+    if (ai.key) return { kind: "key", label: ai.key.label, provider: ai.key.provider };
+    return ai.key === null && !platform ? { kind: "nobody" } : { kind: "key" };
+  }
+  return ai.servesYou ? { kind: "plan", brain: ai.brain } : { kind: "nobody" };
+}
+
+/**
  * What a connect flow says once an AI is chosen. The team's right hand has two AIs, and the words say which moved:
  * the workspace's (everyone without a plan of their own) or the person's alone. Any other agent has one.
  */

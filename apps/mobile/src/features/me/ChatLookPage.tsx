@@ -9,6 +9,7 @@ import {
   type ChatTone,
   chatLookOf,
   DEFAULT_TEXT_SIZE,
+  facesShown,
   mineOnRight,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
@@ -19,6 +20,7 @@ import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, Segmented, Text, useTheme, useToast } from "@/ui";
+import { initialText } from "@/ui/type-scale";
 import { bubbleFill, CHAT_TEXT, CHAT_TEXT_MAX_SCALE, chatNameOf } from "../chat/logic";
 import { RowLookContext } from "../chat/look";
 import { MessageText } from "../chat/MessageText";
@@ -46,7 +48,7 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
   const name = line.mine ? dir.nameOf({ type: "person", id: meId }) : "Ada";
   const face = line.grouped ? null : line.mine ? (
     <View style={[styles.personFace, { backgroundColor: c.sunken }]}>
-      <Text variant="caption" tone="muted" style={styles.personLetter}>
+      <Text variant="caption" tone="muted" style={[styles.personLetter, PERSON_INITIAL]}>
         {name.slice(0, 1).toUpperCase()}
       </Text>
     </View>
@@ -65,11 +67,13 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
       </View>
     );
   const right = line.mine && mineOnRight(style);
+  // As the conversation draws it: a DM whose sides say who spoke has no face.
+  const faced = !right && facesShown(style, dm);
   if (style === "bubbles") {
     const fill = line.mine ? bubbleFill(dm ? SAMPLE_COLOR : "sky", tone, colors.bg, scheme === "dark") : c.bubble;
     return (
       <View style={[styles.row, right && styles.right]}>
-        {right ? null : <View style={styles.faceSlot}>{face}</View>}
+        {faced ? <View style={styles.faceSlot}>{face}</View> : null}
         <View style={[styles.bubble, { backgroundColor: fill }]}>
           <Text style={[styles.line, line.mine && tone === "strong" ? styles.onSolid : undefined]} numberOfLines={1}>
             {line.text}
@@ -90,7 +94,7 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
     );
   return (
     <View style={styles.row}>
-      <View style={styles.faceSlot}>{face}</View>
+      {faced ? <View style={styles.faceSlot}>{face}</View> : null}
       <View style={styles.flex}>
         {line.grouped ? null : (
           <Text style={styles.line} numberOfLines={1}>
@@ -158,7 +162,9 @@ function TextPreview({ size, style, tone, dm }: { size: ChatTextSize; style: Cha
   const meId = useMeId();
   const text = CHAT_TEXT[size];
   const fill = bubbleFill(dm ? SAMPLE_COLOR : "sky", tone, colors.bg, scheme === "dark");
-  const look = { style, tone, fill, names: !dm, text };
+  // As the conversation draws it: a DM whose sides say who spoke has no face.
+  const faces = facesShown(style, dm);
+  const look = { style, tone, fill, names: !dm, faces, text };
   const bubbled = style === "bubbles";
   const name = (who: string) => (
     <Text
@@ -181,7 +187,7 @@ function TextPreview({ size, style, tone, dm }: { size: ChatTextSize; style: Cha
         importantForAccessibility="no-hide-descendants"
       >
         <View style={styles.previewRow}>
-          <AgentAvatar agent={SAMPLE_AGENT} size={30} live={false} />
+          {faces ? <AgentAvatar agent={SAMPLE_AGENT} size={30} live={false} /> : null}
           {bubbled ? (
             <View style={[styles.previewBubble, { backgroundColor: c.bubble }]}>
               {dm ? null : name("Ada")}
@@ -201,7 +207,7 @@ function TextPreview({ size, style, tone, dm }: { size: ChatTextSize; style: Cha
         ) : (
           <View style={styles.previewRow}>
             <View style={[styles.previewFace, { backgroundColor: c.sunken }]}>
-              <Text variant="footnote" tone="muted" style={styles.bold}>
+              <Text variant="footnote" tone="muted" style={[styles.bold, PREVIEW_INITIAL]}>
                 {dir.nameOf({ type: "person", id: meId }).slice(0, 1).toUpperCase()}
               </Text>
             </View>
@@ -364,6 +370,11 @@ function UnreadLine() {
   );
 }
 
+/** The sample person's 18 tile: the initial centred in it. */
+const PERSON_INITIAL = initialText(18, 9);
+/** Tamanho do texto's person, a 30 tile: the initial centred in it, at the footnote's size. */
+const PREVIEW_INITIAL = initialText(30, 13);
+
 const styles = StyleSheet.create({
   gap: { height: 8 },
   pad: { paddingHorizontal: 16, paddingBottom: 8 },
@@ -380,7 +391,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   faceSlot: { width: 18 },
   personFace: { width: 18, height: 18, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  personLetter: { fontSize: 9, lineHeight: 12, fontWeight: "600" },
+  personLetter: { fontWeight: "600" },
   bubble: { maxWidth: "86%", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9 },
   line: { fontSize: 9.5, lineHeight: 13, flexShrink: 1 },
   onSolid: { color: "#ffffff" },

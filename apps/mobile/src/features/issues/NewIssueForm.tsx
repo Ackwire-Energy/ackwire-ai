@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, useToast } from "@/ui";
+import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, OPTION_ROW, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
@@ -136,7 +136,7 @@ export function NewIssueForm() {
             <GroupedList>
               <GroupedRow
                 label={whoName(who)}
-                leading={who ? <Face who={who} size={26} live={false} /> : undefined}
+                leading={who ? <Face who={who} size={OPTION_ROW.face} live={false} /> : undefined}
                 icon={who ? undefined : "agent"}
                 value={whoRole || undefined}
                 chevron
@@ -149,7 +149,7 @@ export function NewIssueForm() {
                       <GroupedRow
                         key={a ? `${a.type}:${a.id}` : "nobody"}
                         label={whoName(a)}
-                        leading={a ? <Face who={a} size={26} live={false} /> : undefined}
+                        leading={a ? <Face who={a} size={OPTION_ROW.face} live={false} /> : undefined}
                         icon={a ? undefined : "circle"}
                         value={a?.type === "agent" ? (dir.agentById.get(a.id)?.role ?? undefined) : undefined}
                         onPress={() => {

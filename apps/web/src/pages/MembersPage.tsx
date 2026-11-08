@@ -95,14 +95,22 @@ function whenWords(t: TFunction, locale: string, iso: string, now = new Date()) 
   return relativeTime(t, locale, iso, now);
 }
 
-/** A face, two lines, then what ends the row: the people, the requests and the invitations all read this way. */
-function Who({ face, name, sub }: { face: ReactNode; name: string; sub: ReactNode }) {
+/**
+ * A request, an invitation or a suggestion as a MediaRow: the face and who it is on one line, its actions at that line's
+ * end (under everything where the list is narrow), and what it is and its state under them at the row's width.
+ */
+function Who({ face, name, sub, children }: { face: ReactNode; name: string; sub: ReactNode; children?: ReactNode }) {
   return (
     <>
-      {face}
-      <span className="list-col">
-        <span className="members-row__name">{name}</span>
-        <span className="small muted members-row__sub">{sub}</span>
+      <span className="ac-mediarow__face">{face}</span>
+      <span className="ac-mediarow__head">
+        <b className="members-row__name">{name}</b>
+      </span>
+      <span className="ac-mediarow__body">
+        <span className="members-row__line">
+          {sub && <span className="small muted members-row__sub">{sub}</span>}
+          {children}
+        </span>
       </span>
     </>
   );
@@ -490,7 +498,7 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                 <div
                   key={r.id}
                   id={`join-request-${r.id}`}
-                  className="ac-list__row members-row"
+                  className="ac-list__row members-row ac-mediarow"
                   role="group"
                   aria-label={
                     by
@@ -498,15 +506,16 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                       : t("members.requests.label", { name: r.name })
                   }
                 >
-                  <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email} />
-                  <State icon={by ? "person" : "link"}>{how}</State>
-                  {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
-                  {!r.verified && !by && (
-                    <span className="members-row__flag">
-                      <Chip icon="mail">{t("members.requests.unverified")}</Chip>
-                    </span>
-                  )}
-                  <span className="members-row__acts">
+                  <Who face={<Avatar size="md" name={r.name} />} name={r.name} sub={r.email}>
+                    <State icon={by ? "person" : "link"}>{how}</State>
+                    {/* Nobody proved the address: approving can't let them in at once (ADR 0072). */}
+                    {!r.verified && !by && (
+                      <span className="members-row__flag">
+                        <Chip icon="mail">{t("members.requests.unverified")}</Chip>
+                      </span>
+                    )}
+                  </Who>
+                  <span className="ac-mediarow__end ac-mediarow__end--wrap members-row__acts">
                     <RolesPicker
                       size="sm"
                       roles={orgRoles}
@@ -539,7 +548,11 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
                       {t("members.requests.deny")}
                     </Button>
                   </span>
-                  {r.note && <p className="members-row__note">{t("members.requests.note", { note: r.note })}</p>}
+                  {r.note && (
+                    <p className="ac-mediarow__body members-row__note">
+                      {t("members.requests.note", { note: r.note })}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -726,7 +739,7 @@ function SentInvitations() {
             // biome-ignore lint/a11y/useSemanticElements: a row of the list, named for whom it invites
             <div
               key={inv.id}
-              className="ac-list__row members-row"
+              className="ac-list__row members-row ac-mediarow"
               data-off={off || undefined}
               role="group"
               aria-label={t("members.invitations.label", { email: inv.email })}
@@ -735,21 +748,22 @@ function SentInvitations() {
                 face={<Avatar size="md" name={inv.email} initials={inv.email.slice(0, 2).toUpperCase()} />}
                 name={inv.email}
                 sub={sub}
-              />
-              {again && !off ? (
-                <State icon="check" tone="ok">
-                  {t("members.invitations.resentState", { date: date(again) })}
-                </State>
-              ) : off ? (
-                <State icon="clock">
-                  {t("members.invitations.expired", { when: whenWords(t, i18n.language, inv.expiresAt) })}
-                </State>
-              ) : (
-                <State icon="clock" tone={soon ? "soon" : undefined}>
-                  {t("members.invitations.expires", { left })}
-                </State>
-              )}
-              <span className="members-row__acts ac-acts">
+              >
+                {again && !off ? (
+                  <State icon="check" tone="ok">
+                    {t("members.invitations.resentState", { date: date(again) })}
+                  </State>
+                ) : off ? (
+                  <State icon="clock">
+                    {t("members.invitations.expired", { when: whenWords(t, i18n.language, inv.expiresAt) })}
+                  </State>
+                ) : (
+                  <State icon="clock" tone={soon ? "soon" : undefined}>
+                    {t("members.invitations.expires", { left })}
+                  </State>
+                )}
+              </Who>
+              <span className="ac-mediarow__end ac-mediarow__end--wrap members-row__acts ac-acts">
                 {off ? (
                   <>
                     <Button size="sm" icon="refresh" loading={sending} onClick={() => sendAgain(inv, true)}>
@@ -954,7 +968,7 @@ function Suggestions() {
               // biome-ignore lint/a11y/useSemanticElements: a row of the list, named for whom it suggests
               <div
                 key={s.id}
-                className="ac-list__row members-row"
+                className="ac-list__row members-row ac-mediarow"
                 role="group"
                 aria-label={t("members.suggest.label", { email: s.email })}
               >
@@ -962,11 +976,12 @@ function Suggestions() {
                   face={<Avatar size="md" name={s.email} initials={s.email.slice(0, 2).toUpperCase()} />}
                   name={s.email}
                   sub={s.note ?? ""}
-                />
-                <State icon="clock">
-                  {t("members.suggest.waiting", { when: whenWords(t, i18n.language, s.createdAt) })}
-                </State>
-                <span className="members-row__acts ac-acts">
+                >
+                  <State icon="clock">
+                    {t("members.suggest.waiting", { when: whenWords(t, i18n.language, s.createdAt) })}
+                  </State>
+                </Who>
+                <span className="ac-mediarow__end ac-mediarow__end--wrap members-row__acts ac-acts">
                   <Button
                     variant="ghost"
                     size="sm"

@@ -17,7 +17,7 @@ import { handleAfterRename } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { accountPlan, planReplies } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
-import { isRightHand, rightHandFallback } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, mineStatus } from "@agenteschat/client/lib/right-hand";
 import {
   AffixInput,
   BrainLogo,
@@ -28,6 +28,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  Icon,
   InfoHint,
   Input,
   ProviderLogo,
@@ -36,7 +37,7 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -99,8 +100,11 @@ type PlanKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "anti
 const planKind = (kind: string | undefined): PlanKind | null => (kind && kind !== "model" ? (kind as PlanKind) : null);
 
 /**
- * "Sua IA" (ADR 0137 §11): the plan the viewer's own DM with the right hand thinks with, theirs or one shared with them,
- * and, without one, what the workspace's does for them. Everyone has this row.
+ * "Sua IA" (ADR 0137 §11) as one status, a MediaRow: the logo of what answers the viewer in their own DM with the right
+ * hand, its name and what it is to them on one line (Claude · chave do workspace), and its action at that line's end, or
+ * under it where the column is narrow. When nothing answers them it is the call to connect a plan. Why it is theirs
+ * alone is the ⓘ of the section it stands in. Everyone has this row, in the DM's side panel and on the right hand's
+ * page.
  */
 export function RightHandMineRow({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
@@ -111,14 +115,10 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const toast = useToast();
   const connect = useConnectAi();
   const view = useAgentBrain(org.id, agent.id).data;
-  const g = agentGrammar(agent.name);
-  const kind = planKind(view?.brain);
-  const signIn = view?.accounts.find((a) => a.id === view.account);
-  const first = (id: string | null | undefined) => (id ? dir.memberById.get(id)?.name.split(" ")[0] : undefined);
-  const ws = view?.workspaceAi;
-  const wsKind = planKind(ws?.brain);
   const platform = usePlatformKey(org.id).data === true;
-  const fallback = ws ? rightHandFallback(t, ws, me.user.id, g, (id) => first(id), platform) : null;
+  const status = mineStatus(view, me.user.id, platform);
+  if (!status) return null;
+  const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
   const back = () =>
     void api.agents
       .setBrain(org.id, agent.id, { scope: "mine", brain: "model" })
@@ -127,46 +127,72 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
         void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
       })
       .catch((e) => toast.show(errorText(t, e), "error"));
+  const connectTo = (label: string, primary = false) =>
+    connect && (
+      <Button size="sm" variant={primary ? "primary" : undefined} onClick={() => connect.open({ agentId: agent.id })}>
+        {label}
+      </Button>
+    );
+  let face: ReactNode;
+  let name: string;
+  let what: string | null = null;
+  let acts: ReactNode;
+  if (status.kind === "own") {
+    const kind = planKind(status.brain);
+    face = kind && <BrainLogo kind={kind} size="sm" />;
+    name = status.label ?? (kind ? t(`aiAccounts.connect.${kind}`) : t("rightHand.settings.mine"));
+    what = status.ownerId
+      ? t("rightHand.settings.mineOf", { owner: first(status.ownerId) })
+      : t("rightHand.settings.mineYours");
+    acts = (
+      <>
+        <Button size="sm" onClick={back}>
+          {t("rightHand.settings.useWorkspace")}
+        </Button>
+        {connectTo(t("rightHand.settings.change"))}
+      </>
+    );
+  } else if (status.kind === "key") {
+    face = status.provider ? (
+      <ProviderLogo id={status.provider} size="sm" />
+    ) : (
+      <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
+        <Icon name="key" />
+      </span>
+    );
+    name = status.label ?? t("rightHand.settings.mineKeyName");
+    what = t("rightHand.settings.mineKey");
+    acts = connectTo(t("rightHand.settings.useMine"));
+  } else if (status.kind === "plan") {
+    const kind = planKind(status.brain);
+    face = kind && <BrainLogo kind={kind} size="sm" />;
+    name = kind ? t(`aiAccounts.connect.${kind}`) : t("rightHand.settings.workspace");
+    what = t("rightHand.settings.minePlan");
+    acts = connectTo(t("rightHand.settings.useMine"));
+  } else {
+    face = <Icon name="bulb" size={16} className="muted" />;
+    name = t("rightHand.settings.mineNobody");
+    acts = connectTo(t("rightHand.settings.connectMine"), true);
+  }
   return (
-    <PrefRow
-      id="rh-mine"
-      icon="bulb"
-      label={t("rightHand.settings.mine")}
-      help={
-        <>
-          <span>{t("rightHand.settings.mineHelp", g)}</span>
-          {kind ? (
-            <PlanLine
-              kind={kind}
-              label={signIn?.label}
-              owner={signIn?.ownerId && signIn.ownerId !== me.user.id ? first(signIn.ownerId) : undefined}
-            />
-          ) : (
-            fallback && (
-              <span className="rh-set__planline ac-iconline">
-                {wsKind && <BrainLogo kind={wsKind} size="xs" />}
-                {fallback}
-              </span>
-            )
-          )}
-        </>
-      }
-      control={
-        <span className="rh-set__acts">
-          {kind && (
-            <Button size="sm" onClick={back}>
-              {t("rightHand.settings.useWorkspace")}
-            </Button>
-          )}
-          {connect && (
-            <Button size="sm" onClick={() => connect.open({ agentId: agent.id })}>
-              {t(kind ? "rightHand.settings.change" : "rightHand.settings.connectMine")}
-            </Button>
-          )}
-        </span>
-      }
-    />
+    <div className="rh-mine ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">{face}</span>
+      <span className="ac-mediarow__head">
+        <b>{name}</b>
+        {what && <span className="ac-mediarow__meta">{what}</span>}
+      </span>
+      {acts && <span className="ac-mediarow__end ac-mediarow__end--wrap rh-set__acts">{acts}</span>}
+    </div>
   );
+}
+
+/** "Sua IA"'s explanation, the ⓘ of the section the status stands in. */
+export function useRightHandMineHint(agent: Agent) {
+  const { t } = useTranslation();
+  return {
+    name: t("common.about", { label: t("rightHand.settings.mine") }),
+    text: t("rightHand.settings.mineHelp", agentGrammar(agent.name)),
+  };
 }
 
 function RightHandForm({ agent }: { agent: Agent }) {
@@ -261,7 +287,6 @@ function RightHandForm({ agent }: { agent: Agent }) {
               </span>
             }
           />
-          <RightHandMineRow agent={agent} />
           <PrefRow
             id="rh-ai"
             icon="members"

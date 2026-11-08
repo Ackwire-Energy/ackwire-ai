@@ -212,7 +212,7 @@ function Row({
         pressed && onPress ? { backgroundColor: c.sunken } : null,
       ]}
     >
-      {/* One column for whatever leads (an icon's tile, a 26 to 36 face, a mark): the text, and the hairline above,
+      {/* One column for whatever leads (an icon's tile, a 24 to 36 face, a mark): the text, and the hairline above,
           start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
         <View style={styles.lead}>

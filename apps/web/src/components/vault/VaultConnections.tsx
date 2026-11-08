@@ -266,78 +266,82 @@ function ConnectionRow({
     await actions.sync(c.id);
   };
   return (
-    <div className="ac-list__row connected-row vlt-conn">
-      <VaultTile icon="lock" />
-      <span className="list-col connected-row__text">
-        <span className="list-title ac-captop">
+    <div className="ac-list__row connected-row ac-mediarow vlt-conn">
+      <span className="ac-mediarow__face">
+        <VaultTile icon="lock" />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span>{c.label}</span>
           <StateChip connection={c} />
         </span>
+      </span>
+      <div className="ac-mediarow__body">
         <span className="small muted" title={line}>
           {line}
         </span>
         {c.status === "error" && (
           <span className="small vlt-conn__fix">{t(`vault.connections.fix.${errorKey(c.errorCode)}`)}</span>
         )}
-      </span>
-      <span className="connected-row__who small muted">
-        <AgentFaces access={c.access} />
-        {agentsSummary(t, i18n.language, dir, c.access)}
-      </span>
-      {c.can.edit && (
-        <div className="connected-row__actions">
-          {/* A full Vault isn't fixed by reconnecting: it syncs again once items are removed. */}
-          {c.status === "error" && c.errorCode !== "too_many_items" ? (
-            <Button
-              size="sm"
-              variant="primary"
-              aria-label={t("vault.connections.reconnectName", { name: c.name })}
-              onClick={onReconnect}
-            >
-              {t("vault.connections.reconnect")}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              icon="refresh"
-              loading={actions.syncing}
-              disabled={actions.syncing || c.status === "syncing"}
-              onClick={() => void sync()}
-            >
-              {t("vault.connections.syncNow")}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("vault.connections.accessTitle", { label: c.label })}
-            onClick={onAccess}
-          >
-            {t("vault.connections.access")}
-          </Button>
-          <Menu
-            align="end"
-            label={t("vault.connections.actionsName", { name: c.name })}
-            trigger={
+        <span className="connected-row__who small muted">
+          <AgentFaces access={c.access} />
+          {agentsSummary(t, i18n.language, dir, c.access)}
+        </span>
+        {c.can.edit && (
+          <div className="connected-row__actions">
+            {/* A full Vault isn't fixed by reconnecting: it syncs again once items are removed. */}
+            {c.status === "error" && c.errorCode !== "too_many_items" ? (
               <Button
                 size="sm"
-                variant="ghost"
-                iconOnly
-                icon="more"
-                aria-label={t("vault.connections.actionsName", { name: c.name })}
-              />
-            }
-          >
-            <MenuItem icon="refresh" onSelect={onReconnect}>
-              {t("vault.connections.reconnect")}
-            </MenuItem>
-            <MenuSeparator />
-            <MenuItem icon="power" danger onSelect={onDisconnect}>
-              {t("vault.connections.disconnect")}
-            </MenuItem>
-          </Menu>
-        </div>
-      )}
+                variant="primary"
+                aria-label={t("vault.connections.reconnectName", { name: c.name })}
+                onClick={onReconnect}
+              >
+                {t("vault.connections.reconnect")}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                icon="refresh"
+                loading={actions.syncing}
+                disabled={actions.syncing || c.status === "syncing"}
+                onClick={() => void sync()}
+              >
+                {t("vault.connections.syncNow")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("vault.connections.accessTitle", { label: c.label })}
+              onClick={onAccess}
+            >
+              {t("vault.connections.access")}
+            </Button>
+            <Menu
+              align="end"
+              label={t("vault.connections.actionsName", { name: c.name })}
+              trigger={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="more"
+                  aria-label={t("vault.connections.actionsName", { name: c.name })}
+                />
+              }
+            >
+              <MenuItem icon="refresh" onSelect={onReconnect}>
+                {t("vault.connections.reconnect")}
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem icon="power" danger onSelect={onDisconnect}>
+                {t("vault.connections.disconnect")}
+              </MenuItem>
+            </Menu>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

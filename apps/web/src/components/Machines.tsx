@@ -368,11 +368,11 @@ function MachineRow({
     m.pairedBy ? t("machines.pairedBy", { name: m.pairedBy.name }) : null,
   ].filter(Boolean);
   return (
-    <div className="ac-list__row machine-row">
-      <span className="machine-row__pic">
+    <div className="ac-list__row machine-row ac-mediarow">
+      <span className="machine-row__pic ac-mediarow__face">
         <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
       </span>
-      <span className="list-col machine-row__main">
+      <span className="ac-mediarow__head">
         <span className="list-title">
           <Link
             to="/org/$orgId/settings/computers/$machineId"
@@ -387,31 +387,33 @@ function MachineRow({
           <PausedChip paused={m.paused} />
           {!m.execAllowed && <Chip icon="block">{t("machines.execOff")}</Chip>}
         </span>
-        <span className="small muted">
-          {m.kind === "host" ? t(`machines.host.${hostDescKey(m.os)}`) : facts.join(" · ")}
+      </span>
+      <span className="ac-mediarow__body small muted">
+        {m.kind === "host" ? t(`machines.host.${hostDescKey(m.os)}`) : facts.join(" · ")}
+      </span>
+      <span className="ac-mediarow__end">
+        <span className="machine-row__agents">
+          {m.agents.length > 0 ? (
+            <span
+              className="row"
+              style={{ gap: 4 }}
+              title={t("machines.usedBy", {
+                names: joinNames(
+                  m.agents.map((a) => a.name),
+                  t,
+                ),
+              })}
+            >
+              {m.agents.slice(0, 4).map((a) => (
+                <AgentAvatar key={a.id} agentId={a.id} size="sm" name={a.name} />
+              ))}
+            </span>
+          ) : (
+            <span className="small muted">{t("machines.noAgents")}</span>
+          )}
         </span>
+        {m.canManage && <MachineMenu machine={m} onRename={onRename} onRemove={onRemove} />}
       </span>
-      <span className="machine-row__agents">
-        {m.agents.length > 0 ? (
-          <span
-            className="row"
-            style={{ gap: 4 }}
-            title={t("machines.usedBy", {
-              names: joinNames(
-                m.agents.map((a) => a.name),
-                t,
-              ),
-            })}
-          >
-            {m.agents.slice(0, 4).map((a) => (
-              <AgentAvatar key={a.id} agentId={a.id} size="sm" name={a.name} />
-            ))}
-          </span>
-        ) : (
-          <span className="small muted">{t("machines.noAgents")}</span>
-        )}
-      </span>
-      {m.canManage && <MachineMenu machine={m} onRename={onRename} onRemove={onRemove} />}
     </div>
   );
 }
@@ -423,28 +425,30 @@ function HostOffRow() {
   const toast = useToast();
   const turnOn = useHostComputerOn(org.id);
   return (
-    <div className="ac-list__row machine-row">
-      <span className="machine-row__pic">
+    <div className="ac-list__row machine-row ac-mediarow">
+      <span className="machine-row__pic ac-mediarow__face">
         <ComputerPortrait kind="linux" state="offline" />
       </span>
-      <span className="list-col machine-row__main">
-        <span className="list-title machine-row__name">{t("machines.host.label")}</span>
-        <span className="small muted">{t("machines.host.offText")}</span>
+      <span className="ac-mediarow__head">
+        <b className="list-title machine-row__name">{t("machines.host.label")}</b>
       </span>
+      <span className="ac-mediarow__body small muted">{t("machines.host.offText")}</span>
       {can(org, "configure") && (
-        <Button
-          size="sm"
-          loading={turnOn.isPending}
-          disabled={turnOn.isPending}
-          onClick={() =>
-            turnOn.mutate(undefined, {
-              onSuccess: () => toast.show(t("machines.host.used")),
-              onError: (err) => toast.show(errorText(t, err), "error"),
-            })
-          }
-        >
-          {t("machines.host.use")}
-        </Button>
+        <span className="ac-mediarow__end">
+          <Button
+            size="sm"
+            loading={turnOn.isPending}
+            disabled={turnOn.isPending}
+            onClick={() =>
+              turnOn.mutate(undefined, {
+                onSuccess: () => toast.show(t("machines.host.used")),
+                onError: (err) => toast.show(errorText(t, err), "error"),
+              })
+            }
+          >
+            {t("machines.host.use")}
+          </Button>
+        </span>
       )}
     </div>
   );
@@ -870,22 +874,24 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
           // name's line. A name alone centres on the tile, its state with it.
           const warn = tool === "commands" && on;
           return (
-            <div key={tool} className="ac-list__row machine-tool" data-tool={tool}>
-              {tool === "commands" ? (
-                <span className="newag__ib">
-                  <Icon name="code" size={16} />
-                </span>
-              ) : (
-                <ProviderLogo id={tool} size="sm" off={!on} />
-              )}
-              <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
-                <span className={warn ? "ac-hintline ac-captop" : "ac-hintline"}>
+            <div key={tool} className="ac-list__row machine-tool ac-mediarow ac-mediarow--row" data-tool={tool}>
+              <span className="ac-mediarow__face">
+                {tool === "commands" ? (
+                  <span className="newag__ib">
+                    <Icon name="code" size={16} />
+                  </span>
+                ) : (
+                  <ProviderLogo id={tool} size="sm" off={!on} />
+                )}
+              </span>
+              <span className="ac-mediarow__head">
+                <span className="ac-hintline">
                   <span className="machine-folder__name">{name}</span>
                   <InfoHint name={t("common.about", { label: name })}>{t(`machines.access.toolText.${tool}`)}</InfoHint>
                 </span>
-                {warn && <span className="small muted">{t("machines.access.commandsWarn")}</span>}
               </span>
-              <span className={warn ? "machine-tool__tail ac-captail ac-captop" : "machine-tool__tail"}>
+              {warn && <span className="ac-mediarow__body small muted">{t("machines.access.commandsWarn")}</span>}
+              <span className="machine-tool__tail ac-mediarow__end">
                 <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
                 {on && canReduceAccess(m) && (
                   <Button
@@ -1083,26 +1089,29 @@ export function MachinePage({ machineId }: { machineId: string }) {
                     <Link
                       to="/org/$orgId/agents/$agentId"
                       params={{ orgId: org.id, agentId: a.id }}
-                      className="machine-page__agent"
+                      className="machine-page__agent ac-mediarow"
                     >
-                      <AgentAvatar agentId={a.id} size="md" name={a.name} />
-                      <span className="list-col" style={{ minWidth: 0, flex: 1 }}>
-                        <span className="machine-page__agent-name">
-                          {a.name} <span className="muted">@{a.handle}</span>
-                        </span>
-                        {/* On the workspace's own computer, each agent's own folder is its name's ⓘ. */}
-                        {folders && (folders.length > 0 || !managed) && (
-                          <span className="small muted">
-                            {folders.length > 0
-                              ? t("machines.page.agentFolders", {
-                                  ...agentGrammar(a.name),
-                                  folders: joinNames(folders, t),
-                                })
-                              : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
-                          </span>
-                        )}
+                      <span className="ac-mediarow__face">
+                        <AgentAvatar agentId={a.id} size="md" name={a.name} />
                       </span>
-                      <Icon name="chevronRight" />
+                      <span className="ac-mediarow__head machine-page__agent-name">
+                        <b>{a.name}</b>
+                        <span className="ac-mediarow__meta">@{a.handle}</span>
+                      </span>
+                      <span className="ac-mediarow__end">
+                        <Icon name="chevronRight" />
+                      </span>
+                      {/* On the workspace's own computer, each agent's own folder is its name's ⓘ. */}
+                      {folders && (folders.length > 0 || !managed) && (
+                        <span className="ac-mediarow__body small muted">
+                          {folders.length > 0
+                            ? t("machines.page.agentFolders", {
+                                ...agentGrammar(a.name),
+                                folders: joinNames(folders, t),
+                              })
+                            : t("machines.page.agentOwnFolder", agentGrammar(a.name))}
+                        </span>
+                      )}
                     </Link>
                     <OpenComputerButton agentId={a.id} name={a.name} />
                   </div>

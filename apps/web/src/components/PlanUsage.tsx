@@ -42,17 +42,21 @@ export function AccountHead({ account, extra }: { account: PlanAccountInfo; extr
   const whose =
     account.email ?? (account.ownerName ? t("usageViews.whose", { name: account.ownerName.split(" ")[0] }) : null);
   return (
-    <div className="plan-acct ac-faceline">
-      <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
-      <span className="plan-acct__text">
-        <span className="plan-acct__name ac-captop">
+    <div className="plan-acct ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">
+        <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="plan-acct__name">
           {accountName(t, account)}
           {account.plan && <span className="plan-acct__chip">{planName(account.plan)}</span>}
           {account.signedOut && (
             <span className="plan-acct__chip plan-acct__chip--out">{t("usageViews.signedOut")}</span>
           )}
         </span>
-        <span className="plan-acct__sub">{[brandOf(account), whose, extra].filter(Boolean).join(" · ")}</span>
+      </span>
+      <span className="ac-mediarow__body plan-acct__sub">
+        {[brandOf(account), whose, extra].filter(Boolean).join(" · ")}
       </span>
     </div>
   );

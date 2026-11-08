@@ -40,8 +40,6 @@ const PLACED_BY_HAND: Record<string, string> = {
     "menu items are one line (no wrapping) of 14px text on their own 20px line, which the 16px icon sits on",
   "apps/web/src/components/import-flow.css .imp-row__mark":
     "an import plan row's 18px check column centres on the row's 26px lead tile (.imp-row__lead), not on its text",
-  "apps/web/src/components/proposals.css .proposal-row > .ac-icon":
-    "a proposal row's 20px workspace icon centres on the row's 24px first line, the height of the agents' faces in the other rows",
 };
 
 /** Where the opening tag that starts at `start` ends: braces are skipped, so an `=>` in an attribute doesn't end it. */

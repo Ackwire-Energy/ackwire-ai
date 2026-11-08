@@ -337,22 +337,24 @@ function JevCard({ routing }: { routing?: AiRouting["by"] }) {
   return (
     <section id="jev" ref={box} tabIndex={-1} className="jev" aria-labelledby="jev-title">
       <List>
-        <div className="ac-list__row jev__head ac-actrow">
-          <ProviderLogo id="typesafe" size="sm" />
-          <span className="list-col ac-actrow__text">
-            <span className="ac-hintline ac-captop">
+        <div className="ac-list__row jev__head ac-mediarow ac-mediarow--row">
+          <span className="ac-mediarow__face">
+            <ProviderLogo id="typesafe" size="sm" />
+          </span>
+          <span className="ac-mediarow__head">
+            <span className="ac-hintline">
               <h3 id="jev-title" className="jev__title">
                 {t("jev.title")}
               </h3>
               <InfoHint name={t("common.about", { label: t("jev.title") })}>{t("jev.about")}</InfoHint>
             </span>
-            <span className="small muted">{t("jev.lead")}</span>
           </span>
-          <span className="ac-captail ac-captop">
+          <span className="ac-mediarow__end">
             <Chip icon={chip.icon} tone={chip.tone}>
               {t(`jev.state.${chip.word}`)}
             </Chip>
           </span>
+          <span className="ac-mediarow__body small muted">{t("jev.lead")}</span>
         </div>
         {view.source === null ? (
           <div className="ac-list__row jev__body">
