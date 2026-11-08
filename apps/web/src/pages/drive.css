@@ -38,6 +38,11 @@
   flex-direction: column;
   gap: 26px;
 }
+/* "Carregar mais": the next page of files, centred under them. */
+.drive-more {
+  display: flex;
+  justify-content: center;
+}
 /* A head with a hint (private files): on a narrow page the hint drops to a line of its own rather than wrapping beside the
    title, so the lock, title and count stay on one centred line. */
 .drive-group__head {

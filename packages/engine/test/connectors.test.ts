@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { eq, schema } from "@agenteschat/db";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   type ConnectorDeps,
   completeOAuth,
@@ -20,6 +21,7 @@ import {
   revokeConnection,
   setAgentScopes,
   startOAuth,
+  TokenRefused,
   ValidationError,
   wrapExternal,
 } from "../src";
@@ -504,5 +506,88 @@ describe("OAuth (state + PKCE)", () => {
     expect(await connectionHeaders(soon, connection)).toEqual({ authorization: "Bearer gho_token_2" });
     expect(token.seen.at(-1)?.get("grant_type")).toBe("refresh_token");
     expect(token.seen.at(-1)?.get("refresh_token")).toBe("ghr_refresh_1");
+  });
+});
+
+describe("a sign-in that stops working", () => {
+  const ctxOf = (fx: Fixture) => ({
+    db: fx.db,
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+    runId: crypto.randomUUID(),
+    channelId: fx.general.id,
+    threadRootId: crypto.randomUUID(),
+    triggerMessageId: crypto.randomUUID(),
+  });
+  const rowOf = async (fx: Fixture, id: string) =>
+    (await fx.db.select().from(schema.connectorConnections).where(eq(schema.connectorConnections.id, id)))[0];
+
+  test("a refresh the provider refuses: Precisa reconectar, no tools; a busy provider marks nothing; Reconectar heals", async () => {
+    f = await setup();
+    let refresh: "busy" | "refused" | "ok" = "busy";
+    let n = 0;
+    const http = (async (_url: string, init?: RequestInit) => {
+      const form = new URLSearchParams(String(init?.body));
+      if (form.get("grant_type") === "refresh_token" && refresh === "busy")
+        return Response.json({ error: "server_error" }, { status: 503 });
+      // GitHub says no with a 200.
+      if (form.get("grant_type") === "refresh_token" && refresh === "refused")
+        return Response.json({
+          error: "bad_refresh_token",
+          error_description: "The refresh token passed is incorrect",
+        });
+      n++;
+      return Response.json({ access_token: `gho_token_${n}`, refresh_token: `ghr_refresh_${n}`, expires_in: 3600 });
+    }) as unknown as typeof fetch;
+    const deps = depsOf(f, { http });
+    const signIn = async () => {
+      const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+      return (await completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" })).connection;
+    };
+    const connection = await signIn();
+    const soon = depsOf(f, { http, now: () => new Date(Date.now() + 3590_000) });
+    await expect(connectionHeaders(soon, connection)).rejects.not.toBeInstanceOf(TokenRefused);
+    expect((await rowOf(f, connection.id))?.status).toBe("active");
+
+    refresh = "refused";
+    await expect(connectionHeaders(soon, connection)).rejects.toBeInstanceOf(TokenRefused);
+    const dead = await rowOf(f, connection.id);
+    expect(dead?.status).toBe("needs_reconnect");
+    expect(dead?.lastError).toContain("The refresh token passed is incorrect");
+    expect(dead && connectionView(dead).status).toBe("needs_reconnect");
+    const mcp = fakeGithubMcp();
+    const source = createConnectorToolSource({ ...soon, connect: mcp.connect });
+    expect(await source.tools(ctxOf(f))).toEqual([]);
+
+    refresh = "ok";
+    const again = await signIn();
+    expect((await rowOf(f, again.id))?.status).toBe("active");
+    expect(connectionView(again).status).toBe("active");
+  });
+
+  test("a server that answers 401 to the connection's key: Precisa reconectar, its tools gone until a new one", async () => {
+    f = await setup();
+    const mcp = fakeGithubMcp();
+    let revoked = true;
+    const connect: typeof mcp.connect = async (c, headers) => {
+      if (revoked) throw new StreamableHTTPError(401, "Error POSTing to endpoint: Bad credentials");
+      return mcp.connect(c, headers);
+    };
+    const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    const source = createConnectorToolSource({ ...depsOf(f), connect });
+    expect(await source.tools(ctxOf(f))).toEqual([]);
+    expect(await rowOf(f, c.id)).toMatchObject({ status: "needs_reconnect" });
+    revoked = false;
+    // Hidden until someone reconnects, even once the server would answer.
+    expect(await source.tools(ctxOf(f))).toEqual([]);
+    const fresh = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_other_654321",
+    });
+    expect(fresh.status).toBe("active");
+    expect((await source.tools(ctxOf(f))).length).toBeGreaterThan(0);
   });
 });

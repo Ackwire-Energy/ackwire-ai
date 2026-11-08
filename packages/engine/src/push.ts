@@ -80,9 +80,9 @@ export function pushWorthy(
 }
 
 /**
- * Called by `notify` for each row it created or merged into (with the person's choices, read there): the
- * first event of a group (count 1) the person wants on their devices enqueues `push.send`, when they have
- * a phone or a browser registered.
+ * A row the person wants on their devices now (their choices, read by the caller when it has them) enqueues
+ * `push.send` once per `dedupeKey`, when they have a phone or a browser registered: `notify` for a group's first
+ * event, and a reminder or a snooze's wake under keys of their own.
  */
 export async function enqueuePush(
   db: Database,
@@ -91,7 +91,6 @@ export async function enqueuePush(
   prefs?: NoticePrefs,
   dedupeKey = `push.send:${row.id}`,
 ): Promise<boolean> {
-  if (row.count !== 1) return false;
   if (!pushWorthy(row, now, prefs ?? (await readNoticePrefs(db, row.orgId, row.userId)))) return false;
   const [device] = await db
     .select({ id: pushDevices.id })

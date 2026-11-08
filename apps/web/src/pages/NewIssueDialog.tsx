@@ -1,5 +1,6 @@
 import type { Issue, IssueColumn, IssuePriority } from "@agenteschat/client";
-import { useIssueAction } from "@agenteschat/client";
+import { useIssueAction, useStartAgentOnTask } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
@@ -56,7 +57,7 @@ export function NewIssueDialog({
   columns: IssueColumn[];
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const columnTitle = useColumnTitle();
@@ -71,6 +72,7 @@ export function NewIssueDialog({
   const chosenColumn = todoColumns.find((c) => c.id === column) ?? todoColumns[0];
   const actors = useActors();
   const action = useIssueAction(org.id);
+  const start = useStartAgentOnTask(org.id);
   const [wide, setWide] = useState(false);
   const [title, setTitle] = useState("");
   // The quick box's text; the full form keeps the description and the criteria apart.
@@ -131,6 +133,20 @@ export function NewIssueDialog({
     onClose();
   };
   const ready = title.trim() !== "" && !files.uploading && !action.isPending;
+  /** "Pedir" right after creating: when it can't start, the toast says why, with Pedir de novo. */
+  const startAgent = (issue: Issue, picked: { id: string; name: string }, again = false) => {
+    const g = agentGrammar(picked.name);
+    start.mutateAsync({ issueId: issue.id, agentId: picked.id }).then(
+      () => again && toast.show(t("issues.asked", g)),
+      (error: unknown) =>
+        toast.show(
+          t("issues.form.notStarted", { number: issue.number, ...g }),
+          "error",
+          { label: t("issues.form.askAgain"), run: () => startAgent(issue, picked, true) },
+          errorText(t, error, i18n.language),
+        ),
+    );
+  };
   const submit = () => {
     if (!ready) return;
     const body = wide
@@ -156,16 +172,9 @@ export function NewIssueDialog({
           // New tasks land in the first column of A fazer; another one was chosen.
           if (chosenColumn && chosenColumn.id !== columnIdOf(issue, columns) && chosen?.type !== "agent")
             action.mutate({ type: "update", id: issue.id, patch: { columnId: chosenColumn.id } });
-          // An agent picked here starts right away ("Pedir"): assigned, its run linked, in progress.
-          if (chosen?.type === "agent")
-            action.mutate(
-              { type: "ask", id: issue.id, agentId: chosen.id },
-              {
-                // Couldn't ask (not in a shared channel…): it stays assigned to the agent.
-                onError: () => action.mutate({ type: "update", id: issue.id, patch: { assignee: chosen } }),
-              },
-            );
           toast.show(t("issues.form.created", { number: issue.number }));
+          // An agent picked here starts right away ("Pedir"): assigned, its run linked, in progress.
+          if (chosen?.type === "agent") startAgent(issue, { id: chosen.id, name: agent?.name ?? "" });
           if (another) {
             reset(true);
             // After the form unlocks: a disabled field takes no focus.

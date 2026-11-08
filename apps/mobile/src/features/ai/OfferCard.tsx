@@ -112,7 +112,7 @@ function InstallSkill({ card }: { card: Extract<Card, { kind: "install_skill" }>
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const may = can(org, "manage_agents");
-  const skills = useSkills(orgId, may);
+  const skills = useSkills(orgId);
   return (
     <Shell
       icon="brain"

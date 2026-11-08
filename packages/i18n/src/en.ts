@@ -1997,7 +1997,7 @@ export const en = {
       budgetHelp: "When it reaches the limit, it stops and tells you, like any agent.",
       audience: "Who can use it",
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
-      lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
+      lock: "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins.",
       audit: "See what {{name}} did",
       change: "Change",
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
@@ -6278,6 +6278,9 @@ export const en = {
       cancel: "Cancel",
       create: "Create task",
       created: "Task #{{number}} created.",
+      /** The agent picked for it couldn't start: under it, why (`errorText`), and Ask again. */
+      notStarted: "Task #{{number}} created, but {{name}} didn't start.",
+      askAgain: "Ask again",
       intro: "Whoever takes it, a person or an agent, shows on the board with its progress.",
       criteriaFound_one: "{{count}} acceptance criterion",
       criteriaFound_other: "{{count}} acceptance criteria",
@@ -6327,6 +6330,8 @@ export const en = {
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
     asked: "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along.",
+    /** An agent picked on a task couldn't start on it: under it, why, and Ask again. */
+    notStarted: "{{name}} didn't start.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     discussion: "Discussion",
@@ -9897,6 +9902,8 @@ export const en = {
     title: "Drive",
     subtitle: "Everything people and agents made or uploaded.",
     search: "Search files",
+    /** The next page of files, under them. */
+    loadMore: "Load more",
     kind: "Type",
     filters: "Filters",
     allKinds: "All types",
@@ -10440,6 +10447,8 @@ export const en = {
     toolsCount_one: "{{count}} tool",
     toolsCount_other: "{{count}} tools",
     active: "Active",
+    /** A server by address whose tools couldn't be read last time: agents have none from it now. */
+    noToolsNow: "No tools right now",
     notReviewed: "Waiting for review",
     toReview_one: "{{count}} new tool to review",
     toReview_other: "{{count}} new tools to review",

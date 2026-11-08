@@ -1404,28 +1404,39 @@ export async function listArtifactVersions(
   }));
 }
 
-/**
- * Everything the actor can see, newest update first: org-wide files, files
- * of channels they belong to, and of public channels (people).
- */
-export async function listArtifacts(
-  db: Database,
-  actor: ArtifactActor,
-  orgId: string,
-  filters: {
-    q?: string;
-    kind?: ArtifactKind;
-    channelId?: string;
-    author?: ArtifactAuthor;
-    /** Made or changed by (any version), e.g. an agent's files on its page. */
-    changedBy?: ArtifactAuthor;
-    limit?: number;
-    /** Updated at or after this time. */
-    since?: Date;
-    /** Agents: also the conversations this person shares with the agent (see `requesterSharedChannels`). */
-    requesterUserId?: string | null;
-  } = {},
-): Promise<ArtifactView[]> {
+/** What a list of files narrows by: the Drive's filters, the same for a page and for the counts by kind. */
+export interface ArtifactFilters {
+  /** Words in the title, the text or the conversation's name. */
+  q?: string;
+  kind?: ArtifactKind;
+  /** Any of these kinds (the Drive's kind chips, several on). */
+  kinds?: ArtifactKind[];
+  channelId?: string;
+  /** In any of these conversations. */
+  channelIds?: string[];
+  author?: ArtifactAuthor;
+  /** Made or last changed by any of them. */
+  authors?: ArtifactAuthor[];
+  /** Made or changed by (any version), e.g. an agent's files on its page. */
+  changedBy?: ArtifactAuthor;
+  /** Made by an agent or by a person (Quem fez). */
+  who?: "agents" | "people";
+  /** Updated at or after this time. */
+  since?: Date;
+  /** Agents: also the conversations this person shares with the agent (see `requesterSharedChannels`). */
+  requesterUserId?: string | null;
+}
+
+export type ArtifactSort = "recent" | "name" | "kind";
+
+/** The longest page a list returns. */
+export const ARTIFACT_PAGE_MAX = 200;
+
+/** The order of `sort: "kind"`, as the apps list the kinds (mirror of `ARTIFACT_KINDS` in `@agenteschat/client`). */
+const KIND_ORDER = ["document", "table", "diff", "diagram", "html", "file"];
+
+/** The files the actor can see that pass `filters` (all but the kinds), as SQL, and what an agent's DM reads. */
+async function artifactScope(db: Database, actor: ArtifactActor, orgId: string, filters: ArtifactFilters) {
   await requireMember(db, actor, orgId);
   let visible: string[];
   let dm: AgentsDmReads | null = null;
@@ -1446,33 +1457,67 @@ export async function listArtifacts(
     visible = await personReadableChannels(db, actor.userId, orgId);
   }
   const q = filters.q?.trim();
+  const madeBy = (a: ArtifactAuthor) => and(eq(artifacts.createdByType, a.type), eq(artifacts.createdById, a.id));
+  const where = and(
+    eq(artifacts.orgId, orgId),
+    isNull(artifacts.deletedAt),
+    eq(artifacts.inDrive, true),
+    or(isNull(artifacts.channelId), visible.length > 0 ? inArray(artifacts.channelId, visible) : undefined, ownRoom),
+    filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
+    filters.channelIds?.length ? inArray(artifacts.channelId, filters.channelIds) : undefined,
+    filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
+    filters.author ? madeBy(filters.author) : undefined,
+    filters.authors?.length
+      ? or(
+          ...filters.authors.flatMap((a) => [
+            madeBy(a),
+            and(eq(artifacts.updatedByType, a.type), eq(artifacts.updatedById, a.id)),
+          ]),
+        )
+      : undefined,
+    filters.changedBy
+      ? sql`exists (select 1 from ${artifactVersions} where ${artifactVersions.artifactId} = ${artifacts.id} and ${artifactVersions.authorType} = ${filters.changedBy.type} and ${artifactVersions.authorId} = ${filters.changedBy.id})`
+      : undefined,
+    filters.who ? eq(artifacts.createdByType, filters.who === "agents" ? "agent" : "person") : undefined,
+    q
+      ? sql`(${artifacts.title} ilike ${`%${q}%`} or ${artifacts.excerpt} ilike ${`%${q}%`} or exists (select 1 from ${channels} where ${channels.id} = ${artifacts.channelId} and ${channels.kind} = 'channel' and ${channels.name} ilike ${`%${q}%`}))`
+      : undefined,
+  );
+  return { where, dm, visible };
+}
+
+const kindsSql = (filters: ArtifactFilters) =>
+  filters.kind
+    ? eq(artifacts.kind, filters.kind)
+    : filters.kinds?.length
+      ? inArray(artifacts.kind, filters.kinds)
+      : undefined;
+
+/**
+ * What the actor can see, newest update first unless `sort` says otherwise: org-wide files, files of channels they
+ * belong to, and of public channels (people). `offset` and `limit` page it, at most `ARTIFACT_PAGE_MAX` and one more
+ * (so a page knows another follows).
+ */
+export async function listArtifacts(
+  db: Database,
+  actor: ArtifactActor,
+  orgId: string,
+  filters: ArtifactFilters & { limit?: number; offset?: number; sort?: ArtifactSort } = {},
+): Promise<ArtifactView[]> {
+  const { where, dm, visible } = await artifactScope(db, actor, orgId, filters);
+  const order =
+    filters.sort === "name"
+      ? [sql`lower(${artifacts.title})`]
+      : filters.sort === "kind"
+        ? [sql`array_position(${`{${KIND_ORDER.join(",")}}`}::text[], ${artifacts.kind}::text) nulls last`]
+        : [];
   const rows = await db
     .select()
     .from(artifacts)
-    .where(
-      and(
-        eq(artifacts.orgId, orgId),
-        isNull(artifacts.deletedAt),
-        eq(artifacts.inDrive, true),
-        or(
-          isNull(artifacts.channelId),
-          visible.length > 0 ? inArray(artifacts.channelId, visible) : undefined,
-          ownRoom,
-        ),
-        filters.kind ? eq(artifacts.kind, filters.kind) : undefined,
-        filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
-        filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
-        filters.author
-          ? and(eq(artifacts.createdByType, filters.author.type), eq(artifacts.createdById, filters.author.id))
-          : undefined,
-        filters.changedBy
-          ? sql`exists (select 1 from ${artifactVersions} where ${artifactVersions.artifactId} = ${artifacts.id} and ${artifactVersions.authorType} = ${filters.changedBy.type} and ${artifactVersions.authorId} = ${filters.changedBy.id})`
-          : undefined,
-        q ? sql`(${artifacts.title} ilike ${`%${q}%`} or ${artifacts.excerpt} ilike ${`%${q}%`})` : undefined,
-      ),
-    )
-    .orderBy(desc(artifacts.updatedAt))
-    .limit(Math.min(200, filters.limit ?? 100));
+    .where(and(where, kindsSql(filters)))
+    .orderBy(...order, desc(artifacts.updatedAt), desc(artifacts.id))
+    .limit(Math.min(ARTIFACT_PAGE_MAX + 1, filters.limit ?? 100))
+    .offset(filters.offset ?? 0);
   const fromDm = dm
     ? await Promise.all(
         rows.map(
@@ -1486,6 +1531,22 @@ export async function listArtifacts(
   return rows
     .filter((_, i) => fromDm?.[i] !== false)
     .map((a) => view(a, actor.type === "person" && editableKind(a.kind)));
+}
+
+/** How many files a person sees per kind for `filters` (the kinds left out): the Drive's kind chips. */
+export async function countArtifacts(
+  db: Database,
+  actor: Extract<ArtifactActor, { type: "person" }>,
+  orgId: string,
+  filters: ArtifactFilters = {},
+): Promise<Partial<Record<ArtifactKind, number>>> {
+  const { where } = await artifactScope(db, actor, orgId, filters);
+  const rows = await db
+    .select({ kind: artifacts.kind, n: sql<number>`count(*)::int` })
+    .from(artifacts)
+    .where(where)
+    .groupBy(artifacts.kind);
+  return Object.fromEntries(rows.map((r) => [r.kind, r.n]));
 }
 
 /**

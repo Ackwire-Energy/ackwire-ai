@@ -529,8 +529,9 @@ export async function notify(deps: NotificationDeps, input: NotifyInput): Promis
         alert: noticeOn(prefs, row.kind, row.waiting),
       });
     await publishCounts(deps, input.orgId, userId);
-    // Their phone and browsers too (ADR 0035, 0071), through the outbox; never undoes the notification.
-    await enqueuePush(deps.db, row, nowOf(deps), prefs).catch(() => false);
+    // Their phone and browsers too (ADR 0035, 0071), through the outbox; never undoes the notification. A group pushes
+    // once while unread: only the event that opened its row.
+    if (row.count === 1) await enqueuePush(deps.db, row, nowOf(deps), prefs).catch(() => false);
   }
   return out;
 }
@@ -912,7 +913,11 @@ export async function remindNotifications(
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-/** Snoozed notifications whose time came: back in the inbox, on top (worker, every 30 s). */
+/**
+ * Snoozed notifications whose time came (worker, every 30 s): back in the inbox on top and unread, as "Volto a avisar"
+ * promised, so they reach the person as a new one does (the island and its sound, the desktop banner, one more push
+ * keyed by this wake). An approval the person may no longer decide stays out.
+ */
 export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<number> {
   const now = nowOf(deps);
   const rows = await deps.db
@@ -921,22 +926,36 @@ export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<
     .where(and(lte(notifications.snoozedUntil, now), isNull(notifications.doneAt)))
     .returning();
   const users = new Map<string, string>();
-  for (const r of rows) {
-    users.set(`${r.orgId}:${r.userId}`, r.orgId);
-    if (r.kind === "approval") {
+  for (const woke of rows) {
+    users.set(`${woke.orgId}:${woke.userId}`, woke.orgId);
+    if (woke.kind === "approval") {
       const [still] = await deps.db
         .select({ id: notifications.id })
         .from(notifications)
-        .where(and(eq(notifications.id, r.id), stillDecides(r.orgId, r.userId)));
+        .where(and(eq(notifications.id, woke.id), stillDecides(woke.orgId, woke.userId)));
       if (!still) continue;
     }
+    const r = woke.readAt ? await unreadAgain(deps.db, woke) : woke;
+    const prefs = await readNoticePrefs(deps.db, r.orgId, r.userId);
     await publishUserEvent(deps.pubsub, r.orgId, r.userId, {
       type: "notification.upserted",
       notification: notificationView(r),
+      alert: noticeOn(prefs, r.kind, r.waiting),
     });
+    await enqueuePush(deps.db, r, now, prefs, `push.send:${r.id}:woke:${now.getTime()}`).catch(() => false);
   }
   for (const [key, orgId] of users) await publishCounts(deps, orgId, key.slice(orgId.length + 1));
   return rows.length;
+}
+
+/** A read row unread again, unless a newer unread row of its group holds the group's one open slot. */
+async function unreadAgain(db: Database, row: Row): Promise<Row> {
+  try {
+    const [back] = await db.update(notifications).set({ readAt: null }).where(eq(notifications.id, row.id)).returning();
+    return back ?? row;
+  } catch {
+    return row;
+  }
 }
 
 // ── Reading ───────────────────────────────────────────────────────────────────

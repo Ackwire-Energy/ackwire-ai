@@ -16,6 +16,8 @@ import type {
   ArtifactAuthor,
   ArtifactContent,
   ArtifactDetail,
+  ArtifactFilters,
+  ArtifactKind,
   ArtifactVersion,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -186,22 +188,48 @@ export function createMockArtifacts(
     return { ...(await view(orgId, s)), shownVersion: v.version, content, versioned };
   };
   const me = async (): Promise<ArtifactAuthor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
+  /** Like the server's `listArtifacts`: the Drive's filters (`kinds` too unless `allKinds`), in its order. */
+  const listed = async (orgId: string, filters: ArtifactFilters, allKinds = false) => {
+    const q = filters.q?.trim().toLowerCase();
+    const same = (a: ArtifactAuthor, b: ArtifactAuthor | undefined) => a.type === b?.type && a.id === b.id;
+    const shown = (await store(orgId))
+      .filter((s) => !s.deletedAt)
+      .filter((s) => allKinds || !filters.kind || s.meta.kind === filters.kind)
+      .filter((s) => allKinds || !filters.kinds?.length || filters.kinds.includes(s.meta.kind))
+      .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
+      .filter((s) => !filters.channelIds?.length || filters.channelIds.includes(s.meta.channelId ?? ""))
+      .filter((s) => !filters.author || s.versions.some((v) => same(v.author, filters.author)))
+      .filter(
+        (s) =>
+          !filters.authors?.length ||
+          filters.authors.some((a) => same(a, s.meta.createdBy) || same(a, s.meta.updatedBy)),
+      )
+      .filter((s) => !filters.who || s.meta.createdBy.type === (filters.who === "agents" ? "agent" : "person"))
+      .filter((s) => !q || s.meta.title.toLowerCase().includes(q));
+    const order = ["document", "table", "diff", "diagram", "html", "file"];
+    const newest = (a: Artifact, b: Artifact) => b.updatedAt.localeCompare(a.updatedAt);
+    return (await Promise.all(shown.map((s) => view(orgId, s)))).sort(
+      filters.sort === "name"
+        ? (a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()) || newest(a, b)
+        : filters.sort === "kind"
+          ? (a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || newest(a, b)
+          : newest,
+    );
+  };
+  /** The server's page size. */
+  const PAGE = 100;
   return {
-    list: async (orgId, filters = {}) => {
-      const q = filters.q?.trim().toLowerCase();
-      const shown = (await store(orgId))
-        .filter((s) => !s.deletedAt)
-        .filter((s) => !filters.kind || s.meta.kind === filters.kind)
-        .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
-        .filter(
-          (s) =>
-            !filters.author ||
-            s.versions.some((v) => v.author.type === filters.author?.type && v.author.id === filters.author.id),
-        )
-        .filter((s) => !q || s.meta.title.toLowerCase().includes(q));
-      return (await Promise.all(shown.map((s) => view(orgId, s)))).sort((a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt),
-      );
+    list: async (orgId, filters = {}) => (await listed(orgId, filters)).slice(0, PAGE),
+    page: async (orgId, filters = {}, cursor) => {
+      const all = await listed(orgId, filters);
+      const at = Number(cursor ?? 0);
+      const counts: Partial<Record<ArtifactKind, number>> = {};
+      if (!cursor) for (const a of await listed(orgId, filters, true)) counts[a.kind] = (counts[a.kind] ?? 0) + 1;
+      return {
+        artifacts: all.slice(at, at + PAGE),
+        nextCursor: at + PAGE < all.length ? String(at + PAGE) : null,
+        ...(cursor ? {} : { counts }),
+      };
     },
     get: async (orgId, id, version) => detail(orgId, await find(orgId, id), version),
     keep: async (orgId, id) => {

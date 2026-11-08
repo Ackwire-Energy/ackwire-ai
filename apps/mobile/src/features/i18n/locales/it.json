@@ -1682,6 +1682,7 @@
     "everyoneFailed": "Non è stato possibile cambiare l'accesso di tutti. Riprova.",
     "disconnectFailed": "Impossibile scollegare {{name}}. Riprova.",
     "needsReconnect": "L'account {{name}} ha smesso di funzionare. Gli agenti non possono usarlo finché qualcuno non lo ricollega.",
+    "noTools": "Non è stato possibile leggere gli strumenti di {{name}}. Gli agenti ne restano senza finché non vengono letti di nuovo, in Strumenti.",
     "accountTitle": "Questo account",
     "renameFailed": "Non è stato possibile rinominarlo. Riprova.",
     "whoTitle": "Chi lo usa e fino a che punto",
@@ -1814,7 +1815,7 @@
   },
   "crash": {
     "title": "Qualcosa è andato storto in questa schermata",
-    "subtitle": "L'app ha avuto un errore mostrando questo. Riprova. Se continua a succedere, mandaci il testo qui sotto.",
+    "subtitle": "L'app ha avuto un errore mostrando questo. Riprova.",
     "retry": "Riprova"
   },
   "notFound": {

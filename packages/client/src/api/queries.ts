@@ -10,7 +10,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
@@ -3610,14 +3610,27 @@ export function useStartMigration(orgId: string) {
   });
 }
 
-export const useArtifacts = (orgId: string, filters: ArtifactFilters) => {
+/**
+ * The Drive's files for `filters`, a page of 100 at a time (`fetchNextPage` while `hasNextPage`): `artifacts` is what
+ * loaded so far, `counts` how many each kind has for these filters (kinds left out), from the first page.
+ */
+export function useArtifacts(orgId: string, filters: ArtifactFilters) {
   const api = useApi();
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: keys.artifactList(orgId, filters),
-    queryFn: () => api.artifacts.list(orgId, filters),
+    queryFn: ({ pageParam }) => api.artifacts.page(orgId, filters, pageParam || undefined),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: (prev) => prev,
   });
-};
+  const pages = query.data?.pages;
+  // A file that moved to another page while the next one loaded comes once, where it came first.
+  const artifacts = useMemo(
+    () => [...new Map((pages ?? []).flatMap((p) => p.artifacts).map((a) => [a.id, a])).values()],
+    [pages],
+  );
+  return { ...query, artifacts: query.data ? artifacts : undefined, counts: pages?.[0]?.counts ?? null };
+}
 
 /** One artifact at a version (latest when omitted). */
 /** `GET …/artifacts-trash`: deleted files (30 days). */
@@ -3992,6 +4005,31 @@ export function useIssueAction(orgId: string) {
           return api.issues.askAgent(orgId, action.id, action.agentId);
         case "audience":
           return api.issues.setAudience(orgId, action.id, action.audience);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+/**
+ * An agent picked for a task starts on it ("Pedir"). When it can't, the agent stays the task's, as the person picked
+ * it, and the call rejects with why: the caller says it with the task's own words and offers to ask again, so it's
+ * silent here (no second toast).
+ */
+export function useStartAgentOnTask(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async ({ issueId, agentId }: { issueId: string; agentId: string }) => {
+      try {
+        return await api.issues.askAgent(orgId, issueId, agentId);
+      } catch (error) {
+        await api.issues.update(orgId, issueId, { assignee: { type: "agent", id: agentId } }).catch(() => {});
+        throw error;
       }
     },
     onSettled: () => {

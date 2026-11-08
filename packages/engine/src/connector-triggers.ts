@@ -1,6 +1,6 @@
 import { parseAddressList } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { type ConnectorDeps, connectionHeaders } from "./connectors/connections";
+import { type ConnectorDeps, connectionHeaders, noteRefusedSignIn } from "./connectors/connections";
 import { customScope } from "./connectors/custom";
 import { connectOverHttp, type McpConnect, type McpSession } from "./connectors/mcp";
 import { presetForServer } from "./connectors/presets";
@@ -222,11 +222,16 @@ async function withSession<T>(deps: ConnectorTriggerDeps, connectionId: string, 
     .from(connectorConnections)
     .where(and(eq(connectorConnections.id, connectionId), isNull(connectorConnections.revokedAt)));
   if (!connection) throw new Error("connection_gone");
-  const session = await (deps.connect ?? connectOverHttp)(connection, await connectionHeaders(deps, connection));
   try {
-    return await run(session);
-  } finally {
-    await session.close().catch(() => undefined);
+    const session = await (deps.connect ?? connectOverHttp)(connection, await connectionHeaders(deps, connection));
+    try {
+      return await run(session);
+    } finally {
+      await session.close().catch(() => undefined);
+    }
+  } catch (error) {
+    await noteRefusedSignIn(deps.db, connection, error);
+    throw error;
   }
 }
 

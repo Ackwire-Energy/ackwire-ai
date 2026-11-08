@@ -46,6 +46,8 @@ import type {
   AppsList,
   Artifact,
   ArtifactDetail,
+  ArtifactFilters,
+  ArtifactPage,
   ArtifactVersion,
   AskToJoinResult,
   AuditPage,
@@ -256,6 +258,23 @@ const threadQuery = (f: Partial<ThreadFilters>) => ({
   q: f.q?.trim() || undefined,
   cursor: f.cursor,
   limit: f.limit,
+});
+
+const csv = (list: readonly string[] | undefined) => (list?.length ? list.join(",") : undefined);
+
+/** The Drive's filters as `GET …/artifacts` reads them. */
+const artifactQuery = (f: ArtifactFilters) => ({
+  q: f.q,
+  kind: f.kind,
+  kinds: csv(f.kinds),
+  channelId: f.channelId,
+  channelIds: csv(f.channelIds),
+  authorType: f.author?.type,
+  authorId: f.author?.id,
+  changed: f.changed && f.author ? "1" : undefined,
+  authors: csv(f.authors?.map((a) => `${a.type}:${a.id}`)),
+  who: f.who,
+  sort: f.sort && f.sort !== "recent" ? f.sort : undefined,
 });
 
 /**
@@ -1256,18 +1275,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     artifacts: {
       list: async (orgId, filters = {}) =>
-        (
-          await request<{ artifacts: Artifact[] }>(`${org(orgId)}/artifacts`, {
-            query: {
-              q: filters.q,
-              kind: filters.kind,
-              channelId: filters.channelId,
-              authorType: filters.author?.type,
-              authorId: filters.author?.id,
-              changed: filters.changed && filters.author ? "1" : undefined,
-            },
-          })
-        ).artifacts,
+        (await request<ArtifactPage>(`${org(orgId)}/artifacts`, { query: artifactQuery(filters) })).artifacts,
+      page: (orgId, filters = {}, cursor) =>
+        request<ArtifactPage>(`${org(orgId)}/artifacts`, { query: { ...artifactQuery(filters), cursor } }),
       get: (orgId, id, version) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}`, { query: { version } }),
       keep: (orgId, id) => request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/keep`, { method: "POST" }),

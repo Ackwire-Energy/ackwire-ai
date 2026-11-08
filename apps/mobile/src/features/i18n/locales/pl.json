@@ -1774,6 +1774,7 @@
     "everyoneFailed": "Nie udało się zmienić dostępu dla wszystkich. Spróbuj ponownie.",
     "disconnectFailed": "Nie udało się odłączyć {{name}}. Spróbuj ponownie.",
     "needsReconnect": "Konto {{name}} przestało działać. Agenci nie mogą z niego korzystać, dopóki ktoś go nie połączy ponownie.",
+    "noTools": "Nie udało się odczytać narzędzi {{name}}. Agenci są bez nich, dopóki nie zostaną odczytane ponownie, w Narzędziach.",
     "accountTitle": "To konto",
     "renameFailed": "Nie udało się zmienić nazwy. Spróbuj ponownie.",
     "whoTitle": "Kto z tego korzysta i w jakim zakresie",
@@ -1910,7 +1911,7 @@
   },
   "crash": {
     "title": "Coś poszło nie tak na tym ekranie",
-    "subtitle": "Aplikacja napotkała błąd przy wyświetlaniu tego widoku. Spróbuj ponownie. Jeśli to się powtarza, wyślij nam tekst poniżej.",
+    "subtitle": "Aplikacja napotkała błąd przy wyświetlaniu tego widoku. Spróbuj ponownie.",
     "retry": "Spróbuj ponownie"
   },
   "notFound": {

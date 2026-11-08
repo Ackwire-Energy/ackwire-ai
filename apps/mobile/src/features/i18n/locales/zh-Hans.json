@@ -1498,6 +1498,7 @@
     "everyoneFailed": "无法更改所有人的访问权限，请重试。",
     "disconnectFailed": "无法断开 {{name}}，请重试。",
     "needsReconnect": "{{name}} 账号已失效。在有人重新连接之前，智能体无法使用它。",
+    "noTools": "无法读取{{name}}的工具。在工具中重新读取之前，智能体用不了它们。",
     "accountTitle": "此账号",
     "renameFailed": "无法重命名，请重试。",
     "whoTitle": "谁在使用，权限多大",
@@ -1622,7 +1623,7 @@
   },
   "crash": {
     "title": "此页面出了点问题",
-    "subtitle": "应用在显示这些内容时出错了。请重试。如果问题持续出现，请把下面的文字发给我们。",
+    "subtitle": "应用在显示这些内容时出错了。请重试。",
     "retry": "重试"
   },
   "notFound": {

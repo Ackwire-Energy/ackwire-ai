@@ -9,6 +9,8 @@ import {
   type KeyWrapper,
   PushError,
   type PushSender,
+  type RealtimeEvent,
+  userTopic,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { LOCALE_CODES } from "@agenteschat/i18n/locale";
@@ -41,12 +43,14 @@ import {
   renderPush,
   sealSecret,
   setNoticePref,
+  snoozeNotification,
   unregisterPushDevice,
   VAPID_FALLBACK_SUBJECT,
   VAPID_KEEP_NEW_MS,
   VAPID_RECHECK_MS,
   vapidKeys,
   vapidSubject,
+  wakeSnoozedNotifications,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -264,6 +268,57 @@ describe("push delivery", () => {
       [TOKEN_BIA_EN, "ana", "Te mandei o contrato"],
     ]);
     expect(push.sent[0]?.data).toMatchObject({ kind: "dm", channelId: dm.id, dmId: dm.id });
+  });
+
+  test("Lembrar depois reaches the person's phone when its time comes, even read before or merged", async () => {
+    f = await setup();
+    const { bia, push, drain } = await withPhone();
+    const reply = (text: string) =>
+      notify(deps(), {
+        orgId: f.org.id,
+        userIds: [bia.id],
+        kind: "agent_reply",
+        groupKey: "agent_reply:release",
+        actor: { type: "agent", id: f.agent.id },
+        source: { channelId: f.general.id },
+        latest: { text },
+      });
+    await reply("Deploy feito");
+    await reply("Os testes passaram");
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia pode revisar?" });
+    await drain();
+    expect(push.sent.map((m) => m.data?.kind).sort()).toEqual(["agent_reply", "mention"]);
+    const rows = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
+    const merged = rows.find((r) => r.kind === "agent_reply");
+    const read = rows.find((r) => r.kind === "mention");
+    expect(merged?.count).toBe(2);
+    // The first tap on a narrow screen reads it; then "Lembrar depois".
+    await markNotificationRead(deps(), bia.id, f.org.id, read?.id ?? "", true);
+    const until = new Date(Date.now() + 3600_000);
+    for (const n of [merged, read]) await snoozeNotification(deps(), bia.id, f.org.id, n?.id ?? "", until);
+    const events: RealtimeEvent[] = [];
+    f.pubsub.subscribe(userTopic(f.org.id, bia.id), (e) => events.push(e));
+
+    expect(await wakeSnoozedNotifications({ ...deps(), now: () => new Date(until.getTime() + 1000) })).toBe(2);
+    await drain();
+    expect(
+      push.sent
+        .slice(2)
+        .map((m) => m.data?.kind)
+        .sort(),
+    ).toEqual(["agent_reply", "mention"]);
+    const woke = events.filter((e) => e.type === "notification.upserted");
+    expect(woke.map((e) => ("alert" in e ? e.alert : null))).toEqual([true, true]);
+    const back = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
+    expect(back.map((r) => [r.kind, r.readAt, r.snoozedUntil])).toEqual(
+      expect.arrayContaining([
+        ["agent_reply", null, null],
+        ["mention", null, null],
+      ]),
+    );
+    // Once per reminder.
+    await drain();
+    expect(push.sent).toHaveLength(4);
   });
 
   test("thread replies and other non-pushing kinds don't push", async () => {

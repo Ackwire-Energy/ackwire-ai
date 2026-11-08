@@ -217,6 +217,45 @@ test("Drive API: create, new version, versions, download link, file, delete", as
   expect((await api(`/artifacts/${a.id}`)).status).toBe(404);
 });
 
+test("Drive API: pages with a cursor in the order asked; the first page counts each kind for the filters", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const made = [
+    ["Cc", "table"],
+    ["Aa", "document"],
+    ["Ee", "table"],
+    ["Bb", "document"],
+    ["Dd", "table"],
+  ] as const;
+  for (const [title, kind] of made) {
+    const content = kind === "table" ? { kind, columns: ["a"], rows: [["1"]] } : { kind, markdown: `# ${title}` };
+    expect((await api("/artifacts", { json: { title, content } })).status).toBe(201);
+  }
+  type Page = { artifacts: { title: string }[]; nextCursor: string | null; counts?: Record<string, number> };
+  const read = async (query: string) => (await (await api(`/artifacts?${query}`)).json()) as Page;
+  const titles = (p: Page) => p.artifacts.map((a) => a.title);
+
+  const first = await read("limit=2&sort=name");
+  expect(titles(first)).toEqual(["Aa", "Bb"]);
+  expect(first.counts).toEqual({ table: 3, document: 2 });
+  const second = await read(`limit=2&sort=name&cursor=${first.nextCursor}`);
+  expect(titles(second)).toEqual(["Cc", "Dd"]);
+  expect(second.counts).toBeUndefined();
+  const last = await read(`limit=2&sort=name&cursor=${second.nextCursor}`);
+  expect([titles(last), last.nextCursor]).toEqual([["Ee"], null]);
+  // Newest first by default; kinds narrow the list while the chips still count every kind.
+  const tables = await read("kinds=table&limit=2");
+  expect(titles(tables)).toEqual(["Dd", "Ee"]);
+  expect(tables.counts).toEqual({ table: 3, document: 2 });
+  expect(titles(await read("sort=kind"))).toEqual(["Bb", "Aa", "Dd", "Ee", "Cc"]);
+  // Quem fez looks at every file, not a page.
+  expect(await read("who=agents")).toMatchObject({ artifacts: [], nextCursor: null, counts: {} });
+  expect((await read("who=people&limit=1")).counts).toEqual({ table: 3, document: 2 });
+});
+
 test("Drive API: canDelete and who can see it on each file; the trash deletes for good", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

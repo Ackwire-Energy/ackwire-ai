@@ -3,7 +3,8 @@ import { ApiError, NetworkError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
-import { lowerFirst } from "./format";
+import { joinNames, lowerFirst } from "./format";
+import { agentGrammar } from "./grammar";
 import { limitRefusalText } from "./limits";
 import { providerOf } from "./providers";
 import { endSentence } from "./text";
@@ -664,6 +665,19 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   if (restriction) return restriction;
   const limit = limitRefusalText(t, locale, error.code, error.params);
   if (limit) return limit;
+  // An agent that doesn't answer this person (`audienceError`): whom it answers, by name.
+  if (
+    (error.code === "audience.only" || error.code === "audience.nobody") &&
+    typeof error.params?.agentName === "string"
+  ) {
+    const g = agentGrammar(error.params.agentName);
+    const names = Array.isArray(error.params.names)
+      ? error.params.names.filter((n): n is string => typeof n === "string")
+      : [];
+    return names.length > 0
+      ? t("audience.notice.only", { ...g, names: joinNames(names, t) })
+      : t("audience.notice.nobody", g);
+  }
   // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
   if (error.code === "mail.owner_only" && !error.params?.ownerName)
     return t("errors.mail.ownerOnlyUnknown", error.params);

@@ -21,6 +21,7 @@ import {
   type ConnectorDeps,
   connectionHeaders,
   GITHUB_APP_AUTH,
+  noteRefusedSignIn,
   toolPrefixOfConnection,
 } from "./connections";
 import {
@@ -247,11 +248,17 @@ export function createConnectorToolSource(
     auth?: Record<string, string>,
   ): Promise<T> {
     const extra = isCustom(connection) ? undefined : CONNECTOR_CATALOG[connection.connector]?.headers;
-    const session = await connect(connection, { ...extra, ...(auth ?? (await connectionHeaders(deps, connection))) });
     try {
-      return await fn(session);
-    } finally {
-      await session.close().catch(() => {});
+      const session = await connect(connection, { ...extra, ...(auth ?? (await connectionHeaders(deps, connection))) });
+      try {
+        return await fn(session);
+      } finally {
+        await session.close().catch(() => {});
+      }
+    } catch (error) {
+      // A 401 for headers given in `auth` may be the GitHub App's token, which says nothing of the connection's sign-in.
+      if (!auth) await noteRefusedSignIn(deps.db, connection, error);
+      throw error;
     }
   }
 
@@ -308,7 +315,7 @@ export function createConnectorToolSource(
    * level may be approved for good for one agent (`customAlwaysAsks` aside).
    */
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
-    // A Composio account that stopped working has no tools until it is reconnected.
+    // A sign-in that stopped working (a Composio account too) has no tools until it is reconnected.
     if (connection.status === "needs_reconnect") return [];
     const classified = await classifiedTools(deps.db, connection.id);
     if (classified.length === 0) return [];
@@ -423,7 +430,8 @@ export function createConnectorToolSource(
           continue;
         }
         const def = CONNECTOR_CATALOG[connection.connector];
-        if (!def) continue;
+        // A sign-in that stopped working has no tools until Reconectar.
+        if (!def || connection.status === "needs_reconnect") continue;
         const prefix = toolPrefixOfConnection(connection);
         let listed: McpTool[];
         try {

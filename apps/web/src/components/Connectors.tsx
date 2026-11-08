@@ -432,6 +432,10 @@ function ConnectedRow({
             <Chip icon="alert" tone="waiting">
               {t("connectors.composio.needsReconnect")}
             </Chip>
+          ) : item.toolsError ? (
+            <Chip icon="alert" tone="waiting">
+              {t("connectors.noToolsNow")}
+            </Chip>
           ) : item.pending > 0 && item.server?.reviewedAt ? (
             <Chip icon="waiting" tone="waiting">
               {t("connectors.toReview", { count: item.pending })}

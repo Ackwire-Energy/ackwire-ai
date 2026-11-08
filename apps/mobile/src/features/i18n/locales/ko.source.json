@@ -3919,6 +3919,9 @@
   "connectors.needsReconnect": {
     "value": "The {{name}} account stopped working. Agents can't use it until someone reconnects it."
   },
+  "connectors.noTools": {
+    "value": "{{name}}'s tools couldn't be read. Agents go without them until they're read again, in Tools."
+  },
   "connectors.accountTitle": {
     "value": "This account"
   },
@@ -4213,7 +4216,7 @@
     "value": "Something went wrong on this screen"
   },
   "crash.subtitle": {
-    "value": "The app hit an error showing this. Try again. If it keeps happening, send us the text below."
+    "value": "The app hit an error showing this. Try again."
   },
   "crash.retry": {
     "value": "Try again"

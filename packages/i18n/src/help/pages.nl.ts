@@ -248,27 +248,37 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Goedkeuringen",
-    summary: "Er gebeurt niets gevoeligs zonder een mens.",
+    summary: "Gevoelige acties wachten op een mens, één keer of voorgoed.",
     sections: [
       {
         id: "what",
         heading: "Wat eerst vraagt",
         blocks: [
-          "Als een agent wil mergen, deployen, terugdraaien, iets naar buiten sturen of gegevens verwijderen, vraagt hij het eerst, welke toegang hij ook heeft. Het verzoek verschijnt in **Goedkeuringen** en in het kanaal, met de precieze actie en de reden.",
+          "Als een agent wil mergen, deployen, terugdraaien, iets naar buiten sturen of gegevens verwijderen, vraagt hij het eerst, welke toegang hij ook heeft. Het verzoek verschijnt in **Goedkeuringen** en in het gesprek, met de precieze actie en de reden.",
         ],
       },
       {
-        id: "exact",
-        heading: "Eén goedkeuring, één actie",
+        id: "always",
+        heading: "Eén keer, of altijd",
         blocks: [
-          "Elke goedkeuring geldt voor één precieze actie, met haar waarden. Verandert de agent iets, dan moet hij het opnieuw vragen.",
+          "Goedkeuren geldt voor één precieze actie, met haar waarden. Verandert de agent iets, dan vraagt hij het opnieuw.",
+          "**Altijd goedkeuren** laat de agent dat soort actie vanaf nu doen, met elke waarde, zonder te vragen. Bij het verzoek van een routine doet **Altijd in deze routine** hetzelfde, alleen voor die routine. Geen van beide wordt aangeboden voor mergen, deployen, terugdraaien en dergelijke. Ongedaan maken doe je in **Tools en toegang** op de pagina van de agent, of in de instellingen van de routine.",
         ],
       },
       {
         id: "who",
         heading: "Wie goedkeurt",
         blocks: [
-          "De eigenaar van de agent keurt zijn verzoeken goed. Heeft een agent geen eigenaar, dan doen de beheerders het.",
+          {
+            list: [
+              "De eigenaar van de agent, voor zijn verzoeken.",
+              "Iedereen met een rol met **Acties van agents goedkeuren**, voor elke agent.",
+              "De mensen die een agent noemt als hij vraagt, in plaats van zijn eigenaar.",
+              "Wie iemand vervangt in **Wie keurt voor mij goed**, voor wat aan die persoon wordt gevraagd. Mergen, deployen en andere risicovolle acties alleen als dat aanstaat.",
+            ],
+          },
+          "Een actie in iemands eigen mailbox wacht alleen op die persoon. Nieuwe toegang voor een agent wacht op wie agents beheert.",
+          "Lodi, je rechterhand, kan ook voor jou nieuwe agents goedkeuren die andere agents voorstellen, en wijzigingen in het model, budget en de kanalen van een agent, alleen als jij erom vroeg. Wie jou vervangt en wat Lodi goedkeurt, kies je in **Instellingen\u00a0›\u00a0Jij\u00a0›\u00a0Goedkeuringen**.",
         ],
       },
       {

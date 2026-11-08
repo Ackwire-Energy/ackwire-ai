@@ -1590,6 +1590,7 @@
     "everyoneFailed": "De toegang van iedereen kon niet worden gewijzigd. Probeer het opnieuw.",
     "disconnectFailed": "{{name}} kon niet worden losgekoppeld. Probeer het opnieuw.",
     "needsReconnect": "Het account van {{name}} werkt niet meer. Agents kunnen het niet gebruiken tot iemand het opnieuw verbindt.",
+    "noTools": "De tools van {{name}} konden niet worden gelezen. Agents hebben ze pas weer als ze opnieuw worden gelezen, in Tools.",
     "accountTitle": "Dit account",
     "renameFailed": "Naam wijzigen lukte niet. Probeer het opnieuw.",
     "whoTitle": "Wie het gebruikt en hoe ver",
@@ -1718,7 +1719,7 @@
   },
   "crash": {
     "title": "Er ging iets mis op dit scherm",
-    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw. Gebeurt het vaker, stuur ons dan de tekst hieronder.",
+    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw.",
     "retry": "Opnieuw proberen"
   },
   "notFound": {

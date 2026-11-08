@@ -250,26 +250,38 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Onaylar",
-    summary: "Hassas hiçbir şey bir kişi olmadan olmaz.",
+    summary: "Hassas işlemler bir kişiyi bekler, bir kez ya da kalıcı olarak.",
     sections: [
       {
         id: "what",
         heading: "Neler önce sorar",
         blocks: [
-          "Bir ajan merge, deploy ya da geri alma yapmak, dışarıya bir şey göndermek veya veri silmek istediğinde, erişimi ne olursa olsun önce sorar. İstek, tam işlem ve nedeniyle birlikte **Onaylar** bölümünde ve kanalda görünür.",
+          "Bir ajan merge, deploy ya da geri alma yapmak, dışarıya bir şey göndermek veya veri silmek istediğinde, erişimi ne olursa olsun önce sorar. İstek, tam işlem ve nedeniyle birlikte **Onaylar** bölümünde ve konuşmada görünür.",
         ],
       },
       {
-        id: "exact",
-        heading: "Bir onay, bir işlem",
+        id: "always",
+        heading: "Bir kez ya da her zaman",
         blocks: [
-          "Her onay, değerleriyle birlikte tek bir işlemi kapsar. Ajan herhangi bir şeyi değiştirirse yeniden sormak zorundadır.",
+          "Onaylamak, değerleriyle birlikte tek bir işlemi kapsar. Ajan herhangi bir şeyi değiştirirse yeniden sorar.",
+          "**Her zaman onayla**, ajanın bu tür bir işlemi bundan sonra her değerle, sormadan yapmasına izin verir. Bir rutinin isteğinde **Bu rutinde her zaman** aynısını yalnızca o rutin için yapar. İkisi de merge, deploy, geri alma ve benzerleri için sunulmaz. Geri almak için ajanın sayfasındaki **Araçlar ve erişim** bölümüne ya da rutinin ayarlarına gidin.",
         ],
       },
       {
         id: "who",
         heading: "Kim onaylar",
-        blocks: ["Ajanın isteklerini sahibi onaylar. Sahibi olmayan bir ajan için yöneticiler onaylar."],
+        blocks: [
+          {
+            list: [
+              "Ajanın sahibi, ajanın istekleri için.",
+              "Rolünde **Ajanların eylemlerini onaylama** olan herkes, tüm ajanlar için.",
+              "Ajanın isterken adını verdiği kişiler, sahibinin yerine.",
+              "**Benim yerime kim onaylar** bölümünde birinin yerine bakan kişi, o kişiden istenenler için. Merge, deploy ve diğer riskli işlemler yalnızca bu açıksa.",
+            ],
+          },
+          "Birinin kendi posta kutusundaki bir işlem yalnızca o kişiyi bekler. Bir ajan için yeni erişim, ajanları yönetenleri bekler.",
+          "Sağ kolunuz Lodi de diğer ajanların önerdiği yeni ajanları ve bir ajanın modeli, bütçesi ve kanallarındaki değişiklikleri, yalnızca siz istediyseniz, sizin yerinize onaylayabilir. Kimin sizin yerinize baktığını ve Lodi’nin neyi onaylayacağını **Ayarlar\u00a0›\u00a0Siz\u00a0›\u00a0Onaylar** bölümünden seçersiniz.",
+        ],
       },
       {
         id: "refusing",

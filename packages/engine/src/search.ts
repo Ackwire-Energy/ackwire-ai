@@ -389,6 +389,18 @@ export async function searchForUser(
     visibleChannelIds: visible,
     visibleIssueScopes,
   });
+  // An archived thread is out of search (ADR 0029 §11): its replies go, its root stays with the channel's timeline.
+  const found = hits.filter((h) => h.kind === "message").map((h) => h.sourceId);
+  if (found.length > 0) {
+    const { messages: m, threads: t } = schema;
+    const archived = await deps.db
+      .select({ id: m.id })
+      .from(m)
+      .innerJoin(t, and(eq(t.orgId, m.orgId), eq(t.rootMessageId, m.threadId)))
+      .where(and(eq(m.orgId, orgId), inArray(m.id, found), eq(t.state, "archived")));
+    const gone = new Set(archived.map((r) => r.id));
+    hits = hits.filter((h) => h.kind !== "message" || !gone.has(h.sourceId));
+  }
   // A task's document follows a change of who sees it a moment later: the task itself decides.
   const tasks = hits.filter((h) => h.kind === "issue").map((h) => h.sourceId);
   if (tasks.length > 0) {

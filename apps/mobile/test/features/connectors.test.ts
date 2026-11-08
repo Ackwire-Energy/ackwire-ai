@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Connection, ConnectorDef, CustomServer, GitHubAppInfo, GitHubAppInstallation } from "@agenteschat/client";
 import { connectedItems, isMcpItem, itemName } from "@agenteschat/client/lib/connected";
 import {
@@ -476,5 +478,36 @@ describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", 
     expect(back).toContain("installationIdOf(params.installation_id)");
     // The server's own app is made in the browser, on Conectores of the web.
     expect(app).toContain("/settings/connectors`)");
+  });
+});
+
+describe("a connection that stopped working", () => {
+  test("a dead sign-in or unread tools: the strip's tile waits with why, and the screen says so first", () => {
+    const def = { id: "github", label: "GitHub", kind: "catalog", tools: [] } as unknown as ConnectorDef;
+    const dead = {
+      id: "c1",
+      connector: "github",
+      label: "GitHub",
+      createdAt: "2026-11-01T00:00:00Z",
+      revokedAt: null,
+      status: "needs_reconnect",
+    } as unknown as Connection;
+    const unread = {
+      id: "s1",
+      label: "Suporte",
+      serverUrl: "https://mcp.suporte.dev",
+      createdAt: "2026-11-02T00:00:00Z",
+      tools: [],
+      toolsError: "upstream timed out",
+    } as unknown as CustomServer;
+    const [gh, sup] = connectedItems([dead], [unread], [def]);
+    expect([gh?.needsReconnect, gh?.toolsError]).toEqual([true, null]);
+    expect([sup?.needsReconnect, sup?.toolsError]).toEqual([false, "upstream timed out"]);
+    const src = (f: string) => readFileSync(join(import.meta.dir, "../../src/features/connectors", f), "utf8");
+    const strip = src("ConnectorsScreen.tsx");
+    const tile = strip.slice(strip.indexOf("function ConnectedTile("), strip.indexOf("const TILE_IN"));
+    expect(tile).toContain('t("connectors.composio.needsReconnect")');
+    expect(tile).toContain('t("connectors.noToolsNow")');
+    expect(src("ConnectionScreen.tsx")).toContain('t("mobile.connectors.noTools", { name })');
   });
 });

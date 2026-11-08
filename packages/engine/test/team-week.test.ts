@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { en, STRINGS } from "@agenteschat/i18n";
 import {
   actOnTeamWeek,
   createSetupToolSource,
@@ -17,6 +18,7 @@ import {
   requestKey,
   SET_TEAM_WEEK_TOOL,
   setTeamWeekPrefs,
+  TEAM_WEEK_DEFAULTS,
   TEAM_WEEK_JOB,
   type TeamWeekCard,
   teamWeekCardOf,
@@ -27,7 +29,9 @@ import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
-  await f?.close();
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
 });
 
 const HOUR = 3_600_000;
@@ -512,4 +516,19 @@ describe("Resumo do dia", () => {
     expect((res.output as { content: string }).content).toContain("Resumo do dia");
     expect(await getTeamWeekPrefs(f.db, f.org.id, bia.id)).toMatchObject({ off: false, daily: true, hour: 9 });
   });
+});
+
+test("Lodi's settings name what it posts unasked: Team week, on by default, in every language", () => {
+  expect(TEAM_WEEK_DEFAULTS.off).toBe(false);
+  for (const [code, strings] of Object.entries(STRINGS)) {
+    const words = strings as {
+      rightHand?: { settings?: Record<string, string> };
+      teamWeek?: { settings?: { label?: string } };
+    };
+    const label = words.teamWeek?.settings?.label ?? en.teamWeek.settings.label;
+    expect(label).not.toBe("");
+    const lines = Object.entries(words.rightHand?.settings ?? {}).filter(([k]) => /^lock(_female)?$/.test(k));
+    for (const [key, line] of lines)
+      expect({ code, key, names: line.includes(label) }).toEqual({ code, key, names: true });
+  }
 });

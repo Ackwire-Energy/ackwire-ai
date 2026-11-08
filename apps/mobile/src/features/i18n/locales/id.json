@@ -1498,6 +1498,7 @@
     "everyoneFailed": "Tidak bisa mengubah akses semua orang. Coba lagi.",
     "disconnectFailed": "Tidak bisa memutus {{name}}. Coba lagi.",
     "needsReconnect": "Akun {{name}} berhenti berfungsi. Agen tidak bisa memakainya sampai ada yang menghubungkannya lagi.",
+    "noTools": "Alat dari {{name}} tidak bisa dibaca. Agen tidak bisa memakainya sampai dibaca lagi, di Alat.",
     "accountTitle": "Akun ini",
     "renameFailed": "Tidak bisa mengganti nama. Coba lagi.",
     "whoTitle": "Siapa yang memakainya dan sejauh mana",
@@ -1622,7 +1623,7 @@
   },
   "crash": {
     "title": "Ada yang salah di layar ini",
-    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi. Jika terus terjadi, kirimkan teks di bawah ke kami.",
+    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi.",
     "retry": "Coba lagi"
   },
   "notFound": {

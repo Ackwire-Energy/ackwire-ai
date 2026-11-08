@@ -248,27 +248,37 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Aprobaciones",
-    summary: "Nada sensible pasa sin una persona.",
+    summary: "Las acciones delicadas esperan a una persona, una vez o para siempre.",
     sections: [
       {
         id: "what",
         heading: "Qué pide permiso antes",
         blocks: [
-          "Cuando un agente quiere hacer un merge, un deploy, revertir algo, enviar algo hacia afuera o borrar datos, primero pregunta, tenga el acceso que tenga. La solicitud aparece en **Aprobaciones** y en el canal, con la acción exacta y el motivo.",
+          "Cuando un agente quiere hacer un merge, un deploy, revertir algo, enviar algo hacia afuera o borrar datos, primero pregunta, tenga el acceso que tenga. La solicitud aparece en **Aprobaciones** y en la conversación, con la acción exacta y el motivo.",
         ],
       },
       {
-        id: "exact",
-        heading: "Una aprobación, una acción",
+        id: "always",
+        heading: "Una vez, o siempre",
         blocks: [
-          "Cada aprobación cubre una acción exacta, con sus valores. Si el agente cambia algo, tiene que volver a preguntar.",
+          "Aprobar cubre una acción exacta, con sus valores. Si el agente cambia algo, vuelve a preguntar.",
+          "**Aprobar siempre** deja que el agente haga ese tipo de acción de ahora en adelante, con cualquier valor, sin preguntar. En la solicitud de una rutina, **Siempre en esta rutina** hace lo mismo solo para esa rutina. Ninguno de los dos aparece para merge, deploy, rollback y similares. Para deshacerlo, ve a **Herramientas y acceso** en la página del agente, o a los ajustes de la rutina.",
         ],
       },
       {
         id: "who",
         heading: "Quién aprueba",
         blocks: [
-          "El responsable del agente aprueba sus solicitudes. Si el agente no tiene responsable, lo hacen los admins.",
+          {
+            list: [
+              "El responsable del agente, en sus solicitudes.",
+              "Quien tenga un rol con **Aprobar acciones de los agentes**, en todos los agentes.",
+              "Las personas que el agente nombra al pedir, en lugar de su responsable.",
+              "Quien cubre a alguien en **Quién aprueba por mí**, en lo que se le pide a esa persona. Merge, deploy y otras acciones de riesgo solo cuando eso está activado.",
+            ],
+          },
+          "Una acción en el correo de alguien espera solo a esa persona. Un acceso nuevo para un agente espera a quien gestiona agentes.",
+          "Lodi, tu mano derecha, también puede aprobar por ti los agentes nuevos que proponen otros agentes y los cambios de modelo, presupuesto y canales de un agente, solo cuando tú lo pediste. Quién te cubre y lo que aprueba Lodi se eligen en **Configuración\u00a0›\u00a0Tú\u00a0›\u00a0Aprobaciones**.",
         ],
       },
       {

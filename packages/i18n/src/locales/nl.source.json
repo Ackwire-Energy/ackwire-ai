@@ -4881,7 +4881,7 @@
     "value": "Outside it, a person doesn't see {{name}} in the sidebar."
   },
   "rightHand.settings.lock": {
-    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+    "value": "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins."
   },
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
@@ -15093,6 +15093,12 @@
   "issues.form.created": {
     "value": "Task #{{number}} created."
   },
+  "issues.form.notStarted": {
+    "value": "Task #{{number}} created, but {{name}} didn't start."
+  },
+  "issues.form.askAgain": {
+    "value": "Ask again"
+  },
   "issues.form.intro": {
     "value": "Whoever takes it, a person or an agent, shows on the board with its progress."
   },
@@ -15216,6 +15222,9 @@
   },
   "issues.asked": {
     "value": "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along."
+  },
+  "issues.notStarted": {
+    "value": "{{name}} didn't start."
   },
   "issues.activity": {
     "value": "Activity"
@@ -24267,6 +24276,9 @@
   "drive.search": {
     "value": "Search files"
   },
+  "drive.loadMore": {
+    "value": "Load more"
+  },
   "drive.kind": {
     "value": "Type"
   },
@@ -25764,6 +25776,9 @@
   },
   "connectors.active": {
     "value": "Active"
+  },
+  "connectors.noToolsNow": {
+    "value": "No tools right now"
   },
   "connectors.notReviewed": {
     "value": "Waiting for review"

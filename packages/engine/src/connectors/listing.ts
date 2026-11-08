@@ -343,7 +343,7 @@ export async function connectorStates(
       : (CONNECTOR_CATALOG[c.connector]?.label ?? c.label);
     const s = services.get(label.toLowerCase());
     if (!s) continue;
-    // A Composio account that stopped working has no tools until Reconectar.
+    // A sign-in that stopped working (a Composio account too) has no tools until Reconectar.
     if (c.status === "needs_reconnect") s.reconnect = true;
     else s.held.push(c.id);
   }

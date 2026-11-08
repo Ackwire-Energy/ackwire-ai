@@ -541,6 +541,22 @@ describe("Drive", () => {
     expect(names()).toHaveLength(5);
   });
 
+  test("past 100 files: Carregar mais brings the next ones, and the kind chips count every file", async () => {
+    const api = createFakeApi(seedState(), { seed: true });
+    for (let i = 1; i <= 100; i++)
+      await api.artifacts.create(ORG_ID, { title: `Nota ${i}`, content: { kind: "document", markdown: "x" } });
+    const documents = (await api.artifacts.page(ORG_ID)).counts?.document ?? 0;
+    expect(documents).toBeGreaterThan(100);
+    await goDrive({ api });
+    expect(names()).toHaveLength(100);
+    const kinds = screen().getByRole("group", { name: "Tipos" });
+    expect(within(kinds).getByRole("button", { name: `Documentos: ${documents}` })).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Carregar mais" }));
+    await settle(6);
+    expect(names()).toHaveLength(105);
+    expect(screen().queryByRole("button", { name: "Carregar mais" })).toBeNull();
+  });
+
   test("who made it: agents or people", async () => {
     await goDrive();
     await click(screen().getByRole("radio", { name: "Pessoas" }));
