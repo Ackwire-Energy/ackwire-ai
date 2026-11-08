@@ -1493,6 +1493,9 @@
     "workingNow": "Sedang bekerja",
     "available": "Tersedia",
     "archived": "Diarsipkan",
+    "restore": "Pulihkan",
+    "restoreAction": "Pulihkan {{name}}",
+    "restored": "{{name}} kembali ke tim.",
     "emptyTitle": "Bangun tim agenmu",
     "empty": "Setiap agen punya peran dan bekerja bersama orang-orang, di kanal yang sama.",
     "emptyViewerTitle": "Tim agenmu muncul di sini",
@@ -1749,6 +1752,13 @@
     "generalName": "#general tetap dengan namanya.",
     "archive": "Arsipkan kanal",
     "archived": "#{{channel}} diarsipkan. Percakapannya tetap disimpan.",
+    "archivedTitle": "Kanal yang diarsipkan",
+    "archivedCount_other": "{{count}} kanal diarsipkan",
+    "archivedNone": "Tidak ada kanal diarsipkan untuk dipulihkan",
+    "archivedOn": "Diarsipkan {{date}}",
+    "restore": "Pulihkan",
+    "restoreName": "Pulihkan #{{channel}}",
+    "restored": "#{{channel}} kembali.",
     "leave": "Keluar dari kanal",
     "left": "Kamu keluar dari #{{channel}}",
     "leaveTitle": "Keluar dari #{{channel}}?",
@@ -7874,6 +7884,19 @@
     "confirm": "Konfirmasi dan undang",
     "otherTime": "Waktu lain",
     "confirmed": "Acara dibuat dan undangan terkirim.",
+    "proposalDismissed": "Usulan ditolak",
+    "proposalWaits": "{{name}} mengonfirmasi acara ini.",
+    "rsvp": {
+      "accept": "Hadir",
+      "decline": "Tidak hadir",
+      "accepted": "hadir",
+      "declined": "tidak hadir",
+      "mine": {
+        "needs_action": "Kamu termasuk yang diundang ke acara ini.",
+        "accepted": "Kamu hadir.",
+        "declined": "Kamu tidak hadir."
+      }
+    },
     "kind": {
       "event": "Acara",
       "routine": "Rutinitas",
@@ -9739,9 +9762,6 @@
     },
     "s3": "Bucket milikmu sendiri",
     "s3Text": "S3, R2, MinIO, dan lainnya yang kompatibel dengan S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Segera hadir",
     "current": "Sedang dipakai",
     "usage": {
       "files": "{{size}} file",
@@ -11170,6 +11190,11 @@
       "subject": "Subjek berisi",
       "text": "Isi berisi",
       "noMailbox": "Hubungkan kotak surat di Konektor dulu.",
+      "readsNone": "{{name}} belum membaca kotak surat mana pun.",
+      "cantRead": "{{name}} tidak membaca kotak surat ini.",
+      "connectorReadsNone": "{{name}} belum membaca {{connector}}.",
+      "connectorCantRead": "{{name}} tidak membaca {{connector}}.",
+      "giveAccess": "Beri akses",
       "openConnectors": "Buka Konektor",
       "when": "Saat email masuk ke {{address}}",
       "whenFolder": "Saat email masuk ke {{address}} ({{folder}})",
@@ -11342,6 +11367,8 @@
       "checkAddress": "Periksa alamatnya dan coba lagi.",
       "tooLong": "Itu terlalu panjang. Persingkat dan coba lagi.",
       "updateComputerApp": "Aplikasi di komputer terlalu lama untuk ini. Perbarui dan coba lagi.",
+      "computerUpdatesItself": "Komputer ruang kerja memperbarui dirinya sendiri untuk ini. Coba lagi sebentar lagi.",
+      "notInvited": "Kamu tidak termasuk yang diundang ke acara ini.",
       "offHere": "Ini dimatikan di sini.",
       "notInConversation": "Tidak ada di percakapan ini.",
       "accountStart": "Komputer tidak bisa memulai proses masuk. Pastikan komputer menyala dan coba lagi.",
@@ -12421,6 +12448,7 @@
     }
   },
   "settings": {
+    "notOpen": "Peranmu di ruang kerja ini tidak membuka {{section}}. Orang yang mengelola peran bisa membukanya untukmu.",
     "nav": "Bagian pengaturan",
     "group": {
       "you": "Kamu",

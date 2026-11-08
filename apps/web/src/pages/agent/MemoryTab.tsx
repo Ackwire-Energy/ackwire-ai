@@ -11,6 +11,7 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import { memoryLine, pendingOnAgent, proposalTitle, proposalWhy } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
@@ -323,9 +324,17 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
             >
               {s.locked ? t("agentPage.memory.unlock") : t("agentPage.memory.lock")}
             </Button>
-            <Link className="agp-more" to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "skills" }}>
-              {t("agentPage.memory.share")}
-            </Link>
+            {/* Skills is for who manages agents: an owner without it turns the skill on in each agent's own page. */}
+            {can(org, "manage_agents") && (
+              <Link
+                className="agp-more"
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: "skills" }}
+                search={{ skill: s.id }}
+              >
+                {t("agentPage.memory.share")}
+              </Link>
+            )}
           </>
         )}
       </span>

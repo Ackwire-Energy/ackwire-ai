@@ -69,6 +69,8 @@ export interface CalendarEventView {
 export interface CalendarProposalView {
   id: string;
   agentId: string;
+  /** Who asked: they confirm it, or who configures the workspace. */
+  requesterUserId: string;
   title: string;
   start: string;
   end: string;
@@ -252,6 +254,7 @@ function view(
 const proposalView = (p: ProposalRow): CalendarProposalView => ({
   id: p.id,
   agentId: p.agentId,
+  requesterUserId: p.requesterUserId,
   title: p.title,
   start: p.startAt.toISOString(),
   end: p.endAt.toISOString(),
@@ -852,7 +855,7 @@ export async function respondToEvent(
       ),
     )
     .returning();
-  if (!row) throw new NotFoundError("You are not invited to this event");
+  if (!row) throw new NotFoundError("You are not invited to this event", "calendar.not_invited");
   const [event] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, eventId));
   if (!event) throw new NotFoundError("Event not found");
   await publishListChanged(deps.pubsub, orgId, "calendar");
@@ -1128,14 +1131,24 @@ async function decideProposalRow(db: Database, userId: string, orgId: string, id
   return p;
 }
 
-async function syncProposalCard(db: Database, p: ProposalRow) {
+/** The proposal's card in its conversation follows its decision, at once for who has it open. */
+async function syncProposalCard(deps: CalendarDeps, p: ProposalRow) {
   if (!p.messageId) return;
-  await db
+  const [card] = await deps.db
     .update(schema.messages)
     .set({
       meta: sql`jsonb_set(${schema.messages.meta}, '{calendarProposal}', ${JSON.stringify(proposalView(p))}::jsonb)`,
     })
-    .where(and(eq(schema.messages.id, p.messageId), eq(schema.messages.orgId, p.orgId)));
+    .where(and(eq(schema.messages.id, p.messageId), eq(schema.messages.orgId, p.orgId)))
+    .returning({ channelId: schema.messages.channelId, threadId: schema.messages.threadId });
+  if (card)
+    await publishChannelEvent(deps.pubsub, {
+      type: "calendar.proposal.updated",
+      channelId: card.channelId,
+      threadId: card.threadId,
+      messageId: p.messageId,
+      proposal: proposalView(p),
+    });
 }
 
 /** The person who asked confirms: the event is created (by them) and the participants are invited. */
@@ -1160,7 +1173,7 @@ export async function confirmCalendarProposal(deps: CalendarDeps, userId: string
     .set({ status: "confirmed", eventId: event.id })
     .where(eq(calendarProposals.id, p.id))
     .returning();
-  if (row) await syncProposalCard(deps.db, row);
+  if (row) await syncProposalCard(deps, row);
   return event;
 }
 
@@ -1171,7 +1184,7 @@ export async function dismissCalendarProposal(deps: CalendarDeps, userId: string
     .set({ status: "dismissed" })
     .where(eq(calendarProposals.id, p.id))
     .returning();
-  if (row) await syncProposalCard(deps.db, row);
+  if (row) await syncProposalCard(deps, row);
 }
 
 /** Resolves `@ana` / `@dev` handles (or ids) to people and agents of the org. */

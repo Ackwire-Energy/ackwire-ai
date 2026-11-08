@@ -44,6 +44,7 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactDetail,
   ArtifactFilters,
@@ -778,6 +779,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           })
         ).mailboxes,
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      unarchive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/unarchive`, { json: {} }),
       purge: (orgId, agentId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
       former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,
@@ -971,6 +973,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
+      archived: async (orgId) =>
+        (await request<{ channels: ArchivedChannel[] }>(`${org(orgId)}/archived-channels`)).channels,
       deleteChannel: (orgId, channelId, name) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/delete`, { json: { name } }),
       roster: async (orgId, channelId) =>
@@ -1635,6 +1639,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<CalendarEvent>(`${org(orgId)}/calendar/proposals/${enc(id)}/confirm`, { json: {} }),
       dismissProposal: (orgId, id) =>
         request<void>(`${org(orgId)}/calendar/proposals/${enc(id)}/dismiss`, { json: {} }),
+      respond: (orgId, id, status) =>
+        request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}/rsvp`, { json: { status } }),
       update: (orgId, id, patch, series) =>
         request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}`, {
           method: "PATCH",

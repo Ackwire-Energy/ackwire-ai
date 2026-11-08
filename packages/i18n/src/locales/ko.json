@@ -1493,6 +1493,9 @@
     "workingNow": "지금 작업 중",
     "available": "대기 중",
     "archived": "보관됨",
+    "restore": "복원",
+    "restoreAction": "{{name}} 복원",
+    "restored": "{{name}}이(가) 팀으로 돌아왔어요.",
     "emptyTitle": "에이전트 팀을 꾸려 보세요",
     "empty": "에이전트마다 역할이 있고, 같은 채널에서 사람과 함께 일해요.",
     "emptyViewerTitle": "에이전트 팀이 여기에 표시돼요",
@@ -1749,6 +1752,13 @@
     "generalName": "#general은 이름을 바꿀 수 없어요.",
     "archive": "채널 보관",
     "archived": "#{{channel}}을(를) 보관했어요. 대화는 유지돼요.",
+    "archivedTitle": "보관된 채널",
+    "archivedCount_other": "보관된 채널 {{count}}개",
+    "archivedNone": "복원할 보관된 채널이 없어요",
+    "archivedOn": "{{date}}에 보관됨",
+    "restore": "복원",
+    "restoreName": "#{{channel}} 복원",
+    "restored": "#{{channel}}이(가) 돌아왔어요.",
     "leave": "채널 나가기",
     "left": "#{{channel}}에서 나갔어요",
     "leaveTitle": "#{{channel}}에서 나갈까요?",
@@ -7819,6 +7829,19 @@
     "confirm": "확정하고 초대하기",
     "otherTime": "다른 시간",
     "confirmed": "일정을 만들고 초대를 보냈어요.",
+    "proposalDismissed": "제안을 넘겼어요",
+    "proposalWaits": "{{name}}님이 이 일정을 확정해요.",
+    "rsvp": {
+      "accept": "참석",
+      "decline": "불참",
+      "accepted": "참석",
+      "declined": "불참",
+      "mine": {
+        "needs_action": "이 일정에 초대받았어요.",
+        "accepted": "참석해요.",
+        "declined": "참석하지 않아요."
+      }
+    },
     "kind": {
       "event": "일정",
       "routine": "루틴",
@@ -9679,9 +9702,6 @@
     },
     "s3": "내 버킷",
     "s3Text": "S3, R2, MinIO 등 S3 호환 저장소.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "곧 지원 예정",
     "current": "사용 중",
     "usage": {
       "files": "파일 {{size}}",
@@ -11110,6 +11130,11 @@
       "subject": "제목에 포함",
       "text": "본문에 포함",
       "noMailbox": "먼저 커넥터에서 메일함을 연결하세요.",
+      "readsNone": "{{name}}은(는) 아직 어떤 메일함도 읽지 못해요.",
+      "cantRead": "{{name}}은(는) 이 메일함을 읽지 못해요.",
+      "connectorReadsNone": "{{name}}은(는) 아직 {{connector}}을(를) 읽지 못해요.",
+      "connectorCantRead": "{{name}}은(는) {{connector}}을(를) 읽지 못해요.",
+      "giveAccess": "접근 권한 주기",
       "openConnectors": "커넥터 열기",
       "when": "{{address}}에 이메일이 도착하면",
       "whenFolder": "{{address}}({{folder}})에 이메일이 도착하면",
@@ -11282,6 +11307,8 @@
       "checkAddress": "주소를 확인하고 다시 시도해 주세요.",
       "tooLong": "너무 길어요. 줄이고 다시 시도해 주세요.",
       "updateComputerApp": "컴퓨터의 앱이 너무 오래됐어요. 업데이트하고 다시 시도해 주세요.",
+      "computerUpdatesItself": "워크스페이스 컴퓨터가 이를 위해 스스로 업데이트돼요. 잠시 후 다시 시도하세요.",
+      "notInvited": "이 일정에 초대받지 않았어요.",
       "offHere": "여기서는 꺼져 있어요.",
       "notInConversation": "이 대화에 없어요.",
       "accountStart": "컴퓨터가 로그인을 시작하지 못했어요. 켜져 있는지 확인하고 다시 시도해 주세요.",
@@ -12359,6 +12386,7 @@
     }
   },
   "settings": {
+    "notOpen": "이 워크스페이스에서 내 역할로는 {{section}}을(를) 열 수 없어요. 역할을 관리하는 사람이 열어 줄 수 있어요.",
     "nav": "설정 섹션",
     "group": {
       "you": "나",

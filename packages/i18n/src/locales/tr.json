@@ -1544,6 +1544,9 @@
     "workingNow": "Şu anda çalışıyor",
     "available": "Müsait",
     "archived": "Arşivlenenler",
+    "restore": "Geri getir",
+    "restoreAction": "{{name}} ajanını geri getir",
+    "restored": "{{name}} ekibe geri döndü.",
     "emptyTitle": "Ajan ekibinizi kurun",
     "empty": "Her ajanın bir rolü vardır ve kişilerle aynı kanallarda birlikte çalışır.",
     "emptyViewerTitle": "Ajan ekibiniz burada görünür",
@@ -1811,6 +1814,14 @@
     "generalName": "#general adını korur.",
     "archive": "Kanalı arşivle",
     "archived": "#{{channel}} arşivlendi. Sohbet korunur.",
+    "archivedTitle": "Arşivlenen kanallar",
+    "archivedCount_one": "{{count}} arşivlenen kanal",
+    "archivedCount_other": "{{count}} arşivlenen kanal",
+    "archivedNone": "Geri getirilecek arşivlenmiş kanal yok",
+    "archivedOn": "{{date}} tarihinde arşivlendi",
+    "restore": "Geri getir",
+    "restoreName": "#{{channel}} kanalını geri getir",
+    "restored": "#{{channel}} geri geldi.",
     "leave": "Kanaldan ayrıl",
     "left": "#{{channel}} kanalından ayrıldınız",
     "leaveTitle": "#{{channel}} kanalından ayrılınsın mı?",
@@ -8110,6 +8121,19 @@
     "confirm": "Onayla ve davet et",
     "otherTime": "Başka bir zaman",
     "confirmed": "Etkinlik oluşturuldu ve davetler gönderildi.",
+    "proposalDismissed": "Öneri reddedildi",
+    "proposalWaits": "Bu etkinliği {{name}} onaylıyor.",
+    "rsvp": {
+      "accept": "Katılacağım",
+      "decline": "Katılmayacağım",
+      "accepted": "katılacak",
+      "declined": "katılmayacak",
+      "mine": {
+        "needs_action": "Bu etkinliğin davetlileri arasındasınız.",
+        "accepted": "Katılacaksınız.",
+        "declined": "Katılmayacaksınız."
+      }
+    },
     "kind": {
       "event": "Etkinlik",
       "routine": "Rutin",
@@ -10056,9 +10080,6 @@
     },
     "s3": "Kendi bucket'ınız",
     "s3Text": "S3, R2, MinIO ve S3 uyumlu diğerleri.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Yakında",
     "current": "Kullanımda",
     "usage": {
       "files": "{{size}} dosya",
@@ -11520,6 +11541,11 @@
       "subject": "Konu şunu içeriyor",
       "text": "Metin şunu içeriyor",
       "noMailbox": "Önce Bağlayıcılar bölümünden bir posta kutusu bağlayın.",
+      "readsNone": "{{name}} henüz hiçbir posta kutusunu okumuyor.",
+      "cantRead": "{{name}} bu posta kutusunu okumuyor.",
+      "connectorReadsNone": "{{name}} henüz {{connector}} okumuyor.",
+      "connectorCantRead": "{{name}} {{connector}} okumuyor.",
+      "giveAccess": "Erişim ver",
       "openConnectors": "Bağlayıcıları aç",
       "when": "{{address}} adresine bir e-posta geldiğinde",
       "whenFolder": "{{address}} adresine ({{folder}}) bir e-posta geldiğinde",
@@ -11697,6 +11723,8 @@
       "checkAddress": "Adresi kontrol edip tekrar deneyin.",
       "tooLong": "Bu çok uzun. Kısaltıp tekrar deneyin.",
       "updateComputerApp": "Bilgisayardaki uygulama bunun için çok eski. Güncelleyip tekrar deneyin.",
+      "computerUpdatesItself": "Çalışma alanının bilgisayarı bunun için kendini güncelliyor. Birazdan tekrar deneyin.",
+      "notInvited": "Bu etkinliğin davetlileri arasında değilsiniz.",
       "offHere": "Bu, burada kapalı.",
       "notInConversation": "Bu sohbette değil.",
       "accountStart": "Bilgisayar girişi başlatamadı. Açık olduğunu kontrol edip tekrar deneyin.",
@@ -12791,6 +12819,7 @@
     }
   },
   "settings": {
+    "notOpen": "Bu çalışma alanındaki rolünüz {{section}} bölümünü açmıyor. Rolleri yöneten kişi sizin için açabilir.",
     "nav": "Ayarlar bölümleri",
     "group": {
       "you": "Siz",

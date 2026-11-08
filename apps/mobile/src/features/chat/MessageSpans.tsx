@@ -2,6 +2,7 @@ import { everyoneWord, isEveryoneWord } from "@agenteschat/client/lib/everyone";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { type ComponentRef, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -10,6 +11,7 @@ import { serverUrl } from "@/lib/server";
 import { Text, useTheme } from "@/ui";
 import { withAlpha } from "@/ui/palette";
 import { openPage } from "../ai/parts";
+import { ownLinkHref } from "../links/app-links";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
@@ -72,9 +74,16 @@ export function Spans({
             // An address as written, whatever way: the words of a link written with its own stay.
             const pill = !live && s.text === s.href ? linkPill(s.href) : null;
             if (pill) return <LinkPillText key={key} href={s.href} pill={pill} />;
-            // Opens in the in-app browser; a press on a link wins over the row's long press.
+            // A page of this server opens its screen here; any other site the in-app browser. A press on a link wins
+            // over the row's long press.
+            const own = ownLinkHref(s.href, serverUrl());
             return (
-              <RNText key={key} accessibilityRole="link" onPress={() => openPage(s.href)} style={styles.link}>
+              <RNText
+                key={key}
+                accessibilityRole="link"
+                onPress={() => (own ? router.push(own as never) : openPage(s.href))}
+                style={styles.link}
+              >
                 {s.text}
               </RNText>
             );

@@ -15,6 +15,7 @@ import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { leaves, removes } from "@agenteschat/client/lib/roles";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useSidebarPins } from "@/hooks/useSidebarPins";
@@ -36,16 +37,41 @@ import { isStoppable, useStopRun } from "./StopRun";
 
 const linkTo = (path: string) => `${window.location.origin}${path}`;
 
-/** "Arquivar canal" with "Desfazer" in its toast; leaves the channel's page when it was open. */
-export function useArchiveChannelWithUndo() {
+/** An archived channel back as it was (the archive's Desfazer, Canais arquivados' Restaurar): it opens again. */
+export function useRestoreChannel() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
+  const [pending, setPending] = useState(false);
+  // The call's own promise, not a mutation's callbacks: Desfazer runs after the screen that archived it closed.
+  const run = (channel: Pick<Channel, "id" | "name">, onDone?: () => void) => {
+    setPending(true);
+    void api.chat
+      .unarchive(org.id, channel.id)
+      .then(async () => {
+        onDone?.();
+        await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
+        toast.show(t("channel.restored", { channel: channel.name }));
+        await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
+      })
+      .catch((e: unknown) => toast.show(errorText(t, e), "error"))
+      .finally(() => setPending(false));
+  };
+  return { run, pending };
+}
+
+/** "Arquivar canal" with "Desfazer" in its toast; leaves the channel's page when it was open. */
+export function useArchiveChannelWithUndo() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const navigate = useNavigate();
   const router = useRouter();
   const archive = useArchiveChannel(org.id);
+  const restore = useRestoreChannel();
   const run = (channel: Pick<Channel, "id" | "name">, onDone?: () => void) =>
     archive.mutate(channel.id, {
       onSuccess: () => {
@@ -54,11 +80,7 @@ export function useArchiveChannelWithUndo() {
           void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
         toast.show(t("channel.archived", { channel: channel.name }), "info", {
           label: t("channelCategories.undo"),
-          run: () =>
-            void api.chat.unarchive(org.id, channel.id).then(async () => {
-              await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
-              await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
-            }),
+          run: () => restore.run(channel),
         });
       },
       onError: (e) => toast.show(errorText(t, e), "error"),

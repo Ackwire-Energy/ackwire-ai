@@ -25,6 +25,24 @@ const choose = async (combobox: HTMLElement, option: string) => {
   await settle();
 };
 
+/** The routine's agents read these mailboxes (the rest stay "Sem acesso"). */
+function reads(
+  mail: NonNullable<ReturnType<typeof fakeMailOf.get>>,
+  state: ReturnType<typeof seedState>,
+  ids: string[],
+) {
+  for (const agent of state.agents)
+    mail.agentMail.set(
+      agent.id,
+      new Map(
+        ids.map((accountId) => [
+          accountId,
+          { accountId, level: "read" as const, canDelete: false, policy: defaultPolicy() },
+        ]),
+      ),
+    );
+}
+
 /** A client with email on (Gmail/Outlook and IMAP), optionally with mailboxes already connected. */
 function mailApi(accounts: Partial<MailAccount>[] = []) {
   const state = seedState({ connections: [] });
@@ -669,7 +687,8 @@ describe("the agent's email rules", () => {
 
 describe("Rotinas: quando chegar um email", () => {
   test("mailbox, inbox by default and filters; the card shows the mailbox and 'Precisa reconectar'", async () => {
-    const { api, state } = mailApi([{ address: "ana@example.com" }]);
+    const { api, state, mail } = mailApi([{ address: "ana@example.com" }]);
+    reads(mail, state, ["mail-1"]);
     const created: RoutineInput[] = [];
     const real = api.routines.create;
     api.routines.create = (orgId, input) => {
@@ -698,6 +717,44 @@ describe("Rotinas: quando chegar um email", () => {
       filter: { from: ["@cliente.com"], subject: "pedido" },
     });
     expect(state.calls.some((c) => c.method === "mail.folders")).toBe(true);
+  });
+
+  test("only the mailboxes the routine's agent reads; none read says so and where its access is given", async () => {
+    const { api, state, mail } = mailApi([{ address: "ana@example.com" }, { address: "vendas@example.com" }]);
+    reads(mail, state, ["mail-2"]);
+    await renderApp(`/org/${ORG_ID}/routines`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await click(within(dialog).getByRole("radio", { name: "Email" }));
+    await settle(6);
+    const box = within(dialog).getByRole("combobox", { name: "Caixa de email" });
+    expect(box.textContent).toContain("vendas@example.com");
+    box.focus();
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    await settle(2);
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["vendas@example.com"]);
+    await act(async () => fireEvent.keyDown(screen().getAllByRole("option")[0] as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    cleanup();
+
+    const none = mailApi([{ address: "ana@example.com" }]);
+    await renderApp(`/org/${ORG_ID}/routines`, { api: none.api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const again = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await click(within(again).getByRole("radio", { name: "Email" }));
+    await settle(6);
+    expect(within(again).queryByRole("combobox", { name: "Caixa de email" })).toBeNull();
+    const note = within(again).getByText(/ainda não lê nenhuma caixa de email/);
+    const link = within(note.closest("p") as HTMLElement).getByRole("link");
+    expect(link.getAttribute("href")).toMatch(new RegExp(`/org/${ORG_ID}/agents/[^/?]+\\?tab=access`));
   });
 
   test("an email routine in the list: mail icon, the mailbox in words, 'Precisa reconectar'", async () => {
@@ -734,7 +791,10 @@ describe("Rotinas: quando chegar um email", () => {
 
 describe("Rotinas: quando chegar um email no MillionSend (ADR 0130)", () => {
   test("offered where MillionSend is connected: the inbox's address and filters, then the card in words", async () => {
-    const { api } = mailApi([]);
+    const { api, state } = mailApi([]);
+    // The routine's agent reads the connection: a routine can wait on it.
+    for (const agent of state.agents)
+      state.scopes[agent.id] = [...(state.scopes[agent.id] ?? []), { connectionId: "ms-1", scope: "custom:ms-1:read" }];
     api.customConnectors.list = async () => [
       {
         id: "ms-1",
@@ -777,6 +837,38 @@ describe("Rotinas: quando chegar um email no MillionSend (ADR 0130)", () => {
     });
     await settle(6);
     expect(screen().getByText("Quando chegar um email em vendas@loja.example")).toBeTruthy();
+  });
+
+  test("an agent that can't read the connection: it says so and where its access is given, before saving", async () => {
+    const { api } = mailApi([]);
+    api.customConnectors.list = async () => [
+      {
+        id: "ms-1",
+        serverUrl: "https://api.millionsend.com/mcp",
+        label: "MillionSend",
+        accountLabel: null,
+        authType: "oauth",
+        iconUrl: null,
+        status: "active",
+        tools: [],
+        events: ["millionsend.email.received"],
+        reviewedAt: null,
+        createdAt: "2026-11-01T00:00:00Z",
+      },
+    ];
+    await renderApp(`/org/${ORG_ID}/routines`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
+    await settle(4);
+    await click(within(dialog).getByRole("radio", { name: "Email no MillionSend" }));
+    await settle(6);
+    const note = within(dialog).getByText(/ainda não lê o MillionSend/);
+    expect(
+      within(note.closest("p") as HTMLElement)
+        .getByRole("link")
+        .getAttribute("href"),
+    ).toMatch(new RegExp(`/org/${ORG_ID}/agents/[^/?]+\\?tab=access`));
   });
 
   test("never offered without a MillionSend connection", async () => {

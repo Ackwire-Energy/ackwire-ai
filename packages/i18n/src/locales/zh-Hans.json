@@ -1493,6 +1493,9 @@
     "workingNow": "正在工作",
     "available": "空闲",
     "archived": "已归档",
+    "restore": "恢复",
+    "restoreAction": "恢复 {{name}}",
+    "restored": "{{name}} 已回到团队。",
     "emptyTitle": "组建你的智能体团队",
     "empty": "每个智能体都有自己的角色，和成员在同一个频道里一起工作。",
     "emptyViewerTitle": "你的智能体团队会显示在这里",
@@ -1749,6 +1752,13 @@
     "generalName": "#general 的名称不能更改。",
     "archive": "归档频道",
     "archived": "#{{channel}} 已归档。对话会保留。",
+    "archivedTitle": "已归档的频道",
+    "archivedCount_other": "{{count}} 个已归档的频道",
+    "archivedNone": "没有可恢复的已归档频道",
+    "archivedOn": "{{date}} 归档",
+    "restore": "恢复",
+    "restoreName": "恢复 #{{channel}}",
+    "restored": "#{{channel}} 已恢复。",
     "leave": "退出频道",
     "left": "你已退出 #{{channel}}",
     "leaveTitle": "退出 #{{channel}}？",
@@ -7871,6 +7881,19 @@
     "confirm": "确认并邀请",
     "otherTime": "换个时间",
     "confirmed": "日程已创建，邀请已发送。",
+    "proposalDismissed": "已放弃提议",
+    "proposalWaits": "{{name}} 确认此日程。",
+    "rsvp": {
+      "accept": "参加",
+      "decline": "不参加",
+      "accepted": "参加",
+      "declined": "不参加",
+      "mine": {
+        "needs_action": "你在此日程的受邀者之中。",
+        "accepted": "你会参加。",
+        "declined": "你不参加。"
+      }
+    },
     "kind": {
       "event": "日程",
       "routine": "例行工作",
@@ -9750,9 +9773,6 @@
     },
     "s3": "你自己的存储桶",
     "s3Text": "S3、R2、MinIO 以及其他兼容 S3 的服务。",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "即将推出",
     "current": "使用中",
     "usage": {
       "files": "{{size}} 文件",
@@ -11177,6 +11197,11 @@
       "subject": "主题包含",
       "text": "正文包含",
       "noMailbox": "请先在“连接器”中连接一个邮箱。",
+      "readsNone": "{{name}} 还不能读取任何邮箱。",
+      "cantRead": "{{name}} 不能读取这个邮箱。",
+      "connectorReadsNone": "{{name}} 还不能读取 {{connector}}。",
+      "connectorCantRead": "{{name}} 不能读取 {{connector}}。",
+      "giveAccess": "授予访问权限",
       "openConnectors": "打开连接器",
       "when": "当 {{address}} 收到邮件时",
       "whenFolder": "当 {{address}}（{{folder}}）收到邮件时",
@@ -11349,6 +11374,8 @@
       "checkAddress": "请检查地址后重试。",
       "tooLong": "内容太长。请缩短后重试。",
       "updateComputerApp": "电脑上的应用版本太旧。请更新后重试。",
+      "computerUpdatesItself": "工作区的电脑会为此自动更新。请稍后再试。",
+      "notInvited": "你不在此日程的受邀者之中。",
       "offHere": "此功能在这里已关闭。",
       "notInConversation": "不在这个对话中。",
       "accountStart": "电脑无法开始登录。请确认电脑已开机后重试。",
@@ -12428,6 +12455,7 @@
     }
   },
   "settings": {
+    "notOpen": "你在这个工作区的角色打不开 {{section}}。管理角色的人可以为你开放。",
     "nav": "设置分区",
     "group": {
       "you": "你",

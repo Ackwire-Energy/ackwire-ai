@@ -331,6 +331,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
       cacheTeamCard(qc, orgId, event, event.card);
       break;
+    case "calendar.proposal.updated":
+      // An agent's event proposal was confirmed or dismissed: its card says so.
+      cacheMessageMeta(qc, orgId, channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
+      break;
     case "browser.handoff.updated": {
       const { handoff } = event;
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.

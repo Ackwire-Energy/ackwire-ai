@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AgentProposalCard } from "../src/api/types";
+import type { AgentProposalCard, CalendarProposal } from "../src/api/types";
 import {
   actionCardOf,
   agentProposalOf,
@@ -299,4 +299,28 @@ test("a people row is settled when it holds, or once the person is gone", () => 
   expect(memberRowDone({ userId: "u2", name: "Ana", remove: true }, members)).toBe(false);
   expect(memberRowDone({ userId: "u9", name: "Zé", role: "owner" }, members)).toBe(true);
   expect(rolesAfter({ addRoleIds: ["r3"], removeRoleIds: ["r1"] }, ["r1", "r2"])).toEqual(["r2", "r3"]);
+});
+
+test("an agent's event proposal is a card of its own: who confirms it, and what it says once decided", () => {
+  const proposal: CalendarProposal = {
+    id: "p1",
+    agentId: "a1",
+    requesterUserId: "u1",
+    title: "Revisão do PR",
+    start: "2026-10-20T15:00:00.000Z",
+    end: "2026-10-20T15:30:00.000Z",
+    participants: [{ type: "person", id: "u2" }],
+    note: null,
+    status: "pending",
+  };
+  expect(actionCardOf({ calendarProposalId: "p1", calendarProposal: proposal })).toEqual({
+    kind: "calendar_proposal",
+    proposal,
+  });
+  expect(actionCardOf({ calendarProposal: { ...proposal, status: "confirmed" } })).toMatchObject({
+    proposal: { status: "confirmed" },
+  });
+  // A card the server didn't write whole is no card.
+  expect(actionCardOf({ calendarProposal: { ...proposal, start: 3 } })).toBeNull();
+  expect(actionCardOf({ calendarProposal: { ...proposal, status: "lost" } })).toBeNull();
 });

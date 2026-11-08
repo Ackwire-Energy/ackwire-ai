@@ -98,6 +98,34 @@ describe("Calendário: views, moves and series", () => {
     expect(screen().getByRole("button", { name: "Revisão trimestral, 15:00–16:00" })).toBeTruthy();
   });
 
+  test("an invitation: Vou and Não vou in its details, then what I answered and who else said what", async () => {
+    let id = "";
+    const { state } = await go(async (api) => {
+      const event = await api.calendar.create(ORG_ID, {
+        title: "Planejamento",
+        start: at(15).toISOString(),
+        end: at(16).toISOString(),
+        recurrence: "none",
+        participants: [
+          { type: "person", id: "u-walter" },
+          { type: "person", id: "u-joao" },
+        ],
+      });
+      id = event.id;
+    });
+    await click(screen().getByRole("button", { name: "Planejamento, 15:00–16:00" }));
+    await settle(3);
+    const details = () => screen().getByRole("region", { name: "Planejamento" });
+    expect(details().textContent).toContain("Você está entre os convidados deste evento.");
+    await click(within(details()).getByRole("button", { name: "Vou" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "calendar.respond")?.args).toEqual([ORG_ID, id, "accepted"]);
+    expect(details().textContent).toContain("Você vai.");
+    // The answer can change.
+    expect(within(details()).getByRole("button", { name: "Não vou" })).toBeTruthy();
+    expect(within(details()).queryByRole("button", { name: "Vou" })).toBeNull();
+  });
+
   test("a link whose day doesn't exist opens on today's week", async () => {
     for (const day of ["2026-13-45", "2026-02-30", "garbage", "20261028"]) {
       await renderApp(`/org/${ORG_ID}/calendar?open=x&day=${day}`, { api: createFakeApi(seedState()) });

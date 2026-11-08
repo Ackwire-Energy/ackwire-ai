@@ -1025,6 +1025,15 @@ export function createMockPlanning(
         const s = await store(orgId);
         s.proposals = s.proposals.filter((x) => x.id !== id);
       },
+      respond: async (orgId, id, status) => {
+        record("calendar.respond", orgId, id, status);
+        const e = (await store(orgId)).events.find((x) => x.id === id);
+        const mine = (await me()).id;
+        const row = e?.rsvp.find((r) => r.type === "person" && r.id === mine);
+        if (!e || !row) throw new MockNotFoundError("You are not invited to this event");
+        row.status = status;
+        return clone(e);
+      },
       update: async (orgId, id, patch, series) => {
         record("calendar.update", id, patch, series);
         const s = await store(orgId);

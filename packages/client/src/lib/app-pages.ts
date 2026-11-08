@@ -30,7 +30,7 @@ export const APP_PAGES = {
     label: "settings.section.general",
   },
   members: { web: "/settings/members", phone: "/me/members", may: null, label: "settings.section.members" },
-  roles: { web: "/settings/roles", phone: null, may: "manage_roles", label: "settings.section.roles" },
+  roles: { web: "/settings/roles", phone: "/settings/roles", may: "manage_roles", label: "settings.section.roles" },
   audit: { web: "/settings/audit", phone: "/settings/audit", may: "view_audit", label: "settings.section.audit" },
   usage: { web: "/settings/usage", phone: "/usage", may: null, label: "settings.section.usage" },
   computers: {
@@ -71,7 +71,7 @@ export const APP_PAGES = {
     may: "create_agents",
     label: "settings.section.import",
   },
-  approvals: { web: "/approvals", phone: null, may: null, label: "shell.approvals" },
+  approvals: { web: "/approvals", phone: "/activity", may: null, label: "shell.approvals" },
   proposals: { web: "/proposals", phone: "/proposals", may: null, label: "shell.proposals" },
   routines: { web: "/routines", phone: "/routines", may: null, label: "shell.routines" },
   drive: { web: "/drive", phone: "/drive", may: null, label: "shell.drive" },

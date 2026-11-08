@@ -1544,6 +1544,9 @@
     "workingNow": "Arbeitet gerade",
     "available": "Verfügbar",
     "archived": "Archiviert",
+    "restore": "Wiederherstellen",
+    "restoreAction": "{{name}} wiederherstellen",
+    "restored": "{{name}} ist wieder im Team.",
     "emptyTitle": "Stell dein Team aus Agenten zusammen",
     "empty": "Jeder Agent hat eine Rolle und arbeitet mit den Personen zusammen, in denselben Kanälen.",
     "emptyViewerTitle": "Dein Team aus Agenten erscheint hier",
@@ -1811,6 +1814,14 @@
     "generalName": "#general behält seinen Namen.",
     "archive": "Kanal archivieren",
     "archived": "#{{channel}} archiviert. Die Unterhaltung bleibt erhalten.",
+    "archivedTitle": "Archivierte Kanäle",
+    "archivedCount_one": "{{count}} archivierter Kanal",
+    "archivedCount_other": "{{count}} archivierte Kanäle",
+    "archivedNone": "Keine archivierten Kanäle zum Wiederherstellen",
+    "archivedOn": "Archiviert am {{date}}",
+    "restore": "Wiederherstellen",
+    "restoreName": "#{{channel}} wiederherstellen",
+    "restored": "#{{channel}} ist wieder da.",
     "leave": "Kanal verlassen",
     "left": "Du hast #{{channel}} verlassen",
     "leaveTitle": "#{{channel}} verlassen?",
@@ -8164,6 +8175,19 @@
     "confirm": "Bestätigen und einladen",
     "otherTime": "Andere Zeit",
     "confirmed": "Termin erstellt und Einladungen gesendet.",
+    "proposalDismissed": "Vorschlag verworfen",
+    "proposalWaits": "{{name}} bestätigt diesen Termin.",
+    "rsvp": {
+      "accept": "Ich komme",
+      "decline": "Ich komme nicht",
+      "accepted": "kommt",
+      "declined": "kommt nicht",
+      "mine": {
+        "needs_action": "Du bist zu diesem Termin eingeladen.",
+        "accepted": "Du kommst.",
+        "declined": "Du kommst nicht."
+      }
+    },
     "kind": {
       "event": "Termin",
       "routine": "Routine",
@@ -10116,9 +10140,6 @@
     },
     "s3": "Dein eigener Bucket",
     "s3Text": "S3, R2, MinIO und andere S3-kompatible.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Bald verfügbar",
     "current": "In Verwendung",
     "usage": {
       "files": "{{size}} an Dateien",
@@ -11584,6 +11605,11 @@
       "subject": "Betreff enthält",
       "text": "Text enthält",
       "noMailbox": "Verbinde zuerst ein Postfach unter Konnektoren.",
+      "readsNone": "{{name}} liest noch kein Postfach.",
+      "cantRead": "{{name}} liest dieses Postfach nicht.",
+      "connectorReadsNone": "{{name}} liest {{connector}} noch nicht.",
+      "connectorCantRead": "{{name}} liest {{connector}} nicht.",
+      "giveAccess": "Zugriff geben",
       "openConnectors": "Konnektoren öffnen",
       "when": "Wenn eine E-Mail bei {{address}} eingeht",
       "whenFolder": "Wenn eine E-Mail bei {{address}} eingeht ({{folder}})",
@@ -11761,6 +11787,8 @@
       "checkAddress": "Prüf die Adresse und versuch es noch einmal.",
       "tooLong": "Das ist zu lang. Kürz es und versuch es noch einmal.",
       "updateComputerApp": "Die App auf dem Computer ist dafür zu alt. Aktualisiere sie und versuch es noch einmal.",
+      "computerUpdatesItself": "Der Computer des Workspace aktualisiert sich dafür von selbst. Versuch es gleich noch einmal.",
+      "notInvited": "Du bist zu diesem Termin nicht eingeladen.",
       "offHere": "Das ist hier ausgeschaltet.",
       "notInConversation": "Nicht in dieser Unterhaltung.",
       "accountStart": "Der Computer konnte die Anmeldung nicht starten. Prüf, ob er an ist, und versuch es noch einmal.",
@@ -12855,6 +12883,7 @@
     }
   },
   "settings": {
+    "notOpen": "Deine Rolle in diesem Workspace öffnet {{section}} nicht. Wer die Rollen verwaltet, kann es für dich freigeben.",
     "nav": "Bereiche der Einstellungen",
     "group": {
       "you": "Du",

@@ -1248,6 +1248,18 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex: 1;
   min-width: 0;
 }
+/* Canais arquivados: the rows alone, a channel's long name wrapping where it can't break. */
+.archived-channels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.archived-channels .member-row {
+  padding-block: var(--space-2);
+}
+.archived-channels .list-col b {
+  overflow-wrap: anywhere;
+}
 .member-row__you {
   display: inline-flex;
   align-items: center;

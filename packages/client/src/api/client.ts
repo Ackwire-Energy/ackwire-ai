@@ -65,6 +65,7 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -650,6 +651,8 @@ export interface ApiClient {
     /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
     mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;
+    /** An archived agent back in the team (who manages agents); never a deleted one. */
+    unarchive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
@@ -810,8 +813,10 @@ export interface ApiClient {
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
-    /** "Desfazer" right after archiving. */
+    /** An archived channel back as it was (its creator or who manages channels). */
     unarchive(orgId: string, channelId: string): Promise<void>;
+    /** The archived channels the viewer may bring back, the latest first. */
+    archived(orgId: string): Promise<ArchivedChannel[]>;
     /** Owners and admins, never #general: the channel and what it held go for good. `name`: typed to confirm. */
     deleteChannel(orgId: string, channelId: string, name: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
@@ -1484,6 +1489,8 @@ export interface ApiClient {
     /** Confirms an agent's proposal: creates the event and invites the people. */
     confirmProposal(orgId: string, id: string): Promise<CalendarEvent>;
     dismissProposal(orgId: string, id: string): Promise<void>;
+    /** Accepts or declines an invitation (the viewer's own answer). */
+    respond(orgId: string, id: string, status: "accepted" | "declined"): Promise<CalendarEvent>;
     /** A recurring event: `scope` and the occurrence's original start say which occurrences change. */
     update(
       orgId: string,

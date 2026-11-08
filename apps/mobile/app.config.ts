@@ -41,6 +41,7 @@ export const APP_LINK_PATTERNS = [
   "/org/*/agents/*",
   "/org/*/approvals",
   "/org/*/proposals",
+  "/org/*/task-manager",
   "/org/*/notifications",
   "/org/*/issues",
   "/org/*/issues/*",
@@ -66,6 +67,11 @@ export const APP_LINK_PATTERNS = [
   "/org/*/settings/usage",
   "/org/*/settings/import",
   "/org/*/settings/media",
+  "/org/*/settings/approvals",
+  "/org/*/settings/right_hand",
+  "/org/*/settings/roles",
+  "/org/*/settings/vault",
+  "/org/*/settings/about",
   "/org/*/settings/computers/*",
 ];
 // Our EAS project on expo.dev (not a secret: it only names the project).

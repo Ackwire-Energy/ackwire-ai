@@ -64,3 +64,36 @@ test("the name typed to confirm, then the channel is gone and its page left", as
   expect(router.state.location.pathname).not.toContain(ENG_ID);
   expect(screen().queryByRole("dialog", { name: /^#eng/ })).toBeNull();
 });
+
+test("Canais arquivados, in Canais' +: the archived channels this person may bring back, each with Restaurar", async () => {
+  const state = seedState();
+  state.archivedChannels = [
+    { id: "ch-old", name: "lancamento", topic: "", visibility: "public", archivedAt: "2026-11-01T12:00:00.000Z" },
+    // The worst case the dialog lays out: a name as long as a channel's may be, private.
+    {
+      id: "ch-long",
+      name: "operacoes-de-atendimento-ao-cliente-enterprise-america-latina-e-europa-2026",
+      topic: "",
+      visibility: "private",
+      archivedAt: "2026-10-30T09:00:00.000Z",
+    },
+  ];
+  const r = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+  await settle(8);
+  const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+  const plus = within(nav).getByRole("button", { name: "Novo canal ou categoria" });
+  await act(async () => {
+    fireEvent.keyDown(plus, { key: "Enter" });
+    fireEvent.keyUp(plus, { key: "Enter" });
+  });
+  await settle(2);
+  await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Canais arquivados" }));
+  await settle(4);
+  const dialog = screen().getByRole("dialog", { name: "Canais arquivados" });
+  expect(dialog.textContent).toContain("#lancamento");
+  await click(within(dialog).getByRole("button", { name: "Restaurar #lancamento" }));
+  await settle(6);
+  expect(state.calls.find((c) => c.method === "chat.unarchive")?.args).toEqual([ORG_ID, "ch-old"]);
+  expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/ch-old`);
+  expect(screen().queryByRole("dialog", { name: "Canais arquivados" })).toBeNull();
+});

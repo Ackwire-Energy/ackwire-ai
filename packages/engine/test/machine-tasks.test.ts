@@ -469,6 +469,36 @@ describe("background tasks (ADR 0029)", () => {
     expect(await tasks()).toEqual([]);
   });
 
+  test("the workspace's own computer too old for tasks: it updates by itself, never the update command", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, paired.machineId));
+    const start = (protocol: number, mission: boolean) =>
+      startMachineTask(
+        { db: f.db, call: (f.machineHub as MachineHub).call },
+        {
+          orgId: f.org.id,
+          agent: { id: f.agent.id, handle: "dev" },
+          machineId: paired.machineId,
+          protocol,
+          machineName: "Workspace",
+          channelId: f.general.id,
+          threadRootId: null,
+          runId: null,
+          requestedByUserId: f.owner.id,
+          title: "x",
+          executor: "shell",
+          command: "true",
+          ...(mission ? { mission: { id: "mission-1", rules: "" } } : {}),
+        },
+      ).catch((e: Error) => e.message);
+    for (const said of [await start(3, false), await start(4, true)]) {
+      expect(said).toContain("It updates by itself, so try again later.");
+      expect(said).not.toContain("agentes-runner update");
+    }
+    expect(await tasks()).toEqual([]);
+  });
+
   test("offline: after the grace its running tasks are interrupted, with one notice per thread", async () => {
     f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
     const paired = await pairedMachine();

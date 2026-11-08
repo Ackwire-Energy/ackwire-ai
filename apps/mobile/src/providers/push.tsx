@@ -5,8 +5,8 @@ import * as Notifications from "expo-notifications";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
-import { openPage } from "@/features/ai/parts";
 import { hrefForPush, notificationWebPath, pushAsNotification } from "@/features/links/logic";
+import { openWebPath } from "@/features/links/open-web";
 import { openWorkspace } from "@/features/server";
 import { pushOpens } from "@/lib/org-choice";
 import {
@@ -154,7 +154,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
         const href = hrefForPush(data, status);
         // No screen of its own in the app (the workspace's billing hold): its page on the web, in the in-app browser.
         const web = href || !orgId ? null : notificationWebPath(pushAsNotification(data), orgId);
-        setTimeout(() => (web ? openPage(`${serverUrl()}${web}`) : router.push(href ?? "/activity")), 0);
+        setTimeout(() => (web ? openWebPath(web) : router.push(href ?? "/activity")), 0);
       });
     };
     if (afterSwitch) {

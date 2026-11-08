@@ -1493,6 +1493,9 @@
     "workingNow": "作業中",
     "available": "対応可能",
     "archived": "アーカイブ済み",
+    "restore": "元に戻す",
+    "restoreAction": "{{name}}を元に戻す",
+    "restored": "{{name}}がチームに戻りました。",
     "emptyTitle": "エージェントのチームを作りましょう",
     "empty": "エージェントはそれぞれ役割を持ち、同じチャンネルで人と一緒に働きます。",
     "emptyViewerTitle": "エージェントのチームはここに表示されます",
@@ -1749,6 +1752,13 @@
     "generalName": "#generalの名前は変更できません。",
     "archive": "チャンネルをアーカイブ",
     "archived": "#{{channel}}をアーカイブしました。会話は残ります。",
+    "archivedTitle": "アーカイブしたチャンネル",
+    "archivedCount_other": "アーカイブしたチャンネル {{count}} 件",
+    "archivedNone": "元に戻せるアーカイブ済みのチャンネルはありません",
+    "archivedOn": "{{date}}にアーカイブ",
+    "restore": "元に戻す",
+    "restoreName": "#{{channel}}を元に戻す",
+    "restored": "#{{channel}}が戻りました。",
     "leave": "チャンネルから退出",
     "left": "#{{channel}}から退出しました",
     "leaveTitle": "#{{channel}}から退出しますか？",
@@ -7825,6 +7835,19 @@
     "confirm": "確定して招待",
     "otherTime": "別の日時",
     "confirmed": "予定を作成し、招待を送信しました。",
+    "proposalDismissed": "提案を見送りました",
+    "proposalWaits": "{{name}}さんがこの予定を確定します。",
+    "rsvp": {
+      "accept": "参加する",
+      "decline": "参加しない",
+      "accepted": "参加",
+      "declined": "不参加",
+      "mine": {
+        "needs_action": "この予定に招待されています。",
+        "accepted": "参加します。",
+        "declined": "参加しません。"
+      }
+    },
     "kind": {
       "event": "予定",
       "routine": "ルーティン",
@@ -9685,9 +9708,6 @@
     },
     "s3": "独自のバケット",
     "s3Text": "S3、R2、MinIOなど、S3互換のストレージ。",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "近日公開",
     "current": "使用中",
     "usage": {
       "files": "ファイル{{size}}",
@@ -11116,6 +11136,11 @@
       "subject": "件名に含む",
       "text": "本文に含む",
       "noMailbox": "先にコネクタでメールボックスを接続してください。",
+      "readsNone": "{{name}}はまだどのメールボックスも読めません。",
+      "cantRead": "{{name}}はこのメールボックスを読めません。",
+      "connectorReadsNone": "{{name}}はまだ{{connector}}を読めません。",
+      "connectorCantRead": "{{name}}は{{connector}}を読めません。",
+      "giveAccess": "アクセスを許可",
       "openConnectors": "コネクタを開く",
       "when": "{{address}}にメールが届いたとき",
       "whenFolder": "{{address}}（{{folder}}）にメールが届いたとき",
@@ -11288,6 +11313,8 @@
       "checkAddress": "アドレスを確認して、もう一度お試しください。",
       "tooLong": "長すぎます。短くして、もう一度お試しください。",
       "updateComputerApp": "コンピューターのアプリが古すぎます。更新して、もう一度お試しください。",
+      "computerUpdatesItself": "ワークスペースのコンピューターはこのために自動で更新されます。少ししてからもう一度お試しください。",
+      "notInvited": "この予定には招待されていません。",
       "offHere": "ここではオフになっています。",
       "notInConversation": "この会話にいません。",
       "accountStart": "コンピューターがログインを開始できませんでした。電源が入っているか確認して、もう一度お試しください。",
@@ -12367,6 +12394,7 @@
     }
   },
   "settings": {
+    "notOpen": "このワークスペースでのあなたのロールでは{{section}}を開けません。ロールを管理している人が開けるようにできます。",
     "nav": "設定のセクション",
     "group": {
       "you": "あなた",

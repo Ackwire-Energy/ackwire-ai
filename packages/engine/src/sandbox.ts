@@ -17,6 +17,7 @@ import {
 } from "./machines";
 import { missionOfRun } from "./mission-context";
 import { can, requirePermission } from "./organizations";
+import { runnerUpdateWay } from "./runner-update";
 import type { ToolContext } from "./tools/types";
 
 const { orgSandboxSettings } = schema;
@@ -216,7 +217,7 @@ export async function withConnectedMachine<T>(
   // An old runner would ignore `agent` and put every agent in the same folder.
   if (status.protocol < AGENT_FOLDERS_PROTOCOL) {
     throw new SandboxUnavailableError(
-      `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). Tell the person: its owner should update it with \`agentes-runner update\`.`,
+      `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). ${runnerUpdateWay(status)}`,
     );
   }
   const provider = createMachineSandboxProvider(hub, { id: ctx.agentId, handle, ...(name ? { name } : {}) });

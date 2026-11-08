@@ -93,6 +93,7 @@ import type {
   BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
+  CalendarProposal,
   CardDelegate,
   Channel,
   ChannelEvent,
@@ -646,6 +647,18 @@ export const useFormerAgents = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
 };
+
+/** Restaurar on an archived agent (Equipe, the phone's Agentes): back in the team and its lists. */
+export function useUnarchiveAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentId: string) => api.agents.unarchive(orgId, agentId),
+    onSuccess: () => {
+      for (const key of [keys.agents(orgId), keys.team(orgId)]) void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
 
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
@@ -2232,9 +2245,9 @@ export function useDisconnect(orgId: string) {
   });
 }
 
-export const useAgentScopes = (orgId: string, agentId: string) => {
+export const useAgentScopes = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
+  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId), enabled });
 };
 
 // ── Mailboxes (ADR 0038) ────────────────────────────────────────────────────
@@ -3045,6 +3058,27 @@ export function useArchiveChannel(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (channelId: string) => api.chat.archive(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
+/** The archived channels the viewer may bring back (`enabled`: only where they're offered). */
+export const useArchivedChannels = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.archivedChannels(orgId),
+    queryFn: () => api.chat.archived(orgId),
+    enabled,
+    staleTime: 60_000,
+  });
+};
+
+/** "Restaurar" an archived channel: back in everyone's list as it was. */
+export function useUnarchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.unarchive(orgId, channelId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }
@@ -4278,15 +4312,37 @@ export function useCalendarAction(orgId: string) {
             patch: CalendarEventPatch;
             series?: { scope: SeriesScope; occurrenceStart: string };
           }
-        | { type: "remove"; id: string; series?: { scope: SeriesScope; occurrenceStart: string } },
+        | { type: "remove"; id: string; series?: { scope: SeriesScope; occurrenceStart: string } }
+        | { type: "respond"; id: string; status: "accepted" | "declined" },
     ): Promise<unknown> => {
       if (action.type === "create") return api.calendar.create(orgId, action.input);
+      if (action.type === "respond") return api.calendar.respond(orgId, action.id, action.status);
       if (action.type === "update") return api.calendar.update(orgId, action.id, action.patch, action.series);
       if (action.type === "remove") return api.calendar.remove(orgId, action.id, action.series);
       if (action.type === "confirm") return api.calendar.confirmProposal(orgId, action.id);
       return api.calendar.dismissProposal(orgId, action.id);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.calendar(orgId) }),
+  });
+}
+
+/**
+ * An event proposal's card in its conversation: Confirmar creates the event, Dispensar drops it, and the card says so
+ * at once (others see it through `calendar.proposal.updated`).
+ */
+export function useCalendarProposal(orgId: string, where: { channelId: string; messageId: string }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ proposal, decision }: { proposal: CalendarProposal; decision: "confirm" | "dismiss" }) => {
+      if (decision === "confirm") await api.calendar.confirmProposal(orgId, proposal.id);
+      else await api.calendar.dismissProposal(orgId, proposal.id);
+      return { ...proposal, status: decision === "confirm" ? ("confirmed" as const) : ("dismissed" as const) };
+    },
+    onSuccess: (proposal) => {
+      cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ calendarProposal: proposal }));
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
   });
 }
 

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { PlanUsage, Run } from "@agenteschat/client";
+import type { LearnedSkill, PlanUsage, Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   agentSearch,
@@ -809,6 +809,48 @@ describe("agent page: memory and proposals", () => {
     expect(row.textContent).toContain("Não verificado");
     await click(within(row).getByRole("button", { name: "Esquecer" }));
     expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
+  });
+
+  test("Dar a outros agentes opens that skill in Skills, only for who may open Skills", async () => {
+    const made: LearnedSkill = {
+      id: "sk-made",
+      name: "relatorio-semanal",
+      description: "Monta o relatório da semana",
+      version: 1,
+      source: "manual",
+      sourceUrl: null,
+      defaultForNewAgents: false,
+      metadata: {},
+      origin: "agent",
+      ownerAgentId: ADA_ID,
+      locked: false,
+      useCount: 2,
+      lastUsedAt: null,
+      body: "# Relatório",
+      archived: false,
+      canChange: true,
+      canRevert: false,
+      createdAt: "2026-11-01T12:00:00.000Z",
+      updatedAt: "2026-11-01T12:00:00.000Z",
+    };
+    const open = async (state: ReturnType<typeof seedState>) => {
+      const api = createFakeApi(state);
+      api.skills.learned = async () => [made];
+      await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=memory`, { api });
+      await settle(8);
+      await click(
+        within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
+      );
+    };
+    await open(seedState());
+    expect(screen().getByRole("link", { name: "Dar a outros agentes" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/skills?skill=sk-made`,
+    );
+    cleanup();
+    // Ada's owner, a member: Travar is theirs, but Skills is for who manages agents.
+    await open(asOwner());
+    expect(screen().getByRole("button", { name: "Travar" })).toBeTruthy();
+    expect(screen().queryByRole("link", { name: "Dar a outros agentes" })).toBeNull();
   });
 
   test("its own how-tos sit under how it works: the plain summary first, the technical text folded", async () => {

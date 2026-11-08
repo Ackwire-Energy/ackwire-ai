@@ -41,6 +41,7 @@ import {
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
+  Alert,
   Button,
   Card,
   CardHeader,
@@ -118,7 +119,7 @@ export function SettingsPage(props: ComponentProps<typeof Settings>) {
 }
 
 function Settings({
-  section = "general",
+  section,
   connected,
   outcome,
   review,
@@ -130,6 +131,7 @@ function Settings({
   agent,
   person,
 }: {
+  /** The section a link names; none (`/settings`): Geral for who opens it, else their first one. */
   section?: SettingsSection;
   connected?: string;
   /** Back from OAuth: what came in (`connected`, `reconnected`, `same_account`). */
@@ -153,8 +155,11 @@ function Settings({
   const { org } = useOrg();
   const server = useAuthConfig().data;
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
-  // A section this person can't open (a member's link to Geral): their first one, their account.
-  const current = visible.some((s) => s.id === section) ? section : (visible[0]?.id ?? "account");
+  // A section a link names that this person can't open: their first one, their account, saying why. Opening the
+  // settings with no section named has nothing to explain. Billing where no billing service runs isn't about their role.
+  const wanted = section ?? "general";
+  const current = visible.some((s) => s.id === wanted) ? wanted : (visible[0]?.id ?? "account");
+  const refused = section && current !== section && !(section === "billing" && !server?.billingUrl) ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
   const strip = useRef<HTMLDivElement>(null);
@@ -211,6 +216,7 @@ function Settings({
         </div>
       </nav>
       <div className="settings__body" data-scroll-restoration-id="settings-section">
+        {refused && <Alert tone="neutral">{t("settings.notOpen", { section: sectionName(refused) })}</Alert>}
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
           <PageHeader
             level={2}

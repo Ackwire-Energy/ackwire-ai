@@ -3797,6 +3797,15 @@
   "team.archived": {
     "value": "Archived"
   },
+  "team.restore": {
+    "value": "Restore"
+  },
+  "team.restoreAction": {
+    "value": "Restore {{name}}"
+  },
+  "team.restored": {
+    "value": "{{name}} is back on the team."
+  },
   "team.emptyTitle": {
     "value": "Build your team of agents"
   },
@@ -4447,6 +4456,30 @@
   },
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
+  },
+  "channel.archivedTitle": {
+    "value": "Archived channels"
+  },
+  "channel.archivedCount": {
+    "value": {
+      "one": "{{count}} archived channel",
+      "other": "{{count}} archived channels"
+    }
+  },
+  "channel.archivedNone": {
+    "value": "No archived channels to restore"
+  },
+  "channel.archivedOn": {
+    "value": "Archived {{date}}"
+  },
+  "channel.restore": {
+    "value": "Restore"
+  },
+  "channel.restoreName": {
+    "value": "Restore #{{channel}}"
+  },
+  "channel.restored": {
+    "value": "#{{channel}} is back."
   },
   "channel.leave": {
     "value": "Leave channel"
@@ -19727,6 +19760,33 @@
   "calendar.confirmed": {
     "value": "Event created and invitations sent."
   },
+  "calendar.proposalDismissed": {
+    "value": "Proposal dismissed"
+  },
+  "calendar.proposalWaits": {
+    "value": "{{name}} confirms this event."
+  },
+  "calendar.rsvp.accept": {
+    "value": "Going"
+  },
+  "calendar.rsvp.decline": {
+    "value": "Not going"
+  },
+  "calendar.rsvp.accepted": {
+    "value": "going"
+  },
+  "calendar.rsvp.declined": {
+    "value": "not going"
+  },
+  "calendar.rsvp.mine.needs_action": {
+    "value": "You're invited to this event."
+  },
+  "calendar.rsvp.mine.accepted": {
+    "value": "You're going."
+  },
+  "calendar.rsvp.mine.declined": {
+    "value": "You're not going."
+  },
   "calendar.kind.event": {
     "value": "Event"
   },
@@ -24657,15 +24717,6 @@
   "storage.s3Text": {
     "value": "S3, R2, MinIO and others compatible with S3."
   },
-  "storage.gdrive": {
-    "value": "Google Drive"
-  },
-  "storage.onedrive": {
-    "value": "OneDrive"
-  },
-  "storage.soon": {
-    "value": "Coming soon"
-  },
   "storage.current": {
     "value": "In use"
   },
@@ -28054,6 +28105,21 @@
   "mail.routine.noMailbox": {
     "value": "Connect a mailbox in Connectors first."
   },
+  "mail.routine.readsNone": {
+    "value": "{{name}} can't read any mailbox yet."
+  },
+  "mail.routine.cantRead": {
+    "value": "{{name}} can't read this mailbox."
+  },
+  "mail.routine.connectorReadsNone": {
+    "value": "{{name}} can't read {{connector}} yet."
+  },
+  "mail.routine.connectorCantRead": {
+    "value": "{{name}} can't read {{connector}}."
+  },
+  "mail.routine.giveAccess": {
+    "value": "Give access"
+  },
   "mail.routine.openConnectors": {
     "value": "Open Connectors"
   },
@@ -28476,6 +28542,12 @@
   },
   "errors.said.updateComputerApp": {
     "value": "The computer's app is too old for this. Update it and try again."
+  },
+  "errors.said.computerUpdatesItself": {
+    "value": "The workspace's computer updates itself for this. Try again in a little while."
+  },
+  "errors.said.notInvited": {
+    "value": "You're not invited to this event."
   },
   "errors.said.offHere": {
     "value": "This is turned off here."
@@ -31169,6 +31241,9 @@
   },
   "audit.panel.copied": {
     "value": "Record copied"
+  },
+  "settings.notOpen": {
+    "value": "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you."
   },
   "settings.nav": {
     "value": "Settings sections"

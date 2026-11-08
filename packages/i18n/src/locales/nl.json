@@ -1544,6 +1544,9 @@
     "workingNow": "Nu aan het werk",
     "available": "Beschikbaar",
     "archived": "Gearchiveerd",
+    "restore": "Terugzetten",
+    "restoreAction": "{{name}} terugzetten",
+    "restored": "{{name}} is terug in het team.",
     "emptyTitle": "Stel je team van agents samen",
     "empty": "Elke agent heeft een rol en werkt samen met mensen, in dezelfde kanalen.",
     "emptyViewerTitle": "Je team van agents verschijnt hier",
@@ -1811,6 +1814,14 @@
     "generalName": "#general houdt zijn naam.",
     "archive": "Kanaal archiveren",
     "archived": "#{{channel}} gearchiveerd. Het gesprek blijft bewaard.",
+    "archivedTitle": "Gearchiveerde kanalen",
+    "archivedCount_one": "{{count}} gearchiveerd kanaal",
+    "archivedCount_other": "{{count}} gearchiveerde kanalen",
+    "archivedNone": "Geen gearchiveerde kanalen om terug te zetten",
+    "archivedOn": "Gearchiveerd op {{date}}",
+    "restore": "Terugzetten",
+    "restoreName": "#{{channel}} terugzetten",
+    "restored": "#{{channel}} is terug.",
     "leave": "Kanaal verlaten",
     "left": "Je hebt #{{channel}} verlaten",
     "leaveTitle": "#{{channel}} verlaten?",
@@ -8211,6 +8222,19 @@
     "confirm": "Bevestigen en uitnodigen",
     "otherTime": "Ander tijdstip",
     "confirmed": "Afspraak gemaakt en uitnodigingen verstuurd.",
+    "proposalDismissed": "Voorstel afgewezen",
+    "proposalWaits": "{{name}} bevestigt deze afspraak.",
+    "rsvp": {
+      "accept": "Ik kom",
+      "decline": "Ik kom niet",
+      "accepted": "komt",
+      "declined": "komt niet",
+      "mine": {
+        "needs_action": "Je bent uitgenodigd voor deze afspraak.",
+        "accepted": "Je komt.",
+        "declined": "Je komt niet."
+      }
+    },
     "kind": {
       "event": "Afspraak",
       "routine": "Routine",
@@ -10181,9 +10205,6 @@
     },
     "s3": "Je eigen bucket",
     "s3Text": "S3, R2, MinIO en andere die compatibel zijn met S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Binnenkort",
     "current": "In gebruik",
     "usage": {
       "files": "{{size}} aan bestanden",
@@ -11645,6 +11666,11 @@
       "subject": "Onderwerp bevat",
       "text": "Tekst bevat",
       "noMailbox": "Koppel eerst een mailbox bij Connectors.",
+      "readsNone": "{{name}} leest nog geen enkele mailbox.",
+      "cantRead": "{{name}} leest deze mailbox niet.",
+      "connectorReadsNone": "{{name}} leest {{connector}} nog niet.",
+      "connectorCantRead": "{{name}} leest {{connector}} niet.",
+      "giveAccess": "Toegang geven",
       "openConnectors": "Connectors openen",
       "when": "Als er een mail binnenkomt op {{address}}",
       "whenFolder": "Als er een mail binnenkomt op {{address}} ({{folder}})",
@@ -11822,6 +11848,8 @@
       "checkAddress": "Controleer het adres en probeer het opnieuw.",
       "tooLong": "Dat is te lang. Maak het korter en probeer het opnieuw.",
       "updateComputerApp": "De app op de computer is hiervoor te oud. Werk hem bij en probeer het opnieuw.",
+      "computerUpdatesItself": "De computer van de werkruimte werkt zichzelf hiervoor bij. Probeer het zo opnieuw.",
+      "notInvited": "Je bent niet uitgenodigd voor deze afspraak.",
       "offHere": "Dit staat hier uit.",
       "notInConversation": "Niet in dit gesprek.",
       "accountStart": "De computer kon het inloggen niet starten. Controleer of hij aanstaat en probeer het opnieuw.",
@@ -12916,6 +12944,7 @@
     }
   },
   "settings": {
+    "notOpen": "Je rol in deze werkruimte opent {{section}} niet. Wie de rollen beheert, kan het voor je openzetten.",
     "nav": "Onderdelen van de instellingen",
     "group": {
       "you": "Jij",

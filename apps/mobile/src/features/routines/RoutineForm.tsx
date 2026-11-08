@@ -1,5 +1,7 @@
 import {
   type Routine,
+  useAgentMail,
+  useAgentScopes,
   useChannels,
   useCustomServers,
   useMailAccounts,
@@ -19,7 +21,13 @@ import {
   templateRule,
 } from "@agenteschat/client/lib/routine-templates";
 import { busyOnComputer, eventWebhook, runsPerDay } from "@agenteschat/client/lib/routine-view";
-import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
+import {
+  connectionReader,
+  mailboxReader,
+  timezoneName,
+  triggerChoices,
+  zoneDisplayName,
+} from "@agenteschat/client/lib/routines";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -74,6 +82,7 @@ import {
   wasUtc,
   zoneOf,
 } from "./logic";
+import { AgentAccessNote } from "./parts";
 import { fromApiRule, nextLabel, ruleSentence, runLabel, toApiRule, upcomingLabels } from "./rule";
 import { TemplatePicker } from "./TemplatePicker";
 import { WebhookCard } from "./WebhookCard";
@@ -227,15 +236,23 @@ function Form({ routine }: { routine: Routine | undefined }) {
       : parsed.data.error;
   })();
 
-  // "Quando chegar um email": the first mailbox and its inbox until the person picks.
-  const mailList = mailboxes.data ?? [];
-  const hasMail = d.kind === "email" || mailList.length > 0;
+  // "Quando chegar um email": the first mailbox its agent reads, and its inbox, until the person picks (as the web's,
+  // the mailboxes the agent can't read aren't offered: the server refuses them).
+  const allMail = mailboxes.data ?? [];
+  const hasMail = d.kind === "email" || allMail.length > 0;
+  const reads = useAgentMail(orgId, d.agentId, d.kind === "email" && Boolean(d.agentId) && allMail.length > 0);
+  const mailPick = triggerChoices(
+    allMail,
+    d.agentId && reads.data ? mailboxReader(reads.data) : undefined,
+    d.email.accountId,
+  );
+  const mailList = mailPick.options;
+  const firstMailbox = d.agentId && allMail.length > 0 && reads.isPending ? undefined : mailList[0]?.id;
   const folders = useMailFolders(orgId, d.kind === "email" && d.email.accountId ? d.email.accountId : null);
   useEffect(() => {
-    const first = mailboxes.data?.[0];
-    if (d.kind === "email" && !d.email.accountId && first)
-      setD((x) => ({ ...x, email: { ...x.email, accountId: first.id, folder: "" } }));
-  }, [d.kind, d.email.accountId, mailboxes.data]);
+    if (d.kind === "email" && !d.email.accountId && firstMailbox)
+      setD((x) => ({ ...x, email: { ...x.email, accountId: firstMailbox, folder: "" } }));
+  }, [d.kind, d.email.accountId, firstMailbox]);
   useEffect(() => {
     if (d.email.accountId && !d.email.folder && (folders.data || folders.isError))
       setD((x) => ({ ...x, email: { ...x.email, folder: inboxOf(folders.data) } }));
@@ -260,7 +277,13 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const fromBad = d.kind === "email" && from.invalid.length > 0;
   // "Email no MillionSend" (ADR 0130): the first connection, its inbox's address and the same filters.
   const hasMillionSend = d.kind === "connector" || eventConnections.length > 0;
-  const firstConnection = eventConnections[0]?.id;
+  const grants = useAgentScopes(orgId, d.agentId, d.kind === "connector" && Boolean(d.agentId));
+  const connectionPick = triggerChoices(
+    eventConnections,
+    d.agentId && grants.data ? connectionReader(grants.data) : undefined,
+    d.connector.connectionId,
+  );
+  const firstConnection = d.agentId && grants.isPending ? undefined : connectionPick.options[0]?.id;
   useEffect(() => {
     if (d.kind === "connector" && !d.connector.connectionId && firstConnection)
       setD((x) => ({ ...x, connector: { ...x.connector, connectionId: firstConnection } }));
@@ -575,7 +598,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
             </>
           ) : null}
           {d.kind === "email" ? (
-            mailboxes.isSuccess && mailList.length === 0 ? (
+            mailboxes.isSuccess && allMail.length === 0 ? (
               <View style={styles.noMail}>
                 <Text variant="footnote" tone="faint">
                   {t("mail.routine.noMailbox")}
@@ -590,6 +613,12 @@ function Form({ routine }: { routine: Routine | undefined }) {
               </View>
             ) : (
               <>
+                {mailPick.cantRead ? (
+                  <AgentAccessNote
+                    agentId={d.agentId}
+                    words={mailList.length === 0 ? "mail.routine.readsNone" : "mail.routine.cantRead"}
+                  />
+                ) : null}
                 <View style={styles.gap} />
                 <GroupedList>
                   <GroupedRow
@@ -680,6 +709,22 @@ function Form({ routine }: { routine: Routine | undefined }) {
 
           {d.kind === "connector" ? (
             <>
+              {connectionPick.cantRead ? (
+                <AgentAccessNote
+                  agentId={d.agentId}
+                  words={
+                    connectionPick.options.length === 0
+                      ? "mail.routine.connectorReadsNone"
+                      : "mail.routine.connectorCantRead"
+                  }
+                  values={{
+                    connector:
+                      eventConnections.find((s) => s.id === d.connector.connectionId)?.label ??
+                      eventConnections[0]?.label ??
+                      "",
+                  }}
+                />
+              ) : null}
               <View style={styles.gap} />
               <GroupedList>
                 <StackedField label={t("mail.routine.inboxAddress")}>

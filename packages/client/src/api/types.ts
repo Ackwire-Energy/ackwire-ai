@@ -1105,6 +1105,15 @@ export interface MessageCard {
   author: string;
 }
 
+/** An archived channel the viewer may bring back (`GET …/archived-channels`). */
+export interface ArchivedChannel {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  archivedAt: string;
+}
+
 export interface ChannelCard {
   id: string;
   name: string;
@@ -1494,6 +1503,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
     } & AgentProposalDecision)
+  /** An agent's event proposal was confirmed or dismissed: its card (`meta.calendarProposal`) as it is now. */
+  | {
+      type: "calendar.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      proposal: CalendarProposal;
+    }
   /** The right hand's team card changed (ADR 0137 §10): the whole card. */
   | {
       type: "team.proposal.updated";
@@ -3838,6 +3855,8 @@ export type CalendarEventPatch = Partial<
 export interface CalendarProposal {
   id: string;
   agentId: string;
+  /** Who asked: they confirm it (or who configures the workspace). Absent on an older server. */
+  requesterUserId?: string;
   title: string;
   start: string;
   end: string;

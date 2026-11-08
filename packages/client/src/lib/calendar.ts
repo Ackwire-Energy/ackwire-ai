@@ -1,7 +1,24 @@
-import type { Actor, CalendarRange, RoutineTarget } from "../api/types";
-import { uses12h } from "./format";
+import type { Actor, CalendarEvent, CalendarRange, RoutineTarget } from "../api/types";
+import { formatTime, uses12h } from "./format";
 
 export { uses12h };
+
+/** "ter, 20 out": a day as the calendar writes it, in the reader's language. */
+export const shortDay = (locale: string, d: Date) =>
+  new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" })
+    .format(d)
+    .replace(/\./g, "")
+    .replace(/ de /g, " ");
+
+/** "ter, 20 out, 15:00–15:30": an event's or a proposal's day and times. */
+export const slotText = (locale: string, start: string, end: string) =>
+  `${shortDay(locale, new Date(start))}, ${formatTime(locale, start)}–${formatTime(locale, end)}`;
+
+export type RsvpStatus = CalendarEvent["rsvp"][number]["status"];
+
+/** The viewer's answer to an event they're invited to; null when they aren't. */
+export const myRsvp = (event: Pick<CalendarEvent, "rsvp"> | undefined, userId: string) =>
+  event?.rsvp.find((r) => r.type === "person" && r.id === userId)?.status ?? null;
 
 /** Pixels per hour in the day/week grid. */
 export const HOUR_PX = 44;

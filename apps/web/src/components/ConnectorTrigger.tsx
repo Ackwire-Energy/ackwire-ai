@@ -1,10 +1,12 @@
 import type { CustomServer, Routine, RoutineConnectorTrigger } from "@agenteschat/client";
-import { useCustomServers } from "@agenteschat/client";
+import { useAgentScopes, useCustomServers } from "@agenteschat/client";
+import { connectionReader, triggerChoices } from "@agenteschat/client/lib/routines";
 import { Field, Input, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
+import { AgentAccessNote } from "@/components/EmailTrigger";
 import { useOrg } from "@/components/org-context";
 
 /**
@@ -34,26 +36,46 @@ export const cleanConnectorFilter = (f: RoutineConnectorTrigger["filter"]): Rout
 export function ConnectorTriggerFields({
   value,
   onChange,
+  agentId,
 }: {
   value: ConnectorTriggerDraft;
   onChange: (value: ConnectorTriggerDraft) => void;
+  /** The routine's agent: only the connections it reads are offered (the server refuses the others). */
+  agentId: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const list = useEmailEventConnections(org.id);
+  const grants = useAgentScopes(org.id, agentId, Boolean(agentId) && list.length > 0);
+  const { options, cantRead } = triggerChoices(
+    list,
+    agentId && grants.data ? connectionReader(grants.data) : undefined,
+    value.connectionId,
+  );
+  const waiting = Boolean(agentId) && list.length > 0 && grants.isPending;
+  const first = waiting ? undefined : options[0];
   useEffect(() => {
-    if (!value.connectionId && list[0]) onChange({ ...value, connectionId: list[0].id });
-  }, [value, list, onChange]);
+    if (!value.connectionId && first) onChange({ ...value, connectionId: first.id });
+  }, [value, first, onChange]);
   const setFilter = (filter: RoutineConnectorTrigger["filter"]) => onChange({ ...value, filter });
+  const picked = list.find((s) => s.id === value.connectionId) ?? list[0];
+  const access = cantRead && agentId && (
+    <AgentAccessNote
+      agentId={agentId}
+      words={options.length === 0 ? "mail.routine.connectorReadsNone" : "mail.routine.connectorCantRead"}
+      values={{ connector: picked?.label ?? "" }}
+    />
+  );
+  if (options.length === 0 && access) return access;
   return (
     <div className="routine-email">
       <div className="grid-fields">
-        {list.length > 1 && (
+        {options.length > 1 && (
           <Field label={t("routines.form.kind.connector")} id="nr-connection">
             <Select
               value={value.connectionId || undefined}
               onValueChange={(connectionId) => onChange({ ...value, connectionId })}
-              options={list.map((s) => ({ value: s.id, label: s.label }))}
+              options={options.map((s) => ({ value: s.id, label: s.label }))}
             />
           </Field>
         )}
@@ -65,6 +87,7 @@ export function ConnectorTriggerFields({
           />
         </Field>
       </div>
+      {access}
       <span className="ac-eyebrow">{t("mail.routine.filters")}</span>
       <AddressList
         id="nr-ms-from"

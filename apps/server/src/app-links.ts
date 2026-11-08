@@ -6,7 +6,8 @@ import type { Context } from "hono";
  * Links to the website that open the phone app when it is installed (iOS universal links, Android App Links): an
  * invitation, "Esqueci a senha", an early-access sign-up, and a workspace's pages the app has a screen for (a
  * conversation and its message `?m=`, a DM, a thread, an agent, tasks, routines, approvals, the inbox, search, Drive,
- * the wiki, people, the settings sections the app has). Without the app they stay links to the website. The files
+ * the wiki, people, the task manager, the settings sections the app has). Without the app they stay links to the
+ * website. The files
  * below are what iOS and Android fetch from our domain to trust the app with those paths.
  *
  * iOS reads the paths from here (`*` is any text); Android from the app's build (`APP_LINK_PATTERNS` in
@@ -28,6 +29,7 @@ export const APP_LINK_PATHS = [
   "/org/*/agents/*",
   "/org/*/approvals",
   "/org/*/proposals",
+  "/org/*/task-manager",
   "/org/*/notifications",
   "/org/*/issues",
   "/org/*/issues/*",
@@ -53,6 +55,11 @@ export const APP_LINK_PATHS = [
   "/org/*/settings/usage",
   "/org/*/settings/import",
   "/org/*/settings/media",
+  "/org/*/settings/approvals",
+  "/org/*/settings/right_hand",
+  "/org/*/settings/roles",
+  "/org/*/settings/vault",
+  "/org/*/settings/about",
   "/org/*/settings/computers/*",
 ];
 

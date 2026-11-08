@@ -516,6 +516,14 @@ describe("Armazenamento", () => {
     expect(src("features/settings/StorageScreen.tsx")).toContain("belowText: usage ?? undefined");
   });
 
+  test("no native Google Drive or OneDrive is promised: they connect through Conectores", () => {
+    const screen = readFileSync(
+      join(import.meta.dir, "..", "..", "src", "features/settings/StorageScreen.tsx"),
+      "utf8",
+    );
+    expect(screen).not.toMatch(/storage\.(gdrive|onedrive|soon)|Google Drive|OneDrive/);
+  });
+
   test("the form from the saved bucket, keys blank (kept), and what the server gets", () => {
     const form = s3FormOf(config);
     expect(form).toMatchObject({ bucket: "acme", prefix: "", accessKeyId: "", secretAccessKey: "" });

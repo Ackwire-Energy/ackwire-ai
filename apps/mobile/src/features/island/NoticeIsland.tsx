@@ -22,15 +22,14 @@ import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, with
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { setIslandLive } from "@/lib/push";
-import { serverUrl } from "@/lib/server";
 import { useRealtime } from "@/providers/realtime";
 import { haptics, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
-import { openPage } from "../ai/parts";
 import { isDashboardNotice } from "../dashboards/logic";
 import { notificationHref, notificationWebPath } from "../links/logic";
+import { openWebPath } from "../links/open-web";
 import { Face } from "../shared/Face";
 import { useOrgId } from "../shared/hooks";
 import { island } from "./island";
@@ -335,7 +334,7 @@ function useOpenNotice(n: AppNotification, onOpened: () => void) {
     onOpened();
     // An approval opens in its sheet (held to approve there); the rest, where it happened.
     if (href) router.push(href);
-    else if (web) openPage(`${serverUrl()}${web}`);
+    else if (web) openWebPath(web);
   };
   return { canOpen: Boolean(href || web), open };
 }

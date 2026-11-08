@@ -1,6 +1,13 @@
-import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
+import {
+  useArchivedChannels,
+  useChannelCard,
+  useChannels,
+  useJoinChannel,
+  useUnarchiveChannel,
+} from "@agenteschat/client";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text as RNText, StyleSheet, View } from "react-native";
 import { Button, Icon, Text, useToast } from "@/ui";
@@ -60,12 +67,18 @@ export function ChannelRefText({ name, text, refs }: { name: string; text: strin
   );
 }
 
-/** A channel's card in a sheet: what it is, who is in it, and Join or Open (the web's hover card). */
+/**
+ * A channel's card in a sheet: what it is, who is in it, and Join or Open (the web's hover card); an archived one, Restaurar
+ * for who may bring it back.
+ */
 function ChannelCardSheet({ channelId, onDone }: { channelId: string; onDone: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
+  const toast = useToast();
   const card = useChannelCard(orgId, channelId);
   const join = useJoinChannel(orgId, channelId);
+  const restorable = useArchivedChannels(orgId, card.data?.archived === true).data?.some((x) => x.id === channelId);
+  const restore = useUnarchiveChannel(orgId);
   const colors = useColors();
   const c = card.data;
   if (!c) {
@@ -89,6 +102,25 @@ function ChannelCardSheet({ channelId, onDone }: { channelId: string; onDone: ()
         subtitle={c.archived ? `${t("channelRefs.archived")} · ${channelCardFacts(t, c)}` : channelCardFacts(t, c)}
       />
       {c.topic ? <Text variant="body">{c.topic}</Text> : null}
+      {c.archived && restorable ? (
+        <View style={styles.actions}>
+          <Button
+            variant="secondary"
+            wide
+            label={t("channel.restore")}
+            loading={restore.isPending}
+            onPress={() =>
+              restore.mutate(channelId, {
+                onSuccess: () => {
+                  toast({ title: t("channel.restored", { channel: c.name }), icon: "check" });
+                  openIt();
+                },
+                onError: (error) => toast({ title: errorText(t, error, i18n.language), icon: "x" }),
+              })
+            }
+          />
+        </View>
+      ) : null}
       {c.archived ? null : (
         <View style={styles.actions}>
           {joinable(c) ? (

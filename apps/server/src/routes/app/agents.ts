@@ -69,6 +69,7 @@ import {
   setReportsTo,
   speakerOf,
   TEAM_TEMPLATES,
+  unarchiveAgent,
   undoTeam,
   updateAgent,
   updateAgentGroup,
@@ -1586,6 +1587,24 @@ export function agentRoutes(deps: AppDeps) {
         return c.body(null, 204);
       }
       await archiveAgent(db, actor, orgId, agentId, adapters.pubsub);
+      await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/unarchive",
+      tags,
+      security,
+      summary: "Bring an archived agent back to the team (who manages agents); a deleted one never comes back",
+      request: { params: AgentParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      await unarchiveAgent(db, c.get("user").id, orgId, agentId, { pubsub: adapters.pubsub });
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
     },

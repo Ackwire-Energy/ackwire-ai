@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { userTopic } from "@agenteschat/adapters";
+import { channelTopic, userTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -106,7 +106,9 @@ describe("calendar", () => {
       id: bia.id,
       status: "accepted",
     });
-    await expect(respondToEvent(deps, outsider.id, f.org.id, event.id, "accepted")).rejects.toThrow("not invited");
+    await expect(respondToEvent(deps, outsider.id, f.org.id, event.id, "accepted")).rejects.toMatchObject({
+      code: "calendar.not_invited",
+    });
 
     await createIssue(deps, { type: "person", userId: f.owner.id }, f.org.id, {
       title: "Entrega",
@@ -213,6 +215,14 @@ describe("calendar", () => {
       meta: { bodyCode: "calendar_proposal", bodyParams: { title: "Revisão do PR" } },
     });
     expect(card?.threadId).toBeNull(); // asked in the channel: the card is there
+    // Its words in the reader's language, and who confirms it, for the card in the conversation.
+    expect(card?.meta).toMatchObject({
+      bodyCode: "calendar_proposal",
+      bodyParams: { title: "Revisão do PR" },
+      calendarProposal: { requesterUserId: f.owner.id, status: "pending" },
+    });
+    const heard: { type: string; messageId?: string; proposal?: { status: string } }[] = [];
+    f.pubsub.subscribe(channelTopic(f.general.id), (e) => heard.push(e as (typeof heard)[number]));
 
     const deps = { db: f.db, pubsub: f.pubsub };
     await expect(dismissCalendarProposal(deps, bia.id, f.org.id, proposal?.id ?? "")).rejects.toBeInstanceOf(
@@ -225,5 +235,12 @@ describe("calendar", () => {
       .from(schema.messages)
       .where(eq(schema.messages.id, proposal?.messageId ?? ""));
     expect(after?.meta.calendarProposal).toMatchObject({ status: "confirmed" });
+    // Everyone with the conversation open sees the card decided.
+    expect(heard.filter((e) => e.type === "calendar.proposal.updated")).toEqual([
+      expect.objectContaining({
+        messageId: proposal?.messageId,
+        proposal: expect.objectContaining({ status: "confirmed" }),
+      }),
+    ]);
   });
 });

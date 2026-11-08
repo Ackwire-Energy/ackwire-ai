@@ -25,14 +25,14 @@ import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, SheetScreen, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
+import { openWebPath } from "../links/open-web";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ConnectAiFlow, viewOf } from "./ConnectAiSteps";
 import type { FlowView } from "./logic";
-import { openPage, PlanHoldNote, usePlanHold } from "./parts";
+import { PlanHoldNote, usePlanHold } from "./parts";
 
 /**
  * The first run's API key (the web's key panel, saved by the step's button): a pay-as-you-go key for the
@@ -223,7 +223,7 @@ export function ConnectAiSheet() {
               answer();
             })
           }
-          onComputer={() => openPage(`${serverUrl()}/org/${orgId}/settings/computers`)}
+          onComputer={() => openWebPath(`/org/${orgId}/settings/computers`)}
           onPlanDone={(id) => {
             setLinked((l) => [...l, id]);
             answer();
