@@ -244,6 +244,13 @@ html[data-pointer] :focus-visible {
     margin-block-start: calc(var(--cap-top) - 0.5lh);
   }
 }
+/* A first line that holds a pill doesn't rise, nor does the row's when a pill ends the row on it (`.ac-captail`): the
+   pill fills that line, so its top meets the picture's top on the row's padding and the name centres on it. */
+.ac-captop:has(.ac-chip),
+:is(.ac-list__row, .ac-faceline):has(> .ac-captail > .ac-chip) .ac-captop,
+.ac-captail.ac-captop:has(> .ac-chip) {
+  margin-block-start: 0;
+}
 /*
  * What ends a row whose words can wrap (a chip, its buttons, a switch) belongs to the first line, never to the row's
  * middle: `.ac-captail` is a box as tall as that line (in the row's font size and line height), whatever it holds

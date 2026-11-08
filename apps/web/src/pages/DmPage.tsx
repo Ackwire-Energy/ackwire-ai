@@ -92,7 +92,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
         {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
         <div className="dm-who__text">
           <h1 className={agent || person ? "channel__title ac-captop" : "channel__title"}>
-            {name}
+            <span className="channel__name">{name}</span>
             {agent && <AudienceChip agent={agent} />}
           </h1>
           {agent && (

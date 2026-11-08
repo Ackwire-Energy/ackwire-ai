@@ -169,7 +169,8 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
      search takes the whole screen. */
   .channel__acts > .channel__threads,
   .channel__acts > .channel__pin,
-  .channel__acts > .channel__search {
+  .channel__acts > .channel__search,
+  .channel__header > .channel__search {
     display: none;
   }
   .channel__acts:has(.channel__members-toggle) > .channel__cog {

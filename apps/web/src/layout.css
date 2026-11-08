@@ -10180,6 +10180,10 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   font-weight: 650;
   white-space: nowrap;
 }
+/* A tag on a first line that rises keeps the line where it is, as the kit's pills do (`.ac-captop:has(.ac-chip)`). */
+.ac-captop:has(.agp-tag) {
+  margin-block-start: 0;
+}
 .agp-tag--dot {
   height: 18px;
   margin-left: auto;

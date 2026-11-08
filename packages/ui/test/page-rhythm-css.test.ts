@@ -158,3 +158,14 @@ describe("the toolbar", () => {
     expect(body(".ac-filter__option > .ac-countchip + .ac-tz__check")).toContain("margin-left: var(--space-2);");
   });
 });
+
+describe("a pill on a name's first line", () => {
+  test("doesn't rise with .ac-captop, on the line or ending the row on it", () => {
+    for (const selector of [
+      ".ac-captop:has(.ac-chip)",
+      ":is(.ac-list__row, .ac-faceline):has(> .ac-captail > .ac-chip) .ac-captop",
+      ".ac-captail.ac-captop:has(> .ac-chip)",
+    ])
+      expect(body(selector)).toContain("margin-block-start: 0;");
+  });
+});

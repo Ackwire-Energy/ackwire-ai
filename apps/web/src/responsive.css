@@ -154,6 +154,22 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* A DM's name keeps its line, its pill 8 after it on its capitals, and under it when both don't fit. */
+  .dm-who .channel__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+  }
+  .dm-who .channel__title > .channel__name {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dm-who .channel__title > .ac-chip {
+    flex: none;
+  }
   .channel__topic {
     overflow: hidden;
     text-overflow: ellipsis;

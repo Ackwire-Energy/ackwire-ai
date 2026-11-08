@@ -1092,7 +1092,11 @@ test("a DM's head: the name with a line under it rises to the face's top, a pers
   cleanup();
   await open(seedState(), `dm/agent/${ADA_ID}`);
   await settle(4);
-  expect(screen().getByRole("heading", { level: 1, name: "Ada" }).className).toBe("channel__title ac-captop");
+  const ada = screen().getByRole("heading", { level: 1, name: "Ada" });
+  expect(ada.className).toBe("channel__title ac-captop");
+  // The name in a span of its own, so a phone's title keeps its line and a pill goes under it when both don't fit.
+  expect(ada.firstElementChild?.className).toBe("channel__name");
+  expect(ada.firstElementChild?.textContent).toBe("Ada");
 });
 
 describe("direct messages with an agent", () => {
