@@ -89,7 +89,9 @@ html:not([data-pointer]) .audit-row:focus-visible {
 .audit-row__sub:empty {
   display: none;
 }
+/* Its own column, the last: a row without an outcome leaves the chip's cell empty, never the time on a line alone. */
 .audit-row__time {
+  grid-column: -2;
   text-align: right;
   font-size: 13.5px;
   color: var(--faint);
