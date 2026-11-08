@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { LOGO_SIZES, type LogoSize, MARK_GRADIENT, markShapes, STACK_RING, stackChips } from "./provider-marks";
 import { useTheme } from "./theme";
+import { initialText } from "./type-scale";
 
 const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18, hero: 24 } as const;
 
@@ -64,7 +65,10 @@ export function ProviderLogo({ id, size = "tile", off = false, label }: Provider
         </Svg>
       ) : (
         // A fixed box: the letter doesn't grow with the text size setting.
-        <Text allowFontScaling={false} style={{ fontSize: INITIAL_SIZE[size], fontWeight: "600", color: colors.muted }}>
+        <Text
+          allowFontScaling={false}
+          style={{ ...initialText(box, INITIAL_SIZE[size]), fontWeight: "600", color: colors.muted }}
+        >
           {id.trim().charAt(0).toUpperCase()}
         </Text>
       )}

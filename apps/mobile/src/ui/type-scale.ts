@@ -127,12 +127,13 @@ export function countBadge(fontSize: number) {
 }
 
 /**
- * A face's initial (PersonAvatar): one line exactly the tile's height, centred both ways, Android's extra font padding
- * off, as a count sits in its pill (`countBadge`). With no line height the line box centres instead of the letter.
+ * A tile's initial (a person's face, a maker without a mark, a voter): one line exactly the tile's height, centred both
+ * ways, Android's extra font padding off, as a count sits in its pill (`countBadge`). With no line height the line box
+ * centres instead of the letter.
  */
-export function initialText(size: number) {
+export function initialText(size: number, fontSize = size * 0.42) {
   return {
-    fontSize: size * 0.42,
+    fontSize,
     lineHeight: size,
     includeFontPadding: false,
     textAlign: "center" as const,

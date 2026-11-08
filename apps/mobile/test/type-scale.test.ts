@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   CHROME_MAX_SCALE,
   countBadge,
@@ -136,5 +138,15 @@ describe("count badge", () => {
         textAlignVertical: "center",
       });
     }
+    // A tile whose letter keeps its own size (a maker without a mark, a voter) is centred the same way.
+    expect(initialText(30, 13)).toMatchObject({ fontSize: 13, lineHeight: 30, includeFontPadding: false });
+  });
+
+  test("every tile with an initial on the phone draws it that way", () => {
+    const src = (path: string) => readFileSync(join(import.meta.dir, "../src", path), "utf8");
+    expect(src("agent/PersonAvatar.tsx")).toContain("...initialText(size)");
+    expect(src("ui/ProviderLogo.tsx")).toContain("...initialText(box, INITIAL_SIZE[size])");
+    expect(src("features/blocks/PollCard.tsx")).toContain("const VOTER_INITIAL = initialText(20, 12);");
+    expect(src("features/me/ChatLookPage.tsx")).toContain("const PERSON_INITIAL = initialText(18, 9);");
   });
 });

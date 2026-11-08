@@ -3,7 +3,7 @@ import { pollAnswered, pollIsOpen, pollTally, pollToggle } from "@agenteschat/cl
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Icon, Sky, Text, textLineOf, useToast } from "@/ui";
-import { leadBox } from "@/ui/type-scale";
+import { initialText, leadBox } from "@/ui/type-scale";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
@@ -103,7 +103,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
               <View style={[styles.faces, { minHeight: line.height }]}>
                 {o.voters.slice(0, FACES).map((v) => (
                   <View key={v} style={[styles.face, { backgroundColor: c.line2, borderColor: c.raised }]}>
-                    <Text variant="caption" style={styles.bold}>
+                    <Text variant="caption" style={[styles.bold, VOTER_INITIAL]}>
                       {nameOf(v).slice(0, 1).toUpperCase()}
                     </Text>
                   </View>
@@ -132,6 +132,9 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
     </View>
   );
 }
+
+/** A voter's 24 tile inside its 2-point ring: the initial centred in the 20 left. */
+const VOTER_INITIAL = initialText(20, 12);
 
 const styles = StyleSheet.create({
   // As wide as the message, under what comes before it (the files' cards keep the same gap).

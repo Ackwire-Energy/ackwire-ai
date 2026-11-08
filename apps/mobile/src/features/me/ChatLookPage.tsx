@@ -16,6 +16,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, Segmented, Text, useTheme, useToast } from "@/ui";
+import { initialText } from "@/ui/type-scale";
 import { bubbleFill } from "../chat/logic";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Page } from "./parts";
@@ -41,7 +42,7 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
   const name = line.mine ? dir.nameOf({ type: "person", id: meId }) : "Ada";
   const face = line.grouped ? null : line.mine ? (
     <View style={[styles.personFace, { backgroundColor: c.sunken }]}>
-      <Text variant="caption" tone="muted" style={styles.personLetter}>
+      <Text variant="caption" tone="muted" style={[styles.personLetter, PERSON_INITIAL]}>
         {name.slice(0, 1).toUpperCase()}
       </Text>
     </View>
@@ -260,6 +261,9 @@ function UnreadLine() {
   );
 }
 
+/** The sample person's 18 tile: the initial centred in it. */
+const PERSON_INITIAL = initialText(18, 9);
+
 const styles = StyleSheet.create({
   gap: { height: 8 },
   pad: { paddingHorizontal: 16, paddingBottom: 8 },
@@ -276,7 +280,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   faceSlot: { width: 18 },
   personFace: { width: 18, height: 18, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  personLetter: { fontSize: 9, lineHeight: 12, fontWeight: "600" },
+  personLetter: { fontWeight: "600" },
   bubble: { maxWidth: "86%", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9 },
   line: { fontSize: 9.5, lineHeight: 13, flexShrink: 1 },
   onSolid: { color: "#ffffff" },
