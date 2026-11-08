@@ -2028,6 +2028,7 @@
     "popoverTitle": "Agentes",
     "seenBy": "Visto por {{names}}",
     "retry": "Intentar de nuevo",
+    "retrying": "Intentando de nuevo…",
     "platformCap": "Menciona a un agente con @ para que responda.",
     "mentionNeeded": "Ningún agente va a responder sin una @",
     "mentionNeededHint": "Ninguna IA de aquí pudo elegir un agente para este mensaje. Menciona a un agente para llamarlo.",
@@ -2407,6 +2408,7 @@
     "rightHand": {
       "computer_away": "{{name}} no puede responder ahora: la computadora del plan no está disponible.",
       "computer_failed": "{{name}} no puede responder ahora: la computadora del plan tuvo un problema.",
+      "cli_failed": "{{name}} no puede responder ahora: la IA del plan se detuvo con un error.",
       "plan_limit": "{{name}} no puede responder ahora: el plan llegó a su límite.",
       "plan_not_shared": "Conecta tu propio plan para hablar con {{name}}: el plan del workspace solo atiende a su dueño.",
       "runner_outdated": "{{name}} no puede responder ahora: el programa en la computadora del plan necesita una actualización.",
@@ -5055,6 +5057,9 @@
         "computer_busy": "La computadora siguió ocupada con otras tareas.",
         "computer_failed": "La computadora tuvo un problema y se detuvo.",
         "computer_timeout": "La computadora tardó demasiado en responder.",
+        "cli_failed": "El programa {{brain}} se detuvo con un error: {{detail}}",
+        "cli_stopped": "El programa {{brain}} se detuvo con un error.",
+        "cli_closed": "El programa {{brain}} se cerró de repente.",
         "account_missing": "La cuenta elegida para este agente ya no está en su computadora. Elige otra en la configuración del agente o agrégala de nuevo.",
         "our_error": "Algo salió mal de nuestro lado y la tarea se detuvo. Pide de nuevo en un rato.",
         "unknown": "Falló."
@@ -7322,6 +7327,7 @@
       "computer_busy": "La computadora siguió ocupada con otras tareas",
       "computer_failed": "La computadora tuvo un problema y se detuvo",
       "computer_timeout": "La computadora tardó demasiado en responder",
+      "cli_failed": "El programa de IA de la computadora se detuvo con un error",
       "account_missing": "La cuenta del agente ya no está en su computadora",
       "our_error": "Algo salió mal de nuestro lado"
     },
@@ -12510,6 +12516,7 @@
       "agentBusy": "El agente ya está trabajando en esta conversación. Espera a que termine para continuar.",
       "continueForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede continuarla.",
       "notRestartable": "Esta respuesta ya había empezado, así que no puede empezar de nuevo. Envía tu mensaje otra vez.",
+      "notRestartableVoice": "Esta respuesta ya había empezado, así que no puede empezar de nuevo. Graba tu mensaje otra vez.",
       "cancelForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede detenerlo.",
       "answerForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede hacer esto.",
       "stopReasonForbidden": "Solo quien lo detuvo puede decir por qué."
@@ -14930,6 +14937,7 @@
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
       "no_ai_computer_away": "Ahora no puedo responder: la computadora de mi plan no está disponible.",
       "no_ai_computer_failed": "Ahora no puedo responder: la computadora de mi plan tuvo un problema.",
+      "no_ai_cli_failed": "Ahora no puedo responder: la IA de mi plan se detuvo con un error.",
       "no_ai_plan_limit": "Ahora no puedo responder: el plan con el que pienso llegó a su límite.",
       "no_ai_plan_not_shared": "No puedo responderte por el plan del workspace: solo atiende a su dueño. Conecta tu propio plan y te responderé.",
       "no_ai_runner_outdated": "Ahora no puedo responder: el programa en la computadora de mi plan necesita una actualización.",

@@ -2032,6 +2032,7 @@
     "popoverTitle": "Agents",
     "seenBy": "Vu par {{names}}",
     "retry": "Réessayer",
+    "retrying": "Nouvelle tentative…",
     "platformCap": "Mentionnez un agent avec @ pour qu'il réponde.",
     "mentionNeeded": "Aucun agent ne répondra sans @",
     "mentionNeededHint": "Aucune IA ici n'a pu choisir un agent pour ce message. Mentionnez un agent pour l'appeler.",
@@ -2411,6 +2412,7 @@
     "rightHand": {
       "computer_away": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement n'est pas disponible.",
       "computer_failed": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement a eu un problème.",
+      "cli_failed": "{{name}} ne peut pas répondre maintenant : l'IA de l'abonnement s'est arrêtée sur une erreur.",
       "plan_limit": "{{name}} ne peut pas répondre maintenant : l'abonnement a atteint sa limite.",
       "plan_not_shared": "Connectez votre propre forfait pour parler à {{name}} : le forfait du workspace ne répond qu'à son propriétaire.",
       "runner_outdated": "{{name}} ne peut pas répondre pour l'instant : le programme sur l'ordinateur de l'abonnement doit être mis à jour.",
@@ -5093,6 +5095,9 @@
         "computer_busy": "L'ordinateur est resté occupé par d'autres tâches.",
         "computer_failed": "L'ordinateur a rencontré un problème et s'est arrêté.",
         "computer_timeout": "L'ordinateur a mis trop de temps à répondre.",
+        "cli_failed": "Le programme {{brain}} s'est arrêté sur une erreur : {{detail}}",
+        "cli_stopped": "Le programme {{brain}} s'est arrêté sur une erreur.",
+        "cli_closed": "Le programme {{brain}} s'est fermé de façon inattendue.",
         "account_missing": "Le compte choisi pour cet agent n'est plus sur son ordinateur. Choisissez-en un autre dans les paramètres de l'agent, ou ajoutez-le à nouveau.",
         "our_error": "Un problème est survenu de notre côté et la tâche s'est arrêtée. Redemandez dans un moment.",
         "unknown": "Échec."
@@ -7374,6 +7379,7 @@
       "computer_busy": "L'ordinateur est resté occupé par d'autres tâches",
       "computer_failed": "L'ordinateur a rencontré un problème et s'est arrêté",
       "computer_timeout": "L'ordinateur a mis trop de temps à répondre",
+      "cli_failed": "Le programme d'IA de l'ordinateur s'est arrêté sur une erreur",
       "account_missing": "Le compte de l'agent n'est plus sur son ordinateur",
       "our_error": "Un problème est survenu de notre côté"
     },
@@ -12579,6 +12585,7 @@
       "agentBusy": "L'agent travaille déjà dans cette conversation. Attendez qu'il ait fini pour continuer.",
       "continueForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent la poursuivre.",
       "notRestartable": "Cette réponse avait déjà commencé, elle ne peut donc pas repartir de zéro. Renvoyez votre message.",
+      "notRestartableVoice": "Cette réponse avait déjà commencé, elle ne peut donc pas repartir de zéro. Enregistrez à nouveau votre message.",
       "cancelForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent l'arrêter.",
       "answerForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent faire cela.",
       "stopReasonForbidden": "Seule la personne qui l'a arrêté peut dire pourquoi."
@@ -15011,6 +15018,7 @@
       "no_ai_not_signed_in": "Je ne peux pas encore répondre : {{brain}} n'est pas connecté sur mon ordinateur.",
       "no_ai_computer_away": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement n'est pas disponible.",
       "no_ai_computer_failed": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement a eu un problème.",
+      "no_ai_cli_failed": "Je ne peux pas répondre maintenant : l'IA de mon abonnement s'est arrêtée sur une erreur.",
       "no_ai_plan_limit": "Je ne peux pas répondre maintenant : l'abonnement avec lequel je réfléchis a atteint sa limite.",
       "no_ai_plan_not_shared": "Je ne peux pas vous répondre par le forfait du workspace : il ne répond qu'à son propriétaire. Connectez votre propre forfait et je répondrai.",
       "no_ai_runner_outdated": "Je ne peux pas répondre pour l'instant : le programme sur l'ordinateur de mon abonnement doit être mis à jour.",

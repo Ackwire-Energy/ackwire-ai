@@ -2031,6 +2031,7 @@
     "popoverTitle": "Agenti",
     "seenBy": "Visto da {{names}}",
     "retry": "Riprova",
+    "retrying": "Nuovo tentativo…",
     "platformCap": "Menziona un agente con @ perché risponda.",
     "mentionNeeded": "Nessun agente risponderà senza una @",
     "mentionNeededHint": "Nessuna IA qui ha potuto scegliere un agente per questo messaggio. Menziona un agente per chiamarlo.",
@@ -2412,6 +2413,7 @@
     "rightHand": {
       "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
       "computer_failed": "{{name}} non può rispondere ora: il computer del piano ha avuto un problema.",
+      "cli_failed": "{{name}} non può rispondere ora: l'IA del piano si è fermata con un errore.",
       "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
       "plan_not_shared": "Collega il tuo piano per parlare con {{name}}: il piano del workspace risponde solo al suo proprietario.",
       "runner_outdated": "{{name}} non può rispondere ora: il programma sul computer del piano va aggiornato.",
@@ -5094,6 +5096,9 @@
         "computer_busy": "Il computer è rimasto occupato con altre attività.",
         "computer_failed": "Il computer ha avuto un problema e si è fermato.",
         "computer_timeout": "Il computer ha impiegato troppo tempo a rispondere.",
+        "cli_failed": "Il programma {{brain}} si è fermato con un errore: {{detail}}",
+        "cli_stopped": "Il programma {{brain}} si è fermato con un errore.",
+        "cli_closed": "Il programma {{brain}} si è chiuso all'improvviso.",
         "account_missing": "L'account scelto per questo agente non è più sul suo computer. Scegline un altro nelle impostazioni dell'agente o aggiungilo di nuovo.",
         "our_error": "Qualcosa è andato storto da parte nostra e l'attività si è fermata. Richiedilo tra poco.",
         "unknown": "Non riuscita."
@@ -7377,6 +7382,7 @@
       "computer_busy": "Il computer è rimasto occupato con altre attività",
       "computer_failed": "Il computer ha avuto un problema e si è fermato",
       "computer_timeout": "Il computer ha impiegato troppo tempo a rispondere",
+      "cli_failed": "Il programma di IA sul computer si è fermato con un errore",
       "account_missing": "L'account dell'agente non è più sul suo computer",
       "our_error": "Qualcosa è andato storto da parte nostra"
     },
@@ -12588,6 +12594,7 @@
       "agentBusy": "L'agente sta già lavorando in questa conversazione. Aspetta che finisca per continuare.",
       "continueForbidden": "Solo chi l'ha chiesto, il responsabile dell'agente o un admin può continuarla.",
       "notRestartable": "Questa risposta era già iniziata, quindi non può ripartire da capo. Invia di nuovo il tuo messaggio.",
+      "notRestartableVoice": "Questa risposta era già iniziata, quindi non può ripartire da capo. Registra di nuovo il tuo messaggio.",
       "cancelForbidden": "Solo chi l'ha chiesto, il responsabile dell'agente o un admin può fermarlo.",
       "answerForbidden": "Solo chi l'ha chiesto, il responsabile dell'agente o un admin può farlo.",
       "stopReasonForbidden": "Solo chi l'ha fermato può dire perché."
@@ -15014,6 +15021,7 @@
       "no_ai_not_signed_in": "Non posso ancora rispondere: {{brain}} non ha effettuato l'accesso sul mio computer.",
       "no_ai_computer_away": "Ora non posso rispondere: il computer del mio piano non è disponibile.",
       "no_ai_computer_failed": "Ora non posso rispondere: il computer del mio piano ha avuto un problema.",
+      "no_ai_cli_failed": "Ora non posso rispondere: l'IA del mio piano si è fermata con un errore.",
       "no_ai_plan_limit": "Ora non posso rispondere: il piano con cui penso ha raggiunto il limite.",
       "no_ai_plan_not_shared": "Non posso risponderti con il piano del workspace: risponde solo al suo proprietario. Collega il tuo piano e ti risponderò.",
       "no_ai_runner_outdated": "Ora non posso rispondere: il programma sul computer del mio piano va aggiornato.",

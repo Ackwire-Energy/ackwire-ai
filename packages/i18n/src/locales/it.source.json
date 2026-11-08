@@ -4778,6 +4778,9 @@
   "receipts.retry": {
     "value": "Try again"
   },
+  "receipts.retrying": {
+    "value": "Trying again…"
+  },
   "receipts.platformCap": {
     "value": "Mention an agent with @ to have it answer."
   },
@@ -5640,6 +5643,9 @@
   },
   "noAi.rightHand.computer_failed": {
     "value": "{{name}} can't answer now: the computer the plan is signed in on had a problem."
+  },
+  "noAi.rightHand.cli_failed": {
+    "value": "{{name}} can't answer now: the plan's AI stopped with an error."
   },
   "noAi.rightHand.plan_limit": {
     "value": "{{name}} can't answer now: the plan reached its limit."
@@ -12030,6 +12036,15 @@
   "agentPage.activity.errors.computer_timeout": {
     "value": "The computer took too long to answer."
   },
+  "agentPage.activity.errors.cli_failed": {
+    "value": "The {{brain}} program stopped with an error: {{detail}}"
+  },
+  "agentPage.activity.errors.cli_stopped": {
+    "value": "The {{brain}} program stopped with an error."
+  },
+  "agentPage.activity.errors.cli_closed": {
+    "value": "The {{brain}} program closed unexpectedly."
+  },
   "agentPage.activity.errors.account_missing": {
     "value": "The account chosen for this agent isn't on its computer anymore. Choose another one in the agent's settings, or add it again."
   },
@@ -17104,6 +17119,9 @@
   },
   "routines.code.computer_timeout": {
     "value": "The computer took too long to answer"
+  },
+  "routines.code.cli_failed": {
+    "value": "The AI program on the computer stopped with an error"
   },
   "routines.code.account_missing": {
     "value": "The agent's account isn't on its computer anymore"
@@ -29347,6 +29365,9 @@
   "errors.run.notRestartable": {
     "value": "This answer had already started, so it can't start over. Send your message again."
   },
+  "errors.run.notRestartableVoice": {
+    "value": "This answer had already started, so it can't start over. Record your message again."
+  },
   "errors.run.cancelForbidden": {
     "value": "Only who asked, the agent's owner or an admin can stop it."
   },
@@ -35359,6 +35380,9 @@
   },
   "chat.body.no_ai_computer_failed": {
     "value": "I can't answer now: the computer my plan is signed in on had a problem."
+  },
+  "chat.body.no_ai_cli_failed": {
+    "value": "I can't answer now: my plan's AI stopped with an error."
   },
   "chat.body.no_ai_plan_limit": {
     "value": "I can't answer now: the plan I think with reached its limit."

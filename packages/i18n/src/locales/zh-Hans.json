@@ -1875,6 +1875,7 @@
     "popoverTitle": "智能体",
     "seenBy": "{{names}} 已读",
     "retry": "重试",
+    "retrying": "正在重试…",
     "platformCap": "用 @ 提及智能体，让它来回答。",
     "mentionNeeded": "不用 @ 就没有智能体会回答",
     "mentionNeededHint": "这里没有可用的 AI 为这条消息挑选智能体。提及一个智能体来呼叫它。",
@@ -2224,6 +2225,7 @@
     "rightHand": {
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
       "computer_failed": "{{name}} 现在无法回答：套餐所在的电脑出了问题。",
+      "cli_failed": "{{name}} 现在无法回答：套餐的 AI 因出错而停止。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
       "plan_not_shared": "连接你自己的套餐才能与{{name}}交谈：工作区的套餐只回复其所有者。",
       "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
@@ -4755,6 +4757,9 @@
         "computer_busy": "电脑一直忙于其他任务。",
         "computer_failed": "电脑遇到问题，已停止。",
         "computer_timeout": "电脑响应时间过长。",
+        "cli_failed": "因为出错，{{brain}} 程序已停止：{{detail}}",
+        "cli_stopped": "因为出错，{{brain}} 程序已停止。",
+        "cli_closed": "程序 {{brain}} 意外关闭。",
         "account_missing": "为这个智能体选择的账号已不在它的电脑上。请在智能体设置中选择另一个账号，或重新添加。",
         "our_error": "我们这边出了点问题，任务已停止。请稍后再提一次。",
         "unknown": "失败。"
@@ -6931,6 +6936,7 @@
       "computer_busy": "电脑一直忙于其他任务",
       "computer_failed": "电脑遇到问题，已停止",
       "computer_timeout": "电脑响应时间过长",
+      "cli_failed": "电脑上的 AI 程序因出错而停止",
       "account_missing": "智能体的账号已不在它的电脑上",
       "our_error": "我们这边出了点问题"
     },
@@ -11729,6 +11735,7 @@
       "agentBusy": "智能体已在这段对话中工作，请等它完成后再继续。",
       "continueForbidden": "只有提问者、智能体负责人或管理员可以让它继续。",
       "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。",
+      "notRestartableVoice": "这个回答已经开始，无法重新开始。请重新录制你的消息。",
       "cancelForbidden": "只有提问者、智能体负责人或管理员可以停止它。",
       "answerForbidden": "只有提问者、智能体负责人或管理员可以执行此操作。",
       "stopReasonForbidden": "只有停止它的人可以说明原因。"
@@ -14065,6 +14072,7 @@
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "no_ai_computer_away": "我现在无法回答：我的套餐所在的电脑不可用。",
       "no_ai_computer_failed": "我现在无法回答：我的套餐所在的电脑出了问题。",
+      "no_ai_cli_failed": "我现在无法回答：我的套餐的 AI 因出错而停止。",
       "no_ai_plan_limit": "我现在无法回答：我用来思考的套餐已达到上限。",
       "no_ai_plan_not_shared": "我无法通过工作区的套餐回复你：它只回复其所有者。连接你自己的套餐后我就能回复。",
       "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",

@@ -2114,6 +2114,7 @@
     "popoverTitle": "Agenci",
     "seenBy": "Widzą: {{names}}",
     "retry": "Spróbuj ponownie",
+    "retrying": "Ponawianie…",
     "platformCap": "Wspomnij agenta przez @, aby odpowiedział.",
     "mentionNeeded": "Bez @ żaden agent nie odpowie",
     "mentionNeededHint": "Żadna AI tutaj nie mogła wybrać agenta do tej wiadomości. Wspomnij agenta, aby go wywołać.",
@@ -2502,6 +2503,7 @@
     "rightHand": {
       "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
       "computer_failed": "{{name}} nie może teraz odpowiedzieć: komputer planu miał problem.",
+      "cli_failed": "{{name}} nie może teraz odpowiedzieć: AI planu zatrzymała się z błędem.",
       "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
       "plan_not_shared": "Połącz własny plan, aby rozmawiać z {{name}}: plan workspace'u odpowiada tylko swojemu właścicielowi.",
       "runner_outdated": "{{name}} nie może teraz odpowiedzieć: program na komputerze planu wymaga aktualizacji.",
@@ -5276,6 +5278,9 @@
         "computer_busy": "Komputer był zajęty innymi zadaniami.",
         "computer_failed": "Komputer napotkał problem i się zatrzymał.",
         "computer_timeout": "Komputer zbyt długo nie odpowiadał.",
+        "cli_failed": "Program {{brain}} zatrzymał się z błędem: {{detail}}",
+        "cli_stopped": "Program {{brain}} zatrzymał się z błędem.",
+        "cli_closed": "Program {{brain}} nagle się zamknął.",
         "account_missing": "Konta wybranego dla tego agenta nie ma już na jego komputerze. Wybierz inne w ustawieniach agenta albo dodaj je ponownie.",
         "our_error": "Coś poszło nie tak po naszej stronie i zadanie się zatrzymało. Poproś ponownie za chwilę.",
         "unknown": "Błąd."
@@ -7585,6 +7590,7 @@
       "computer_busy": "Komputer był zajęty innymi zadaniami",
       "computer_failed": "Komputer napotkał problem i się zatrzymał",
       "computer_timeout": "Komputer zbyt długo nie odpowiadał",
+      "cli_failed": "Program AI na komputerze zatrzymał się z błędem",
       "account_missing": "Konta agenta nie ma już na jego komputerze",
       "our_error": "Coś poszło nie tak po naszej stronie"
     },
@@ -13025,6 +13031,7 @@
       "agentBusy": "Agent już pracuje w tej rozmowie. Poczekaj, aż skończy, żeby kontynuować.",
       "continueForbidden": "Kontynuować może tylko osoba, która prosiła, właściciel agenta albo administrator.",
       "notRestartable": "Ta odpowiedź już się zaczęła, więc nie może zacząć się od nowa. Wyślij swoją wiadomość ponownie.",
+      "notRestartableVoice": "Ta odpowiedź już się zaczęła, więc nie może zacząć się od nowa. Nagraj swoją wiadomość ponownie.",
       "cancelForbidden": "Zatrzymać może tylko osoba, która prosiła, właściciel agenta albo administrator.",
       "answerForbidden": "Może to zrobić tylko osoba, która prosiła, właściciel agenta albo administrator.",
       "stopReasonForbidden": "Tylko osoba, która zatrzymała, może podać powód."
@@ -15497,6 +15504,7 @@
       "no_ai_not_signed_in": "Nie mogę jeszcze odpowiadać: {{brain}} nie jest zalogowany na moim komputerze.",
       "no_ai_computer_away": "Nie mogę teraz odpowiedzieć: komputer mojego planu jest niedostępny.",
       "no_ai_computer_failed": "Nie mogę teraz odpowiedzieć: komputer mojego planu miał problem.",
+      "no_ai_cli_failed": "Nie mogę teraz odpowiedzieć: AI mojego planu zatrzymała się z błędem.",
       "no_ai_plan_limit": "Nie mogę teraz odpowiedzieć: plan, z którym myślę, osiągnął limit.",
       "no_ai_plan_not_shared": "Nie mogę Ci odpowiedzieć przez plan workspace'u: odpowiada tylko swojemu właścicielowi. Połącz własny plan, a odpowiem.",
       "no_ai_runner_outdated": "Nie mogę teraz odpowiedzieć: program na komputerze mojego planu wymaga aktualizacji.",
