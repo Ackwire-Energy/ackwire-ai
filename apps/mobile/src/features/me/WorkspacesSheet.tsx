@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { GroupedFooter, GroupedList, GroupedRow, SheetScreen, Text } from "@/ui";
+import { GroupedFooter, GroupedList, GroupedRow, SheetScreen } from "@/ui";
 import { router } from "@/ui/navigation";
+import { SheetHeader } from "../new/parts";
 import { goBack } from "../shared/parts";
 import { useOpenWorkspaceRow, useWorkspacesAcross, WorkspaceGroups } from "./WorkspacesPages";
 
@@ -17,9 +18,7 @@ export function WorkspacesSheet() {
   const open = useOpenWorkspaceRow(goBack);
   return (
     <SheetScreen>
-      <Text variant="title2" accessibilityRole="header" style={styles.title}>
-        {t("mobile.me.workspaces")}
-      </Text>
+      <SheetHeader title={t("mobile.me.workspaces")} />
       <WorkspaceGroups groups={groups} onOpen={open} />
       <View style={styles.gap} />
       <GroupedList>
@@ -39,6 +38,5 @@ export function WorkspacesSheet() {
 }
 
 const styles = StyleSheet.create({
-  title: { paddingHorizontal: 4, paddingBottom: 4 },
   gap: { height: 16 },
 });

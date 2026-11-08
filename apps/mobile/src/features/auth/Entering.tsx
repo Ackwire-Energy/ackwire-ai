@@ -2,16 +2,30 @@ import { type Agent, keys } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut } from "react-native-reanimated";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrgMaybe } from "@/providers/org";
-import { Sky } from "@/sky/Sky";
+import { WorkspaceSky } from "@/sky/Sky";
 import { Text, useTheme } from "@/ui";
 import { agentLook } from "../shared/logic";
 import { OrgAvatar } from "../shared/OrgAvatar";
 
 /** How many of the team stand on the horizon. */
 const TEAM = 4;
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/**
+ * The team arrives on the horizon as you come in: each one rises a few points onto it and fades in, the first (the
+ * one at work) leading and the others closing in behind with shrinking gaps, so the four read as one wave, not a
+ * queue. A rare moment (signing in, switching workspace), so it may take its time; nothing waits on it.
+ */
+const ARRIVE_AT = [140, 200, 245, 280];
+const arrive = (i: number, reduced: boolean) =>
+  reduced
+    ? FadeIn.duration(200)
+    : FadeInUp.duration(420)
+        .delay(ARRIVE_AT[i] ?? 280)
+        .easing(EASE_OUT)
+        .withInitialValues({ opacity: 0, transform: [{ translateY: 14 }] });
 
 /**
  * The passage into the app after signing in: the workspace's mark over its sky, "Entrando na Acme…", and the team
@@ -21,7 +35,7 @@ const TEAM = 4;
  */
 export function Entering({ org }: { org: string | null }) {
   const { t } = useTranslation();
-  const { colors: c } = useTheme();
+  const { colors: c, reducedMotion } = useTheme();
   const state = useOrgMaybe();
   const qc = useQueryClient();
   // What the phone already holds of this workspace's agents: never a request, the account is still loading.
@@ -34,8 +48,9 @@ export function Entering({ org }: { org: string | null }) {
       style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]}
       accessibilityLiveRegion="polite"
     >
-      {/* The sky low on the screen, the horizon the team stands on; its glow fades upward on its own. */}
-      <Sky color="sky" depth={0.7} fade={0.45} style={styles.sky} />
+      {/* This workspace's own sky (its server's: day on agentes.chat, dusk on a team's own), low on the screen: the
+          horizon the team stands on, its glow fading upward on its own. */}
+      <WorkspaceSky fade={0.45} style={styles.sky} />
       <View style={styles.center}>
         {org ? (
           <OrgAvatar logo={state?.org?.logo} name={org} size={72} />
@@ -52,13 +67,13 @@ export function Entering({ org }: { org: string | null }) {
       {team.length > 0 ? (
         <View style={styles.team} accessibilityElementsHidden>
           {team.map((a, i) => (
-            <View key={a.id} style={styles.member}>
+            <Animated.View key={a.id} entering={arrive(i, reducedMotion)} style={styles.member}>
               {/* The first one at work: the team is busy, not posed. */}
               <AgentAvatar agent={{ ...agentLook(a), id: a.id }} size={36} framed={false} mode={i === 0 ? "run" : "idle"} />
               <Text variant="caption" tone="ink2" numberOfLines={1} style={styles.name}>
                 {a.name}
               </Text>
-            </View>
+            </Animated.View>
           ))}
         </View>
       ) : null}

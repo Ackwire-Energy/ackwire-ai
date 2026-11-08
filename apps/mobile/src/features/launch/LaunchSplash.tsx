@@ -49,6 +49,8 @@ import {
 
 /** The agent's canvas: room around the body for the turn and the breath. */
 const BOX = Math.ceil(LOGO * 1.5);
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 const PAD = (BOX - LOGO) / 2;
 /** Points per sky cell (the sprites stand on the same grid). */
 const PX = 4;
@@ -168,10 +170,13 @@ export function LaunchSplash({
       shown.value = withTiming(0, { duration: LAUNCH.reducedExit * 1000 }, end);
       return;
     }
+    // The handover into the app, one gesture: the agent lifts away toward the top (where the app's bar will be) as
+    // the sky sinks to the horizon and the splash thins out over the screen under it, so the home is seen arriving
+    // through it rather than cut to. On-screen moves on the strong ease-in-out, the fade on ease-out.
     const ms = LAUNCH.exit * 1000;
-    away.value = withTiming(1, { duration: ms * 0.4, easing: Easing.inOut(Easing.quad) });
-    level.value = withTiming(0, { duration: ms, easing: Easing.inOut(Easing.cubic) });
-    shown.value = withDelay(ms * 0.3, withTiming(0, { duration: ms * 0.7, easing: Easing.inOut(Easing.quad) }, end));
+    away.value = withTiming(1, { duration: ms * 0.6, easing: EASE_IN_OUT });
+    level.value = withTiming(0, { duration: ms, easing: EASE_IN_OUT });
+    shown.value = withDelay(ms * 0.25, withTiming(0, { duration: ms * 0.75, easing: EASE_OUT }, end));
   }, [leaving, reduced, away, level, shown, finish]);
 
   // The native image goes once this first frame is laid out (it looks the same).
@@ -202,8 +207,8 @@ export function LaunchSplash({
   const mark = useAnimatedStyle(() => ({
     opacity: 1 - away.value,
     transform: [
-      { translateY: -LAUNCH.lift * lift.value - raise * up.value - 40 * away.value },
-      { scale: 1 - 0.15 * away.value },
+      { translateY: -LAUNCH.lift * lift.value - raise * up.value - 96 * away.value },
+      { scale: 1 - 0.3 * away.value },
     ],
   }));
   const panelStyle = useAnimatedStyle(() => ({ opacity: up.value * (1 - away.value) }));

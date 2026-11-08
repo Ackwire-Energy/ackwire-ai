@@ -4,7 +4,15 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, Linking, StyleSheet, View, type ViewStyle } from "react-native";
-import Animated, { Easing, FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { ALLOW_HTTP } from "@/lib/server";
@@ -28,6 +36,12 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const CARD_IN = FadeInDown.duration(240).easing(EASE_OUT);
 const LINE_OUT = FadeOut.duration(160).easing(EASE_OUT);
 const CORNERS_IN = FadeIn.duration(300).easing(EASE_OUT);
+/**
+ * The read locks on: the four corners close in on the code, a short settle with a hint of give (the code "caught"),
+ * on the same frame as the success tap. The scale is the corners', never the camera's.
+ */
+const LOCKED = 0.86;
+const LOCK = { duration: 380, dampingRatio: 0.78 } as const;
 
 /**
  * Escanear QR code: the camera, a target of four pixel corners and one glass line of help. Reads QR codes only. A
@@ -43,6 +57,8 @@ export default function Scan() {
   const [notOurs, setNotOurs] = useState(false);
   const [read, setRead] = useState<{ server: string; token?: string } | null>(null);
   const done = useRef(false);
+  const lock = useSharedValue(1);
+  const lockStyle = useAnimatedStyle(() => ({ transform: [{ scale: lock.value }] }));
 
   // Back from Ajustes: Android keeps the app running when the camera is allowed there, so read it again.
   useEffect(() => {
@@ -83,7 +99,6 @@ export default function Scan() {
           <Button
             variant="primary"
             wide
-            icon="camera"
             label={t("mobile.auth.scan.allow")}
             onPress={() => void requestPermission()}
           />
@@ -113,22 +128,26 @@ export default function Scan() {
           const link = parseConnectLink(data, { allowHttp: ALLOW_HTTP });
           if (!link) return setNotOurs(true);
           done.current = true;
-          // The read is the moment: one light tap as the corners change color, nothing more until the confirmation.
-          haptics.light();
+          // The read is the moment: the corners lock on and take the server's color, with one success tap on that
+          // frame; nothing more until the confirmation.
+          if (!reduced) lock.value = withSpring(LOCKED, LOCK);
+          haptics.success();
           setRead(link);
         }}
       />
       <View style={styles.center} pointerEvents="none">
-        <Animated.View
-          key={read ? "read" : "aim"}
-          entering={reduced ? undefined : CORNERS_IN}
-          style={styles.target}
-          accessibilityElementsHidden
-        >
-          <Corner tone={tone} at="tl" />
-          <Corner tone={tone} at="tr" />
-          <Corner tone={tone} at="br" />
-          <Corner tone={tone} at="bl" />
+        <Animated.View style={lockStyle}>
+          <Animated.View
+            key={read ? "read" : "aim"}
+            entering={reduced ? undefined : CORNERS_IN}
+            style={styles.target}
+            accessibilityElementsHidden
+          >
+            <Corner tone={tone} at="tl" />
+            <Corner tone={tone} at="tr" />
+            <Corner tone={tone} at="br" />
+            <Corner tone={tone} at="bl" />
+          </Animated.View>
         </Animated.View>
       </View>
       <View style={[styles.back, { top: insets.top + 8 }]}>

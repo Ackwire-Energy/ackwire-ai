@@ -90,15 +90,18 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
 
   test("every entry goes through WholeAccount, which asks that, after Sair", () => {
     expect(read("ui/auth/WholeAccount.tsx")).toContain("if (!accountOutOfReach(orgs)) return null;");
-    for (const screen of [
-      "ui/auth/DeletingWorkspace.tsx",
-      "ui/auth/SuspendedWorkspace.tsx",
-      "features/onboarding/OnboardingFlow.tsx",
-    ]) {
+    for (const screen of ["ui/auth/DeletingWorkspace.tsx", "ui/auth/SuspendedWorkspace.tsx"]) {
       const code = read(screen);
       expect(code).not.toContain('label={t("deleteAccount.menu")}');
       expect(code.indexOf("<WholeAccount")).toBeGreaterThan(code.indexOf('t("mobile.org.signOut")'));
     }
+    // The first run shows nothing destructive, yet deleting the account stays reachable (App Store 5.1.1(v)): its
+    // quiet Sair offers Sair and, after it, Apagar conta in red.
+    const first = read("features/onboarding/OnboardingFlow.tsx");
+    expect(first).not.toContain('label={t("deleteAccount.menu")}');
+    expect(first.indexOf('label: t("deleteAccount.menu")')).toBeGreaterThan(first.indexOf('label: t("mobile.org.signOut")'));
+    expect(first).toContain('openWebPath("/onboarding?account=delete")');
+    expect(first).not.toContain("onboarding.deleteLink");
   });
 
   test("the first workspace that opens is the main action, Restaurar only with nowhere else to go", () => {

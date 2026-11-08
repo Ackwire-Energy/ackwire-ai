@@ -8,7 +8,7 @@ import {
 import { useNetworkState } from "expo-network";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { useNow } from "@/features/shared/hooks";
 import { SERVER_GIVE_UP_MS, SERVER_STUCK_MS, serverDownOf } from "@/lib/org-choice";
@@ -20,6 +20,7 @@ import { CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { Text } from "@/ui/Text";
 import { problemText } from "./index";
+import { ServerAddress } from "./ServerAddress";
 
 /** While it waits, the account is asked for again this often (the app opens on its own once it answers). */
 export const RETRY_EVERY_MS = 15_000;
@@ -106,12 +107,13 @@ export function useServerDown(active: boolean): ServerDown | null {
  * Under the launch splash's name while the server doesn't answer (`LaunchSplash`'s `waiting`): what happened, with
  * the reason when the server's check found one; the wait for the next try as a wick burning down ("tenta de novo em
  * 12 s": it always tried on its own, now it shows); "Tentar agora"; and the quiet ways out: back to another server
- * this phone is signed in to (ADR 0154), or Sair.
+ * this phone is signed in to (ADR 0154), "Trocar de servidor" (fix the address without leaving the account), or Sair.
  */
 export function ServerDownPanel({ down }: { down: ServerDown }) {
   const { t } = useTranslation();
   const network = useNetworkState();
   const back = useServerToReturn();
+  const [switching, setSwitching] = useState(false);
   const offline = network.isConnected === false || network.isInternetReachable === false;
   const host = serverHost(down.server);
   // Off a tailnet, "unreachable" here is a server that worked before: down, not a wrong address.
@@ -145,8 +147,13 @@ export function ServerDownPanel({ down }: { down: ServerDown }) {
         {back ? (
           <AuthLink label={t("mobile.auth.server.backTo", { host: serverHost(back) })} onPress={() => void setServer(back)} />
         ) : null}
+        <AuthLink label={t("mobile.auth.server.down.switchServer")} onPress={() => setSwitching(true)} />
         <AuthLink label={t("mobile.org.signOut")} onPress={() => void signOut()} />
       </View>
+      {/* Over the splash, which covers the navigator: the address screen comes up whole, its back circle closing it. */}
+      <Modal visible={switching} animationType="slide" onRequestClose={() => setSwitching(false)}>
+        <ServerAddress onDone={() => setSwitching(false)} scan={false} />
+      </Modal>
     </View>
   );
 }
@@ -177,5 +184,5 @@ const styles = StyleSheet.create({
   wick: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingBottom: 8 },
   fuse: { width: 56, flex: 0 },
   tabular: { fontVariant: ["tabular-nums"] },
-  links: { paddingTop: 8, flexDirection: "row", justifyContent: "center", gap: 16, flexWrap: "wrap" },
+  links: { paddingTop: 8, flexDirection: "row", justifyContent: "center", columnGap: 16, rowGap: 12, flexWrap: "wrap" },
 });

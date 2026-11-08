@@ -4,7 +4,7 @@ import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
@@ -16,6 +16,8 @@ import { router } from "@/ui/navigation";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
+import { ZoneList } from "../me/AccountPage";
+import { chooseAction } from "../settings/parts";
 import { phoneTimezone, stepFailedText, zoneLabel } from "./logic";
 
 /**
@@ -38,7 +40,9 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const zone = phoneTimezone();
+  // The phone's zone, said in one line with Trocar beside it; the person may pick another before the workspace exists.
+  const [zone, setZone] = useState<string | null>(phoneTimezone);
+  const [pickingZone, setPickingZone] = useState(false);
   const orgName = name.trim();
 
   // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the step says where it
@@ -130,14 +134,29 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
       subtitle={another ? t("mobile.onb.anotherLead", { org: another }) : t("onboarding.workspace.lead")}
       onBack={onLeave && !created ? onLeave : undefined}
       agentMode={pending ? "run" : "idle"}
+      // Nothing destroys on screen: until a workspace is set up this is the only screen, so the way out of the account
+      // is one quiet "Sair", which offers Sair and, in red, Apagar conta in the system's list (a person must always
+      // reach deleting their account, App Store 5.1.1(v); the web's first run takes it from there).
       footer={
-        <>
-          {created ? (
-            <AuthLink label={t("onboarding.deleteLink")} onPress={() => openWebPath("/onboarding?delete=1")} />
-          ) : null}
-          {/* Until a workspace is set up this is the only screen: the way out of the account is a quiet line here. */}
-          {pending ? null : <AuthLink label={t("mobile.org.signOut")} onPress={() => void signOut()} />}
-        </>
+        pending ? null : (
+          <AuthLink
+            label={t("mobile.org.signOut")}
+            onPress={() =>
+              chooseAction(
+                email,
+                [
+                  { label: t("mobile.org.signOut"), onPress: () => void signOut() },
+                  {
+                    label: t("deleteAccount.menu"),
+                    destructive: true,
+                    onPress: () => openWebPath("/onboarding?account=delete"),
+                  },
+                ],
+                t("mobile.common.cancel"),
+              )
+            }
+          />
+        )
       }
     >
       <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
@@ -151,8 +170,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           accessibilityLabel={t("onboarding.workspace.name")}
           autoCapitalize="words"
           autoCorrect={false}
-          // The keyboard's blue key is the action; gray until a name is typed.
-          returnKeyType="done"
+          // The keyboard's blue key is the action ("continuar"); gray until a name is typed.
+          returnKeyType="continue"
           enablesReturnKeyAutomatically
           onSubmitEditing={submit}
           autoFocus
@@ -163,19 +182,41 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           {error}
         </Text>
       ) : null}
-      <Button
-        variant="primary"
-        wide
-        label={another ? t("mobile.onb.create") : t("onboarding.actions.continue")}
-        loading={pending}
-        disabled={orgName.length === 0}
-        onPress={submit}
-      />
+      {/* The keyboard's blue key is the only action, as on the sign-in; the agent above works while it saves. */}
       {zone ? (
-        <Text variant="footnote" tone="muted" style={[CENTER, { paddingTop: 8 }]}>
-          {t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })}
-        </Text>
+        <Pressable
+          onPress={() => setPickingZone(true)}
+          disabled={pending}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })}. ${t("mobile.onb.zoneChange")}`}
+          hitSlop={12}
+          style={({ pressed }) => [styles.zone, pressed && styles.pressed]}
+        >
+          <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.shrink}>
+            {`${t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} · `}
+          </Text>
+          <Text variant="footnote" tone="ink2" style={styles.bold}>
+            {t("mobile.onb.zoneChange")}
+          </Text>
+        </Pressable>
       ) : null}
+      {/* Outside the navigator (this screen covers it), so the list comes in a sheet of its own. */}
+      <Modal
+        visible={pickingZone}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPickingZone(false)}
+      >
+        <ZoneList
+          title={t("mobile.onb.zoneTitle")}
+          value={zone}
+          onClose={() => setPickingZone(false)}
+          onPick={(picked) => {
+            if (picked) setZone(picked);
+            setPickingZone(false);
+          }}
+        />
+      </Modal>
       {unconfirmed ? <ConfirmationNote email={email} /> : null}
     </AuthScaffold>
   );
@@ -233,6 +274,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 8 },
+  zone: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8, maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
   linkButton: { alignSelf: "flex-start", marginTop: 2 },
   pressed: { opacity: 0.6 },
 });

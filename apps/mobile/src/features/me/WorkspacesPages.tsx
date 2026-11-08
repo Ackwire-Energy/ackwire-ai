@@ -13,9 +13,11 @@ import { ALLOW_HTTP, serverUrl, signedInServers, useServer, useSignedInServers }
 import { useOrg, useOrgMaybe } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics, Locked, SheetScreen, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
+import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
+import { SheetHeader } from "../new/parts";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack } from "../shared/parts";
 import { Page } from "./parts";
@@ -54,7 +56,9 @@ export function useWorkspacesAcross(): { groups: ServerWorkspaces[]; elsewhere: 
       current: s === server,
       orgs: openOrgs(me?.organizations ?? []),
       unread: r?.data?.unread ?? [],
-      failed: Boolean(r?.isError) && !r?.data,
+      // A failed refresh over a list already known keeps the list (faded); with nothing known, one line says so. The
+      // open server's own list comes from the workspace in use, never faded.
+      failed: Boolean(r?.isError) && !(s === server && org),
     });
   });
   return { groups, elsewhere: unreadElsewhere(groups, org?.orgId ?? null) };
@@ -87,7 +91,8 @@ export function useOpenWorkspaceRow(before?: () => void) {
 /**
  * The groups of workspaces, one per server (its host as the small header), each workspace with its own mark (logo,
  * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
- * answer stays in its place, faded. Shared by the page and the sheet.
+ * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
+ * page and the sheet.
  */
 export function WorkspaceGroups({ groups, onOpen }: { groups: ServerWorkspaces[]; onOpen: ReturnType<typeof useOpenWorkspaceRow> }) {
   const { t, i18n } = useTranslation();
@@ -112,6 +117,7 @@ export function WorkspaceGroups({ groups, onOpen }: { groups: ServerWorkspaces[]
                       label={o.name}
                       sub={notes.get(o.id) ?? t(`mobile.me.role.${o.role}`)}
                       checked={here}
+                      faint={g.quiet}
                       {...(!here && o.unread > 0 ? { value: String(o.unread) } : {})}
                       onPress={() => onOpen(g, o)}
                     />
@@ -162,9 +168,8 @@ export function AddWorkspacePage() {
   };
   return (
     <SheetScreen fit>
-      <Text variant="title2" accessibilityRole="header" style={styles.sheetTitle}>
-        {t("mobile.me.addWorkspace")}
-      </Text>
+      {/* The sheets' bar: back to the list it came from, the title centered (as Novo's). */}
+      <SheetHeader title={t("mobile.me.addWorkspace")} icon="back" />
       <GroupedList>
         <GroupedRow
           icon="plus"
@@ -190,8 +195,9 @@ export function AddWorkspacePage() {
 }
 
 /**
- * Servidor da equipe, while signed in: the question, the address with the URL keyboard open and its return key as the
- * action, Escanear QR code below it, and one quiet line: nothing signs out (ADR 0154). The server is checked first;
+ * Servidor da equipe, while signed in, on the sign-in's ruler (a low sky, the question in two lines): the address with
+ * the URL keyboard open and its return key as the action, Escanear QR code below it as the one button, and one quiet
+ * line: nothing signs out (ADR 0154). The server is checked first;
  * then the app moves there: signed in there already, its workspaces; otherwise its sign-in.
  */
 export function TeamServerPage() {
@@ -219,64 +225,58 @@ export function TeamServerPage() {
   };
 
   return (
-    <Page title={t("mobile.me.teamServer")}>
-      <Text variant="subhead" tone="muted" style={styles.lead}>
-        {t("mobile.me.teamServerLeadShort")}
-      </Text>
-      <View style={styles.form}>
-        <Locked when={busy} keepKeyboard>
-          <AuthField
-            value={address}
-            onChangeText={(value) => {
-              setAddress(value);
-              setError(null);
-            }}
-            placeholder={t("mobile.auth.server.placeholder")}
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-            textContentType="URL"
-            returnKeyType="go"
-            enablesReturnKeyAutomatically
-            onSubmitEditing={() => void submit()}
-            accessibilityLabel={t("mobile.auth.server.label")}
-            autoFocus
-          />
-        </Locked>
-        {error ? (
-          <Text tone="danger" variant="small" style={styles.center}>
-            {error}
-          </Text>
-        ) : null}
-        <Button
-          variant="primary"
-          wide
-          label={busy ? t("mobile.auth.server.checking") : t("mobile.auth.server.use")}
-          loading={busy}
-          disabled={!address.trim()}
-          onPress={() => void submit()}
+    <AuthScaffold
+      sky="low"
+      title={t("mobile.me.teamServerQuestion")}
+      subtitle={t("mobile.me.teamServerLeadShort")}
+      onBack={goBack}
+      agentMode={busy ? "run" : "idle"}
+    >
+      <Locked when={busy} keepKeyboard>
+        <AuthField
+          value={address}
+          onChangeText={(value) => {
+            setAddress(value);
+            setError(null);
+          }}
+          placeholder={t("mobile.auth.server.placeholder")}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="URL"
+          // The keyboard's blue key ("ir") is the action, as on the sign-in; gray until an address is typed.
+          returnKeyType="go"
+          enablesReturnKeyAutomatically
+          onSubmitEditing={() => void submit()}
+          accessibilityLabel={t("mobile.auth.server.label")}
+          autoFocus
         />
-        <Button
-          variant="secondary"
-          wide
-          icon="camera"
-          label={t("mobile.auth.server.scan")}
-          disabled={busy}
-          onPress={() => router.push("/me/scan")}
-        />
-        <Text variant="footnote" tone="muted" style={[styles.center, styles.quiet]}>
-          {t("mobile.me.addWorkspaceFoot")}
+      </Locked>
+      {error ? (
+        <Text tone="danger" variant="small" style={styles.center} accessibilityLiveRegion="polite">
+          {error}
         </Text>
-      </View>
-    </Page>
+      ) : busy ? (
+        <Text variant="footnote" tone="muted" style={styles.center} accessibilityLiveRegion="polite">
+          {t("mobile.auth.server.checking")}
+        </Text>
+      ) : null}
+      <Button
+        variant="secondary"
+        wide
+        label={t("mobile.auth.server.scan")}
+        disabled={busy}
+        onPress={() => router.push("/me/scan")}
+      />
+      <Text variant="footnote" tone="muted" style={[styles.center, styles.quiet]}>
+        {t("mobile.me.addWorkspaceFoot")}
+      </Text>
+    </AuthScaffold>
   );
 }
 
 const styles = StyleSheet.create({
   gap: { height: 22 },
-  sheetTitle: { paddingHorizontal: 4, paddingBottom: 12 },
-  lead: { paddingHorizontal: 4, paddingTop: 4 },
-  form: { gap: 8, paddingTop: 16 },
   center: { textAlign: "center" },
   quiet: { paddingTop: 8 },
 });

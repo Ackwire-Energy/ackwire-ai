@@ -1,32 +1,54 @@
 import { serverHost } from "@agenteschat/client/lib/server";
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { useTranslation } from "react-i18next";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { chooseAction } from "@/features/settings/parts";
 import { setServer, useServer, useServerToReturn } from "@/lib/server";
 import { router } from "@/ui/navigation";
 import { Text } from "../Text";
 import { AuthLink } from "./AuthLink";
 
 /**
- * The quiet line under the sign-in: "agentes.chat · Português (Brasil)", the server this sign-in goes to and the
- * app's language, each a link to its own page (the server's, ADR 0154; the language's, ADR 0122). One line where
- * there were two with different punctuation. Signed in on another server (this one added from Workspaces): "Voltar
- * para …" goes back to it, still signed in there.
+ * The quiet line under the sign-in: "agentes.chat · Português · Mudar". The server this sign-in goes to and the app's
+ * language are said, not offered as two links; "Mudar" is the one thing to press, and it opens the system's list with
+ * both (the server's page, ADR 0154; the language's, ADR 0122). Signed in on another server (this one added from
+ * Workspaces): "Voltar para …" goes back to it, still signed in there.
  */
 export function AuthFootLine() {
   const { t, i18n } = useTranslation();
   const server = useServer();
   const back = useServerToReturn();
   const language = isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language;
+  const change = () =>
+    chooseAction(
+      t("mobile.auth.server.footChoose"),
+      [
+        { label: t("mobile.auth.server.footServer"), onPress: () => router.push("/server") },
+        { label: t("mobile.auth.server.footLanguage"), onPress: () => router.push("/language") },
+      ],
+      t("mobile.common.cancel"),
+    );
   return (
-    <View style={{ alignItems: "center", gap: 12 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        <Word label={serverHost(server)} hint={t("mobile.auth.server.change")} onPress={() => router.push("/server")} />
-        <Text variant="footnote" tone="faint">
-          ·
+    <View style={styles.foot}>
+      <Pressable
+        onPress={change}
+        accessibilityRole="button"
+        accessibilityLabel={`${serverHost(server)}, ${language}. ${t("mobile.auth.server.footChange")}`}
+        // An 18-point line: 12 of slop above and below reaches the 44-point target.
+        hitSlop={12}
+        style={({ pressed }) => [styles.line, pressed && styles.pressed]}
+      >
+        {/* The host is cut in the middle (its end says which team), the language never. */}
+        <Text variant="footnote" tone="faint" numberOfLines={1} ellipsizeMode="middle" style={styles.host}>
+          {serverHost(server)}
         </Text>
-        <Word label={language} hint={t("shell.language")} onPress={() => router.push("/language")} />
-      </View>
+        <Text variant="footnote" tone="faint" numberOfLines={1}>
+          {` · ${language} · `}
+        </Text>
+        <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.bold}>
+          {t("mobile.auth.server.footChange")}
+        </Text>
+      </Pressable>
       {back ? (
         <AuthLink
           label={t("mobile.auth.server.backTo", { host: serverHost(back) })}
@@ -37,22 +59,13 @@ export function AuthFootLine() {
   );
 }
 
-/** One word of the line, pressable: a 18-point line with 12 of slop reaches the 44-point target. */
-function Word({ label, hint, onPress }: { label: string; hint: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="link"
-      accessibilityLabel={`${hint}: ${label}`}
-      hitSlop={12}
-      style={({ pressed }) => ({ maxWidth: "70%", opacity: pressed ? 0.6 : 1 })}
-    >
-      <Text variant="footnote" tone="ink2" numberOfLines={1} ellipsizeMode="middle" style={{ fontWeight: "600" }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
+const styles = StyleSheet.create({
+  foot: { alignItems: "center", gap: 12, alignSelf: "stretch" },
+  line: { flexDirection: "row", alignItems: "center", maxWidth: "100%" },
+  host: { flexShrink: 1 },
+  bold: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
+});
 
 /** The old name, for anything still importing it: the same line. */
 export const ServerLine = AuthFootLine;

@@ -11,6 +11,8 @@ export interface ServerWorkspaces {
   orgs: (OrgSummary & { unread: number })[];
   /** It didn't answer and nothing is known of it. */
   failed: boolean;
+  /** It didn't answer this time, but its workspaces are known: they stay in the list, faded. */
+  quiet: boolean;
 }
 
 /** The servers Workspaces lists (pure): the ones signed in to, in the order added, and the current one if it isn't yet. */
@@ -32,6 +34,7 @@ export function workspacesOf(input: {
     current: input.current,
     orgs: input.orgs.map((o) => ({ ...o, unread: counts.get(o.id) ?? 0 })),
     failed: input.failed && input.orgs.length === 0,
+    quiet: input.failed && input.orgs.length > 0,
   };
 }
 

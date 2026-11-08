@@ -113,6 +113,9 @@ describe("Workspaces", () => {
     expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).failed).toBe(
       false,
     );
+    // Known but silent this time: its workspaces stay, faded.
+    expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).quiet).toBe(true);
+    expect(down.quiet).toBe(false);
   });
 
   test("a new workspace asked for: over once another workspace is open than when the first run showed", () => {

@@ -2,7 +2,7 @@ import type { Expression } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView, KeyboardToolbar } from "react-native-keyboard-controller";
 import Animated, { Easing, FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
@@ -21,6 +21,8 @@ const SKY = { normal: 130, low: 88 } as const;
 /** The agent over the sky's bottom edge, its feet on the text below. */
 const AGENT = 96;
 const AGENT_OVERLAP = 8;
+/** The system bar over the keyboard (`KeyboardToolbar`), as tall as the library draws it. */
+const TOOLBAR = 42;
 
 /** The text of the screens before the app: centered under the agent (fields and buttons keep the width). */
 export const CENTER = { textAlign: "center" } as const;
@@ -52,6 +54,11 @@ export interface AuthScaffoldProps {
   sky?: keyof typeof SKY;
   /** The sky of this server (day on the Cloud, dusk on a team's own) instead of the app's: where a connection leads. */
   skyHost?: string;
+  /**
+   * Several fields on one screen (name, password, a note): the system's bar over the keyboard with ‹ › between them
+   * and Pronto, so the keyboard walks the form instead of closing and reopening on each field.
+   */
+  toolbar?: boolean;
 }
 
 /**
@@ -72,74 +79,90 @@ export function AuthScaffold({
   overlay,
   sky = "normal",
   skyHost,
+  toolbar = false,
 }: AuthScaffoldProps) {
   const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const skyStyle = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } as const;
   return (
-    // The keyboard library's view: with its provider on, Android no longer resizes the window by itself.
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="none"
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* The keyboard library's view: with its provider on, Android no longer resizes the window by itself. With the
+          bar over the keyboard, the content keeps clear of it too. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        keyboardVerticalOffset={toolbar ? TOOLBAR : 0}
       >
-        <View
-          style={{ height: insets.top + SKY[sky], zIndex: 1 }}
-          accessibilityLabel={t("mobile.auth.skyLabel")}
-          accessibilityRole="image"
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
         >
-          {skyHost ? (
-            <WorkspaceSky host={skyHost} fade={0.55} style={skyStyle} />
-          ) : (
-            <Sky color="sky" depth={0.9} fade={0.55} style={skyStyle} />
-          )}
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", marginBottom: -AGENT_OVERLAP }}>
-            <AgentAvatar
-              agent={{ color: "sky", eyes: "round", id: "agentes" }}
-              size={AGENT}
-              mode={agentMode}
-              expression={expression}
-            />
-          </View>
-          {onBack ? (
-            <View style={{ position: "absolute", top: insets.top + 8, left: 16 }}>
-              <IconButton icon="back" label={t("mobile.common.back")} onPress={onBack} plate />
+          <View
+            style={{ height: insets.top + SKY[sky], zIndex: 1 }}
+            accessibilityLabel={t("mobile.auth.skyLabel")}
+            accessibilityRole="image"
+          >
+            {skyHost ? (
+              <WorkspaceSky host={skyHost} fade={0.55} style={skyStyle} />
+            ) : (
+              <Sky color="sky" depth={0.9} fade={0.55} style={skyStyle} />
+            )}
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", marginBottom: -AGENT_OVERLAP }}>
+              <AgentAvatar
+                agent={{ color: "sky", eyes: "round", id: "agentes" }}
+                size={AGENT}
+                mode={agentMode}
+                expression={expression}
+              />
             </View>
-          ) : null}
-        </View>
-        <Animated.View
-          key={stepKey}
-          entering={reducedMotion ? undefined : STEP_IN}
-          style={{ paddingHorizontal: 16, paddingTop: AGENT_OVERLAP + 16, flex: 1 }}
-        >
-          {progress ? (
-            <Text variant="footnote" tone="faint" style={[CENTER, { fontWeight: "600", marginBottom: 8 }]}>
-              {progress}
+            {onBack ? (
+              <View style={{ position: "absolute", top: insets.top + 8, left: 16 }}>
+                <IconButton icon="back" label={t("mobile.common.back")} onPress={onBack} plate />
+              </View>
+            ) : null}
+          </View>
+          <Animated.View
+            key={stepKey}
+            entering={reducedMotion ? undefined : STEP_IN}
+            style={{ paddingHorizontal: 16, paddingTop: AGENT_OVERLAP + 16, flex: 1 }}
+          >
+            {progress ? (
+              <Text variant="footnote" tone="faint" style={[CENTER, { fontWeight: "600", marginBottom: 8 }]}>
+                {progress}
+              </Text>
+            ) : null}
+            {/* Centered, like the agent above it: the screens before the app are one question each. */}
+            <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite" style={CENTER}>
+              {unbrokenHyphens(title)}
             </Text>
-          ) : null}
-          {/* Centered, like the agent above it: the screens before the app are one question each. */}
-          <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite" style={CENTER}>
-            {unbrokenHyphens(title)}
-          </Text>
-          {subtitle ? (
-            <Text
-              variant="subhead"
-              tone={subtitleStrong ? "ink2" : "muted"}
-              numberOfLines={subtitleStrong ? 1 : undefined}
-              ellipsizeMode="middle"
-              style={[CENTER, { marginTop: 8 }, subtitleStrong ? { fontWeight: "600" } : null]}
-            >
-              {subtitle}
-            </Text>
-          ) : null}
-          <View style={{ marginTop: 24, gap: 8 }}>{children}</View>
-          <View style={{ flex: 1 }} />
-          {footer ? <View style={{ marginTop: 24, alignItems: "center", gap: 12 }}>{footer}</View> : null}
-        </Animated.View>
-      </ScrollView>
-      {overlay}
-    </KeyboardAvoidingView>
+            {subtitle ? (
+              <Text
+                variant="subhead"
+                tone={subtitleStrong ? "ink2" : "muted"}
+                numberOfLines={subtitleStrong ? 1 : undefined}
+                ellipsizeMode="middle"
+                style={[CENTER, { marginTop: 8 }, subtitleStrong ? { fontWeight: "600" } : null]}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
+            <View style={{ marginTop: 24, gap: 8 }}>{children}</View>
+            <View style={{ flex: 1 }} />
+            {footer ? <View style={{ marginTop: 24, alignItems: "center", gap: 12 }}>{footer}</View> : null}
+          </Animated.View>
+        </ScrollView>
+        {overlay}
+      </KeyboardAvoidingView>
+      {/* Outside the avoiding view: the bar follows the keyboard itself, so it is never lifted twice. */}
+      {toolbar ? (
+        <KeyboardToolbar>
+          <KeyboardToolbar.Prev />
+          <KeyboardToolbar.Next />
+          <KeyboardToolbar.Done text={t("mobile.common.done")} />
+        </KeyboardToolbar>
+      ) : null}
+    </View>
   );
 }

@@ -417,6 +417,7 @@ export function LinkSteps({
       stepKey={step}
       onBack={onBack}
       sky={step === "you" ? "low" : "normal"}
+      toolbar={step === "you"}
       agentMode={sending || asking || checking ? "run" : "idle"}
       expression={expression}
       overlay={human.view}
