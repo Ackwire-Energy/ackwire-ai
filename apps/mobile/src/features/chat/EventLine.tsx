@@ -8,7 +8,8 @@ import { StyleSheet, View } from "react-native";
 import { EventPill, EventPillAction, EventPillText } from "@/ui";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { ConsultPairRow } from "./ConsultGroup";
-import { eventLineOf, MSG_TEXT } from "./logic";
+import { eventLineOf } from "./logic";
+import { useQuietInset } from "./look";
 import { MessageText } from "./MessageText";
 import { StoppedLine } from "./StoppedLine";
 
@@ -27,6 +28,7 @@ export function EventLine({ message, fold, gap }: { message: Message; fold?: Con
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
+  const inset = useQuietInset();
   // A person stopped one of the agent's tasks (ADR 0128): its own line, with the reason, or a way to give one.
   const stopped = stoppedNoticeOf(message.meta);
   if (stopped) return <StoppedLine message={message} notice={stopped} gap={gap} />;
@@ -63,7 +65,7 @@ export function EventLine({ message, fold, gap }: { message: Message; fold?: Con
     );
   if (!line) return null;
   return (
-    <View style={[styles.line, { marginTop: gap }]}>
+    <View style={[styles.line, { paddingLeft: inset, marginTop: gap }]}>
       <EventPill
         mark={line.icon}
         time={when.time(message.createdAt)}
@@ -119,5 +121,5 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
 
 const styles = StyleSheet.create({
   // Aligned with the messages' words, like `IssueTakenLine`; left aligned, never centered. The list sets its top.
-  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
+  line: { paddingRight: 16 },
 });

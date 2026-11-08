@@ -11,8 +11,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Chip, LineIcon, Text } from "@/ui";
-import { MSG_AVATAR, MSG_GAP, MSG_INSET, MSG_TEXT, rowFrame } from "../chat/logic";
-import { useRhythm } from "../chat/look";
+import { MSG_AVATAR, MSG_GAP, MSG_INSET, rowFrame } from "../chat/logic";
+import { useQuietInset, useRhythm, useRowLook } from "../chat/look";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
@@ -25,6 +25,7 @@ import { useAgentsQueue, useOpenQueue } from "./QueueSheet";
  */
 export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelId: string; wait: ConversationWait }) {
   const rhythm = useRhythm();
+  const { faces } = useRowLook();
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const meId = useMeId();
@@ -38,9 +39,11 @@ export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelI
   const c = useColors();
   return (
     <View style={[styles.turn, rowFrame(rhythm.block, rhythm.turn)]} accessibilityLiveRegion="polite">
-      <View style={styles.avslot}>
-        <AgentFace agentId={agentId} size={MSG_AVATAR} mode="rest" />
-      </View>
+      {faces ? (
+        <View style={styles.avslot}>
+          <AgentFace agentId={agentId} size={MSG_AVATAR} mode="rest" />
+        </View>
+      ) : null}
       <View style={styles.body}>
         <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
           {name(agentId) ?? t("channel.unknownAgent")}
@@ -69,6 +72,7 @@ export function QueueWaitRow({ channelId, wait: { agentId, runId } }: { channelI
  */
 export function FanStrip({ message: m, receipt }: { message: Message; receipt: MessageReceipt | undefined }) {
   const rhythm = useRhythm();
+  const inset = useQuietInset();
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
@@ -78,7 +82,10 @@ export function FanStrip({ message: m, receipt }: { message: Message; receipt: M
   if (!fanShows(m, fan, receipt)) return null;
   const summary = fanOutText(t, fan);
   return (
-    <View style={[styles.fan, { borderColor: c.line2, marginTop: rhythm.part }]} accessibilityLiveRegion="polite">
+    <View
+      style={[styles.fan, { borderColor: c.line2, marginLeft: inset, marginTop: rhythm.part }]}
+      accessibilityLiveRegion="polite"
+    >
       <View style={styles.fanHead}>
         <Text variant="footnote" tone="ink2" style={[styles.grow, styles.name]}>
           {summary}
@@ -117,7 +124,6 @@ const styles = StyleSheet.create({
   acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 },
   // Under the message's text, in its column.
   fan: {
-    marginLeft: MSG_TEXT,
     marginRight: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,

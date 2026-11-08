@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { chatLookOf, mineOnRight } from "@agenteschat/client/lib/chat-look";
+import { chatLookOf, facesShown, mineOnRight } from "@agenteschat/client/lib/chat-look";
 import { AGENT_GRADIENTS, type AgentColorName, contrastOf, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
-import { bubbleFill, nameInk } from "../../src/features/chat/logic";
+import {
+  BUBBLES_INSET,
+  bubbleFill,
+  MSG_INSET,
+  MSG_TEXT,
+  nameInk,
+  quietInset,
+  ROW_BODY_INSET,
+  rowBodyInset,
+} from "../../src/features/chat/logic";
 import { appColors } from "../../src/ui/palette";
 
 const read = (rel: string) => Bun.file(new URL(`../../src/features/${rel}`, import.meta.url).pathname).text();
@@ -58,6 +67,52 @@ describe("the rows follow the same choice as the web", () => {
     const chat = await read("chat/ChatScreen.tsx");
     expect(chat).toContain("firstUnreadId(list, from.at, meId)");
     expect(chat).toContain("holdAt(id ?? undefined, 0, false);");
+  });
+
+  test("a DM whose sides say who spoke has no face: its bodies and quiet rows start at the rows' own padding", () => {
+    const dm = (style: "comfortable" | "bubbles") => ({ style, faces: facesShown(style, true) });
+    expect(rowBodyInset(dm("bubbles"))).toEqual({ left: BUBBLES_INSET, right: ROW_BODY_INSET.bubbles.right });
+    expect(rowBodyInset(dm("comfortable"))).toEqual({ left: MSG_INSET, right: ROW_BODY_INSET.comfortable.right });
+    expect(quietInset(dm("bubbles"))).toBe(BUBBLES_INSET);
+    expect(quietInset(dm("comfortable"))).toBe(MSG_INSET);
+    // A channel, and a DM in a look with everyone on the left, keep the face and the words' column.
+    for (const style of ["comfortable", "bubbles", "left", "compact"] as const) {
+      expect(rowBodyInset({ style, faces: facesShown(style, false) })).toEqual(ROW_BODY_INSET[style]);
+      expect(quietInset({ style, faces: facesShown(style, false) })).toBe(MSG_TEXT);
+    }
+    expect(quietInset({ style: "left", faces: facesShown("left", true) })).toBe(MSG_TEXT);
+  });
+
+  test("the look says it, and every row with a face column and every quiet row reads it", async () => {
+    expect(await read("chat/look.ts")).toContain("faces: facesShown(style, dm)");
+    expect(await read("chat/look.ts")).toContain("paddingLeft: BUBBLES_INSET");
+    for (const file of ["chat/MessageRow.tsx", "chat/LiveRows.tsx"]) {
+      expect(await read(file)).toContain("{look.faces ? (");
+    }
+    const queue = await read("queue/parts.tsx");
+    expect(queue).toContain("{faces ? (");
+    expect(await read("chat/QuoteLine.tsx")).toContain(
+      "look.faces ? WORDS_START[look.style] : rowBodyInset(look).left",
+    );
+    expect(await read("chat/ConsultGroup.tsx")).toContain("const inset = rowBodyInset(useRowLook());");
+    expect(await read("chat/ChatScreen.tsx")).toContain("const quiet = quietInset(rowLook);");
+    for (const file of [
+      "chat/EventLine.tsx",
+      "chat/issue-work.tsx",
+      "chat/StoppedLine.tsx",
+      "chat/AgentReceipts.tsx",
+      "queue/parts.tsx",
+    ]) {
+      const src = await read(file);
+      expect(src).toContain("useQuietInset()");
+      expect(src).not.toContain("MSG_TEXT");
+    }
+  });
+
+  test("Conversa's DM previews draw it as the conversation does", async () => {
+    const page = await read("me/ChatLookPage.tsx");
+    expect(page).toContain("const faced = !right && facesShown(style, dm);");
+    expect(page.match(/\{faced \? <View style=\{styles\.faceSlot\}>\{face\}<\/View> : null\}/g)).toHaveLength(2);
   });
 
   test("Você opens Conversa, which saves on the server", async () => {

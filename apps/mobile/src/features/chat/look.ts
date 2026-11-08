@@ -1,10 +1,10 @@
-import { CHAT_RHYTHM, type ChatStyle, type ChatTone, chatLookOf } from "@agenteschat/client/lib/chat-look";
+import { CHAT_RHYTHM, type ChatStyle, type ChatTone, chatLookOf, facesShown } from "@agenteschat/client/lib/chat-look";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { createContext, useContext, useMemo } from "react";
 import { StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { useTheme } from "@/ui";
-import { bubbleFill, MSG_TEXT } from "./logic";
+import { BUBBLES_INSET, bubbleFill, quietInset } from "./logic";
 
 /** How this conversation's rows are drawn (`chatLookOf`, as on the web's `MessageLook`). */
 export interface RowLook {
@@ -14,9 +14,11 @@ export interface RowLook {
   fill: string | null;
   /** False where the name says nothing (a DM's two speakers). */
   names: boolean;
+  /** False where the sides say who spoke (`facesShown`, a DM with mine on the right): no face on the other side's rows. */
+  faces: boolean;
 }
 
-export const ROW_LOOK_DEFAULT: RowLook = { style: "comfortable", tone: "light", fill: null, names: true };
+export const ROW_LOOK_DEFAULT: RowLook = { style: "comfortable", tone: "light", fill: null, names: true, faces: true };
 export const RowLookContext = createContext<RowLook>(ROW_LOOK_DEFAULT);
 export const useRowLook = () => useContext(RowLookContext);
 
@@ -26,7 +28,7 @@ export function useConversationLook(dm: boolean, agentColor?: AgentColorName): R
   const { colors, scheme } = useTheme();
   const { style, tone } = chatLookOf(org?.chatPrefs, dm);
   const fill = bubbleFill(agentColor ?? "sky", tone, colors.bg, scheme === "dark");
-  return useMemo(() => ({ style, tone, fill, names: !dm }), [style, tone, fill, dm]);
+  return useMemo(() => ({ style, tone, fill, names: !dm, faces: facesShown(style, dm) }), [style, tone, fill, dm]);
 }
 
 /** This conversation's rhythm: every row and line of its list takes its room from here. */
@@ -44,17 +46,12 @@ export const useOwnTop = (marginTop: number) => (useContext(RowPartContext) === 
 /** `useOwnTop` for a card, the one thing in a body with room of its own: `CHAT_RHYTHM`'s `card` under words. */
 export const useCardTop = (marginTop = 0) => ({ marginTop: useContext(RowPartContext) ?? marginTop });
 
-/** How far a row's body stands in from the conversation's edges, at each end. */
-export const ROW_BODY_INSET: Record<ChatStyle, { left: number; right: number }> = {
-  left: { left: MSG_TEXT, right: 16 },
-  comfortable: { left: MSG_TEXT, right: 16 },
-  bubbles: { left: 48, right: 44 },
-  compact: { left: 74, right: 12 },
-};
+/** `quietInset` in this conversation's look. */
+export const useQuietInset = () => quietInset(useRowLook());
 
 /** The rows' frames per style, shared by the saved row (`MessageRow`) and the live one (`TurnRow`). */
 export const lookRows = StyleSheet.create({
-  bubblesRow: { paddingLeft: 10, paddingRight: 44, gap: 8 },
+  bubblesRow: { paddingLeft: BUBBLES_INSET, paddingRight: 44, gap: 8 },
   bubblesSlot: { width: 30, paddingTop: 0 },
   compactRow: { paddingLeft: 10, paddingRight: 12, gap: 6 },
   compactSlot: { width: 18, paddingTop: 1 },

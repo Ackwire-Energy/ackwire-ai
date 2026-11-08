@@ -6,6 +6,7 @@ import {
   type ChatStyle,
   type ChatTone,
   chatLookOf,
+  facesShown,
   mineOnRight,
 } from "@agenteschat/client/lib/chat-look";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
@@ -59,11 +60,13 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
       </View>
     );
   const right = line.mine && mineOnRight(style);
+  // As the conversation draws it: a DM whose sides say who spoke has no face.
+  const faced = !right && facesShown(style, dm);
   if (style === "bubbles") {
     const fill = line.mine ? bubbleFill(dm ? SAMPLE_COLOR : "sky", tone, colors.bg, scheme === "dark") : c.bubble;
     return (
       <View style={[styles.row, right && styles.right]}>
-        {right ? null : <View style={styles.faceSlot}>{face}</View>}
+        {faced ? <View style={styles.faceSlot}>{face}</View> : null}
         <View style={[styles.bubble, { backgroundColor: fill }]}>
           <Text style={[styles.line, line.mine && tone === "strong" ? styles.onSolid : undefined]} numberOfLines={1}>
             {line.text}
@@ -84,7 +87,7 @@ function SampleRow({ line, style, tone, dm }: { line: Line; style: ChatStyle; to
     );
   return (
     <View style={styles.row}>
-      <View style={styles.faceSlot}>{face}</View>
+      {faced ? <View style={styles.faceSlot}>{face}</View> : null}
       <View style={styles.flex}>
         {line.grouped ? null : (
           <Text style={styles.line} numberOfLines={1}>

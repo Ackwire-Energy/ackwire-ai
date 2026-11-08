@@ -11,6 +11,7 @@ import type {
 import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import type { ChatStyle } from "@agenteschat/client/lib/chat-look";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
@@ -50,6 +51,34 @@ export const MSG_AVATAR = 34;
 export const MSG_GAP = 12;
 /** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
 export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
+/** A `bubbles` row's own padding at its start (`lookRows.bubblesRow`). */
+export const BUBBLES_INSET = 10;
+
+/** How far a row's body stands in from the conversation's edges, at each end. */
+export const ROW_BODY_INSET: Record<ChatStyle, { left: number; right: number }> = {
+  left: { left: MSG_TEXT, right: 16 },
+  comfortable: { left: MSG_TEXT, right: 16 },
+  bubbles: { left: 48, right: 44 },
+  compact: { left: 74, right: 12 },
+};
+
+interface InsetLook {
+  style: ChatStyle;
+  /** `RowLook.faces`: false in a DM whose sides say who spoke. */
+  faces: boolean;
+}
+
+/** `ROW_BODY_INSET` in a look: a row with no face starts its body at its own padding. */
+export function rowBodyInset({ style, faces }: InsetLook) {
+  const inset = ROW_BODY_INSET[style];
+  return faces ? inset : { ...inset, left: style === "bubbles" ? BUBBLES_INSET : MSG_INSET };
+}
+
+/**
+ * Where a quiet row starts (an event pill, a receipt's line, a stopped task, the browser's card): on the messages'
+ * words, or where the rows show no face, at their bodies' start, as the web's `--thread-indent`.
+ */
+export const quietInset = (look: InsetLook) => (look.faces ? MSG_TEXT : rowBodyInset(look).left);
 
 /**
  * A row in the list, `gap` under what shows above it. Its plate (a mention, a press) reaches past its content, and it

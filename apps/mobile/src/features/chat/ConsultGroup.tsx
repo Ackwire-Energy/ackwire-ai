@@ -29,7 +29,8 @@ import { Icon, Text } from "@/ui";
 import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { ROW_BODY_INSET, useRhythm, useRowLook } from "./look";
+import { rowBodyInset } from "./logic";
+import { useRhythm, useRowLook } from "./look";
 
 /** A question's state in words, on the conversation's screen ("A Iris espera uma aprovação"). */
 export const consultLineLabel = (
@@ -127,7 +128,7 @@ export function ConsultPairRow({
 }) {
   const { t, i18n } = useTranslation();
   const rhythm = useRhythm();
-  const inset = ROW_BODY_INSET[useRowLook().style];
+  const inset = rowBodyInset(useRowLook());
   const dir = useDirectory();
   const c = useColors();
   const live = items.some((x) => x.status === "open");

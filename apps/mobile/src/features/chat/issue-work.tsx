@@ -7,8 +7,7 @@ import { EventPill, Icon, Text } from "@/ui";
 import { StateChip } from "../issues/parts";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
-import { MSG_TEXT } from "./logic";
-import { useCardTop } from "./look";
+import { useCardTop, useQuietInset } from "./look";
 
 /**
  * "Ask Ada to implement" (as on the web): the root of the work thread in the
@@ -60,11 +59,12 @@ export function IssueTakenLine({ message, gap }: { message: Message; gap: number
   const { t } = useTranslation();
   const dir = useDirectory();
   const when = useWhen();
+  const inset = useQuietInset();
   const taken = issueTakenOf(message.meta);
   if (!taken) return null;
   const name = dir.nameOf(message.author);
   return (
-    <View style={[styles.line, { marginTop: gap }]}>
+    <View style={[styles.line, { paddingLeft: inset, marginTop: gap }]}>
       <EventPill mark="issue" time={when.time(message.createdAt)}>
         {t("chat.issueWork.taken", { name })}{" "}
         <Text
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   pressed: { opacity: 0.85 },
   // An event pill at the messages' words, left aligned; the list sets its top.
-  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
+  line: { paddingRight: 16 },
   // The pill's words' size (its sentence sets it; a nested text keeps the variant's own otherwise).
   link: { fontSize: 14, lineHeight: 19 },
 });

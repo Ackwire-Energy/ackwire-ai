@@ -250,13 +250,15 @@ export const TurnRow = memo(function TurnRow({
         ]}
       >
         {compact ? <View style={lookRows.compactClock} /> : null}
-        <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
-          <AgentFace
-            agentId={run.agentId}
-            size={compact ? 18 : bubbled ? 30 : 34}
-            mode={live ? (phase === "writing" ? "run" : "think") : "idle"}
-          />
-        </View>
+        {look.faces ? (
+          <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
+            <AgentFace
+              agentId={run.agentId}
+              size={compact ? 18 : bubbled ? 30 : 34}
+              mode={live ? (phase === "writing" ? "run" : "think") : "idle"}
+            />
+          </View>
+        ) : null}
         <View style={[styles.body, { gap: rhythm.part }]}>
           <View>
             <View style={styles.who}>
