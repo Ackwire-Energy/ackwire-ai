@@ -197,6 +197,36 @@ describe("propose_agent", () => {
     expect(await proposals(f)).toHaveLength(0);
   });
 
+  test("an agent like it already on the team: no card until the person says to make another", async () => {
+    f = await setup();
+    const ada = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Designer", instructions: "Desenha." },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ctx = await runFor(f, f.owner.id, "cria um agente de design");
+    // Its name in other case and accents, or its role under another name.
+    for (const input of [
+      { ...ADA, name: "ÁDA", handle: "ada-2", role: "Revisora" },
+      { ...ADA, name: "Bruna", handle: "bruna", role: "designer " },
+    ]) {
+      const out = await propose(f, ctx, input);
+      expect(out.isError).toBeUndefined();
+      expect(out.content).toContain("Not posted: an agent like this already exists: Ada (@ada, Designer)");
+      expect(out.content).toContain("call propose_agent again with also_new: true");
+    }
+    expect(await proposals(f)).toHaveLength(0);
+    // The person said to make another one.
+    const out = await propose(f, ctx, { ...ADA, name: "Bruna", handle: "bruna", also_new: true });
+    expect(out.isError).toBeUndefined();
+    expect(await proposals(f)).toHaveLength(1);
+    // An archived agent isn't on the team.
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, ada.id));
+    expect((await propose(f, ctx, { ...ADA, handle: "ada-3" })).content).toStartWith("Posted the proposal of Ada");
+  });
+
   test("apps by name or by service: a Stripe account is 'stripe'; with two, its name says which", async () => {
     f = await setup();
     const acme = await connect(f, `custom:${crypto.randomUUID()}`, "Stripe (Acme)", "stripe");

@@ -22,6 +22,7 @@ import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connectors/connections";
 import { customScope, isCustom } from "./connectors/custom";
+import { normalizeNote } from "./consultations";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { openPersonAgentDm } from "./dms";
@@ -383,6 +384,49 @@ export async function checkRoutine(
     report: routineReportOf(r.report),
     access: routineAccessOf(r.access),
   };
+}
+
+/** An active agent a draft would repeat (`agentsLike`), and the draft's name. */
+export interface AgentLike {
+  draft: string;
+  name: string;
+  handle: string;
+  role: string;
+}
+
+/**
+ * Active agents that new ones would repeat: the same name, or the same role, case, accents and spacing aside. The
+ * tools that propose agents post nothing then until the person says to make another (`also_new`), since a free
+ * handle alone would put a second one on the team.
+ */
+export async function agentsLike(
+  db: Database,
+  orgId: string,
+  drafts: { name?: unknown; role?: unknown }[],
+): Promise<AgentLike[]> {
+  const team = await db
+    .select({ name: agents.name, handle: agents.handle, role: agents.role })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt)));
+  const same = (have: string, asked: unknown) =>
+    have.trim() !== "" && normalizeNote(have) === normalizeNote(str(asked));
+  return drafts.flatMap((d) => {
+    const found = team.find((a) => same(a.name, d.name) || same(a.role, d.role));
+    return found ? [{ draft: str(d.name), ...found }] : [];
+  });
+}
+
+/** What a proposing tool answers when agents like its drafts exist: who they are, and to ask the person first. */
+export function agentsLikeText(found: AgentLike[], tool: string) {
+  const one = found.length === 1;
+  const who = found
+    .map(
+      (a) =>
+        `${a.name} (@${a.handle}${a.role ? `, ${a.role}` : ""})${normalizeNote(a.draft) === normalizeNote(a.name) ? "" : ` for ${a.draft}`}`,
+    )
+    .join(", ");
+  const another = one ? "another" : "new ones";
+  return `Not posted: ${one ? "an agent like this already exists" : "agents like these already exist"}: ${who}. Ask the person whether to change ${one ? "that one" : "those"} or make ${another}, then end your turn. Only once they say to make ${another}, call ${tool} again with also_new: true.`;
 }
 
 /**
