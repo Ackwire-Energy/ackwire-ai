@@ -138,6 +138,7 @@ const KNOWN = {
   "run.answer_forbidden": "errors.run.answerForbidden",
   "run.stop_reason_forbidden": "errors.run.stopReasonForbidden",
   "run.not_restartable": "errors.run.notRestartable",
+  "run.not_restartable_voice": "errors.run.notRestartableVoice",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",

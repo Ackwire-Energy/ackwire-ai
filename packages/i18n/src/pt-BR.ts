@@ -1950,6 +1950,8 @@ export const ptBR = {
     popoverTitle: "Agentes",
     seenBy: "Vista por {{names}}",
     retry: "Tentar de novo",
+    /** On its way (`receipts.retry` pressed): the line says so until the server answers. */
+    retrying: "Tentando de novo…",
     platformCap: "Mencione um agente com @ para ele responder.",
     mentionNeeded: "Nenhum agente vai responder sem @",
     mentionNeededHint:
@@ -12000,6 +12002,8 @@ export const ptBR = {
       agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
       continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
       notRestartable: "Esta resposta já tinha começado, então não dá para recomeçar. Mande a mensagem de novo.",
+      /** The same refusal for a voice message: its words are never sent again as text. */
+      notRestartableVoice: "Esta resposta já tinha começado, então não dá para recomeçar. Grave a mensagem de novo.",
       cancelForbidden: "Só quem pediu, o dono do agente ou um admin pode parar.",
       answerForbidden: "Só quem pediu, o dono do agente ou um admin pode fazer isso.",
       stopReasonForbidden: "Só quem parou pode dizer o motivo.",

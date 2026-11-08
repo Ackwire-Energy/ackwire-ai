@@ -1958,6 +1958,8 @@ export const en = {
     popoverTitle: "Agents",
     seenBy: "Seen by {{names}}",
     retry: "Try again",
+    /** On its way (`receipts.retry` pressed): the line says so until the server answers. */
+    retrying: "Trying again…",
     platformCap: "Mention an agent with @ to have it answer.",
     mentionNeeded: "No agent will answer without an @",
     mentionNeededHint: "No AI here could pick an agent for this message. Mention an agent to call it.",
@@ -11891,6 +11893,8 @@ export const en = {
       agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
       continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
       notRestartable: "This answer had already started, so it can't start over. Send your message again.",
+      /** The same refusal for a voice message: its words are never sent again as text. */
+      notRestartableVoice: "This answer had already started, so it can't start over. Record your message again.",
       cancelForbidden: "Only who asked, the agent's owner or an admin can stop it.",
       answerForbidden: "Only who asked, the agent's owner or an admin can do this.",
       stopReasonForbidden: "Only who stopped it can say why.",

@@ -970,14 +970,11 @@ function Chat({
   const sendRef = useRef(send);
   sendRef.current = send;
   const onResend = useCallback(
-    (m: Message) => {
-      void retryAnswer(api, orgId, m, () => {
-        // Sent again as text, a voice message's words would show: it is sent by recording it again.
-        if (voiceOf(m.meta)) return;
+    (m: Message) =>
+      retryAnswer(api, orgId, m, () => {
         sendRef.current(m.body, threadId);
         toEnd();
-      }).catch((error) => toast({ title: errorText(t, error), icon: "x" }));
-    },
+      }).catch((error) => toast({ title: errorText(t, error), icon: "x" })),
     [api, orgId, threadId, toEnd, toast, t],
   );
   const realtime = useRealtime().status;

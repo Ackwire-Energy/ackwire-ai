@@ -11,7 +11,7 @@ import {
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, runFailureLine } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -135,7 +135,7 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * receipt is a line under the message (`part="line"`), so the text still follows the name.
  */
 export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
@@ -156,6 +156,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       : null;
   const view = receiptView(receipt);
   const status = view.status;
+  // One agent failed: while its failed row is in the conversation the row says why; once it's closed (its ×, a
+  // reload), this line does.
+  const failedAgent = status?.kind === "failed" && status.agents.length === 1 ? status.agents[0] : undefined;
+  const failedRun = failedAgent ? receipt?.runOf?.[failedAgent] : undefined;
+  const rowSaysWhy = useLive((s) => (failedRun ? s.streams.runs[failedRun]?.status === "failed" : false));
   const callAgent =
     actions && actions.channelAgents.length > 0 ? (
       <ReceiptAction>
@@ -183,6 +188,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t);
+  const failure = failedAgent && !rowSaysWhy ? receipt?.failures?.[failedAgent] : undefined;
+  const failedWhy = failedAgent && failure ? runFailureLine(t, name(failedAgent), failure, i18n.language) : null;
   const only = status?.kind === "no_ai" && status.agents.length === 1 ? status.agents[0] : undefined;
   const mayConnect = mayConnectAi(only ? dir.agentById.get(only) : null, me.user.id, org);
   const mentionNeeded = status?.kind === "nobody" && status.mentionNeeded === true;
@@ -321,7 +328,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
-          <span>{t("receipts.failedShort")}</span>
+          <span>{failedWhy ?? t("receipts.failedShort")}</span>
           {/* Only who asked: anyone else's click would be refused (`run.answer_forbidden`). */}
           {message.author.id === me.user.id && (
             <ReceiptAction>
@@ -329,6 +336,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                 type="button"
                 className="ac-receipt__action"
                 disabled={retrying}
+                aria-busy={retrying || undefined}
                 onClick={() => {
                   setRetrying(true);
                   void retryAnswer(api, org.id, message, () => actions.resend(message.body))
@@ -336,7 +344,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                     .finally(() => setRetrying(false));
                 }}
               >
-                {t("receipts.retry")}
+                {retrying && <PixelSpinner size={12} />}
+                {t(retrying ? "receipts.retrying" : "receipts.retry")}
               </button>
             </ReceiptAction>
           )}

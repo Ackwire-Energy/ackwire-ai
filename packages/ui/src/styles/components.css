@@ -3745,6 +3745,15 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   text-decoration: underline;
   cursor: pointer;
 }
+/* On its way (a retry, opening the plans): muted words, and its spinner (which sits on the capitals) before them. */
+.ac-receipt__action:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+.ac-receipt__action > .ac-pixspin {
+  margin-inline-end: 4px;
+}
 html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);

@@ -57,3 +57,24 @@ test("a second tap while the first is on its way asks nothing and sends nothing"
   await Promise.all([retryAnswer(api, "o", message, () => resent++), retryAnswer(api, "o", message, () => resent++)]);
   expect({ calls, resent }).toEqual({ calls: 1, resent: 1 });
 });
+
+test("a voice message that can't start over is never sent again as text, nor dropped in silence: it says to record it", async () => {
+  const voice = { ...message, id: "m-voice", meta: { voice: { clipId: "clip-1", durationMs: 4000, peaks: [] } } };
+  let resent = 0;
+  for (const answer of [
+    async () => ({ runs: [] }),
+    () => Promise.reject(new ApiError(409, "run.not_restartable", "already started")),
+  ]) {
+    const refused = await retryAnswer(apiWith(answer), "o", voice as Message, () => resent++).catch((e) => e);
+    expect(refused).toMatchObject({ name: "ApiError", code: "run.not_restartable_voice" });
+  }
+  expect(resent).toBe(0);
+  // Started again: nothing to say.
+  await retryAnswer(
+    apiWith(async () => ({ runs: [{ agentId: "a", runId: "r2" }] })),
+    "o",
+    voice as Message,
+    () => resent++,
+  );
+  expect(resent).toBe(0);
+});

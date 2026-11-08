@@ -259,14 +259,36 @@ async function restartFailedRun(deps: AnswerNowDeps, userId: string, failed: Age
     return { runId, created: "created" in next ? next.created : null };
   });
   if (!started) return current(deps.db, failed);
+  // The message's receipt follows the new run at once, on every device: until a worker claims it, nothing else names
+  // the message, and the line under it would still say the old run failed.
+  const who = { agentId: failed.agentId, runId: started.runId };
   if (started.created) {
+    const { channelId } = started.created;
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
-      channelId: started.created.channelId,
+      channelId,
       threadId: replyThreadOf(started.created),
-      agentId: failed.agentId,
-      runId: started.runId,
+      ...who,
     });
+    await publishChannelEvent(deps.pubsub, { type: "message.claimed", channelId, messageId: trigger.id, ...who });
+  } else {
+    // Into the agent's task already at work: said as a message sent into it is.
+    const [task] = await deps.db
+      .select({
+        channelId: agentRuns.channelId,
+        threadRootId: agentRuns.threadRootId,
+        triggerMessageId: agentRuns.triggerMessageId,
+      })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.orgId, failed.orgId), eq(agentRuns.id, started.runId)));
+    if (task)
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.run.steered",
+        channelId: task.channelId,
+        threadId: replyThreadOf(task),
+        messageId: trigger.id,
+        ...who,
+      });
   }
   return { agentId: failed.agentId, runId: started.runId };
 }

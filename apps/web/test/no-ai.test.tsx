@@ -1204,4 +1204,81 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     await click(within(receiptOf("resume o canal")).getByRole("button", { name: "Tentar de novo" }));
     expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["@ada resume o canal"]);
   });
+
+  test("a voice message that can't start over is never sent again as text: the words say to record it again", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    const voice = { clipId: "clip-1", durationMs: 4000, peaks: [] };
+    state.messages.push({ ...failed(), body: "resume o canal", meta: { voice } });
+    state.answerNowError = new ApiError(409, "run.not_restartable", "already started");
+    await open(state);
+    await click(within(receiptOf("resume o canal")).getByRole("button", { name: "Tentar de novo" }));
+    expect(calls(state, "chat.post")).toEqual([]);
+    expect([...document.querySelectorAll(".ac-toast")].at(-1)?.textContent).toContain(
+      "Esta resposta já tinha começado, então não dá para recomeçar. Grave a mensagem de novo.",
+    );
+  });
+
+  test("after the × on her failed line: the cause stays under my message, Tentar de novo says it is trying, and the line moves on once she starts again", async () => {
+    const { socket, state, api } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const asked = state.messages.at(-1) as Message;
+    const failure = { error: "runner_error", errorCode: "run.computer_failed", errorParams: { code: "runner_error" } };
+    const fails = async (runId: string) => {
+      const run = { threadId: null, runId, agentId: ADA_ID };
+      await push(socket, { type: "agent.thinking", ...run });
+      await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId });
+      await push(socket, { type: "agent.run", ...run, status: "failed", ...failure });
+      await push(socket, { type: "run.finished", ...run, status: "failed", ...failure });
+      await push(socket, {
+        type: "message.handled",
+        messageId: asked.id,
+        agentId: ADA_ID,
+        runId,
+        status: "failed",
+        ...failure,
+      });
+      await settle(2);
+    };
+    await fails("r1");
+    const reason = "Ada não conseguiu responder: o computador teve um problema e parou";
+    const errorLine = () => document.querySelector(".ac-msg__error")?.textContent ?? null;
+    expect(errorLine()).toContain(reason);
+    // While her line says why, mine doesn't say it twice.
+    expect(receiptOf("e o login?").textContent).toBe("Não conseguiu responder·Tentar de novo");
+
+    const row = document.querySelector(".ac-msg__error-row") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Fechar" }));
+    expect(errorLine()).toBeNull();
+    expect(receiptOf("e o login?").textContent).toBe(`${reason}·Tentar de novo`);
+
+    // Held, to see the click's own feedback while the request is out.
+    let answer: (v: { runs: { agentId: string; runId: string }[] }) => void = () => {};
+    api.chat.answerNow = (orgId, messageId) => {
+      state.calls.push({ method: "chat.answerNow", args: [orgId, messageId] });
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    };
+    await click(within(receiptOf("e o login?")).getByRole("button", { name: "Tentar de novo" }), 2);
+    const busy = within(receiptOf("e o login?")).getByRole("button", {
+      name: "Tentando de novo…",
+    }) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(busy.querySelector(".ac-pixspin")).not.toBeNull();
+
+    // What `restartFailedRun` publishes before it answers: the new run claims her message at once.
+    await push(socket, { type: "agent.thinking", threadId: null, runId: "r2", agentId: ADA_ID });
+    await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId: "r2" });
+    await act(async () => answer({ runs: [{ agentId: ADA_ID, runId: "r2" }] }));
+    await settle(3);
+    expect(receiptOf("e o login?").textContent ?? "").not.toContain("Não conseguiu responder");
+    expect(receiptOf("e o login?").textContent ?? "").not.toContain("Tentar de novo");
+    expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["@ada e o login?"]);
+
+    // It fails again: the line comes back with the button ready.
+    await fails("r2");
+    expect(errorLine()).toContain(reason);
+    expect(within(receiptOf("e o login?")).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
 });
