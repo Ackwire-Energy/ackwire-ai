@@ -91,6 +91,7 @@ const Proposal = z
   .object({
     id: z.uuid(),
     agentId: z.uuid(),
+    requesterUserId: z.string(),
     title: z.string(),
     start: z.string(),
     end: z.string(),

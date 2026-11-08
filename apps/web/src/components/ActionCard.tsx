@@ -58,6 +58,7 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
+import { CalendarProposalCardView } from "@/components/calendar/ProposalCard";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
@@ -127,6 +128,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "update_skills") return <UpdateSkillsCardView message={message} card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   if (card.kind === "team_week") return <TeamWeekCardView message={message} card={card} />;
+  if (card.kind === "calendar_proposal") return <CalendarProposalCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),

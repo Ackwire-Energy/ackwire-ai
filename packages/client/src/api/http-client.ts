@@ -1610,6 +1610,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<CalendarEvent>(`${org(orgId)}/calendar/proposals/${enc(id)}/confirm`, { json: {} }),
       dismissProposal: (orgId, id) =>
         request<void>(`${org(orgId)}/calendar/proposals/${enc(id)}/dismiss`, { json: {} }),
+      respond: (orgId, id, status) =>
+        request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}/rsvp`, { json: { status } }),
       update: (orgId, id, patch, series) =>
         request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}`, {
           method: "PATCH",

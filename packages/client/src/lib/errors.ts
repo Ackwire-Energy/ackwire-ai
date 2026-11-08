@@ -383,6 +383,7 @@ const KNOWN = {
   "notifications.snooze_too_far": "errors.said.tooFar",
   "when.too_far": "errors.said.tooFar",
   "calendar.invalid_date": "errors.said.checkDate",
+  "calendar.not_invited": "errors.said.notInvited",
   "notifications.bad_snooze": "errors.said.checkDate",
   "schedule.invalid_datetime": "errors.said.checkDate",
   "schedule.invalid_time": "errors.said.checkDate",

@@ -3,6 +3,7 @@ import {
   useAgents,
   useAllInvitations,
   useApprovals,
+  useCalendarProposal,
   useCatalog,
   useChannels,
   useConnections,
@@ -19,7 +20,10 @@ import {
   skillUpdateState,
 } from "@agenteschat/client/lib/action-cards";
 import { APP_PAGES, appPagePath } from "@agenteschat/client/lib/app-pages";
+import { slotText } from "@agenteschat/client/lib/calendar";
 import { connectedItems } from "@agenteschat/client/lib/connected";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -27,9 +31,10 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { EventPillAction, EventPillText, type IconName, Text } from "@/ui";
+import { EventPillAction, EventPillText, type IconName, Text, useToast } from "@/ui";
 import { AskDone, AskWaiting } from "../chat/asks";
 import { openWebPath } from "../links/open-web";
+import { useDirectory, useMeId } from "../shared/hooks";
 import { PersonLimitNote } from "../usage/people";
 
 /**
@@ -51,6 +56,7 @@ export function OfferCard({ message: m }: { message: Message }) {
   if (card.kind === "member_changes") return <People card={card} />;
   if (card.kind === "open_page") return <OpenScreen card={card} />;
   if (card.kind === "person_limit") return <PersonLimitNote card={card} />;
+  if (card.kind === "calendar_proposal") return <CalendarProposalOffer message={m} card={card} />;
   return null;
 }
 
@@ -222,6 +228,88 @@ function OpenScreen({ card }: { card: Extract<Card, { kind: "open_page" }> }) {
       action={allowed && (here || web) ? t(here ? "rightHand.open.open" : "rightHand.open.web") : null}
       onAction={() => (here ? router.push(here as never) : openWebPath(`/org/${orgId}${web ?? ""}`))}
       blocked={t("rightHand.open.notAllowed")}
+    />
+  );
+}
+
+/**
+ * An agent's event proposal, as the web's card: who asked (or who configures the workspace) confirms it here, which
+ * creates the event and invites the people, or asks for another time; anyone else reads who confirms it.
+ */
+function CalendarProposalOffer({
+  message,
+  card,
+}: {
+  message: Message;
+  card: Extract<Card, { kind: "calendar_proposal" }>;
+}) {
+  const { t, i18n } = useTranslation();
+  const { orgId, org } = useOrg();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const toast = useToast();
+  const decide = useCalendarProposal(orgId, { channelId: message.channelId, messageId: message.id });
+  const p = card.proposal;
+  if (p.status !== "pending") {
+    const how = t(p.status === "confirmed" ? "calendar.confirmed" : "calendar.proposalDismissed");
+    return (
+      <View>
+        <AskDone done={p.status === "confirmed"} words={`${p.title} · ${how}`} />
+      </View>
+    );
+  }
+  const mine = p.requesterUserId === meId || can(org, "configure");
+  const run = (decision: "confirm" | "dismiss") =>
+    decide.mutate(
+      { proposal: p, decision },
+      { onError: (error) => toast({ title: errorText(t, error, i18n.language), icon: "x" }) },
+    );
+  const requester = p.requesterUserId ? dir.nameOf({ type: "person", id: p.requesterUserId }) : "";
+  return (
+    <AskWaiting
+      forMe={mine}
+      mark="clock"
+      words={p.title}
+      actions={
+        mine ? (
+          <>
+            <EventPillAction
+              primary
+              label={t("calendar.confirm")}
+              disabled={decide.isPending}
+              onPress={() => run("confirm")}
+            />
+            <EventPillAction
+              label={t("calendar.otherTime")}
+              disabled={decide.isPending}
+              onPress={() => run("dismiss")}
+            />
+          </>
+        ) : null
+      }
+      below={
+        <EventPillText>
+          <Text variant="footnote">
+            {t("calendar.proposalDetail", {
+              when: slotText(i18n.language, p.start, p.end),
+              people: joinNames(
+                p.participants.map((a) => dir.nameOf(a)),
+                t,
+              ),
+            })}
+          </Text>
+          {p.note ? (
+            <Text variant="footnote" tone="muted">
+              {p.note}
+            </Text>
+          ) : null}
+          {!mine && requester ? (
+            <Text variant="footnote" tone="muted">
+              {t("calendar.proposalWaits", { name: requester })}
+            </Text>
+          ) : null}
+        </EventPillText>
+      }
     />
   );
 }

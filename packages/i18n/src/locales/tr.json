@@ -7897,6 +7897,19 @@
     "confirm": "Onayla ve davet et",
     "otherTime": "Başka bir zaman",
     "confirmed": "Etkinlik oluşturuldu ve davetler gönderildi.",
+    "proposalDismissed": "Öneri reddedildi",
+    "proposalWaits": "Bu etkinliği {{name}} onaylıyor.",
+    "rsvp": {
+      "accept": "Katılacağım",
+      "decline": "Katılmayacağım",
+      "accepted": "katılacak",
+      "declined": "katılmayacak",
+      "mine": {
+        "needs_action": "Bu etkinliğin davetlileri arasındasınız.",
+        "accepted": "Katılacaksınız.",
+        "declined": "Katılmayacaksınız."
+      }
+    },
     "kind": {
       "event": "Etkinlik",
       "routine": "Rutin",
@@ -13596,6 +13609,7 @@
       "action_update_skills": "Becerileri güncelle",
       "action_approvals": "Sizi bekleyen onaylar",
       "action_open_page": "Bir ekran aç",
+      "calendar_proposal": "Etkinlik önerisi: {{title}}",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "team_proposal": "Bir ekip önerdi: {{names}}",
       "settings_proposal": "{{names}} için bir değişiklik önerdi",

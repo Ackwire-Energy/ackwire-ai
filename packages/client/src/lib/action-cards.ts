@@ -4,6 +4,7 @@ import type {
   AgentDraft,
   AgentProposalCard,
   AiStatus,
+  CalendarProposal,
   CardDelegate,
   CostKind,
   CostlyDecision,
@@ -195,7 +196,25 @@ export interface OpenPageCard {
   why: string;
 }
 
+/** An agent's event proposal (`propose_event`): the person who asked confirms it, which creates the event. */
+export interface CalendarProposalCard {
+  kind: "calendar_proposal";
+  proposal: CalendarProposal;
+}
+
+const PROPOSAL_STATES: readonly string[] = ["pending", "confirmed", "dismissed"];
+
+/** The proposal on its message (`meta.calendarProposal`), only as the server writes it whole. */
+export function calendarProposalCardOf(meta: Record<string, unknown> | null | undefined): CalendarProposalCard | null {
+  const p = meta?.calendarProposal as Partial<CalendarProposal> | undefined;
+  if (!p || typeof p !== "object") return null;
+  const texts = [p.id, p.agentId, p.title, p.start, p.end].every((v) => typeof v === "string");
+  if (!texts || !Array.isArray(p.participants) || !PROPOSAL_STATES.includes(p.status ?? "")) return null;
+  return { kind: "calendar_proposal", proposal: p as CalendarProposal };
+}
+
 export type ActionCard =
+  | CalendarProposalCard
   | ApprovalsCard
   | MemberChangesCard
   | OpenPageCard
@@ -399,7 +418,8 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
     usagePauseCardOf(meta) ??
     costlyProposalOf(meta) ??
     personLimitCardOf(meta) ??
-    teamWeekCardOf(meta);
+    teamWeekCardOf(meta) ??
+    calendarProposalCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

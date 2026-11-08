@@ -7998,6 +7998,19 @@
     "confirm": "Bevestigen en uitnodigen",
     "otherTime": "Ander tijdstip",
     "confirmed": "Afspraak gemaakt en uitnodigingen verstuurd.",
+    "proposalDismissed": "Voorstel afgewezen",
+    "proposalWaits": "{{name}} bevestigt deze afspraak.",
+    "rsvp": {
+      "accept": "Ik kom",
+      "decline": "Ik kom niet",
+      "accepted": "komt",
+      "declined": "komt niet",
+      "mine": {
+        "needs_action": "Je bent uitgenodigd voor deze afspraak.",
+        "accepted": "Je komt.",
+        "declined": "Je komt niet."
+      }
+    },
     "kind": {
       "event": "Afspraak",
       "routine": "Routine",
@@ -13733,6 +13746,7 @@
       "action_update_skills": "Skills bijwerken",
       "action_approvals": "Goedkeuringen die op jou wachten",
       "action_open_page": "Een scherm openen",
+      "calendar_proposal": "Voorstel voor een afspraak: {{title}}",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "team_proposal": "Stelde een team voor: {{names}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",

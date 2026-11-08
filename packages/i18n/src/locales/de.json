@@ -7951,6 +7951,19 @@
     "confirm": "Bestätigen und einladen",
     "otherTime": "Andere Zeit",
     "confirmed": "Termin erstellt und Einladungen gesendet.",
+    "proposalDismissed": "Vorschlag verworfen",
+    "proposalWaits": "{{name}} bestätigt diesen Termin.",
+    "rsvp": {
+      "accept": "Ich komme",
+      "decline": "Ich komme nicht",
+      "accepted": "kommt",
+      "declined": "kommt nicht",
+      "mine": {
+        "needs_action": "Du bist zu diesem Termin eingeladen.",
+        "accepted": "Du kommst.",
+        "declined": "Du kommst nicht."
+      }
+    },
     "kind": {
       "event": "Termin",
       "routine": "Routine",
@@ -13666,6 +13679,7 @@
       "action_update_skills": "Skills aktualisieren",
       "action_approvals": "Freigaben, die auf dich warten",
       "action_open_page": "Eine Seite öffnen",
+      "calendar_proposal": "Terminvorschlag: {{title}}",
       "agent_proposal": "Hat einen neuen Agenten vorgeschlagen: {{name}}",
       "team_proposal": "Hat ein Team vorgeschlagen: {{names}}",
       "settings_proposal": "Hat eine Änderung für {{names}} vorgeschlagen",

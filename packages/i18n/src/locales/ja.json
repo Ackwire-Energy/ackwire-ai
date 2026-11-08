@@ -7618,6 +7618,19 @@
     "confirm": "確定して招待",
     "otherTime": "別の日時",
     "confirmed": "予定を作成し、招待を送信しました。",
+    "proposalDismissed": "提案を見送りました",
+    "proposalWaits": "{{name}}さんがこの予定を確定します。",
+    "rsvp": {
+      "accept": "参加する",
+      "decline": "参加しない",
+      "accepted": "参加",
+      "declined": "不参加",
+      "mine": {
+        "needs_action": "この予定に招待されています。",
+        "accepted": "参加します。",
+        "declined": "参加しません。"
+      }
+    },
     "kind": {
       "event": "予定",
       "routine": "ルーティン",
@@ -13160,6 +13173,7 @@
       "action_update_skills": "スキルを更新",
       "action_approvals": "あなたの承認待ち",
       "action_open_page": "画面を開く",
+      "calendar_proposal": "予定の提案: {{title}}",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "team_proposal": "チームを提案しました：{{names}}",
       "settings_proposal": "{{names}}への変更を提案しました",

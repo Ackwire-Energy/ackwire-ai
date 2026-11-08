@@ -7664,6 +7664,19 @@
     "confirm": "确认并邀请",
     "otherTime": "换个时间",
     "confirmed": "日程已创建，邀请已发送。",
+    "proposalDismissed": "已放弃提议",
+    "proposalWaits": "{{name}} 确认此日程。",
+    "rsvp": {
+      "accept": "参加",
+      "decline": "不参加",
+      "accepted": "参加",
+      "declined": "不参加",
+      "mine": {
+        "needs_action": "你在此日程的受邀者之中。",
+        "accepted": "你会参加。",
+        "declined": "你不参加。"
+      }
+    },
     "kind": {
       "event": "日程",
       "routine": "例行工作",
@@ -13227,6 +13240,7 @@
       "action_update_skills": "更新技能",
       "action_approvals": "等你处理的审批",
       "action_open_page": "打开页面",
+      "calendar_proposal": "日程提议：{{title}}",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "team_proposal": "提议了一个团队：{{names}}",
       "settings_proposal": "提议更改 {{names}}",

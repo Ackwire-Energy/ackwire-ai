@@ -43,6 +43,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
   cacheReceipts,
@@ -844,6 +845,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
       // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
       if (event.type === "team.proposal.updated") cacheTeamCard(qc, orgId, event, event.card);
+      // An agent's event proposal was confirmed or dismissed: its card says so.
+      if (event.type === "calendar.proposal.updated")
+        cacheMessageMeta(qc, orgId, event.channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);

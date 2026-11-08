@@ -19244,6 +19244,33 @@
   "calendar.confirmed": {
     "value": "Event created and invitations sent."
   },
+  "calendar.proposalDismissed": {
+    "value": "Proposal dismissed"
+  },
+  "calendar.proposalWaits": {
+    "value": "{{name}} confirms this event."
+  },
+  "calendar.rsvp.accept": {
+    "value": "Going"
+  },
+  "calendar.rsvp.decline": {
+    "value": "Not going"
+  },
+  "calendar.rsvp.accepted": {
+    "value": "going"
+  },
+  "calendar.rsvp.declined": {
+    "value": "not going"
+  },
+  "calendar.rsvp.mine.needs_action": {
+    "value": "You're invited to this event."
+  },
+  "calendar.rsvp.mine.accepted": {
+    "value": "You're going."
+  },
+  "calendar.rsvp.mine.declined": {
+    "value": "You're not going."
+  },
   "calendar.kind.event": {
     "value": "Event"
   },
@@ -33361,6 +33388,9 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "chat.body.calendar_proposal": {
+    "value": "Event proposal: {{title}}"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"

@@ -7667,6 +7667,19 @@
     "confirm": "Konfirmasi dan undang",
     "otherTime": "Waktu lain",
     "confirmed": "Acara dibuat dan undangan terkirim.",
+    "proposalDismissed": "Usulan ditolak",
+    "proposalWaits": "{{name}} mengonfirmasi acara ini.",
+    "rsvp": {
+      "accept": "Hadir",
+      "decline": "Tidak hadir",
+      "accepted": "hadir",
+      "declined": "tidak hadir",
+      "mine": {
+        "needs_action": "Kamu termasuk yang diundang ke acara ini.",
+        "accepted": "Kamu hadir.",
+        "declined": "Kamu tidak hadir."
+      }
+    },
     "kind": {
       "event": "Acara",
       "routine": "Rutinitas",
@@ -13214,6 +13227,7 @@
       "action_update_skills": "Perbarui skill",
       "action_approvals": "Persetujuan yang menunggumu",
       "action_open_page": "Buka layar",
+      "calendar_proposal": "Usulan acara: {{title}}",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "team_proposal": "Mengusulkan tim: {{names}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",

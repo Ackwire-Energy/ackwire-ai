@@ -8,7 +8,7 @@ import type { ArtifactView } from "./artifacts";
 import type { BlockStateView } from "./block-state";
 import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
-import type { CalendarEventView } from "./calendar";
+import type { CalendarEventView, CalendarProposalView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import { oneLine } from "./mail/text";
@@ -569,6 +569,14 @@ export type ChannelEvent =
   | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
   /** An event of this channel's calendar was created. */
   | { type: "calendar.event_created" | "calendar.event_updated"; channelId: string; event: CalendarEventView }
+  /** An agent's event proposal was confirmed or dismissed: its card (`meta.calendarProposal`) as it is now. */
+  | {
+      type: "calendar.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      proposal: CalendarProposalView;
+    }
   /** An event (or some of its occurrences: `scope`) was deleted. */
   | {
       type: "calendar.event_deleted";

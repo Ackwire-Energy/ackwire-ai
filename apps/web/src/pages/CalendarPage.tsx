@@ -8,9 +8,11 @@ import {
   collapseRoutines,
   type ItemSource,
   isBarItem,
+  myRsvp,
   onDay,
   rangeLabel,
   sameDay,
+  slotText,
   startOfDay,
   stepFocus,
   toItems,
@@ -95,7 +97,7 @@ const shortcutsFree = (e: KeyboardEvent) => {
  */
 export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: string }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const toast = useToast();
   const action = useCalendarAction(org.id);
   const reminders = useReminderAction(org.id);
@@ -270,9 +272,25 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
       },
     );
   };
+  const respond = (item: CalItem, status: "accepted" | "declined") => {
+    const e = events.get(item.key);
+    if (!e) return;
+    action.mutate(
+      { type: "respond", id: e.id, status },
+      { onError: (error) => toast.show(errorText(t, error, i18n.language), "error") },
+    );
+  };
+  const rsvpOf = (item: CalItem) => {
+    const e = item.kind === "event" ? events.get(item.key) : undefined;
+    const status = myRsvp(e, me.user.id);
+    if (!e || !status) return undefined;
+    const answers = new Map(e.rsvp.filter((r) => r.type === "person").map((r) => [r.id, r.status]));
+    return { status, answers, onRespond: (next: "accepted" | "declined") => respond(item, next) };
+  };
   const details = (item: CalItem) => (
     <ItemDetails
       item={item}
+      rsvp={rsvpOf(item)}
       onEdit={
         item.kind === "event"
           ? () => {
@@ -533,7 +551,7 @@ function Proposal({ proposal }: { proposal: CalendarRange["proposals"][number] }
   const actors = useActors();
   const action = useCalendarAction(org.id);
   const agent = { type: "agent" as const, id: proposal.agentId };
-  const when = `${dayLabel(i18n.language, new Date(proposal.start))}, ${formatTime(i18n.language, proposal.start)}–${formatTime(i18n.language, proposal.end)}`;
+  const when = slotText(i18n.language, proposal.start, proposal.end);
   const people = joinNames(proposal.participants.map(actors.name), t);
   return (
     <ApprovalCard

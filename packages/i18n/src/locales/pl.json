@@ -8541,6 +8541,19 @@
     "confirm": "Potwierdź i zaproś",
     "otherTime": "Inny termin",
     "confirmed": "Utworzono wydarzenie i wysłano zaproszenia.",
+    "proposalDismissed": "Propozycja odrzucona",
+    "proposalWaits": "{{name}} potwierdza to wydarzenie.",
+    "rsvp": {
+      "accept": "Będę",
+      "decline": "Nie będę",
+      "accepted": "będzie",
+      "declined": "nie będzie",
+      "mine": {
+        "needs_action": "Jesteś wśród zaproszonych na to wydarzenie.",
+        "accepted": "Będziesz.",
+        "declined": "Nie będziesz."
+      }
+    },
     "kind": {
       "event": "Wydarzenie",
       "routine": "Rutyna",
@@ -14615,6 +14628,7 @@
       "action_update_skills": "Zaktualizuj umiejętności",
       "action_approvals": "Zatwierdzenia czekające na ciebie",
       "action_open_page": "Otwórz ekran",
+      "calendar_proposal": "Propozycja wydarzenia: {{title}}",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "team_proposal": "Zaproponował zespół: {{names}}",
       "settings_proposal": "Zaproponował zmianę dla: {{names}}",

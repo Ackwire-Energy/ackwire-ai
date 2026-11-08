@@ -8207,6 +8207,19 @@
     "confirm": "Confirmar e invitar",
     "otherTime": "Otro horario",
     "confirmed": "Evento creado e invitaciones enviadas.",
+    "proposalDismissed": "Propuesta descartada",
+    "proposalWaits": "{{name}} confirma este evento.",
+    "rsvp": {
+      "accept": "Voy",
+      "decline": "No voy",
+      "accepted": "va",
+      "declined": "no va",
+      "mine": {
+        "needs_action": "Estás entre los invitados de este evento.",
+        "accepted": "Vas.",
+        "declined": "No vas."
+      }
+    },
     "kind": {
       "event": "Evento",
       "routine": "Rutina",
@@ -14066,6 +14079,7 @@
       "action_update_skills": "Actualizar habilidades",
       "action_approvals": "Aprobaciones esperándote",
       "action_open_page": "Abrir una pantalla",
+      "calendar_proposal": "Propuesta de evento: {{title}}",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "team_proposal": "Propuso un equipo: {{names}}",
       "settings_proposal": "Propuso un cambio para {{names}}",

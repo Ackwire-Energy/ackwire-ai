@@ -1463,6 +1463,8 @@ export interface ApiClient {
     /** Confirms an agent's proposal: creates the event and invites the people. */
     confirmProposal(orgId: string, id: string): Promise<CalendarEvent>;
     dismissProposal(orgId: string, id: string): Promise<void>;
+    /** Accepts or declines an invitation (the viewer's own answer). */
+    respond(orgId: string, id: string, status: "accepted" | "declined"): Promise<CalendarEvent>;
     /** A recurring event: `scope` and the occurrence's original start say which occurrences change. */
     update(
       orgId: string,

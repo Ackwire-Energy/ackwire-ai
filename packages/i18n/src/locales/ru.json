@@ -8507,6 +8507,19 @@
     "confirm": "Подтвердить и пригласить",
     "otherTime": "Другое время",
     "confirmed": "Событие создано, приглашения отправлены.",
+    "proposalDismissed": "Предложение отклонено",
+    "proposalWaits": "Это событие подтверждает {{name}}.",
+    "rsvp": {
+      "accept": "Приду",
+      "decline": "Не приду",
+      "accepted": "придёт",
+      "declined": "не придёт",
+      "mine": {
+        "needs_action": "Вы среди приглашённых на это событие.",
+        "accepted": "Вы придёте.",
+        "declined": "Вы не придёте."
+      }
+    },
     "kind": {
       "event": "Событие",
       "routine": "Регулярная задача",
@@ -14553,6 +14566,7 @@
       "action_update_skills": "Обновить навыки",
       "action_approvals": "Одобрения ждут вас",
       "action_open_page": "Открыть экран",
+      "calendar_proposal": "Предложение события: {{title}}",
       "agent_proposal": "Предложил нового агента: {{name}}",
       "team_proposal": "Предложил команду: {{names}}",
       "settings_proposal": "Предложил изменение для: {{names}}",
