@@ -118,7 +118,7 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   color: var(--accent, var(--link));
 }
 .tp-section__title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
