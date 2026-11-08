@@ -9549,11 +9549,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 600;
   color: var(--ink2);
 }
-.agp-brainfield__hint {
-  font-size: 12.5px;
-  line-height: 18px;
-  color: var(--muted);
-}
 /* The account and its plan's usage in one outline: the meters hang under the account's picker, on a sunken band. */
 .agp-acct {
   display: flex;

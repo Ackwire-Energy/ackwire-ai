@@ -745,7 +745,9 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
       action={{ label: t("common.save"), disabled: !ready, onPress: save }}
       locked={update.isPending}
     >
-      <GroupedHeader>{t("rolesPage.name")}</GroupedHeader>
+      <GroupedHeader hint={{ name: t("common.about", { label: t("rolesPage.name") }), text: t("rolesPage.nameDesc") }}>
+        {t("rolesPage.name")}
+      </GroupedHeader>
       <TextArea
         value={value}
         onChangeText={setDraft}
@@ -757,7 +759,6 @@ export function RenameRoleScreen({ roleId }: { roleId: string }) {
         onSubmitEditing={save}
         accessibilityLabel={t("rolesPage.name")}
       />
-      <GroupedFooter>{t("rolesPage.nameDesc")}</GroupedFooter>
     </SettingsPage>
   );
 }

@@ -66,6 +66,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   List,
   ListRow,
@@ -211,18 +212,20 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
       />
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
       {settings.data && (
-        <>
-          <span className="row" style={{ gap: 10, alignItems: "center" }}>
-            <Switch
-              id="skills-agents-improve"
-              checked={settings.data.agentsImprove}
-              disabled={action.isPending}
-              onCheckedChange={(on) => action.mutate({ type: "settings", settings: { agentsImprove: on } })}
-            />
+        <span className="row" style={{ gap: 10, alignItems: "center" }}>
+          <Switch
+            id="skills-agents-improve"
+            checked={settings.data.agentsImprove}
+            disabled={action.isPending}
+            onCheckedChange={(on) => action.mutate({ type: "settings", settings: { agentsImprove: on } })}
+          />
+          <span className="ac-hintline">
             <label htmlFor="skills-agents-improve">{t("skills.agentsImprove")}</label>
+            <InfoHint name={t("common.about", { label: t("skills.agentsImprove") })}>
+              {t("skills.agentsImproveHelp")}
+            </InfoHint>
           </span>
-          <p className="small muted">{t("skills.agentsImproveHelp")}</p>
-        </>
+        </span>
       )}
       {skills.isLoading && <LoadingList count={3} avatar={false} />}
       {noSkills && (
@@ -970,9 +973,11 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           disabled={action.isPending}
           onCheckedChange={(on) => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: on } })}
         />
-        <label htmlFor={`skill-auto-${s.id}`}>{t("skills.autoUpdate")}</label>
+        <span className="ac-hintline">
+          <label htmlFor={`skill-auto-${s.id}`}>{t("skills.autoUpdate")}</label>
+          <InfoHint name={t("common.about", { label: t("skills.autoUpdate") })}>{t("skills.autoUpdateHelp")}</InfoHint>
+        </span>
       </span>
-      <p className="small muted">{t("skills.autoUpdateHelp")}</p>
     </>
   );
 }

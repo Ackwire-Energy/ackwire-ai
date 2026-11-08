@@ -20,6 +20,7 @@ import {
   Field,
   Icon,
   type IconName,
+  InfoHint,
   Input,
   List,
   Locked,
@@ -391,18 +392,18 @@ function BucketForm({ config }: { config: StorageConfig }) {
             />
           </Field>
         </div>
-        <div className="row" style={{ alignItems: "flex-start", gap: 8 }}>
+        <div className="row" style={{ alignItems: "center", gap: 8 }}>
           <Checkbox
             id="st-path"
             checked={form.pathStyle}
             onCheckedChange={(v) => set("pathStyle", v)}
-            aria-describedby="st-path-help"
+            aria-describedby="st-path-hint"
           />
-          <span className="list-col" style={{ gap: 2 }}>
+          <span className="ac-hintline">
             <label htmlFor="st-path">{t("storage.pathStyle")}</label>
-            <span id="st-path-help" className="small muted">
+            <InfoHint id="st-path-hint" name={t("common.about", { label: t("storage.pathStyle") })}>
               {t("storage.pathStyleHelp")}
-            </span>
+            </InfoHint>
           </span>
         </div>
       </Locked>

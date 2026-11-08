@@ -387,7 +387,8 @@ html:not([data-pointer]) .roles-pick__row:focus-visible {
   font-size: 14px;
   font-weight: 600;
 }
-.roles-look__text span {
+/* Why a row can't change (Todos keeps its name): in sight under the label. */
+.roles-look__status {
   font-size: 13px;
   color: var(--muted);
 }

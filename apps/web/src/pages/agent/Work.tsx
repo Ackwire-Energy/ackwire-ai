@@ -1938,7 +1938,12 @@ function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: 
   const label = t("agentPage.work.brain.speed");
   return (
     <div className="agp-brainfield">
-      <span className="ac-effort__head">{label}</span>
+      <span className="ac-effort__head">
+        <span className="ac-hintline">
+          <span>{label}</span>
+          <InfoHint name={t("common.about", { label })}>{t("agentPage.work.brain.speedText")}</InfoHint>
+        </span>
+      </span>
       <Segmented
         className="agp-brainseg"
         label={label}
@@ -1946,7 +1951,6 @@ function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: 
         onValueChange={onChange}
         options={SPEEDS.map((s) => ({ value: s, label: t(`agentPage.work.brain.speeds.${s}`) }))}
       />
-      <span className="agp-brainfield__hint">{t("agentPage.work.brain.speedText")}</span>
     </div>
   );
 }
