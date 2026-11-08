@@ -233,12 +233,6 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   background: var(--sunken);
   color: var(--ink2);
 }
-/* Where the messages' side padding narrows to 12px (`responsive.css`). */
-@media (max-width: 760px) {
-  .channel__messages {
-    --thread-indent: 58px;
-  }
-}
 
 /* ── Thread view ───────────────────────────────────────────────────────── */
 .thread-head__text {

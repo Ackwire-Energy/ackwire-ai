@@ -33,6 +33,12 @@
 .channel__messages {
   --thread-indent: 64px;
 }
+/* Where the messages' side padding narrows to 12px (`responsive.css`). */
+@media (max-width: 760px) {
+  .channel__messages {
+    --thread-indent: 58px;
+  }
+}
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
   /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
