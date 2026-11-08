@@ -42,8 +42,11 @@ export interface FieldProps {
   label: ReactNode;
   /** Defaults to a generated id. The control picks it up automatically. */
   id?: string;
+  /** A format example under the control ("ex.: https://acme.com/webhook"). What the field is for goes in `hint`. */
+  example?: ReactNode;
+  /** @deprecated What the field is for goes behind the ⓘ (`hint`), a format example in `example`. */
   help?: ReactNode;
-  /** Shown instead of `help`; marks the control `aria-invalid`. */
+  /** Shown instead of `example`; marks the control `aria-invalid`. */
   error?: ReactNode;
   /** Something next to the label (e.g. "Esqueci minha senha"). */
   labelAside?: ReactNode;
@@ -56,14 +59,28 @@ export interface FieldProps {
   children: ReactNode;
 }
 
-/** A form field: always-visible label, optional ⓘ hint, help or error, wired to its control. */
-export function Field({ label, id, help, error, labelAside, hint, group, className, style, children }: FieldProps) {
+/** A form field: always-visible label, optional ⓘ hint, a format example or an error under it, wired to its control. */
+export function Field({
+  label,
+  id,
+  example,
+  help,
+  error,
+  labelAside,
+  hint,
+  group,
+  className,
+  style,
+  children,
+}: FieldProps) {
   const generated = useId();
   const controlId = id ?? `f${generated.replace(/:/g, "")}`;
   const helpId = `${controlId}-help`;
   const hintId = `${controlId}-hint`;
   const showError = error !== undefined && error !== null && error !== false;
-  const showHelp = !showError && help !== undefined && help !== null && help !== false;
+  const exampled = example !== undefined && example !== null && example !== false;
+  const note = exampled ? example : help;
+  const showHelp = !showError && note !== undefined && note !== null && note !== false;
   const describedBy = [showError || showHelp ? helpId : "", hint ? hintId : ""].filter(Boolean).join(" ");
   const labelId = `${controlId}-label`;
   const labelOnly = group ? (
@@ -106,8 +123,8 @@ export function Field({ label, id, help, error, labelAside, hint, group, classNa
         )}
         {children}
         {showHelp && (
-          <span id={helpId} className="ac-field__help">
-            {help}
+          <span id={helpId} className={exampled ? "ac-field__example" : "ac-field__help"}>
+            {note}
           </span>
         )}
         {showError && (

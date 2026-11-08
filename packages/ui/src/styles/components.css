@@ -531,7 +531,8 @@ html:not([data-pointer]) .ac-link:focus-visible {
   align-items: baseline;
   gap: var(--space-2);
 }
-.ac-field__help {
+.ac-field__help,
+.ac-field__example {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
@@ -10304,11 +10305,15 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 label.ac-setrow__title {
   cursor: pointer;
 }
-.ac-setrow__desc {
+.ac-setrow__desc,
+.ac-setrow__status {
   display: block;
   font-size: 13px;
   color: var(--muted);
   margin-top: 1px;
+}
+.ac-setrow__text > .ac-hintline {
+  font-size: 14px;
 }
 .ac-setrow__end {
   display: inline-flex;
