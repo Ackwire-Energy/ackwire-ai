@@ -20,7 +20,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View }
 import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
+import { Button, fieldText, Icon, InfoHint, Segmented, Text, useTheme, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
@@ -93,7 +93,14 @@ export function UsageScreen() {
                 <UsageCard
                   icon="laptop"
                   title={t("usageViews.accounts.title")}
-                  footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
+                  {...(data.accounts.length > 0
+                    ? {
+                        hint: {
+                          name: t("common.about", { label: t("usageViews.accounts.title") }),
+                          text: t("usageViews.estimate"),
+                        },
+                      }
+                    : {})}
                 >
                   {data.accounts.length === 0 && hold ? (
                     <PlanHoldNote org={org} />
@@ -201,12 +208,22 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
         </>
       )}
       {account.agents.length > 0 ? (
-        <Text variant="small" tone="muted">
-          {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
-          {money && typeof account.equivalentUsd === "number"
-            ? ` · ${t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}`
-            : ""}
-        </Text>
+        money && typeof account.equivalentUsd === "number" ? (
+          <InfoHint
+            name={t("common.about", { label: t("usageViews.apiPrice") })}
+            text={t("usageViews.apiPriceHint")}
+            variant="small"
+          >
+            <Text variant="small" tone="muted">
+              {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
+              {` · ${t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}`}
+            </Text>
+          </InfoHint>
+        ) : (
+          <Text variant="small" tone="muted">
+            {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
+          </Text>
+        )
       ) : null}
     </>
   );

@@ -21,7 +21,7 @@ import { Canvas, createPicture, Picture, Skia } from "@shopify/react-native-skia
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { type IconName, LineIcon, ProviderLogo, Text, useTheme } from "@/ui";
+import { type IconName, InfoHint, LineIcon, ProviderLogo, Text, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /*
@@ -231,28 +231,44 @@ function Tag({ text, color }: { text: string; color: string }) {
   );
 }
 
-/** A card of the usage views: its icon and title (and a line under it), then its body, then an optional footer. */
+/**
+ * A card of the usage views: its icon and title (an ⓘ after it with what the card's numbers mean), then its body, then
+ * an optional footer.
+ */
 export function UsageCard({
   icon,
   title,
+  hint,
   footer,
   children,
 }: {
   icon: IconName;
   title: string;
+  hint?: { name: string; text: string };
   footer?: string;
   children: ReactNode;
 }) {
   const { colors: c, shadows } = useTheme();
+  const heading = (
+    <Text variant="callout" tone="ink" accessibilityRole="header" style={[styles.grow, styles.heavy]}>
+      {title}
+    </Text>
+  );
   return (
     // The kit's card surface (e1 and the lit top edge), as the other cards on these screens.
     <View style={[styles.card, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
       <View style={styles.cardHead}>
         {/* On the title's line: a 16-point icon at the top of a 21-point line sat above its letters. */}
         <LineIcon variant="callout" name={icon} size={16} color={c.muted} />
-        <Text variant="callout" tone="ink" accessibilityRole="header" style={[styles.grow, styles.heavy]}>
-          {title}
-        </Text>
+        {hint ? (
+          <View style={styles.grow}>
+            <InfoHint {...hint} variant="callout">
+              {heading}
+            </InfoHint>
+          </View>
+        ) : (
+          heading
+        )}
       </View>
       {children}
       {footer ? (
