@@ -71,6 +71,7 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            accessibilityLabel={item.accessibilityLabel}
             onLayout={(e) => {
               const { x: left, width: w } = e.nativeEvent.layout;
               setBoxes((b) =>

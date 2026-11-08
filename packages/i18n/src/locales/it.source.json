@@ -31479,6 +31479,30 @@
   "settings.account.chat.openLatest": {
     "value": "Latest message"
   },
+  "settings.account.chat.textSize": {
+    "value": "Text size"
+  },
+  "settings.account.chat.textSizeHelp": {
+    "value": "Of messages, in every conversation and on all your devices"
+  },
+  "settings.account.chat.textSizePhone": {
+    "value": "Your phone's own text size setting applies too"
+  },
+  "settings.account.chat.textXs": {
+    "value": "Smaller"
+  },
+  "settings.account.chat.textSm": {
+    "value": "Small"
+  },
+  "settings.account.chat.textMd": {
+    "value": "Default"
+  },
+  "settings.account.chat.textLg": {
+    "value": "Large"
+  },
+  "settings.account.chat.textXl": {
+    "value": "Larger"
+  },
   "settings.account.chat.sample.ask": {
     "value": "How many are left?"
   },

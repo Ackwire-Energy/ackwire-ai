@@ -12,6 +12,13 @@ export const CHAT_TONES = ["light", "strong"] as const;
 export type ChatTone = (typeof CHAT_TONES)[number];
 export const CHAT_OPEN_AT = ["latest", "read"] as const;
 export type ChatOpenAt = (typeof CHAT_OPEN_AT)[number];
+/**
+ * Tamanho do texto, smallest first: the words of every message and the name over them, in every look and conversation.
+ * The web's sizes are `--msg-text` and its lines in packages/ui's components.css, the phone's `CHAT_TEXT` in
+ * apps/mobile/src/features/chat/look.ts (the system's own text size still applies there).
+ */
+export const CHAT_TEXT_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+export type ChatTextSize = (typeof CHAT_TEXT_SIZES)[number];
 
 /** Only what the person chose: a key not here follows the defaults below, so they can change for everyone else. */
 export interface ChatPrefs {
@@ -20,12 +27,17 @@ export interface ChatPrefs {
   channelTone?: ChatTone;
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
+  textSize?: ChatTextSize;
 }
 
 /** Owner's decision: a channel reads as one log, and in a DM right and left already say who spoke. */
 export const DEFAULT_CHANNEL_STYLE: ChatStyle = "left";
 export const DEFAULT_DM_STYLE: ChatStyle = "bubbles";
 export const DEFAULT_CHAT_TONE: ChatTone = "light";
+/** Owner's decision: smaller words than before the setting existed, which `lg` comes close to. */
+export const DEFAULT_TEXT_SIZE: ChatTextSize = "md";
+
+export const textSizeOf = (prefs: ChatPrefs | undefined): ChatTextSize => prefs?.textSize ?? DEFAULT_TEXT_SIZE;
 
 /**
  * A conversation's vertical rhythm, the web's (`--msg-part-gap`, `--msg-turn-gap`, `--msg-card-gap`, `--msg-block`) and

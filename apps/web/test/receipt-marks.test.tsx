@@ -178,8 +178,10 @@ describe("a receipt never changes a message's height", () => {
     const face = px(value(kit, ".ac-avatar--xs", "width"));
     expect(value(app, ".ac-receipt__check:has(> .ac-avatar)", "padding")).toBe("0 1px");
     expect(face + 2 * 1).toBe(check);
+    // At every text size: the name's line is the tighter one, at its smallest on the smallest step.
+    expect(value(kit, ".ac-msg__head", "line-height")).toBe("var(--msg-line-tight)");
     expect(px(value(kit, ".ac-avatar--xs", "height"))).toBeLessThanOrEqual(
-      px(value(kit, ".ac-msg__head", "line-height")),
+      px(value(kit, '[data-text-size="xs"]', "--msg-line-tight")),
     );
     // A DM's face slot takes no width of its own: empty, it leaves the time on the bubble's edge.
     expect(value(app, ".ac-receipt__seen", "width")).toBeUndefined();

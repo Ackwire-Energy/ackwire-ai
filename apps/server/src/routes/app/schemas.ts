@@ -4,6 +4,7 @@ import {
   AGENT_STYLES,
   CHAT_OPEN_AT,
   CHAT_STYLES,
+  CHAT_TEXT_SIZES,
   CHAT_TONES,
   ONBOARDING_STEPS,
   STANDING_STATES,
@@ -68,6 +69,10 @@ export const ChatPrefs = z
     channelTone: z.enum(CHAT_TONES).optional(),
     dmTone: z.enum(CHAT_TONES).optional(),
     openAt: z.enum(CHAT_OPEN_AT).optional(),
+    textSize: z
+      .enum(CHAT_TEXT_SIZES)
+      .optional()
+      .openapi({ description: "Tamanho do texto of the messages, smallest first; absent: `md`." }),
   })
   .openapi("ChatPrefs");
 

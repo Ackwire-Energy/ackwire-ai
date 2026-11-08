@@ -15,6 +15,8 @@ import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "
 import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
 import { copyText, MONO } from "../shared/parts";
+import { CHAT_TEXT_MAX_SCALE, chatCodeOf } from "./logic";
+import { useRowLook } from "./look";
 
 /** Lines a card shows in the conversation; the rest open in full screen. */
 const SHOWN = 14;
@@ -127,6 +129,8 @@ export function CodeText({
 }) {
   const c = useColors();
   const { scheme } = useTheme();
+  // In a conversation, the person's Tamanho do texto, as the words around it; full screen keeps its own size.
+  const sized = useRowLook().text;
   const colors = TOKEN[scheme];
   const color = (kind: CodeTokenKind) =>
     kind === "plain"
@@ -142,7 +146,11 @@ export function CodeText({
               : colors[kind];
   const gutter = String(lines.length).length;
   return (
-    <RNText selectable style={[styles.mono, { color: c.ink2 }, wrap ? styles.wrap : null]}>
+    <RNText
+      selectable
+      style={[styles.mono, sized ? chatCodeOf(sized) : null, { color: c.ink2 }, wrap ? styles.wrap : null]}
+      maxFontSizeMultiplier={sized ? CHAT_TEXT_MAX_SCALE : undefined}
+    >
       {lines.map((line, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the lines of one block, in order
         <RNText key={i}>

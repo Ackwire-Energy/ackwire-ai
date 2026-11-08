@@ -1,21 +1,27 @@
 import { useSetChatPrefs } from "@agenteschat/client";
 import {
   CHAT_STYLES,
+  CHAT_TEXT_SIZES,
   type ChatOpenAt,
   type ChatPrefs,
   type ChatStyle,
+  type ChatTextSize,
   type ChatTone,
   chatLookOf,
+  DEFAULT_TEXT_SIZE,
   mineOnRight,
+  textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, Segmented, Text, useTheme, useToast } from "@/ui";
-import { bubbleFill } from "../chat/logic";
+import { bubbleFill, CHAT_TEXT, CHAT_TEXT_MAX_SCALE, chatNameOf } from "../chat/logic";
+import { RowLookContext } from "../chat/look";
+import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Page } from "./parts";
 
@@ -141,8 +147,78 @@ function Choice({
 }
 
 /**
+ * Tamanho do texto's preview: an answer and my question at their real size, drawn by the conversation's own words
+ * (`MessageText`), so the system's text size grows them as it does in a conversation.
+ */
+function TextPreview({ size, style, tone, dm }: { size: ChatTextSize; style: ChatStyle; tone: ChatTone; dm: boolean }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const { colors, scheme } = useTheme();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const text = CHAT_TEXT[size];
+  const fill = bubbleFill(dm ? SAMPLE_COLOR : "sky", tone, colors.bg, scheme === "dark");
+  const look = { style, tone, fill, names: !dm, text };
+  const bubbled = style === "bubbles";
+  const name = (who: string) => (
+    <Text
+      variant="footnote"
+      tone="ink2"
+      style={[styles.bold, chatNameOf(text)]}
+      maxFontSizeMultiplier={CHAT_TEXT_MAX_SCALE}
+      numberOfLines={1}
+    >
+      {who}
+    </Text>
+  );
+  const answer = <MessageText body={t("settings.account.chat.sample.answer")} selectable={false} />;
+  const ask = <MessageText body={t("settings.account.chat.sample.ask")} selectable={false} />;
+  return (
+    <RowLookContext.Provider value={look}>
+      <View
+        style={[styles.preview, { backgroundColor: c.bg, borderColor: c.line }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={styles.previewRow}>
+          <AgentAvatar agent={SAMPLE_AGENT} size={30} live={false} />
+          {bubbled ? (
+            <View style={[styles.previewBubble, { backgroundColor: c.bubble }]}>
+              {dm ? null : name("Ada")}
+              {answer}
+            </View>
+          ) : (
+            <View style={styles.flex}>
+              {name("Ada")}
+              {answer}
+            </View>
+          )}
+        </View>
+        {mineOnRight(style) ? (
+          <View style={[styles.previewBubble, styles.previewMine, { backgroundColor: (bubbled && fill) || c.bubble }]}>
+            {ask}
+          </View>
+        ) : (
+          <View style={styles.previewRow}>
+            <View style={[styles.previewFace, { backgroundColor: c.sunken }]}>
+              <Text variant="footnote" tone="muted" style={styles.bold}>
+                {dir.nameOf({ type: "person", id: meId }).slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.flex}>
+              {name(dir.nameOf({ type: "person", id: meId }))}
+              {ask}
+            </View>
+          </View>
+        )}
+      </View>
+    </RowLookContext.Provider>
+  );
+}
+
+/**
  * Conversa, as Sua conta has it on the web: how conversations look to me on every device. Channels and DMs each have
- * their own style, Bolhas its Clara or Forte, and where a conversation opens.
+ * their own style, Bolhas its Clara or Forte, the size of the words in all of them, and where a conversation opens.
  */
 export function ChatLookPage() {
   const { t } = useTranslation();
@@ -153,6 +229,7 @@ export function ChatLookPage() {
   const dm = kind === "dms";
   const prefs = org?.chatPrefs;
   const { style, tone } = chatLookOf(prefs, dm);
+  const textSize = textSizeOf(prefs);
   const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
   const save = (patch: ChatPrefs) =>
     set.mutate(patch, { onError: () => toast({ title: t("settings.account.activityFailed"), icon: "x" }) });
@@ -161,6 +238,13 @@ export function ChatLookPage() {
     left: t("settings.account.chat.left"),
     bubbles: t("settings.account.chat.bubbles"),
     compact: t("settings.account.chat.compact"),
+  };
+  const sizes: Record<ChatTextSize, string> = {
+    xs: t("settings.account.chat.textXs"),
+    sm: t("settings.account.chat.textSm"),
+    md: t("settings.account.chat.textMd"),
+    lg: t("settings.account.chat.textLg"),
+    xl: t("settings.account.chat.textXl"),
   };
   const talk: Line[] = [
     { mine: true, text: t("settings.account.chat.sample.ask"), time: "14:30" },
@@ -221,6 +305,29 @@ export function ChatLookPage() {
           </GroupedFooter>
         </>
       ) : null}
+      <GroupedHeader>{t("settings.account.chat.textSize")}</GroupedHeader>
+      <View style={styles.pad}>
+        <Segmented
+          wide="fit"
+          items={CHAT_TEXT_SIZES.map((s) => ({
+            key: s,
+            // An A in the step's own size, as on the web; the default also says its name.
+            label: (
+              <>
+                <RNText style={{ fontSize: CHAT_TEXT[s].fontSize }}>A</RNText>
+                {s === DEFAULT_TEXT_SIZE ? ` ${sizes[s]}` : null}
+              </>
+            ),
+            accessibilityLabel: sizes[s],
+          }))}
+          value={textSize}
+          onChange={(v) => save({ textSize: v as ChatTextSize })}
+        />
+      </View>
+      <View style={styles.pad}>
+        <TextPreview size={textSize} style={style} tone={tone} dm={dm} />
+      </View>
+      <GroupedFooter>{t("settings.account.chat.textSizePhone")}</GroupedFooter>
       <GroupedHeader>{t("settings.account.chat.openAt")}</GroupedHeader>
       <View style={styles.grid} accessibilityRole="radiogroup">
         <Choice
@@ -283,4 +390,9 @@ const styles = StyleSheet.create({
   toEnd: { flex: 1, justifyContent: "flex-end", gap: 3 },
   unread: { flexDirection: "row", alignItems: "center", gap: 4 },
   rule: { flex: 1, height: 1 },
+  preview: { gap: 10, padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+  previewRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  previewFace: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  previewBubble: { flexShrink: 1, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 18 },
+  previewMine: { alignSelf: "flex-end", maxWidth: "86%" },
 });

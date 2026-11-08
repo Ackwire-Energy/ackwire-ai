@@ -36,6 +36,17 @@ test("how conversations look: only what the person chose, each person's own, mer
   expect((await put(owner, { dmStyle: "wide" })).status).toBe(400);
   expect(await prefsOf(owner)).toEqual({ dmStyle: "compact", channelTone: "strong", openAt: "read" });
 
+  // Tamanho do texto: one of the steps, kept beside the looks, each person's own.
+  expect((await put(owner, { textSize: "huge" })).status).toBe(400);
+  expect(await (await put(owner, { textSize: "xl" })).json()).toEqual({
+    dmStyle: "compact",
+    channelTone: "strong",
+    openAt: "read",
+    textSize: "xl",
+  });
+  expect((await prefsOf(owner))?.textSize).toBe("xl");
+  expect(await prefsOf(member)).toEqual({});
+
   const stranger = browser(t);
   await signUp(stranger, "stranger@example.com");
   expect((await put(stranger, { dmStyle: "left" })).status).toBe(403);

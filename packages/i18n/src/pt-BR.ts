@@ -12820,6 +12820,16 @@ export const ptBR = {
         openAt: "Ao abrir uma conversa, me leve para",
         openRead: "Última mensagem lida",
         openLatest: "Mensagem mais recente",
+        /** The words of every message, in every look, smallest step first. */
+        textSize: "Tamanho do texto",
+        textSizeHelp: "Das mensagens, em todas as conversas e nos seus aparelhos",
+        /** On the phone, under the steps: the system's own text size still applies on top. */
+        textSizePhone: "O tamanho de texto dos ajustes do celular também vale",
+        textXs: "Menor",
+        textSm: "Pequeno",
+        textMd: "Padrão",
+        textLg: "Grande",
+        textXl: "Maior",
         sample: {
           ask: "Quantas faltam?",
           answer: "Faltam 14. Aviso?",

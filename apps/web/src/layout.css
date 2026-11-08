@@ -2373,13 +2373,16 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
-   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate. */
+   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate.
+   Its code takes the words' Tamanho do texto, as inline code does (12.5px on a 20px line at the default). */
 .ac-msg__text .code-card__code {
   margin: 0;
   padding: 0 16px 14px;
   background: none;
   border-radius: 0;
   overflow-y: auto;
+  font-size: calc(var(--msg-text) - 1.5px);
+  line-height: var(--msg-line-tight);
 }
 .md .code-card code,
 .md .code-viewer code {

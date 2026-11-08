@@ -4,18 +4,23 @@
  * these rules win over the rows' own on a phone width too.
  */
 
-/* ── Each look's rhythm: the gap inside a group and between groups, and the row's plate. ── */
+/*
+ * ── Each look's rhythm: the gap inside a group and between groups, and the row's plate. A bubble's padding and
+ * Compacta's one line keep the words on the tighter line of the person's text size. ──
+ */
 [data-look="bubbles"] {
   --msg-part-gap: 8px;
   --msg-turn-gap: 16px;
   --msg-block: 1px;
   --msg-lead: 40px;
+  --msg-line: var(--msg-line-tight);
 }
 [data-look="compact"] {
   --msg-part-gap: 4px;
   --msg-turn-gap: 8px;
   --msg-block: 1px;
   --msg-lead: 76px;
+  --msg-line: var(--msg-line-tight);
 }
 
 /* ── Bolhas ── */
@@ -89,8 +94,6 @@
   padding: 7px 14px 8px;
   border-radius: 18px;
   background: var(--msg-bubble);
-  font-size: 14.5px;
-  line-height: 21px;
   transition: filter 0.12s;
 }
 /* A table or code takes the whole bubble; a wider one scrolls inside it. */
@@ -170,14 +173,14 @@
   --reply-face: 32px;
   --reply-gap: 8px;
 }
-/* Name inside the bubble, in its color; a DM's two speakers leave it to screen readers. */
+/* Name inside the bubble, in its color, a step under the words; a DM's two speakers leave it to screen readers. */
 .ac-msg__bubble-head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px var(--space-2);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: calc(var(--msg-text) - 1px);
+  line-height: calc(var(--msg-line-tight) - 2px);
   user-select: none;
 }
 /* A step toward the ink: amber, teal and lighter colors of an agent's own are under AA on the bubble. */
@@ -200,8 +203,8 @@
 }
 /* A row with no words of its own keeps its line above its card, in the name's size. */
 .ac-msg[data-look="bubbles"] .ac-msg__head {
-  font-size: 13px;
-  line-height: 18px;
+  font-size: calc(var(--msg-text) - 1px);
+  line-height: calc(var(--msg-line-tight) - 2px);
 }
 /*
  * The time inside the bubble, in its bottom right corner. The last line keeps room for it (`--stamp-room`), and when it
@@ -332,7 +335,7 @@
 .ac-msg[data-look="compact"] {
   --msg-inline: 12px;
   display: block;
-  min-height: 20px;
+  min-height: var(--msg-line);
   padding-inline: 88px var(--msg-inline);
 }
 .ac-msg[data-look="compact"] .ac-msg__gutter,
@@ -340,12 +343,13 @@
 .ac-msg[data-look="compact"] .ac-avatar__badge {
   display: none;
 }
+/* The clock and the small face centre on the words' first line (20px at the default size), under the row's 1px plate. */
 .ac-msg__clock {
   position: absolute;
-  top: 3px;
+  top: calc(var(--msg-line) / 2 - 7px);
   left: 14px;
   width: 40px;
-  font-size: 11px;
+  font-size: max(11px, calc(var(--msg-text) - 3px));
   line-height: 17px;
   text-align: right;
   color: var(--faint);
@@ -363,14 +367,14 @@
   bottom: -3px;
 }
 .ac-msg[data-look="compact"]:has(> .ac-msg__reply) > .ac-msg__clock {
-  top: 25px;
+  top: calc(var(--msg-line) / 2 + 15px);
 }
 .ac-msg[data-look="compact"]:has(> .ac-msg__reply) > .ac-msg__avatar {
-  top: 24px;
+  top: calc(var(--msg-line) / 2 + 14px);
 }
 .ac-msg[data-look="compact"] .ac-msg__avatar {
   position: absolute;
-  top: 2px;
+  top: calc(var(--msg-line) / 2 - 8px);
   left: 62px;
   width: 18px;
   height: 18px;
@@ -390,8 +394,8 @@
 .ac-msg[data-look="compact"] .ac-msg__head {
   display: inline;
   margin-right: 6px;
-  font-size: 13.5px;
-  line-height: 20px;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
 }
 .ac-msg[data-look="compact"] .ac-msg__head > * {
   margin-right: 6px;
@@ -399,8 +403,8 @@
 .ac-msg[data-look="compact"] .ac-msg__text,
 .ac-msg[data-look="compact"] .ac-msg__text .md {
   display: inline;
-  font-size: 13.5px;
-  line-height: 20px;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
 }
 .ac-msg[data-look="compact"] .ac-msg__text .md > p:first-child {
   display: inline;
@@ -425,18 +429,19 @@
 }
 /*
  * An event pill here is a row of the look's grid, read like the lines around it: no frame, its time in the clock's
- * column, its mark in the small face's, its sentence on the text's column and its actions as words after it.
+ * column, its mark in the small face's, its sentence on the text's column and its actions as words after it. So it
+ * takes the person's Tamanho do texto as those lines do (a 20px line at the default).
  */
 .channel__messages[data-look="compact"] .ac-eventpill {
   position: relative;
 }
 .channel__messages[data-look="compact"] .ac-eventpill__frame {
   display: block;
-  min-height: 20px;
+  min-height: var(--msg-line);
   border-radius: 0;
   box-shadow: none;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: calc(var(--msg-text) - 1px);
+  line-height: var(--msg-line);
   color: var(--muted);
 }
 .channel__messages[data-look="compact"] .ac-eventpill--waiting .ac-eventpill__frame {
@@ -446,10 +451,10 @@
   display: inline;
   padding: 0;
 }
-/* The text's column is 88px in: the small face's at 62px, the clock's 40px at 14px. */
+/* The text's column is 88px in: the small face's at 62px, the clock's 40px at 14px, both on the first line. */
 .channel__messages[data-look="compact"] .ac-eventpill__mark {
   position: absolute;
-  top: 1px;
+  top: calc(var(--msg-line) / 2 - 9px);
   left: -26px;
   width: 18px;
   height: 18px;
@@ -460,12 +465,12 @@
    row's inset, never a second line over the next row's clock. */
 .channel__messages[data-look="compact"] .ac-eventpill__time {
   position: absolute;
-  top: 2px;
+  top: calc(var(--msg-line) / 2 - 8px);
   left: -74px;
   display: flex;
   justify-content: flex-end;
   width: 40px;
-  font-size: 11px;
+  font-size: max(11px, calc(var(--msg-text) - 3px));
   line-height: 17px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -481,8 +486,8 @@
   border: 0;
   border-radius: 0;
   background: none;
-  font-size: 12.5px;
-  line-height: 20px;
+  font-size: calc(var(--msg-text) - 1.5px);
+  line-height: var(--msg-line);
   color: var(--ink2);
 }
 .channel__messages[data-look="compact"] .ac-eventpill__action:hover:not(:disabled) {
@@ -577,6 +582,21 @@
 .chat-look__mini--read {
   -webkit-mask-image: linear-gradient(#000 76%, transparent);
   mask-image: linear-gradient(#000 76%, transparent);
+}
+/* Tamanho do texto's steps: an A in each step's own size (its `data-text-size`), so five fit a phone's width. */
+.chat-look__a {
+  font-size: var(--msg-text);
+  line-height: 1;
+  font-weight: 600;
+}
+/* Tamanho do texto's preview: the rows at their real size, as tall as they are. */
+.chat-look__mini--real {
+  height: auto;
+}
+.chat-look__mini--real .channel__messages {
+  height: auto;
+  padding-block: 10px;
+  zoom: 1;
 }
 .chat-look__mini--end .channel__messages {
   position: absolute;

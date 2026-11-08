@@ -12713,6 +12713,16 @@ export const en = {
         openAt: "When I open a conversation, take me to",
         openRead: "Last message read",
         openLatest: "Latest message",
+        /** The words of every message, in every look, smallest step first. */
+        textSize: "Text size",
+        textSizeHelp: "Of messages, in every conversation and on all your devices",
+        /** On the phone, under the steps: the system's own text size still applies on top. */
+        textSizePhone: "Your phone's own text size setting applies too",
+        textXs: "Smaller",
+        textSm: "Small",
+        textMd: "Default",
+        textLg: "Large",
+        textXl: "Larger",
         sample: {
           ask: "How many are left?",
           answer: "14 left. Shall I tell them?",

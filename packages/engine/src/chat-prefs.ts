@@ -11,6 +11,9 @@ export type ChatTone = (typeof CHAT_TONES)[number];
 /** Where a conversation opens: at its newest message, or where the person stopped reading. */
 export const CHAT_OPEN_AT = ["latest", "read"] as const;
 export type ChatOpenAt = (typeof CHAT_OPEN_AT)[number];
+/** Tamanho do texto of the messages, smallest first. */
+export const CHAT_TEXT_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+export type ChatTextSize = (typeof CHAT_TEXT_SIZES)[number];
 
 /** Only what the person chose: a key not here keeps the app's default. */
 export interface ChatPrefs {
@@ -19,6 +22,7 @@ export interface ChatPrefs {
   channelTone?: ChatTone;
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
+  textSize?: ChatTextSize;
 }
 
 const oneOf = <T extends string>(list: readonly T[], v: unknown) => (list.includes(v as T) ? (v as T) : undefined);
@@ -32,6 +36,7 @@ export function chatPrefsOf(stored: unknown): ChatPrefs {
     channelTone: oneOf(CHAT_TONES, o.channelTone),
     dmTone: oneOf(CHAT_TONES, o.dmTone),
     openAt: oneOf(CHAT_OPEN_AT, o.openAt),
+    textSize: oneOf(CHAT_TEXT_SIZES, o.textSize),
   };
   return Object.fromEntries(Object.entries(picks).filter(([, v]) => v !== undefined));
 }

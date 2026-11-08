@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Pressable, Text as RNText, ScrollView, type ScrollViewInstance, View } from "react-native";
 import { Count } from "./Count";
 import { haptics } from "./haptics";
@@ -12,10 +12,13 @@ const PEEK = 40;
 
 export interface FilterItem {
   key: string;
-  label: string;
+  /** Words, or text of its own sizes inside the label's (Segmented only: Tamanho do texto's growing A's). */
+  label: ReactNode;
   count?: number;
   /** A small icon before the label (Segmented only). */
   icon?: IconName;
+  /** What a screen reader says where the label doesn't say it in words (Segmented only). */
+  accessibilityLabel?: string;
 }
 
 export interface FiltersProps {

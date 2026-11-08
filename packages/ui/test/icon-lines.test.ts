@@ -36,10 +36,6 @@ const X_HEIGHT_AIM = /(?:^|;)\s*(?:translate|top|margin(?:-top)?|vertical-align)
 
 /** Leads still placed by hand, and why. An entry leaves when its rule does. */
 const PLACED_BY_HAND: Record<string, string> = {
-  'apps/web/src/chat/looks.css .channel__messages[data-look="compact"] .ac-eventpill__mark':
-    "Compacta's event row: its 18px mark stands in the small face's column on the row's 20px line, as the face",
-  'apps/web/src/chat/looks.css .ac-msg[data-look="compact"] .ac-msg__avatar':
-    "Compacta's 18px face stands in its own column on the row's 20px line, ahead of the name, not as a lead of the text",
   "packages/ui/src/styles/components.css .ac-menu__item .ac-icon":
     "menu items are one line (no wrapping) of 14px text on their own 20px line, which the 16px icon sits on",
   "apps/web/src/components/import-flow.css .imp-row__mark":
@@ -230,10 +226,11 @@ describe("a picture beside lines, a bubble beside a face, a row of actions", () 
     const fallback = rise.indexOf("margin-block-start: calc(var(--cap-top) - 11px)");
     expect(fallback).toBeGreaterThan(-1);
     expect(rise.indexOf("margin-block-start: calc(var(--cap-top) - 0.5lh)")).toBeGreaterThan(fallback);
-    // The chat's name on a 20px line whose box starts at the face's top, never raised to put its capitals there:
-    // capitals flush with the face's edge read as a face hanging under the name. Never a line as tall as the face.
+    // The chat's name on its line (20px at the default text size) whose box starts at the face's top, never raised to
+    // put its capitals there: capitals flush with the face's edge read as a face hanging under the name. Never a line
+    // as tall as the face.
     const head = await kitRule(".ac-msg__head");
-    expect(head).toContain("line-height: 20px");
+    expect(head).toContain("line-height: var(--msg-line-tight)");
     expect(head).not.toContain("margin-block-start");
     expect(await kitRule(".ac-msg__head > .ac-msg__aside")).toContain("align-self: center");
   });
