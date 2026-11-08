@@ -74,7 +74,11 @@ export function ReportsToField({ agentId, id }: { agentId: string; id: string })
             onValueChange={(v) => setReportsTo([{ agentId, reportsToAgentId: v || null }])}
             // A list of agents shows their faces (the empty choice a glyph in a face's room), the trigger the chosen one's.
             options={[
-              { value: NOBODY, label: t("team.reportsTo.none"), leading: <Icon name="person" size={18} className="muted" /> },
+              {
+                value: NOBODY,
+                label: t("team.reportsTo.none"),
+                leading: <Icon name="person" size={18} className="muted" />,
+              },
               ...supervisorChoices(agent, team, lodiId).map((a) => ({
                 value: a.id,
                 label: a.name,
