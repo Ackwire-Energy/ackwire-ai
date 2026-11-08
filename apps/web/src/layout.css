@@ -9973,7 +9973,6 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   grid-template-rows: auto auto 1fr;
   align-items: start;
   gap: 16px 24px;
-  max-width: 1240px;
 }
 .agp-overview > * {
   grid-column: 1;

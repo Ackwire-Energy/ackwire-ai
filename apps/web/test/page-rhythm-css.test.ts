@@ -22,3 +22,14 @@ test("a DM's name keeps its line on a phone, its pill 8 after it and under it wh
   // A tag on a first line that rises keeps the line where it is, as the kit's pills do.
   expect(last(topLevel(await read("layout.css")), ".ac-captop:has(.agp-tag)", "margin-block-start")).toBe("0");
 });
+
+test("the agent page's overview takes all the width it has, and the computer's line wraps whole", async () => {
+  for (const sheet of ["layout.css", "responsive.css"])
+    expect(declarations(await read(sheet), ".agp-overview").filter(([p]) => p === "max-width")).toEqual([]);
+  const computer = await read("components/computer/computer.css");
+  const line = declarations(computer, ".cmp-entry__line>span:last-child");
+  expect(line.filter(([p]) => p === "text-overflow" || p === "white-space")).toEqual([]);
+  expect(last(computer, ".cmp-entry__line>span:last-child", "overflow-wrap")).toBe("anywhere");
+  // Its icon stays on the first line's capitals when the words wrap (`.ac-iconline`).
+  expect(last(computer, ".cmp-entry__line", "align-items")).toBe("flex-start");
+});
