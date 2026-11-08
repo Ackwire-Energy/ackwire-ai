@@ -309,7 +309,7 @@ describe("GitHub App installations are bound to one organization", () => {
   });
 });
 
-describe("only an installation made from an install started here links (ADR 0153)", () => {
+describe("only an installation made from an install started here links (ADR 0156)", () => {
   const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
 
   test("made on GitHub before the install started: refused, whoever sees it; made after, or a minute off, links", async () => {
@@ -355,7 +355,7 @@ describe("only an installation made from an install started here links (ADR 0153
   });
 });
 
-describe("the app's installation is the workspace's GitHub (ADR 0153)", () => {
+describe("the app's installation is the workspace's GitHub (ADR 0156)", () => {
   test("a first installation without a GitHub connection is one: every agent's, its accounts as the account", async () => {
     const w = await world();
     await w.install(w.ana, w.orgA.id, 1);
@@ -452,7 +452,7 @@ describe("the app's installation is the workspace's GitHub (ADR 0153)", () => {
   });
 });
 
-describe("installation tokens (ADR 0153)", () => {
+describe("installation tokens (ADR 0156)", () => {
   test("the first permission set the installation grants: workflows when it has them, contents alone when not", async () => {
     const w = await world();
     await w.install(w.ana, w.orgA.id, 1);

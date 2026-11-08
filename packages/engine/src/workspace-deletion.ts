@@ -853,7 +853,7 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
     }
   }
   // The app's installations reach the workspace's repositories with no one left to use them: uninstalled there, as
-  // removing one does (ADR 0153); left installed, anyone who can see one could bind it to another workspace.
+  // removing one does (ADR 0156); left installed, anyone who can see one could bind it to another workspace.
   const app = deps.githubApp?.app();
   if (app && deps.githubApp) {
     const installs = await db

@@ -38,7 +38,7 @@ import { useToast } from "@/lib/toast";
 const connectorsPath = (orgId: string) => `/org/${orgId}/settings/connectors`;
 
 /**
- * Settings → Conectores: the GitHub accounts where the organization installed the agentes.chat app (ADR 0033, 0153).
+ * Settings → Conectores: the GitHub accounts where the organization installed the agentes.chat app (ADR 0033, 0156).
  * Where it is installed, agents act on GitHub as the app. Each account opens its page on GitHub (Gerenciar no GitHub,
  * where its repositories are picked), and Remover uninstalls it there too. Only installations made from here count
  * for this organization. Hidden when the server has no app and nothing is installed, except for the admins whose

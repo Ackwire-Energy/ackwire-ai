@@ -202,7 +202,7 @@ export function ConnectFlow({
  * Step 1: OAuth ("Continuar no Linear"), or an API key. A service through Composio signs in on Composio's page
  * ("Continuar na Composio"): no key field of ours. A new account goes on to its tools; a new sign-in for an account,
  * or the same account again, ends here with a toast saying which. GitHub, where the server has the agentes.chat app
- * (ADR 0153), offers the app first (installed on GitHub's page, which comes back to Conectores) and an account second.
+ * (ADR 0156), offers the app first (installed on GitHub's page, which comes back to Conectores) and an account second.
  */
 function ConnectStep({
   def,

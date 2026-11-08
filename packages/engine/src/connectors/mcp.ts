@@ -232,7 +232,7 @@ export function createConnectorToolSource(
     log?: { warn(message: string, data?: Record<string, unknown>): void };
     /** Tells connector admins live when a server changes an approved tool. */
     pubsub?: PubSub;
-    /** The server's GitHub App (ADR 0153): GitHub's tools act as it wherever the workspace installed it. */
+    /** The server's GitHub App (ADR 0156): GitHub's tools act as it wherever the workspace installed it. */
     githubApp?: GitHubAppAccess;
   },
 ): ToolSource {
@@ -271,7 +271,7 @@ export function createConnectorToolSource(
   }
 
   /**
-   * What the agent writes to GitHub, signed (ADR 0153): a body ends with its line naming the agent and the person it
+   * What the agent writes to GitHub, signed (ADR 0156): a body ends with its line naming the agent and the person it
    * works for, a commit message credits that person. The approval card showed the agent's own words.
    */
   async function signed(

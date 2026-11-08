@@ -23,7 +23,7 @@ export interface GitHubAppAccess {
 }
 
 /**
- * What an installation token of the app may do for a call, by our scope (ADR 0153), most first: GitHub refuses a set
+ * What an installation token of the app may do for a call, by our scope (ADR 0156), most first: GitHub refuses a set
  * the installation lacks (`workflows` on an older installation) and the next is asked. A scope with none (Projects,
  * which GitHub Apps can't reach on a person's account) never goes through the app.
  */
@@ -86,7 +86,7 @@ export type GitHubCallAuth = { headers: Record<string, string>; token: string | 
 const bearer = (token: string): GitHubCallAuth => ({ headers: { authorization: `Bearer ${token}` }, token });
 
 /**
- * Who a GitHub tool call goes as (ADR 0153): wherever an installation of the app bound to this workspace covers what
+ * Who a GitHub tool call goes as (ADR 0156): wherever an installation of the app bound to this workspace covers what
  * the call names, its short token (one repository: that repository's; an account or several of its repositories: the
  * installation's), so what the agent writes comes from the app's bot. Elsewhere the workspace's account connection,
  * as before; GitHub through the app alone says why it can't instead.

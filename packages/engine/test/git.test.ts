@@ -977,14 +977,14 @@ describe("the computer", () => {
     expect(pr?.content).toContain("https://github.com/acme/app/pull/7");
     const post = github.calls.find((c) => c.method === "POST");
     expect(post?.auth).toBe(`Bearer ${GH_TOKEN}`);
-    // Signed for the person who asked (ADR 0153), though the model wrote no body.
+    // Signed for the person who asked (ADR 0156), though the model wrote no body.
     expect(JSON.parse(post?.text ?? "{}").body).toBe(
       `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no agentes.chat</sub>`,
     );
   });
 });
 
-describe("the git proxy and the GitHub App (ADR 0153)", () => {
+describe("the git proxy and the GitHub App (ADR 0156)", () => {
   const APP: GitHubAppConfig = {
     appId: "123",
     privateKey: generateKeyPairSync("rsa", { modulusLength: 2048 })

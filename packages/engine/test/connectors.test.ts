@@ -161,7 +161,7 @@ describe("connections", () => {
   });
 });
 
-describe("GitHub and the GitHub App's installations (ADR 0153)", () => {
+describe("GitHub and the GitHub App's installations (ADR 0156)", () => {
   test("disconnecting an account while installations remain keeps GitHub through the app; disconnecting that ends both", async () => {
     f = await setup();
     const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {

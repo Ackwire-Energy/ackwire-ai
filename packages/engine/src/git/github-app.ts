@@ -4,7 +4,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 const { githubAppInstallations } = schema;
 
 /**
- * Our GitHub App (ADR 0033, 0153): `GITHUB_APP_*`, else the one the server's owner made from Settings
+ * Our GitHub App (ADR 0033, 0156): `GITHUB_APP_*`, else the one the server's owner made from Settings
  * (`github-app-settings.ts`). Short tokens scoped to one repo. The app is public; installations count only for the
  * organization that installed it from agentes.chat (`github_app_installations`, see `github-app-installs.ts`).
  */
@@ -277,7 +277,7 @@ export async function installationStatus(
 }
 
 /**
- * When GitHub made an installation and the id of the account it is on, which binding one checks (ADR 0153): `gone`
+ * When GitHub made an installation and the id of the account it is on, which binding one checks (ADR 0156): `gone`
  * (uninstalled), or null when GitHub didn't answer or didn't say.
  */
 export async function installationOrigin(

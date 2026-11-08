@@ -1,4 +1,4 @@
-# 0153. The GitHub App is the workspace's GitHub identity
+# 0156. The GitHub App is the workspace's GitHub identity
 
 - Status: Accepted
 - Date: 2026-11-07

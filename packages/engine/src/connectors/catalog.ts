@@ -28,7 +28,7 @@ export interface ConnectorTool {
    */
   ours?: boolean;
   /**
-   * Where the agent's own words go on GitHub (ADR 0153): a `body` gets the agent's signature line when given
+   * Where the agent's own words go on GitHub (ADR 0156): a `body` gets the agent's signature line when given
    * (`always`: an empty one too), a commit `message` the person's credit.
    */
   sign?: { field: "body" | "message"; always?: true };

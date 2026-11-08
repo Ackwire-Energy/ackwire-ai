@@ -31,7 +31,7 @@ const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 const SIGNED_IN: &str = "/desktop/signed-in";
 /// The help pages: background reading opens in the browser, never in place of the conversation.
 const HELP: &str = "/help/";
-/// The server's page that posts its GitHub App manifest to github.com (ADR 0153): the window would hand that post to
+/// The server's page that posts its GitHub App manifest to github.com (ADR 0156): the window would hand that post to
 /// the browser without its form, so the whole page opens there.
 const GITHUB_APP_MANIFEST: &str = "/api/app/github-app/manifest/start";
 /// Cloudflare Turnstile, the bot check of the site's sign-in pages: its frame loads inside the page. On macOS and

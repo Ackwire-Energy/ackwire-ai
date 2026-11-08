@@ -83,7 +83,7 @@ const Setup = z
   })
   .openapi("GitHubAppSetup");
 
-/** The server's GitHub App now: env, else the one made from Settings (ADR 0153). */
+/** The server's GitHub App now: env, else the one made from Settings (ADR 0156). */
 export const githubAppOf = (deps: AppDeps) =>
   deps.extras?.githubApp ? deps.extras.githubApp.current() : githubAppConfig(deps.config);
 
@@ -122,7 +122,7 @@ const MANIFEST_STARTS = { limit: 10, windowMs: 60_000 };
 const ownerOnly = "404 for everyone but the server's pinned owner (ADR 0073), and on agentes.chat itself.";
 
 /**
- * Our public GitHub App (ADR 0033, 0153): organizations install it from the app, which binds the installation to them;
+ * Our public GitHub App (ADR 0033, 0156): organizations install it from the app, which binds the installation to them;
  * GitHub redirects back to `/api/app/github-app/callback` (user authorization during installation). Without
  * `GITHUB_APP_*`, the server's owner makes one from Settings with GitHub's manifest flow.
  */
@@ -401,7 +401,7 @@ export function githubAppRoutes(deps: AppDeps) {
     },
   );
 
-  // ── The server's own app, made with GitHub's manifest flow (ADR 0153) ──
+  // ── The server's own app, made with GitHub's manifest flow (ADR 0156) ──
 
   app.openapi(
     createRoute({

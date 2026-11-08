@@ -75,7 +75,7 @@ const Connection = z
     serverUrl: z.string(),
     authType: z.string().openapi({
       description:
-        "`oauth`, `api_key`, `none`, or `github_app`: GitHub through the workspace's GitHub App installations alone (ADR 0153), whose accounts are `accountLabel`; it has no Reconectar.",
+        "`oauth`, `api_key`, `none`, or `github_app`: GitHub through the workspace's GitHub App installations alone (ADR 0156), whose accounts are `accountLabel`; it has no Reconectar.",
     }),
     accountLabel: z.string().nullable(),
     tokenExpiresAt: z.string().nullable(),
@@ -268,7 +268,7 @@ export function connectorRoutes(deps: AppDeps) {
       security,
       summary: "Disconnect (agents lose its scopes)",
       description:
-        "GitHub (ADR 0153): an account's connection in a workspace with GitHub App installations stays as GitHub through the app alone (`authType: github_app`, the same id, grants kept); disconnecting that removes the installations too, and uninstalls the app from their GitHub accounts.",
+        "GitHub (ADR 0156): an account's connection in a workspace with GitHub App installations stays as GitHub through the app alone (`authType: github_app`, the same id, grants kept); disconnecting that removes the installations too, and uninstalls the app from their GitHub accounts.",
       request: { params: OrgParams.extend({ connectionId: z.uuid() }) },
       responses: { 204: noContent[204], ...errors },
     }),

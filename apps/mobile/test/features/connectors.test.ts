@@ -334,7 +334,7 @@ describe("Ferramentas: what changed comes first, Salvar stays at hand", () => {
   });
 });
 
-describe("GitHub through the agentes.chat app (ADR 0153), as the web shows it", () => {
+describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", () => {
   const install = (login: string, over: Partial<GitHubAppInstallation> = {}): GitHubAppInstallation => ({
     id: `i-${login}`,
     installationId: login.length,

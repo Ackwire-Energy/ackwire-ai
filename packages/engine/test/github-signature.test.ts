@@ -16,7 +16,7 @@ afterEach(() => f?.close());
 
 const API = "https://api.github.test";
 
-describe("the line and the credit (ADR 0153)", () => {
+describe("the line and the credit (ADR 0156)", () => {
   test("a body gets the line once, its names inert; a commit message gets the trailer in its trailer block", () => {
     const line = "Dev, agent for @everyone <b>x</b> on agentes.chat";
     const signed = signedBody("Fixes #1", line);

@@ -4,7 +4,7 @@ import { GITHUB_APP_AUTH } from "./connected";
 import { joinNames, namesText } from "./format";
 
 /**
- * The GitHub repositories panel (ADR 0153), the same on the web and the phone: what it shows for the organization's
+ * The GitHub repositories panel (ADR 0156), the same on the web and the phone: what it shows for the organization's
  * installations of the agentes.chat app, from `GET …/github-app` and the organization's GitHub connection.
  */
 

@@ -151,7 +151,7 @@ const CLOCK_SKEW_MS = 2 * 60_000;
  * GitHub's redirect after installing (user authorization during installation on): checks the state (exists, unused,
  * not expired, same person, still an admin), exchanges the code for the person's token and requires the installation
  * to be one they can see, and a personal account's to be theirs — so nobody can claim another account's installation
- * by its id. Then binds it to the organization, whose GitHub it becomes when it has no connection yet (ADR 0153); an
+ * by its id. Then binds it to the organization, whose GitHub it becomes when it has no connection yet (ADR 0156); an
  * installation bound to another organization is refused (`github_app.other_workspace`). A new binding needs an
  * installation GitHub made after this state was issued: one made on GitHub itself, or kept there when its uninstall
  * was refused, shows to every member of its account who reads one of its repositories, so seeing it gives no right to
@@ -297,7 +297,7 @@ async function unbind(db: Database, row: GitHubAppInstallation, actor: AuditEntr
 }
 
 /**
- * Removes an installation from the organization (admins), and uninstalls the app from that GitHub account (ADR 0153,
+ * Removes an installation from the organization (admins), and uninstalls the app from that GitHub account (ADR 0156,
  * best effort: it is unbound here whatever GitHub answers). `uninstalled`: false when GitHub refused or didn't answer,
  * so the person can uninstall it there.
  */
@@ -323,7 +323,7 @@ const reconciled = new Map<string, number>();
 const RECONCILE_MS = 60_000;
 
 /**
- * Keeps an organization's bindings in step with GitHub without a webhook (ADR 0153): each installation is asked of
+ * Keeps an organization's bindings in step with GitHub without a webhook (ADR 0156): each installation is asked of
  * GitHub, at most once a minute per organization. Uninstalled there: unbound, as `installation.deleted` does;
  * otherwise its account, repository selection and suspension are refreshed. No answer leaves it as it is.
  */

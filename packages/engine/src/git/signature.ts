@@ -9,7 +9,7 @@ import type { GitHubHttp } from "./github-app";
 const { accounts, organizationMembers, users } = schema;
 
 /**
- * What an agent writes on GitHub says whose agent it is (ADR 0153): every body ends with one line naming the agent and
+ * What an agent writes on GitHub says whose agent it is (ADR 0156): every body ends with one line naming the agent and
  * the person it works for ("Theo, agente de Ana no agentes.chat", in the workspace owner's language), and commits
  * credit that person (`Co-authored-by`) when they linked GitHub to sign in, never with their email.
  */

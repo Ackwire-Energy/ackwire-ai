@@ -47,7 +47,7 @@ const settingsOf = (fx: Fixture, extra: { env?: GitHubAppConfig | null; now?: ()
     now: extra.now,
   });
 
-describe("the server's GitHub App (ADR 0153)", () => {
+describe("the server's GitHub App (ADR 0156)", () => {
   test("env wins: it is the app, and nothing is saved over it", async () => {
     f = await setup();
     const env = { ...MADE, appId: "1", slug: "env-app" };

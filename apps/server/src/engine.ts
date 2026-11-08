@@ -311,7 +311,7 @@ export function buildEngine(o: EngineOptions) {
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
   };
-  // The server's GitHub App (ADR 0153): `GITHUB_APP_*`, else the one its owner made from Settings, read on every call
+  // The server's GitHub App (ADR 0156): `GITHUB_APP_*`, else the one its owner made from Settings, read on every call
   // (through the getters below), so one made or removed there works without a restart.
   const githubApp = createGitHubAppSettings({
     db,
@@ -781,7 +781,7 @@ export function buildEngine(o: EngineOptions) {
     talker,
     /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
     jevKey,
-    /** Likewise: the server's GitHub App (ADR 0153). */
+    /** Likewise: the server's GitHub App (ADR 0156). */
     githubApp,
     /** Likewise: the speech engines, read before the first voice message. */
     speech,

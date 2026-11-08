@@ -5,7 +5,7 @@ import { users } from "./auth";
 /**
  * Secrets of the whole installation, sealed like provider keys (ADR 0007), that its owner adds in Settings: the
  * TypeSafe key for Jev (ADR 0073), the GIPHY key for GIFs (ADR 0091), the speech provider's key (ADR 0100) and the
- * GitHub App made from Settings (ADR 0153; its `key_hint` is the app's public slug). Not a tenant's, so no `org_id`.
+ * GitHub App made from Settings (ADR 0156; its `key_hint` is the app's public slug). Not a tenant's, so no `org_id`.
  * They travel with backups and open only with the same `AGENTES_SECRET`.
  */
 export const instanceSecrets = pgTable(

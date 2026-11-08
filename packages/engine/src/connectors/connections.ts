@@ -409,7 +409,7 @@ export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, conne
 /**
  * Disconnects: the secret stays sealed but unused; agents lose the connection's scopes and its "Aprovar sempre" rules.
  * A service through Composio: Composio then drops the account (`composio`), best effort, never revoking it there.
- * GitHub (ADR 0153): an account's connection in a workspace with GitHub App installations becomes GitHub through the
+ * GitHub (ADR 0156): an account's connection in a workspace with GitHub App installations becomes GitHub through the
  * app alone (same row, its secret cleared, grants and rules kept); GitHub through the app alone unbinds them all.
  */
 export async function revokeConnection(
@@ -482,7 +482,7 @@ async function dropConnection(tx: Executor, orgId: string, row: ConnectorConnect
   return row;
 }
 
-/** `auth_type` of GitHub through the workspace's GitHub App installations alone (ADR 0153): no secret of its own. */
+/** `auth_type` of GitHub through the workspace's GitHub App installations alone (ADR 0156): no secret of its own. */
 export const GITHUB_APP_AUTH = "github_app";
 
 /** What a GitHub connection keeps of an account once only the app is left. */
@@ -510,7 +510,7 @@ async function installationAccounts(tx: Executor, orgId: string) {
 }
 
 /**
- * Keeps the workspace's GitHub connection in step with its GitHub App installations (ADR 0153), in the caller's
+ * Keeps the workspace's GitHub connection in step with its GitHub App installations (ADR 0156), in the caller's
  * transaction: with installations and no GitHub connection, the app alone is one, made by the person binding it
  * (every agent's, like any first connection: grants, rules and the git proxy work as with an account's); a row of the
  * app alone names their accounts, and ends with the last one, as disconnecting does. An account's own connection is

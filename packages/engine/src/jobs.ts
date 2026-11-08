@@ -171,7 +171,7 @@ export interface JobDeps extends RunExecutorDeps {
   vault?: VaultDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
-  /** The server's GitHub App: job `org.delete` uninstalls it from the workspace's GitHub accounts (ADR 0153). */
+  /** The server's GitHub App: job `org.delete` uninstalls it from the workspace's GitHub accounts (ADR 0156). */
   githubApp?: GitHubAppAccess;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
   mail?: MailAdapters | null;

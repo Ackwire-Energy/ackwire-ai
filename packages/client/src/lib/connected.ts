@@ -31,7 +31,7 @@ export interface ConnectedItem {
   /** Connected through Composio (ADR 0107): its page signs in, and no address shows. */
   viaComposio: boolean;
   /**
-   * GitHub through the agentes.chat app alone (ADR 0153): no account signed in, so nothing to reconnect; `account`
+   * GitHub through the agentes.chat app alone (ADR 0156): no account signed in, so nothing to reconnect; `account`
    * holds the accounts it is installed on.
    */
   viaGithubApp?: boolean;

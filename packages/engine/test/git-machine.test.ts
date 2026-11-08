@@ -642,7 +642,7 @@ describe("prompt text and permissions", () => {
   });
 });
 
-describe("agents' commits and the GitHub App (ADR 0153)", () => {
+describe("agents' commits and the GitHub App (ADR 0156)", () => {
   test("authored as the app's bot where the workspace installed it; each turn credits the person who linked GitHub", async () => {
     const w = await world();
     const app = { ...APP, slug: "agentes-machine-test" };

@@ -1598,7 +1598,7 @@ export const featureKeysEn = {
     usedBy_one: "{{names}} uses it",
     usedBy_other: "{{names}} use it",
     fromAgent: "Connect a service",
-    /** GitHub with the agentes.chat app (ADR 0153): the app first, an account as the other way. */
+    /** GitHub with the agentes.chat app (ADR 0156): the app first, an account as the other way. */
     githubApp: {
       useApp: "Use the agentes.chat app",
       useAccount: "Use a GitHub account",

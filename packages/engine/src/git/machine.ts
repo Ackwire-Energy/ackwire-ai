@@ -75,7 +75,7 @@ export function machineGitUnavailable(status: MachineStatus | null, orgId: strin
  * The `proxy` and `author` of a `git.sync` for this agent on this machine:
  * a fresh proxy credential (6 h) bound to the machine and the agent. Null
  * when the org has no GitHub connection or the agent has no git access.
- * With the GitHub App installed for the workspace (ADR 0153), commits are
+ * With the GitHub App installed for the workspace (ADR 0156), commits are
  * authored as the app's bot, so GitHub shows them as the app's.
  */
 export async function machineGitSetup(
@@ -273,7 +273,7 @@ export function codeStart(
 }
 
 /**
- * The turn's commits credit the person behind its run (ADR 0153), as the run's commits through GitHub's API do, when
+ * The turn's commits credit the person behind its run (ADR 0156), as the run's commits through GitHub's API do, when
  * they linked GitHub to sign in: the line that says so, next to where the turn starts.
  */
 async function creditLine(deps: MachineGitDeps, turn: CodeTurn) {

@@ -1408,7 +1408,7 @@ export async function deleteAccount(
     for (const org of plan.leaves) await followOwner(tx, org.id);
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
     // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091); so would
-    // the speech provider's key (ADR 0100) and the GitHub App they made, whose GitHub account holds it (ADR 0153).
+    // the speech provider's key (ADR 0100) and the GitHub App they made, whose GitHub account holds it (ADR 0156).
     if (userId === owner) {
       await deleteJevKey(tx, { type: "system", id: null });
       await deleteGifKey(tx, { type: "system", id: null });

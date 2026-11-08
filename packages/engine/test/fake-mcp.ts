@@ -56,7 +56,7 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
         },
       );
     }
-    // What agents write on GitHub (ADR 0153): bodies, commit messages, an account-wide read and Projects.
+    // What agents write on GitHub (ADR 0156): bodies, commit messages, an account-wide read and Projects.
     if (options.writes) {
       const repo = { owner: z.string(), repo: z.string() };
       const tools: Record<string, Record<string, z.ZodType>> = {

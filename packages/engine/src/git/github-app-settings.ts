@@ -9,7 +9,7 @@ import { forgetAllInstallationTokens, type GitHubAppConfig, type GitHubHttp, git
 const { instanceSecrets } = schema;
 
 /**
- * The server's GitHub App (ADR 0153): `GITHUB_APP_*` when set, else the one the server's pinned owner made from
+ * The server's GitHub App (ADR 0156): `GITHUB_APP_*` when set, else the one the server's pinned owner made from
  * Settings with GitHub's manifest flow, kept like the Jev key (ADR 0073): sealed, never returned (only its public
  * slug and page), read again a minute after the last read, so a server that didn't make it sees it too.
  */

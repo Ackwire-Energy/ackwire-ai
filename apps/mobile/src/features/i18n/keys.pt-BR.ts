@@ -1599,7 +1599,7 @@ export const featureKeysPtBR = {
     usedBy_one: "{{names}} usa",
     usedBy_other: "{{names}} usam",
     fromAgent: "Conectar um serviço",
-    /** O GitHub com o app agentes.chat (ADR 0153): o app primeiro, uma conta como o outro jeito. */
+    /** O GitHub com o app agentes.chat (ADR 0156): o app primeiro, uma conta como o outro jeito. */
     githubApp: {
       useApp: "Usar o app agentes.chat",
       useAccount: "Usar uma conta do GitHub",

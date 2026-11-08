@@ -86,7 +86,7 @@ async function world(options: { account?: boolean } = {}) {
   return { mcp, rest, source, ctx, call };
 }
 
-describe("GitHub's tools act as the app where it is installed (ADR 0153)", () => {
+describe("GitHub's tools act as the app where it is installed (ADR 0156)", () => {
   test("what the app's token may do, by the tool's scope: most first, never Projects", () => {
     expect(appPermissionsFor("push_files", "repo.write")).toEqual([
       { contents: "write", workflows: "write" },
@@ -150,7 +150,7 @@ describe("GitHub's tools act as the app where it is installed (ADR 0153)", () =>
   });
 });
 
-describe("what agents write on GitHub is signed (ADR 0153)", () => {
+describe("what agents write on GitHub is signed (ADR 0156)", () => {
   test("bodies end with one line naming the agent and the person; an edit replaces the old one", async () => {
     const w = await world({ account: true });
     const line = `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no agentes.chat</sub>`;

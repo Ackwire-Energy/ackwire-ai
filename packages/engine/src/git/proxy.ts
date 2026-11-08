@@ -316,7 +316,7 @@ async function proxyGit(
     { db: deps.db, orgId: claims.orgId },
     connection,
     parsed,
-    // Workflow files too where the installation grants it (ADR 0153): an older installation has contents alone.
+    // Workflow files too where the installation grants it (ADR 0156): an older installation has contents alone.
     write ? [{ contents: "write", workflows: "write" }, { contents: "write" }] : { contents: "read" },
   );
   if (!bearer) {

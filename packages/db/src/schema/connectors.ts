@@ -41,7 +41,7 @@ export const connectorConnections = pgTable(
     serverUrl: text().notNull(),
     /**
      * `oauth`, `api_key` or `none`; `github_app`: GitHub through the workspace's installations of the GitHub App
-     * alone (ADR 0153), with no secret and the installations' accounts as `account_label`.
+     * alone (ADR 0156), with no secret and the installations' accounts as `account_label`.
      */
     authType: text().notNull(),
     secretCiphertext: text(),

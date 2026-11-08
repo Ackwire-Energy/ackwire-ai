@@ -1907,7 +1907,7 @@ export interface GitHubAppInstallation {
   createdAt: string;
 }
 
-/** The server's own GitHub App (ADR 0153), for its pinned owner: from env (read-only here), made from Settings, or none. */
+/** The server's own GitHub App (ADR 0156), for its pinned owner: from env (read-only here), made from Settings, or none. */
 export interface GitHubAppSetup {
   source: "env" | "settings" | null;
   slug: string | null;

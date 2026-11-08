@@ -416,7 +416,7 @@ function ConnectedNote({ name }: { name: string }) {
  * with its own session) and/or paste a key. A catalog service that needs its server's address asks for it.
  * `item`: an account of a server by address (its address; `reconnect`: a new sign-in for it). A new account
  * goes on (`onConnected`); a new sign-in, or the same account again, ends with a toast (`onDone`). GitHub, where
- * the server has the agentes.chat app (ADR 0153), offers the app first and an account as the other way, unless
+ * the server has the agentes.chat app (ADR 0156), offers the app first and an account as the other way, unless
  * `accountOnly` (a sign-in asked for as such).
  */
 function ConnectStep({
