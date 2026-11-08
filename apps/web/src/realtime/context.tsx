@@ -88,6 +88,7 @@ import {
   useIssueLive,
   useSendWaiting,
 } from "@agenteschat/client";
+import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
@@ -140,26 +141,10 @@ export interface LiveNotice {
   agentId: string;
   threadId: string | null;
   messageId: string;
-  text: string;
-  /** `channel.agents_denied`: this channel's exceptions, not the agent's audience (ADR 0134). */
+  /** `channel.agents_denied` (this channel's exceptions, ADR 0134) or the agent's audience, with what words it. */
   code?: string;
+  params?: Record<string, unknown>;
 }
-
-/** `agent.unavailable` (user scope): my message mentioned an agent that doesn't answer me. */
-export interface AgentUnavailableEvent {
-  type: "agent.unavailable";
-  agentId: string;
-  channelId: string;
-  threadId: string | null;
-  messageId: string;
-  text: string;
-  code?: string;
-}
-
-export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
-  e.type === "agent.unavailable" &&
-  typeof (e as AgentUnavailableEvent).agentId === "string" &&
-  typeof (e as AgentUnavailableEvent).channelId === "string";
 
 export interface LiveMemoryCard {
   key: string;
@@ -360,8 +345,8 @@ export function createStreamsStore(
         agentId: e.agentId,
         threadId: e.threadId,
         messageId: e.messageId,
-        text: e.text,
         code: e.code,
+        params: e.params,
       };
       set({
         ...state,

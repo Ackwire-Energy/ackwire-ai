@@ -90,7 +90,7 @@ import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
-import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { canTalk, unavailableNotice } from "@agenteschat/client/lib/audience";
 import { accessInput, accessOf, accessValid, type ChannelAccess } from "@agenteschat/client/lib/channel-access";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
@@ -3277,21 +3277,14 @@ function LiveNotices({ channelId }: { channelId: string }) {
   if (!notices?.length) return null;
   return (
     <>
-      {notices.map((n) => {
-        const agent = dir.agentById.get(n.agentId);
-        const known =
-          n.code === "channel.agents_denied"
-            ? t("channel.perms.agentsDenied")
-            : agent
-              ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)
-              : "";
-        return (
-          <p key={n.key} className="channel__notice ac-iconline" role="status">
-            <Icon name="lock" size={16} />
-            <span>{known || n.text}</span>
-          </p>
-        );
-      })}
+      {notices.map((n) => (
+        <p key={n.key} className="channel__notice ac-iconline" role="status">
+          <Icon name="lock" size={16} />
+          <span>
+            {unavailableNotice(t, n, dir.agentById.get(n.agentId), (id) => dir.memberById.get(id)?.name, dir.roleName)}
+          </span>
+        </p>
+      ))}
     </>
   );
 }

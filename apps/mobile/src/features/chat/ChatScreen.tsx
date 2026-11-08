@@ -180,7 +180,7 @@ import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
 import { QuoteBar } from "./QuoteLine";
-import { AgentLocked } from "./ReachLines";
+import { AgentLocked, UnavailableLines } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
   appendedKeys,
@@ -428,6 +428,11 @@ function Chat({
 
   // ── Live ──
   const live = useChatLive(orgId, channelId, readable);
+  // Agents my message here named that won't answer me: in this conversation or this thread only.
+  const notices = useMemo(
+    () => live.notices.filter((n) => (isThread ? n.threadId === threadId : n.threadId === null)),
+    [live.notices, isThread, threadId],
+  );
   // People's messages loaded over HTTP start (or catch up) their agents' receipts, as on the web.
   const { seed: seedReceipts } = live;
   useEffect(() => {
@@ -2177,6 +2182,7 @@ function Chat({
                 />
                 <Connection status={realtime} />
                 {banner ? <NoAiBanner banner={banner} /> : null}
+                <UnavailableLines notices={notices} />
                 {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
                     of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
                 {member && awayAsk ? (

@@ -282,9 +282,12 @@ describe("audience rules", () => {
       channelId: "c1",
       threadId: null,
       messageId: "m1",
-      text: "O Theo só responde a Walter.",
+      text: "Theo only replies to Ana.",
+      code: "audience.only",
+      params: { agentName: "Theo", names: ["Ana"] },
     });
     expect(Object.keys(store.get().streams.runs)).toHaveLength(0);
-    expect(store.get().notices.c1?.map((n) => n.text)).toEqual(["O Theo só responde a Walter."]);
+    // What words it, never the server's English.
+    expect(store.get().notices.c1?.map((n) => [n.code, n.params?.names])).toEqual([["audience.only", ["Ana"]]]);
   });
 });
