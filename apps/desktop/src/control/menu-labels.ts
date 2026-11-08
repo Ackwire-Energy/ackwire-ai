@@ -37,5 +37,9 @@ export function menuLabels(t: TFunction): Record<string, string> {
     hereBack: t("desktop.server.updateBack", { version: "{version}" }),
     setupFailed: t("desktop.here.notifyFailed"),
     setupFailedBody: t("desktop.here.notifyFailedBody"),
+    // Another server's new notifications (workspaces.rs, ADR 0154): "{count}" is left for Rust.
+    serversCloud: t("desktop.servers.cloud"),
+    workspaceNewsOne: t("desktop.servers.newsOne"),
+    workspaceNewsMany: t("desktop.servers.newsMany", { n: "{count}" }),
   };
 }

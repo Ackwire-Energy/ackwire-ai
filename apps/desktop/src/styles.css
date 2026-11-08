@@ -1250,6 +1250,25 @@ body[data-window="popover"] {
 .dk-under-card {
   margin-top: 12px;
 }
+/* A server's workspaces under its row in Preferences › Servers (ADR 0154): a chip each, logo and unread count. */
+.dk-ws-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dk-ws-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+.dk-ws-count {
+  margin-left: 6px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
 /* The server here: Restart and Stop under its card, "Stop running it here…" at the far end. */
 .dk-here__acts {
   display: flex;

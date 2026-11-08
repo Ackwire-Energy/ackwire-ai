@@ -11,6 +11,7 @@
     "allow-reveal-folder",
     "allow-pick-folder",
     "allow-servers-get",
+    "allow-workspaces-get",
     "allow-server-choose",
     "allow-server-remove",
     "allow-tray-visible",

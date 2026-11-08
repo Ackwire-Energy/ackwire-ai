@@ -31,7 +31,7 @@ import {
   type Tailnet,
 } from "../control/local-server";
 import type { Platform } from "../control/platform";
-import type { ServerList } from "../control/server";
+import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import type { AppInfo, Host, RunnerInfo, RunnerStateChange, WindowName } from "./types";
@@ -100,7 +100,7 @@ function fakeCheck(server: string, waits: boolean): ServerCheck {
 export function createFakeHost(
   initial: WindowName,
   scenario: Scenario,
-  options: { link?: string | null; found?: boolean; here?: HereOptions; someCommands?: boolean } = {},
+  options: { link?: string | null; found?: boolean; here?: HereOptions; someCommands?: boolean; welcomeAdd?: boolean } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
   const lineListeners = new Set<(homeId: string, line: string) => void>();
@@ -266,6 +266,19 @@ export function createFakeHost(
       console.info("[fake] main window on", server + (page ?? ""));
       devChanged();
     },
+    workspaces: async (): Promise<ServerWorkspaces[]> =>
+      list.servers.map((server, i) => ({
+        server,
+        signedIn: true,
+        orgs:
+          i === 0
+            ? [
+                { id: "o-acme", name: "Acme", logo: null, unread: 0, waiting: 0 },
+                { id: "o-norte", name: "Estúdio Norte", logo: null, unread: 3, waiting: 0 },
+              ]
+            : [{ id: `o-${i}`, name: "Oficina", logo: null, unread: 1, waiting: 0 }],
+      })),
+    welcomeMode: async () => (options.welcomeAdd ? "add" : null),
     removeServer: async (server) => {
       list.servers = list.servers.filter((s) => s !== server);
       if (list.current === server) list.current = list.servers[0] ?? null;
