@@ -3963,6 +3963,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 }
 .settings__nav {
   flex: 0 0 216px;
+  min-width: 0;
   position: sticky;
   top: 24px;
   display: flex;
@@ -3982,18 +3983,15 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   font-weight: 700;
   letter-spacing: -0.015em;
 }
+/* The workspace's name wraps under the mark, which stays on its first line: a long one never widens the nav. */
 .settings__org {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
   color: var(--ink-muted);
   font-size: 13px;
 }
 .settings__org > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .settings__groups {
   display: flex;

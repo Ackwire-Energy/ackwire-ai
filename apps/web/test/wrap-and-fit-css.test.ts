@@ -38,7 +38,12 @@ test("a settings row's control taller than its name's line stays clear of the ha
 });
 
 test("what a row says wraps instead of losing its end to an ellipsis", () => {
-  for (const selector of [".routine-row__when-text b", ".routine-row__when-text small", ".plan-acct__sub"]) {
+  for (const selector of [
+    ".routine-row__when-text b",
+    ".routine-row__when-text small",
+    ".plan-acct__sub",
+    ".settings__org>span",
+  ]) {
     expect([selector, last(top, selector, "text-overflow")]).toEqual([selector, undefined]);
     expect([selector, last(top, selector, "white-space")]).toEqual([selector, undefined]);
   }
@@ -51,4 +56,8 @@ test("usage on a phone: the figures under the name, as wide as the row, not sque
   expect(last(phone, ".plan-api__value", "text-align")).toBe("left");
   expect(last(phone, ".plan-source", "grid-template-columns")?.replace(/\s+/g, "")).toBe("minmax(0,1fr)");
   expect(last(phone, ".plan-source__n", "align-items")).toBe("flex-start");
+});
+
+test("a long workspace name never widens the settings' nav", () => {
+  expect(last(top, ".settings__nav", "min-width")).toBe("0");
 });

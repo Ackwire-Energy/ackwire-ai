@@ -120,6 +120,16 @@ describe("finding the settings", () => {
     }
   });
 
+  test("a long workspace name wraps under the nav's title beside its mark, whole, never widening the nav", async () => {
+    const state = seedState();
+    const name = "Cooperativa Agroindustrial dos Produtores Rurais do Vale do Jequitinhonha";
+    if (state.me?.organizations[0]) state.me.organizations[0].name = name;
+    await go("settings/general", state);
+    const org = document.querySelector(".settings__org") as HTMLElement;
+    expect(org.classList.contains("ac-iconline")).toBe(true);
+    expect(org.textContent).toBe(name);
+  });
+
   test("Sobre o agentes.chat: for a member too, with the license's attribution, the version and the source", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
