@@ -443,6 +443,7 @@ const KNOWN = {
   "account.runner_old": "errors.said.updateComputerApp",
   "machine.access_outdated": "errors.said.updateComputerApp",
   "machine.outdated": "errors.said.updateComputerApp",
+  "machine.updates_itself": "errors.said.computerUpdatesItself",
   "database.disabled": "errors.said.offHere",
   "mail.composio_disabled": "errors.said.offHere",
   "mail.imap_disabled": "errors.said.offHere",

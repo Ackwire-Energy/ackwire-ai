@@ -27814,6 +27814,12 @@
   "errors.said.updateComputerApp": {
     "value": "The computer's app is too old for this. Update it and try again."
   },
+  "errors.said.computerUpdatesItself": {
+    "value": "The workspace's computer updates itself for this. Try again in a little while."
+  },
+  "errors.said.notInvited": {
+    "value": "You're not invited to this event."
+  },
   "errors.said.offHere": {
     "value": "This is turned off here."
   },

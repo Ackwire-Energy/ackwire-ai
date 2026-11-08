@@ -11412,6 +11412,8 @@
       "checkAddress": "Adresi kontrol edip tekrar deneyin.",
       "tooLong": "Bu çok uzun. Kısaltıp tekrar deneyin.",
       "updateComputerApp": "Bilgisayardaki uygulama bunun için çok eski. Güncelleyip tekrar deneyin.",
+      "computerUpdatesItself": "Çalışma alanının bilgisayarı bunun için kendini güncelliyor. Birazdan tekrar deneyin.",
+      "notInvited": "Bu etkinliğin davetlileri arasında değilsiniz.",
       "offHere": "Bu, burada kapalı.",
       "notInConversation": "Bu sohbette değil.",
       "accountStart": "Bilgisayar girişi başlatamadı. Açık olduğunu kontrol edip tekrar deneyin.",

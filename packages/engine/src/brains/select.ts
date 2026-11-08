@@ -26,6 +26,7 @@ import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
 import { isRightHand, rightHandPerson, rightHandPlanRefusal, thinkingAgent } from "../right-hand";
+import { runnerUpdateWay } from "../runner-update";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
@@ -421,7 +422,7 @@ export function computerBrainUnavailable(
     ) {
       return {
         code: "runner_outdated",
-        message: `The runner on ${status.name} is too old for ${name} agents. Update it.`,
+        message: `The runner on ${status.name} is too old for ${name} agents. ${runnerUpdateWay(status)}`,
       };
     }
     if (status.executors?.detectedAt && !status.executors[kind]) {
@@ -432,7 +433,10 @@ export function computerBrainUnavailable(
   const off = toolOff(status, "codex");
   if (off) return off;
   if (status.protocol < BRAIN_PROTOCOL) {
-    return { code: "runner_outdated", message: `The runner on ${status.name} is too old for Codex agents. Update it.` };
+    return {
+      code: "runner_outdated",
+      message: `The runner on ${status.name} is too old for Codex agents. ${runnerUpdateWay(status)}`,
+    };
   }
   const codex = status.executors?.codex;
   if (status.executors?.detectedAt && !codex) {

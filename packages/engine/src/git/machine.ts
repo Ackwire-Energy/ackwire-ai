@@ -16,6 +16,7 @@ import { activeConnections } from "../connectors/connections";
 import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } from "../machines";
 import { missionOfRun } from "../mission-context";
+import { runnerUpdateWay } from "../runner-update";
 import { standingRefusal } from "../standing";
 import { grantedScopeKeys } from "../tools/scopes";
 import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
@@ -64,7 +65,7 @@ export function machineGitUnavailable(status: MachineStatus | null, orgId: strin
   if (status.paused) return new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
   if (status.protocol < GIT_PROTOCOL) {
     return new Error(
-      `The agentes app (runner) on the computer ${status.name} is too old to clone repositories. Tell the person: its owner should update it (the app updates itself; or agentes-runner update).`,
+      `The agentes app (runner) on the computer ${status.name} is too old to clone repositories. ${runnerUpdateWay(status)}`,
     );
   }
   return null;

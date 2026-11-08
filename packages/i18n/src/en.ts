@@ -11140,6 +11140,8 @@ export const en = {
       checkAddress: "Check the address and try again.",
       tooLong: "That's too long. Shorten it and try again.",
       updateComputerApp: "The computer's app is too old for this. Update it and try again.",
+      computerUpdatesItself: "The workspace's computer updates itself for this. Try again in a little while.",
+      notInvited: "You're not invited to this event.",
       offHere: "This is turned off here.",
       notInConversation: "They aren't in this conversation.",
       accountStart: "The computer couldn't start the sign-in. Check that it's on and try again.",

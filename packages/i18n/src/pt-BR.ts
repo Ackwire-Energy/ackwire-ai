@@ -11244,6 +11244,8 @@ export const ptBR = {
       checkAddress: "Confira o endereço e tente de novo.",
       tooLong: "Ficou longo demais. Encurte e tente de novo.",
       updateComputerApp: "O app do computador é antigo demais para isso. Atualize e tente de novo.",
+      computerUpdatesItself: "O computador do workspace se atualiza sozinho para isso. Tente de novo daqui a pouco.",
+      notInvited: "Você não está entre os convidados deste evento.",
       offHere: "Isso está desligado aqui.",
       notInConversation: "Não está nesta conversa.",
       accountStart: "O computador não conseguiu iniciar o login. Confira se ele está ligado e tente de novo.",

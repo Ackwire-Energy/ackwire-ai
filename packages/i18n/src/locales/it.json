@@ -11914,6 +11914,8 @@
       "checkAddress": "Controlla l'indirizzo e riprova.",
       "tooLong": "È troppo lungo. Accorcialo e riprova.",
       "updateComputerApp": "L'app del computer è troppo vecchia per questo. Aggiornala e riprova.",
+      "computerUpdatesItself": "Il computer dello spazio di lavoro si aggiorna da solo per questo. Riprova tra poco.",
+      "notInvited": "Non sei tra gli invitati a questo evento.",
       "offHere": "Questo è disattivato qui.",
       "notInConversation": "Non è in questa conversazione.",
       "accountStart": "Il computer non è riuscito ad avviare l'accesso. Controlla che sia acceso e riprova.",

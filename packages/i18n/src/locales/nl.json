@@ -11537,6 +11537,8 @@
       "checkAddress": "Controleer het adres en probeer het opnieuw.",
       "tooLong": "Dat is te lang. Maak het korter en probeer het opnieuw.",
       "updateComputerApp": "De app op de computer is hiervoor te oud. Werk hem bij en probeer het opnieuw.",
+      "computerUpdatesItself": "De computer van de werkruimte werkt zichzelf hiervoor bij. Probeer het zo opnieuw.",
+      "notInvited": "Je bent niet uitgenodigd voor deze afspraak.",
       "offHere": "Dit staat hier uit.",
       "notInConversation": "Niet in dit gesprek.",
       "accountStart": "De computer kon het inloggen niet starten. Controleer of hij aanstaat en probeer het opnieuw.",

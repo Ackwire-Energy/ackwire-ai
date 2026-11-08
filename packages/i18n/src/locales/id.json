@@ -11064,6 +11064,8 @@
       "checkAddress": "Periksa alamatnya dan coba lagi.",
       "tooLong": "Itu terlalu panjang. Persingkat dan coba lagi.",
       "updateComputerApp": "Aplikasi di komputer terlalu lama untuk ini. Perbarui dan coba lagi.",
+      "computerUpdatesItself": "Komputer ruang kerja memperbarui dirinya sendiri untuk ini. Coba lagi sebentar lagi.",
+      "notInvited": "Kamu tidak termasuk yang diundang ke acara ini.",
       "offHere": "Ini dimatikan di sini.",
       "notInConversation": "Tidak ada di percakapan ini.",
       "accountStart": "Komputer tidak bisa memulai proses masuk. Pastikan komputer menyala dan coba lagi.",

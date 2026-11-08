@@ -11476,6 +11476,8 @@
       "checkAddress": "Prüf die Adresse und versuch es noch einmal.",
       "tooLong": "Das ist zu lang. Kürz es und versuch es noch einmal.",
       "updateComputerApp": "Die App auf dem Computer ist dafür zu alt. Aktualisiere sie und versuch es noch einmal.",
+      "computerUpdatesItself": "Der Computer des Workspace aktualisiert sich dafür von selbst. Versuch es gleich noch einmal.",
+      "notInvited": "Du bist zu diesem Termin nicht eingeladen.",
       "offHere": "Das ist hier ausgeschaltet.",
       "notInConversation": "Nicht in dieser Unterhaltung.",
       "accountStart": "Der Computer konnte die Anmeldung nicht starten. Prüf, ob er an ist, und versuch es noch einmal.",

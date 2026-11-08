@@ -18,6 +18,7 @@ import type { CodeSetup } from "../git/machine";
 import type { MachineCaller } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
+import { runnerUpdateWay } from "../runner-update";
 import {
   accountFields,
   accountUnavailable,
@@ -73,7 +74,11 @@ export interface ComputerBrainLink {
       opencode?: { version: string };
       grok?: { version: string };
       antigravity?: { version: string };
+      /** Every agent as its own user (`runnerUpdateWay`). */
+      mode?: "system";
     };
+    /** `managed`: the workspace's own computer, which updates by itself. */
+    kind?: string;
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
     name?: string;
@@ -313,7 +318,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: `The runner on the computer is too old for agents that think with ${name}. Update it.`,
+        message: `The runner on the computer is too old for agents that think with ${name}. ${runnerUpdateWay(status)}`,
         retryable: true,
       };
       return;
@@ -345,7 +350,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: `The runner on the computer is too old to keep ${name} within this agent's permissions. Update it.`,
+        message: `The runner on the computer is too old to keep ${name} within this agent's permissions. ${runnerUpdateWay(status)}`,
         retryable: true,
       };
       return;
@@ -357,7 +362,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: `The runner on the computer is too old to keep ${name} to the right hand's tools. Update it.`,
+        message: `The runner on the computer is too old to keep ${name} to the right hand's tools. ${runnerUpdateWay(status)}`,
         retryable: true,
       };
       return;

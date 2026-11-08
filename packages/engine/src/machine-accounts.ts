@@ -74,6 +74,7 @@ import {
 } from "./machines";
 import { recordAccountFailure } from "./operator-events";
 import { can, requirePermission } from "./organizations";
+import { runnerUpdateWay } from "./runner-update";
 import { wakeOnRoom } from "./usage-pause";
 
 const { machineAccounts, agents, machines, rightHandBrains, users } = schema;
@@ -963,10 +964,13 @@ async function memberMachine(db: Database, userId: string, orgId: string, machin
   return { membership, machine };
 }
 
-const runnerOld = (machine: Pick<MachineRow, "name">) =>
-  new ConflictError(`The runner on ${machine.name} is too old for accounts. Update it.`, "account.runner_old", {
-    name: machine.name,
-  });
+/** The workspace's own computer updates by itself (`machine.updates_itself`): nobody is told to update it. */
+const runnerOld = (machine: Pick<MachineRow, "name" | "kind" | "executors">) =>
+  new ConflictError(
+    `The runner on ${machine.name} is too old for accounts. ${runnerUpdateWay(machine)}`,
+    machine.kind === "managed" ? "machine.updates_itself" : "account.runner_old",
+    { name: machine.name },
+  );
 
 /** On a runner that knows accounts (`protocol`: and what is asked of it), and online now: the protocol it speaks. */
 async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow, protocol = ACCOUNTS_PROTOCOL) {

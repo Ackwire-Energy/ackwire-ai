@@ -10,6 +10,7 @@ import type { BrainUnavailability, ModelScope } from "./brains/select";
 import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
 import { personBehindCall } from "./requester";
+import { runnerUpdateWay } from "./runner-update";
 import type { AgentRun } from "./runs";
 import { scrubSignIns } from "./tool-detail";
 import type { ToolContext } from "./tools/types";
@@ -350,7 +351,7 @@ export async function rightHandPlanRefusal(
   db: Executor,
   agent: Pick<Agent, "name" | "ownerUserId" | "planForOthers">,
   run: Pick<AgentRun, "orgId" | "id" | "triggerMessageId">,
-  status: Pick<MachineStatus, "name" | "protocol"> | null,
+  status: Pick<MachineStatus, "name" | "protocol" | "kind" | "executors"> | null,
 ): Promise<BrainUnavailability | null> {
   if (!agent.planForOthers) {
     const person = await personBehindCall({
@@ -366,7 +367,7 @@ export async function rightHandPlanRefusal(
   if (status && status.protocol < LOCKED_BRAIN_PROTOCOL) {
     return {
       code: "runner_outdated",
-      message: `The runner on ${status.name} is too old for ${agent.name} to think there. Update it.`,
+      message: `The runner on ${status.name} is too old for ${agent.name} to think there. ${runnerUpdateWay(status)}`,
     };
   }
   return null;

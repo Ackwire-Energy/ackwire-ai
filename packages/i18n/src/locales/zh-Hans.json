@@ -11071,6 +11071,8 @@
       "checkAddress": "请检查地址后重试。",
       "tooLong": "内容太长。请缩短后重试。",
       "updateComputerApp": "电脑上的应用版本太旧。请更新后重试。",
+      "computerUpdatesItself": "工作区的电脑会为此自动更新。请稍后再试。",
+      "notInvited": "你不在此日程的受邀者之中。",
       "offHere": "此功能在这里已关闭。",
       "notInConversation": "不在这个对话中。",
       "accountStart": "电脑无法开始登录。请确认电脑已开机后重试。",
