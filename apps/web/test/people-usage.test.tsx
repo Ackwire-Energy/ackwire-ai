@@ -169,6 +169,19 @@ describe("Orçamento e uso › Pessoas", () => {
     expect(text(document.body)).toContain(
       "Vale o limite da pessoa. Sem ele, o maior entre os papéis dela. Sem nenhum, o padrão. Donos não têm limite.",
     );
+    // One list of settings rows. With no default, the default's select says Sem limite, never an empty box.
+    const limits = document.querySelector(".pu-limits") as HTMLElement;
+    expect(limits.querySelector(":scope .settings-rows > .settings-row")).toBeTruthy();
+    expect(limits.querySelector("#pu-default")?.textContent).toContain("Sem limite");
+    // What happens at the limit is a short choice, its two sentences behind the row's ⓘ, and the 80% notice a switch.
+    expect(limits.querySelector("#pu-when")?.textContent).toContain("Parar trabalho novo");
+    expect(within(limits).getByRole("button", { name: "Sobre Quando alguém chega no limite" })).toBeTruthy();
+    expect(within(limits).getByRole("switch", { name: "Avisar em 80%" }).getAttribute("aria-checked")).toBe("true");
+    // The exceptions are a group of the list, its heading on the rows' words, "Adicionar pessoa" at its end.
+    const exceptions = [...limits.querySelectorAll(".settings-rows > .ac-grouphead")].find((h) =>
+      h.textContent?.startsWith("Exceções"),
+    );
+    expect(exceptions?.querySelector(".ac-grouphead__aside")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Salvar" }));
     expect(state.calls.find((c) => c.method === "orgs.setPersonLimits")?.args[1]).toEqual({
       defaultUsd: null,
