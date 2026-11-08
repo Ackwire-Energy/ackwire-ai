@@ -1979,9 +1979,13 @@ function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun
   return (
     <div className="routine-hook">
       <div className="routine-hook__part">
-        <span className="ac-field__label">{t("routines.webhook.address")}</span>
+        <span className="ac-hintline">
+          <span className="ac-field__label">{t("routines.webhook.address")}</span>
+          <InfoHint name={t("common.about", { label: t("routines.webhook.address") })}>
+            {t("routines.webhook.addressHelp")}
+          </InfoHint>
+        </span>
         <CommandBlock command={data.url} copied={t("routines.webhook.copied")} />
-        <p className="small muted">{t("routines.webhook.addressHelp")}</p>
         {asking === "address" ? (
           <HookQuestion
             text={t("routines.webhook.replaceBody")}

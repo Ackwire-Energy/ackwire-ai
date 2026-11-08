@@ -24,6 +24,7 @@ import {
   DialogFooter,
   GroupHeading,
   Icon,
+  InfoHint,
   Locked,
   Menu,
   MenuItem,
@@ -317,7 +318,12 @@ export function NewMissionDialog({
             </div>
           )}
           <div className="ac-field">
-            <span className="ac-field__label">{t("missions.new.home")}</span>
+            <span className="ac-hintline">
+              <span className="ac-field__label">{t("missions.new.home")}</span>
+              <InfoHint name={t("common.about", { label: t("missions.new.home") })}>
+                {t("missions.new.homeHint", agentGrammar(agent?.name ?? ""))}
+              </InfoHint>
+            </span>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <Segmented
                 size="sm"
@@ -344,10 +350,6 @@ export function NewMissionDialog({
                 <span className="mi-hint">{t("missions.new.dmWith", { name: agent?.name ?? "" })}</span>
               )}
             </div>
-            <span className="mi-hint ac-iconline">
-              <Icon name="thread" size={14} />
-              {t("missions.new.homeHint", agentGrammar(agent?.name ?? ""))}
-            </span>
           </div>
           {machine && !machine.online && (
             <div className="mi-notes ac-iconline">
