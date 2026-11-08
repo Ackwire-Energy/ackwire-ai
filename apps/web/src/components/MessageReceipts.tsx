@@ -344,7 +344,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
                     .finally(() => setRetrying(false));
                 }}
               >
-                {retrying && <PixelSpinner size={12} />}
+                {retrying && <PixelSpinner size={14} />}
                 {t(retrying ? "receipts.retrying" : "receipts.retry")}
               </button>
             </ReceiptAction>
