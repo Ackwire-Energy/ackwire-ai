@@ -277,6 +277,7 @@ const styles = StyleSheet.create({
   locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
   unavailable: { gap: 4, paddingHorizontal: 16, paddingBottom: 6 },
   unavailableRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  grow: { flex: 1, minWidth: 0 },
   lockedText: { textAlign: "center" },
   bold: { fontWeight: "600" },
   // As the team checks' line (TeamChecks): the icon, the first line and the action (32, in a 50 row) share one middle,
