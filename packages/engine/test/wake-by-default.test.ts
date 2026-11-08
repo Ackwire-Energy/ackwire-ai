@@ -2,6 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { asc, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   createAgent,
   createAgentRuns,
   createFakeJudge,
@@ -16,7 +17,7 @@ import {
   type ToolContext,
   WHY_AN_AGENT_CALLED,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * An agent's @mention wakes the agent it names unless the judge is sure the message needs nothing from it (ADR
@@ -340,5 +341,80 @@ describe("a mention of an agent that isn't in the conversation is told to its au
         ),
       },
     });
+  });
+});
+
+describe("a mention of a person who doesn't read the conversation is told to its author", () => {
+  const tellsBruno = (req: ModelRequest) =>
+    isFor(req, "Dev", "dev") && lastText(req).includes("avisa o bruno")
+      ? { chunks: ["@bruno e @carla, a proposta saiu. @leo, confere?"] }
+      : { chunks: ["ok"] };
+  const lastContext = () => JSON.stringify((f.provider.calls.at(-1)?.request as ModelRequest | undefined)?.messages);
+  /** Bruno and Rita aren't in #general, Leo is, and Carla is an administrator, who hears a mention from any channel. */
+  async function people() {
+    for (const [role, name] of [
+      ["member", "Bruno"],
+      ["member", "Leo"],
+      ["admin", "Carla"],
+      ["member", "Rita Souza"],
+    ] as const) {
+      const user = await addMember(f.db, f.org.id, role, name);
+      await f.db
+        .update(schema.organizationMembers)
+        .set({ handle: name.split(" ")[0]?.toLowerCase() })
+        .where(eq(schema.organizationMembers.userId, user.id));
+      if (name === "Leo") await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: user.id });
+    }
+  }
+
+  test("a reply keeps who it missed and its next context says to use send_dm", async () => {
+    f = await setup({ reply: tellsBruno });
+    await people();
+    await ask("@dev avisa o bruno e a carla que a proposta saiu");
+    await drainOutbox(f.db, f.handlers);
+    const [told] = (await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId === f.agent.id);
+    expect(told?.meta.unreachedPeople).toEqual(["bruno"]);
+    await ask("@dev e aí?");
+    await drainOutbox(f.db, f.handlers);
+    expect(lastContext()).toContain(
+      "[Not delivered]: @bruno wasn't in this conversation, so your mention didn't notify them. If they should see it, tell them with send_dm.",
+    );
+  });
+
+  test("post_message's result says so", async () => {
+    f = await setup({ chatTools: true });
+    await people();
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const person = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "avisa no #general",
+    });
+    const [run] = await f.db.transaction((tx) => createAgentRuns(tx, person, [f.agent.id], "dm"));
+    if (!run || !f.tools) throw new Error("no run or tools");
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: dm.id,
+      threadRootId: person.id,
+      triggerMessageId: person.id,
+    };
+    const result = await f.tools.invoke(ctx, {
+      toolUseId: "tu_post",
+      name: "post_message",
+      input: { channel: "general", text: "@bruno e @carla, a proposta saiu. @leo, confere? @Rita Souza também." },
+    });
+    expect(result).toMatchObject({
+      output: {
+        content: expect.stringContaining(
+          "@bruno, @rita weren't in #general, so your mention didn't notify them. If they should see it, tell them with send_dm.",
+        ),
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("@carla wasn't");
+    expect(JSON.stringify(result)).not.toContain("@leo wasn't");
   });
 });

@@ -173,6 +173,34 @@ test("send_dm: the agent writes to a person in its DM with them, they're notifie
   expect(results.at(-1)?.content).toContain("Several people match");
 });
 
+test("send_dm to a blocked account or one waiting for its deletion: nobody by that name, nothing sent", async () => {
+  f = await setup({
+    chatTools: true,
+    reply: (req: ModelRequest) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("avisa"))
+        return { chunks: [], toolUses: [{ name: "send_dm", input: { person: "joao", text: "Oi!" } }] };
+      return { chunks: ["ok"] };
+    },
+  });
+  const joao = await addMember(f.db, f.org.id, "member", "João Lima");
+  const deps = { db: f.db, pubsub: f.pubsub };
+  for (const closed of [
+    { blockedAt: new Date() },
+    { blockedAt: null, deletionDueAt: new Date(Date.now() + 86_400_000) },
+  ]) {
+    await f.db.update(schema.users).set(closed).where(eq(schema.users.id, joao.id));
+    await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev avisa o joao na dm" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await toolResults()).filter((r) => r.name === "send_dm").at(-1)).toMatchObject({
+      isError: true,
+      content: 'No one called "joao" in this organization.',
+    });
+  }
+  expect((await f.db.select().from(schema.channels)).some((c) => c.kind === "dm")).toBe(false);
+});
+
 test("send_dm with a file: the person gets the file itself (a copy from the asker's DM), not only its name; a file the asker can't see is refused", async () => {
   let fileId = "";
   f = await setup({

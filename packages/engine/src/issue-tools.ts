@@ -76,6 +76,16 @@ const line = (i: IssueView, names: Map<string, string>) =>
 /** One issue's line with its assignee's name. */
 const lineOf = async (deps: IssueDeps, ctx: ToolContext, i: IssueView) => line(i, await assigneeNames(deps, ctx, [i]));
 
+/**
+ * An issue just given to another agent: the assignment wakes nobody (only `askAgentToImplement` starts the assignee's
+ * work), so the agent reads how to hand the job over before it tells anyone the task is being worked on. "" otherwise.
+ */
+async function handOverLine(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
+  if (i.assignee?.type !== "agent" || i.assignee.id === ctx.agentId) return "";
+  const name = (await assigneeNames(deps, ctx, [i])).get(i.assignee.id) ?? "that agent";
+  return `\nAssigning doesn't tell ${name} or start its work: to have it work on #${i.number} now, hand it the job with tell_agent (say it's task #${i.number}); otherwise say the task waits in its list.`;
+}
+
 async function describeIssue(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
   const criteria = i.criteria.map((c, k) => `${k + 1}. [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   return [
@@ -354,7 +364,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 ? `\nIts agent couldn't start on it: ${handed.message} Don't make it again: tell them why; they can start it from the task.`
                 : handed
                   ? "\nIts agent started on it in the task's own conversation, where the person follows it from the task's chip on your reply. What comes of it reaches you here by itself: tell them in a line who has it, without promising a time, and don't check on it."
-                  : ""
+                  : await handOverLine(deps, ctx, i)
             }`,
             data: {
               issue: { id: i.id, number: i.number },
@@ -440,8 +450,9 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
             (i, db) => issueChange({ ...deps, db }, ctx, before, i),
           );
+          const reassigned = (before.assignee as { id?: string } | null | undefined)?.id !== latest.assignee?.id;
           return {
-            content: `Updated ${await lineOf(deps, ctx, latest)}`,
+            content: `Updated ${await lineOf(deps, ctx, latest)}${reassigned ? await handOverLine(deps, ctx, latest) : ""}`,
             data: { issue: { id: latest.id, number: latest.number } },
           };
         } catch (error) {
