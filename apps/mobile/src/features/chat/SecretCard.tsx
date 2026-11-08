@@ -17,7 +17,6 @@ import {
   secretWhere,
 } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -38,6 +37,7 @@ import {
   ToggleSwitch,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";

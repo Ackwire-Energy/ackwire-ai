@@ -1,5 +1,4 @@
 import { passwordState } from "@agenteschat/client/lib/text";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { authClient } from "@/lib/auth";
@@ -7,6 +6,7 @@ import { Button, Locked } from "@/ui";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { haptics } from "@/ui/haptics";
+import { router } from "@/ui/navigation";
 
 /**
  * "Esqueci a senha"'s link opened in the app (`/reset-password?token=`, a universal link / App Link): a new

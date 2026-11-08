@@ -20,7 +20,6 @@ import {
 } from "@agenteschat/client/lib/routine-templates";
 import { busyOnComputer, eventWebhook, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
-import { router } from "expo-router";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -40,6 +39,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { boldRuns } from "../chat/actions";
 import { AllowTalkAction } from "../chat/ReachLines";
 import { routineHref } from "../links/logic";

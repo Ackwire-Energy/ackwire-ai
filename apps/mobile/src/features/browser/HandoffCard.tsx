@@ -9,12 +9,12 @@ import {
   useBrowserHandoffActions,
   useDesktopStatus,
 } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";

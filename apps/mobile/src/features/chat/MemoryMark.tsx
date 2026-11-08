@@ -1,13 +1,13 @@
 import { cacheMessageMemories, keys, type Message, type MessageMemory, useApi } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentReadingBook } from "@/agent/ReadingBook";
 import { useOrg } from "@/providers/org";
 import { Button, Card, Locked, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { canEditMemories } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";

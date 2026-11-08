@@ -4410,6 +4410,16 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--primary.ac-btn--loading .ac-btn__spinner {
   color: var(--on-action);
 }
+/* Words that take turns (`SwapLabel`): stacked in one cell, the unseen one keeps its width. */
+.ac-swap {
+  display: inline-grid;
+}
+.ac-swap > * {
+  grid-area: 1 / 1;
+}
+.ac-swap > [aria-hidden="true"] {
+  visibility: hidden;
+}
 .ac-btn--loading:disabled {
   cursor: progress;
   border-color: var(--line-strong);

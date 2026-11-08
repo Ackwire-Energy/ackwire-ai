@@ -28,13 +28,13 @@ import {
   teamWeekWhen,
 } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useReducedMotion } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useCardTop } from "../chat/look";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";

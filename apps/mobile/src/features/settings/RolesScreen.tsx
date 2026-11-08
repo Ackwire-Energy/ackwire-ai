@@ -34,7 +34,6 @@ import {
   withLevel,
 } from "@agenteschat/client/lib/roles";
 import { matchesWords } from "@agenteschat/ui/search";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
@@ -49,6 +48,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { RoleMark } from "../dashboards/parts";
 import { Face } from "../shared/Face";

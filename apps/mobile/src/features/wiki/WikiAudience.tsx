@@ -18,11 +18,11 @@ import {
   wikiBaseLevels,
   wikiRowCap,
 } from "@agenteschat/client/lib/wiki";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Locked, Row, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { AccessList, type AccessListRow } from "../shared/AccessList";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";

@@ -18,11 +18,11 @@ import {
   suggestPlaces,
   typingOperator,
 } from "@agenteschat/client/lib/search-filters";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { Button, EmptyState, Filters, Icon, PressScale, SectionHeader, Text, useReducedMotion } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";

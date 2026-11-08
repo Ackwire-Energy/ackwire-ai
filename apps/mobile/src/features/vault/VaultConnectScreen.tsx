@@ -8,11 +8,11 @@ import {
   type VaultSourceInfo,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
 import { chooseAction, SettingsPage } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";

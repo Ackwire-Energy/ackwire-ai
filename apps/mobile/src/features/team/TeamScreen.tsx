@@ -9,11 +9,11 @@ import {
   sectorSupervisor,
   supervisorOf,
 } from "@agenteschat/client/lib/team-views";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, EmptyState, ListRow, SectionHeader, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";

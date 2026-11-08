@@ -19,7 +19,7 @@ import { ObsidianMark } from "@/components/wiki/ObsidianMark";
 import { WikiAudienceDialog } from "@/components/wiki/WikiAudience";
 import { WikiBulkAgentsDialog, WikiBulkDeleteDialog, WikiTrash } from "@/components/wiki/WikiBulk";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
-import { AuthorAvatar, PageOutline, typingIn, WikiReader } from "@/components/wiki/WikiReader";
+import { AuthorAvatar, PageOutline, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText } from "@/lib/context-menu";
@@ -27,6 +27,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import type { VaultFile } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import "./wiki.css";
+import { typingInField } from "@/lib/keys";
 
 /** The suggested start (Visão geral, Processos/Como trabalhamos, Glossário), in the UI language. */
 export function starterPages(t: TFunction) {
@@ -102,7 +103,8 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
   // N: a new page (when not typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey || typingIn(document.activeElement)) return;
+      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey || typingInField(document.activeElement))
+        return;
       if (writing || importing) return;
       e.preventDefault();
       startNew();

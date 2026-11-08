@@ -8,11 +8,11 @@ import {
   usageContinueBlock,
   usageContinueOffered,
 } from "@agenteschat/client/lib/routine-view";
-import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, LineIcon, PixelOrbit, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";

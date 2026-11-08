@@ -1,7 +1,7 @@
 import { keys, useApi, useAuthConfig, useMe } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
-import { type Href, ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
+import { type Href, ThemeProvider as NavigationThemeProvider, Stack, usePathname } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -28,7 +28,7 @@ import { useSession } from "@/providers/session";
 import { DeletingAccount } from "@/ui/auth/DeletingAccount";
 import { DeletingWorkspace } from "@/ui/auth/DeletingWorkspace";
 import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
-import { useNavigationTheme } from "@/ui/navigation";
+import { router, useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});

@@ -37,6 +37,7 @@ import {
   Locked,
   Segmented,
   Select,
+  useUnsavedInDialog,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -49,6 +50,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { useEdited } from "@/hooks/useEdited";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -209,6 +211,7 @@ function ConnectStep({
   const [advanced, setAdvanced] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<DatabaseConnectError | null>(null);
+  useUnsavedInDialog(useEdited(true, [label, url, host, port, database, username, password, prefix]));
   const fields = host.trim() !== "" && username.trim() !== "" && password !== "";
   const urlError = touched && !fields && !isDatabaseUrl(url) ? t("database.urlInvalid") : undefined;
   const dbName = database.trim() || databaseNameOf(url);

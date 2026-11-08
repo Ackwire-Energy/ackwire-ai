@@ -1,9 +1,9 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet } from "react-native";
 import { STORED } from "@/lib/storage";
 import { LargeTitleScreen, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { useConversations } from "../shared/queries";

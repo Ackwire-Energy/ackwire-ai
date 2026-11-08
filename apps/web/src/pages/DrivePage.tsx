@@ -52,12 +52,11 @@ import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./drive.css";
+import { typingInField } from "@/lib/keys";
 
 /** Authors shown on a channel's group header. */
 const STACK_MAX = 5;
 
-const typing = (el: Element | null) =>
-  el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 /** A menu, listbox or dialog is open: Esc and shortcuts are theirs. */
 const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]'));
 
@@ -208,12 +207,12 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
       if (s.trashOpen || layerOpen()) return;
       const active = document.activeElement;
       if (e.key === "Escape") {
-        if (typing(active)) return;
+        if (typingInField(active)) return;
         // The details dialog closes itself on Esc; here Esc clears the selection.
         if (s.selected.size > 0) setSelected(new Set());
         return;
       }
-      if (typing(active) || e.altKey) return;
+      if (typingInField(active) || e.altKey) return;
       if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         searchRef.current?.focus();

@@ -45,7 +45,7 @@ import {
 } from "@agenteschat/client/lib/new-agent";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
-import { router, usePreventRemove } from "expo-router";
+import { usePreventRemove } from "expo-router";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
@@ -67,6 +67,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";

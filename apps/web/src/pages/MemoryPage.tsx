@@ -306,6 +306,7 @@ function EditMemoryDialog({
       onOpenChange={(open) => !open && onClose()}
       title={t("memory.editTitle", { kind: memory ? t(`memory.kindsLower.${memory.kind}`) : "" })}
       closeLabel={t("common.close")}
+      unsaved={memory !== null && text !== memory.text}
       width={520}
     >
       <DialogBody>

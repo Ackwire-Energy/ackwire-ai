@@ -13,12 +13,12 @@ import {
   useEtaNow,
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg, useOrgMaybe } from "@/providers/org";
 import { Button, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";

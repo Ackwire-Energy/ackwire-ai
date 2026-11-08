@@ -1,12 +1,12 @@
 import { useMissionList, useNotifications } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { mixHex } from "@agenteschat/ui/agent/engine";
-import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { CHROME_MAX_SCALE, Count, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
+import { router } from "@/ui/navigation";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";

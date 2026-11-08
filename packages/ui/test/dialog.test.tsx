@@ -5,7 +5,16 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useRef, useState } from "react";
-import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, InfoHint, Input } from "../src";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogSearchList,
+  InfoHint,
+  Input,
+  useUnsavedInDialog,
+} from "../src";
 
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -241,6 +250,46 @@ describe("Dialog", () => {
     // A modal dialog turns the page's pointer events off; a toast turns its own back on.
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     expect(css.split("\n.ac-toast {")[1]?.split("}")[0]).toContain("pointer-events: auto");
+  });
+
+  test("holding unsaved writing, a press on the scrim or Esc leaves it open; its close button still closes it", async () => {
+    let closes = 0;
+    render(
+      <Dialog open onOpenChange={() => closes++} title="Nova tarefa" closeLabel="Fechar" unsaved>
+        <Input aria-label="Título" defaultValue="Fechar a folha" />
+      </Dialog>,
+    );
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    const scrim = document.querySelector(".ac-dialog__scrim") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(scrim);
+      fireEvent.click(scrim);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => fireEvent.keyDown(body().getByRole("textbox", { name: "Título" }), { key: "Escape" }));
+    expect(closes).toBe(0);
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Fechar" })));
+    expect(closes).toBe(1);
+  });
+
+  test("a form inside it with unsaved writing (a step of a flow) keeps it open the same way, until it's gone", async () => {
+    let closes = 0;
+    function Step({ unsaved }: { unsaved: boolean }) {
+      useUnsavedInDialog(unsaved);
+      return <Input aria-label="Senha" />;
+    }
+    const at = (unsaved: boolean) => (
+      <Dialog open onOpenChange={() => closes++} title="Conectar o banco" closeLabel="Fechar">
+        <Step unsaved={unsaved} />
+      </Dialog>
+    );
+    const { rerender } = render(at(true));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await act(async () => fireEvent.keyDown(body().getByRole("textbox", { name: "Senha" }), { key: "Escape" }));
+    expect(closes).toBe(0);
+    rerender(at(false));
+    await act(async () => fireEvent.keyDown(body().getByRole("textbox", { name: "Senha" }), { key: "Escape" }));
+    expect(closes).toBe(1);
   });
 
   test("searchable list variant filters and shows the empty message", async () => {

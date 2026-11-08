@@ -310,6 +310,47 @@ export function audienceNotice(t: TFunction, agent: Agent, nameOf: NameOf, roleN
   return t("audience.notice.only", { ...g, names: joinNames(names, t) });
 }
 
+/** `agent.unavailable` (my own topic): a message of mine named an agent that won't answer me, never stored. */
+export interface AgentUnavailableEvent {
+  type: "agent.unavailable";
+  agentId: string;
+  channelId: string;
+  threadId: string | null;
+  messageId: string;
+  /** The server's English, for agents and old clients: the app words it from `code` and `params`. */
+  text: string;
+  /** `channel.agents_denied` (this channel's exceptions, ADR 0134), `audience.only` or `audience.nobody`. */
+  code?: string;
+  params?: Record<string, unknown>;
+}
+
+export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
+  e.type === "agent.unavailable" &&
+  typeof (e as AgentUnavailableEvent).agentId === "string" &&
+  typeof (e as AgentUnavailableEvent).channelId === "string";
+
+/**
+ * Why the agent I named won't answer me, in my language: the channel's own exception, or whom the agent answers (from
+ * the directory when it knows the agent, else from the names the server sent).
+ */
+export function unavailableNotice(
+  t: TFunction,
+  notice: Pick<AgentUnavailableEvent, "code" | "params">,
+  agent: Agent | undefined,
+  nameOf: NameOf,
+  roleName?: NameOf,
+): string {
+  if (notice.code === "channel.agents_denied") return t("channel.perms.agentsDenied");
+  const known = agent ? audienceNotice(t, agent, nameOf, roleName) : "";
+  if (known) return known;
+  const p = notice.params ?? {};
+  const g = agentGrammar(typeof p.agentName === "string" ? p.agentName : (agent?.name ?? ""));
+  const names = Array.isArray(p.names) ? p.names.filter((n): n is string => typeof n === "string") : [];
+  return names.length > 0
+    ? t("audience.notice.only", { ...g, names: joinNames(names, t) })
+    : t("audience.notice.nobody", g);
+}
+
 /** The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". */
 export function audienceSummary(t: TFunction, agent: Agent, nameOf: NameOf, roleName: NameOf = () => undefined) {
   const a = audienceOf(agent);

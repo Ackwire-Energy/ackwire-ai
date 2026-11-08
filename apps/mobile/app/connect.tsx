@@ -1,5 +1,5 @@
 import { checkServer, normalizeServer, type ServerCheck, serverHost } from "@agenteschat/client/lib/server";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { connectToServer, problemText } from "@/features/server";
@@ -9,6 +9,7 @@ import { useSession } from "@/providers/session";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
+import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 
 /** How long the token's session gets to arrive before the screen says so (never a screen that waits forever). */

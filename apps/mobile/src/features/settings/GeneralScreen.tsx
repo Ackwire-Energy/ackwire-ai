@@ -10,7 +10,6 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +35,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";

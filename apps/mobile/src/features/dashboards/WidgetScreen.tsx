@@ -12,7 +12,6 @@ import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
 import { plainInline } from "@agenteschat/client/lib/markdown";
 import { WIDGET_LIMITS, WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, RefreshControl, StyleSheet, TextInput, View } from "react-native";
@@ -33,6 +32,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { boardHref, routineHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId, usePullRefresh } from "../shared/hooks";

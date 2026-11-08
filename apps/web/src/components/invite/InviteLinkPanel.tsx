@@ -1,7 +1,7 @@
 import type { InviteLink } from "@agenteschat/client";
 import { useInviteLinks, useMakeInviteLink, useRenewInviteLink, useTurnOffInviteLink } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
-import { Button, Dialog, DialogFooter, Icon, Input } from "@agenteschat/ui";
+import { Button, Dialog, DialogFooter, Icon, Input, SwapLabel } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
@@ -54,7 +54,7 @@ export function InviteLinkPanel() {
               icon={copied === current.id ? "check" : "copy"}
               onClick={() => copy(current.id, current.url ?? "")}
             >
-              {copied === current.id ? t("common.copied") : t("members.copyLink")}
+              <SwapLabel label={t("members.copyLink")} alt={t("common.copied")} showAlt={copied === current.id} />
             </Button>
           </div>
           <p className="invite-link__foot">

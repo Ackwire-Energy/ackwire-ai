@@ -1,9 +1,10 @@
 import { Dialog as RDialog } from "radix-ui";
-import { type ReactNode, useRef } from "react";
+import { type MouseEvent, type ReactNode, useRef } from "react";
 import { cx } from "../cx";
 import { Icon } from "../icons/Icon";
 import { Button } from "./Button";
 import { CountChip } from "./Chip";
+import { UnsavedContext, useUnsavedForms } from "./Dialog";
 
 export interface DetailsDialogPageLink {
   /** "Abrir em página própria". */
@@ -58,7 +59,12 @@ export interface DetailsDialogProps {
    * inner step to back out of first, like a reason being typed).
    */
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  /** It holds edits not saved yet: a press outside or Esc leaves it open, as `Dialog`'s `unsaved`. */
+  unsaved?: boolean;
 }
+
+/** A double click's two presses fall within this, on any system's default setting. */
+const DOUBLE_CLICK_MS = 500;
 
 /**
  * The one way an item's details open (issues, Drive, routines, threads,
@@ -86,14 +92,31 @@ export function DetailsDialog({
   children,
   className,
   onEscapeKeyDown,
+  unsaved = false,
 }: DetailsDialogProps) {
   // Controlled: no Radix Trigger to return focus to, so remember it.
   const wasOpen = useRef(false);
   const returnTo = useRef<HTMLElement | null>(null);
+  const openedAt = useRef(0);
   if (open && !wasOpen.current && typeof document !== "undefined") {
     returnTo.current = document.activeElement as HTMLElement | null;
+    openedAt.current = Date.now();
   }
   wasOpen.current = open;
+  // Opened by a click, the second press of a double click lands on the details: on the scrim it would close them at
+  // once, inside it would press whatever is under it. It presses nothing, and the double click opens the item itself
+  // (`page`), as in a file manager.
+  const doubleClicking = () => Date.now() - openedAt.current < DOUBLE_CLICK_MS;
+  const second = (e: MouseEvent) => {
+    if (e.detail < 2 || !doubleClicking()) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const openItem = () => {
+    if (doubleClicking()) page?.onOpen?.();
+  };
+  const forms = useUnsavedForms();
+  const keep = () => unsaved || forms.held();
   const inline = !eyebrow && !titleHidden;
   const heading = titleHidden ? (
     <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
@@ -152,7 +175,7 @@ export function DetailsDialog({
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
-        <RDialog.Overlay className="ac-dialog__scrim" />
+        <RDialog.Overlay className="ac-dialog__scrim" onDoubleClick={openItem} />
         <RDialog.Content
           className={cx(
             "ac-details",
@@ -162,7 +185,16 @@ export function DetailsDialog({
             className,
           )}
           aria-describedby={undefined}
-          onEscapeKeyDown={onEscapeKeyDown}
+          onEscapeKeyDown={(e) => {
+            onEscapeKeyDown?.(e);
+            if (keep()) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (keep() || doubleClicking()) e.preventDefault();
+          }}
+          onMouseDownCapture={second}
+          onClickCapture={second}
+          onDoubleClick={openItem}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {
@@ -171,14 +203,16 @@ export function DetailsDialog({
             }
           }}
         >
-          {side ? (
-            <>
-              <div className="ac-details__main">{main}</div>
-              <div className="ac-details__side">{side}</div>
-            </>
-          ) : (
-            main
-          )}
+          <UnsavedContext.Provider value={forms.report}>
+            {side ? (
+              <>
+                <div className="ac-details__main">{main}</div>
+                <div className="ac-details__side">{side}</div>
+              </>
+            ) : (
+              main
+            )}
+          </UnsavedContext.Provider>
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

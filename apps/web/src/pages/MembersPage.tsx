@@ -57,6 +57,7 @@ import {
   MenuNote,
   PageHeader,
   PlanMeter,
+  SwapLabel,
   Textarea,
 } from "@agenteschat/ui";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
@@ -381,7 +382,7 @@ function InviteActions() {
     <>
       {!held && (
         <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
-          {copied ? t("common.copied") : t("members.copyInviteLink")}
+          <SwapLabel label={t("members.copyInviteLink")} alt={t("common.copied")} showAlt={copied !== null} />
         </Button>
       )}
       {invite && (
@@ -591,7 +592,7 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
               icon={copied ? "check" : "copy"}
               onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}
             >
-              {copied ? t("common.copied") : t("common.copy")}
+              <SwapLabel label={t("common.copy")} alt={t("common.copied")} showAlt={copied} />
             </Button>
           </div>
         </DialogBody>
@@ -769,7 +770,7 @@ function SentInvitations() {
                           copy(inv.id, inv.url ?? "", t(`members.invitations.${words.copied}`, { email: inv.email }))
                         }
                       >
-                        {copied === inv.id ? t("common.copied") : t("members.copyLink")}
+                        <SwapLabel label={t("members.copyLink")} alt={t("common.copied")} showAlt={copied === inv.id} />
                       </Button>
                     )}
                     <Button

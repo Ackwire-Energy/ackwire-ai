@@ -9,12 +9,12 @@ import {
   useRenameChannelCategory,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Gap, SettingsPage } from "../settings/parts";
 import { useColors, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";

@@ -1,6 +1,5 @@
 import type { ArtifactDetail } from "@agenteschat/client";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AccessibilityActionEvent, StyleSheet, View } from "react-native";
@@ -15,6 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics, Icon, Text, useReducedMotion, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
 import { DECK_DRAG, DECK_RISE, deckCard, deckIndex, deckTarget, wrapPlace } from "./deck";
 import { encodeFileList } from "./logic";

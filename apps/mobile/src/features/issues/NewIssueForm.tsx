@@ -2,9 +2,10 @@ import { type Actor, type Issue, type IssuePriority, useAiStatus, useIssueAction
 import { PRIORITIES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { EVERYONE } from "@agenteschat/client/lib/who-sees";
-import { useState } from "react";
+import { usePreventRemove } from "expo-router";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, useToast } from "@/ui";
 import { Face } from "../shared/Face";
@@ -44,6 +45,15 @@ export function NewIssueForm() {
   const sees = useWhoSeesDraft(EVERYONE);
   const seesLabel = useWhoSeesLabel();
   const ready = title.trim().length > 0 && !action.isPending && sees.ready;
+  // A back swipe with a task half written asks first, as the web's dialog keeps it from a stray click.
+  const done = useRef(false);
+  usePreventRemove(title.trim() !== "" || text.trim() !== "", ({ repeat }) => {
+    if (done.current) return repeat();
+    Alert.alert(t("edit.unsaved"), undefined, [
+      { text: t("edit.keepEditing"), style: "cancel" },
+      { text: t("edit.discard"), style: "destructive", onPress: repeat },
+    ]);
+  });
   const toggle = (o: Exclude<Open, null>) => setOpen((v) => (v === o ? null : o));
   const agents = dir.agents.filter((a) => a.canTalk !== false);
   const whoName = (a: Actor | null) =>
@@ -74,6 +84,7 @@ export function NewIssueForm() {
             title: t("mobile.issues.form.created", { number: issue.number }),
             ...(who?.type === "agent" ? { agentId: who.id } : {}),
           });
+          done.current = true;
           close();
         },
         onError: () => toast({ title: t("mobile.issues.form.createFailed"), icon: "x" }),

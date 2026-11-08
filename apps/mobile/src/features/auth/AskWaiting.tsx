@@ -1,7 +1,7 @@
 import { keys, useApi } from "@agenteschat/client";
 import { ANSWER_POLL_MS } from "@agenteschat/client/lib/join-requests";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -12,6 +12,7 @@ import { useSession } from "@/providers/session";
 import { Button, Card, haptics, Icon, LineIcon, PixelOrbit, Text, useTheme } from "@/ui";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { rememberSignIn } from "@/ui/auth/SocialButtons";
+import { router } from "@/ui/navigation";
 import { LAST_EMAIL } from "./AuthFlow";
 import { forgetAsk, rememberInvite } from "./invite";
 import { Said, useLeaveInvite } from "./invite-parts";

@@ -1,7 +1,7 @@
 import { serverHost } from "@agenteschat/client/lib/server";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { setServer, useServer, useServerToReturn } from "@/lib/server";
+import { router } from "@/ui/navigation";
 import { AuthLink } from "./AuthLink";
 
 /**

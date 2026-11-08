@@ -1,11 +1,11 @@
 import { type Routine, useCalendar } from "@agenteschat/client";
 import { clockHour, whenAt } from "@agenteschat/client/lib/format";
 import { runPixels } from "@agenteschat/client/lib/routine-view";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { CellCanvas } from "../browser/TrailPixels";
 import { routineHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";

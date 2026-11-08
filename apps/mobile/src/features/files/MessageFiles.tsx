@@ -1,11 +1,11 @@
 import type { ArtifactDetail } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { ChoicesCard } from "../blocks/ChoicesCard";
 import { LiveBlockCard } from "../blocks/LiveBlock";
 import { PollCard } from "../blocks/PollCard";

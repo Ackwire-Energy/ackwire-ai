@@ -43,7 +43,7 @@ import { isWidgetChangeRun, widgetFiring, widgetRunStarting } from "./dashboards
 import { widgetRoutineGone, widgetRoutineHeld } from "./dashboards/refresh-ledger";
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
+import { publishListChanged, publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
 import { releaseRoutineEmails } from "./mail/inbound";
 import {
   checkWatchable,
@@ -1410,6 +1410,7 @@ export async function createRoutine(
       ownActions: row.ownActions,
     },
   });
+  await publishListChanged(deps.pubsub, orgId, "routines");
   const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -1763,6 +1764,7 @@ export async function updateRoutine(
     target: { type: "routine", id: row.id },
     details: { before, after },
   });
+  await publishListChanged(deps.pubsub, orgId, "routines");
   const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -1817,6 +1819,7 @@ async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineR
     target: { type: "routine", id: current.id },
     details: { name: current.name, agentId: current.agentId },
   });
+  await publishListChanged(deps.pubsub, orgId, "routines");
 }
 
 /**
@@ -1871,6 +1874,7 @@ export async function duplicateRoutine(
     target: { type: "routine", id: row.id },
     details: { from: current.id },
   });
+  await publishListChanged(deps.pubsub, orgId, "routines");
   const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -1905,6 +1909,7 @@ export async function setRoutineActive(
   }
   const connector = row ? await connectorOf(deps.db, row.id) : null;
   if (row && connector) await syncConnector(deps, row, connector);
+  await publishListChanged(deps.pubsub, orgId, "routines");
   const [view] = await views(deps.db, row ? [row] : [], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -2378,6 +2383,7 @@ export async function takeOverRoutine(
     target: { type: "routine", id: row.id },
     details: { from: current.createdByUserId },
   });
+  await publishListChanged(deps.pubsub, orgId, "routines");
   await resolveRoutinePaused(deps, orgId, row.id).catch(() => {});
   const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;

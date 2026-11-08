@@ -5,7 +5,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { router, usePreventRemove } from "expo-router";
+import { usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
@@ -23,6 +23,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { MessageText } from "../chat/MessageText";
 import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";

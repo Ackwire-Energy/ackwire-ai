@@ -5,7 +5,7 @@ import { currentHandles, getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
 import { type EmailLocale, emailLocale, queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import { publishChannelEvent, publishListChanged, publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
@@ -487,6 +487,7 @@ export async function createCalendarEvent(
       event: result,
     });
   }
+  await publishListChanged(deps.pubsub, orgId, "calendar");
   return result;
 }
 
@@ -743,6 +744,7 @@ export async function updateCalendarEvent(
   if (result.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "calendar.event_updated", channelId: result.channelId, event: out });
   }
+  await publishListChanged(deps.pubsub, orgId, "calendar");
   return out;
 }
 
@@ -826,16 +828,18 @@ export async function deleteCalendarEvent(
       ...(options.occurrenceStart ? { occurrenceStart: options.occurrenceStart } : {}),
     });
   }
+  await publishListChanged(deps.pubsub, orgId, "calendar");
 }
 
 /** RSVP of a person to an event they're invited to. */
 export async function respondToEvent(
-  db: Database,
+  deps: CalendarDeps,
   userId: string,
   orgId: string,
   eventId: string,
   status: "accepted" | "declined",
 ) {
+  const { db } = deps;
   const [row] = await db
     .update(calendarAttendees)
     .set({ status, respondedAt: new Date() })
@@ -851,6 +855,7 @@ export async function respondToEvent(
   if (!row) throw new NotFoundError("You are not invited to this event");
   const [event] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, eventId));
   if (!event) throw new NotFoundError("Event not found");
+  await publishListChanged(deps.pubsub, orgId, "calendar");
   return view(event, await attendeesOf(db, [eventId]));
 }
 

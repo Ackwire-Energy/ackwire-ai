@@ -23,6 +23,7 @@ import { useActors } from "@/components/actors";
 import { PeoplePicker, type PickKey } from "@/components/MemberPicker";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { useEdited } from "@/hooks/useEdited";
 import { fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -107,6 +108,18 @@ export function EventDialog({
     times: [allDay ? "00:00" : startTime],
     ...(rule.freq === "weekly" && !rule.byWeekday?.length ? { byWeekday: [weekdayOfYmd(startDay)] } : {}),
   };
+  const unsaved = useEdited(open, [
+    title,
+    location,
+    description,
+    [...picked],
+    rule,
+    allDay,
+    startDay,
+    startTime,
+    endDay,
+    endTime,
+  ]);
   const start = at(startDay, allDay ? "00:00" : startTime);
   const end = allDay ? at(endDay, "00:00") : at(endDay, endTime);
   const timeOk = allDay ? end >= start : end > start;
@@ -166,6 +179,7 @@ export function EventDialog({
       onOpenChange={(o) => !o && onClose()}
       title={event ? t("calendar.form.editTitle") : t("calendar.new")}
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={600}
     >
       <form

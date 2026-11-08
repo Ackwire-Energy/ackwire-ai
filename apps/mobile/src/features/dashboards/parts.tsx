@@ -10,7 +10,6 @@ import {
 } from "@agenteschat/client";
 import { WIDGET_SCHEDULES, WIDGET_SIZES, type WidgetSize } from "@agenteschat/ui/widgets/spec";
 import { Canvas } from "@shopify/react-native-skia";
-import { router } from "expo-router";
 import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -30,6 +29,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";

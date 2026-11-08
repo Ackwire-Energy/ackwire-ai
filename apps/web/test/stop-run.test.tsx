@@ -117,6 +117,26 @@ describe("Parar is immediate", () => {
     expect(cancels(state)).toHaveLength(1);
   });
 
+  test("Esc in the conversation's search stops nothing, the second one neither", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await settle(2);
+    const search = screen().getAllByRole("combobox", { name: "Buscar" })[0] as HTMLInputElement;
+    search.focus();
+    await act(async () => fireEvent.change(search, { target: { value: "login" } }));
+    await settle(2);
+    await act(async () => fireEvent.keyDown(search, { key: "Escape" }));
+    await settle(2);
+    await act(async () => fireEvent.keyDown(search, { key: "Escape" }));
+    await settle(2);
+    expect(cancels(state)).toHaveLength(0);
+    // From the page itself, Esc still stops it.
+    search.blur();
+    await esc();
+    await settle(2);
+    expect(cancels(state)).toHaveLength(1);
+  });
+
   test("Esc in a field of the agent's page in the panel stops nothing under it", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });

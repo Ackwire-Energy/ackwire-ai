@@ -3,7 +3,6 @@ import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate } from "@agenteschat/client/lib/format";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -11,6 +10,7 @@ import { firstName } from "@/features/shared/logic";
 import { useOrgGate } from "@/providers/org";
 import { Button, Text, useTheme } from "@/ui";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
+import { router } from "@/ui/navigation";
 import { ErrorLine, LeaveButton } from "./invite-parts";
 
 /** An invitation that couldn't be read for a moment: never mistaken for one that's gone. */

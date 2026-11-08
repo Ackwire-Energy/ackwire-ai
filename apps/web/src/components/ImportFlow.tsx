@@ -31,6 +31,7 @@ import {
   normalizeAppearance,
   OptionCard,
   Spinner,
+  SwapLabel,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -664,7 +665,7 @@ function AiAppImport({ orgId }: { orgId: string }) {
           />
           <div className="imp-other__copy">
             <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-              {copied === "ok" ? t("common.copied") : t("onboarding.import.aiApp.copy")}
+              <SwapLabel label={t("onboarding.import.aiApp.copy")} alt={t("common.copied")} showAlt={copied === "ok"} />
             </Button>
             <span role="status" className="small muted">
               {copied === "ok"
@@ -715,7 +716,7 @@ function OtherApp({ card }: { card: RequestCard }) {
       />
       <div className="imp-other__copy">
         <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-          {copied === "ok" ? t("common.copied") : t("onboarding.import.request.copy")}
+          <SwapLabel label={t("onboarding.import.request.copy")} alt={t("common.copied")} showAlt={copied === "ok"} />
         </Button>
         <span role="status" className="small muted">
           {copied === "ok"

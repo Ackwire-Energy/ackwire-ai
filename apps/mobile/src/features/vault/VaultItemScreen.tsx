@@ -7,11 +7,11 @@ import {
   type VaultMatch,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { confirmAction, Gap, SettingsPage } from "../settings/parts";
 import { Face } from "../shared/Face";

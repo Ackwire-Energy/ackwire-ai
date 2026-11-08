@@ -1,8 +1,8 @@
 import { useHomeBoard, type Widget } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Icon, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";

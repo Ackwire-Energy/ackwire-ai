@@ -2,11 +2,11 @@ import { type ApiClient, type ArtifactDetail, keys, useApi } from "@agenteschat/
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
-import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 import { appHeaders, readCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
+import { router } from "@/ui/navigation";
 import { resolveDownloadUrl, type ShareSource, safeFileName, shareSource } from "./logic";
 
 /**

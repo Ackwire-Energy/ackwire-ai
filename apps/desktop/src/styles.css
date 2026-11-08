@@ -498,9 +498,14 @@ body[data-window="popover"] {
   font-size: 13.5px;
   font-weight: 500;
 }
-.dk-mi:hover,
+.dk-mi:not(:disabled):hover,
 .dk-mi:focus-visible {
   background: var(--plate);
+}
+/* While what it does is running: not pressable, and it looks it. */
+.dk-mi:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 .dk-mi > .ac-icon {
   color: var(--muted);

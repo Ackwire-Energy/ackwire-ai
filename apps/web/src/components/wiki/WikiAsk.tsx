@@ -66,6 +66,7 @@ export function WikiAskDialog({
       title={t("wiki.ask.title")}
       description={t("wiki.ask.text")}
       closeLabel={t("common.close")}
+      unsaved={text.trim() !== ""}
       width={480}
     >
       <Locked when={sending}>

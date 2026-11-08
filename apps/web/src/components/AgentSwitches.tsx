@@ -1,4 +1,5 @@
 import { Icon, Switch } from "@agenteschat/ui";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AgentAvatar } from "./AgentAvatar";
@@ -27,6 +28,8 @@ export function AgentSwitches({
   const agents = dir.agents;
   const every = agents.length > 0 && agents.every((a) => value.includes(a.id));
   const topLabel = all?.label ?? t("browser.profiles.everyone");
+  // Each name is its switch's label: a press on it toggles the switch.
+  const ids = useId();
   return (
     <div>
       {(all || agents.length > 1) && (
@@ -34,11 +37,12 @@ export function AgentSwitches({
           <span className="cflow-agent__all-icon" aria-hidden="true">
             <Icon name="members" size={16} />
           </span>
-          <span className="cflow-agent__name">
+          <label className="cflow-agent__name" htmlFor={`${ids}-all`}>
             <span>{topLabel}</span>
             {all?.detail && <span className="small muted">{all.detail}</span>}
-          </span>
+          </label>
           <Switch
+            id={`${ids}-all`}
             checked={all ? all.checked : every}
             aria-label={topLabel}
             onCheckedChange={(on) => (all ? all.onChange(on) : onChange(on ? agents.map((a) => a.id) : []))}
@@ -49,11 +53,12 @@ export function AgentSwitches({
         {agents.map((a) => (
           <li key={a.id} className="cflow-agent">
             <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-            <span className="cflow-agent__name">
+            <label className="cflow-agent__name" htmlFor={`${ids}-${a.id}`}>
               <span>{a.name}</span>
               {all && a.role && <span className="small muted">{a.role}</span>}
-            </span>
+            </label>
             <Switch
+              id={`${ids}-${a.id}`}
               checked={all?.checked || value.includes(a.id)}
               disabled={all?.checked}
               aria-label={a.name}

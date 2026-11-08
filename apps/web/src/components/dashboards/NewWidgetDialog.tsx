@@ -28,6 +28,7 @@ import {
   Switch,
   useDarkTheme,
   useNow,
+  useUnsavedInDialog,
   WidgetBleed,
   WidgetBody,
   WidgetGlyph,
@@ -155,6 +156,7 @@ function NewWidgetBody({
   // After a test the ask folds into one line; this opens it again for a change.
   const [editing, setEditing] = useState(false);
   const askField = useRef<HTMLTextAreaElement>(null);
+  useUnsavedInDialog(text.trim() !== "" || condition.trim() !== "");
 
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const suggestions = useWidgetSuggestions(orgId, agent?.id, mode === "ask");

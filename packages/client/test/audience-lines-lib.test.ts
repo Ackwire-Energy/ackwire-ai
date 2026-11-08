@@ -10,6 +10,7 @@ import {
   opensOthersPlan,
   setupPlanOpens,
   setupPlanQuestion,
+  unavailableNotice,
   widenQuestion,
 } from "../src/lib/audience";
 import { agentWorkingIn, type StreamsState } from "../src/realtime/streams";
@@ -191,5 +192,31 @@ describe("agentsReach: whether a narrowed audience holds for agents too", () => 
   test("on its owner's plan answering only its owner, nobody else, agents included", () => {
     expect(agentsReach(owner, true, "u-heitor")).toBe("plan");
     expect(agentsReach({ mode: "people", userIds: [] }, true, "u-heitor")).toBe("plan");
+  });
+});
+
+describe("unavailableNotice (an agent I named won't answer me)", () => {
+  const t = ((key: string, o?: Record<string, unknown>) =>
+    `${key}${o ? JSON.stringify(o) : ""}`) as unknown as TFunction;
+  const nobody = () => undefined;
+  test("the channel's exception, the agent as the directory knows it, else the server's names: never its English", () => {
+    expect(unavailableNotice(t, { code: "channel.agents_denied" }, undefined, nobody)).toBe(
+      "channel.perms.agentsDenied",
+    );
+    const theo = { name: "Theo", audience: { mode: "people", userIds: ["u-a"], roleIds: [] } } as unknown as Agent;
+    const known = unavailableNotice(t, { code: "audience.only" }, theo, (id) => (id === "u-a" ? "Ana" : undefined));
+    expect(known).toStartWith('audience.notice.only{"name":"Theo"');
+    expect(known).toContain("Ana");
+    const sent = unavailableNotice(
+      t,
+      { code: "audience.only", params: { agentName: "Lia", names: ["Suporte"] } },
+      undefined,
+      nobody,
+    );
+    expect(sent).toStartWith('audience.notice.only{"name":"Lia","context":"female"');
+    expect(sent).toContain("Suporte");
+    expect(
+      unavailableNotice(t, { code: "audience.nobody", params: { agentName: "Theo", names: [] } }, undefined, nobody),
+    ).toBe('audience.notice.nobody{"name":"Theo"}');
   });
 });

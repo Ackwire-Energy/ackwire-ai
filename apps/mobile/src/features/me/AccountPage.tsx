@@ -3,7 +3,6 @@ import { browserTimezone, zoneDisplayName } from "@agenteschat/client/lib/routin
 import { filterZones, type ZoneOption, zoneOptions } from "@agenteschat/ui/timezones";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -23,6 +22,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { goBack, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";

@@ -1,6 +1,6 @@
 import { type NoticeCategory, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
 import { Card, CardHeader, Chip, Icon, type IconName, Switch } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -114,7 +114,8 @@ export function NoticePrefsSection() {
 
 /**
  * One line of the person's own settings: its icon (or their face), its name and what it covers, then its control.
- * With `onOpen` the whole line is a button that opens something, a chevron at its end.
+ * With `onOpen` the whole line is a button that opens something, a chevron at its end. With a switch the whole line is
+ * its label, so a press on its words toggles it as on a line that opens something.
  */
 export function PrefRow({
   id,
@@ -134,6 +135,9 @@ export function PrefRow({
   control?: ReactNode;
   onOpen?: () => void;
 }) {
+  const toggle = isValidElement(control) && control.type === Switch;
+  const switchId = toggle ? ((control.props as { id?: string }).id ?? `${id}-switch`) : undefined;
+  const end = toggle ? cloneElement(control as ReactElement<{ id?: string }>, { id: switchId }) : control;
   const body = (
     <>
       <span className="settings-row__icon" aria-hidden="true">
@@ -150,14 +154,20 @@ export function PrefRow({
       {onOpen ? (
         <Icon name="chevronRight" size={16} className="settings-row__chevron" />
       ) : (
-        control && <div className="settings-row__end">{control}</div>
+        end && <div className="settings-row__end">{end}</div>
       )}
     </>
   );
-  return onOpen ? (
-    <button type="button" className="settings-row ac-actrow settings-row--lead settings-row--open" onClick={onOpen}>
+  if (onOpen)
+    return (
+      <button type="button" className="settings-row ac-actrow settings-row--lead settings-row--open" onClick={onOpen}>
+        {body}
+      </button>
+    );
+  return toggle ? (
+    <label htmlFor={switchId} className="settings-row ac-actrow settings-row--lead settings-row--toggle">
       {body}
-    </button>
+    </label>
   ) : (
     <div className="settings-row ac-actrow settings-row--lead">{body}</div>
   );

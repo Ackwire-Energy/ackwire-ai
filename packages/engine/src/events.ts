@@ -839,6 +839,17 @@ export const publishAgentsChanged = (pubsub: PubSub | undefined, orgId: string) 
 export const publishChannelsChanged = (pubsub: PubSub | undefined, orgId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "channels.changed" } });
 
+/**
+ * A list any member may have open changed: the Drive's files (saved, changed, moved, deleted, restored), the calendar,
+ * the routines, or agents' memories learned in the background. Same contract as the agents': no ids, each app reads
+ * again what its person may see.
+ */
+export const publishListChanged = (
+  pubsub: PubSub | undefined,
+  orgId: string,
+  list: "artifacts" | "calendar" | "routines" | "memory",
+) => publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: `${list}.changed` } });
+
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };
 

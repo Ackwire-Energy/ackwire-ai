@@ -1,11 +1,12 @@
 import { useMessageCard } from "@agenteschat/client";
 import { type MessageLink, messageRefLabel } from "@agenteschat/client/lib/message-links";
-import { type Href, router } from "expo-router";
+import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Icon } from "@/ui";
+import { router } from "@/ui/navigation";
 import { messageRefHref } from "../links/app-links";
 import { useColors } from "../shared/hooks";
 import { messageRefWords } from "./logic";

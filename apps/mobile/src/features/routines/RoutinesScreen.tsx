@@ -1,5 +1,4 @@
 import { type Routine, useRoutines } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
@@ -17,6 +16,7 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";

@@ -28,7 +28,6 @@ import {
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
-import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,6 +35,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, EventPillAction, fieldText, Icon, LineIcon, Locked, Sheet, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";

@@ -19,7 +19,6 @@ import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -36,6 +35,7 @@ import {
   useTheme,
   WithPresence,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
