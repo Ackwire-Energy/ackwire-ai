@@ -34,6 +34,7 @@ const PROVIDERS: { id: SpeechProvider; name: string }[] = [
   { id: "soniox", name: "Soniox" },
   { id: "groq", name: "Groq" },
   { id: "openai", name: "OpenAI" },
+  { id: "deepinfra", name: "DeepInfra" },
 ];
 
 /** Configurações › Voz (ADR 0100). Who configures the workspace changes it; everyone else reads it. */
@@ -176,7 +177,7 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
               value={value}
               autoComplete="off"
               spellCheck={false}
-              placeholder={local ? "http://whisper:8000/v1" : t("voice.settings.keyPlaceholder")}
+              placeholder={local ? "http://speech:8000/v1" : t("voice.settings.keyPlaceholder")}
               invalid={Boolean(error)}
               onChange={(e) => {
                 setValue(e.target.value);

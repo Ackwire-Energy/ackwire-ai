@@ -10,6 +10,7 @@ dist/
 files-*.tar.gz
 .DS_Store
 coverage/
+__pycache__/
 # Claude Code's local state stays out; the project's rules in .claude/rules/ are tracked.
 .claude/*
 !.claude/rules/

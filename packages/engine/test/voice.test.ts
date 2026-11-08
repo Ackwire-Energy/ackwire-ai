@@ -5,6 +5,7 @@ import {
   acceptVoiceClip,
   createLocalKeyWrapper,
   createSpeechSettings,
+  envSpeechEngines,
   previewMediaKind,
   previewMeta,
   readableBody,
@@ -145,6 +146,71 @@ describe("sending", () => {
     const { clipId } = await accept(deps);
     await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
     expect((await messageOf(clipId))?.body).toBe("oi");
+  });
+
+  test("a server of one's own that says the language isn't for it hands over at once, with no retry", async () => {
+    f = await setup();
+    // The speech service answers 422 for a language Parakeet doesn't know, which the adapter reads as refused.
+    const own = engine(new SpeechError("refused", "The speech server answered 422: unsupported_language"));
+    const next = engine("こんにちは");
+    const deps = voiceDeps([own, next]);
+    const { clipId } = await accept(deps);
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await messageOf(clipId))?.body).toBe("こんにちは");
+    expect([own.sent.length, next.sent.length]).toEqual([1, 1]);
+  });
+
+  test("when the next engine fails too, the recording waits for a retry as before", async () => {
+    f = await setup();
+    const notForMe = () => new SpeechError("refused", "The speech server answered 422: unsupported_language");
+    const busy = () => new SpeechError("busy", "Groq answered 503");
+    const deps = voiceDeps([engine(notForMe(), notForMe()), engine(busy(), busy())]);
+    const { clipId } = await accept(deps);
+    await expect(transcribeVoiceClip(deps, clipId, { finalAttempt: false })).rejects.toBeInstanceOf(SpeechError);
+    expect((await clipOf(clipId)).status).toBe("pending");
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: true });
+    expect(voiceOf((await messageOf(clipId))?.meta)?.noWords).toBe(true);
+  });
+
+  test("a refusal after a busy engine still leaves the recording for a retry, in any order", async () => {
+    f = await setup();
+    // SPEECH_ENGINES=groq,local: Groq busy for a moment, then our server's "not for me".
+    const busy = new SpeechError("busy", "Groq answered 503");
+    const notForMe = new SpeechError("refused", "The speech server answered 422: unsupported_language");
+    const deps = voiceDeps([engine(busy, "oi"), engine(notForMe)]);
+    const { clipId } = await accept(deps);
+    await expect(transcribeVoiceClip(deps, clipId, { finalAttempt: false })).rejects.toBe(busy);
+    expect((await clipOf(clipId)).status).toBe("pending");
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await messageOf(clipId))?.body).toBe("oi");
+  });
+
+  test("SPEECH_ENGINES=local,deepinfra: DeepInfra takes what our server is too busy for or doesn't know", async () => {
+    f = await setup();
+    for (const status of [503, 422]) {
+      const urls: string[] = [];
+      const fetch = (async (url: string | URL | Request) => {
+        urls.push(String(url));
+        return String(url).startsWith("http://speech:8000/")
+          ? Response.json({ error: { message: "not now" } }, { status })
+          : Response.json({ text: "Oi, tudo bem?" });
+      }) as unknown as typeof globalThis.fetch;
+      const engines = envSpeechEngines(
+        "local,deepinfra",
+        { local: { baseUrl: "http://speech:8000/v1" }, deepinfra: { apiKey: "fake-deepinfra-key" } },
+        { fetch },
+      );
+      const deps = voiceDeps(engines);
+      const { clipId } = await accept(deps);
+      await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+      expect((await messageOf(clipId))?.body).toBe("Oi, tudo bem?");
+      expect(urls).toEqual([
+        "http://speech:8000/v1/audio/transcriptions",
+        "https://api.deepinfra.com/v1/openai/audio/transcriptions",
+      ]);
+      // 3 s at $0.012 an hour, with no minimum.
+      expect(await clipOf(clipId)).toMatchObject({ status: "sent", engine: "deepinfra", costNanoUsd: 10_000 });
+    }
   });
 });
 

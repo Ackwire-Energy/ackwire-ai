@@ -85,7 +85,11 @@ export function voiceRoutes(deps: AppDeps) {
                 clientId: z.string().min(1).max(64),
                 threadId: z.uuid().optional(),
                 replyTo: z.uuid().optional(),
-                language: z.string().max(8).optional().openapi({ description: "`pt`, `en`. Absent: detected." }),
+                language: z
+                  .string()
+                  .max(8)
+                  .optional()
+                  .openapi({ description: "The app's language (`pt`, `en`): a hint for engines that take one." }),
               }),
             },
           },

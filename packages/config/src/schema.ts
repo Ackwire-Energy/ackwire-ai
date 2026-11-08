@@ -471,7 +471,7 @@ export const envVars = {
   SPEECH_ENGINES: {
     schema: z.string().optional(),
     description:
-      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
+      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai, local and deepinfra. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
     section: "Chat",
     example: "assemblyai,groq",
   },
@@ -505,12 +505,18 @@ export const envVars = {
     section: "Chat",
     secret: true,
   },
+  DEEPINFRA_API_KEY: {
+    schema: z.string().optional(),
+    description: "DeepInfra key for voice messages, optional (ADR 0100). The audio goes to DeepInfra to become text.",
+    section: "Chat",
+    secret: true,
+  },
   LOCAL_SPEECH_URL: {
     schema: z.url().optional(),
     description:
-      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): Speaches, a local Whisper or Parakeet. The audio stays with you.",
+      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): the compose file's `speech` profile (Parakeet, at `http://speech:8000/v1`), Speaches or a local Whisper. The audio stays with you.",
     section: "Chat",
-    example: "http://whisper:8000/v1",
+    example: "http://speech:8000/v1",
   },
   LOCAL_SPEECH_MODEL: {
     schema: z.string().optional(),
