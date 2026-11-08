@@ -115,9 +115,17 @@ describe("app API protections", () => {
     await signUp(owner, "owner@example.com");
     const res = await owner("/api/app/organizations", { json: { name: "", teamSize: "huge" } });
     expect(res.status).toBe(400);
-    const { error } = (await res.json()) as { error: { code: string; message: string } };
+    const { error } = (await res.json()) as { error: { code: string; message: string; params?: unknown } };
     expect(error.code).toBe("invalid_request");
     expect(error.message).toMatch(/^name: [^;]+\. teamSize: [^;]+$/);
+    // The validator's English is for developers: the apps word the first problem by its kind.
+    expect(error.params).toEqual({ field: "name", issue: "missing" });
+    const long = await owner("/api/app/organizations", { json: { name: "x".repeat(101) } });
+    expect(((await long.json()) as { error: { params?: unknown } }).error.params).toEqual({
+      field: "name",
+      issue: "too_long",
+      max: 100,
+    });
   });
 });
 

@@ -645,6 +645,7 @@ function NewAgentForm({
         <GroupedList>
           <TextArea
             value={instructions}
+            maxLength={50_000}
             onChangeText={setInstructions}
             placeholder={t("newAgent.instructionsPlaceholder")}
             accessibilityLabel={t("newAgent.instructions")}

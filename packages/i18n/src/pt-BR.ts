@@ -53,6 +53,7 @@ export const ptBR = {
     today: "Hoje",
     yesterday: "Ontem",
     loadFailed: "Não foi possível carregar. Confira a conexão e tente de novo.",
+    gone: "Isso não está mais aqui. Foi apagado, ou você não tem mais acesso.",
     notAllowed: "Você não tem permissão para isso.",
     tooMany: "Muitas tentativas. Tente de novo mais tarde.",
     /** A request with no answer at all (`errorText`): the browser offline, or the server out of reach. */
@@ -6011,6 +6012,7 @@ export const ptBR = {
         done: "Terminado",
         canceled: "Não vai ser feito",
       },
+      stageFull: "{{stage}} já tem {{max}} colunas, o máximo de uma etapa. Exclua uma delas antes.",
       stageExplain: {
         todo: "Tarefas novas entram na primeira coluna de A fazer.",
         in_progress: "Quando um agente começa, a tarefa vai para a primeira coluna de Em andamento.",
@@ -11294,6 +11296,7 @@ export const ptBR = {
     },
     issue: {
       assigneeOutside: "Essa pessoa não vê esta tarefa. Inclua ela em Quem vê primeiro.",
+      stageFull: "Uma etapa tem no máximo {{max}} colunas. Exclua uma das colunas dela antes.",
       deleteForbidden: "Só quem criou esta tarefa ou um administrador pode excluir.",
       audienceEmpty: "Escolha quem vê.",
     },

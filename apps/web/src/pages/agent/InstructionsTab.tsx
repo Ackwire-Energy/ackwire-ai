@@ -48,6 +48,7 @@ export function InstructionsTab() {
                   ref={area}
                   className="newag__textarea agp-instructions"
                   rows={14}
+                  maxLength={50_000}
                   aria-label={t("agent.instructions")}
                   placeholder={t("newAgent.instructionsPlaceholder")}
                   value={draft.instructions}

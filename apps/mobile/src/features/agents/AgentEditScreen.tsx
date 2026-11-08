@@ -263,6 +263,7 @@ export function AgentEditScreen({ id }: { id: string }) {
                 {fields.has("instructions") ? (
                   <TextArea
                     value={draft.instructions}
+                    maxLength={50_000}
                     onChangeText={(v) => set("instructions", v)}
                     placeholder={t("newAgent.instructionsPlaceholder")}
                     accessibilityLabel={t("agent.instructions")}

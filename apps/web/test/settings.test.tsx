@@ -41,6 +41,8 @@ describe("Configurações do workspace", () => {
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Salvar organização" })).toBeNull();
     const field = screen().getByLabelText("Contexto do workspace");
+    // The server's cap: typing stops there, never a refusal after sending.
+    expect(field.getAttribute("maxlength")).toBe("20000");
     await type(field, "A Acme faz um app para clínicas.");
     await act(async () => fireEvent.blur(field));
     await settle(4);

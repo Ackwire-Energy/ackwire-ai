@@ -191,6 +191,7 @@ const KNOWN = {
   "org.not_restorable": "errors.org.notRestorable",
   "account.not_restorable": "errors.account.notRestorable",
   "issue.assignee_outside": "errors.issue.assigneeOutside",
+  "issue_column.stage_full": "errors.issue.stageFull",
   "issue.delete_forbidden": "errors.issue.deleteForbidden",
   "issue.audience_empty": "errors.issue.audienceEmpty",
   [REAUTH_PASSWORD]: "errors.reauth.password",
@@ -669,11 +670,27 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   // Own keys only: a code from an address (`/login?error=toString`) names no line of Object's.
   const key = Object.hasOwn(KNOWN, error.code) ? KNOWN[error.code as keyof typeof KNOWN] : undefined;
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
+  // The server's validator refused a field: its English is for developers, never shown in any language.
+  const issue = error.code === "invalid_request" ? error.params?.issue : undefined;
+  if (typeof issue === "string")
+    return t(
+      Object.hasOwn(FIELD_ISSUES, issue) ? FIELD_ISSUES[issue as keyof typeof FIELD_ISSUES] : "errors.said.input",
+    );
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
 
+/** The kind of field a validation failure names (`params.issue`, apps/server http/errors.ts), by its words. */
+const FIELD_ISSUES = {
+  too_long: "errors.said.tooLong",
+  too_many: "errors.said.tooMany",
+  missing: "errors.said.fillIn",
+} as const;
+
 /** The app has its own line for this server code. */
 export const hasWordsFor = (code: string) => Object.hasOwn(KNOWN, code);
+
+/** What the request named isn't there anymore (deleted, archived, or never this person's to see): trying again won't help. */
+export const isGone = (error: unknown) => error instanceof ApiError && (error.status === 404 || error.status === 410);
 
 /**
  * `knownErrorText` for the person an invitation is for: a full workspace says whom to tell, never its numbers,
@@ -694,15 +711,16 @@ const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "c
 /**
  * The words of a refusal the app has no line for: in English, the server's own (written for people) for a 4xx and for
  * a computer's own refusal (its 503 `machine.<code>`); in any other language a plain line by what kind of refusal it
- * is, never English mid-screen. Any other 5xx (a runner's `machine.internal` too) is for the log, and the person reads
- * that it failed on our side.
+ * is, never English mid-screen. Something gone reads the plain line in every language: the server's "Agent not found"
+ * says neither why nor what to do. Any other 5xx (a runner's `machine.internal` too) is for the log, and the person
+ * reads that it failed on our side.
  */
 function untranslatedText(t: TFunction, error: ApiError): string {
   const told = error.status < 500 || (error.code.startsWith("machine.") && error.code !== "machine.internal");
   if (!told || !error.message) return t("common.ourSide");
+  if (isGone(error)) return t("errors.said.gone");
   if (readsEnglish(t)) return error.message;
   if (error.status >= 500) return t("errors.said.computer");
-  if (error.status === 404 || error.status === 410) return t("errors.said.gone");
   return t(error.status === 409 ? "errors.said.conflict" : "errors.said.input");
 }
 

@@ -61,6 +61,17 @@ describe("board columns", () => {
     expect(cols.filter((c) => c.stage === "todo").map((c) => c.name)).toEqual(["Semana", null, "Ideias"]);
   });
 
+  test("a stage holds at most 10 columns: the eleventh is refused with a code the apps word", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    for (let i = 1; i < 10; i++) await createIssueColumn(deps, f.owner.id, f.org.id, { name: `C${i}`, stage: "todo" });
+    const refused = await createIssueColumn(deps, f.owner.id, f.org.id, { name: "C10", stage: "todo" }).catch(
+      (e: unknown) => e,
+    );
+    expect(refused).toBeInstanceOf(ValidationError);
+    expect(refused).toMatchObject({ code: "issue_column.stage_full", params: { max: 10 } });
+  });
+
   test("deleting a column moves its tasks; a stage keeps one column; members only", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

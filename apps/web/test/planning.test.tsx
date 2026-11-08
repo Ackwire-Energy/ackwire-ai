@@ -281,6 +281,19 @@ describe("Tarefas: custom board columns", () => {
     expect(within(stage).getByRole("region", { name: "Ideias" })).toBeTruthy();
   });
 
+  test("a stage with the most columns says so in the dialog, before any refusal", async () => {
+    const api = createFakeApi(seedState());
+    for (let i = 1; i < 10; i++) await api.issues.addColumn(ORG_ID, { name: `C${i}`, stage: "todo" });
+    await go("issues", api);
+    await click(within(await openMenu("Mais opções")).getByRole("menuitem", { name: "Adicionar coluna" }));
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "Nova coluna" });
+    await type(within(dialog).getByLabelText("Nome"), "Mais uma");
+    await click(within(dialog).getByRole("radio", { name: /A fazer/ }));
+    expect(dialog.textContent).toContain("A fazer já tem 10 colunas, o máximo de uma etapa. Exclua uma delas antes.");
+    expect(within(dialog).getByRole("button", { name: "Adicionar coluna" }).hasAttribute("disabled")).toBe(true);
+  });
+
   test("a column's menu: the first one says what lands there; the only one can't be deleted", async () => {
     await go("issues");
     const menu = await openMenu("Opções da coluna A fazer");

@@ -22,7 +22,16 @@ import { type Query, useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
+import {
+  BOARD,
+  columnIdOf,
+  columnsOf,
+  isCustomBoard,
+  STAGE_COLUMNS_MAX,
+  STATUS_ICON,
+  useColumnTitle,
+  useStageName,
+} from "@/lib/issues";
 import { useToast } from "@/lib/toast";
 import type { DragEntry, IssueDrag } from "./issue-drag";
 
@@ -464,7 +473,9 @@ export function AddColumnDialog({
     : after && after.stage === stage
       ? t("issues.columns.whereAfter", { name: title(after) })
       : t("issues.columns.whereEnd", { stage: stageName(stage) });
-  const ready = Boolean(name.trim() && stage);
+  // A stage at its most columns takes no more: said before the person types, never as the server's refusal.
+  const full = stage !== null && columnsOf(columns, stage).length >= STAGE_COLUMNS_MAX;
+  const ready = Boolean(name.trim() && stage) && !full;
   const create = () => {
     if (!stage || !name.trim()) return;
     const before = new Set(columns.map((c) => c.id));
@@ -538,8 +549,12 @@ export function AddColumnDialog({
               />
             </div>
             <p className="issues-explain ac-iconline">
-              <Icon name="arrowRight" size={16} />
-              <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
+              <Icon name={full ? "alert" : "arrowRight"} size={16} />
+              <span>
+                {full && stage
+                  ? t("issues.columns.stageFull", { stage: stageName(stage), max: STAGE_COLUMNS_MAX })
+                  : t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}
+              </span>
             </p>
           </DialogBody>
         </Locked>

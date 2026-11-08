@@ -502,6 +502,8 @@ describe("agent page: inline editing and the save bar", () => {
   test("changes add up in one bar: count, names, Ver (old → new, Desfazer), Alterado on the card, Descartar", async () => {
     await go("?tab=instructions");
     const box = screen().getByRole("textbox", { name: "Instruções" });
+    // The server's cap: typing stops there, never a refusal after saving.
+    expect(box.getAttribute("maxlength")).toBe("50000");
     await type(box, "Instruções de Ada.\nAbre PRs pequenos.");
     const card = box.closest("section") as HTMLElement;
     expect(card.getAttribute("data-changed")).toBe("true");

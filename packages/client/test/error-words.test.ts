@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ptBR, resources } from "@agenteschat/i18n";
+import { en as enStrings, ptBR, resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import { ApiError, createFileRequester, createRequester, invitationQuery, NetworkError } from "../src/index";
 import { authErrorText, errorText, hasWordsFor, noAnswer, sendWaits, signInRefusalText } from "../src/lib/errors";
@@ -158,6 +158,36 @@ describe("a failed request in the person's words (errorText)", () => {
     // Codes the app knows, 413 and 403 say what they always said.
     expect(errorText(pt, new ApiError(403, "forbidden", ""))).toBe("common.notAllowed");
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
+  });
+
+  test("a field the server's validator refused reads by its kind in every language, never the validator's English", () => {
+    const lang = (lng: string) => {
+      const instance = i18next.createInstance();
+      void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+      return instance.t;
+    };
+    const refused = (message: string, params?: Record<string, unknown>) =>
+      new ApiError(400, "invalid_request", message, params);
+    const long = refused("context: Too big: expected string to have <=20000 characters", {
+      field: "context",
+      issue: "too_long",
+      max: 20000,
+    });
+    expect(errorText(lang("en"), long)).toBe(enStrings.errors.said.tooLong);
+    expect(errorText(lang("pt-BR"), long)).toBe(ptBR.errors.said.tooLong);
+    expect(errorText(lang("en"), refused("name: Too small", { field: "name", issue: "missing" }))).toBe(
+      enStrings.errors.said.fillIn,
+    );
+    expect(errorText(lang("en"), refused("ids: Too big", { field: "ids", issue: "too_many", max: 50 }))).toBe(
+      enStrings.errors.said.tooMany,
+    );
+    expect(errorText(lang("en"), refused("x: Invalid input", { field: "x", issue: "invalid" }))).toBe(
+      enStrings.errors.said.input,
+    );
+    // A refusal the server wrote for people, with no field named, keeps its words in English.
+    expect(errorText(lang("en"), refused("That column does not exist"))).toBe("That column does not exist");
+    // Something gone says so plainly in English too: the server's "Agent not found" says nothing to do.
+    expect(errorText(lang("en"), new ApiError(404, "not_found", "Agent not found"))).toBe(enStrings.errors.said.gone);
   });
 
   test("Better Auth's refusals a person meets on sign-up say what happened, never the plain line", () => {

@@ -51,6 +51,8 @@ export const en = {
     today: "Today",
     yesterday: "Yesterday",
     loadFailed: "Couldn't load this. Check your connection and try again.",
+    /** What a page loads was deleted, archived or isn't this person's to see: no try brings it back. */
+    gone: "This isn't here anymore. It was deleted, or you no longer have access.",
     notAllowed: "You don't have permission for this.",
     tooMany: "Too many tries. Try again later.",
     offline: "You're offline. Check your connection and try again.",
@@ -5949,6 +5951,8 @@ export const en = {
         done: "Finished",
         canceled: "Won't be done",
       },
+      /** The stage picked already holds the most columns a stage may have. */
+      stageFull: "{{stage}} already has {{max}} columns, the most a stage holds. Delete one there first.",
       stageExplain: {
         todo: "New tasks land in the first column of To do.",
         in_progress: "When an agent starts, the task goes to the first column of In progress.",
@@ -11191,6 +11195,7 @@ export const en = {
     },
     issue: {
       assigneeOutside: "This person can't see this task. Add them to who sees it first.",
+      stageFull: "A stage holds at most {{max}} columns. Delete one of its columns first.",
       deleteForbidden: "Only who created this task or an administrator can delete it.",
       audienceEmpty: "Choose who sees it.",
     },

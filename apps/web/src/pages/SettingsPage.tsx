@@ -468,6 +468,7 @@ function GeneralSection() {
         <Textarea
           ref={contextRef}
           rows={7}
+          maxLength={20_000}
           value={context}
           onChange={(e) => changeContext(e.target.value)}
           onBlur={flushContext}

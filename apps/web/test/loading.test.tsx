@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Message } from "@agenteschat/client";
+import { ApiError, type Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { stepAt } from "@/components/Loading";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -66,6 +66,29 @@ describe("loading states", () => {
     }
     expect(calls).toBeGreaterThanOrEqual(2);
     expect(screen().queryByRole("status", { name: "Carregando a lista" })).toBeNull();
+  });
+
+  test("something gone: what happened, and no Tentar de novo that could never work", async () => {
+    const api = createFakeApi(seedState());
+    api.issues.list = async () => {
+      throw new ApiError(404, "not_found", "Not found");
+    };
+    await renderApp(`/org/${ORG_ID}/issues`, { api });
+    await settle(10);
+    expect(screen().getByText("Isso não está mais aqui. Foi apagado, ou você não tem mais acesso.")).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+  });
+
+  test("an old link to an archived agent's DM says it was archived, in words, with no Tentar de novo", async () => {
+    const api = createFakeApi(seedState());
+    api.dms.open = async () => {
+      throw new ApiError(404, "not_found", "Agent not found");
+    };
+    await renderApp(`/org/${ORG_ID}/dm/agent/gone-agent`, { api });
+    await settle(10);
+    expect(screen().getByText("Este agente não existe ou foi arquivado.")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Agent not found");
+    expect(screen().queryByRole("button", { name: "Tentar de novo" })).toBeNull();
   });
 
   test("long actions: the step follows the clock (fake time)", () => {
