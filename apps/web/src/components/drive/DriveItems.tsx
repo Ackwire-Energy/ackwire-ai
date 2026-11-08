@@ -27,7 +27,7 @@ export interface ItemProps {
   /** A click: details, or selection with Shift / ⌘ / while selecting. */
   onPick: (a: Artifact, e: MouseEvent) => void;
   onToggle: (a: Artifact) => void;
-  /** Straight to the viewer (double click, "Abrir"). */
+  /** Straight to the viewer ("Abrir"; a double click goes there through the details it opens). */
   onOpen: (a: Artifact) => void;
 }
 
@@ -70,7 +70,6 @@ export function DriveCard({
           className="drive-card__title drive-hit"
           aria-haspopup="dialog"
           onClick={(e) => onPick(a, e)}
-          onDoubleClick={() => onOpen(a)}
         >
           {a.title}
         </button>
@@ -138,7 +137,6 @@ export function DriveRow({
             className="drive-row__title drive-hit"
             aria-haspopup="dialog"
             onClick={(e) => onPick(a, e)}
-            onDoubleClick={() => onOpen(a)}
           >
             {a.title}
           </button>

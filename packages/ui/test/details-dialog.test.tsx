@@ -101,6 +101,28 @@ describe("DetailsDialog", () => {
     expect(opened).toBe(1);
   });
 
+  test("opened by a double click's first press: its second presses nothing, and the double click opens the item", async () => {
+    let opened = 0;
+    render(<Harness onPage={() => opened++} />);
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Abrir detalhes" }), { detail: 1 }));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    // The second press on the scrim keeps the details; on a button inside, the button isn't pressed.
+    const scrim = document.querySelector(".ac-dialog__scrim") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(scrim);
+      fireEvent.click(scrim, { detail: 2 });
+    });
+    expect(body().getByRole("dialog", { name: "Exportar agenda" })).toBeTruthy();
+    const page = body().getByRole("button", { name: "Abrir em página própria" });
+    await act(async () => fireEvent.click(page, { detail: 2 }));
+    expect(opened).toBe(0);
+    await act(async () => fireEvent.doubleClick(scrim));
+    expect(opened).toBe(1);
+    // A press of its own, later on, works as ever.
+    await act(async () => fireEvent.click(page, { detail: 1 }));
+    expect(opened).toBe(2);
+  });
+
   test("an item laid out as its own page: the title only names it, and the height stays full", async () => {
     render(
       <DetailsDialog

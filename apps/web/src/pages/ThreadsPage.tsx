@@ -446,7 +446,6 @@ function ThreadRow({
         if ((e.target as HTMLElement).closest("button, a, [role=checkbox], [role=menu]")) return;
         onOpen();
       }}
-      onDoubleClick={onGo}
     >
       {/* Who carries the thread; the checkbox takes its place on hover or while selecting. */}
       <span className="thread-row__lead">
