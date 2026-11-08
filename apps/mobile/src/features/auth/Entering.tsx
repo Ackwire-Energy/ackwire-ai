@@ -49,8 +49,9 @@ export function Entering({ org }: { org: string | null }) {
       accessibilityLiveRegion="polite"
     >
       {/* This workspace's own sky (its server's: day on agentes.chat, dusk on a team's own), low on the screen: the
-          horizon the team stands on, its glow fading upward on its own. */}
-      <WorkspaceSky fade={0.45} style={styles.sky} />
+          horizon the team stands on. It sits on the screen's bottom edge, so it comes in from nothing over its top
+          half instead of starting on a hard line, and stays whole down to the edge. */}
+      <WorkspaceSky fadeTop={0.55} fade={2} style={styles.sky} />
       <View style={styles.center}>
         {org ? (
           <OrgAvatar logo={state?.org?.logo} name={org} size={72} />

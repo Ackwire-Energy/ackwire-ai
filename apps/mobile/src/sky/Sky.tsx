@@ -42,10 +42,13 @@ function hostOf(url: string): string {
  */
 export function WorkspaceSky({
   fade = 0.55,
+  fadeTop = 0,
   host,
   style,
 }: {
   fade?: number;
+  /** Comes in from nothing down to this height share (a band mid-screen, never a hard top line); 0 = none. */
+  fadeTop?: number;
   /** Another server's sky (where a connection leads, a workspace elsewhere: ADR 0154); the current server's by default. */
   host?: string;
   style?: StyleProp<ViewStyle>;
@@ -62,6 +65,7 @@ export function WorkspaceSky({
       tones={[...tones, deepest, deepest, ink.dim, ink.bright]}
       pixel={4}
       fade={fade}
+      fadeTop={fadeTop}
       extra={{ hour: hour === "day" ? 0 : 1, top: tones.length - 1 }}
       style={style}
     />

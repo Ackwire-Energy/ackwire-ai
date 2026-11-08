@@ -4,8 +4,9 @@
  *
  * Uniforms shared by all: `size` (points), `px` (points per cell), `t` (seconds), `last` (index of the
  * last tone), `pal[8]` (tones, padded), `fade` (from this height, as a share, the drawing fades out to
- * the bottom like the web's mask; 2 = no fade), `clear` (1 = the first tone is see-through, for a drawing
- * over glass). Arrays are only read with loop indices (SkSL rule).
+ * the bottom like the web's mask; 2 = no fade), `fadeTop` (down to this height, as a share, the drawing comes in
+ * from nothing in the dither's own steps, so a band laid mid-screen never starts on a hard line; 0 = none),
+ * `clear` (1 = the first tone is see-through, for a drawing over glass). Arrays are only read with loop indices (SkSL rule).
  */
 export type DitherKind = "sky" | "computer" | "fuse" | "bar" | "track" | "sweep" | "pill" | "horizon" | "workspace";
 
@@ -15,6 +16,7 @@ uniform float px;
 uniform float t;
 uniform float last;
 uniform float fade;
+uniform float fadeTop;
 uniform float clear;
 uniform float4 pal[8];
 
@@ -58,6 +60,7 @@ half4 main(float2 pos) {
   if (clear > 0.5 && idx < 0.5) return half4(0.0);
   float4 c = tone(min(idx, last));
   float yy = pos.y / size.y;
+  if (fadeTop > 0.0 && yy < fadeTop && (yy / fadeTop) * (yy / fadeTop) < bayer(x, y)) return half4(0.0);
   float a = yy < fade ? 1.0 : clamp(1.0 - (yy - fade) / max(0.001, 1.0 - fade), 0.0, 1.0);
   return half4(c.rgb * a, a);
 }
@@ -84,6 +87,7 @@ half4 main(float2 pos) {
   if (clear > 0.5 && idx < 0.5) return half4(0.0);
   float4 c = tone(idx);
   float yy = pos.y / size.y;
+  if (fadeTop > 0.0 && yy < fadeTop && (yy / fadeTop) * (yy / fadeTop) < bayer(x, y)) return half4(0.0);
   float a = yy < fade ? 1.0 : clamp(1.0 - (yy - fade) / max(0.001, 1.0 - fade), 0.0, 1.0);
   return half4(c.rgb * a, a);
 }

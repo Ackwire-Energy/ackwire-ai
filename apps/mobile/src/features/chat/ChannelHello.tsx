@@ -27,7 +27,7 @@ const CREW = 6;
 /** A framed face, the lists' smaller framed size. */
 const FACE = 36;
 /** The sky band the crew stands on. */
-const BAND = 112;
+const BAND = 136;
 
 /*
  * The first open, once per channel while the app runs (never blocking a tap):
@@ -178,7 +178,9 @@ export function ChannelHello({
         {crew.length > 0 ? (
           <View style={styles.band} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <Animated.View style={[StyleSheet.absoluteFill, skyIn]}>
-              <WorkspaceSky style={styles.fill} />
+              {/* A band in the middle of the screen: it comes in from nothing over its top half and goes back to the
+                  page from 60 % down, so the horizon never starts on a hard line. */}
+              <WorkspaceSky fadeTop={0.5} fade={0.6} style={styles.fill} />
             </Animated.View>
             <View style={styles.crew}>
               {crew.map((m, i) => (
