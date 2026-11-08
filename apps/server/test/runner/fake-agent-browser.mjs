@@ -1,5 +1,5 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
-// Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
+// Each run appends `{ args, stdin, cwd }` to $FAKE_AB_LOG (one JSON line). The page
 // lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port, delayMs }`.
 // In a `batch`, `focus` focuses a ref and `eval` runs its script against that field as a page would see it
 // (`attrs[ref]`: `tag`, `type`, `autocomplete`, `method` of its form, `submitMethod`: a submit button's
@@ -21,7 +21,8 @@ const stdin = await new Promise((resolve) => {
   });
   process.stdin.on("end", () => resolve(data));
 });
-if (process.env.FAKE_AB_LOG) appendFileSync(process.env.FAKE_AB_LOG, `${JSON.stringify({ args: argv, stdin })}\n`);
+if (process.env.FAKE_AB_LOG)
+  appendFileSync(process.env.FAKE_AB_LOG, `${JSON.stringify({ args: argv, stdin, cwd: process.cwd() })}\n`);
 
 const VALUED = new Set([
   "--namespace",

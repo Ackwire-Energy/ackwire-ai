@@ -246,8 +246,10 @@ curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-cli
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
   wins over a variable. With `--json` nothing is asked: a missing answer is a failed check, and the
   two yes/no questions take their defaults. The server becomes its agents' computer where it can be
-  (on Linux as root, with systemd built with `BPF_FRAMEWORK`, apt-get and 4 GB of memory or more, and on a
-  Mac; `--computer no` says otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
+  (on Linux as root, with systemd built with `BPF_FRAMEWORK`, apt-get and 4 GB of memory or more, in simple
+  mode where systemd lacks `BPF_FRAMEWORK`, and on a Mac; `--computer no` says otherwise), what the agents
+  need there is installed when missing (`--requirements none` says otherwise), and the usage statistics are
+  on (`--telemetry off` says otherwise).
 - stdout is one JSON object, and progress goes to stderr. Exit code 0: done; 1: a check failed;
   2: a wrong option.
 - `--dry-run --json` returns the plan and changes nothing.
@@ -1035,6 +1037,10 @@ Without root nothing installs Chrome for you: `agentes-runner update` and the in
 where to get it, and when a computer's runner connects without a Chrome, whoever connected it gets a
 notification once (with the browser switched on there).
 
+Google makes no Chrome for Linux on ARM, so there (an arm64 server or VM) the agents' browser is the
+computer's Chromium: Debian's (`sudo apt install chromium`) or Ubuntu's snap (`sudo snap install chromium`).
+`--system` installs Debian's with the same update timer, and agent-browser's arm64 build.
+
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
 hand (to sign in, say); and people can open a terminal there, a shell as the agent. Both need the
@@ -1222,7 +1228,10 @@ agent's home. Mac and Windows computers have no desktop use.
 the organizations the installation's first account made and is an owner or an admin of. The setup
 does it by default, after asking: on Linux each agent gets a user of its own with a screen (as root,
 with systemd built with `BPF_FRAMEWORK`: yes by default with apt-get and 4 GB of memory or more, no by
-default otherwise, saying why),
+default otherwise, saying why; where systemd lacks `BPF_FRAMEWORK`, as on Ubuntu, it offers **simple
+mode** instead: every agent works as one user, `agentes`, made without sudo, so they see each other's
+folders but not yours or the server's; its service is a user unit kept running with
+`loginctl enable-linger`, with its own copy of the token in `/home/agentes/host-computer-token`),
 and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
 commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
 `host-computer-token` beside it (readable by you only), installs what runs the agents there from the
@@ -1235,6 +1244,18 @@ service. It's skipped, saying why, while sign-up is open (`ALLOW_SIGNUP=true`) o
 every workspace its computer (`MACHINE_PROVISIONING=external`), since the server won't start with the
 token then; on Linux without root or systemd; inside the image; and on a machine already connected as
 a computer, whose connection stays as it is.
+
+**What the agents need there.** On Linux the setup then checks what the agents use on that machine:
+their browser (Google Chrome, or Chromium on ARM, where Google makes none), the packages for their
+screens (Xtigervnc and XFCE), Claude Code and Codex. It says what's there and asks about each one missing,
+yes by default (`--requirements all`, `none` or a list such as `browser,claude` answers for all; without
+a terminal, yes). System mode's installer brings the browser and the screens itself, so only Claude Code
+and Codex are asked about there. It installs them as root with the computers' installer
+(`curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --requirements browser,desktop,claude,codex`,
+which also works by hand): Chromium from Debian's apt, or Ubuntu's snap where apt has none; Claude Code
+with Anthropic's installer, copied to `/usr/local/bin`; Codex from the latest release of OpenAI's
+`codex` on GitHub, to `/usr/local/bin`. Running the setup again installs nothing that's there; Claude
+Code and Codex update themselves where they can, or with that command.
 
 By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
 agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
@@ -1533,7 +1554,8 @@ that computer: its `Desktops` and `Terminal` lines say what is missing (the runn
 newer, the packages, or the switch), as in Agent computers above.
 
 **An agent says "Google Chrome isn't installed on this computer".** Install Google Chrome there
-(google.com/chrome); on a computer installed with `--system`, run that same install command again.
+(google.com/chrome), or Chromium on Linux on ARM (as the message says); on a computer installed with
+`--system`, run that same install command again.
 The next request works, no restart needed. "Google Chrome didn't start" names the system libraries it
 lacks when that is why, and the runner's log keeps what Chrome printed. Each of these is also sent to
 your error reports when `SENTRY_DSN` is set.

@@ -1,6 +1,6 @@
 # 0133. Agent browsers run the computer's Google Chrome stable, updated like anyone's
 
-- Status: Accepted (built)
+- Status: Accepted (built); amended by 0153 (Linux on ARM runs Chromium)
 - Date: 2026-11-03
 - Amends: ADR 0040 (agent browser: §2 "Chrome" and "System mode", which pinned Chrome for Testing), 0110 (browser profiles run on the same Chrome)
 - Extends: ADR 0104 (error reports)

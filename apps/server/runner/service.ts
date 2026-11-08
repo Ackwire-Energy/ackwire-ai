@@ -224,7 +224,8 @@ function runnerService(
 export function systemdUnit(launch: Launch, args?: readonly string[]): string {
   return systemdUnitText(
     runnerService(launch, {
-      description: "agentes.chat runner (connected computer)",
+      // `host …`: the server's own computer in simple mode (ADR 0153 §5).
+      description: `agentes.chat runner (${args?.[0] === "host" ? "this server's computer" : "connected computer"})`,
       path: launch.path ?? process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
       manager: "systemd",
       ...(args ? { args } : {}),

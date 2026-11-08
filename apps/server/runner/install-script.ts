@@ -3,6 +3,8 @@ import {
   AGENT_BROWSER_VERSION,
   agentBrowserUrl,
   CHROME_NEEDED,
+  CHROMIUM_LINUX,
+  CHROMIUM_NEEDED,
 } from "@agenteschat/adapters/machine-protocol";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
@@ -80,7 +82,7 @@ export const ISOLATION_APT_PACKAGES = ["nftables", "iproute2"] as const;
 /** System mode: the runner and its Bun (root's, readable by the agents' users), and the command on the PATH. */
 export const SYSTEM_RUNNER_DIR = "/opt/agentes-runner";
 export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
-/** System mode on x86_64: `agent-browser-<version>`, root's, for every agent's user to run. */
+/** System mode on x86_64 and arm64: `agent-browser-<version>`, root's, for every agent's user to run. */
 export const SYSTEM_BROWSER_DIR = `${SYSTEM_RUNNER_DIR}/browser`;
 
 /** Where Google Chrome stable's Linux package (`google-chrome-stable`) installs it. */
@@ -108,6 +110,25 @@ export const GOOGLE_APT = {
 } as const;
 
 /**
+ * `--desktop` on Linux on ARM, where the agents' browser is Debian's Chromium (ADR 0153): hides its own menu entry,
+ * as `GOOGLE_APT.desktopEntry` hides Chrome's.
+ */
+export const CHROMIUM_DESKTOP_ENTRY = "/usr/local/share/applications/chromium.desktop";
+
+/**
+ * `--requirements` (the self-host setup's step, ADR 0153 §6): what it can install, as root, alone. The coding CLIs go
+ * to /usr/local/bin, on every agent's PATH in either mode.
+ */
+export const REQUIREMENTS = ["browser", "desktop", "claude", "codex"] as const;
+export type Requirement = (typeof REQUIREMENTS)[number];
+/** Anthropic's installer for Claude Code (it checks what it downloads against its own manifest). */
+export const CLAUDE_INSTALL_URL = "https://claude.ai/install.sh";
+export const CLAUDE_EXE = "/usr/local/bin/claude";
+/** OpenAI's Codex CLI: its latest release's static Linux build, `codex-<arch>-unknown-linux-musl.tar.gz`. */
+export const CODEX_RELEASES = "https://github.com/openai/codex/releases/latest/download";
+export const CODEX_EXE = "/usr/local/bin/codex";
+
+/**
  * The installer served at `GET /api/machines/install.sh`:
  *
  *   curl -fsSL <publicUrl>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
@@ -130,12 +151,13 @@ export const GOOGLE_APT = {
  * `--system` (Linux, root) installs the runner for the whole computer, each
  * agent as its own OS user: `ISOLATION_APT_PACKAGES` (without apt it names
  * them), the pinned Bun and the bundle in
- * `SYSTEM_RUNNER_DIR`, on x86_64 the pinned `agent-browser` in
+ * `SYSTEM_RUNNER_DIR`, on x86_64 and arm64 the pinned `agent-browser` in
  * `SYSTEM_BROWSER_DIR` (checked against its SHA-256, so no agent downloads it
  * at its browser's first use; one that can't be fetched is left to that first
  * use, warned about), Google Chrome stable from Google's apt repository
  * (`GOOGLE_APT`, its key checked against its fingerprint) when the computer
- * has none, upgraded every 6 hours by a timer of its own, the launcher at
+ * has none, or on arm64, where Google makes no Chrome, Debian's `chromium`
+ * (ADR 0153), upgraded every 6 hours by a timer of its own, the launcher at
  * `SYSTEM_LAUNCHER`, the home
  * `SYSTEM_RUNNER_HOME` (0700) and the root unit (`service install --system`).
  * With `--no-pair` it doesn't connect, with `--no-start` it starts nothing,
@@ -161,6 +183,14 @@ export const GOOGLE_APT = {
  * `--enroll-file FILE` (any mode) connects with a code issued for this
  * computer instead (`agentes-runner pair --enroll-file`, ADR 0056 §10),
  * connected before or not.
+ *
+ * `--host-token-file` alone on Linux as a user other than root is the
+ * self-host setup's simple mode (ADR 0153 §5): this server's computer runs as
+ * that user, its agents sharing it. `--requirements LIST` (alone, as root on
+ * Linux) installs only what the agents need of `REQUIREMENTS` and stops: the
+ * browser (`get_chrome`; on Linux on ARM Debian's Chromium, else Ubuntu's
+ * snap), the packages for their screens, and Claude Code and Codex in
+ * /usr/local/bin.
  */
 export function installScript(publicUrl: string): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
@@ -185,7 +215,17 @@ DOCK_PACKAGES=${shQuote(DESKTOP_DOCK_APT_PACKAGES.join(" "))}
 AB_VERSION=${shQuote(AGENT_BROWSER_VERSION)}
 AB_SHA256=${shQuote(AGENT_BROWSER_SHA256["linux-x64"])}
 AB_URL=${shQuote(agentBrowserUrl("linux-x64"))}
+AB_SHA256_ARM=${shQuote(AGENT_BROWSER_SHA256["linux-arm64"])}
+AB_URL_ARM=${shQuote(agentBrowserUrl("linux-arm64"))}
 CHROME_EXE=${shQuote(GOOGLE_CHROME_LINUX)}
+CHROMIUM_EXE=${shQuote(CHROMIUM_LINUX[0])}
+CHROMIUM_SNAP=${shQuote(CHROMIUM_LINUX[1])}
+CLAUDE_INSTALL_URL=${shQuote(CLAUDE_INSTALL_URL)}
+CLAUDE_EXE=${shQuote(CLAUDE_EXE)}
+CODEX_RELEASES=${shQuote(CODEX_RELEASES)}
+CODEX_EXE=${shQuote(CODEX_EXE)}
+CHROMIUM_DESKTOP=${shQuote(CHROMIUM_DESKTOP_ENTRY)}
+CHROMIUM_NEEDED=${shQuote(CHROMIUM_NEEDED)}
 CHROME_KEY_URL=${shQuote(GOOGLE_APT.key)}
 CHROME_KEY_FPR=${shQuote(GOOGLE_APT.fingerprint)}
 CHROME_KEYRING=${shQuote(GOOGLE_APT.keyring)}
@@ -206,6 +246,7 @@ NO_START=0
 UID_RANGE=""
 RUNNER_SHA256=""
 HOST_TOKEN_FILE=""
+REQUIREMENTS=""
 SERVER_FLAG=""
 ENROLL_FILE=""
 
@@ -231,7 +272,8 @@ usage() {
     "  --agent-uid-range  with --system: the uids agent users get (default ${uids})" \\
     "  --runner-sha256    install the runner only if its download has this SHA-256 (64 hex digits)" \\
     "  --server           where this computer reaches the server, if not at $SERVER" \\
-    "  --host-token-file  with --system (alone on a Mac): this server's own computer, with HOST_COMPUTER_TOKEN from this file" \\
+    "  --host-token-file  with --system (alone on a Mac, or on Linux as another user): this server's own computer, with HOST_COMPUTER_TOKEN from this file" \\
+    "  --requirements     alone, as root on Linux: install only these for the agents (${REQUIREMENTS.join(",")}), then stop" \\
     "  --enroll-file      connect with the code issued for this computer in FILE (removed once read), connected before or not"
 }
 
@@ -424,9 +466,13 @@ browser_later() {
 
 # The agents' agent-browser in $BROWSER_DIR, for every agent's user to run and root alone to write, checked against
 # its SHA-256 before it is installed, so no agent downloads it at its browser's first use. One already there at that
-# checksum is kept. Only on x86_64, the build pinned here.
+# checksum is kept. On x86_64 and arm64, the builds pinned here.
 get_browser() {
-  case "$(uname -m)" in x86_64 | amd64) ;; *) return 0 ;; esac
+  case "$(uname -m)" in
+    x86_64 | amd64) ;;
+    aarch64 | arm64) AB_SHA256=$AB_SHA256_ARM AB_URL=$AB_URL_ARM ;;
+    *) return 0 ;;
+  esac
   mkdir -p "$BROWSER_DIR"
   chown 0:0 "$BROWSER_DIR"
   chmod 755 "$BROWSER_DIR"
@@ -489,12 +535,18 @@ install_chrome() {
   apt_install google-chrome-stable || return 1
   if [ -n "$WWW" ]; then update-alternatives --set x-www-browser "$WWW" || true; fi
   if [ -n "$GNOME_WWW" ]; then update-alternatives --set gnome-www-browser "$GNOME_WWW" || true; fi
+  update_timer google-chrome-stable "Google Chrome"
+}
+
+# A systemd timer of its own that upgrades the package $1 (named $2) alone every 6 hours, whether or not this computer
+# updates itself.
+update_timer() {
   mkdir -p "$(dirname "$CHROME_UPDATES")"
-  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" 'After=network-online.target' '' \\
+  printf '%s\\n' '[Unit]' "Description=$2's updates for the agents' browsers" 'After=network-online.target' '' \\
     '[Service]' 'Type=oneshot' 'Environment=DEBIAN_FRONTEND=noninteractive' \\
-    "ExecStart=/bin/sh -c 'apt-get -qq -o DPkg::Lock::Timeout=600 update; apt-get -qq -o DPkg::Lock::Timeout=600 install -y --only-upgrade --no-install-recommends google-chrome-stable'" \\
+    "ExecStart=/bin/sh -c 'apt-get -qq -o DPkg::Lock::Timeout=600 update; apt-get -qq -o DPkg::Lock::Timeout=600 install -y --only-upgrade --no-install-recommends $1'" \\
     > "$CHROME_UPDATES.service"
-  printf '%s\\n' '[Unit]' "Description=Google Chrome's updates for the agents' browsers" '' '[Timer]' \\
+  printf '%s\\n' '[Unit]' "Description=$2's updates for the agents' browsers" '' '[Timer]' \\
     'OnCalendar=00/6:00' 'RandomizedDelaySec=1h' 'Persistent=true' '' '[Install]' 'WantedBy=timers.target' \\
     > "$CHROME_UPDATES.timer"
   chmod 644 "$CHROME_UPDATES.service" "$CHROME_UPDATES.timer"
@@ -503,11 +555,77 @@ install_chrome() {
   systemctl enable --now "$TIMER" 2>/dev/null || systemctl enable "$TIMER" || true
 }
 
+# Linux on ARM, where Google makes no Chrome: the agents' browser is Chromium (ADR 0153).
+on_arm_linux() {
+  [ "$(uname -s)" = Linux ] || return 1
+  case "$(uname -m)" in aarch64 | arm64) return 0 ;; esac
+  return 1
+}
+
+# Debian's chromium (the arm64 build Debian keeps patched), upgraded by the same timer as Chrome. The package may make
+# itself the default web browser: the computer's own choice is put back. Ubuntu has no chromium package of its own
+# (apt's only installs the snap): there the snap, which refreshes itself (CHROMIUM_FROM=snap).
+install_chromium() {
+  WWW=$(update-alternatives --query x-www-browser 2>/dev/null | sed -n 's/^Value: //p')
+  GNOME_WWW=$(update-alternatives --query gnome-www-browser 2>/dev/null | sed -n 's/^Value: //p')
+  CHROMIUM_FROM=apt
+  if ! apt_install chromium; then
+    command -v snap >/dev/null 2>&1 || return 1
+    CHROMIUM_FROM=snap
+    snap install chromium || return 1
+    return 0
+  fi
+  if [ -n "$WWW" ]; then update-alternatives --set x-www-browser "$WWW" || true; fi
+  if [ -n "$GNOME_WWW" ]; then update-alternatives --set gnome-www-browser "$GNOME_WWW" || true; fi
+  update_timer chromium Chromium
+}
+
+# The computer's Chromium: Debian's, else the snap.
+chromium_exe() {
+  if [ -x "$CHROMIUM_EXE" ]; then echo "$CHROMIUM_EXE"; elif [ -x "$CHROMIUM_SNAP" ]; then echo "$CHROMIUM_SNAP"; fi
+}
+
+chromium_version() { "$(chromium_exe)" --version 2>/dev/null | sed -n 's/^Chromium \\([0-9.]*\\).*/\\1/p'; }
+
+# get_chrome on Linux on ARM: the computer's Chromium, else Debian's installed with apt (Ubuntu's snap where apt has
+# none).
+get_chromium() {
+  if [ -n "$(chromium_exe)" ]; then
+    V=$(chromium_version)
+    t_step "Chromium\${V:+ $V}, updated by this computer's own updates"
+  elif ! command -v apt-get >/dev/null 2>&1; then
+    t_warn "$CHROMIUM_NEEDED"
+    return 0
+  else
+    if ! t_run "Installing Chromium (Google makes no Chrome for Linux on ARM)" install_chromium; then
+      t_tail "$T_LOG"
+      t_warn "Installing Chromium failed: run this installer again. Until then the agents say their browser isn't installed"
+      return 0
+    fi
+    V=$(chromium_version)
+    if [ "$CHROMIUM_FROM" = snap ]; then
+      t_step "Chromium\${V:+ $V} (snap), updated by snap"
+    else
+      t_step "Chromium\${V:+ $V}, upgraded every 6 hours"
+    fi
+  fi
+  if [ "$DESKTOP" -eq 1 ]; then
+    mkdir -p "$(dirname "$CHROMIUM_DESKTOP")"
+    printf '%s\\n' '[Desktop Entry]' 'Type=Application' 'Name=Chromium' 'Exec=/usr/bin/chromium' 'NoDisplay=true' \\
+      > "$CHROMIUM_DESKTOP"
+    chmod 644 "$CHROMIUM_DESKTOP"
+  fi
+}
+
 chrome_version() { "$CHROME_EXE" --version 2>/dev/null | sed -n 's/^Google Chrome \\([0-9.]*\\).*/\\1/p'; }
 
 # The agents' browser is the computer's Google Chrome: installed when it has none (with apt), never pinned. A key that
 # isn't Google's stops the install; anything else only says so, and each agent says so when it needs its browser.
 get_chrome() {
+  if on_arm_linux && [ ! -x "$CHROME_EXE" ]; then
+    get_chromium
+    return 0
+  fi
   if [ -x "$CHROME_EXE" ]; then
     V=$(chrome_version)
     t_step "Google Chrome\${V:+ $V}, updated by this computer's own updates"
@@ -534,13 +652,113 @@ get_chrome() {
 }
 
 # Without root nothing installs Chrome: a runner that updates here says what the agents' browser needs (the paths
-# findChrome looks at, but Windows, which has no sh installer).
+# findChrome looks at, but Windows, which has no sh installer; Chromium's too on Linux on ARM).
 chrome_or_warn() {
   for EXE in "$CHROME_EXE" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
     "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
     if [ -x "$EXE" ]; then return 0; fi
   done
-  t_warn "$CHROME_NEEDED"
+  if ! on_arm_linux; then
+    t_warn "$CHROME_NEEDED"
+    return 0
+  fi
+  for EXE in ${CHROMIUM_LINUX.map(shQuote).join(" ")}; do
+    if [ -x "$EXE" ]; then return 0; fi
+  done
+  t_warn "$CHROMIUM_NEEDED"
+}
+
+# --requirements' screens: the packages for the agents' screens alone (no isolation: that is --system's).
+desktop_packages() {
+  PACKAGES="$DESKTOP_PACKAGES"
+  if ! command -v apt-get >/dev/null 2>&1; then
+    t_warn "For the agents' screens, install these packages (Debian names) with this computer's package manager: $PACKAGES"
+    return 0
+  fi
+  t_run "Installing the packages for the agents' screens" apt_packages || {
+    t_tail "$T_LOG"
+    t_warn "Installing the packages for the agents' screens failed: run this again"
+    return 0
+  }
+  t_step "The packages for the agents' screens"
+}
+
+# Claude Code for every user (an agent's PATH is /usr/local/bin:/usr/bin:/bin): Anthropic's installer, run in a home
+# of its own that is thrown away, then its binary copied to $CLAUDE_EXE.
+install_claude() {
+  command -v bash >/dev/null 2>&1 || return 1
+  CL=$(mktemp -d) || return 1
+  if download "$CLAUDE_INSTALL_URL" "$CL/install.sh" && HOME="$CL" CLAUDE_INSTALL_ALLOW_SUDO=1 bash "$CL/install.sh" &&
+    BIN=$(readlink -f "$CL/.local/bin/claude") && [ -f "$BIN" ] && cp "$BIN" "$CLAUDE_EXE.new" &&
+    chmod 755 "$CLAUDE_EXE.new" && mv -f "$CLAUDE_EXE.new" "$CLAUDE_EXE"; then
+    rm -rf "$CL"
+    return 0
+  fi
+  rm -rf "$CL" "$CLAUDE_EXE.new"
+  return 1
+}
+
+# Codex for every user: the latest release's static build for this processor, into $CODEX_EXE.
+install_codex() {
+  case "$(uname -m)" in
+    x86_64 | amd64) CPU=x86_64 ;;
+    aarch64 | arm64) CPU=aarch64 ;;
+    *) return 1 ;;
+  esac
+  CX=$(mktemp -d) || return 1
+  if download "$CODEX_RELEASES/codex-$CPU-unknown-linux-musl.tar.gz" "$CX/codex.tar.gz" &&
+    tar -xzf "$CX/codex.tar.gz" -C "$CX" && cp "$CX/codex-$CPU-unknown-linux-musl" "$CODEX_EXE.new" &&
+    chmod 755 "$CODEX_EXE.new" && mv -f "$CODEX_EXE.new" "$CODEX_EXE"; then
+    rm -rf "$CX"
+    return 0
+  fi
+  rm -rf "$CX" "$CODEX_EXE.new"
+  return 1
+}
+
+# $1 (claude or codex) at $2, named $3: kept when it is there (it updates itself), else installed with install_$1.
+get_cli() {
+  if [ -x "$2" ]; then
+    t_step "$3 $("$2" --version 2>/dev/null | head -n 1 | sed 's/^[^0-9]*//; s/ .*//')"
+    return 0
+  fi
+  if ! t_run "Installing $3" "install_$1"; then
+    t_tail "$T_LOG"
+    t_warn "Installing $3 failed: run this again, or install it yourself"
+    return 0
+  fi
+  t_step "$3 $("$2" --version 2>/dev/null | head -n 1 | sed 's/^[^0-9]*//; s/ .*//'), in $2"
+}
+
+# --requirements: only what the agents need that was asked for, as root on Linux, then stop. The self-host setup runs
+# it for the requirements the person said yes to.
+install_requirements() {
+  [ "$(id -u)" -eq 0 ] || die "--requirements installs packages: run it as root"
+  [ "$(uname -s)" = Linux ] || die "--requirements is for Linux"
+  # The list, split on its commas by the shell alone.
+  R_LIST="" REST="$REQUIREMENTS,"
+  while [ -n "$REST" ]; do
+    R=\${REST%%,*} REST=\${REST#*,}
+    [ -z "$R" ] || R_LIST="$R_LIST $R"
+  done
+  for R in $R_LIST; do
+    case "$R" in
+      browser | claude | codex) ;;
+      desktop) DESKTOP=1 ;;
+      *) die "--requirements takes ${REQUIREMENTS.join(", ")}: not $R" ;;
+    esac
+  done
+  start_frame
+  for R in $R_LIST; do
+    case "$R" in
+      browser) get_chrome ;;
+      desktop) desktop_packages ;;
+      claude) get_cli claude "$CLAUDE_EXE" "Claude Code" ;;
+      codex) get_cli codex "$CODEX_EXE" Codex ;;
+    esac
+  done
+  t_gap
+  t_end Done
 }
 
 # Chrome for Testing, which runners before Google Chrome used: removed once the runner restarted without it.
@@ -724,6 +942,8 @@ main() {
       --runner-sha256=*) RUNNER_SHA256="\${1#--runner-sha256=}"; shift ;;
       --enroll-file) need_value "$1" $#; ENROLL_FILE="$2"; shift 2 ;;
       --enroll-file=*) ENROLL_FILE="\${1#--enroll-file=}"; shift ;;
+      --requirements) need_value "$1" $#; REQUIREMENTS="$2"; shift 2 ;;
+      --requirements=*) REQUIREMENTS="\${1#--requirements=}"; shift ;;
       -h|--help) usage; exit 0 ;;
       *) die "unknown option: $1" ;;
     esac
@@ -745,19 +965,27 @@ main() {
   [ -z "$ENROLL_FILE" ] || [ "$NO_PAIR" -eq 0 ] || die "--enroll-file connects this computer, so it doesn't go with --no-pair"
   [ -z "$ENROLL_FILE" ] || [ -z "$HOST_TOKEN_FILE" ] ||
     die "--enroll-file doesn't go with --host-token-file: this server's own computer connects with its token"
-  # On a Mac this server's computer runs as the person (agents in folders of their own), so it needs no --system.
-  MAC_HOST=0
-  if [ -n "$HOST_TOKEN_FILE" ] && [ "$(uname -s)" = Darwin ]; then MAC_HOST=1; fi
+  if [ -n "$REQUIREMENTS" ]; then
+    if [ "$SYSTEM" -eq 1 ] || [ -n "$HOST_TOKEN_FILE" ] || [ -n "$ENROLL_FILE" ]; then
+      die "--requirements goes alone: it only installs what the agents need"
+    fi
+    install_requirements
+    return 0
+  fi
+  # On a Mac this server's computer runs as the person (agents in folders of their own), so it needs no --system; on
+  # Linux as another user it is the setup's simple mode, its agents sharing that user (ADR 0153 §5).
+  USER_HOST=0
+  if [ -n "$HOST_TOKEN_FILE" ] && { [ "$(uname -s)" = Darwin ] || [ "$(id -u)" -ne 0 ]; }; then USER_HOST=1; fi
   if [ "$SYSTEM" -eq 1 ]; then
     [ "$NO_SERVICE" -eq 0 ] || die "--system always installs the service (to leave it stopped, use --no-start)"
     [ -z "$DIR" ] || die "--dir doesn't go with --system: each agent works in its own user's home"
     install_system
   elif [ "$DESKTOP" -eq 1 ] || [ "$NO_PAIR" -eq 1 ] || [ "$NO_START" -eq 1 ] || [ -n "$UID_RANGE" ] ||
-    { [ -n "$HOST_TOKEN_FILE" ] && [ "$MAC_HOST" -eq 0 ]; }; then
-    die "--desktop, --no-pair, --no-start, --agent-uid-range and --host-token-file go with --system (on a Mac, --host-token-file goes alone)"
+    { [ -n "$HOST_TOKEN_FILE" ] && [ "$USER_HOST" -eq 0 ]; }; then
+    die "--desktop, --no-pair, --no-start, --agent-uid-range and --host-token-file go with --system (on a Mac, or on Linux as another user, --host-token-file goes alone)"
   else
-    [ "$MAC_HOST" -eq 0 ] || [ "$NO_SERVICE" -eq 0 ] ||
-      die "--host-token-file installs the service: it's how this Mac keeps up with the server"
+    [ "$USER_HOST" -eq 0 ] || [ "$NO_SERVICE" -eq 0 ] ||
+      die "--host-token-file installs the service: it's how this computer keeps up with the server"
     install_user
   fi
 }

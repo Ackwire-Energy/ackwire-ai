@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -9,6 +18,7 @@ import {
   BROWSER_PROTOCOL,
   browserSetupOf,
   CHROME_FAILURES,
+  CHROMIUM_LINUX,
   chromeFailureKind,
   decodeBrowserFrame,
   MACHINE_PROTOCOL_VERSION,
@@ -17,6 +27,7 @@ import {
   parseServerFrame,
   type RunnerAccess,
   type RunnerFrame,
+  usesChromium,
 } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
@@ -34,8 +45,10 @@ import {
   captureTime,
   chromeCandidates,
   chromeLaunchArgs,
+  chromeName,
   chromeUserAgent,
   chromeVersion,
+  confinedChrome,
   crashPage,
   DRAG_GAP_MAX_MS,
   DRAG_LAG_MAX_MS,
@@ -49,6 +62,7 @@ import {
   launchChrome,
   NAME_CONTROLS,
   type OwnChrome,
+  readableDisplay,
   relayCommands,
   type StreamSocket,
   selectFieldScript,
@@ -74,6 +88,7 @@ const ops = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
 interface Logged {
   args: string[];
   stdin: string;
+  cwd: string;
 }
 
 /**
@@ -268,7 +283,22 @@ test("only the computer's Google Chrome is driven, at its standard path on each 
     path.join("/Applications", app),
     path.join(home, "Applications", app),
   ]);
-  expect(chromeCandidates(home, "linux")).toEqual(["/opt/google/chrome/chrome"]);
+  expect(chromeCandidates(home, "linux", {}, "x64")).toEqual(["/opt/google/chrome/chrome"]);
+  // Linux on ARM, where Google makes no Chrome: Debian's Chromium, then Ubuntu's snap (ADR 0153).
+  expect(chromeCandidates(home, "linux", {}, "arm64")).toEqual([
+    "/opt/google/chrome/chrome",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+  ]);
+  expect(usesChromium("linux", "arm64")).toBe(true);
+  expect(usesChromium("linux", "x64")).toBe(false);
+  expect(usesChromium("darwin", "arm64")).toBe(false);
+  expect(chromeName("/opt/google/chrome/chrome")).toBe("Google Chrome");
+  for (const exe of CHROMIUM_LINUX) expect(chromeName(exe)).toBe("Chromium");
+  // Only the snap reads no hidden folder at the top of the home, so its start pages move.
+  expect(confinedChrome("/snap/bin/chromium")).toBe(true);
+  expect(confinedChrome("/usr/bin/chromium")).toBe(false);
+  expect(confinedChrome(null)).toBe(false);
   expect(
     chromeCandidates(home, "win32", {
       ProgramFiles: "C:\\Program Files",
@@ -1989,7 +2019,9 @@ test.if(posix)(
       () => null,
       (e: unknown) => e as { code?: string; message?: string },
     );
-    expect(err).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.missing });
+    // On Linux on ARM the agent is told to install Chromium instead (ADR 0153), read as missing all the same.
+    const missing = usesChromium() ? CHROME_FAILURES.missingChromium : CHROME_FAILURES.missing;
+    expect(err).toMatchObject({ code: "browser_unavailable", message: missing });
     expect(chromeFailureKind(err?.message ?? "")).toBe("missing");
     // No Chrome for Testing fallback: agent-browser is never asked to install one, and no Chrome started.
     expect(t.logged().some((l) => l.args.includes("install"))).toBe(false);
@@ -2074,6 +2106,65 @@ function fakeDesktop(startMs = 0): NonNullable<BrowserManagerOptions["desktops"]
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const headless = (c?: FakeChrome) => !!c?.args.includes("--headless=new");
+
+test.if(posix)(
+  "an agent whose folder moved (its handle changed) gets a session there, not one in the old folder",
+  async () => {
+    const t = setup();
+    const old = await t.folder();
+    expect(
+      await t.manager.act(dev, old, { op: "browser.act", command: "open", args: ["https://a/"], timeoutSeconds: 30 }),
+    ).toMatchObject({ success: true });
+    // The handle changed: its folder is renamed, and the next request names the new one.
+    const moved = path.join(path.dirname(old), "renamed-agent");
+    renameSync(old, moved);
+    expect(
+      await t.manager.act(dev, moved, { op: "browser.act", command: "open", args: ["https://b/"], timeoutSeconds: 30 }),
+    ).toMatchObject({ success: true });
+    const last = t
+      .logged()
+      .filter((l) => l.args.includes("https://b/"))
+      .at(-1);
+    expect(last?.cwd).toBe(moved);
+    expect(t.chromes.at(-1)?.args).toContain(`--user-data-dir=${path.join(moved, ".agentes", "browser")}`);
+  },
+);
+
+test.if(posix)("Ubuntu's snap Chromium on a desktop: a copy of its Xauthority it can read, the agent's alone", () => {
+  const home = tempDir("xauth-");
+  dirs.push(home);
+  const source = path.join(home, ".agentes-runner", "desktop", "d1", "Xauthority");
+  mkdirSync(path.dirname(source), { recursive: true });
+  writeFileSync(source, "cookie 1", { mode: 0o600 });
+  const folder = path.join(home, "agentes", "plano");
+  const on = readableDisplay({ display: 7, xauthority: source }, folder);
+  expect(on).toEqual({ display: 7, xauthority: path.join(folder, ".agentes", "Xauthority") });
+  expect(readFileSync(on.xauthority, "utf8")).toBe("cookie 1");
+  expect(statSync(on.xauthority).mode & 0o777).toBe(0o600);
+  // The desktop started again with a new cookie: the next start copies it again.
+  writeFileSync(source, "cookie 2");
+  expect(readFileSync(readableDisplay({ display: 7, xauthority: source }, folder).xauthority, "utf8")).toBe("cookie 2");
+});
+
+test.if(posix)(
+  "Ubuntu's snap Chromium: the start page goes in the agent's own folder, which the snap can read (ADR 0153)",
+  async () => {
+    const snap = setup({ chrome: () => "/snap/bin/chromium" });
+    const folder = await snap.folder();
+    await snap.manager.warm(dev, folder, false);
+    const page = new URL(snap.chromes[0]?.args.at(-1) ?? "");
+    expect(page.protocol).toBe("file:");
+    expect(decodeURIComponent(page.pathname)).toBe(path.join(folder, ".agentes", "start", "agentes-start.html"));
+    expect(existsSync(path.join(folder, ".agentes", "start", "agentes-start.html"))).toBe(true);
+    // Any other browser keeps it under the runner's home, out of the agent's folder.
+    const other = setup();
+    const otherFolder = await other.folder();
+    await other.manager.warm(dev, otherFolder, false);
+    const kept = decodeURIComponent(new URL(other.chromes[0]?.args.at(-1) ?? "").pathname);
+    expect(kept.startsWith(path.join(other.home, "start"))).toBe(true);
+    expect(existsSync(path.join(otherFolder, ".agentes", "start"))).toBe(false);
+  },
+);
 
 test.if(posix)(
   "warm: the agent's Chrome starts ahead, once, on a blank page, without agent-browser or a stream",

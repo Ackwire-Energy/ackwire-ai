@@ -67,6 +67,8 @@ export interface Options {
   emailFrom?: string;
   computer?: (typeof YES_NO)[number];
   computerCommands?: (typeof YES_NO)[number];
+  /** `--requirements`: what to install for the agents without asking (`[]`: nothing); absent, asked. */
+  requirements?: Requirement[];
   telemetry?: OnOff;
   typesafeKey?: string;
   start: boolean;
@@ -90,6 +92,7 @@ const OPTIONS = {
   "email-from": { type: "string" },
   computer: { type: "string" },
   "computer-commands": { type: "string" },
+  requirements: { type: "string" },
   telemetry: { type: "string" },
   "typesafe-key": { type: "string" },
   "no-start": { type: "boolean" },
@@ -131,6 +134,11 @@ export function parseOptions(
   if (computer !== undefined && !isOneOf(computer, YES_NO)) return { error: "--computer is yes or no." };
   const commands = text("computer-commands");
   if (commands !== undefined && !isOneOf(commands, YES_NO)) return { error: "--computer-commands is yes or no." };
+  const requirementsText = text("requirements");
+  const requirements = requirementsText === undefined ? undefined : parseRequirements(requirementsText);
+  if (requirements === null) {
+    return { error: `--requirements is all, none, or some of ${REQUIREMENTS.join(", ")} (comma-separated).` };
+  }
   const telemetry = text("telemetry");
   if (telemetry !== undefined && !isOneOf(telemetry, ON_OFF)) return { error: "--telemetry is on or off." };
   const timeoutText = text("timeout");
@@ -166,6 +174,7 @@ export function parseOptions(
       ...optional("emailFrom", text("email-from")),
       ...(computer ? { computer } : {}),
       ...(commands ? { computerCommands: commands } : {}),
+      ...(requirements ? { requirements } : {}),
       ...(telemetry ? { telemetry } : {}),
       ...optional("typesafeKey", text("typesafe-key")),
       start: !flag("no-start"),
@@ -778,6 +787,8 @@ export const COMPUTER_WAIT_S = 90;
 
 export interface ThisMachine {
   platform: Platform;
+  /** `process.arch`: on Linux on ARM the agents' browser is Chromium (ADR 0153). */
+  arch: string;
   /** In bytes. */
   memory: number;
   root: boolean;
@@ -794,7 +805,11 @@ export interface ThisMachine {
   connected: boolean;
 }
 
-export type ComputerOffer = { mac: boolean; yes: boolean; why: string | null } | { problem: Problem };
+/**
+ * `simple`: Linux without systemd's BPF_FRAMEWORK (Ubuntu), where agents can't each be a user of their own: offered
+ * in simple mode instead, all of them as one user without sudo (`SIMPLE_USER`, ADR 0153 §5).
+ */
+export type ComputerOffer = { mac: boolean; simple: boolean; yes: boolean; why: string | null } | { problem: Problem };
 
 /**
  * A setting the server refuses to start with alongside HOST_COMPUTER_TOKEN (packages/config, `loadConfig`),
@@ -845,12 +860,7 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
   if (!mac && !machine.systemd) {
     return no("The agents' computer runs as a system service, and systemd isn't running here.", `So ${later}.`);
   }
-  if (!mac && !machine.bpf) {
-    return no(
-      "This machine's systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't), which keeps each agent's user off the others' ports.",
-      `Use Debian 13 for it, or ${later}.`,
-    );
-  }
+  const simple = !mac && !machine.bpf;
   if (machine.connected) {
     // Its service would be replaced, and the server it's connected to would lose this computer.
     return no(
@@ -858,18 +868,20 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
       `Its connection stays as it is. So ${later}.`,
     );
   }
-  if (mac) return { mac, yes: true, why: null };
+  if (mac) return { mac, simple: false, yes: true, why: null };
   if (!machine.apt) {
     return {
       mac,
+      simple,
       yes: false,
       why: "This machine has no apt-get, so the packages agents' screens and browsers need would be yours to install.",
     };
   }
-  if (machine.memory >= COMPUTER_MIN_MEMORY) return { mac, yes: true, why: null };
+  if (machine.memory >= COMPUTER_MIN_MEMORY) return { mac, simple, yes: true, why: null };
   const gb = Number((machine.memory / 1024 ** 3).toFixed(1));
   return {
     mac,
+    simple,
     yes: false,
     why: `This machine has ${gb} GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.`,
   };
@@ -901,11 +913,28 @@ export function appOnThisMachine(content: string | null): string {
   return `http://${host}:${envValue(content, "HOST_PORT") || "3000"}`;
 }
 
+/**
+ * Simple mode (`ComputerOffer.simple`): the user every agent works as, without sudo, its home, and the token file its
+ * service reads (a copy of `HOST_TOKEN_FILE` it owns).
+ */
+export const SIMPLE_USER = "agentes";
+export const SIMPLE_HOME = `/home/${SIMPLE_USER}`;
+export const SIMPLE_RUNNER_HOME = `${SIMPLE_HOME}/.agentes-runner`;
+export const SIMPLE_TOKEN_FILE = `${SIMPLE_HOME}/${HOST_TOKEN_FILE}`;
+
+/** What the question about simple mode says: why not each agent its own user, and what sharing one means. */
+export const SIMPLE_MODE_WHY = [
+  "This machine can't give each agent a user of its own: its systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't; Debian 13's is).",
+  `In simple mode all agents work as one user, ${SIMPLE_USER}, without sudo: they can see each other's folders, but not yours or the server's.`,
+];
+
 export interface ComputerInstall {
   /** Where this machine reaches agentes.chat. */
   server: string;
   script: string;
   args: string[];
+  /** Simple mode: run as this user, not root. */
+  user?: string;
 }
 
 /**
@@ -915,6 +944,7 @@ export interface ComputerInstall {
  */
 export function computerInstall(p: {
   mac: boolean;
+  simple?: boolean;
   server: string;
   tokenFile: string;
   commands: boolean;
@@ -923,24 +953,103 @@ export function computerInstall(p: {
     server: p.server,
     script: `${p.server}/api/machines/install.sh`,
     args: [
-      ...(p.mac ? [] : ["--system", "--desktop"]),
+      ...(p.mac || p.simple ? [] : ["--system", "--desktop"]),
       "--server",
       p.server,
       "--host-token-file",
-      p.tokenFile,
+      p.simple ? SIMPLE_TOKEN_FILE : p.tokenFile,
       ...(p.commands ? [] : ["--no-exec"]),
     ],
+    ...(p.simple ? { user: SIMPLE_USER } : {}),
   };
 }
 
 export const computerCommand = (install: ComputerInstall) =>
-  `curl -fsSL ${install.script} | sh -s -- ${install.args.map(quoteEnvValue).join(" ")}`;
+  `curl -fsSL ${install.script} | ${install.user ? `runuser -u ${install.user} -- ` : ""}sh -s -- ${install.args.map(quoteEnvValue).join(" ")}`;
+
+// ── What the agents need on this machine ───────────────────────────────────
+
+/** What the requirements step can install (the computers' installer's `--requirements`, ADR 0153 §6). */
+export const REQUIREMENTS = ["browser", "desktop", "claude", "codex"] as const;
+export type Requirement = (typeof REQUIREMENTS)[number];
+
+/** `--requirements`: `all`, `none`, or a comma-separated list; null when it isn't one of those. */
+export function parseRequirements(text: string): Requirement[] | null {
+  const value = text.trim().toLowerCase();
+  if (value === "all") return [...REQUIREMENTS];
+  if (value === "none") return [];
+  const list = value.split(",").map((v) => v.trim());
+  if (!list.every((v) => isOneOf(v, REQUIREMENTS))) return null;
+  return REQUIREMENTS.filter((r) => list.includes(r));
+}
+
+export interface RequirementCheck {
+  id: Requirement;
+  /** What people call it. */
+  label: string;
+  present: boolean;
+  /** System mode's own installer brings it (`--system --desktop`): not asked. */
+  withComputer: boolean;
+}
+
+/**
+ * What the agents need on this Linux machine and whether it's there, where the runner looks for each: the browser
+ * (Google Chrome, or Chromium on ARM), the packages for their screens, and Claude Code and Codex on an agent's PATH
+ * (/usr/local/bin or /usr/bin). On a Mac nothing is checked: the person installs what they use.
+ */
+export function checkRequirements(m: {
+  mac: boolean;
+  simple: boolean;
+  arch: string;
+  exists: (path: string) => boolean;
+}): RequirementCheck[] {
+  if (m.mac) return [];
+  const arm = m.arch === "arm64";
+  const any = (paths: string[]) => paths.some(m.exists);
+  return [
+    {
+      id: "browser",
+      label: arm
+        ? "Chromium (the agents' browser; Google makes no Chrome for Linux on ARM)"
+        : "Google Chrome (the agents' browser)",
+      present: any(["/opt/google/chrome/chrome", ...(arm ? ["/usr/bin/chromium", "/snap/bin/chromium"] : [])]),
+      withComputer: !m.simple,
+    },
+    {
+      id: "desktop",
+      label: "A screen for each agent (Xtigervnc and XFCE, about 300 MB)",
+      present: any(["/usr/bin/Xtigervnc"]) && any(["/usr/bin/xfce4-session"]),
+      withComputer: !m.simple,
+    },
+    {
+      id: "claude",
+      label: "Claude Code (for agents that think with a Claude plan)",
+      present: any(["/usr/local/bin/claude", "/usr/bin/claude"]),
+      withComputer: false,
+    },
+    {
+      id: "codex",
+      label: "Codex (for agents that think with a ChatGPT plan)",
+      present: any(["/usr/local/bin/codex", "/usr/bin/codex"]),
+      withComputer: false,
+    },
+  ];
+}
+
+/** The requirements to ask about: missing and not brought by the computer's own installer. */
+export const askableRequirements = (checks: RequirementCheck[]) => checks.filter((c) => !c.present && !c.withComputer);
+
+/** The computers' installer run for the requirements chosen, as root. */
+export const requirementsCommand = (install: ComputerInstall, list: Requirement[]) =>
+  `curl -fsSL ${install.script} | sh -s -- --requirements ${list.join(",")}`;
 
 /** What the run does about the agents' computer (a dry run takes the answers' defaults). */
 export type ComputerPlan =
   | {
       state: "on";
       mac: boolean;
+      /** Simple mode: every agent as `SIMPLE_USER` (`ComputerOffer.simple`). */
+      simple: boolean;
       commands: boolean;
       install: ComputerInstall;
       /** On before this run, and nothing asked to change it: set up again only when it needs to be. */
@@ -995,7 +1104,7 @@ export function decideComputer(p: {
   const on = p.computer ? p.computer === "yes" : now ? now === "on" : p.answers.on;
   if (on === undefined) return { ask: "computer", yes: p.offer.yes };
   if (!on) return off();
-  const { mac } = p.offer;
+  const { mac, simple } = p.offer;
   // On a Mac agents work as the person, so their commands could reach everything that person can: asked
   // with the computer, off when it was on already and nothing installed says otherwise.
   const unsaid = mac ? (now === "on" ? false : p.answers.commands) : true;
@@ -1005,8 +1114,9 @@ export function decideComputer(p: {
     plan: {
       state: "on",
       mac,
+      simple,
       commands,
-      install: computerInstall({ mac, server: p.server, tokenFile: p.tokenFile, commands }),
+      install: computerInstall({ mac, simple, server: p.server, tokenFile: p.tokenFile, commands }),
       kept: now === "on" && !p.computer && !p.commands,
     },
     entries: now === "on" ? {} : { HOST_COMPUTER_TOKEN: randomBytes(48).toString("base64") },
@@ -1019,7 +1129,15 @@ export const HOST_LAUNCHD_LABEL = "chat.agentes.runner";
 /** The root runner's home on Linux: a computer connected in system mode has its token in its config.json. */
 export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
 
-export function computerFiles(mac: boolean, home: string, runnerHome: string) {
+export function computerFiles(mac: boolean, home: string, runnerHome: string, simple = false) {
+  if (simple) {
+    return {
+      service: `${SIMPLE_HOME}/.config/systemd/user/${HOST_SERVICE}.service`,
+      bundle: `${SIMPLE_RUNNER_HOME}/agentes-runner.mjs`,
+      command: `${SIMPLE_RUNNER_HOME}/bin/agentes-runner`,
+      log: null,
+    };
+  }
   return mac
     ? {
         service: join(home, "Library", "LaunchAgents", `${HOST_LAUNCHD_LABEL}.plist`),
@@ -1224,6 +1342,8 @@ export interface PlanInput {
   domain: string | null;
   email: EmailChoice | "set";
   computer: ComputerPlan;
+  /** What the agents need here: what's there already, and what the run installs (`--requirements`). */
+  requirements: { present: string[]; install: Requirement[] };
   /** The usage statistics' answer, and whether .env already had it. */
   telemetry: { value: OnOff; kept: boolean };
   /** Jev's key: `--typesafe-key` to check, kept from .env, or none. */
@@ -1241,7 +1361,9 @@ function computerStep(c: ComputerPlan): string {
   if (c.state === "skipped") return `agents' computer: skipped. ${c.why}`;
   const who = c.mac
     ? `this Mac, agents working as you in folders of their own, commands ${c.commands ? "on" : "off"}`
-    : "this machine, each agent a user of its own with a screen";
+    : c.simple
+      ? `this machine in simple mode, every agent as the user ${SIMPLE_USER} (no sudo), commands ${c.commands ? "on" : "off"}`
+      : "this machine, each agent a user of its own with a screen";
   return `agents' computer: ${who} (HOST_COMPUTER_TOKEN, also in ${HOST_TOKEN_FILE})`;
 }
 
@@ -1293,6 +1415,7 @@ export function planSteps(p: PlanInput): string[] {
     }[p.email],
   );
   steps.push(computerStep(p.computer));
+  if (p.requirements.present.length) steps.push(`already here for the agents: ${p.requirements.present.join(", ")}`);
   steps.push(telemetryStep(p.telemetry));
   if (p.jev === "kept") steps.push("Jev: keep what .env has (TYPESAFE_API_KEY)");
   else if (p.jev !== "off") steps.push("Jev: TYPESAFE_API_KEY from --typesafe-key, checked when the setup runs");
@@ -1314,6 +1437,14 @@ export function planSteps(p: PlanInput): string[] {
     steps.push(`PUBLIC_URL: https://${p.domain ?? "<domain>"}, COMPOSE_PROFILES=https, then wait for the certificate`);
   } else {
     steps.push("start: docker compose up -d, wait for /api/health");
+  }
+  if (p.computer.state === "on" && p.requirements.install.length) {
+    steps.push(`install for the agents: ${requirementsCommand(p.computer.install, p.requirements.install)}`);
+  }
+  if (p.computer.state === "on" && p.computer.simple) {
+    steps.push(
+      `user ${SIMPLE_USER}: create it if missing (no sudo), keep its services running (loginctl enable-linger), give it ${SIMPLE_TOKEN_FILE}`,
+    );
   }
   if (p.computer.state === "on") {
     steps.push(
