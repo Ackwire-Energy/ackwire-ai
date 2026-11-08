@@ -1,6 +1,7 @@
 import { and, asc, desc, type Executor, eq, gt, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
+import type { ReleasedAsks } from "./catch-up-triage";
 import { ago } from "./context";
-import { cutText, possessive } from "./format";
+import { andList, cutText, possessive } from "./format";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
 
@@ -35,7 +36,8 @@ export const isCatchUp = (
  */
 export async function catchUpText(
   db: Executor,
-  run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "pendingMessageIds">,
+  run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "pendingMessageIds"> &
+    Partial<Pick<AgentRun, "transcript">>,
   trigger: { createdAt: Date },
   w: {
     since: number;
@@ -51,6 +53,8 @@ export async function catchUpText(
 ): Promise<string> {
   const threadId = replyThreadOf(run);
   const askIds = [run.triggerMessageId, ...run.pendingMessageIds];
+  const released = (run.transcript as { releasedAsks?: ReleasedAsks[] } | null | undefined)?.releasedAsks ?? [];
+  const skip = [...askIds, ...released.flatMap((r) => r.messageIds)];
   const read = (where: SQL | undefined) =>
     db
       .select({
@@ -71,7 +75,7 @@ export async function catchUpText(
           eq(messages.channelId, run.channelId),
           where,
           gt(messages.createdAt, trigger.createdAt),
-          sql`not (${messages.id} = any(${`{${askIds.join(",")}}`}::uuid[]))`,
+          sql`not (${messages.id} = any(${`{${skip.join(",")}}`}::uuid[]))`,
           isNull(messages.deletedAt),
           sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
         ),
@@ -113,6 +117,11 @@ export async function catchUpText(
         ]
       : []),
   ];
+  // What it let go while it waited (`releaseAsks`) is someone else's now: it neither answers nor reads it as news.
+  for (const r of released)
+    lines.push(
+      `${andList(r.askers.map(possessive))} ask was handled meanwhile${r.who ? ` by ${r.who}` : ""}: it isn't yours to answer anymore.`,
+    );
   if (rows.length === 0 && w.brief) lines.push(w.brief);
   if (rows.length > 0) {
     const who = [...counts].map(([name, n]) => `${name} ${n}`).join(", ");

@@ -40,6 +40,7 @@ import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
 import { openRequestsBlock, openRequestsOf } from "./open-requests";
+import { parkedOnBlock } from "./parked-asks";
 import { reachNote, reachOf } from "./reach";
 import {
   byAnotherAgent,
@@ -637,6 +638,12 @@ export async function buildRunContext(
             .limit(Math.max(1, options.maxMessages - 1)),
   ]);
   const root = rootRows[0];
+  // Other agents waiting (their plan, budget or computer) on what it answers, its thread's root included: it may let
+  // them go once it handled it.
+  const parkedHere =
+    options.routine || run.background || isAgentOnlyDm(channel)
+      ? null
+      : parkedOnBlock(db, run, trigger, root ?? null).catch(() => null);
   // The thread comes first; earlier channel messages (or the range) fill what's left.
   // A range longer than that loses its oldest messages (the thread summary, when the
   // thread itself is long, covers the thread, not the range).
@@ -1133,6 +1140,7 @@ export async function buildRunContext(
     ...(works ? await works.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(heldElsewhere ? await heldElsewhere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(openRequests ? await openRequests.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(parkedHere ? await parkedHere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(handOffs
       ? await handOffs.then((rows) => {
           const text = rows && handOffsBlock(rows, zone);

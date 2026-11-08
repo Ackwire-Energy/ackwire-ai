@@ -24,6 +24,8 @@ const USAGE_NOTES = new Set([
   "plan_model_off_wait",
   "plan_inactive_wait",
   "budget_wait",
+  // A skipped ask's note where its run had none of its own to say it on: always `usageWait.closed`.
+  "catch_up_closed",
 ]);
 
 type Meta = Record<string, unknown> | undefined;

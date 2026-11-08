@@ -60,6 +60,7 @@ import {
   createPassToolSource,
   createPermissionToolSource,
   createReactToolSource,
+  createReleaseAsksToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSessionScreening,
@@ -380,6 +381,8 @@ export function buildEngine(o: EngineOptions) {
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
       // The agent takes back a request for a person it no longer needs (listed while it has one open).
       createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
+      // An agent that handled what another waits to answer (its plan, budget or computer) lets it go.
+      createReleaseAsksToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({
         pubsub: adapters.pubsub,

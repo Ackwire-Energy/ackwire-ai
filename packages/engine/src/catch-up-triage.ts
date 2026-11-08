@@ -1,4 +1,4 @@
-import { and, desc, type Executor, eq, gt, inArray, isNull, ne, type SQL, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, gt, inArray, isNull, ne, or, type SQL, schema, sql } from "@agenteschat/db";
 import { ago } from "./context";
 import { andList, cutText, possessive } from "./format";
 import type { Judge, JudgeAnswer, JudgeQuestion } from "./judge";
@@ -70,7 +70,7 @@ export interface TriageAsker {
   key: string;
   userId: string;
   name: string;
-  asks: { text: string; at: Date; editedSincePause: boolean }[];
+  asks: { id?: string; text: string; at: Date; editedSincePause: boolean }[];
 }
 
 export interface TriageSnapshot {
@@ -107,6 +107,8 @@ export interface TriageAskerVerdict {
   reason?: CloseReason;
   /** Who closed it: a participant's key. */
   who?: string;
+  /** How sure the close of this ask is (with `reason`): what the bar weighs. */
+  sure?: number;
 }
 
 export interface TriageVerdict {
@@ -131,6 +133,8 @@ export interface TriageRecord {
   brief?: string;
   overruledBy?: string;
   overruledAt?: string;
+  /** Another agent let these asks go (`release_waiting_agent`): its id. */
+  releasedBy?: string;
 }
 
 /** What a closed note says (`meta.usageWait.closed`): why, who, and who may answer it anyway. */
@@ -150,6 +154,17 @@ const conversation = (run: Pick<AgentRun, "orgId" | "channelId" | "threadRootId"
   );
 };
 
+/** Asks a run let go (`releaseAsks`): no longer its to answer, so not news either. */
+export const releasedAsksOf = (run: Pick<AgentRun, "transcript">) =>
+  ((run.transcript as { releasedAsks?: ReleasedAsks[] } | null)?.releasedAsks ?? []).flatMap((r) => r.messageIds);
+
+/** What a parked run let go of (`transcript.releasedAsks`): whose asks, handled by whom. */
+export interface ReleasedAsks {
+  messageIds: string[];
+  askers: string[];
+  who: string | null;
+}
+
 /**
  * What the check reads, only from the run's conversation (what the agent itself would read next) and the threads under
  * its asks (another agent may have answered one there): the asks (its trigger and the messages that joined it), what
@@ -160,15 +175,17 @@ export async function triageSnapshot(
   run: Pick<
     AgentRun,
     "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "pendingMessageIds" | "issueId"
-  >,
+  > &
+    Partial<Pick<AgentRun, "transcript">>,
   trigger: { createdAt: Date },
   agentName: string,
   since: number,
 ): Promise<TriageSnapshot> {
   const askIds = [run.triggerMessageId, ...run.pendingMessageIds];
+  const skip = [...askIds, ...releasedAsksOf({ transcript: run.transcript ?? null })];
   const news = and(
     isNull(messages.deletedAt),
-    sql`not (${messages.id} = any(${`{${askIds.join(",")}}`}::uuid[]))`,
+    sql`not (${messages.id} = any(${`{${skip.join(",")}}`}::uuid[]))`,
     sql`${messages.authorAgentId} is distinct from ${run.agentId}::uuid`,
     // A promise ("I'll answer when it resets") is no answer, nor is a notice.
     sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
@@ -255,7 +272,7 @@ export async function triageSnapshot(
       a = { key: `a${askers.length + 1}`, userId: m.userId, name, asks: [] };
       askers.push(a);
     }
-    a.asks.push({ text: m.body, at: m.at, editedSincePause: (m.editedAt?.getTime() ?? 0) > since });
+    a.asks.push({ id: m.id, text: m.body, at: m.at, editedSincePause: (m.editedAt?.getTime() ?? 0) > since });
   }
   const posted = [...here, ...underAsks].sort((a, b) => a.at.getTime() - b.at.getTime());
   const posts = posted.map((m): TriageSnapshot["posts"][number] => {
@@ -519,15 +536,15 @@ export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageS
     const either = Math.min(1, p.solved + p.not_needed);
     if (self && either >= bar) {
       certainty[i] = either;
-      return { ...out, reason: p.solved >= p.not_needed ? "solved" : "withdrawn", who };
+      return { ...out, reason: p.solved >= p.not_needed ? "solved" : "withdrawn", who, sure: either };
     }
     if (p.solved >= bar && (posters.has(who) || (changed?.status === "done" && changed.changedBy === who))) {
       certainty[i] = p.solved;
-      return { ...out, reason: "solved", who };
+      return { ...out, reason: "solved", who, sure: p.solved };
     }
     if (p.not_needed >= bar && changed?.status === "canceled" && changed.changedBy === who) {
       certainty[i] = p.not_needed;
-      return { ...out, reason: "task_canceled", who };
+      return { ...out, reason: "task_canceled", who, sure: p.not_needed };
     }
     return out;
   });
@@ -651,12 +668,13 @@ export async function overruledHere(
 }
 
 /**
- * Another agent's run answering in this conversation right now: the check waits for its answer rather than read half
- * of it.
+ * Another agent's run answering in this conversation right now, or in the thread under one of `asks`: the check waits
+ * for its answer rather than read half of it.
  */
 export async function otherAgentAnswering(
   db: Executor,
   run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  asks: string[] = [],
 ): Promise<boolean> {
   const threadId = replyThreadOf(run);
   const [row] = await db
@@ -669,9 +687,12 @@ export async function otherAgentAnswering(
         ne(agentRuns.agentId, run.agentId),
         eq(agentRuns.status, "running"),
         eq(agentRuns.background, false),
-        threadId
-          ? eq(agentRuns.threadRootId, threadId)
-          : sql`${agentRuns.threadRootId} = ${agentRuns.triggerMessageId}`,
+        or(
+          threadId
+            ? eq(agentRuns.threadRootId, threadId)
+            : sql`${agentRuns.threadRootId} = ${agentRuns.triggerMessageId}`,
+          asks.length > 0 ? inArray(agentRuns.threadRootId, asks) : undefined,
+        ),
       ),
     )
     .limit(1);

@@ -123,6 +123,7 @@ import {
   closedNoteOf,
   otherAgentAnswering,
   overruledHere,
+  type ReleasedAsks,
   type TriageRecord,
   type TriageVerdict,
   triageBrief,
@@ -659,6 +660,8 @@ export interface Transcript {
   catchUp?: { since: number; mayPass?: true };
   /** The check before that catch-up (`catch-up-triage.ts`): its last verdict, reused while nothing new came in. */
   catchUpTriage?: TriageRecord;
+  /** Asks it let go while it waited (`parked-asks.ts`): handled elsewhere, never answered nor read as news. */
+  releasedAsks?: ReleasedAsks[];
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -5776,7 +5779,7 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
 }
 
 /** Adds text to the conversation as the person's side (joined to a last user message, never two in a row). */
-function appendUserText(t: Transcript, text: string) {
+export function appendUserText(t: Pick<Transcript, "messages">, text: string) {
   const last = t.messages.at(-1);
   if (last?.role === "user") {
     const blocks: ContentBlock[] =

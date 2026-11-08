@@ -85,6 +85,7 @@ import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { outOfOfficeIds } from "./out-of-office";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
+import { checkParkedRun, EARLY_CHECK_JOB, scheduleParkedChecks } from "./parked-asks";
 import { notifyPersonLimit, PERSON_LIMIT_JOB } from "./person-usage";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import { reachOf, settleReach } from "./reach";
@@ -557,6 +558,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
+      // A waiting run whose ask may have just been handled here checks early (`parked-asks.ts`).
+      await scheduleParkedChecks(deps.db, message).catch(() => {});
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
       // A task conversation's root (ADR 0145) stands for the task: nobody is routed either.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
@@ -796,6 +799,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [POLL_CLOSE_JOB]: async (job) => {
       if (!deps.artifacts) throw new Error("Files are unavailable");
       await closePoll(deps.artifacts, orgOf(job), String(job.payload.artifactId));
+    },
+    // Something landed where a waiting run would read it: its asks, or its own requests, are checked now.
+    [EARLY_CHECK_JOB]: async (job) => {
+      await checkParkedRun(
+        { db: deps.db, pubsub: deps.pubsub, judge: deps.context?.judge },
+        String(job.payload.runId),
+        job.id,
+      );
     },
     // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
     [FOLLOW_UP_JOB]: async (job) => {
