@@ -111,7 +111,6 @@ export function AccessTab() {
       <ReadOnlyNote field="levels" />
       <Toolbar
         size="sm"
-        className="agp-toolbar"
         search={
           <SearchField
             size="sm"
@@ -135,20 +134,6 @@ export function AccessTab() {
             count: count[f],
           }))}
         />
-        {editable && resources.some((r) => r.kind === "connector") && (
-          <span className="newag__quick agp-quick">
-            {t("agentPage.access.allConnectors")}
-            <Button size="sm" variant="ghost" onClick={() => allConnectors("none")}>
-              {t("access.level.none")}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
-              {t("agentPage.access.onlyRead")}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
-              {t("access.level.write")}
-            </Button>
-          </span>
-        )}
       </Toolbar>
       <div className="agp-cols">
         <div className="agp-col">
@@ -167,7 +152,25 @@ export function AccessTab() {
                   id="ac-connectors"
                   icon="plug"
                   title={t("agentPage.access.connectors", { org: org.name })}
-                  action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
+                  action={
+                    // Setting every connector at once acts on this card's list, so it sits on its head.
+                    editable && resources.some((r) => r.kind === "connector") ? (
+                      <span className="newag__quick">
+                        {t("agentPage.access.allConnectors")}
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("none")}>
+                          {t("access.level.none")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
+                          {t("agentPage.access.onlyRead")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
+                          {t("access.level.write")}
+                        </Button>
+                      </span>
+                    ) : (
+                      <span className="small muted">{t("agentPage.access.oneLevel")}</span>
+                    )
+                  }
                 />
                 {noConnectors ? (
                   <NoConnectors look={lookOf(agent) ?? true} />

@@ -56,7 +56,6 @@ async function selectorsWith(match: (property: string, value: string) => boolean
  */
 const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".agp-subnav": "strip",
-  ".agp-toolbar .ac-seg": "strip",
   ".agp-tabs .ac-tabs": "strip",
   ".settings__groups": "strip",
   ".channel-settings__nav": "strip",

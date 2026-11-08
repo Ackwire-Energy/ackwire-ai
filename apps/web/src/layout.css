@@ -10533,15 +10533,6 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   color: var(--ink);
   font-weight: 600;
 }
-.agp-toolbar {
-  margin-bottom: 14px;
-}
-.agp-toolbar--in {
-  margin-bottom: 0;
-}
-.agp-quick {
-  margin-left: auto;
-}
 .level-row[data-changed] {
   margin: 0 -10px;
   padding-right: 10px;

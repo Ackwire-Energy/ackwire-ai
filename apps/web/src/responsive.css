@@ -332,16 +332,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-quick {
-    margin-left: 0;
-  }
-  /* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
-  .agp-toolbar .ac-seg {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
   /* The tokens go on the time's line: beside the words they kept their one line and squeezed a failure's reason to a
      word a line. */
   .agp-run {
@@ -436,16 +426,6 @@
     height: 44px;
     padding: 0 10px;
     font-size: 13.5px;
-  }
-  .agp-quick {
-    margin-left: 0;
-  }
-  /* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
-  .agp-toolbar .ac-seg {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
   }
   .agp-run {
     grid-template-columns: minmax(0, 1fr) auto;

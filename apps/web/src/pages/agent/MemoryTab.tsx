@@ -523,7 +523,6 @@ export function MemoryTab() {
             />
             <Toolbar
               size="sm"
-              className="agp-toolbar agp-toolbar--in"
               search={
                 <SearchField
                   size="sm"

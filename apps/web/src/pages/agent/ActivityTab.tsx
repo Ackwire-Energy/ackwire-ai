@@ -226,7 +226,6 @@ export function ActivityTab() {
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
         <Toolbar
           size="sm"
-          className="agp-toolbar agp-toolbar--in"
           search={
             <SearchField
               size="sm"
