@@ -35,6 +35,8 @@ describe("back from a provider's sign-in that didn't connect", () => {
         other_account: "Termine com a conta que começou. Este navegador entrou com outra.",
         not_allowed: "Você não tem permissão para isso.",
         not_visible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
+        other_workspace:
+          "Essa conta do GitHub já está ligada a outro workspace. Remova o app de lá antes de instalar aqui.",
         failed: "Não deu para conectar. Tente de novo em instantes.",
         "Some words from the server": "Não deu para conectar. Tente de novo em instantes.",
       },
@@ -46,6 +48,8 @@ describe("back from a provider's sign-in that didn't connect", () => {
         not_allowed: "You don't have permission for this.",
         not_visible:
           "Your GitHub account can't see that installation. Install it with an account that has access to it.",
+        other_workspace:
+          "That GitHub account is already linked to another workspace. Remove the app there before installing it here.",
         failed: "Couldn't connect. Try again in a moment.",
         "Some words from the server": "Couldn't connect. Try again in a moment.",
       },
@@ -86,6 +90,19 @@ describe("back from a provider's sign-in that didn't connect", () => {
     expect(open("/?github_app_error=requested", "en").shown).toEqual([
       ["We asked the GitHub account's owner to install the app. It shows up here once they do.", "info"],
     ]);
+  });
+
+  test("GitHub's return that worked: the app installed, or the server's own app made, on whatever page it lands", () => {
+    expect(open(`${CONNECTORS}?github_app=installed&tab=apps`)).toEqual({
+      shown: [["App agentes.chat instalado.", undefined]],
+      left: `${CONNECTORS}?tab=apps`,
+    });
+    expect(open(`/org/${ORG_ID}/settings/skills?github_app=created`, "en")).toEqual({
+      shown: [["GitHub app created. Workspaces here can install it now.", undefined]],
+      left: `/org/${ORG_ID}/settings/skills`,
+    });
+    // Anything else is left as it came.
+    expect(open(`${CONNECTORS}?github_app=nonsense`).shown).toEqual([]);
   });
 
   test("Gmail's or Outlook's that found no workspace says so on the start; Conectores reads its own", () => {

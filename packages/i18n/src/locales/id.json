@@ -9577,18 +9577,34 @@
   },
   "githubApp": {
     "title": "Repositori GitHub",
-    "text": "Pasang aplikasi GitHub di akun dan repositori yang boleh dipakai agen untuk kode dan pull request. Hanya {{org}} yang memakai apa yang kamu pasang dari sini.",
-    "install": "Pasang aplikasi GitHub",
+    "text": "Di tempat aplikasi agentes.chat terpasang, agen membuka pull request, issue, komentar, dan commit sebagai aplikasi itu, dengan nama agen dan orang yang meminta. Hanya {{org}} yang memakai apa yang kamu pasang dari sini.",
+    "install": "Pasang aplikasi agentes.chat",
+    "installMore": "Pasang di akun lain",
     "none": "Belum ada akun GitHub.",
+    "usingAccount": "Saat ini agen muncul di GitHub sebagai {{account}}. Pasang aplikasinya agar mereka muncul sebagai aplikasi agentes.chat.",
     "allRepos": "Semua repositori",
     "someRepos": "Repositori terpilih",
     "suspended": "Ditangguhkan di GitHub",
+    "manage": "Kelola di GitHub",
+    "manageName": "Kelola {{account}} di GitHub",
     "remove": "Hapus",
     "removeName": "Hapus {{account}}",
-    "removed": "{{account}} dihapus. Aplikasinya tetap terpasang di GitHub. Copot di sana kalau kamu mau.",
-    "installed": "Aplikasi GitHub terpasang.",
+    "removeTitle": "Hapus aplikasi dari {{account}}?",
+    "removeText": "Aplikasi agentes.chat dicopot dari {{account}} di GitHub, dan agen berhenti memakai repositori akun itu lewat aplikasi ini.",
+    "removeLast": "Ini yang terakhir, jadi agen kehilangan GitHub sampai seseorang memasang aplikasinya atau menghubungkan akun.",
+    "removed": "Aplikasi dihapus dari {{account}} dan dicopot di GitHub.",
+    "notUninstalled": "Aplikasi dihapus di sini, tapi GitHub belum mengonfirmasi pencopotan dari {{account}}. Copot di sana.",
+    "openPage": "Buka",
+    "installed": "Aplikasi agentes.chat terpasang.",
     "requested": "Kami sudah meminta pemilik akun GitHub itu memasang aplikasinya. Akan muncul di sini setelah dia memasangnya.",
     "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana.",
+    "otherWorkspace": "Akun GitHub itu sudah terhubung ke ruang kerja lain. Hapus aplikasinya di sana sebelum memasangnya di sini.",
+    "connectAccount": "Hubungkan akun GitHub",
+    "ownerHint": "Pemilik server ini bisa membuat aplikasi GitHub di sini, di Konektor.",
+    "viaApp": "Lewat aplikasi agentes.chat di {{accounts}}",
+    "disconnectApp": "Aplikasi agentes.chat juga dicopot dari {{accounts}} di GitHub.",
+    "disconnectKeepsApp": "Agen tetap di GitHub lewat aplikasi agentes.chat di {{accounts}}.",
+    "keptApp": "Akun GitHub diputuskan. Agen tetap di GitHub lewat aplikasi agentes.chat.",
     "signature": {
       "forPerson": "{{agent}}, agen {{person}} di agentes.chat",
       "alone": "{{agent}}, agen di agentes.chat"
@@ -9596,6 +9612,27 @@
     "manifestPage": {
       "title": "Membuat aplikasi GitHub",
       "continue": "Lanjutkan di GitHub"
+    },
+    "server": {
+      "title": "Aplikasi GitHub server ini",
+      "lead": "Dengan aplikasi ini, agen muncul di GitHub sebagai aplikasi, bukan sebagai akun seseorang.",
+      "without": "GitHub membuat aplikasi di akunmu dengan semuanya sudah terisi, lalu kembali ke sini. Agar dimiliki organisasi, pindahkan nanti di GitHub.",
+      "create": "Buat aplikasi di GitHub",
+      "state": {
+        "off": "Mati",
+        "on": "Aktif",
+        "invalid": "Tidak valid"
+      },
+      "line": {
+        "env": "Diatur di pengaturan server ini (GITHUB_APP_ID).",
+        "invalid": "Server ini tidak bisa membuka aplikasi yang tersimpan. Hapus lalu buat lagi."
+      },
+      "open": "Buka di GitHub",
+      "remove": "Hapus aplikasi",
+      "removeTitle": "Hapus aplikasi GitHub server ini?",
+      "removeText": "Semua ruang kerja di sini langsung tidak bisa lagi menjangkau GitHub lewat aplikasi ini. Aplikasinya tetap ada di GitHub, dan kamu bisa menghapusnya di sana.",
+      "created": "Aplikasi GitHub dibuat. Ruang kerja di sini sekarang bisa memasangnya.",
+      "removed": "Aplikasi GitHub dihapus dari server ini."
     }
   },
   "oauthReturn": {
@@ -10466,6 +10503,15 @@
     "namePlaceholder": "Mis. Dukungan",
     "continueIn": "Lanjutkan di {{name}}",
     "continueInComposio": "Lanjutkan di Composio",
+    "github": {
+      "how": "Cara agen menjangkau GitHub",
+      "app": "Aplikasi agentes.chat",
+      "recommended": "Disarankan",
+      "appText": "Agen muncul sebagai aplikasi, dan kamu memilih repositorinya di GitHub.",
+      "account": "Akun GitHub",
+      "accountText": "Agen muncul sebagai akun itu. GitHub Projects butuh akun.",
+      "appNote": "Kamu memilih akun dan repositori di GitHub, lalu kembali ke sini."
+    },
     "githubOrgs": {
       "title": "Organisasi yang terjangkau",
       "none": "Belum ada organisasi.",

@@ -9887,18 +9887,34 @@
   },
   "githubApp": {
     "title": "GitHub depoları",
-    "text": "Ajanların kod ve çekme istekleri için kullanabileceği hesaplara ve depolara GitHub uygulamasını yükleyin. Buradan yüklediklerinizi yalnızca {{org}} kullanır.",
-    "install": "GitHub uygulamasını yükle",
+    "text": "agentes.chat uygulamasının yüklü olduğu yerlerde ajanlar çekme isteklerini, sorun kayıtlarını, yorumları ve commit'leri uygulama olarak açar, ajanın adı ve isteyen kişiyle birlikte. Buradan yüklediklerinizi yalnızca {{org}} kullanır.",
+    "install": "agentes.chat uygulamasını yükle",
+    "installMore": "Başka bir hesaba yükle",
     "none": "Henüz GitHub hesabı yok.",
+    "usingAccount": "Şu anda ajanlar GitHub'da {{account}} olarak görünüyor. Uygulamayı yükleyin, ajanlar agentes.chat uygulaması olarak görünsün.",
     "allRepos": "Tüm depolar",
     "someRepos": "Seçilen depolar",
     "suspended": "GitHub'da askıya alındı",
+    "manage": "GitHub'da yönet",
+    "manageName": "{{account}} hesabını GitHub'da yönet",
     "remove": "Kaldır",
     "removeName": "Kaldır: {{account}}",
-    "removed": "{{account}} kaldırıldı. GitHub'da yüklü kalır. İsterseniz oradan kaldırın.",
-    "installed": "GitHub uygulaması yüklendi.",
+    "removeTitle": "Uygulama {{account}} hesabından kaldırılsın mı?",
+    "removeText": "agentes.chat uygulaması GitHub'da {{account}} hesabından kaldırılır ve ajanlar bu hesabın depolarını onun üzerinden kullanmayı bırakır.",
+    "removeLast": "Bu sonuncusu, bu yüzden biri uygulamayı yükleyene ya da bir hesap bağlayana kadar ajanlar GitHub'ı kullanamaz.",
+    "removed": "Uygulama {{account}} hesabından kaldırıldı ve GitHub'da da kaldırıldı.",
+    "notUninstalled": "Uygulama burada kaldırıldı ama GitHub, {{account}} hesabından kaldırmayı onaylamadı. Oradan kaldırın.",
+    "openPage": "Aç",
+    "installed": "agentes.chat uygulaması yüklendi.",
     "requested": "GitHub hesabının sahibinden uygulamayı yüklemesini istedik. Yüklediğinde burada görünür.",
     "notVisible": "GitHub hesabınız o kurulumu göremiyor. Ona erişimi olan bir hesapla yükleyin.",
+    "otherWorkspace": "Bu GitHub hesabı zaten başka bir çalışma alanına bağlı. Buraya yüklemeden önce uygulamayı oradan kaldırın.",
+    "connectAccount": "GitHub hesabı bağla",
+    "ownerHint": "Bu sunucunun sahibi GitHub uygulamasını burada, Bağlayıcılar bölümünde oluşturabilir.",
+    "viaApp": "{{accounts}} üzerindeki agentes.chat uygulamasıyla",
+    "disconnectApp": "agentes.chat uygulaması GitHub'da {{accounts}} hesaplarından da kaldırılır.",
+    "disconnectKeepsApp": "Ajanlar {{accounts}} üzerindeki agentes.chat uygulamasıyla GitHub'da kalır.",
+    "keptApp": "GitHub hesabının bağlantısı kesildi. Ajanlar agentes.chat uygulamasıyla GitHub'da kalır.",
     "signature": {
       "forPerson": "{{agent}}, agentes.chat üzerinde {{person}} için çalışan ajan",
       "alone": "{{agent}}, agentes.chat üzerinde bir ajan"
@@ -9906,6 +9922,27 @@
     "manifestPage": {
       "title": "GitHub uygulaması oluşturuluyor",
       "continue": "GitHub üzerinde devam et"
+    },
+    "server": {
+      "title": "Bu sunucunun GitHub uygulaması",
+      "lead": "Bununla ajanlar GitHub'da birinin hesabı olarak değil, uygulama olarak görünür.",
+      "without": "GitHub, her şeyi doldurulmuş uygulamayı hesabınızda oluşturur ve buraya geri döner. Bir kuruluşa ait olması için daha sonra GitHub'da aktarın.",
+      "create": "Uygulamayı GitHub'da oluştur",
+      "state": {
+        "off": "Kapalı",
+        "on": "Açık",
+        "invalid": "Geçersiz"
+      },
+      "line": {
+        "env": "Bu sunucunun ayarlarında tanımlı (GITHUB_APP_ID).",
+        "invalid": "Bu sunucu kayıtlı uygulamayı açamıyor. Kaldırıp yeniden oluşturun."
+      },
+      "open": "GitHub'da aç",
+      "remove": "Uygulamayı kaldır",
+      "removeTitle": "Bu sunucunun GitHub uygulaması kaldırılsın mı?",
+      "removeText": "Buradaki tüm çalışma alanları GitHub'a onun üzerinden hemen erişemez olur. Uygulama GitHub'da kalır, oradan silebilirsiniz.",
+      "created": "GitHub uygulaması oluşturuldu. Buradaki çalışma alanları artık yükleyebilir.",
+      "removed": "GitHub uygulaması bu sunucudan kaldırıldı."
     }
   },
   "oauthReturn": {
@@ -10798,6 +10835,15 @@
     "namePlaceholder": "Örn. Destek",
     "continueIn": "{{name}} ile devam et",
     "continueInComposio": "Composio ile devam et",
+    "github": {
+      "how": "Ajanlar GitHub'a nasıl erişir",
+      "app": "agentes.chat uygulaması",
+      "recommended": "Önerilen",
+      "appText": "Ajanlar uygulama olarak görünür ve depoları GitHub'da siz seçersiniz.",
+      "account": "Bir GitHub hesabı",
+      "accountText": "Ajanlar o hesap olarak görünür. GitHub Projects için bir hesap gerekir.",
+      "appNote": "Hesapları ve depoları GitHub'da seçip buraya dönersiniz."
+    },
     "githubOrgs": {
       "title": "Erişilen kuruluşlar",
       "none": "Henüz kuruluş yok.",

@@ -9947,18 +9947,34 @@
   },
   "githubApp": {
     "title": "GitHub-Repositories",
-    "text": "Installier die GitHub-App auf den Konten und Repositories, die Agenten für Code und Pull Requests nutzen dürfen. Was du von hier installierst, nutzt nur {{org}}.",
-    "install": "GitHub-App installieren",
+    "text": "Wo die agentes.chat-App installiert ist, öffnen Agenten Pull Requests, Issues, Kommentare und Commits als die App, mit dem Namen des Agenten und der Person, die gefragt hat. Was du von hier installierst, nutzt nur {{org}}.",
+    "install": "agentes.chat-App installieren",
+    "installMore": "Auf einem weiteren Konto installieren",
     "none": "Noch kein GitHub-Konto.",
+    "usingAccount": "Heute erscheinen Agenten auf GitHub als {{account}}. Installier die App, damit sie als die agentes.chat-App erscheinen.",
     "allRepos": "Alle Repositories",
     "someRepos": "Ausgewählte Repositories",
     "suspended": "Auf GitHub gesperrt",
+    "manage": "Auf GitHub verwalten",
+    "manageName": "{{account}} auf GitHub verwalten",
     "remove": "Entfernen",
     "removeName": "{{account}} entfernen",
-    "removed": "{{account}} entfernt. Es bleibt auf GitHub installiert. Deinstallier es dort, wenn du willst.",
-    "installed": "GitHub-App installiert.",
+    "removeTitle": "App von {{account}} entfernen?",
+    "removeText": "Die agentes.chat-App wird auf GitHub von {{account}} deinstalliert, und Agenten nutzen die Repositories dieses Kontos nicht mehr über sie.",
+    "removeLast": "Es ist das letzte, daher verlieren Agenten GitHub, bis jemand die App installiert oder ein Konto verbindet.",
+    "removed": "App von {{account}} entfernt und auf GitHub deinstalliert.",
+    "notUninstalled": "App hier entfernt, aber GitHub hat die Deinstallation von {{account}} nicht bestätigt. Deinstallier sie dort.",
+    "openPage": "Öffnen",
+    "installed": "agentes.chat-App installiert.",
     "requested": "Wir haben die Inhaber des GitHub-Kontos gebeten, die App zu installieren. Sie erscheint hier, sobald das passiert ist.",
     "notVisible": "Dein GitHub-Konto kann diese Installation nicht sehen. Installier sie mit einem Konto, das Zugriff darauf hat.",
+    "otherWorkspace": "Dieses GitHub-Konto ist schon mit einem anderen Workspace verbunden. Entferne die App dort, bevor du sie hier installierst.",
+    "connectAccount": "GitHub-Konto verbinden",
+    "ownerHint": "Der Inhaber dieses Servers kann die GitHub-App hier unter Konnektoren erstellen.",
+    "viaApp": "Über die agentes.chat-App auf {{accounts}}",
+    "disconnectApp": "Die agentes.chat-App wird auf GitHub auch von {{accounts}} deinstalliert.",
+    "disconnectKeepsApp": "Agenten bleiben über die agentes.chat-App auf {{accounts}} mit GitHub verbunden.",
+    "keptApp": "GitHub-Konto getrennt. Agenten bleiben über die agentes.chat-App mit GitHub verbunden.",
     "signature": {
       "forPerson": "{{agent}}, Agent von {{person}} auf agentes.chat",
       "alone": "{{agent}}, ein Agent auf agentes.chat"
@@ -9966,6 +9982,27 @@
     "manifestPage": {
       "title": "GitHub-App wird erstellt",
       "continue": "Weiter zu GitHub"
+    },
+    "server": {
+      "title": "GitHub-App dieses Servers",
+      "lead": "Damit erscheinen Agenten auf GitHub als die App, nicht als das Konto einer Person.",
+      "without": "GitHub erstellt die App in deinem Konto mit allem ausgefüllt und kommt dann hierher zurück. Soll sie einer Organisation gehören, übertrag sie danach auf GitHub.",
+      "create": "App auf GitHub erstellen",
+      "state": {
+        "off": "Aus",
+        "on": "An",
+        "invalid": "Ungültig"
+      },
+      "line": {
+        "env": "In den Einstellungen dieses Servers festgelegt (GITHUB_APP_ID).",
+        "invalid": "Dieser Server kann die gespeicherte App nicht öffnen. Entferne sie und erstelle sie neu."
+      },
+      "open": "Auf GitHub öffnen",
+      "remove": "App entfernen",
+      "removeTitle": "GitHub-App dieses Servers entfernen?",
+      "removeText": "Alle Workspaces hier erreichen GitHub sofort nicht mehr über sie. Die App bleibt auf GitHub, wo du sie löschen kannst.",
+      "created": "GitHub-App erstellt. Die Workspaces hier können sie jetzt installieren.",
+      "removed": "GitHub-App von diesem Server entfernt."
     }
   },
   "oauthReturn": {
@@ -10862,6 +10899,15 @@
     "namePlaceholder": "Z. B. Support",
     "continueIn": "Weiter bei {{name}}",
     "continueInComposio": "Weiter bei Composio",
+    "github": {
+      "how": "Wie Agenten GitHub erreichen",
+      "app": "Die agentes.chat-App",
+      "recommended": "Empfohlen",
+      "appText": "Agenten erscheinen als die App, und du wählst die Repositories auf GitHub.",
+      "account": "Ein GitHub-Konto",
+      "accountText": "Agenten erscheinen als dieses Konto. GitHub Projects braucht eins.",
+      "appNote": "Du wählst die Konten und Repositories auf GitHub und kommst dann hierher zurück."
+    },
     "githubOrgs": {
       "title": "Erreichte Organisationen",
       "none": "Noch keine Organisation.",

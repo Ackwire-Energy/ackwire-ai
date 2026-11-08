@@ -9,6 +9,7 @@ import {
   useCustomServers,
   useDatabases,
   useDisconnect,
+  useGitHubApp,
   useMailAccounts,
   useMailAction,
   useMailProviders,
@@ -28,6 +29,7 @@ import {
 import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { appAccountsText, githubDisconnectNote } from "@agenteschat/client/lib/github-app";
 import { choiceOf, newestAccount } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
@@ -63,7 +65,7 @@ import {
   DatabaseRow,
   DatabaseScopeDialog,
 } from "@/components/DatabaseConnect";
-import { GitHubAppPanel } from "@/components/GitHubAppPanel";
+import { GitHubAppPanel, GitHubAppServerCard } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import {
   MailAddressesDialog,
@@ -296,8 +298,14 @@ export function ConnectorsSection({
             {apps.map(row)}
           </List>
         )}
-        <GitHubAppPanel />
+        <GitHubAppPanel
+          onConnectAccount={() => {
+            const github = defs.find((d) => d.id === "github");
+            if (github) setFlow({ step: 0, def: github, account: true });
+          }}
+        />
       </Card>
+      <GitHubAppServerCard />
       <Card aria-labelledby="sec-mcp">
         <CardHeader
           id="sec-mcp"
@@ -327,9 +335,14 @@ export function ConnectorsSection({
           loading={catalog.isLoading}
           onPick={(def) => {
             setAdding(false);
-            // Connected already: a server by address takes another account, a catalog connector a new sign-in.
+            // Connected already: a server by address takes another account, a catalog connector a new sign-in. GitHub
+            // through the agentes.chat app alone has no sign-in: it offers the app on another account, or an account.
             const item = items.find((i) => i.def?.id === def.id);
-            setFlow(item ? { step: 0, def, mode: item.custom ? "add" : "reconnect", item } : { step: 0, def });
+            setFlow(
+              item && !item.viaGithubApp
+                ? { step: 0, def, mode: item.custom ? "add" : "reconnect", item }
+                : { step: 0, def },
+            );
           }}
           onOther={() => {
             setAdding(false);
@@ -400,7 +413,11 @@ function ConnectedRow({
 }) {
   const { t, i18n } = useTranslation();
   const meta = [
-    item.account ? t("connectors.connectedAs", { account: item.account }) : null,
+    item.viaGithubApp && item.account
+      ? appAccountsText(t, item.account)
+      : item.account
+        ? t("connectors.connectedAs", { account: item.account })
+        : null,
     relativeTime(t, i18n.language, item.createdAt),
     t("connectors.toolsCount", { count: item.tools }),
   ].filter(Boolean);
@@ -491,9 +508,12 @@ function ConnectedRow({
             <MenuItem icon="edit" onSelect={onRename}>
               {t("connectors.rename")}
             </MenuItem>
-            <MenuItem icon="refresh" onSelect={onReconnect}>
-              {t("connectors.detail.reconnect")}
-            </MenuItem>
+            {/* GitHub through the app alone has no sign-in to renew: its accounts are on GitHub's side. */}
+            {!item.viaGithubApp && (
+              <MenuItem icon="refresh" onSelect={onReconnect}>
+                {t("connectors.detail.reconnect")}
+              </MenuItem>
+            )}
             {item.custom && (
               <MenuItem icon="plus" onSelect={onAddAccount}>
                 {t("connectors.detail.addAccount")}
@@ -601,6 +621,9 @@ function DisconnectDialog({
   const { disconnect: customDisconnect } = useCustomServerAction(org.id);
   const pending = catalogDisconnect.isPending || customDisconnect.isPending;
   const name = item ? itemName(t, item) : "";
+  // GitHub and the agentes.chat app: the app alone is uninstalled with it, an account goes and the app stays.
+  const installations = useGitHubApp(org.id, item?.def?.id === "github").data?.installations ?? [];
+  const githubNote = item ? githubDisconnectNote(t, item, installations) : null;
   return (
     <Dialog
       open={item !== null}
@@ -617,6 +640,11 @@ function DisconnectDialog({
           </p>
         </DialogBody>
       )}
+      {githubNote && (
+        <DialogBody>
+          <p className="small muted">{githubNote}</p>
+        </DialogBody>
+      )}
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -629,7 +657,9 @@ function DisconnectDialog({
               onSuccess: () => {
                 // Agents lose the connection's grants.
                 void qc.invalidateQueries({ queryKey: keys.access(org.id) });
-                toast.show(t("connectors.disconnected", { name }));
+                toast.show(
+                  githubNote && !item.viaGithubApp ? t("githubApp.keptApp") : t("connectors.disconnected", { name }),
+                );
                 onClose();
               },
             };

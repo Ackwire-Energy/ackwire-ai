@@ -143,11 +143,11 @@ describe("Configurações do workspace", () => {
     );
     const github = screen().getByRole("region", { name: "Repositórios do GitHub" });
     expect(hintOf("Repositórios do GitHub", github).text).toBe(
-      "Instale o app do GitHub nas contas e repositórios que os agentes podem usar para código e pull requests. Só a Acme usa o que você instalar daqui.",
+      "Onde o app agentes.chat está instalado, os agentes abrem pull requests, issues, comentários e commits como o app, com o nome do agente e de quem pediu. Só a Acme usa o que você instalar daqui.",
     );
     expect(
       within(github)
-        .getAllByText(/^Instale o app do GitHub/)
+        .getAllByText(/^Onde o app agentes.chat está instalado/)
         .map((el) => el.hidden),
     ).toEqual([true]);
     expect(section.textContent).toContain("GitHub");

@@ -7,6 +7,8 @@ import { connectorName } from "./scopes";
 export const CONNECTOR_MARK = /^\/connectors\/[a-z0-9-]+\.svg$/;
 /** A mark in its maker's colors the web app serves, drawn as it is. */
 export const OWN_MARK = /^\/brands\/[a-z0-9-]+\.svg$/;
+/** `Connection.authType` of GitHub through the agentes.chat app alone (mirror of `GITHUB_APP_AUTH` in the engine). */
+export const GITHUB_APP_AUTH = "github_app";
 /** A server's own icon, as the backend keeps and serves it behind the session (never the server's URL). */
 export const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
 
@@ -28,6 +30,11 @@ export interface ConnectedItem {
   account: string | null;
   /** Connected through Composio (ADR 0107): its page signs in, and no address shows. */
   viaComposio: boolean;
+  /**
+   * GitHub through the agentes.chat app alone (ADR 0153): no account signed in, so nothing to reconnect; `account`
+   * holds the accounts it is installed on.
+   */
+  viaGithubApp?: boolean;
   /** Its account stopped working (a Composio account): no tools until Reconectar. */
   needsReconnect: boolean;
   /** OAuth scopes its sign-in lacks (GitHub's `project`): Reconectar adds what they let agents do. */
@@ -64,6 +71,7 @@ export function fromConnection(c: Connection, catalog: ConnectorDef[]): Connecte
     image: null,
     account: accountNote(c.label, c.accountLabel),
     viaComposio: false,
+    viaGithubApp: c.authType === GITHUB_APP_AUTH,
     needsReconnect: false,
     reconnectAdds: c.reconnectAdds ?? [],
     createdAt: c.createdAt,

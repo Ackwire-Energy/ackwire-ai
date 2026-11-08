@@ -127,7 +127,9 @@ import type {
   GifKey,
   GifPage,
   GifQuery,
+  GitHubAppInfo,
   GitHubAppInstallation,
+  GitHubAppSetup,
   GitHubOrgAccess,
   GitHubRepositories,
   Health,
@@ -911,12 +913,21 @@ export interface ApiClient {
     disconnect(orgId: string, connectionId: string): Promise<void>;
   };
   githubApp: {
-    /** Whether this server can install the GitHub App, and the organization's installations. */
-    info(orgId: string): Promise<{ installable: boolean; installations: GitHubAppInstallation[] }>;
-    /** Returns GitHub's install URL; GitHub sends the person back to `returnTo`. */
+    /** Whether this server can install the GitHub App, the organization's installations, and the server's app. */
+    info(orgId: string): Promise<GitHubAppInfo>;
+    /** Returns GitHub's install URL; GitHub sends the person back to `returnTo` (`APP_OAUTH_RETURN` from the phone). */
     install(orgId: string, returnTo: string): Promise<string>;
-    /** Unbinds an installation (it stays installed on GitHub). */
-    remove(orgId: string, id: string): Promise<void>;
+    /** Finishes an install the phone started, with what GitHub handed back to the app. */
+    complete(
+      orgId: string,
+      input: { state: string; code: string; installationId: number },
+    ): Promise<{ installation: GitHubAppInstallation }>;
+    /** Unbinds an installation and uninstalls the app from that GitHub account; `uninstalled` false: GitHub didn't. */
+    remove(orgId: string, id: string): Promise<{ uninstalled: boolean }>;
+    /** The server's owner: this server's page that sends the manifest to GitHub, to open. */
+    startManifest(returnTo: string): Promise<string>;
+    /** The server's owner: removes the app made from Settings. */
+    removeSettings(): Promise<GitHubAppSetup>;
     /** Repositories the organization's GitHub reaches, by account. */
     repositories(orgId: string): Promise<GitHubRepositories>;
     /** The organizations the GitHub connection reaches now, and GitHub's page to grant more (admins). */

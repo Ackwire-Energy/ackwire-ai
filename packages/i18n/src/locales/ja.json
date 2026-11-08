@@ -9523,18 +9523,34 @@
   },
   "githubApp": {
     "title": "GitHubリポジトリ",
-    "text": "エージェントがコードやプルリクエストに使えるアカウントとリポジトリに、GitHubアプリをインストールしてください。ここからインストールしたものを使うのは{{org}}だけです。",
-    "install": "GitHubアプリをインストール",
+    "text": "agentes.chat アプリがインストールされている場所では、エージェントがアプリとしてプルリクエスト、Issue、コメント、コミットを作成し、エージェントの名前と依頼した人が添えられます。ここからインストールしたものを使うのは{{org}}だけです。",
+    "install": "agentes.chat アプリをインストール",
+    "installMore": "別のアカウントにインストール",
     "none": "GitHubアカウントはまだありません。",
+    "usingAccount": "現在、エージェントはGitHubで{{account}}として表示されます。アプリをインストールすると、agentes.chat アプリとして表示されます。",
     "allRepos": "すべてのリポジトリ",
     "someRepos": "選択したリポジトリ",
     "suspended": "GitHubで停止中",
+    "manage": "GitHubで管理",
+    "manageName": "GitHubで{{account}}を管理",
     "remove": "削除",
     "removeName": "{{account}}を削除",
-    "removed": "{{account}}を削除しました。GitHubにはインストールされたままです。必要ならGitHubでアンインストールしてください。",
-    "installed": "GitHubアプリをインストールしました。",
+    "removeTitle": "{{account}}からアプリを削除しますか？",
+    "removeText": "agentes.chat アプリはGitHubの{{account}}からアンインストールされ、エージェントはアプリ経由でそのアカウントのリポジトリを使わなくなります。",
+    "removeLast": "これが最後なので、誰かがアプリをインストールするかアカウントを接続するまで、エージェントはGitHubを使えません。",
+    "removed": "{{account}}からアプリを削除し、GitHubでアンインストールしました。",
+    "notUninstalled": "ここではアプリを削除しましたが、GitHubは{{account}}からのアンインストールを確認していません。GitHubでアンインストールしてください。",
+    "openPage": "開く",
+    "installed": "agentes.chat アプリをインストールしました。",
     "requested": "GitHubアカウントのオーナーにアプリのインストールを依頼しました。インストールされると、ここに表示されます。",
     "notVisible": "あなたのGitHubアカウントからは、そのインストールが見えません。アクセス権のあるアカウントでインストールしてください。",
+    "otherWorkspace": "このGitHubアカウントはすでに別のワークスペースに紐づいています。そちらでアプリを削除してから、ここでインストールしてください。",
+    "connectAccount": "GitHubアカウントを接続",
+    "ownerHint": "このサーバーのオーナーが、ここのコネクタでGitHubアプリを作成できます。",
+    "viaApp": "{{accounts}}の agentes.chat アプリ経由",
+    "disconnectApp": "agentes.chat アプリはGitHubの{{accounts}}からもアンインストールされます。",
+    "disconnectKeepsApp": "エージェントは{{accounts}}の agentes.chat アプリ経由でGitHubを使い続けます。",
+    "keptApp": "GitHubアカウントの接続を解除しました。エージェントは agentes.chat アプリ経由でGitHubを使い続けます。",
     "signature": {
       "forPerson": "{{agent}}、agentes.chat の {{person}} のエージェント",
       "alone": "{{agent}}、agentes.chat のエージェント"
@@ -9542,6 +9558,27 @@
     "manifestPage": {
       "title": "GitHub アプリを作成しています",
       "continue": "GitHub で続ける"
+    },
+    "server": {
+      "title": "このサーバーのGitHubアプリ",
+      "lead": "これがあれば、エージェントはGitHubで誰かのアカウントではなくアプリとして表示されます。",
+      "without": "GitHubがすべて入力済みのアプリをあなたのアカウントに作成し、ここに戻ってきます。組織の所有にするには、後でGitHubで移管してください。",
+      "create": "GitHubでアプリを作成",
+      "state": {
+        "off": "オフ",
+        "on": "オン",
+        "invalid": "無効"
+      },
+      "line": {
+        "env": "このサーバーの設定で指定されています（GITHUB_APP_ID）。",
+        "invalid": "このサーバーは保存されたアプリを開けません。削除して作り直してください。"
+      },
+      "open": "GitHubで開く",
+      "remove": "アプリを削除",
+      "removeTitle": "このサーバーのGitHubアプリを削除しますか？",
+      "removeText": "ここのすべてのワークスペースが、すぐにこのアプリ経由でGitHubに接続できなくなります。アプリはGitHubに残り、そこで削除できます。",
+      "created": "GitHubアプリを作成しました。ここのワークスペースでインストールできるようになりました。",
+      "removed": "このサーバーからGitHubアプリを削除しました。"
     }
   },
   "oauthReturn": {
@@ -10412,6 +10449,15 @@
     "namePlaceholder": "例: サポート",
     "continueIn": "{{name}}で続ける",
     "continueInComposio": "Composioで続ける",
+    "github": {
+      "how": "エージェントがGitHubを使う方法",
+      "app": "agentes.chat アプリ",
+      "recommended": "おすすめ",
+      "appText": "エージェントはアプリとして表示され、リポジトリはGitHubで選びます。",
+      "account": "GitHubアカウント",
+      "accountText": "エージェントはそのアカウントとして表示されます。GitHub Projectsにはアカウントが必要です。",
+      "appNote": "アカウントとリポジトリをGitHubで選んで、ここに戻ってきます。"
+    },
     "githubOrgs": {
       "title": "届いている組織",
       "none": "組織はまだありません。",
