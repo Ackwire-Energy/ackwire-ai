@@ -56,6 +56,7 @@ type Info = {
   installable: boolean;
   installations: { id: string; installationId: number; accountLogin: string; manageUrl: string }[];
   setup: { source: string | null; slug: string | null; canCreate: boolean } | null;
+  ownerCreates: boolean;
 };
 
 const signHook = (body: string, secret: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
@@ -71,6 +72,7 @@ test("install from the app: state, callback binding, list, and the webhook unbin
     installable: true,
     installations: [],
     setup: { source: "env", slug: "agentes-chat", htmlUrl: null, state: "ok", canCreate: false },
+    ownerCreates: false,
   } as unknown as Info);
 
   const { installUrl } = (await (
@@ -142,6 +144,12 @@ test("without the app configured: not installable, webhook not mounted, the owne
   const info = (await (await owner(`/api/app/organizations/${orgId}/github-app`)).json()) as Info;
   expect(info.installable).toBe(false);
   expect(info.setup).toMatchObject({ source: null, canCreate: true });
+  // Another admin isn't told the server's app, only that its owner can make one.
+  const admin = await joinByInvitation(t, owner, orgId, "admin@example.com", { role: "admin" });
+  expect((await (await admin(`/api/app/organizations/${orgId}/github-app`)).json()) as Info).toMatchObject({
+    setup: null,
+    ownerCreates: true,
+  });
   expect((await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: {} })).status).toBe(400);
   const hook = await t.app.request("/api/github-app/webhook", { method: "POST", body: "{}" });
   expect(hook.status).toBe(404);
@@ -386,4 +394,9 @@ test("the server's app is the environment's when set (409), and nobody's on agen
   });
   expect(signedUp.status).toBe(200);
   expect((await first("/api/app/github-app/manifest", { json: {}, origin })).status).toBe(404);
+  const made = (await (
+    await first("/api/app/organizations", { json: { name: "Acme", context: "Acme builds rockets." }, origin })
+  ).json()) as { organization: { id: string } };
+  const seen = await first(`/api/app/organizations/${made.organization.id}/github-app`, { origin });
+  expect((await seen.json()) as Info).toMatchObject({ setup: null, ownerCreates: false });
 });

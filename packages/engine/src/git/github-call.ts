@@ -54,7 +54,7 @@ export const appPermissionsFor = (tool: string, scope: string): AppPermissions[]
 export function appMissMessage(target: string, miss: AppTokenMiss | "no_app" | "account_only"): string {
   switch (miss) {
     case "not_installed":
-      return `The agentes.chat GitHub app isn't installed on ${target} for this workspace, so GitHub can't be reached there. Tell the person: an admin adds ${target} to the app in Settings › Connectors › GitHub repositories (Choose repositories).`;
+      return `The agentes.chat GitHub app isn't installed on ${target} for this workspace, so GitHub can't be reached there. Tell the person: an admin adds ${target} to the app in Settings › Connectors › GitHub repositories (Manage on GitHub).`;
     case "refused":
       return `GitHub didn't let the agentes.chat app do this on ${target}: the app doesn't have that permission. Tell the person: an admin can connect a GitHub account in Settings › Connectors, and agents then do it as that account.`;
     case "unreachable":

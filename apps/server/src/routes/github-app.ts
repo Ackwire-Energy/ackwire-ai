@@ -156,11 +156,16 @@ export function githubAppRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "The GitHub App: whether it can be installed here, this organization's installations, the server's app",
-      description: `Installations are checked with GitHub first, at most once a minute per organization: one uninstalled there is gone here. \`setup\`: the server's own app, for its pinned owner only (null for anyone else, and on agentes.chat).`,
+      description: `Installations are checked with GitHub first, at most once a minute per organization: one uninstalled there is gone here. \`setup\`: the server's own app, for its pinned owner only (null for anyone else, and on agentes.chat). \`ownerCreates\`: the server has no app and its owner can make one in Settings, so the admins can be told who to ask (false on agentes.chat).`,
       request: { params: OrgParams },
       responses: {
         200: json(
-          z.object({ installable: z.boolean(), installations: z.array(Installation), setup: Setup.nullable() }),
+          z.object({
+            installable: z.boolean(),
+            installations: z.array(Installation),
+            setup: Setup.nullable(),
+            ownerCreates: z.boolean(),
+          }),
         ),
         ...errors,
       },
@@ -174,11 +179,14 @@ export function githubAppRoutes(deps: AppDeps) {
       );
       const rows = await listGitHubAppInstallations(deps.db, userId, orgId);
       const holder = await ownerSettings(userId);
+      const ownerCreates =
+        settings !== undefined && !isAgentesCloud(deps.config.PUBLIC_URL) && (await settings.view()).source === null;
       return c.json(
         {
           installable: githubAppInstallable(install.app),
           installations: rows.map(githubAppInstallationView),
           setup: holder ? await setupOf(holder) : null,
+          ownerCreates,
         },
         200,
       );
