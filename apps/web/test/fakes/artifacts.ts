@@ -222,8 +222,11 @@ export function createMockArtifacts(
     poll: async (_orgId, id) => openPoll(id),
     vote: async (_orgId, id) => openPoll(id),
     choices: async (_orgId, id) => ({ id, answer: null }),
-    answerChoices: async (_orgId, id, picks) => ({
-      choices: { id, answer: { userId: "me", picks, messageId: null, at: new Date().toISOString() } },
+    answerChoices: async (_orgId, id, picks, _clientId, others) => ({
+      choices: {
+        id,
+        answer: { userId: "me", picks, messageId: null, at: new Date().toISOString(), ...(others ? { others } : {}) },
+      },
       messageId: mockId("msg"),
     }),
     versions: async (orgId, id) =>

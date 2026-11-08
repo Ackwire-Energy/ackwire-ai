@@ -80,6 +80,25 @@ describe("#channel autocomplete", () => {
   });
 });
 
+describe("@mention autocomplete", () => {
+  test("Enter on a name typed in full picks it and posts nothing; the next Enter sends", async () => {
+    const { state } = await go(`c/${GENERAL_ID}`);
+    const box = composer();
+    await typeIn(box, "oi @ada");
+    expect(screen().getByRole("listbox", { name: "Pessoas e agentes" })).toBeTruthy();
+    await keyDown(box, "Enter");
+    expect(box.value).toBe("oi @ada ");
+    expect(box.getAttribute("aria-expanded")).toBe("false");
+    expect(state.calls.filter((c) => c.method === "chat.post")).toHaveLength(0);
+    await typeIn(box, "oi @ada pode revisar?");
+    await keyDown(box, "Enter");
+    await settle(4);
+    expect(
+      state.calls.filter((c) => c.method === "chat.post").map((c) => (c.args[2] as { body: string }).body),
+    ).toEqual(["oi @ada pode revisar?"]);
+  });
+});
+
 describe("#channel links in messages", () => {
   test("a #name of a channel I see links to it (any case); code and other words stay text", async () => {
     await go(`c/${GENERAL_ID}`, withMessage("Leva para #ENG, não `#eng` nem #nada"));

@@ -106,7 +106,7 @@ import type { TaskSecrets } from "./tasks";
  *   several processes of one user). In system mode, a sign-in made `shared`
  *   (`<id>.shared` beside its folder) is root's alone and never lent: a
  *   Claude one is `claude setup-token`'s token (`token.json`, 600), signed in
- *   in a terminal of its own (`spawnToken`), a coding plan's is its key, and
+ *   in a terminal of its own (`spawnInTerminal`), a coding plan's is its key, and
  *   `grant` hands what a turn needs to the agent's worker.
  * - Claude's own login for all agents (`sharedLogin`; `<id>.method` says
  *   `cli_shared`, read as `cli_login` by everything outside this file): the
@@ -377,6 +377,10 @@ const WHOLE_OAUTH_TOKEN = new RegExp(`^${OAUTH_TOKEN.source}$`);
 const OAUTH_TOKENS = new RegExp(OAUTH_TOKEN.source, "g");
 /** The terminal `claude setup-token` draws its screen in: wide enough that its link and token never wrap. */
 const TOKEN_TERMINAL = { cols: 500, rows: 200 } as const;
+/** The Antigravity CLI's sign-in terminal: wide, so its Google link, printed on one line, never wraps. */
+const LOGIN_TERMINAL = { cols: 2000, rows: 50 } as const;
+/** A CLI turning bracketed paste on (`h`) or off (`l`) in its terminal. */
+const PASTE_MODE = new RegExp(`${String.fromCharCode(27)}\\[\\?2004([hl])`, "g");
 /** Between pasting a code into that screen and pressing Enter: the field takes the paste first. */
 const PASTE_ENTER_MS = 300;
 /** After the CLI exits, how long its last output may still take to arrive. */
@@ -1164,7 +1168,7 @@ export interface SharedLogin {
 /** The real `lending.chown`. */
 export const lchownTree: Chown = (file, uid, gid) => lchown(file, uid, gid);
 
-/** `claude setup-token` in its terminal. */
+/** A sign-in's CLI in a terminal of its own (`spawnInTerminal`). */
 interface TokenProcess {
   pid?: number;
   kill(signal: NodeJS.Signals): unknown;
@@ -1177,10 +1181,15 @@ interface Login {
   dir: string;
   /** None for a key account: nothing signs in but the key. */
   child?: ChildProcess;
-  /** System mode, a Claude sign-in for all agents: `claude setup-token`, its screen and the token once shown. */
+  /**
+   * A CLI that signs in only in a terminal (`spawnInTerminal`): system mode's Claude sign-in for all agents
+   * (`claude setup-token`, with its screen and the token once shown) or the Antigravity CLI's.
+   */
   term?: TokenProcess;
   screen?: Screen;
   token?: string;
+  /** The CLI turned bracketed paste on in its terminal: a paste reaches it wrapped in its marks, as a terminal sends one. */
+  brackets?: boolean;
   /** System mode: made for all agents (`<id>.shared` once it signs in). */
   shared: boolean;
   /** Claude's own login for all agents: its CLI runs as the sign-in's user (`sharedCli`). */
@@ -1532,7 +1541,8 @@ export class AccountManager {
       again,
     };
     try {
-      if (forAll && kind === "claude_code" && !cliShared) this.spawnToken(login);
+      if (forAll && kind === "claude_code" && !cliShared) this.spawnInTerminal(login, ["setup-token"]);
+      else if (kind === "antigravity") this.spawnInTerminal(login, LOGIN_ARGS.antigravity);
       else this.spawnLogin(login, email);
     } catch (err) {
       if (!again) await this.discard(kind, loginId);
@@ -1640,30 +1650,37 @@ export class AccountManager {
   }
 
   /**
-   * System mode, a Claude sign-in for all agents: `claude setup-token`, which draws its screen only in a
-   * terminal, in one of its own. Its link, and once signed in its token, are read off that screen; the token is
-   * taken as soon as it is whole, since the screen may be gone when the CLI ends.
+   * A sign-in whose CLI needs a terminal of its own, in one. System mode's Claude sign-in for all agents
+   * (`claude setup-token`) draws its screen only in a terminal: its link, and once signed in its token, are read off
+   * that screen, the token taken as soon as it is whole, since the screen may be gone when the CLI ends. The
+   * Antigravity CLI's `acp --login` reads the pasted code only from its terminal (with none it says "no controlling
+   * terminal; cannot complete interactive login", 1.5.3): what it prints is read as it comes.
    */
-  private spawnToken(login: Login) {
+  private spawnInTerminal(login: Login, args: readonly string[]) {
     const [file, ...pre] = this.command(login.kind);
     const env: NodeJS.ProcessEnv = { ...this.env(login.kind, login.dir), TERM: "xterm-256color" };
     // Held by the sign-in only, so the token on it goes once the sign-in settles.
-    login.screen = new Screen();
+    if (login.kind === "claude_code") login.screen = new Screen();
     const decoder = new TextDecoder();
     let eof: () => void = () => undefined;
     const lastOutput = new Promise<void>((resolve) => {
       eof = resolve;
     });
-    const proc = Bun.spawn([resolveCommand(file ?? "", env.PATH), ...pre, "setup-token"], {
+    const proc = Bun.spawn([resolveCommand(file ?? "", env.PATH), ...pre, ...args], {
       cwd: login.dir,
       env,
       terminal: {
-        ...TOKEN_TERMINAL,
+        ...(login.screen ? TOKEN_TERMINAL : LOGIN_TERMINAL),
         data: (_t, bytes) => {
+          if (login.state !== "waiting") return;
+          const text = decoder.decode(bytes, { stream: true });
+          const mode = text.match(PASTE_MODE)?.at(-1);
+          if (mode) login.brackets = mode.endsWith("h");
           const screen = login.screen;
-          if (login.state !== "waiting" || !screen) return;
-          screen.write(decoder.decode(bytes, { stream: true }));
-          login.token ??= parseSetupToken(screen.text()) ?? undefined;
+          if (screen) {
+            screen.write(text);
+            login.token ??= parseSetupToken(screen.text()) ?? undefined;
+          } else login.output = (login.output + text).slice(-OUTPUT_KEEP);
           login.watch?.();
         },
         exit: () => eof(),
@@ -1770,9 +1787,12 @@ export class AccountManager {
     }
     login.code = code;
     if (login.term) {
-      // As a terminal sends a paste, then Enter: typed one key at a time, a code starting with "c" would copy the
-      // link instead (the screen's shortcut while its field holds only that letter).
-      login.term.write(`${ESC}[200~${code}${ESC}[201~`);
+      // As a terminal sends a paste, then Enter. Claude Code's screen takes it wrapped in bracketed-paste marks (typed
+      // one key at a time, a code starting with "c" would copy the link instead, the screen's shortcut while its
+      // field holds only that letter). Another CLI gets the marks only once it turned them on, as from a terminal:
+      // a prompt that never asked for them would read them as part of the code.
+      const wrap = login.kind === "claude_code" || login.brackets === true;
+      login.term.write(wrap ? `${ESC}[200~${code}${ESC}[201~` : code);
       const enter = setTimeout(() => {
         if (login.state === "waiting") login.term?.write("\r");
       }, PASTE_ENTER_MS);
@@ -1891,7 +1911,7 @@ export class AccountManager {
     login.watch?.();
     if (login.state !== "waiting") return;
     void (async () => {
-      if (login.term) {
+      if (login.screen) {
         const token = parseSetupToken(this.shown(login), true) ?? login.token;
         if (code === 0 && token && (await this.keepToken(login, token))) return;
         if (code === 0 && login.state === "waiting") {

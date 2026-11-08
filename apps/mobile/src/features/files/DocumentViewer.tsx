@@ -6,10 +6,10 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-import { Button, IconButton, Text, ToastHost } from "@/ui";
+import { Button, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { goBack, MONO } from "../shared/parts";
+import { copyText, goBack, MONO } from "../shared/parts";
 import { useFileActions } from "./actions";
 import { type FileInfo, fileInfo } from "./logic";
 import { FileTile, useFileLine } from "./MessageFiles";
@@ -39,8 +39,18 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const query = useArtifact(orgId, id, version);
   const detail = query.data;
   const actions = useFileActions(detail);
+  const toast = useToast();
   const info = detail ? fileInfo(detail) : null;
+  const textual = info?.view === "markdown" || info?.view === "text";
+  // The page's own text, read once for the page and for Copiar texto.
+  const text = useFileText(detail, textual);
   const close = () => goBack();
+  const copy = () => {
+    if (text.data === undefined) return;
+    void copyText(text.data).then((ok) =>
+      toast(ok ? { title: t("contextMenu.textCopied"), icon: "copy" } : { title: t("mobile.app.failed"), icon: "x" }),
+    );
+  };
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
   const shows = info
@@ -51,6 +61,8 @@ function Viewer({ id, version }: { id: string; version?: number }) {
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <IconButton icon="x" plate label={t("mobile.common.close")} onPress={close} />
+        {/* Copiar texto's twin on this side: the title stays centred on the screen. */}
+        {textual ? <View style={styles.balance} /> : null}
         <View style={styles.title}>
           <Text variant="subhead" style={styles.bold} numberOfLines={1}>
             {info?.name ?? ""}
@@ -59,6 +71,15 @@ function Viewer({ id, version }: { id: string; version?: number }) {
             {info && detail ? line(info, [dir.nameOf(detail.createdBy)]) : ""}
           </Text>
         </View>
+        {textual ? (
+          <IconButton
+            icon="copy"
+            plate
+            label={t("contextMenu.copyText")}
+            onPress={copy}
+            disabled={text.data === undefined}
+          />
+        ) : null}
         <IconButton
           icon="more"
           plate
@@ -117,17 +138,23 @@ function Center({ children }: { children: React.ReactNode }) {
   return <View style={styles.center}>{children}</View>;
 }
 
+/** A Markdown or text file's text, loaded once per version. */
+function useFileText(detail: ArtifactDetail | undefined, enabled: boolean) {
+  const api = useApi();
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: ["org", orgId, "artifacts", "text", detail?.id, detail?.shownVersion] as const,
+    queryFn: () => fileText(api, orgId, detail as ArtifactDetail),
+    enabled: enabled && detail !== undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 /** Markdown with the messages' renderer, plain text in mono, on a raised page. */
 function TextPage({ detail, markdown }: { detail: ArtifactDetail; markdown: boolean }) {
   const { t } = useTranslation();
-  const api = useApi();
-  const orgId = useOrgId();
   const c = useColors();
-  const text = useQuery({
-    queryKey: ["org", orgId, "artifacts", "text", detail.id, detail.shownVersion] as const,
-    queryFn: () => fileText(api, orgId, detail),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
+  const text = useFileText(detail, true);
   return (
     <View style={[styles.page, { backgroundColor: c.raised }]}>
       {text.data !== undefined ? (
@@ -265,6 +292,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
   title: { flex: 1, minWidth: 0, alignItems: "center" },
+  balance: { width: ICON_BUTTON_SIZE },
   bold: { fontWeight: "600" },
   body: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 6 },

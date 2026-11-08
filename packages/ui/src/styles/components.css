@@ -2050,6 +2050,9 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 }
 .ac-menu__item {
   display: flex;
+  /* A long menu scrolls in its flex column: a row keeps its own height, or one with a description line would shrink
+     to the row minimum and lie over the next. */
+  flex-shrink: 0;
   align-items: flex-start;
   gap: var(--space-2);
   width: 100%;

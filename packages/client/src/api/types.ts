@@ -3146,16 +3146,25 @@ export type ArtifactContent =
   | { kind: "choices"; questions: ChoiceQuestion[] }
   | ArtifactFileContent;
 
-/** One question of a choice card (ADR 0124): its options show as A, B, C… */
+/** One question of a choice card (ADR 0124): its options show as A, B, C…, then "Outra resposta". */
 export interface ChoiceQuestion {
   question: string;
   options: { label: string; description?: string }[];
 }
 
-/** A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order. */
+/**
+ * A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order; one past a
+ * question's last option is a written answer, its text in `others` at that place.
+ */
 export interface Choices {
   id: string;
-  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+  answer: {
+    userId: string;
+    picks: number[];
+    messageId: string | null;
+    at: string;
+    others?: (string | null)[];
+  } | null;
 }
 
 /** Who set a block's value last; `drawn`: the server picked it among that many options. */

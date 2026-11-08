@@ -4277,6 +4277,8 @@
           "stepTwo": "Tempel kode yang ditampilkan Claude",
           "codeLabel": "Kode Claude",
           "notCode": "Itu sepertinya bukan kode Claude.",
+          "stepTwoGoogle": "Tempel kode yang ditampilkan Google",
+          "codeLabelGoogle": "Kode atau tautan",
           "send": "Kirim ke {{computer}}",
           "sending": "Mengirim kode ke {{computer}}…",
           "sent": "Kode terkirim. Menyelesaikan proses masuk di {{computer}}.",

@@ -21,29 +21,40 @@ export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "nee
   inPlan?: boolean;
 }
 
+const planChoice = (m: PlanModel, value: string): BrainModelChoice => ({
+  value,
+  label: m.label,
+  ...(m.tag ? { tag: m.tag } : {}),
+  ...(m.needs ? { needs: m.needs } : {}),
+  ...(m.free ? { free: m.free } : {}),
+  ...(m.maker ? { maker: m.maker } : {}),
+});
+
+/** How OpenCode's CLI names a model of the Go plan, which an OpenCode key runs (`OPENCODE_API_KEY`, as models.dev says). */
+export const opencodeGoModel = (id: string) => `opencode-go/${id}`;
+
 /**
  * A computer brain's model choices (web and phone): every model of the account's coding plan, each by its alias
- * where it has one (`planModelValue`), else the brain's own (`models`, Claude's aliases or Codex's).
+ * where it has one (`planModelValue`), else the brain's own (`models`: Claude's aliases, Codex's, what the computer's
+ * CLI lists). An OpenCode key (`provider` `zen`) adds OpenCode Go's models: the computer lists its CLI's models with
+ * no key, OpenCode's free tier alone, so a Go model a key pays for would never show.
  */
-export const brainModelChoices = (
+export function brainModelChoices(
   plan: CodingPlan | undefined,
   models: readonly { value: string; label: string; inPlan?: boolean; free?: boolean }[],
-): BrainModelChoice[] =>
-  plan
-    ? plan.claudeCode.models.map((m) => ({
-        value: planModelValue(m),
-        label: m.label,
-        ...(m.tag ? { tag: m.tag } : {}),
-        ...(m.needs ? { needs: m.needs } : {}),
-        ...(m.free ? { free: m.free } : {}),
-        ...(m.maker ? { maker: m.maker } : {}),
-      }))
-    : models.map(({ value, label, inPlan, free }) => ({
-        value,
-        label,
-        ...(inPlan ? { inPlan } : {}),
-        ...(free ? { free } : {}),
-      }));
+  provider?: string | null,
+): BrainModelChoice[] {
+  if (plan) return plan.claudeCode.models.map((m) => planChoice(m, planModelValue(m)));
+  const own = models.map(({ value, label, inPlan, free }) => ({
+    value,
+    label,
+    ...(inPlan ? { inPlan } : {}),
+    ...(free ? { free } : {}),
+  }));
+  if (provider !== "zen") return own;
+  const go = (planOf("opencode")?.claudeCode.models ?? []).map((m) => planChoice(m, opencodeGoModel(m.id)));
+  return [...own, ...go.filter((m) => !own.some((o) => o.value === m.value))];
+}
 
 /**
  * Under OpenCode Go's models (web and phone): Go's key thinks through Claude Code, where OpenCode's free tier

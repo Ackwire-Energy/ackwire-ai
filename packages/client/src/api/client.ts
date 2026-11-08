@@ -1512,12 +1512,16 @@ export interface ApiClient {
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;
     /** A choice card's answer (ADR 0124). */
     choices(orgId: string, id: string): Promise<Choices>;
-    /** Answers a choice card: one option per question, sent to its agent as the person's own message. */
+    /**
+     * Answers a choice card: one option per question, or a written answer (the pick past its last option, the text
+     * in `others` at its place), sent to its agent as the person's own message.
+     */
     answerChoices(
       orgId: string,
       id: string,
       picks: number[],
       clientId: string,
+      others?: (string | null)[],
     ): Promise<{ choices: Choices; messageId: string }>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */

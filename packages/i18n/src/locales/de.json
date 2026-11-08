@@ -4428,6 +4428,8 @@
           "stepTwo": "Füge den Code ein, den Claude anzeigt",
           "codeLabel": "Claude-Code",
           "notCode": "Das sieht nicht nach einem Code von Claude aus.",
+          "stepTwoGoogle": "Füge den Code ein, den Google anzeigt",
+          "codeLabelGoogle": "Code oder Link",
           "send": "An {{computer}} senden",
           "sending": "Code wird an {{computer}} gesendet…",
           "sent": "Code gesendet. Die Anmeldung wird auf {{computer}} abgeschlossen.",

@@ -4562,6 +4562,8 @@
           "stepTwo": "Pega el código que muestra Claude",
           "codeLabel": "Código de Claude",
           "notCode": "Eso no parece el código de Claude.",
+          "stepTwoGoogle": "Pega el código que muestra Google",
+          "codeLabelGoogle": "Código o enlace",
           "send": "Enviar a {{computer}}",
           "sending": "Enviando el código a {{computer}}…",
           "sent": "Código enviado. Terminando el inicio de sesión en {{computer}}.",

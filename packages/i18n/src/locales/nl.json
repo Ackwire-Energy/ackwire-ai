@@ -4452,6 +4452,8 @@
           "stepTwo": "Plak de code die Claude toont",
           "codeLabel": "Claude-code",
           "notCode": "Dat lijkt geen code van Claude.",
+          "stepTwoGoogle": "Plak de code die Google laat zien",
+          "codeLabelGoogle": "Code of link",
           "send": "Naar {{computer}} sturen",
           "sending": "Code naar {{computer}} sturen…",
           "sent": "Code verstuurd. Inloggen wordt afgerond op {{computer}}.",

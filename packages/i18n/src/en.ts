@@ -4511,6 +4511,9 @@ export const en = {
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
           notCode: "That doesn't look like Claude's code.",
+          /** The Gemini sign-in's second step: Google's page shows a code, or lands on one whose link works too. */
+          stepTwoGoogle: "Paste the code Google shows",
+          codeLabelGoogle: "Code or link",
           send: "Send to {{computer}}",
           sending: "Sending the code to {{computer}}…",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",

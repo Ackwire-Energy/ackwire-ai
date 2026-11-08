@@ -1285,9 +1285,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
       choices: (orgId, id) => request<Choices>(`${org(orgId)}/choices/${enc(id)}`),
-      answerChoices: (orgId, id, picks, clientId) =>
+      answerChoices: (orgId, id, picks, clientId, others) =>
         request<{ choices: Choices; messageId: string }>(`${org(orgId)}/choices/${enc(id)}/answer`, {
-          json: { picks, clientId },
+          json: { picks, clientId, ...(others ? { others } : {}) },
         }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,

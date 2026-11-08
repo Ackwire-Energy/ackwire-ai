@@ -18,6 +18,18 @@ export const KIND_ICON = {
 
 export const isArtifactKind = (v: unknown): v is ArtifactKind => ARTIFACT_KINDS.includes(v as ArtifactKind);
 
+/**
+ * The whole text a viewer's "Copiar texto" takes: a document's Markdown, an HTML page's source, a diagram's Mermaid,
+ * a text file's text (code, JSON, Markdown, HTML…, as the server sends it for a file small enough to show). None for
+ * anything else.
+ */
+export function artifactText(content: ArtifactContent): string | undefined {
+  if (content.kind === "document") return content.markdown;
+  if (content.kind === "html") return content.html;
+  if (content.kind === "diagram") return content.mermaid;
+  return content.kind === "file" ? content.text : undefined;
+}
+
 /** `message.meta.artifacts` entries we can show: each file once, at its newest version (where it first came). */
 export function artifactRefs(meta: Record<string, unknown> | undefined): ArtifactRef[] {
   const list = meta?.artifacts;

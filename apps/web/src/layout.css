@@ -7026,12 +7026,14 @@ html:not([data-pointer]) .run-continue:focus-visible {
     padding: 0 16px 12px;
   }
 }
-/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Editar, … and × on the bar. */
+/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Copiar texto, Enviar nova
+   versão, Editar, … and × on the bar. On a phone the actions are their icons alone: with their words the title's column
+   shrank until a file's name wrapped letter by letter. */
 .artifact-sheet__title {
   display: block;
 }
 @media (max-width: 720px) {
-  .artifact-edit__label {
+  .artifact-action__label {
     position: absolute;
     width: 1px;
     height: 1px;

@@ -4260,6 +4260,8 @@
           "stepTwo": "Claude가 보여 주는 코드를 붙여넣으세요",
           "codeLabel": "Claude 코드",
           "notCode": "Claude 코드가 아닌 것 같아요.",
+          "stepTwoGoogle": "Google에 표시된 코드를 붙여넣으세요",
+          "codeLabelGoogle": "코드 또는 링크",
           "send": "{{computer}}(으)로 보내기",
           "sending": "{{computer}}(으)로 코드를 보내는 중…",
           "sent": "코드를 보냈어요. {{computer}}에서 로그인을 마무리하는 중이에요.",

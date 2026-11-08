@@ -127,6 +127,76 @@ describe("calls", () => {
     expect(result.model).toBe(id);
     expect(result.costNanoUsd).toBeUndefined();
     expect(result.usage.inputTokens).toBe(10);
+    // Any other endpoint: no session of ours, the SDK's own User-Agent.
+    expect(req?.headers.get("x-opencode-session")).toBeNull();
+    expect(req?.headers.get("user-agent")).not.toStartWith("agentes.chat/");
+  });
+
+  test("OpenCode (its Go plan): our User-Agent and the conversation's session on every call, both APIs", async () => {
+    const done = chat([
+      { choices: [{ index: 0, delta: { content: "ok" }, finish_reason: "stop" }] },
+      { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } },
+    ]);
+    const go = scripted(done);
+    const provider = createCustomProvider({ fetch: go.fetcher, maxRetries: 0, version: "2026.11.07.9" });
+    const call = (session?: string) =>
+      provider.stream(
+        {
+          model: customModelId(CRED, "deepseek-v4.1-flash"),
+          system: "s",
+          messages: [{ role: "user", content: "hi" }],
+          maxTokens: 100,
+        },
+        {
+          apiKey: "oc_sk_test-key",
+          endpoint: { style: "openai", baseURL: "https://opencode.ai/zen/go/v1" },
+          ...(session ? { session } : {}),
+          onDelta: () => {},
+        },
+      );
+    await call("5f0c2c1e-0000-5000-8000-000000000001");
+    await call();
+    const [first, second] = go.requests;
+    expect(first?.url).toBe("https://opencode.ai/zen/go/v1/chat/completions");
+    expect(first?.headers.get("x-opencode-session")).toBe("5f0c2c1e-0000-5000-8000-000000000001");
+    expect(first?.headers.get("user-agent")).toBe("agentes.chat/2026.11.07.9");
+    // A call of no conversation (the connect dialog's test of each model) is a session of its own.
+    expect(second?.headers.get("x-opencode-session")).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second?.headers.get("user-agent")).toBe("agentes.chat/2026.11.07.9");
+    const messages = scripted(
+      sse([
+        {
+          type: "message_start",
+          message: {
+            id: "m",
+            type: "message",
+            role: "assistant",
+            model: "x",
+            content: [],
+            stop_reason: null,
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        },
+        { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+        { type: "message_stop" },
+      ]),
+    );
+    await createCustomProvider({ fetch: messages.fetcher, maxRetries: 0 }).stream(
+      {
+        model: customModelId(CRED, "minimax-m3"),
+        system: "s",
+        messages: [{ role: "user", content: "hi" }],
+        maxTokens: 100,
+      },
+      {
+        apiKey: "oc_sk_test-key",
+        endpoint: { style: "anthropic", baseURL: "https://opencode.ai/inference/go/anthropic" },
+        session: "conversation-1",
+        onDelta() {},
+      },
+    );
+    expect(messages.requests[0]?.headers.get("x-opencode-session")).toBe("conversation-1");
+    expect(messages.requests[0]?.headers.get("user-agent")).toBe("agentes.chat/dev");
   });
 
   test("Anthropic Messages in its compatible mode; a refusal keeps the server's words", async () => {

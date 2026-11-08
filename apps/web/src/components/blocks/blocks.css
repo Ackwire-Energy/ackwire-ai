@@ -350,10 +350,29 @@
 }
 .choices__picked {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
+}
+/* Beside its 24 px letter: one line sits on the letter's middle, a long written answer wraps under it. */
+.choices__said {
+  min-width: 0;
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+/* "Outra resposta" open: the field under the rows, then Enviar and Cancelar. */
+.choices__write {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+.choices__write-acts {
+  display: flex;
+  gap: var(--space-2);
 }
 .choices__closed {
   display: flex;

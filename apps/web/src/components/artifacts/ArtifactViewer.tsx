@@ -1,6 +1,6 @@
 import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@agenteschat/client";
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@agenteschat/client";
-import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { artifactText, KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
@@ -23,6 +23,7 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { ArtifactMoreMenu, type DownloadFormat, useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { fileSaver } from "./fileSaver";
@@ -108,6 +109,8 @@ export function ArtifactViewer({
   };
   const download = () => save();
   const formats = a ? downloads.formats(a.kind) : [];
+  // The whole text of what's shown (a text or code file, a document, a page's source), copied in one click.
+  const text = a && !editing ? artifactText(a.content) : undefined;
   const canEditNow = Boolean(a?.canEdit && !old && !editing && (a?.kind === "document" || a?.kind === "table"));
   // A snapshot (a screenshot, a photo) has no versions: no history beside it, no "Enviar nova versão" (ADR 0019).
   const versioned = a?.versioned !== false;
@@ -120,19 +123,34 @@ export function ArtifactViewer({
   const sideVersions = versioned && (!image || versionsOpen);
   const focusVersions = () =>
     requestAnimationFrame(() => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus());
+  // Each action's words: on a phone its icon alone (the words stay its name), so the title keeps room to read.
+  const words = (text: string) => <span className="artifact-action__label">{text}</span>;
   const actions = a && (
     <>
       {a.kind === "file" ? (
-        <Button size="sm" variant="ghost" icon="download" className="artifact-download" onClick={download}>
-          {t("artifacts.download")}
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="download"
+          className="artifact-download"
+          title={t("artifacts.download")}
+          onClick={download}
+        >
+          {words(t("artifacts.download"))}
         </Button>
       ) : (
         <Menu
           align="end"
           label={t("artifacts.downloadMenu")}
           trigger={
-            <Button size="sm" variant="ghost" icon="download" className="artifact-download">
-              {t("artifacts.downloadMenu")}
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="download"
+              className="artifact-download"
+              title={t("artifacts.downloadMenu")}
+            >
+              {words(t("artifacts.downloadMenu"))}
             </Button>
           }
         >
@@ -143,9 +161,22 @@ export function ArtifactViewer({
           ))}
         </Menu>
       )}
+      {text && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="copy"
+          className="artifact-copy"
+          title={t("contextMenu.copyText")}
+          onClick={() => void copyText(text, () => toast.show(t("contextMenu.textCopied")))}
+        >
+          {words(t("contextMenu.copyText"))}
+        </Button>
+      )}
       {canUploadVersion && (
         <UploadButton
           variant="ghost"
+          labelClassName="artifact-action__label"
           label={uploader.busy ? t("files.uploadingVersion") : t("files.uploadVersion")}
           busy={uploader.busy}
           onFiles={(files) => void uploader.upload(files.slice(0, 1), { artifactId: a.id })}
@@ -160,7 +191,7 @@ export function ArtifactViewer({
           title={t("artifacts.edit")}
           onClick={() => setEditing(true)}
         >
-          <span className="artifact-edit__label">{t("artifacts.edit")}</span>
+          {words(t("artifacts.edit"))}
         </Button>
       )}
       {image && versioned && (

@@ -94,11 +94,22 @@ export type ArtifactContent =
   | { kind: "choices"; questions: ChoiceQuestion[] }
   | FileContent;
 
-/** One question of a choice card (ADR 0124): its options are shown as A, B, C… */
+/**
+ * One question of a choice card (ADR 0124): its options are shown as A, B, C…, and after them "Outra resposta", a
+ * written answer (picked as the index past the last option).
+ */
 export interface ChoiceQuestion {
   question: string;
   options: { label: string; description?: string }[];
 }
+
+/**
+ * An option that only says "other" (Outra, Outro, Other, Otra, maybe with "opção" or "(escreva)" after it): every
+ * question takes a written answer of its own, so such an option goes, or picking it would answer with the word alone.
+ * ponytail: Portuguese, English and Spanish words; another language's stays an option that answers as its label.
+ */
+const OTHER_OPTION =
+  /^(?:outr[ao]|other|otr[ao])(?:\s+(?:op[cç][aã]o|resposta|coisa|option|answer|opci[oó]n|respuesta))?(?:\s*\(.*\))?[\s.…:!?]*$/iu;
 
 /** A choice card as text, for the model and for search: each question with its lettered options. */
 export function choicesText(questions: ChoiceQuestion[]): string {
@@ -197,6 +208,8 @@ export const ARTIFACT_LIMITS = {
   choiceQuestionChars: 300,
   choiceLabelChars: 120,
   choiceDescriptionChars: 200,
+  /** A question's written answer ("Outra resposta"), in place of its options. */
+  choiceOtherChars: 1000,
   diagramBytes: 200_000,
   tableRows: 10_000,
   tableColumns: 100,
@@ -286,7 +299,8 @@ export function validateContent(raw: unknown): TextContent {
           throw new ValidationError(`a question takes 2 to ${L.choiceOptions} options`);
         if (new Set(options.map((o) => o.label)).size !== options.length)
           throw new ValidationError("options must differ");
-        return { question, options };
+        const named = options.filter((o) => !OTHER_OPTION.test(o.label));
+        return { question, options: named.length > 0 ? named : options };
       });
       return { kind: "choices", questions };
     }

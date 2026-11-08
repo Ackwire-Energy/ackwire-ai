@@ -4587,6 +4587,8 @@
           "stepTwo": "Collez le code affiché par Claude",
           "codeLabel": "Code Claude",
           "notCode": "Cela ne ressemble pas à un code Claude.",
+          "stepTwoGoogle": "Collez le code affiché par Google",
+          "codeLabelGoogle": "Code ou lien",
           "send": "Envoyer à {{computer}}",
           "sending": "Envoi du code à {{computer}}…",
           "sent": "Code envoyé. Fin de la connexion sur {{computer}}.",
