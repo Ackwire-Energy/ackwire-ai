@@ -26,6 +26,9 @@ export interface VoiceSend {
   createdAt: string;
   /** The server it was recorded on: it goes there, with that server's session, whichever is open (ADR 0154). */
   server?: string;
+  /** Why the last try didn't go (an HTTP status or the network's error), kept with the recording to tell it apart. */
+  lastError?: string;
+  tries?: number;
 }
 
 export type VoiceRefusal = "limit" | "refused";
@@ -92,6 +95,14 @@ export function removeBubble(qc: QueryClient, item: Pick<VoiceSend, "orgId" | "c
   }
 }
 
+/** Keeps why a try failed with the recording, and how many tries it took so far. */
+function note(item: VoiceSend, why: string) {
+  queue = read().map((q) =>
+    q.clientId === item.clientId ? { ...q, lastError: why.slice(0, 200), tries: (q.tries ?? 0) + 1 } : q,
+  );
+  write();
+}
+
 function forget(item: VoiceSend) {
   queue = read().filter((q) => q.clientId !== item.clientId);
   write();
@@ -124,7 +135,9 @@ async function upload(item: VoiceSend) {
     const body = (await res.json().catch(() => null)) as { code?: string } | null;
     if (body?.code === "voice_limit" || body?.code === "voice.limit") return "limit" as const;
   }
-  return uploadVerdict(res.status);
+  const verdict = uploadVerdict(res.status);
+  if (verdict === "retry") note(item, `HTTP ${res.status}`);
+  return verdict;
 }
 
 /** Where an item's order matters: its conversation on its server (two conversations never wait on each other). */
@@ -155,7 +168,10 @@ export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefus
     await Promise.all(
       [...lanes.values()].map(async (items) => {
         for (const item of items) {
-          const verdict = await upload(item).catch(() => "retry" as const);
+          const verdict = await upload(item).catch((error: unknown) => {
+            note(item, error instanceof Error ? error.message : String(error));
+            return "retry" as const;
+          });
           if (verdict === "retry") {
             held = true;
             return;
