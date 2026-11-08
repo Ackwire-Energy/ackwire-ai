@@ -29,7 +29,7 @@ import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
 import { ConsultPairRow, useConsultById } from "./ConsultGroup";
-import { useRhythm } from "./look";
+import { useCardTop, useRhythm } from "./look";
 
 const LIST_GAP = 8;
 
@@ -41,9 +41,11 @@ const LIST_GAP = 8;
  */
 export function ReachLines({ message: m }: { message: Message }) {
   const list = reachOf(m.meta);
+  // Cards under the message's words: the body's card gap above them, as every card in a message.
+  const cardTop = useCardTop();
   if (m.author.type !== "agent" || list.length === 0) return null;
   return (
-    <View style={styles.list}>
+    <View style={[styles.list, cardTop]}>
       {list.map((e, i) => (
         <Row key={e.agentId} entry={e} above={list[i - 1]} channelId={m.channelId} authorId={m.author.id ?? ""} />
       ))}

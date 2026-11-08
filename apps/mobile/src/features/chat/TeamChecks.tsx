@@ -8,6 +8,7 @@ import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
 import { boldRuns } from "./actions";
+import { useCardTop } from "./look";
 
 const ICONS: Record<ReturnType<typeof targetKind>, IconName> = {
   email: "mail",
@@ -24,9 +25,11 @@ const ICONS: Record<ReturnType<typeof targetKind>, IconName> = {
  */
 export function TeamChecks({ message: m }: { message: Message }) {
   const list = teamChecksOf(m.meta);
+  // Cards under the message's words: the body's card gap above them, as every card in a message.
+  const cardTop = useCardTop();
   if (m.author.type !== "agent" || list.length === 0) return null;
   return (
-    <View style={styles.list}>
+    <View style={[styles.list, cardTop]}>
       {list.map((c) => (
         <Row key={c.id} check={c} selfId={m.author.id} />
       ))}

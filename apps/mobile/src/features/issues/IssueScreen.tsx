@@ -61,7 +61,7 @@ import { SocialMark } from "@/ui/auth/SocialMarks";
 import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
-import { IssueWorkLine } from "../chat/WorkLine";
+import { IssueWorkLine, useShareWork } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
 import { confirmAction } from "../settings/parts";
 import { Face } from "../shared/Face";
@@ -179,7 +179,7 @@ function IssueView({ number, focusId }: { number: number; focusId: string | null
         >
           <Head issue={i} />
           <WorkCard issue={i} />
-          <IssueWorkLine issue={i} />
+          <IssueWorkLine issue={i} style={styles.section} />
           <ConversationRow issue={i} onOpen={() => openConversation(i)} />
           <Description issue={i} />
           <Criteria issue={i} />
@@ -812,6 +812,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const columnLabel = useColumnLabel();
   const toast = useToast();
   const openConversation = useOpenConversation();
+  const shareWork = useShareWork(i);
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
@@ -938,6 +939,17 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
       },
     },
   ];
+  // Mostrar para todos lives here, not as a fourth action on the work's card (one row of actions there).
+  if (shareWork)
+    items.push({
+      key: "share",
+      icon: "globe",
+      label: t("work.shareEveryone"),
+      onPress: () => {
+        sheet.close();
+        if (!shareWork.pending) shareWork.share();
+      },
+    });
   if (w?.state === "running" && w.runId) {
     const runId = w.runId;
     items.push({
@@ -1002,11 +1014,22 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   centerText: { textAlign: "center" },
-  head: { paddingHorizontal: 20, paddingTop: 6, gap: 6, marginBottom: 14 },
+  head: { paddingHorizontal: 16, paddingTop: 6, gap: 6, marginBottom: 14 },
   bigTitle: { marginVertical: 4 },
   number: { fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  work: { marginHorizontal: 16, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+  // The screen's cards: on the 16 margin, 12 apart (the conversation's card gap, CHAT_RHYTHM.card), radius 20 with the
+  // cut corner. Measured: work card 16 → 16 from the edges, text at 16 + 14 + 24 face + 8 = 62; the work line's card on
+  // the same 16 edges, its text at 16 + 40 = 56.
+  work: {
+    marginHorizontal: 16,
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  section: { marginHorizontal: 16, marginTop: 12 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   steps: { gap: 6 },
   stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
@@ -1014,8 +1037,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   // A long name gives way to the state after it rather than pushing it off the card.
   shrink: { flexShrink: 1 },
-  groupTitle: { paddingTop: 24, paddingBottom: 8, paddingHorizontal: 20, letterSpacing: 0.4 },
-  desc: { paddingHorizontal: 20 },
+  groupTitle: { paddingTop: 24, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  desc: { paddingHorizontal: 16 },
   card: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
   crit: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   // Each list's hairline starts at its words: past the box, or the tile, and the row's gap.
@@ -1038,7 +1061,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 40 },
   talk: {
     marginHorizontal: 16,
-    marginTop: 10,
+    marginTop: 12,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,

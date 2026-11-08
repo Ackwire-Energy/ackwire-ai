@@ -45,6 +45,7 @@ import {
   targetHref,
   viewerCanUndo,
 } from "./actions";
+import { useCardTop } from "./look";
 
 /**
  * What the agent changed with this reply (ADR 0037 round 2), on the card of the reply's tools (a hairline, the cut
@@ -63,12 +64,16 @@ export function Receipts({ message: m }: { message: Message }) {
   );
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
+  // A card under the message's words: the body's card gap above it, as every card in a message.
+  const cardTop = useCardTop();
   if (layout === "none") return null;
   // What changes while it shows (undone, Redo) fades in; what is there when it mounts just shows.
   return (
-    <LayoutAnimationConfig skipEntering>
-      <ReceiptList message={m} list={list} now={now} group={layout === "group"} />
-    </LayoutAnimationConfig>
+    <View style={cardTop}>
+      <LayoutAnimationConfig skipEntering>
+        <ReceiptList message={m} list={list} now={now} group={layout === "group"} />
+      </LayoutAnimationConfig>
+    </View>
   );
 }
 
