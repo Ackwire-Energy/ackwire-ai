@@ -154,6 +154,15 @@ describe("finding the settings", () => {
     expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
   });
 
+  test("Configurações with no section named, opened by a member, lands on their first section with nothing to explain", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go("settings", state);
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(nav.querySelector('[aria-current="page"]')).toBeTruthy();
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
+  });
+
   test("an unknown section goes back to Geral", async () => {
     const { router } = await go("settings/nada");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings`);

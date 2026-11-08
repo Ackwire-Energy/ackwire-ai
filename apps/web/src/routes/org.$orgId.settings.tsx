@@ -4,7 +4,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { settingsSearch } from "@/pages/settings-sections";
 
 /**
- * Settings → Geral. Older OAuth returns (`/settings?connected=…`, `?review=1`)
+ * Settings, no section named: Geral for who opens it. Older OAuth returns (`/settings?connected=…`, `?review=1`)
  * land on Conectores, where they are handled.
  */
 export const Route = createFileRoute("/org/$orgId/settings")({
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/org/$orgId/settings")({
   component: function Settings() {
     return (
       <Main>
-        <SettingsPage section="general" />
+        <SettingsPage />
       </Main>
     );
   },
