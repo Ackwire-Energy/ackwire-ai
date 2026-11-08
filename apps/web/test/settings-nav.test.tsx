@@ -141,6 +141,27 @@ describe("finding the settings", () => {
     expect(screen().getByText("Copyright © 2026 Codari Global, LLC e colaboradores")).toBeTruthy();
   });
 
+  test("Sobre o agentes.chat only on a self-hosted server: agentes.chat Cloud lists it nowhere, its link opens Sua conta", async () => {
+    const nav = () => within(screen().getByRole("navigation", { name: "Seções das configurações" }));
+    const license = () => screen().queryByRole("link", { name: "GNU Affero General Public License v3" });
+    const inPalette = async () => {
+      await act(async () => fireEvent.keyDown(window, { key: "k", metaKey: true }));
+      await type(screen().getByRole("combobox", { name: "Ir para, ou pedir a um agente" }), "sobre");
+      return screen().queryByRole("option", { name: /Sobre o agentes\.chat/ }) !== null;
+    };
+    await go("settings/about", seedState({ authConfig: { cloud: false } }));
+    expect(nav().getByRole("link", { name: "Sobre o agentes.chat" }).getAttribute("aria-current")).toBe("page");
+    expect(license()).not.toBeNull();
+    expect(await inPalette()).toBe(true);
+    cleanup();
+
+    await go("settings/about", seedState({ authConfig: { cloud: true } }));
+    expect(nav().queryByRole("link", { name: "Sobre o agentes.chat" })).toBeNull();
+    expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
+    expect(license()).toBeNull();
+    expect(await inPalette()).toBe(false);
+  });
+
   test("an unknown section goes back to Geral", async () => {
     const { router } = await go("settings/nada");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings`);

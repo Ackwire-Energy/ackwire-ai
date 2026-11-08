@@ -102,6 +102,8 @@ export interface AuthConfig {
   workspaceComputer?: boolean;
   /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
   billingUrl?: string | null;
+  /** One of agentes.chat's own servers (`Instance.cloud`); absent: a self-hosted server too old to say. */
+  cloud?: boolean;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
   /** Where the app reports its own errors (a Sentry-compatible server, ADR 0104); null or absent: nowhere. */

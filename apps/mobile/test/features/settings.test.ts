@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ComputerSetup, Machine, StorageConfig } from "@agenteschat/client";
+import type { AuthConfig, ComputerSetup, Machine, StorageConfig } from "@agenteschat/client";
+import { showsAbout } from "@agenteschat/client/lib/about";
 import { type SetupView, setupView } from "@agenteschat/client/lib/computer";
 import { changedByText, changesSinceLink, skillPendingViews, skillUpdateWords } from "@agenteschat/client/lib/skills";
 import { storageUsageLine } from "@agenteschat/client/lib/storage";
@@ -538,4 +539,23 @@ describe("Armazenamento", () => {
 
 test("the export's file name, as the web saves it", () => {
   expect(exportFileName(new Date("2026-10-28T12:00:00.000Z"))).toBe("agentes-chat-2026-10-28.json");
+});
+
+test("Sobre o agentes.chat in Você: on every self-hosted server, old ones too; never on agentes.chat Cloud", () => {
+  const server = (cloud?: boolean): AuthConfig => ({
+    socialProviders: { google: false, github: false },
+    signupOpen: false,
+    firstRun: false,
+    ...(cloud === undefined ? {} : { cloud }),
+  });
+  expect(showsAbout(server(false))).toBe(true);
+  expect(showsAbout(server())).toBe(true);
+  expect(showsAbout(server(true))).toBe(false);
+  // Nor before the server says which it is: the Cloud never shows it for a moment.
+  expect(showsAbout(undefined)).toBe(false);
+  const me = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", "MeScreen.tsx"), "utf8");
+  expect(me).toContain("const about = showsAbout(useAuthConfig().data);");
+  expect(me).toContain(
+    '...(about ? [{ icon: "info" as const, label: t("settings.section.about"), href: "/me/about" }] : [])',
+  );
 });
