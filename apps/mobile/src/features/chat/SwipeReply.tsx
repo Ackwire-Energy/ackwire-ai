@@ -51,9 +51,9 @@ export function SwipeReply({
   };
   const pan = usePanGesture({
     enabled,
-    // Horizontal intent before anything moves; a vertical move is the list's.
-    activeOffsetX: [14, 1e6],
-    failOffsetY: [-10, 10],
+    // Only a clearly sideways move takes the row (28 across before 6 up or down); anything else is the list's scroll.
+    activeOffsetX: [28, 1e6],
+    failOffsetY: [-6, 6],
     // Not from the screen's left edge: that swipe is the system's way back.
     hitSlop: { left: -24 },
     onUpdate: (e) => {

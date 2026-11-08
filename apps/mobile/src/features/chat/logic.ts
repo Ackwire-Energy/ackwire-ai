@@ -84,15 +84,15 @@ export const quietInset = (look: InsetLook) => (look.faces ? MSG_TEXT : rowBodyI
 /**
  * A message's words per Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), in points, both systems
  * alike. The system's own text size (Dynamic Type, Android's font scale) multiplies them, up to `CHAT_TEXT_MAX_SCALE`.
- * `md`, the default, is under the system body the words had before (17 on 24 on iOS, 16 on 24 on Android); `lg` is
- * iOS's again. Lines about 1.4 times the size.
+ * `md`, the default, is iOS's body (17 on 24), the size people read comfortably in a chat on the phone; the steps
+ * around it go two points each way. Lines about 1.4 times the size.
  */
 export const CHAT_TEXT: Record<ChatTextSize, { fontSize: number; lineHeight: number }> = {
   xs: { fontSize: 13, lineHeight: 18 },
-  sm: { fontSize: 14, lineHeight: 20 },
-  md: { fontSize: 15, lineHeight: 21 },
-  lg: { fontSize: 17, lineHeight: 24 },
-  xl: { fontSize: 19, lineHeight: 27 },
+  sm: { fontSize: 15, lineHeight: 21 },
+  md: { fontSize: 17, lineHeight: 24 },
+  lg: { fontSize: 19, lineHeight: 27 },
+  xl: { fontSize: 21, lineHeight: 29 },
 };
 /**
  * How far the system's text size may grow a message's words and the name over them: every Android scale (up to 2) and

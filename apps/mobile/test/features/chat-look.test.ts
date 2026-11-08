@@ -132,7 +132,7 @@ describe("the rows follow the same choice as the web", () => {
 
 describe("Tamanho do texto on the phone", () => {
   /** Points, before the system's own text size: the words and their line. */
-  const STEPS = { xs: [13, 18], sm: [14, 20], md: [15, 21], lg: [17, 24], xl: [19, 27] } as const;
+  const STEPS = { xs: [13, 18], sm: [15, 21], md: [17, 24], lg: [19, 27], xl: [21, 29] } as const;
 
   for (const step of CHAT_TEXT_SIZES)
     test(`${step}: the words and their line follow the step, the name a step under them`, () => {
@@ -148,14 +148,11 @@ describe("Tamanho do texto on the phone", () => {
       expect(chatCodeOf(CHAT_TEXT[step])).toEqual({ fontSize: fontSize - 2, lineHeight: lineHeight - 1 });
     });
 
-  test("the default is md: smaller than the system body the words had on both systems, the name as it was", () => {
+  test("the default is md: iOS's body on its line, the name a step under it", () => {
     expect(textSizeOf(undefined)).toBe("md");
     const md = CHAT_TEXT.md;
-    for (const os of ["ios", "android"] as const) expect(md.fontSize).toBeLessThan(typeScale(os).body.fontSize);
-    expect(md.lineHeight).toBeLessThan(24);
-    expect(chatNameOf(md)).toEqual({ fontSize: 14, lineHeight: 19 });
-    // `lg` is iOS's body on the line the words had, for whoever wants them back.
-    expect(CHAT_TEXT.lg).toEqual({ fontSize: typeScale("ios").body.fontSize, lineHeight: 24 });
+    expect(md).toEqual({ fontSize: typeScale("ios").body.fontSize, lineHeight: 24 });
+    expect(chatNameOf(md)).toEqual({ fontSize: 16, lineHeight: 22 });
     const sizes = CHAT_TEXT_SIZES.map((s) => CHAT_TEXT[s].fontSize);
     expect([...sizes].sort((a, b) => a - b)).toEqual(sizes);
   });

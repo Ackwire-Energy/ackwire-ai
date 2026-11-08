@@ -18,13 +18,12 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
   type HeaderAction,
-  Icon,
   LargeTitleScreen,
   LIST_PREVIEW,
   ListRow,
@@ -147,7 +146,6 @@ export function AgentsScreen() {
           working={working.length}
           waiting={waiting.length}
           onPress={() => router.push("/task-manager")}
-          color={c.sunken}
         />
       ) : null}
       {/* Equipe's org chart and channels (ADR 0148). */}
@@ -221,12 +219,10 @@ function ManagerRow({
   working,
   waiting,
   onPress,
-  color,
 }: {
   working: number;
   waiting: number;
   onPress: () => void;
-  color: string;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -238,23 +234,20 @@ function ManagerRow({
       .filter(Boolean)
       .join(" · ") || t("mobile.agents.managerQuiet");
   return (
-    <Pressable
+    <ListRow
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={[t("taskManager.title"), line].join(", ")}
-      style={({ pressed }) => [styles.manager, pressed && { backgroundColor: color }]}
-    >
-      <Tile icon="list" size={40} />
-      <View style={styles.grow}>
-        <Text variant="title" numberOfLines={1}>
-          {t("taskManager.title")}
-        </Text>
-        <Text variant="footnote" tone="muted" numberOfLines={1}>
+      leading={<Tile icon="list" size={52} />}
+      title={t("taskManager.title")}
+      sub={
+        <Text variant="subhead" style={{ color: waiting > 0 ? c.amber : c.muted }} numberOfLines={1}>
           {line}
         </Text>
-      </View>
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
+      }
+      subLines={1}
+      chevron
+    />
   );
 }
 
@@ -435,15 +428,6 @@ function AgentRow({
 }
 
 const styles = StyleSheet.create({
-  manager: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 64,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  grow: { flex: 1, minWidth: 0, gap: 2 },
   // The orbit sits on the line's left, 8 before the words, as the state's mark.
   state: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   medium: { fontWeight: weights.medium },

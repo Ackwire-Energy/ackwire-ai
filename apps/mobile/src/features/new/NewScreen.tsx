@@ -103,6 +103,7 @@ export function NewScreen() {
 
   return (
     <SheetSurface>
+      <View style={styles.fill}>
       <View style={styles.head}>
         <Pressable
           onPress={cancel}
@@ -217,6 +218,7 @@ export function NewScreen() {
           </View>
         </Animated.View>
       </ScrollView>
+      </View>
     </SheetSurface>
   );
 }
@@ -281,8 +283,8 @@ const TILE = 36;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  // The sheet's bar: Cancelar at the left, the title centered, 50 tall under the grabber.
-  head: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 50, marginTop: 8, paddingHorizontal: 16 },
+  // The sheet's bar: Cancelar at the left, the title centered, 50 tall, clear of the grabber (5 tall at 5 from the top).
+  head: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 50, marginTop: 14, paddingHorizontal: 16 },
   cancel: { minWidth: 72, minHeight: 44, justifyContent: "center" },
   title: { flex: 1, textAlign: "center" },
   side: { minWidth: 72 },

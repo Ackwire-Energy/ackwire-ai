@@ -53,6 +53,7 @@ export function ArchivedChannelsScreen() {
       ) : null}
       {list.isSuccess && channels.length === 0 ? <EmptyState icon="archive" title={t("channel.archivedNone")} /> : null}
       {channels.length > 0 ? (
+        <View style={styles.in}>
         <GroupedList>
           {channels.map((ch) => (
             <GroupedRow
@@ -66,12 +67,15 @@ export function ArchivedChannelsScreen() {
             />
           ))}
         </GroupedList>
+        </View>
       ) : null}
     </PushedLargeTitle>
   );
 }
 
 const styles = StyleSheet.create({
+  // The grouped card on the screen's 16 margin, as every grouped page's.
+  in: { paddingHorizontal: 16, paddingTop: 4 },
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 32 },
 });
