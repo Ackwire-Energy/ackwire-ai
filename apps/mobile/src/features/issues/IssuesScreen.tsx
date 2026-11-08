@@ -1,9 +1,9 @@
-import { useIssueColumns, useIssues } from "@agenteschat/client";
+import { type Issue, useIssueColumns, useIssues } from "@agenteschat/client";
+import { dueLabel } from "@agenteschat/client/lib/format";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
   Platform,
   RefreshControl,
   ScrollView,
@@ -15,69 +15,112 @@ import {
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Filters, IconButton, SCREEN_X, Text, useReducedMotion } from "@/ui";
+import {
+  Button,
+  Filters,
+  Icon,
+  IconButton,
+  ListRow,
+  PixelOrbit,
+  SCREEN_X,
+  SearchField,
+  SectionHeader,
+  Segmented,
+  SkeletonList,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
+import { Face } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
-import { useColors, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, usePullRefresh } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { FocusLive, PushedHeader } from "../shared/parts";
-import { type BoardColumn, issueBoard } from "./logic";
+import { type BoardColumn, issueBoard, issueState, taskListSections } from "./logic";
 import { BoardCard, ColumnHeader, useColumnLabel } from "./parts";
 
-/** Cards whose agent moves (a long column stays light). */
+/** Cards and rows whose agent moves (a long list stays light). */
 const LIVE_CARDS = 8;
 const COLUMN_GAP = 12;
 /** How much of the next column shows at the edge. */
 const PEEK = 41;
+/** The list's leading column: the check sits where a row's face would. */
+const CHECK_BOX = 52;
+
+type TaskView = "list" | "board";
 
 /**
- * Tasks, pushed from Você, as the board in the pocket: the stages side by side, swiped one at a time with the next
- * one showing at the edge, the tabs on top with their counts. In a column, what waits on someone comes first; custom
- * board columns show as headers. "+" opens "Nova tarefa". Columns are edited on the web only.
+ * Tasks, pushed from Você, in two views on one segmented control under the title. Lista (the default): the large
+ * title and the search of the system, then one list by state, "Para você" first; each row the check in the face's
+ * column of 52, the title, who has it (an agent alive while it works) and its state or due date in words; done is the
+ * green check. Quadro: the stages side by side, swiped one at a time with the next one showing at the edge, the tabs
+ * on top with their counts; custom board columns show as headers. "+" in the bar opens "Nova tarefa"; columns are
+ * edited on the web only. Switching views is a choice made often: it doesn't animate beyond the control's own slide.
  */
 export function IssuesScreen() {
   const { t } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
-  const headerHeight = useHeaderHeight();
-  const { width } = useWindowDimensions();
   const issues = useIssues(orgId);
-  const columns = useIssueColumns(orgId);
-  const pull = usePullRefresh(issues.refetch);
-  const pager = useRef<ScrollViewInstance>(null);
-  const [tab, setTab] = useState(0);
-  // A tab tapped: where the pager is going, so the columns it passes on the way don't light up.
-  const going = useRef<number | null>(null);
-  const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
+  const [view, setView] = useState<TaskView>("list");
   const openNew = () => router.push("/issues/new");
   const mayNew = mayCreate(useOrg().org, "task");
-  const columnWidth = width - PEEK - 16;
-  const step = columnWidth + COLUMN_GAP;
-  const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
-  const onPagerScroll = (x: number) => {
-    const at = columnAt(x);
-    if (going.current === null) setTab(at);
-    else if (at === going.current && Math.abs(x - at * step) < 1) going.current = null;
-  };
-  const go = (index: number) => {
-    going.current = index === tab ? null : index;
-    setTab(index);
-    pager.current?.scrollTo({ x: index * step, animated: true });
-  };
   const empty = issues.isSuccess && (issues.data ?? []).length === 0;
-  return (
-    <View style={[styles.screen, { backgroundColor: c.bg, paddingTop: Platform.OS === "ios" ? headerHeight : 0 }]}>
-      <PushedHeader
-        solid={false}
-        {...(mayNew ? { right: <IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} /> } : {})}
+  const right = mayNew ? <IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} /> : undefined;
+  const views = (
+    <View style={styles.views}>
+      <Segmented
+        wide
+        items={[
+          { key: "list", label: t("mobile.issues.viewList") },
+          { key: "board", label: t("mobile.issues.viewBoard") },
+        ]}
+        value={view}
+        onChange={(k) => setView(k as TaskView)}
       />
-      <Text variant="display" accessibilityRole="header" numberOfLines={1} style={styles.title}>
-        {t("mobile.issues.title")}
-      </Text>
+    </View>
+  );
+  if (view === "board" && !empty) return <Board right={right} views={views} />;
+  return <TaskList right={right} views={views} empty={empty} mayNew={mayNew} onNew={openNew} />;
+}
+
+/** Lista: the search, the views, then the sections ("Para você", Em andamento, Em revisão, A fazer, Feitas hoje). */
+function TaskList({
+  right,
+  views,
+  empty,
+  mayNew,
+  onNew,
+}: {
+  right: ReactNode;
+  views: ReactNode;
+  empty: boolean;
+  mayNew: boolean;
+  onNew: () => void;
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const issues = useIssues(orgId);
+  const pull = usePullRefresh(issues.refetch);
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const sections = useMemo(() => {
+    const all = issues.data ?? [];
+    const shown = query ? all.filter((i) => `${i.title} #${i.number}`.toLowerCase().includes(query)) : all;
+    return taskListSections(shown, meId);
+  }, [issues.data, query, meId]);
+  let row = 0;
+  return (
+    <PushedLargeTitle
+      title={t("mobile.issues.title")}
+      {...(right ? { right } : {})}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+    >
       {issues.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : issues.isError && !issues.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>
@@ -91,40 +134,159 @@ export function IssuesScreen() {
           />
         </View>
       ) : empty ? (
-        <FirstUse place="tasks" acts={mayNew} label={t("mobile.issues.new")} onPress={openNew} />
+        <FirstUse place="tasks" acts={mayNew} label={t("mobile.issues.new")} onPress={onNew} />
       ) : (
         <>
-          <Filters
-            items={board.map((b) => ({
-              key: b.stage,
-              label: t(`mobile.issues.section.${b.stage}`),
-              count: b.count,
-            }))}
-            value={board[tab]?.stage ?? ""}
-            onChange={(k) => go(board.findIndex((b) => b.stage === k))}
-          />
+          <View style={styles.search}>
+            <SearchField
+              value={q}
+              onChangeText={setQ}
+              placeholder={t("mobile.issues.search")}
+              accessibilityLabel={t("mobile.issues.search")}
+              returnKeyType="search"
+            />
+          </View>
+          {views}
+          {sections.length === 0 ? (
+            <Text variant="subhead" tone="faint" style={styles.none}>
+              {query ? t("mobile.issues.noMatch") : t("mobile.issues.columnEmpty")}
+            </Text>
+          ) : null}
           <FocusLive>
-            <ScrollView
-              ref={pager}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={step}
-              decelerationRate="fast"
-              disableIntervalMomentum
-              contentContainerStyle={styles.pager}
-              scrollEventThrottle={32}
-              onScrollBeginDrag={() => {
-                going.current = null;
-              }}
-              onScroll={(e) => onPagerScroll(e.nativeEvent.contentOffset.x)}
-            >
-              {board.map((b) => (
-                <Column key={b.stage} column={b} width={columnWidth} pull={pull} />
-              ))}
-            </ScrollView>
+            {sections.map((s) => (
+              <Fragment key={s.key}>
+                <SectionHeader title={t(`mobile.issues.list.${s.key}`)} count={s.items.length} />
+                {s.items.map((i, n) => {
+                  row += 1;
+                  return <TaskRow key={i.id} issue={i} divider={n > 0} live={row <= LIVE_CARDS} />;
+                })}
+              </Fragment>
+            ))}
           </FocusLive>
         </>
       )}
+    </PushedLargeTitle>
+  );
+}
+
+/**
+ * A task in the list: the check (green once done, faint before), its title, then who has it (the agent's face, its
+ * orbit and "trabalhando" while it works) and its state or due date in words; "espera você" in the waiting color.
+ */
+function TaskRow({ issue: i, divider, live }: { issue: Issue; divider: boolean; live: boolean }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const state = issueState(i);
+  const done = i.status === "done";
+  const running = state === "running";
+  const agent = i.assignee?.type === "agent" ? dir.agentById.get(i.assignee.id) : undefined;
+  const who = i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody");
+  const due = i.dueDate && !done ? dueLabel(t, i18n.language, i.dueDate) : null;
+  const tail = running ? null : state === "waiting" ? t("mobile.issues.waitsYou") : due;
+  const working = t("mobile.issues.state.running").toLocaleLowerCase(i18n.language);
+  return (
+    <ListRow
+      divider={divider}
+      leading={
+        <View style={styles.check}>
+          <Icon name={done ? "checkc" : "circle"} size={24} color={done ? c.ok : c.faint} />
+        </View>
+      }
+      title={i.title}
+      sub={
+        <View style={styles.subLine}>
+          {i.assignee ? <Face who={i.assignee} size={16} live={live} mode={running ? "run" : "idle"} /> : null}
+          <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.shrink}>
+            {who}
+            {tail ? " · " : ""}
+            {tail ? (
+              <Text variant="subhead" style={state === "waiting" ? [styles.bold, { color: c.amber }] : undefined}>
+                {tail}
+              </Text>
+            ) : null}
+            {running ? " · " : ""}
+          </Text>
+          {running ? (
+            <>
+              <PixelOrbit color={agentLook(agent).color} size={11} />
+              <Text variant="subhead" tone="ink2" numberOfLines={1}>
+                {working}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      }
+      accessibilityLabel={[i.title, who, running ? working : tail].filter(Boolean).join(", ")}
+      onPress={() => router.push(`/issues/${i.number}`)}
+    />
+  );
+}
+
+/** Quadro: the stages side by side, as before, under the title and the views. */
+function Board({ right, views }: { right: ReactNode; views: ReactNode }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const orgId = useOrgId();
+  const headerHeight = useHeaderHeight();
+  const { width } = useWindowDimensions();
+  const issues = useIssues(orgId);
+  const columns = useIssueColumns(orgId);
+  const pull = usePullRefresh(issues.refetch);
+  const pager = useRef<ScrollViewInstance>(null);
+  const [tab, setTab] = useState(0);
+  // A tab tapped: where the pager is going, so the columns it passes on the way don't light up.
+  const going = useRef<number | null>(null);
+  const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
+  const columnWidth = width - PEEK - 16;
+  const step = columnWidth + COLUMN_GAP;
+  const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
+  const onPagerScroll = (x: number) => {
+    const at = columnAt(x);
+    if (going.current === null) setTab(at);
+    else if (at === going.current && Math.abs(x - at * step) < 1) going.current = null;
+  };
+  const go = (index: number) => {
+    going.current = index === tab ? null : index;
+    setTab(index);
+    pager.current?.scrollTo({ x: index * step, animated: true });
+  };
+  return (
+    <View style={[styles.screen, { backgroundColor: c.bg, paddingTop: Platform.OS === "ios" ? headerHeight : 0 }]}>
+      <PushedHeader solid={false} {...(right ? { right } : {})} />
+      <Text variant="display" accessibilityRole="header" numberOfLines={1} style={styles.title}>
+        {t("mobile.issues.title")}
+      </Text>
+      {views}
+      <Filters
+        items={board.map((b) => ({
+          key: b.stage,
+          label: t(`mobile.issues.section.${b.stage}`),
+          count: b.count,
+        }))}
+        value={board[tab]?.stage ?? ""}
+        onChange={(k) => go(board.findIndex((b) => b.stage === k))}
+      />
+      <FocusLive>
+        <ScrollView
+          ref={pager}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={step}
+          decelerationRate="fast"
+          disableIntervalMomentum
+          contentContainerStyle={styles.pager}
+          scrollEventThrottle={32}
+          onScrollBeginDrag={() => {
+            going.current = null;
+          }}
+          onScroll={(e) => onPagerScroll(e.nativeEvent.contentOffset.x)}
+        >
+          {board.map((b) => (
+            <Column key={b.stage} column={b} width={columnWidth} pull={pull} />
+          ))}
+        </ScrollView>
+      </FocusLive>
     </View>
   );
 }
@@ -186,8 +348,14 @@ const styles = StyleSheet.create({
   title: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
+  search: { paddingHorizontal: SCREEN_X, paddingBottom: 8 },
+  views: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 8 },
+  check: { width: CHECK_BOX, height: CHECK_BOX, alignItems: "center", justifyContent: "center" },
+  subLine: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0 },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  bold: { fontWeight: "600" },
   pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
   column: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   columnBody: { padding: 10, gap: 10 },
-  none: { padding: 10, textAlign: "center" },
+  none: { padding: 16, textAlign: "center" },
 });

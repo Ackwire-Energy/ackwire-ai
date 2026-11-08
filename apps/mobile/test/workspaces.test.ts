@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { OrgSummary } from "@agenteschat/client";
+import { workspacesBeyond } from "../src/features/me/logic";
 import { orderedServers, unreadElsewhere, workspacesOf } from "../src/features/me/workspaces-logic";
 import { newWorkspaceMade } from "../src/lib/new-workspace";
 import { readPushData } from "../src/lib/push-payload";
@@ -112,6 +113,11 @@ describe("Workspaces", () => {
     expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).failed).toBe(
       false,
     );
+    // Known but silent this time: its workspaces stay, faded.
+    expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).quiet).toBe(
+      true,
+    );
+    expect(down.quiet).toBe(false);
   });
 
   test("a new workspace asked for: over once another workspace is open than when the first run showed", () => {
@@ -119,5 +125,30 @@ describe("Workspaces", () => {
     expect(newWorkspaceMade({ server: cloud, from: "a" }, "a")).toBe(false);
     expect(newWorkspaceMade({ server: cloud, from: "a" }, "new")).toBe(true);
     expect(newWorkspaceMade({ server: cloud, from: null }, "new")).toBe(true);
+  });
+});
+
+describe("Você's workspace row", () => {
+  const group = (current: boolean, ids: string[], failed = false) => ({
+    current,
+    failed,
+    orgs: ids.map((id) => ({ id })),
+  });
+
+  test("how many more, and on how many other servers", () => {
+    // Only the one open: nothing more to say.
+    expect(workspacesBeyond([group(true, ["acme"])], "acme")).toEqual({ others: 0, servers: 0 });
+    // More on this server only.
+    expect(workspacesBeyond([group(true, ["acme", "loja"])], "acme")).toEqual({ others: 1, servers: 0 });
+    // On another server: counted, and that server counted once.
+    expect(workspacesBeyond([group(true, ["acme"]), group(false, ["nimbus", "sol"])], "acme")).toEqual({
+      others: 2,
+      servers: 1,
+    });
+    // A server that didn't answer still means there is more elsewhere.
+    expect(workspacesBeyond([group(true, ["acme"]), group(false, [], true)], "acme")).toEqual({
+      others: 0,
+      servers: 1,
+    });
   });
 });

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { View } from "react-native";
 import { Icon, type IconProps } from "./Icon";
 import { type TextVariant, textLineOf } from "./Text";
+import { useFontScale } from "./text-scale";
 import { leadBox } from "./type-scale";
 
 export type LineIconProps = {
@@ -20,7 +21,7 @@ export type LineIconProps = {
  * row aligned to the top it sits on the first line of wrapping text; in a centered row, on its only line.
  */
 export function LineIcon({ variant = "body", text, ...lead }: LineIconProps) {
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const size = lead.size ?? 20;
   return (
     <View style={leadBox(textLineOf(variant, fontScale, text), size)}>

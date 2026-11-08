@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 import { StyleSheet, TextInput, type TextInputInstance, type TextInputProps } from "react-native";
-import { systemText } from "@/ui";
+import { useSystemText } from "@/ui";
 import { useColors } from "./hooks";
 
 /**
@@ -16,6 +16,8 @@ export function TextArea({
   ...props
 }: Omit<TextInputProps, "ref"> & { minHeight?: number; ref?: Ref<TextInputInstance | null> }) {
   const c = useColors();
+  // What people write grows with their text size, as the text around it.
+  const words = useSystemText("body");
   return (
     <TextInput
       ref={ref}
@@ -23,7 +25,7 @@ export function TextArea({
       textAlignVertical="top"
       placeholderTextColor={c.faint}
       {...props}
-      style={[styles.field, { minHeight, backgroundColor: c.raised, color: c.ink, borderColor: c.line }, style]}
+      style={[styles.field, words, { minHeight, backgroundColor: c.raised, color: c.ink, borderColor: c.line }, style]}
     />
   );
 }
@@ -35,6 +37,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
-    ...systemText("body"),
   },
 });

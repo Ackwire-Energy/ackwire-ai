@@ -1,4 +1,4 @@
-import { keys, useArchivedChannels, useChannelCategories, useChannels } from "@agenteschat/client";
+import { keys, useArchivedChannels, useChannelCategories, useChannels, useMuteChannel } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
@@ -7,9 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, RefreshControl, StyleSheet } from "react-native";
-import { usePush } from "@/providers/push";
-import { GroupedRow, LargeTitleScreen, Text } from "@/ui";
+import { RefreshControl, StyleSheet, View } from "react-native";
+import { GroupedRow, LargeTitleScreen, PULL_TINT, PullOrbit, SkeletonList, SwipeRow } from "@/ui";
 import { router } from "@/ui/navigation";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
@@ -20,13 +19,14 @@ import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { RightHandAsk } from "../right-hand/Pin";
-import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstRunLine } from "./FirstRunLine";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
+import { Arrive, useHomeEntrance, useWake } from "./HomeEntrance";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
 import { HomeWidgets } from "./HomeWidgets";
@@ -45,8 +45,6 @@ import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
 /** Rows of the home whose agent moves (a long list stays light). */
 const LIVE_ROWS = 6;
-/** How long Conversas shows, loaded, before our notifications sheet opens over it (past the launch). */
-const PUSH_OFFER_MS = 2500;
 
 /** A section's "Ver todos", pushed: a kind, or one channel category (ADR 0080). */
 export const openKindList = (kind: ListKind | `category-${string}`) => router.push(`/conversations/${kind}`);
@@ -59,9 +57,10 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * collapsible (remembered), five rows and "Ver todos". Under the greeting, the workspace's own computer while it
  * is being prepared, and a notice per computer that went offline with agents waiting for it. Above the sections a
  * Dashboards row pushes the Dashboards list (ADR 0135 §15). An agent's row says it waits on your ok, waits
- * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
- * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
- * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
+ * for its computer, or what it is doing. A row swiped left pins it on top (or takes it off), the long press's menu
+ * has the rest. While the list loads, rows of its own shape stand in (no spinner, nothing moves when it lands).
+ * Search and Threads have their own tabs. Empty, it invites the first agent. Nothing opens over it on its own: the
+ * offer to turn on notifications comes as a line in the right hand's conversation. When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 const OTHER_CHANNELS = "otherChannels";
@@ -76,6 +75,7 @@ export function ChatsScreen() {
 
 function Home() {
   const { t } = useTranslation();
+  const c = useColors();
   const orgId = useOrgId();
   const qc = useQueryClient();
   const focused = useIsFocused();
@@ -94,6 +94,7 @@ function Home() {
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
   const archived = useArchivedChannels(orgId).data?.length ?? 0;
   const menus = useCategoryMenus();
+  const mute = useMuteChannel(orgId);
   const [waitOpen, setWaitOpen] = useState(false);
 
   useEffect(() => {
@@ -136,28 +137,38 @@ function Home() {
   // Agents already in the team fill the home (Agentes) instead of the invitation to create the first one.
   const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
 
-  const { offer, markOffered } = usePush();
-  const approvalWaits = waiting.items.some((i) => i.kind === "approval");
-  const offerPush = focused && !list.loading && !empty && !failed && (offer.home || (offer.approval && approvalWaits));
-  useEffect(() => {
-    if (!offerPush) return;
-    const timer = setTimeout(() => {
-      if (AppState.currentState !== "active") return;
-      markOffered();
-      router.push("/push-ask");
-    }, PUSH_OFFER_MS);
-    return () => clearTimeout(timer);
-  }, [offerPush, markOffered]);
-  const strip = <WaitingStrip items={waiting.items} open={waitOpen} onOpenChange={setWaitOpen} />;
+  // The first Conversas after the splash arrives as one gesture (once per launch, never holding a tap back): the sky
+  // comes up from the splash's, the greeting rises, the right hand's field follows and its face wakes with a small
+  // hop, and what waits on you lands last. The title stays put: it is where the eye lands.
+  const entrance = useHomeEntrance();
+  const wake = useWake(entrance.armed, entrance.play);
+  const arrive = { armed: entrance.armed, play: entrance.play };
 
-  const ask = pinned.pin && !failed && !list.loading ? <RightHandAsk row={pinned.pin} onStart={startDm} /> : null;
+  const strip = (
+    <Arrive {...arrive} delay={200} rise={10}>
+      <WaitingStrip items={waiting.items} open={waitOpen} onOpenChange={setWaitOpen} />
+    </Arrive>
+  );
+
+  const ask =
+    pinned.pin && !failed && !list.loading ? (
+      <Arrive {...arrive} delay={90}>
+        <RightHandAsk row={pinned.pin} onStart={startDm} faceMode={wake.mode} faceStyle={wake.style} />
+      </Arrive>
+    ) : null;
 
   let live = 0;
   return (
     <LargeTitleScreen
       title={t("mobile.chats.title")}
       {...header}
-      backdrop={empty || failed ? undefined : <GreetingSky />}
+      backdrop={
+        empty || failed ? undefined : (
+          <Arrive {...arrive} rise={0} duration={700} style={StyleSheet.absoluteFill}>
+            <GreetingSky />
+          </Arrive>
+        )
+      }
       below={
         empty || failed ? undefined : (
           <Greeting
@@ -165,10 +176,12 @@ function Home() {
             finished={finished.finished}
             onFinishedPress={(f) => finished.dismiss(f.key)}
             after={ask}
+            arrive={arrive}
           />
         )
       }
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={PULL_TINT} />}
+      pullMark={<PullOrbit refreshing={pull.refreshing} />}
       onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}
     >
       <SetupNotice />
@@ -187,26 +200,64 @@ function Home() {
       ) : empty ? (
         <FirstAgentEmpty />
       ) : list.loading ? (
-        <Text tone="faint" style={styles.center}>
-          {t("mobile.common.loading")}
-        </Text>
+        <>
+          <CollapsibleSection title={t("mobile.chats.section.agents")} count={0} collapsed={false} onToggle={() => {}}>
+            <SkeletonList rows={4} />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title={t("mobile.chats.section.channels")}
+            count={0}
+            collapsed={false}
+            onToggle={() => {}}
+          >
+            <SkeletonList rows={2} />
+          </CollapsibleSection>
+        </>
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);
-          const row = (r: ConversationRow, i: number, shown: boolean) => (
-            <ConversationRowView
-              key={r.key}
-              row={r}
-              divider={i > 0}
-              live={shown && live++ < LIVE_ROWS}
-              agent={agentStates.get(r.key)}
-              pinned={i < (s.pinned ?? 0)}
-              onHold={menus.openRowMenu}
-              holdLabel={t("sidebarPins.pin")}
-              holdActions={menus.rowActionsOf}
-              {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
-            />
-          );
+          const row = (r: ConversationRow, i: number, shown: boolean) => {
+            const view = (
+              <ConversationRowView
+                key={r.key}
+                row={r}
+                divider={i > 0}
+                live={shown && live++ < LIVE_ROWS}
+                agent={agentStates.get(r.key)}
+                pinned={i < (s.pinned ?? 0)}
+                onHold={menus.openRowMenu}
+                holdLabel={t("sidebarPins.pin")}
+                holdActions={menus.rowActionsOf}
+                {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
+              />
+            );
+            // Swiped left: Fixar no topo (or Desafixar), the menu's first action, and on a channel Silenciar (or
+            // Reativar) beside it, on panes; the row stays opaque over them (the hairline and the sky never show).
+            const pin = menus.rowActionsOf(r).find((a) => a.key === "pin");
+            if (!pin) return view;
+            const pinPane = {
+              label: pin.label,
+              icon: "pin" as const,
+              color: c.agent,
+              ink: c.onAgent,
+              onAction: pin.run,
+            };
+            const mutePane =
+              r.kind === "channel"
+                ? {
+                    label: t(r.muted ? "mobile.chats.swipe.unmute" : "mobile.chats.swipe.mute"),
+                    icon: "mute" as const,
+                    color: c.muted,
+                    ink: c.bg,
+                    onAction: () => mute.mutate({ channelId: r.channelId, muted: !r.muted }),
+                  }
+                : null;
+            return (
+              <SwipeRow key={r.key} right={mutePane ? [pinPane, mutePane] : pinPane}>
+                <View style={{ backgroundColor: c.bg }}>{view}</View>
+              </SwipeRow>
+            );
+          };
           const hold = s.categoryId ? menus.categoryMenu(s.categoryId, s.name ?? "") : undefined;
           return (
             <CollapsibleSection
@@ -251,7 +302,3 @@ function Home() {
     </LargeTitleScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { textAlign: "center", paddingVertical: 40 },
-});

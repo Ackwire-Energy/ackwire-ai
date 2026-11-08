@@ -17,8 +17,11 @@ import { Text } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE } from "./type-scale";
 
-/** The sentence's size: a hair under the messages' words, so the event reads as the conversation's, not a voice. */
-const WORDS = { fontSize: 14, lineHeight: 19 } as const;
+/**
+ * The sentence is the `small` variant (15/20): a hair under the messages' words (17), so the event reads as the
+ * conversation's, not a voice, and it grows with the person's text size as they do. Its line, for the time beside it.
+ */
+const WORDS_LINE = 20;
 const MARK = 14;
 /** The small controls' corner, cut at the bottom left (the app's "cut corner"). */
 const RADIUS = 10;
@@ -60,9 +63,9 @@ export function EventPill({ mark, markColor, children, time, actions, below, wai
   const stacked = list.length > 0 && room > 0 && actionsWidth > 0 && room - actionsWidth < ACT_TEXT_MIN;
   const markNode =
     typeof mark === "string" ? (
-      <LineIcon name={mark as IconName} size={MARK} color={markColor ?? c.faint} variant="small" text={WORDS} />
+      <LineIcon name={mark as IconName} size={MARK} color={markColor ?? c.faint} variant="small" />
     ) : (
-      <LineIcon size={MARK} variant="small" text={WORDS}>
+      <LineIcon size={MARK} variant="small">
         {mark}
       </LineIcon>
     );
@@ -71,7 +74,7 @@ export function EventPill({ mark, markColor, children, time, actions, below, wai
       <View style={[styles.frame, stacked ? styles.frameStacked : null, { borderColor: c.line2 }]}>
         <View style={[styles.main, stacked ? null : styles.mainBeside]}>
           {markNode}
-          <Text variant="small" tone={waiting ? "ink" : "ink2"} style={[WORDS, styles.words]}>
+          <Text variant="small" tone={waiting ? "ink" : "ink2"} style={styles.words}>
             {children}
           </Text>
           {time ? (
@@ -169,13 +172,7 @@ export function EventPillAction({
       ) : lead ? (
         <Icon name={lead} size={12} color={primary ? c.ink : c.ink2} />
       ) : null}
-      <Text
-        variant="footnote"
-        tone={primary ? "ink" : "ink2"}
-        numberOfLines={1}
-        maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={styles.label}
-      >
+      <Text variant="label" tone={primary ? "ink" : "ink2"} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
         {label}
       </Text>
       {opens ? (
@@ -220,7 +217,7 @@ const styles = StyleSheet.create({
   },
   mainBeside: { flexShrink: 1, minWidth: 0 },
   words: { flexShrink: 1, minWidth: 0 },
-  time: { lineHeight: WORDS.lineHeight, fontVariant: ["tabular-nums"] },
+  time: { lineHeight: WORDS_LINE, fontVariant: ["tabular-nums"] },
   beside: { flexShrink: 0, flexDirection: "row" },
   // Under the sentence: a hairline across the frame, the actions from its left.
   under: { borderTopWidth: 1, alignItems: "flex-start" },
@@ -230,7 +227,6 @@ const styles = StyleSheet.create({
   slot: { flexDirection: "row", alignItems: "stretch", minHeight: 30 },
   rule: { width: 1 },
   action: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12 },
-  label: { fontSize: 13, fontWeight: "600" },
   spinner: { transform: [{ scale: 0.7 }] },
   dim: { opacity: 0.6 },
   turned: { transform: [{ rotate: "90deg" }] },

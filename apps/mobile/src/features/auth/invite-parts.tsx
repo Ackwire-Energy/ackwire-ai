@@ -2,6 +2,7 @@ import { type InvitationPreview, useAuthConfig } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { Easing, FadeInUp } from "react-native-reanimated";
 import { agentLook } from "@/features/shared/logic";
 import { useSession } from "@/providers/session";
 import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
@@ -65,6 +66,46 @@ export function AgentsThere({ agents, more }: { agents: InvitedAgents; more: num
       <Text variant="small" tone="muted" style={styles.grow}>
         {line}
       </Text>
+    </View>
+  );
+}
+
+/** The team's faces on the sky: as large as the sign-in's agent's frame allows four of them side by side. */
+const CREW_FACE = 56;
+const CREW_MAX = 4;
+
+/**
+ * An invitation's team standing on the sky's edge, before any field (`AuthScaffold`'s `hero`): its first agents,
+ * alive, in their own colors. The first time a screen shows them they rise onto the horizon as one wave (the lead
+ * first, each next one a little sooner and from less far), once; with reduced motion they are simply there.
+ * `happy`: the face they make when you're let in.
+ */
+export function InviteCrew({ agents, happy = false }: { agents: InvitedAgents; happy?: boolean }) {
+  const { reducedMotion } = useTheme();
+  const shown = agents.slice(0, CREW_MAX);
+  if (shown.length === 0) return null;
+  return (
+    <View style={styles.crew} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {shown.map((a, i) => (
+        <Animated.View
+          key={a.id}
+          entering={
+            reducedMotion
+              ? undefined
+              : FadeInUp.duration(360 - i * 30)
+                  .delay(60 + i * Math.max(30, 70 - i * 15))
+                  .easing(Easing.bezier(0.23, 1, 0.32, 1))
+                  .withInitialValues({ transform: [{ translateY: 14 - i * 2 }] })
+          }
+        >
+          <AgentAvatar
+            agent={{ ...agentLook(a), id: a.id }}
+            size={CREW_FACE}
+            framed
+            {...(happy ? { expression: "happy" as const } : {})}
+          />
+        </Animated.View>
+      ))}
     </View>
   );
 }
@@ -158,6 +199,8 @@ export function Said({ reason }: { reason: string }) {
 }
 
 const styles = StyleSheet.create({
+  // The team side by side on the horizon, 12 apart, their feet on the sky's edge like the sign-in's agent.
+  crew: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   lead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },

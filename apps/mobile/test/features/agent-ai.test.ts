@@ -552,10 +552,7 @@ describe("the agent's AI", () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
     expect(await read("ai/logic.ts")).toContain("label: accountTitle(choice.login),");
     // AI accounts' grouped rows take a `label`, the Me page's rows a `title`.
-    for (const [screen, row, prop] of [
-      ["ai/AiAccountsScreen.tsx", "a", "label"],
-      ["me/MeScreen.tsx", "first", "title"],
-    ]) {
+    for (const [screen, row, prop] of [["ai/AiAccountsScreen.tsx", "a", "label"]]) {
       const source = await read(screen);
       expect(source).toContain(`${prop}={accountTitle(${row})}`);
       expect(source).toContain(`${prop}={ownSignInTitle(t, o)}`);

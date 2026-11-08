@@ -34,7 +34,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -381,6 +381,9 @@ function ConnectedSteps({
   );
 }
 
+/** A strong ease-out: the check settles fast. */
+const POP = Easing.bezier(0.23, 1, 0.32, 1);
+
 /** Just connected: a check that pops in (the phone buzzes with it), the name and what comes next. */
 function ConnectedNote({ name }: { name: string }) {
   const { t } = useTranslation();
@@ -393,7 +396,14 @@ function ConnectedNote({ name }: { name: string }) {
       style={[styles.note, styles.notice, { borderColor: colors.line }]}
     >
       <Animated.View
-        entering={reducedMotion ? undefined : ZoomIn.springify().damping(12)}
+        // From 0.9, never from nothing; the note around it fades in with it.
+        entering={
+          reducedMotion
+            ? undefined
+            : ZoomIn.duration(240)
+                .easing(POP)
+                .withInitialValues({ transform: [{ scale: 0.9 }] })
+        }
         style={[styles.badge, { backgroundColor: colors.ok }]}
       >
         {/* The page's own color on the green: white on dark's light green was hard to read. */}

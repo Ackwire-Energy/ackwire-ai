@@ -1,4 +1,4 @@
-import { keys, useApi } from "@agenteschat/client";
+import { invitationQuery, keys, useApi } from "@agenteschat/client";
 import { ANSWER_POLL_MS } from "@agenteschat/client/lib/join-requests";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
@@ -14,8 +14,9 @@ import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { rememberSignIn } from "@/ui/auth/SocialButtons";
 import { router } from "@/ui/navigation";
 import { LAST_EMAIL } from "./AuthFlow";
+import { arriveIn } from "./arrive";
 import { forgetAsk, rememberInvite } from "./invite";
-import { Said, useLeaveInvite } from "./invite-parts";
+import { InviteCrew, Said, useLeaveInvite } from "./invite-parts";
 import { type Answer, type Asked, claimAnswer, claimFailedForNow } from "./invite-steps";
 
 /** How long "Aprovado" shows before the workspace opens: long enough to read it. */
@@ -47,6 +48,11 @@ export function AskWaiting({ asked }: { asked: Asked }) {
   // The one-time sign-in went through: the session arrives a moment later.
   const [signedIn, setSignedIn] = useState(false);
   const { token, org } = asked;
+  // The team the request goes to, on the sky (the invitation's preview: its first agents); the screen never waits on
+  // it, they rise in when it comes.
+  const preview = useQuery({ ...invitationQuery(api, token), retry: false });
+  const agents = preview.data?.agents ?? [];
+  const crew = (happy: boolean) => (agents.length > 0 ? <InviteCrew agents={agents} happy={happy} /> : undefined);
   const claim = useQuery({
     // The key stays out of the query's key, and its answer out of the cache once read: one signs in, for now.
     queryKey: [...keys.invitation(token), "claim"],
@@ -104,7 +110,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
     opened.current = true;
     void qc.invalidateQueries({ queryKey: keys.me }).then(() => {
       gate.choose(orgId);
-      router.replace("/");
+      void arriveIn(api, orgId);
     });
   }, [arrived, orgId]);
 
@@ -123,7 +129,7 @@ export function AskWaiting({ asked }: { asked: Asked }) {
 
   if (answer?.state === "in")
     return (
-      <AuthScaffold title={t("invite.ask.approvedIn", { org })} stepKey="in" expression="happy">
+      <AuthScaffold title={t("invite.ask.approvedIn", { org })} stepKey="in" expression="happy" hero={crew(true)}>
         <WaitCard title={t("invite.entering", { org })} sub={t("invite.enteringReady")} />
       </AuthScaffold>
     );
@@ -159,10 +165,11 @@ export function AskWaiting({ asked }: { asked: Asked }) {
   return (
     <AuthScaffold
       title={t("invite.ask.waitTitle", { org })}
-      subtitle={t("mobile.invite.join.waitLead")}
+      subtitle={t("mobile.invite.join.waitLeadOpen")}
       stepKey="wait"
       expression="happy"
       onBack={leave}
+      hero={crew(false)}
     >
       <WaitCard
         title={t("invite.ask.waitCard", { org })}

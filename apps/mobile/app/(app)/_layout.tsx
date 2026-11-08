@@ -3,6 +3,7 @@ import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { NoticeIsland } from "@/features/island/NoticeIsland";
+import { ShareInbox } from "@/features/share/ShareInbox";
 import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { useAppIconBadge } from "@/features/shared/queries";
 import { ScreenError } from "@/features/shared/ScreenError";
@@ -46,6 +47,8 @@ export default function AppLayout() {
       <AppStack />
       {/* What reaches me while the app is open, out of the camera's island (ADR 0071 §9). */}
       <NoticeIsland />
+      {/* What other apps share through the system's share sheet opens "Compartilhar com…". */}
+      <ShareInbox />
     </>
   );
 }
@@ -69,14 +72,20 @@ function AppStack() {
   useSendWaiting(orgId, useConnection(), () => toast({ title: t("mobile.chat.notSent"), icon: "x" }));
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
-  const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
+  // A request reads as grouped facts (its white groups on the sheet's gray), as the system's own sheets do.
+  const approvalSheet = useFormSheetOptions([0.64, 1]);
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
   const pushSheet = useFormSheetOptions("fitToContents");
+  // The workspaces as a sheet (ADR 0154): tall enough for a few servers, the top detent for many.
+  const workspacesSheet = useFormSheetOptions([0.76, 1]);
   const wikiSheet = useFormSheetOptions([0.55, 1]);
+  // "New" over the tabs as the system's new message: two thirds at rest, the whole screen once the keyboard is up.
+  const newSheet = useFormSheetOptions([0.66, 1]);
+  const shareSheet = useFormSheetOptions([0.72, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -87,6 +96,7 @@ function AppStack() {
       <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="sector-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="sector/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-categories" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -102,7 +112,8 @@ function AppStack() {
       <Stack.Screen name="agent-step/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="new" options={newSheet} />
+      <Stack.Screen name="share-to" options={shareSheet} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -113,6 +124,7 @@ function AppStack() {
       <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-map" options={pushed} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="who-sees" options={{ ...pushed, ...scrollUnder }} />
@@ -153,16 +165,23 @@ function AppStack() {
       <Stack.Screen name="join-requests" options={requestsSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
-      <Stack.Screen name="connect-ai" options={formSheet} />
+      {/* Connect an AI: pushed screens, one question each, on the grouped gray (its bar counts the steps). */}
+      <Stack.Screen
+        name="connect-ai"
+        options={{ ...pushed, ...scrollUnder, contentStyle: { backgroundColor: colors.grouped } }}
+      />
       {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
       <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
-      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154). */}
-      <Stack.Screen name="me/add-workspace" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="me/team-server" options={{ ...pushed, ...scrollUnder }} />
+      {/* The same list as a sheet, from a long press on the workspace's mark in the bar (ADR 0154). */}
+      <Stack.Screen name="workspaces-sheet" options={workspacesSheet} />
+      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154): two choices, a short sheet. */}
+      <Stack.Screen name="me/add-workspace" options={pushSheet} />
+      {/* On the sign-in's ruler: its own sky and back circle, no bar. */}
+      <Stack.Screen name="me/team-server" options={{ headerShown: false }} />
       <Stack.Screen name="me/scan" options={{ headerShown: false }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="invite-people" options={{ ...pushed, ...scrollUnder }} />
@@ -180,8 +199,9 @@ function AppStack() {
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/about" options={{ ...pushed, ...scrollUnder }} />
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
-      <Stack.Screen name="settings/index" options={{ ...pushed, ...coverBarOptions }} />
+      <Stack.Screen name="settings/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/right-hand" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />

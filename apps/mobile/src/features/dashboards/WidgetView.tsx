@@ -204,8 +204,12 @@ function Kpi({
       </Text>
       {spec.delta || spec.note ? (
         <Text variant="footnote" tone="ink2" numberOfLines={compact ? 1 : 2}>
+          {/* On the strip the change is a quiet word (one accent per screen: the waiting strip's); on a board, its color. */}
           {spec.delta ? (
-            <Text variant="footnote" style={[styles.strong, { color: spec.delta.up ? c.ok : c.danger }]}>
+            <Text
+              variant="footnote"
+              style={compact ? { color: c.muted } : [styles.strong, { color: spec.delta.up ? c.ok : c.danger }]}
+            >
               {spec.delta.text}
             </Text>
           ) : null}
@@ -702,12 +706,13 @@ export function WidgetCard({
       ) : null}
       {head === undefined ? (
         <View style={[styles.head, large ? styles.headTop : null]}>
-          <AgentFace agentId={w.agentId} size={16} live={false} />
+          {/* On the home's strip the title stands alone: whose it is shows when it works (the orbit), not before. */}
+          {compact ? null : <AgentFace agentId={w.agentId} size={16} live={false} />}
           <Text variant="caption" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
             {title}
           </Text>
           {/* The strip has no footer: updating is its orbit, a failure its mark, on the title line. */}
-          {compact && w.status === "updating" ? <PixelOrbit color={look.color} size={12} /> : null}
+          {compact && w.status === "updating" ? <PixelOrbit color={look.color} size={16} /> : null}
           {compact && w.status === "failed" ? <Icon name="info" size={13} color={c.warn} /> : null}
         </View>
       ) : (
@@ -869,6 +874,6 @@ const styles = StyleSheet.create({
   bodyCompact: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
   // The strip's columns run down to the card's bottom edge, as a trend does: the card's padding cancelled there.
   toEdge: { marginBottom: -PAD_Y },
-  numCompact: { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 },
+  numCompact: { fontSize: 28, lineHeight: 34, letterSpacing: -0.7 },
   rowCompact: { paddingVertical: 3 },
 });

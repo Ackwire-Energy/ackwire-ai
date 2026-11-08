@@ -63,7 +63,8 @@ export type SettingsSection =
   | "import"
   | "vault";
 
-export type SettingsGroup = "you" | "org" | "agents" | "costs";
+/** The phone's groups: the workspace itself, its people, its agents, costs and data (`mobile.settings.group.*`). */
+export type SettingsGroup = "org" | "people" | "agents" | "costs";
 
 export interface SettingsEntry {
   id: SettingsSection;
@@ -75,11 +76,14 @@ export interface SettingsEntry {
   allowed: (org: OrgSummary | null | undefined) => boolean;
 }
 
-/** The web's settings, in its order and groups (`settings.group.*`, `settings.section.*`), with the phone's screens. */
+/**
+ * The web's settings (`settings.section.*`) in the phone's four groups, each thing once: the workspace itself (what
+ * it is, its right hand, its GIFs), its people (members, roles, the audit), its agents (their access, connectors,
+ * computers, the Vault, skills, the AI apps that reach them) and costs and data. Each with the phone's screen and a
+ * neutral icon (the color stays on faces).
+ */
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
-  // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
-  { id: "apps", group: "you", icon: "share", href: "/settings/apps", allowed: () => true },
-  // The workspace itself (its name, zone, what every agent knows of it): who configures it.
+  // The workspace itself (its name, logo, zone, what every agent knows of it): who configures it.
   {
     id: "general",
     group: "org",
@@ -95,31 +99,39 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
     href: "/settings/right-hand",
     allowed: (o) => can(o, "manage_agents"),
   },
-  // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
-  { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
-  // Papéis e permissões (ADR 0085): who manages roles, as on the web.
-  { id: "roles", group: "org", icon: "lock", href: "/settings/roles", allowed: (o) => can(o, "manage_roles") },
-  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
-  { id: "vault", group: "org", icon: "lock", href: "/settings/vault", allowed: (o) => can(o, "read") },
-  // What agents did and people changed: who may see the audit (it shows everyone's work).
-  { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.
   { id: "media", group: "org", icon: "sticker", href: "/settings/media", allowed: (o) => can(o, "configure") },
-  { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (o) => can(o, "manage_agents") },
-  { id: "connectors", group: "agents", icon: "bolt", href: "/connectors", allowed: () => true },
-  { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
+  // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
+  { id: "members", group: "people", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
+  // Papéis e permissões (ADR 0085): who manages roles, as on the web.
+  { id: "roles", group: "people", icon: "lock", href: "/settings/roles", allowed: (o) => can(o, "manage_roles") },
+  // What agents did and people changed: who may see the audit (it shows everyone's work).
+  { id: "audit", group: "people", icon: "list", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
+  {
+    id: "access",
+    group: "agents",
+    icon: "shield",
+    href: "/settings/access",
+    allowed: (o) => can(o, "manage_agents"),
+  },
+  { id: "connectors", group: "agents", icon: "join", href: "/connectors", allowed: () => true },
   // Every member sees the computers and connects one (ADR 0025).
   { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
+  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
+  { id: "vault", group: "agents", icon: "key", href: "/settings/vault", allowed: (o) => can(o, "read") },
+  { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
+  // AI apps (ADR 0119): each person's own connections in this workspace; connecting one happens on the web.
+  { id: "apps", group: "agents", icon: "share", href: "/settings/apps", allowed: () => true },
   // Everyone (ADR 0063): their plans' meters and the agents whose details they see, in tokens and percentages;
   // money only for who has `view_usage`.
   { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (o) => can(o, "read") },
-  { id: "storage", group: "costs", icon: "drive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
-  { id: "import", group: "costs", icon: "archive", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
+  { id: "storage", group: "costs", icon: "archive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
+  { id: "import", group: "costs", icon: "out", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
 ];
 
-export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["you", "org", "agents", "costs"];
+export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "people", "agents", "costs"];
 
 /** The sections this membership opens, in order. */
 export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));
@@ -142,45 +154,25 @@ export interface TileFacts {
   storage?: { kind: "agentes" | "s3"; edition: "cloud" | "selfhost" } | undefined;
 }
 
-/** Each area's line under its name on the workspace's page, as the web's tiles (`settings.tileState.*`). */
-export function tileStates(t: TFunction, locale: string, f: TileFacts): Partial<Record<SettingsSection, string>> {
+/**
+ * One value per row on the workspace's page, short, in faint ("5", "2", "1 de 2", "40%"): a count or a state, never
+ * a sentence (that is the area's own screen). Absent while it loads or where there is nothing to count.
+ */
+export function areaValues(t: TFunction, locale: string, f: TileFacts): Partial<Record<SettingsSection, string>> {
   const out: Partial<Record<SettingsSection, string>> = {};
-  const pending = f.invitations ?? 0;
   if (f.overview) {
-    out.members = [
-      t("settings.tileState.members", { count: f.overview.people }),
-      pending > 0 ? t("settings.tileState.invitations", { count: pending }) : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    out.access = t("settings.tileState.agents", { count: f.overview.agents });
-    if (f.usesApi)
-      out.usage = t("settings.tileState.usage", { percent: formatPercent(locale, f.overview.budgetUsedPercent) });
+    out.members = String(f.overview.people);
+    out.access = String(f.overview.agents);
+    if (f.usesApi) out.usage = formatPercent(locale, f.overview.budgetUsedPercent);
   }
-  if (f.connectors) {
-    const names = f.connectors.slice(0, 3).join(", ");
-    out.connectors =
-      f.connectors.length === 0
-        ? t("settings.tileState.noConnectors")
-        : `${t("settings.tileState.connectors", { count: f.connectors.length })} · ${names}`;
+  if (f.connectors && f.connectors.length > 0) out.connectors = String(f.connectors.length);
+  if (f.skills !== undefined && f.skills > 0) out.skills = String(f.skills);
+  if (f.computers && f.computers.count > 0)
+    out.computers = t("mobile.settings.ofOnline", { online: f.computers.online, count: f.computers.count });
+  if (f.keys) {
+    const n = f.keys.manages ? f.keys.live : f.keys.plans;
+    if (n > 0) out.keys = String(n);
   }
-  if (f.skills !== undefined) out.skills = t("settings.tileState.skills", { count: f.skills });
-  if (f.computers)
-    out.computers =
-      f.computers.count === 0
-        ? t("settings.tileState.noComputers")
-        : t("settings.tileState.computers", { count: f.computers.count, online: f.computers.online });
-  if (f.keys)
-    out.keys = f.keys.manages
-      ? f.keys.live > 0
-        ? t("settings.tileState.keys", { count: f.keys.live })
-        : f.keys.platform
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")
-      : f.keys.plans > 0
-        ? t("settings.tileState.plans", { count: f.keys.plans })
-        : t("settings.tileState.noPlans");
-  if (f.storage) out.storage = t(storageKey(f.storage.kind, f.storage.edition));
   return out;
 }
 

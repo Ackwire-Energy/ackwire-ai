@@ -3,25 +3,27 @@ import { useNetworkState } from "expo-network";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
+import { AgentAvatar } from "@/agent/AgentAvatar";
 import { serverUrl } from "@/lib/server";
-import { Button, EmptyState, LineIcon, Text } from "@/ui";
+import { Button, LineIcon, Text } from "@/ui";
 import { problemText } from "../server";
-import { useColors } from "../shared/hooks";
+import { RETRY_EVERY_MS, RetryWick } from "../server/ServerDown";
+import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { useSurface } from "../shared/parts";
 import { serverTrouble } from "./logic";
 
-/** While Conversas can't reach the server, it asks again this often (it fills in on its own when it answers). */
-const RETRY_EVERY_MS = 15_000;
-
 /**
  * Why Conversas can't load, in the person's words: no internet on the phone, or the server's own check (`GET
- * /api/instance`: Tailscale, a certificate, a version), or plainly "didn't answer". Mounted only while it fails.
+ * /api/instance`: Tailscale, a certificate, a version), or plainly "didn't answer". Mounted only while it fails. It
+ * asks again on its own every `RETRY_EVERY_MS` and says when (`nextRetryAt`).
  */
 function useServerTrouble(retry: () => Promise<unknown>) {
   const { t } = useTranslation();
   const network = useNetworkState();
   const [check, setCheck] = useState<ServerCheck | null>(null);
   const [checking, setChecking] = useState(false);
+  const [nextRetryAt, setNextRetryAt] = useState(() => Date.now() + RETRY_EVERY_MS);
 
   const latest = useRef(retry);
   latest.current = retry;
@@ -37,7 +39,10 @@ function useServerTrouble(retry: () => Promise<unknown>) {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => void latest.current(), RETRY_EVERY_MS);
+    const timer = setInterval(() => {
+      setNextRetryAt(Date.now() + RETRY_EVERY_MS);
+      void latest.current();
+    }, RETRY_EVERY_MS);
     return () => clearInterval(timer);
   }, []);
 
@@ -56,35 +61,48 @@ function useServerTrouble(retry: () => Promise<unknown>) {
           : t(problemText(trouble.problem, server), { host });
   const again = () => {
     setChecking(true);
+    setNextRetryAt(Date.now() + RETRY_EVERY_MS);
     void Promise.allSettled([checkServer(serverUrl()).then(setCheck), retry()]).then(() => setChecking(false));
   };
-  return { title, plain, checking, again };
+  return { title, plain, checking, nextRetryAt, again };
 }
 
 /**
- * Conversas when its list failed to load with nothing kept on the phone: what is wrong (no internet, the server
- * didn't answer, or why its check says it can't be used), "Tentar de novo", and it tries on its own meanwhile.
- * Without this a failed load read as an empty workspace and invited the first agent.
+ * Conversas when its list failed to load with nothing kept on the phone: the team's right hand asleep where an icon
+ * would be (the team is still there, only out of reach), what is wrong (no internet, the server didn't answer, or
+ * why its check says it can't be used, or "answered, but the conversations didn't load"), the wick to the next try
+ * it makes on its own, and "Tentar agora". Without this a failed load read as an empty workspace and invited the
+ * first agent.
  */
 export function HomeServerError({ retry }: { retry: () => Promise<unknown> }) {
   const { t } = useTranslation();
   const trouble = useServerTrouble(retry);
+  const dir = useDirectory();
+  // The right hand when the directory has it; the app's own agent before anything loaded.
+  const rightHand = dir.agents.find((a) => a.builtin === "right_hand");
+  const look = rightHand
+    ? { ...agentLook(rightHand), id: rightHand.id }
+    : { color: "sky" as const, eyes: "round" as const, id: "agentes" };
   return (
     <View style={styles.full} accessibilityLiveRegion="polite">
-      <EmptyState
-        icon="wifi"
-        title={trouble.title}
-        subtitle={trouble.plain ? t("mobile.chats.serverError.text") : undefined}
-        action={
-          <Button
-            variant="primary"
-            size="sm"
-            icon="undo"
-            label={trouble.checking ? t("mobile.auth.server.checking") : t("mobile.common.retry")}
-            disabled={trouble.checking}
-            onPress={trouble.again}
-          />
-        }
+      <AgentAvatar agent={look} size={96} mode="sleep" framed={false} />
+      <Text variant="body" style={[styles.center, styles.bold, styles.title]}>
+        {trouble.title}
+      </Text>
+      {trouble.plain ? (
+        <Text variant="subhead" tone="muted" style={styles.center}>
+          {t("mobile.chats.serverError.text")}
+        </Text>
+      ) : null}
+      <View style={styles.wick}>
+        <RetryWick nextRetryAt={trouble.nextRetryAt} checking={trouble.checking} />
+      </View>
+      <Button
+        variant="secondary"
+        size="sm"
+        label={t("mobile.auth.server.down.tryNow")}
+        disabled={trouble.checking}
+        onPress={trouble.again}
       />
     </View>
   );
@@ -128,7 +146,10 @@ export function HomeServerNotice({ retry }: { retry: () => Promise<unknown> }) {
 }
 
 const styles = StyleSheet.create({
-  full: { paddingTop: 48, paddingHorizontal: 24 },
+  full: { paddingTop: 96, paddingHorizontal: 32, alignItems: "center", gap: 8 },
+  title: { marginTop: 8 },
+  center: { textAlign: "center" },
+  wick: { marginTop: 8 },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   card: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

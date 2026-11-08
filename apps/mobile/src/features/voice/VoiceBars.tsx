@@ -1,33 +1,50 @@
-import { Canvas, Circle, Group, Path, rect, rrect, Skia, type SkPath } from "@shopify/react-native-skia";
+import { Canvas, Group, LinearGradient, Path, Rect, rect, Skia, type SkPath, vec } from "@shopify/react-native-skia";
 import { useState } from "react";
 import { type LayoutChangeEvent, StyleSheet, type ViewStyle } from "react-native";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 
-const BAR = 3;
-const GAP = 2;
-const HANDLE = 6;
+/** The wave is drawn on the sky's own grid (ADR 0100): square cells of 4, columns 6 apart. */
+const CELL = 4;
+const PITCH = 6;
+const HANDLE = 8;
+/** How much of the left end fades into the field while a recording grows from the right. */
+const FADE = 0.35;
 
-/** How many bars fit in `width`. */
-export const barsIn = (width: number) => Math.max(1, Math.floor((width + GAP) / (BAR + GAP)));
+/** How many columns fit in `width`. */
+export const columnsIn = (width: number) => Math.max(1, Math.floor((width + PITCH - CELL) / PITCH));
+
+/** A column's cells, split so each can take its own tone: the first and last cell (`edge`) and the rest (`inner`). */
+export interface WavePaths {
+  inner: SkPath;
+  edge: SkPath;
+}
 
 /**
- * `peaks` as round bars. `tail`: the newest ones at the right end, and quiet dots before them, the way a live
- * recording looks; otherwise spread over the whole width.
+ * `peaks` as columns of cells, each centered on the middle row. `tail`: the newest columns at the right end, the way a
+ * live recording looks (the rest of the width stays empty); otherwise spread over the whole width.
  */
-export function barsPath(peaks: readonly number[], width: number, height: number, tail = false): SkPath {
-  const path = Skia.PathBuilder.Make();
-  const n = barsIn(width);
+export function wavePaths(peaks: readonly number[], width: number, height: number, tail = false): WavePaths {
+  const inner = Skia.PathBuilder.Make();
+  const edge = Skia.PathBuilder.Make();
+  const rows = Math.max(1, Math.floor(height / CELL));
+  const n = columnsIn(width);
   const shown = tail ? peaks.slice(-n) : stretched(peaks, n);
-  const startAt = tail ? width - shown.length * (BAR + GAP) + GAP : 0;
-  if (tail) {
-    for (let x = startAt - BAR - GAP; x > -BAR; x -= BAR + GAP) path.addCircle(x + BAR / 2, height / 2, 1.2);
-  }
+  // Right-aligned when live: the last column ends at the right edge.
+  const startAt = tail ? width - shown.length * PITCH + (PITCH - CELL) : 0;
   shown.forEach((level, i) => {
-    const h = Math.max(3, Math.min(height, level * height));
-    path.addRRect(rrect(rect(startAt + i * (BAR + GAP), (height - h) / 2, BAR, h), 1.5, 1.5));
+    const cells = Math.max(1, Math.min(rows, Math.round(level * rows)));
+    const top = Math.round((rows - cells) / 2);
+    const x = startAt + i * PITCH;
+    for (let c = 0; c < cells; c++) {
+      const r = rect(x, (top + c) * CELL, CELL, CELL);
+      if (c === 0 || c === cells - 1) edge.addRect(r);
+      else inner.addRect(r);
+    }
   });
-  return path.build();
+  return { inner: inner.build(), edge: edge.build() };
 }
+
+export const emptyWave = (): WavePaths => ({ inner: Skia.Path.Make(), edge: Skia.Path.Make() });
 
 function stretched(peaks: readonly number[], n: number): number[] {
   if (peaks.length === 0) return Array.from({ length: n }, () => 0.06);
@@ -35,27 +52,33 @@ function stretched(peaks: readonly number[], n: number): number[] {
 }
 
 /**
- * A wave drawn by Skia on the UI thread: `path` and `progress` change without a render of anything around it, so a
- * playing or recording wave never touches React.
+ * A wave drawn by Skia on the UI thread: the paths and `progress` change without a render of anything around it, so a
+ * playing or recording wave never touches React. Two tones, as the agent's sky has: `tones[0]` fills a column, `tones[1]`
+ * its two ends; both the same for a wave in ink. What `progress` has passed is in the tones, the rest in `off`.
  */
-export function VoiceBars({
-  path,
+export function PixelWave({
+  inner,
+  edge,
   progress,
-  on,
+  tones,
   off,
   onWidth,
   height,
   handle = false,
+  fade,
   style,
 }: {
-  path: SharedValue<SkPath>;
+  inner: SharedValue<SkPath>;
+  edge: SharedValue<SkPath>;
   progress: SharedValue<number>;
-  on: string;
+  tones: readonly [string, string];
   off: string;
   onWidth?: (width: number) => void;
   height: number;
-  /** A dot at `progress`, to grab and drag. */
+  /** A square at `progress`, to grab and drag; hidden while `progress` is still at the start. */
   handle?: boolean;
+  /** The field's color: the left end of a growing recording fades into it. */
+  fade?: string;
   style?: ViewStyle;
 }) {
   const [width, setWidth] = useState(0);
@@ -65,16 +88,41 @@ export function VoiceBars({
     onWidth?.(next);
   };
   const clip = useDerivedValue(() => rect(0, 0, width * progress.value, height));
-  const handleX = useDerivedValue(() => Math.min(width - HANDLE, Math.max(HANDLE, width * progress.value)));
+  const handleX = useDerivedValue(() => Math.min(width - HANDLE, Math.max(0, width * progress.value - HANDLE / 2)));
+  // At the very start nothing is played yet: no handle until playing or a scrub moves it.
+  const handleOpacity = useDerivedValue(() => (progress.value > 0.002 ? 1 : 0));
   return (
     <Canvas onLayout={layout} style={[styles.canvas, { height }, style]}>
-      <Path path={path} color={off} />
+      <Path path={inner} color={off} />
+      <Path path={edge} color={off} />
       <Group clip={clip}>
-        <Path path={path} color={on} />
+        <Path path={inner} color={tones[0]} />
+        <Path path={edge} color={tones[1]} />
       </Group>
-      {handle ? <Circle cx={handleX} cy={height / 2} r={HANDLE} color={on} /> : null}
+      {fade ? (
+        <Rect x={0} y={0} width={width * FADE} height={height}>
+          <LinearGradient start={vec(0, 0)} end={vec(width * FADE, 0)} colors={[fade, transparent(fade)]} />
+        </Rect>
+      ) : null}
+      {handle ? (
+        <Rect
+          x={handleX}
+          y={height / 2 - HANDLE / 2}
+          width={HANDLE}
+          height={HANDLE}
+          color={tones[0]}
+          opacity={handleOpacity}
+        />
+      ) : null}
     </Canvas>
   );
+}
+
+/** The same color with no alpha, for a gradient's far end ("#rrggbb" or "rgb(a)(…)"). */
+function transparent(color: string): string {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return `${color}00`;
+  const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(color);
+  return m ? `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0)` : "transparent";
 }
 
 const styles = StyleSheet.create({ canvas: { flex: 1, minWidth: 0 } });

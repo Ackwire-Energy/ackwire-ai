@@ -20,7 +20,7 @@ import { levelOf, peaksOf } from "./logic";
 import { joinM4a } from "./m4a";
 import { flushVoice, queueVoice, type VoiceRefusal } from "./outbox";
 import { playingId, seekPlayback, startPlayback, stopPlayback } from "./playback";
-import { barsPath } from "./VoiceBars";
+import { emptyWave, type WavePaths, wavePaths } from "./VoiceBars";
 
 /** Small files of speech: one channel, enough for a voice. Levels on, for the wave. */
 const RECORDING: RecordingOptions = {
@@ -78,7 +78,10 @@ export function useVoiceTake(target: VoiceTarget) {
   const [phase, setPhaseState] = useState<VoicePhase>("idle");
   const [seconds, setSeconds] = useState(0);
   const [listening, setListening] = useState(false);
-  const path = useSharedValue(Skia.Path.Make());
+  /** Whole seconds of everything recorded, for the "0:05 / 0:12" of a paused take. */
+  const [total, setTotal] = useState(0);
+  const inner = useSharedValue(Skia.Path.Make());
+  const edge = useSharedValue(Skia.Path.Make());
   const progress = useSharedValue(1);
 
   const phaseRef = useRef<VoicePhase>("idle");
@@ -99,6 +102,18 @@ export function useVoiceTake(target: VoiceTarget) {
     phaseRef.current = next;
     setPhaseState(next);
   }, []);
+  const setWave = useCallback(
+    (wave: WavePaths) => {
+      inner.value = wave.inner;
+      edge.value = wave.edge;
+    },
+    [inner, edge],
+  );
+  /** The whole take over the width it has now (a paused take's field is laid out differently from a live one's). */
+  const wholeWave = useCallback(
+    () => setWave(wavePaths(peaksOf(levels.current, 96), width.current, LIVE_WAVE)),
+    [setWave],
+  );
 
   const refused = useCallback(
     (reason: VoiceRefusal) => {
@@ -131,13 +146,14 @@ export function useVoiceTake(target: VoiceTarget) {
     doneMs.current = 0;
     liveMs.current = 0;
     released.current = false;
-    path.value = Skia.Path.Make();
+    setWave(emptyWave());
     progress.value = 1;
     setSeconds(0);
+    setTotal(0);
     setListening(false);
     setPhase("idle");
     void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-  }, [path, progress, setPhase, stopTimer]);
+  }, [setWave, progress, setPhase, stopTimer]);
 
   /** One file from every stretch; what can't be joined stays as a file of its own. */
   const joined = useCallback(async () => {
@@ -169,10 +185,12 @@ export function useVoiceTake(target: VoiceTarget) {
     await finishStretch();
     setPhase("paused");
     await joined();
-    path.value = barsPath(peaksOf(levels.current, 96), width.current, LIVE_WAVE);
+    wholeWave();
     progress.value = 0;
-    setSeconds(Math.floor(doneMs.current / 1000));
-  }, [finishStretch, joined, path, progress, setPhase]);
+    const whole = Math.floor(doneMs.current / 1000);
+    setSeconds(whole);
+    setTotal(whole);
+  }, [finishStretch, joined, wholeWave, progress, setPhase]);
 
   const send = useCallback(async () => {
     const { orgId, channelId, threadId, replyTo = null, authorId, afterSend } = targetRef.current;
@@ -240,13 +258,13 @@ export function useVoiceTake(target: VoiceTarget) {
     liveMs.current = status.durationMillis;
     const ms = doneMs.current + liveMs.current;
     levels.current.push(levelOf(status.metering));
-    if (width.current > 0) path.value = barsPath(levels.current, width.current, LIVE_WAVE, true);
+    if (width.current > 0) setWave(wavePaths(levels.current, width.current, LIVE_WAVE, true));
     const whole = Math.floor(ms / 1000);
     setSeconds((s) => (s === whole ? s : whole));
     if (ms < VOICE_MAX_MS) return;
     if (phaseNow === "hold") void send();
     else void pause();
-  }, [pause, path, recorder, send]);
+  }, [pause, setWave, recorder, send]);
 
   const record = useCallback(async () => {
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: "doNotMix" });
@@ -300,9 +318,9 @@ export function useVoiceTake(target: VoiceTarget) {
     if (phaseRef.current === "hold") void send();
   }, [send]);
 
+  /** Hands free. The haptic is the gesture's, on the frame the finger crosses the line, so none here. */
   const lock = useCallback(() => {
     if (phaseRef.current !== "hold") return;
-    haptics.selection();
     setPhase("locked");
   }, [setPhase]);
 
@@ -310,10 +328,10 @@ export function useVoiceTake(target: VoiceTarget) {
     if (phaseRef.current !== "paused") return;
     stopPlayback();
     setListening(false);
-    path.value = barsPath(levels.current, width.current, LIVE_WAVE, true);
+    setWave(wavePaths(levels.current, width.current, LIVE_WAVE, true));
     setPhase("locked");
     await record().catch(() => setPhase("paused"));
-  }, [path, record, setPhase]);
+  }, [setWave, record, setPhase]);
 
   const listen = useCallback(async () => {
     if (playingId() === REVIEW_ID) {
@@ -352,9 +370,15 @@ export function useVoiceTake(target: VoiceTarget) {
     [progress],
   );
 
-  const setWidth = useCallback((w: number) => {
-    width.current = w;
-  }, []);
+  /** The wave's width now; a paused take is redrawn to fit it (its field has other things around the wave). */
+  const setWidth = useCallback(
+    (w: number) => {
+      if (width.current === w) return;
+      width.current = w;
+      if (phaseRef.current === "paused" && w > 0) wholeWave();
+    },
+    [wholeWave],
+  );
 
   // Sent to the background mid-recording: the recording waits, paused.
   useEffect(() => {
@@ -379,8 +403,10 @@ export function useVoiceTake(target: VoiceTarget) {
   return {
     phase,
     seconds,
+    total,
     listening,
-    path,
+    inner,
+    edge,
     progress,
     start,
     release,

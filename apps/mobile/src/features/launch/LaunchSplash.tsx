@@ -49,6 +49,8 @@ import {
 
 /** The agent's canvas: room around the body for the turn and the breath. */
 const BOX = Math.ceil(LOGO * 1.5);
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 const PAD = (BOX - LOGO) / 2;
 /** Points per sky cell (the sprites stand on the same grid). */
 const PX = 4;
@@ -70,6 +72,8 @@ export interface LaunchSplashProps {
   waiting?: ReactNode;
   /** The agent's eyes closed (nothing is happening; open while it checks again). */
   eyesClosed?: boolean;
+  /** The sky at dusk: the app waits on a team's own server, not the Cloud (its sky says which fell silent). */
+  dusk?: boolean;
 }
 
 /**
@@ -81,7 +85,15 @@ export interface LaunchSplashProps {
  * doesn't answer) the agent goes up and closes its eyes, the sprites keep above the panel that comes in at the
  * bottom, and the splash stays until the app is ready. Reduced motion: the logo still, a short fade.
  */
-export function LaunchSplash({ ready, fontsReady, onShown, onDone, waiting, eyesClosed }: LaunchSplashProps) {
+export function LaunchSplash({
+  ready,
+  fontsReady,
+  onShown,
+  onDone,
+  waiting,
+  eyesClosed,
+  dusk = false,
+}: LaunchSplashProps) {
   const { t } = useTranslation();
   const { colors: c, scheme } = useTheme();
   const reduced = useReducedMotion();
@@ -158,10 +170,13 @@ export function LaunchSplash({ ready, fontsReady, onShown, onDone, waiting, eyes
       shown.value = withTiming(0, { duration: LAUNCH.reducedExit * 1000 }, end);
       return;
     }
+    // The handover into the app, one gesture: the agent lifts away toward the top (where the app's bar will be) as
+    // the sky sinks to the horizon and the splash thins out over the screen under it, so the home is seen arriving
+    // through it rather than cut to. On-screen moves on the strong ease-in-out, the fade on ease-out.
     const ms = LAUNCH.exit * 1000;
-    away.value = withTiming(1, { duration: ms * 0.4, easing: Easing.inOut(Easing.quad) });
-    level.value = withTiming(0, { duration: ms, easing: Easing.inOut(Easing.cubic) });
-    shown.value = withDelay(ms * 0.3, withTiming(0, { duration: ms * 0.7, easing: Easing.inOut(Easing.quad) }, end));
+    away.value = withTiming(1, { duration: ms * 0.6, easing: EASE_IN_OUT });
+    level.value = withTiming(0, { duration: ms, easing: EASE_IN_OUT });
+    shown.value = withDelay(ms * 0.25, withTiming(0, { duration: ms * 0.75, easing: EASE_OUT }, end));
   }, [leaving, reduced, away, level, shown, finish]);
 
   // The native image goes once this first frame is laid out (it looks the same).
@@ -192,14 +207,14 @@ export function LaunchSplash({ ready, fontsReady, onShown, onDone, waiting, eyes
   const mark = useAnimatedStyle(() => ({
     opacity: 1 - away.value,
     transform: [
-      { translateY: -LAUNCH.lift * lift.value - raise * up.value - 40 * away.value },
-      { scale: 1 - 0.15 * away.value },
+      { translateY: -LAUNCH.lift * lift.value - raise * up.value - 96 * away.value },
+      { scale: 1 - 0.3 * away.value },
     ],
   }));
   const panelStyle = useAnimatedStyle(() => ({ opacity: up.value * (1 - away.value) }));
   const nameStyle = useAnimatedStyle(() => ({ opacity: name.value }));
   const lineStyle = useAnimatedStyle(() => ({ opacity: lineIn.value }));
-  const tones = useMemo(() => launchSkyTones(c.bg, scheme === "dark"), [c.bg, scheme]);
+  const tones = useMemo(() => launchSkyTones(c.bg, scheme === "dark", dusk), [c.bg, scheme, dusk]);
   const lineText = line ? t(`mobile.splash.${line}`) : "";
 
   return (
@@ -277,6 +292,8 @@ const LaunchSky = memo(function LaunchSky({
     t: clock.value / 1000,
     last,
     fade: 2,
+    // Every uniform of the shared sky shader must be given (Skia throws on a missing one): no fade in from the top.
+    fadeTop: 0,
     clear: 0,
     pal,
     level: level.value,

@@ -1,7 +1,8 @@
 import { type Routine, useRoutines } from "@agenteschat/client";
-import { useEffect, useMemo, useState } from "react";
+import { routineStateTime, routineStateWords } from "@agenteschat/client/lib/routine-view";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
@@ -10,22 +11,35 @@ import {
   Filters,
   Icon,
   IconButton,
+  LineIcon,
+  ListRow,
   SCREEN_X,
   SearchField,
   SectionHeader,
-  Segmented,
+  SkeletonList,
   Text,
   useReducedMotion,
 } from "@/ui";
 import { router } from "@/ui/navigation";
+import { routineHref, widgetHref } from "../links/logic";
 import { mayCreate } from "../new/logic";
+import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
-import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNamesComputers, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
-import { useWhenText } from "./hooks";
-import { isAtWork, routineAgents, routineSections, STATUS_FILTERS, type StatusFilter } from "./logic";
-import { RoutineRow } from "./parts";
+import { useRoutineMenu, useSay, useWhenText } from "./hooks";
+import {
+  isAtWork,
+  isDoneOnce,
+  isPaused,
+  isRunning,
+  routineSections,
+  routineTitle,
+  STATUS_FILTERS,
+  type StatusFilter,
+  whenIcon,
+} from "./logic";
 import { RoutineHorizon } from "./RoutineHorizon";
 
 /** Rows whose agent moves (a long list stays light). */
@@ -34,11 +48,12 @@ const LIVE_ROWS = 8;
 const WORKING_POLL_MS = 15_000;
 
 /**
- * Rotinas, pushed from Você (the web's page on the phone): what the agents do on their own, "Nova rotina" as the
- * bar's "+" (as Tarefas; with none yet, the empty state's own button), the next hours as a horizon, then the
- * search, the status (Todas, Ativas, Pausadas, Por evento, with counts) and the agent; "No ar" and "Pausadas" in
- * the server's order, the one-offs that already ran folded under "Concluídos". A row opens its routine; "…" (or a
- * long press) its actions.
+ * Rotinas, pushed from Você (the web's page on the phone), as Tarefas and Wiki: the large title, "Nova rotina" as the
+ * bar's "+" (with none yet, the empty state's own button), the search of the system, one row of filters (Todas,
+ * Ativas, Pausadas, Por evento; the sections count, not the chips), the next hours as a horizon, then "No ar" and
+ * "Pausadas" in the server's order, the one-offs that already ran folded under "Concluídos". Each row is the agent's
+ * face at 52, the routine's name and when it runs with its clock; what needs a look says so in the waiting color.
+ * A row opens its routine; a long press its actions.
  */
 export function RoutinesScreen() {
   return (
@@ -60,16 +75,11 @@ function RoutineList() {
   const whenText = useWhenText();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [picked, setAgentId] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const list = useMemo(() => routines.data ?? [], [routines.data]);
-  const agents = useMemo(() => routineAgents(list), [list]);
-  // The agent filter holds only while its row shows and has that agent: one gone (its routines deleted, or one
-  // agent left) never keeps the list filtered with no way to see why.
-  const agentId = picked && agents.length > 1 && agents.includes(picked) ? picked : null;
   const sections = useMemo(
-    () => routineSections(list, { status, agentId, query: q }, whenText),
-    [list, status, agentId, q, whenText],
+    () => routineSections(list, { status, agentId: null, query: q }, whenText),
+    [list, status, q, whenText],
   );
   const working = list.some(isAtWork);
   const { refetch } = routines;
@@ -82,7 +92,6 @@ function RoutineList() {
   const clear = () => {
     setQ("");
     setStatus("all");
-    setAgentId(null);
   };
   const ownsAgent = Boolean(meId) && dir.agents.some((a) => a.ownerUserId === meId);
   const mayNew = mayCreate(useOrg().org, "routine", { ownsAgent });
@@ -96,7 +105,7 @@ function RoutineList() {
       row += 1;
       return (
         <Animated.View key={r.id} {...fade} layout={layout}>
-          <RoutineRow routine={r} now={now} divider={i > 0} live={row <= LIVE_ROWS} />
+          <RoutineListRow routine={r} divider={i > 0} live={row <= LIVE_ROWS} />
         </Animated.View>
       );
     });
@@ -106,15 +115,9 @@ function RoutineList() {
       {...(mayNew ? { right: <IconButton icon="plus" label={t("routines.new")} onPress={openNew} /> } : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
-      <View style={styles.head}>
-        <Text variant="subhead" tone="muted">
-          {t("routines.subtitle")}
-        </Text>
-      </View>
       {routines.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : routines.isError && !routines.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>
@@ -128,7 +131,6 @@ function RoutineList() {
         // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
         <Animated.View {...fade}>
           <LayoutAnimationConfig skipEntering>
-            <RoutineHorizon routines={list} now={now} />
             <View style={styles.search}>
               <SearchField
                 value={q}
@@ -138,43 +140,25 @@ function RoutineList() {
                 returnKeyType="search"
               />
             </View>
-            {/* Four choices with their counts can be wider than a small phone: they scroll sideways there. */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.status}
-            >
-              <Segmented
-                items={STATUS_FILTERS.map((s) => ({
-                  key: s,
-                  label: t(`routines.status.${s}`),
-                  count: sections.counts[s],
-                }))}
-                value={status}
-                onChange={(k) => setStatus(k as StatusFilter)}
-              />
-            </ScrollView>
-            {agents.length > 1 ? (
-              <Filters
-                items={[
-                  { key: "", label: t("mobile.routines.anyAgent") },
-                  ...agents.map((id) => ({ key: id, label: dir.nameOf({ type: "agent", id }) })),
-                ]}
-                value={agentId ?? ""}
-                onChange={(k) => setAgentId(k || null)}
-              />
-            ) : null}
-            {/* No count on these headers: the status choices above already say how many are live and paused. */}
+            {/* One row of filters, words only: the sections below say how many. */}
+            <Filters
+              items={STATUS_FILTERS.map((s) => ({ key: s, label: t(`routines.status.${s}`) }))}
+              value={status}
+              onChange={(k) => setStatus(k as StatusFilter)}
+            />
+            <RoutineHorizon routines={list} now={now} />
             {sections.live.length > 0 ? (
               <Animated.View {...fade} layout={layout}>
-                <SectionHeader title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")} />
+                <SectionHeader
+                  title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")}
+                  count={sections.live.length}
+                />
                 {rows(sections.live)}
               </Animated.View>
             ) : null}
             {sections.paused.length > 0 ? (
               <Animated.View {...fade} layout={layout}>
-                <SectionHeader title={t("routines.groupPaused")} />
+                <SectionHeader title={t("routines.groupPaused")} count={sections.paused.length} />
                 {rows(sections.paused)}
               </Animated.View>
             ) : null}
@@ -211,12 +195,72 @@ function RoutineList() {
   );
 }
 
+/**
+ * A routine in the list: the agent's face at 52 (asleep while paused, at work while it runs), the routine's name, and
+ * when it runs with its clock (faint while paused); what needs a look (a reason it paused, failures, waiting for a
+ * computer or a person) takes that line, in the waiting color. A tap opens it (a widget's routine, its widget); a
+ * long press its actions.
+ */
+const RoutineListRow = memo(function RoutineListRow({
+  routine: r,
+  divider,
+  live,
+}: {
+  routine: Routine;
+  divider: boolean;
+  live: boolean;
+}) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const say = useSay();
+  const names = useNamesComputers();
+  const whenText = useWhenText();
+  const menu = useRoutineMenu(r, "list");
+  const paused = isPaused(r);
+  const done = isDoneOnce(r);
+  const running = isRunning(r);
+  const state = routineStateWords(r, routineStateTime(t, i18n.language, r), names);
+  const needsLook = !done && state.tone === "waiting";
+  const line = needsLook ? say(state) : whenText(r);
+  const href = r.target.type === "widget" ? widgetHref(r.target.widgetId, r.target.dashboardId) : routineHref(r.id);
+  const tint = needsLook ? c.amber : paused || done ? c.faint : c.muted;
+  return (
+    <ListRow
+      divider={divider}
+      leading={
+        <AgentFace agentId={r.agentId} size={52} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
+      }
+      title={routineTitle(r)}
+      sub={
+        <View style={styles.when}>
+          <LineIcon variant="subhead" name={needsLook ? "wait" : whenIcon(r)} size={14} color={tint} />
+          <Text
+            variant="subhead"
+            numberOfLines={1}
+            style={[styles.shrink, { color: needsLook ? c.amber : paused || done ? c.faint : c.muted }]}
+          >
+            {line}
+          </Text>
+        </View>
+      }
+      accessibilityLabel={[routineTitle(r), line].join(", ")}
+      accessibilityActions={[{ name: "menu", label: menu.label }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === "menu") menu.open();
+      }}
+      onLongPress={menu.open}
+      delayLongPress={380}
+      onPress={() => router.push(href)}
+    />
+  );
+});
+
 const styles = StyleSheet.create({
-  head: { paddingHorizontal: SCREEN_X, paddingBottom: 12, gap: 14 },
+  when: { flexDirection: "row", alignItems: "flex-start", gap: 6, minWidth: 0 },
+  shrink: { flexShrink: 1, minWidth: 0 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  search: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
-  status: { paddingHorizontal: 16, paddingBottom: 8 },
+  search: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 10 },
   doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: SCREEN_X, paddingVertical: 14 },
   pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },

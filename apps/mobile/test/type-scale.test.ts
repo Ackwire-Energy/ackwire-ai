@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  APP_TEXT_SCALE,
   CHROME_MAX_SCALE,
   countBadge,
   initialText,
   leadBox,
   readingMiddle,
+  scaleMetrics,
   type TypeStyle,
   typeScale,
   typeStyle,
@@ -147,6 +149,29 @@ describe("count badge", () => {
     expect(src("agent/PersonAvatar.tsx")).toContain("...initialText(size)");
     expect(src("ui/ProviderLogo.tsx")).toContain("...initialText(box, INITIAL_SIZE[size])");
     expect(src("features/blocks/PollCard.tsx")).toContain("const VOTER_INITIAL = initialText(20, 12);");
-    expect(src("features/me/ChatLookPage.tsx")).toContain("const PERSON_INITIAL = initialText(18, 9);");
+  });
+});
+
+describe("the person's text size, for the whole app", () => {
+  test("each step is about 2 points on the 17 body, the default unchanged", () => {
+    const body = typeScale("ios").body;
+    const sizes = (["xs", "sm", "md", "lg", "xl"] as const).map(
+      (step) => scaleMetrics(body.fontSize, body.lineHeight, APP_TEXT_SCALE[step]).fontSize,
+    );
+    expect(sizes).toEqual([13, 15, 17, 19, 21]);
+    expect(scaleMetrics(15, 20, APP_TEXT_SCALE.md)).toEqual({ fontSize: 15, lineHeight: 20 });
+  });
+
+  test("a style keeps its own line ratio, in whole points", () => {
+    expect(scaleMetrics(17, 22, APP_TEXT_SCALE.lg)).toEqual({ fontSize: 19, lineHeight: 25 });
+    expect(scaleMetrics(13, 18, APP_TEXT_SCALE.xl)).toEqual({ fontSize: 16, lineHeight: 22 });
+  });
+
+  test("Text grows its variant, never a size set on purpose, and a cap bounds both together", () => {
+    const src = (path: string) => readFileSync(join(import.meta.dir, "../src", path), "utf8");
+    const text = src("ui/Text.tsx");
+    expect(text).toContain("const fixed = own?.fontSize != null || (cap != null && cap > 0 && cap <= 1);");
+    expect(text).toContain("Math.max(1, cap / k)");
+    expect(src("providers/AppProviders.tsx")).toContain("<TextScaleProvider size={textSizeOf(org?.chatPrefs)}>");
   });
 });

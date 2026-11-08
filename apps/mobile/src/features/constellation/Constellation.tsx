@@ -2,18 +2,26 @@ import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type LayoutChangeEvent, Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  Text as RNText,
+  type StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useLivePaused } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
-import { Icon, Text } from "@/ui";
+import { haptics, Icon, Text } from "@/ui";
 import { useReducedMotion } from "@/ui/theme";
 import { Face } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
-  frameStars,
+  fitStars,
   namedStars,
   type Point,
   pixelsAlong,
@@ -33,6 +41,9 @@ const LINE = "#88a9e6";
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 1.8;
 const FOCUS = { duration: 420, easing: Easing.out(Easing.cubic) };
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** A sky that assembled once doesn't again in this run of the app: the moment is the first look, not every visit. */
+const assembled = new Set<string>();
 
 /** A path of small squares, for what is drawn in one color. */
 function squares(points: Point[], size: number) {
@@ -126,57 +137,126 @@ export interface ConstellationProps {
   height: number;
   /** Tapping a star; without it the sky is only to look at (no drag, no zoom). */
   onSelect?: (id: string) => void;
+  /**
+   * Drag and pinch to explore (default, with `onSelect`). False: every star framed and still, taps only, so a sky
+   * inside a scrolling page never takes the page's scroll.
+   */
+  explore?: boolean;
+  /**
+   * The first time this key's sky is seen in a run of the app, the stars fade in and the lines draw outward from the
+   * selected star (the wiki's connections lighting up). Off with reduced motion.
+   */
+  assemble?: string;
 }
 
 /**
- * The sky: a world bigger than the window, dragged and pinched, with the selected star brought to the middle.
- * Lines and stars are one Skia drawing; bodies, names and taps are views on top, moved with it, so the screen reader
- * reaches every star.
+ * The sky: to explore, a world bigger than the window, dragged and pinched, with the selected star brought to the
+ * middle; still (inside a page, or only to look at), the stars spread over the window at their real size. Lines and
+ * stars are one Skia drawing; bodies, names and taps are views on top, moved with it, so the screen reader reaches
+ * every star.
  */
-export function Constellation({ map, selected, height, onSelect }: ConstellationProps) {
+export function Constellation({ map, selected, height, onSelect, explore = true, assemble }: ConstellationProps) {
   const dir = useDirectory();
-  const at = useMemo(() => placeStars(map), [map]);
+  const reduced = useReducedMotion();
+  const still = !(onSelect && explore);
+  const [width, setWidth] = useState(0);
+  const placedStars = useMemo(() => placeStars(map), [map]);
+  const at = useMemo(
+    () => (still && width ? fitStars(placedStars, width, height) : placedStars),
+    [still, placedStars, width, height],
+  );
+  // A still sky's world is the window itself; an explored one, a square with room per star.
   const side = worldSide(map.stars.length);
+  const worldW = still ? width : side;
+  const worldH = still ? height : side;
   const named = useMemo(() => namedStars(map, at, selected), [map, at, selected]);
   const recent = useMemo(() => map.links.filter((l) => l.recent), [map]);
-  const [width, setWidth] = useState(0);
   const x = useSharedValue(0);
   const y = useSharedValue(0);
   const zoom = useSharedValue(1);
   const placed = useRef(false);
+  // The first look: stars, then the lines drawn from the heart outward (`assemble`); otherwise all there at once.
+  const play = useRef(assemble !== undefined && !assembled.has(assemble) && !reduced).current;
+  const lit = useSharedValue(play ? 0 : 1);
+  const drawn = useSharedValue(play ? 0 : 1);
+  // A tapped star's own lines draw bright from it; the first selection is just there.
+  const hotDrawn = useSharedValue(1);
+  const chosenOnce = useRef(false);
 
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
   useEffect(() => {
     if (!width) return;
-    // Only to look at: every star in the frame. To explore: the selected star in the middle.
-    const framed = onSelect || at.size === 0 ? null : frameStars(at, width, height);
-    if (framed) zoom.value = framed.zoom;
-    const p = framed?.center ?? (selected ? at.get(selected) : undefined) ?? { x: side / 2, y: side / 2 };
+    // Still: the window is the world, nothing moves. To explore: the selected star in the middle.
+    if (still) {
+      zoom.value = 1;
+      x.value = 0;
+      y.value = 0;
+      return;
+    }
+    const p = (selected ? at.get(selected) : undefined) ?? { x: side / 2, y: side / 2 };
     const toX = width / 2 - p.x * zoom.value;
     const toY = height / 2 - p.y * zoom.value;
     x.value = placed.current ? withTiming(toX, FOCUS) : toX;
     y.value = placed.current ? withTiming(toY, FOCUS) : toY;
     placed.current = true;
-  }, [selected, at, width, height, side, x, y, zoom, onSelect]);
+  }, [selected, at, width, height, side, x, y, zoom, still]);
+
+  useEffect(() => {
+    if (!play || !width || assemble === undefined) return;
+    assembled.add(assemble);
+    lit.value = withTiming(1, { duration: 420, easing: EASE_OUT });
+    drawn.value = withDelay(180, withTiming(1, { duration: 900, easing: EASE_OUT }));
+  }, [play, width, assemble, lit, drawn]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `selected` is the trigger: a new selection draws its links again
+  useEffect(() => {
+    if (!chosenOnce.current || reduced) {
+      chosenOnce.current = true;
+      hotDrawn.value = 1;
+      return;
+    }
+    hotDrawn.value = 0;
+    hotDrawn.value = withTiming(1, { duration: 240, easing: EASE_OUT });
+  }, [selected, reduced, hotDrawn]);
+
+  // One light tap on the frame a star is chosen; the lines answer in the same frame.
+  const choose = onSelect
+    ? (id: string) => {
+        if (id !== selected) haptics.light();
+        onSelect(id);
+      }
+    : undefined;
 
   const art = useMemo(() => {
+    // Outward from the selected star (or the middle), so a drawing line reads as one wave from the heart.
+    const from = (selected ? at.get(selected) : undefined) ?? { x: worldW / 2, y: worldH / 2 };
+    const reach = (l: StarLink) => {
+      const a = at.get(l.from);
+      const b = at.get(l.to);
+      return a && b ? Math.min(Math.hypot(a.x - from.x, a.y - from.y), Math.hypot(b.x - from.x, b.y - from.y)) : 0;
+    };
+    const outward = [...map.links].sort((p, q) => reach(p) - reach(q));
     const line = (hot: boolean) =>
-      map.links.flatMap((l) => {
+      outward.flatMap((l) => {
         const a = at.get(l.from);
         const b = at.get(l.to);
         if (!a || !b || (l.from === selected || l.to === selected) !== hot) return [];
         return pixelsAlong(a, b);
       });
-    const white: Point[] = [];
-    const tinted = new Map<AgentColorName, Point[]>();
+    // One drawing per color and pixel size: a page an agent wrote takes its color, a page with three links or more
+    // (or read that often) is drawn a size up, the brighter stars of the sky.
+    const groups = new Map<string, { color: string; size: number; points: Point[] }>();
     for (const s of map.stars) {
       const p = at.get(s.id);
       if (!p || s.kind === "agent") continue;
-      const cell = 2;
-      const list = s.kind === "page" ? white : (tinted.get(agentColor(s, dir)) ?? []);
-      for (const [dx, dy] of spriteOf(s.kind)) list.push({ x: p.x + dx * cell - 1, y: p.y + dy * cell - 1 });
-      if (s.kind === "memory") tinted.set(agentColor(s, dir), list);
+      const color = s.kind === "memory" || s.agentId ? gradientOf(agentColor(s, dir))[0] : "#ffffff";
+      const cell = s.kind === "page" && s.weight >= 3 ? 3 : 2;
+      const key = `${color}|${cell}`;
+      const group = groups.get(key) ?? { color, size: cell, points: [] };
+      for (const [dx, dy] of spriteOf(s.kind))
+        group.points.push({ x: p.x + dx * cell - cell / 2, y: p.y + dy * cell - cell / 2 });
+      groups.set(key, group);
     }
     const chosen = map.stars.find((s) => s.id === selected);
     const spot = chosen ? at.get(chosen.id) : undefined;
@@ -184,10 +264,9 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
       ring: squares(spot && chosen ? ringAround(spot, chosen.kind === "agent" ? 27 : 14) : [], 2),
       dim: squares(line(false), 1.5),
       hot: squares(line(true), 2),
-      white: squares(white, 2),
-      tinted: [...tinted].map(([color, pts]) => ({ color: gradientOf(color)[0], path: squares(pts, 2) })),
+      stars: [...groups].map(([key, g]) => ({ key, color: g.color, path: squares(g.points, g.size) })),
     };
-  }, [map, at, selected, dir]);
+  }, [map, at, selected, dir, worldW, worldH]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
@@ -209,45 +288,53 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
   const world = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: zoom.value }],
   }));
+  const spots = useAnimatedStyle(() => ({ opacity: lit.value }));
 
   const sky = (
     <View onLayout={onLayout} style={[styles.window, { height }]}>
       <Dither kind="sky" tones={NIGHT_TONES} pixel={4} style={StyleSheet.absoluteFill} />
-      <Animated.View style={[styles.world, { width: side, height: side }, world]}>
-        <Canvas style={{ width: side, height: side }} pointerEvents="none">
-          <Path path={art.dim} color={LINE} opacity={0.26} />
-          <Path path={art.hot} color={LINE} opacity={0.85} />
-          <Path path={art.white} color="#ffffff" />
-          <Path path={art.ring} color="#ffffff" />
-          {art.tinted.map((t) => (
-            <Path key={t.color} path={t.path} color={t.color} />
-          ))}
-        </Canvas>
-        <Pulse links={recent} at={at} />
-        {map.stars.map((s) => {
-          const p = at.get(s.id);
-          return p ? (
-            <StarSpot
-              key={s.id}
-              star={s}
-              at={p}
-              named={named.has(s.id)}
-              selected={s.id === selected}
-              onPress={onSelect}
-            />
-          ) : null;
-        })}
-      </Animated.View>
+      {/* A still sky waits for its width: it is laid out over the window, never drawn as a square first. */}
+      {still && !width ? null : (
+        <Animated.View style={[styles.world, { width: worldW, height: worldH }, world]}>
+          <Canvas style={{ width: worldW, height: worldH }} pointerEvents="none">
+            <Path path={art.dim} color={LINE} opacity={0.26} end={drawn} />
+            <Path path={art.hot} color={LINE} opacity={0.85} end={hotDrawn} />
+            {art.stars.map((g) => (
+              <Path key={g.key} path={g.path} color={g.color} opacity={lit} />
+            ))}
+            <Path path={art.ring} color="#ffffff" opacity={lit} />
+          </Canvas>
+          <Pulse links={recent} at={at} />
+          <Animated.View style={[StyleSheet.absoluteFill, spots]} pointerEvents="box-none">
+            {map.stars.map((s) => {
+              const p = at.get(s.id);
+              return p ? (
+                <StarSpot
+                  key={s.id}
+                  star={s}
+                  at={p}
+                  named={named.has(s.id)}
+                  selected={s.id === selected}
+                  onPress={choose}
+                />
+              ) : null;
+            })}
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
-  return onSelect ? <GestureDetector gesture={gesture}>{sky}</GestureDetector> : sky;
+  return onSelect && explore ? <GestureDetector gesture={gesture}>{sky}</GestureDetector> : sky;
 }
 
 function agentColor(s: Star, dir: ReturnType<typeof useDirectory>): AgentColorName {
   return agentLook(s.agentId ? dir.anyAgent(s.agentId) : undefined).color;
 }
 
-/** The sky in a card: its name and count on top, and under it what was tapped, which opens. */
+/**
+ * The sky in a card: its name and count on top (when it has one), and under it what was tapped, which opens.
+ * `explore` and `assemble` as `Constellation`'s.
+ */
 export function StarCard({
   label,
   count,
@@ -258,9 +345,13 @@ export function StarCard({
   title,
   subtitle,
   onOpen,
+  explore = true,
+  assemble,
+  accessibilityLabel,
+  style,
 }: {
-  label: string;
-  count: number;
+  label?: string;
+  count?: number;
   map: StarMap;
   selected: string | null;
   height?: number;
@@ -268,20 +359,37 @@ export function StarCard({
   title: string;
   subtitle: string;
   onOpen: () => void;
+  explore?: boolean;
+  assemble?: string;
+  /** What the sky is, for the screen reader, when the card has no name on top. */
+  accessibilityLabel?: string;
+  /** Room around the card where its place differs (under a section header: no top margin). */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.card}>
-      <Constellation map={map} selected={selected} height={height} onSelect={onSelect} />
-      <View style={styles.cardHead} pointerEvents="none">
-        <Icon name="sparkle" size={16} color="#ffffff" />
-        <Text variant="callout" style={styles.cardTitle} numberOfLines={1}>
-          {label}
-        </Text>
-        <Text variant="subhead" style={styles.cardCount}>
-          {count}
-        </Text>
-      </View>
+    <View style={[styles.card, style]} accessibilityLabel={accessibilityLabel}>
+      <Constellation
+        map={map}
+        selected={selected}
+        height={height}
+        onSelect={onSelect}
+        explore={explore}
+        {...(assemble ? { assemble } : {})}
+      />
+      {label ? (
+        <View style={styles.cardHead} pointerEvents="none">
+          <Icon name="sparkle" size={16} color="#ffffff" />
+          <Text variant="callout" style={styles.cardTitle} numberOfLines={1}>
+            {label}
+          </Text>
+          {count !== undefined ? (
+            <Text variant="subhead" style={styles.cardCount}>
+              {count}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityHint={t("mobile.constellation.openHint")}
@@ -337,7 +445,7 @@ const styles = StyleSheet.create({
   },
   nameStrong: { color: "#ffffff", fontWeight: "600" },
   pulse: { position: "absolute", left: 0, top: 0, width: 4, height: 4, backgroundColor: "#cfe0ff" },
-  card: { marginHorizontal: 16, marginTop: 12, borderRadius: 24, overflow: "hidden", backgroundColor: NIGHT },
+  card: { marginHorizontal: 16, marginTop: 12, borderRadius: 20, overflow: "hidden", backgroundColor: NIGHT },
   cardHead: {
     position: "absolute",
     top: 0,

@@ -53,25 +53,29 @@ export function ArchivedChannelsScreen() {
       ) : null}
       {list.isSuccess && channels.length === 0 ? <EmptyState icon="archive" title={t("channel.archivedNone")} /> : null}
       {channels.length > 0 ? (
-        <GroupedList>
-          {channels.map((ch) => (
-            <GroupedRow
-              key={ch.id}
-              icon={ch.visibility === "private" ? "lock" : "hash"}
-              label={`#${ch.name}`}
-              labelLines={3}
-              sub={t("channel.archivedOn", { date: formatShortDate(i18n.language, ch.archivedAt) })}
-              disabled={restore.isPending}
-              onPress={() => ask(ch)}
-            />
-          ))}
-        </GroupedList>
+        <View style={styles.in}>
+          <GroupedList>
+            {channels.map((ch) => (
+              <GroupedRow
+                key={ch.id}
+                icon={ch.visibility === "private" ? "lock" : "hash"}
+                label={`#${ch.name}`}
+                labelLines={3}
+                sub={t("channel.archivedOn", { date: formatShortDate(i18n.language, ch.archivedAt) })}
+                disabled={restore.isPending}
+                onPress={() => ask(ch)}
+              />
+            ))}
+          </GroupedList>
+        </View>
       ) : null}
     </PushedLargeTitle>
   );
 }
 
 const styles = StyleSheet.create({
+  // The grouped card on the screen's 16 margin, as every grouped page's.
+  in: { paddingHorizontal: 16, paddingTop: 4 },
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 32 },
 });

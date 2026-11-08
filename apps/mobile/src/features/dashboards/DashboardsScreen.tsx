@@ -1,7 +1,7 @@
 import { type DashboardSummary, dashboardGroups, useDashboards } from "@agenteschat/client";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, Text, useTheme } from "@/ui";
+import { RefreshControl, StyleSheet, View } from "react-native";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, SkeletonList, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
@@ -20,7 +20,6 @@ export const openNewBoard = () => router.push("/board-new");
  */
 export function DashboardsScreen() {
   const { t } = useTranslation();
-  const { colors: c } = useTheme();
   const orgId = useOrgId();
   const list = useDashboards(orgId);
   const pull = usePullRefresh(list.refetch);
@@ -64,9 +63,8 @@ export function DashboardsScreen() {
           />
         </GroupedList>
         {list.isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={c.muted} />
-          </View>
+          // Loading: the rows' own shape, never a spinner.
+          <SkeletonList rows={4} />
         ) : list.isError && !list.data ? (
           <View style={styles.center}>
             <Text tone="muted" style={styles.centerText}>

@@ -33,10 +33,14 @@ import {
   LIST_INSET,
   ListRow,
   PersonAvatar,
+  PULL_TINT,
+  PullOrbit,
   SectionHeader,
+  SkeletonList,
   SwipeRow,
   Text,
   useReducedMotion,
+  useToast,
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { approvalAction } from "../approvals/logic";
@@ -49,10 +53,10 @@ import { notificationHref, notificationWebPath, routineHref } from "../links/log
 import { openWebPath } from "../links/open-web";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
-import { LoadFailed, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
+import { RetryLine, TeamSkyEmpty } from "../shared/TeamSkyEmpty";
 import { useTabHeader } from "../shared/tabHeader";
 import { WaitingCard, WaitingSource } from "../shared/WaitingCard";
 import { UsageLimitActions } from "../usage/people";
@@ -74,9 +78,11 @@ import { useNoticeTitle } from "./noticeTitle";
 
 /**
  * Atividade: what waits on you on top as the chat's request cards (who asks, the kind, the deadline, the exact
- * request, why, and the decision on the card), or, with nothing waiting, "Nada esperando você" and the next real
- * event (a routine's next run); then the rest by day as loose rows. How many wait is said once, on the section. Swipe
- * a row right to mark read or unread, left for "Feito". Tapping opens where it happened.
+ * request, why, and the decision on the card: Aprovar · Recusar, the page's one primary on the first card), or,
+ * with nothing waiting, the sky with the team and "Nada esperando você", then the next real event (a routine's next
+ * run); then the rest by day as loose rows. How many wait is said once, on the section (the pills carry no counts).
+ * Swipe a row right to mark read or unread, left for "Feito" (a toast offers Desfazer). Tapping opens where it
+ * happened. Loading: rows of the list's own shape; a load that failed is one gray line over what was kept.
  */
 export function ActivityScreen() {
   const { t } = useTranslation();
@@ -114,7 +120,8 @@ export function ActivityScreen() {
     <LargeTitleScreen
       title={t("mobile.activity.title")}
       {...header}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={PULL_TINT} />}
+      pullMark={<PullOrbit refreshing={pull.refreshing} />}
     >
       <Filters
         items={[
@@ -131,21 +138,30 @@ export function ActivityScreen() {
           <SectionHeader title={t("mobile.home.waiting")} count={waitingCount} />
           <LayoutAnimationConfig skipEntering skipExiting>
             <View style={styles.cards}>
-              {waiting.map((n) => (
+              {waiting.map((n, i) => (
                 <Animated.View key={n.id} {...cardMotion}>
-                  <WaitingCardView item={n} />
+                  <WaitingCardView item={n} first={i === 0} />
                 </Animated.View>
               ))}
             </View>
           </LayoutAnimationConfig>
         </>
-      ) : list.isLoading ? null : list.isError && !list.data ? (
-        <LoadFailed onRetry={() => void list.refetch()} />
+      ) : list.isLoading ? (
+        <>
+          <SectionHeader title={t("mobile.activity.day.today")} />
+          <SkeletonList rows={3} />
+          <SectionHeader title={t("mobile.activity.day.yesterday")} />
+          <SkeletonList rows={1} />
+        </>
+      ) : list.isError && !list.data ? (
+        <RetryLine onRetry={() => void list.refetch()} />
       ) : filter !== "done" ? (
         <AllClear />
       ) : days.length === 0 ? (
         <EmptyState size="inline" title={t("mobile.activity.noneDone")} />
       ) : null}
+      {/* Kept rows under a load that failed: the line says so, what loaded stays readable. */}
+      {list.isError && list.data && !list.isLoading ? <RetryLine onRetry={() => void list.refetch()} /> : null}
       {days.map(([group, groupItems]) => (
         <View key={group}>
           <SectionHeader title={t(`mobile.activity.day.${group satisfies DayGroup}`)} />
@@ -189,7 +205,8 @@ function useNoticeHref(n: AppNotification, ai: Parameters<typeof notificationHre
   return id ? `/connectors/tools?id=${id}` : notificationHref(n, ai);
 }
 
-function WaitingCardView({ item: n }: { item: AppNotification }) {
+/** `first`: the page's first card carries its one primary; the others decide or open in secondary. */
+function WaitingCardView({ item: n, first = false }: { item: AppNotification; first?: boolean }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -275,8 +292,12 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
       accessibilityLabel={[name, kind.label, title].filter(Boolean).join(", ")}
       expires={left !== null && card.expiresAt ? { createdAt: n.createdAt, expiresAt: card.expiresAt } : null}
       where={where}
-      decision={decidable ? <ApproveHere approval={decidable} /> : undefined}
-      action={(href || web) && card.kind !== "limit" ? { label: button, onPress: open } : null}
+      decision={decidable ? <ApproveHere approval={decidable} primary={first} /> : undefined}
+      action={
+        (href || web) && card.kind !== "limit"
+          ? { label: button, onPress: open, variant: first ? "primary" : "secondary" }
+          : null
+      }
     >
       {/* Who asked while nobody watched, then why (ADR 0053 §8), as on the request itself. */}
       {card.kind === "approval" ? (
@@ -326,10 +347,11 @@ function kindOf(t: TFunction, kind: WaitingCardKind, screen?: string): { icon: I
 const OWN_ICON = { join: "members", tools: "bolt", limit: "chart" } as const;
 
 /**
- * The request's decision on the card, as the chat's: Aprovar (held to approve when it is high risk) and Agora não,
- * which asks why on the request's own screen.
+ * The request's decision on the card, as the chat's: Aprovar (held to approve when it is high risk; the page's
+ * primary only on its first card) and Recusar, which asks why on the request's own screen. Words alone, no icon in
+ * the button.
  */
-function ApproveHere({ approval: a }: { approval: Approval }) {
+function ApproveHere({ approval: a, primary }: { approval: Approval; primary: boolean }) {
   const { t } = useTranslation();
   const { approve, pending, high } = useApproveNow(a);
   return (
@@ -339,10 +361,9 @@ function ApproveHere({ approval: a }: { approval: Approval }) {
           <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
         ) : (
           <Button
-            variant="primary"
+            variant={primary ? "primary" : "secondary"}
             size="card"
             wide
-            icon="check"
             label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
             disabled={pending}
             onPress={() => approve()}
@@ -354,7 +375,7 @@ function ApproveHere({ approval: a }: { approval: Approval }) {
           variant="secondary"
           size="card"
           wide
-          label={t("approval.notNow")}
+          label={t("mobile.approval.refuse")}
           onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
         />
       }
@@ -375,15 +396,15 @@ function ApprovalSource({ approval: a }: { approval: Approval }) {
 }
 
 /**
- * Nothing waits on you, right on the page: the agent pleased, "Nada esperando você" and one calm line, then
- * the next real event as one line (a routine's next run: its agent, its name and when), which opens the routine.
+ * Nothing waits on you, right on the page: the sky with the team on its horizon, "Nada esperando você" and one calm
+ * line (no card, no button), then the next real event as one line (a routine's next run: its agent, its name and
+ * when), which opens the routine; the history follows within the first thumb.
  */
 function AllClear() {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const routines = useRoutines(orgId);
-  const look = useEmptyLook();
   const next = useMemo(() => nextRoutine<Routine>(routines.data ?? []), [routines.data]);
   const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
   const when = useWhen();
@@ -392,13 +413,7 @@ function AllClear() {
   // The last card decided: the clear page fades in where the cards were.
   return (
     <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
-      <EmptyState
-        size="panel"
-        agent={look}
-        mood="deal"
-        title={t("mobile.activityNow.clear.title")}
-        subtitle={t("mobile.activityNow.clear.text")}
-      />
+      <TeamSkyEmpty title={t("mobile.activityNow.clear.title")} text={t("mobile.activityNow.clear.text")} />
       {/* The next run as a row of the list below it: who, the routine's name on one line, and when. */}
       {next ? (
         <>
@@ -457,6 +472,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const orgId = useOrgId();
   const c = useColors();
   const when = useWhen();
+  const toast = useToast();
   const act = useNotificationAction(orgId);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
@@ -499,9 +515,17 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
   const toggleRead = () => act.mutate({ type: "read", item: n, read: unread });
-  // In "Concluídas" the same swipe moves it back to the inbox.
+  // In "Feitas" the same swipe moves it back to the inbox. Marked done, a toast offers the way back for a moment.
   const isDone = Boolean(n.doneAt);
-  const done = () => act.mutate({ type: "done", item: n, done: !isDone });
+  const done = () => {
+    act.mutate({ type: "done", item: n, done: !isDone });
+    if (!isDone)
+      toast({
+        title: t("mobile.activity.doneToast"),
+        subtitle: title,
+        action: { label: t("mobile.activity.undo"), onPress: () => act.mutate({ type: "done", item: n, done: false }) },
+      });
+  };
   const doneLabel = isDone ? t("mobile.activity.restore") : t("mobile.activity.done");
   const open = () => {
     if (unread) act.mutate({ type: "read", item: n, read: true });
@@ -587,7 +611,8 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
   a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
 
 const styles = StyleSheet.create({
-  cards: { gap: 10, paddingHorizontal: 16 },
+  // Cards 12 apart, at the screen's margin.
+  cards: { gap: 12, paddingHorizontal: 16 },
   change: { paddingHorizontal: 16, paddingBottom: 12 },
   wpressed: { opacity: 0.85 },
   faces: { flexDirection: "row" },

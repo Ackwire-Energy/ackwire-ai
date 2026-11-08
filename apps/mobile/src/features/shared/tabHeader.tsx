@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { type HeaderAction, PersonAvatar } from "@/ui";
+import { type HeaderAction, haptics, PersonAvatar } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "./hooks";
 import { OrgAvatar } from "./OrgAvatar";
@@ -37,8 +37,16 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
     left: (
       <Pressable
         onPress={() => router.push("/me")}
+        // Holding the mark opens the workspaces as a sheet (ADR 0154): one light tap as it commits, the sheet is the
+        // system's form sheet. A tap still opens Você.
+        onLongPress={() => {
+          haptics.light();
+          router.push("/workspaces-sheet");
+        }}
+        delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={org?.name ? `${t("mobile.me.title")}, ${org.name}` : t("mobile.me.title")}
+        accessibilityHint={t("mobile.me.workspacesHoldHint")}
         hitSlop={6}
         style={({ pressed }) => [styles.box, pressed ? styles.pressed : null]}
       >

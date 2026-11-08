@@ -20,8 +20,9 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { Easing, FadeIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Icon, type IconName, MEDIA_ROW, MediaRow, Text } from "@/ui";
+import { Button, Card, Icon, type IconName, MEDIA_ROW, MediaRow, Text, useReducedMotion } from "@/ui";
 import { openConnectAi } from "../../ai/NoAiCard";
 import { usePlanHold } from "../../ai/parts";
 import { requestComposerText } from "../../chat/composer-request";
@@ -48,6 +49,9 @@ const STEP_ICON: Record<AgentSetupStep, IconName> = {
   who: "members",
   how: "doc",
 };
+
+/** The agents whose first card already arrived in their conversation while the app runs (its stagger plays once). */
+const ARRIVED = new Set<string>();
 
 /** The steps this person sees for this agent (none: the checklist isn't theirs, or the agent has none). */
 export function useSetupSteps(agent: Agent | undefined): AgentSetupStep[] {
@@ -143,6 +147,12 @@ export function AgentSetupCard({
   const ready = status.isSuccess && detail.isSuccess && visible.ready && (!steps.includes("apps") || !access.isPending);
   const said = useDoneSay(ready, doneHere, (step) => t(`agentSetup.say.${step}`, agentGrammar(agent.name)));
 
+  // In the new agent's conversation its first card's steps arrive one after another, once per agent while the app
+  // runs: a first-time moment, never replayed when the conversation's list recycles the row or it opens again.
+  const [arrives] = useState(() => place === "dm" && !ARRIVED.has(agent.id));
+  useEffect(() => {
+    if (arrives) ARRIVED.add(agent.id);
+  }, [arrives, agent.id]);
   if (steps.length === 0 || (place === "profile" && all)) return null;
 
   const names = (list: typeof connectors) =>
@@ -197,6 +207,7 @@ export function AgentSetupCard({
   return (
     <SetupCardView
       title={title}
+      arrives={arrives}
       done={doneHere.length}
       total={steps.length}
       rows={steps.map((s) => {
@@ -256,15 +267,27 @@ export function SetupCardView({
   total,
   rows,
   foot,
+  arrives = false,
 }: {
   title: string;
   done: number;
   total: number;
   rows: SetupCardRow[];
   foot?: ReactNode;
+  /** Its rows fade in one after another (the card itself stays put): a new agent's first card, once. */
+  arrives?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
+  // Opacity only, 50 ms apart, 220 ms each with a strong ease-out: the whole card is in by about 400 ms, every
+  // button pressable from the first frame. Reduced motion: no stagger at all.
+  const enter = (i: number) =>
+    arrives && !reduced
+      ? FadeIn.duration(220)
+          .delay(Math.min(i, 5) * 50)
+          .easing(Easing.bezier(0.23, 1, 0.32, 1))
+      : undefined;
   return (
     <Card style={styles.card}>
       <View style={styles.inner} accessibilityLabel={title}>
@@ -285,8 +308,9 @@ export function SetupCardView({
           {rows.map((r, i) => (
             // A MediaRow: the step's icon (a check once done) in the face's place, its name on that line, what it says
             // and its buttons under them at the card's width, as on the web.
-            <View
+            <Animated.View
               key={r.key}
+              entering={enter(i)}
               style={[styles.row, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
             >
               <MediaRow
@@ -341,7 +365,7 @@ export function SetupCardView({
                   </View>
                 ) : null}
               </MediaRow>
-            </View>
+            </Animated.View>
           ))}
         </View>
         {foot}

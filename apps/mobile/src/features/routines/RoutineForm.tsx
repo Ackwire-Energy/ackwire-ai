@@ -28,6 +28,7 @@ import {
   triggerChoices,
   zoneDisplayName,
 } from "@agenteschat/client/lib/routines";
+import { WEEKDAYS } from "@agenteschat/ui/recurrence";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -53,6 +54,7 @@ import { boldRuns } from "../chat/actions";
 import { AllowTalkAction } from "../chat/ReachLines";
 import { routineHref } from "../links/logic";
 import { ZoneList } from "../me/AccountPage";
+import { chooseAction } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
@@ -84,7 +86,20 @@ import {
   zoneOf,
 } from "./logic";
 import { AgentAccessNote } from "./parts";
-import { fromApiRule, nextLabel, ruleSentence, runLabel, toApiRule, upcomingLabels } from "./rule";
+import {
+  COMMON_RULES,
+  fromApiRule,
+  HALF_HOURS,
+  nextDays,
+  nextLabel,
+  presetOf,
+  type RulePreset,
+  ruleSentence,
+  runLabel,
+  toApiRule,
+  upcomingLabels,
+  withPreset,
+} from "./rule";
 import { TemplatePicker } from "./TemplatePicker";
 import { WebhookCard } from "./WebhookCard";
 import { setRoutineZone, useRoutineZone } from "./zone";
@@ -201,6 +216,10 @@ function Form({ routine }: { routine: Routine | undefined }) {
     setPhraseTyped(true);
   };
   const typed = useDeferredValue(phrase.trim());
+  // A pick from the rows (Repetição, Dia, Horário) replaces a kept cron and any phrase, as a phrase read would.
+  const [rulePicked, setRulePicked] = useState(false);
+  // The phrase field: for what the rows don't hold, opened from Repetição's last choice.
+  const [writing, setWriting] = useState(false);
   const schedule = d.kind === "schedule";
   const once = d.rule.freq === "once";
   const parsed = useRuleParse(orgId, typed, schedule && phraseTyped && typed.length > 0, d.rule.timezone);
@@ -221,7 +240,8 @@ function Form({ routine }: { routine: Routine | undefined }) {
   // A routine kept as a cron (every N minutes) says so until a phrase replaces it.
   // A phrase read into a rule replaces it; one typed and erased doesn't (the form's rule is still a placeholder).
   const ruleTyped = phraseTyped && phrase.trim().length > 0;
-  const cron = routine?.trigger.type === "schedule" && !routine.trigger.rule && !ruleTyped ? routine.trigger : null;
+  const cron =
+    routine?.trigger.type === "schedule" && !routine.trigger.rule && !ruleTyped && !rulePicked ? routine.trigger : null;
   const every = cron ? everyMinutes(cron.cron) : null;
   const sentence = cron
     ? every
@@ -236,6 +256,87 @@ function Form({ routine }: { routine: Routine | undefined }) {
       ? tt(`routines.form.parseError.${code.replace(/\./g, "_")}`, { defaultValue: parsed.data.error })
       : parsed.data.error;
   })();
+
+  // "Quando" as rows, each value from the system's list: Repetição, then the day it falls on, then the time.
+  const preset: RulePreset = cron ? "custom" : presetOf(d.rule);
+  const presetWord = (p: RulePreset) =>
+    p === "once"
+      ? t("recurrence.mode.once")
+      : p === "daily"
+        ? t("recurrence.s.daily", { count: 1 })
+        : p === "business"
+          ? t("recurrence.s.businessDays")
+          : p === "weekly"
+            ? t("recurrence.s.weekly", { count: 1 })
+            : p === "monthly"
+              ? t("recurrence.s.monthly", { count: 1 })
+              : t("mobile.routines.when.custom");
+  const pickRule = (next: typeof d.rule) => {
+    setD((x) => ({ ...x, rule: next }));
+    setRulePicked(true);
+    setPhrase("");
+    setPhraseTyped(false);
+  };
+  const choose = (title: string, options: { label: string; checked: boolean; onPress: () => void }[]) =>
+    chooseAction(title, options, t("mobile.common.cancel"));
+  const pickPreset = () =>
+    choose(t("recurrence.frequency"), [
+      ...COMMON_RULES.map((p) => ({
+        label: presetWord(p),
+        checked: preset === p,
+        onPress: () => pickRule(withPreset(d.rule, p)),
+      })),
+      { label: t("mobile.routines.when.write"), checked: false, onPress: () => setWriting(true) },
+    ]);
+  const capital = (word: string) => word.charAt(0).toLocaleUpperCase(i18n.language) + word.slice(1);
+  const dayWord = (ymd: string) =>
+    capital(
+      new Intl.DateTimeFormat(i18n.language, { weekday: "short", day: "numeric", month: "short" }).format(
+        new Date(Number(ymd.slice(0, 4)), Number(ymd.slice(5, 7)) - 1, Number(ymd.slice(8, 10))),
+      ),
+    );
+  const monthDayWord = (day: number) =>
+    day === -1 ? t("mobile.routines.when.lastDay") : t("mobile.routines.when.monthDay", { day });
+  const dayValue =
+    preset === "weekly"
+      ? capital(t(`recurrence.wd.${d.rule.byWeekday?.[0] ?? "MO"}.long`))
+      : preset === "monthly"
+        ? monthDayWord(d.rule.byMonthDay?.[0] ?? 1)
+        : preset === "once"
+          ? dayWord(d.rule.start)
+          : null;
+  const pickDay = () =>
+    choose(
+      t("mobile.routines.when.day"),
+      preset === "weekly"
+        ? WEEKDAYS.map((w) => ({
+            label: capital(t(`recurrence.wd.${w}.long`)),
+            checked: d.rule.byWeekday?.[0] === w,
+            onPress: () => pickRule({ ...d.rule, byWeekday: [w] }),
+          }))
+        : preset === "monthly"
+          ? [...Array.from({ length: 28 }, (_, i) => i + 1), -1].map((day) => ({
+              label: monthDayWord(day),
+              checked: d.rule.byMonthDay?.[0] === day,
+              onPress: () => pickRule({ ...d.rule, byMonthDay: [day] }),
+            }))
+          : nextDays().map((ymd) => ({
+              label: dayWord(ymd),
+              checked: d.rule.start === ymd,
+              onPress: () => pickRule({ ...d.rule, start: ymd }),
+            })),
+    );
+  const time = d.rule.times[0] ?? "09:00";
+  const pickTime = () =>
+    choose(
+      t("recurrence.times"),
+      (HALF_HOURS.includes(time) ? HALF_HOURS : [...HALF_HOURS, time].sort()).map((hhmm) => ({
+        label: hhmm,
+        checked: hhmm === time,
+        onPress: () => pickRule({ ...d.rule, times: [hhmm] }),
+      })),
+    );
+  const showPhrase = writing || cron !== null || preset === "custom";
 
   // "Quando chegar um email": the first mailbox its agent reads, and its inbox, until the person picks (as the web's,
   // the mailboxes the agent can't read aren't offered: the server refuses them).
@@ -361,7 +462,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const submit = () => {
     if (!ready) return;
     if (routine) {
-      const patch = draftChanges(routine, d, savedRule, ruleTyped);
+      const patch = draftChanges(routine, d, savedRule, ruleTyped || rulePicked);
       if (Object.keys(patch).length === 0) {
         close();
         return;
@@ -524,16 +625,42 @@ function Form({ routine }: { routine: Routine | undefined }) {
             <>
               <View style={styles.gap} />
               <GroupedList>
-                <View style={styles.sentence}>
-                  <Text variant="body" accessibilityLiveRegion="polite">
-                    {sentence}
-                  </Text>
-                  {!cron && upcoming.length > 0 ? (
-                    <Text variant="footnote" tone="muted">
-                      {`${t("routines.form.next")}: ${upcoming.join(" · ")}`}
+                {/* A routine kept as a cron says so in its own words until a pick or a phrase replaces it. */}
+                {cron ? (
+                  <View style={styles.sentence}>
+                    <Text variant="body" accessibilityLiveRegion="polite">
+                      {sentence}
                     </Text>
-                  ) : null}
-                </View>
+                  </View>
+                ) : null}
+                <GroupedRow
+                  key="repeat"
+                  icon="replay"
+                  label={t("recurrence.frequency")}
+                  value={presetWord(preset)}
+                  menu
+                  onPress={pickPreset}
+                />
+                {dayValue !== null ? (
+                  <GroupedRow
+                    key="day"
+                    icon="sun"
+                    label={t("mobile.routines.when.day")}
+                    value={dayValue}
+                    menu
+                    onPress={pickDay}
+                  />
+                ) : null}
+                {preset !== "custom" ? (
+                  <GroupedRow
+                    key="time"
+                    icon="clock"
+                    label={t("recurrence.times")}
+                    value={time}
+                    menu
+                    onPress={pickTime}
+                  />
+                ) : null}
                 {/* A cron keeps its own zone until a phrase replaces it: nothing here could change it. */}
                 {cron ? null : (
                   <GroupedField label={t("routines.form.timezone")} onPress={pickZone}>
@@ -543,6 +670,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
                   </GroupedField>
                 )}
               </GroupedList>
+              {/* The rows read back as one sentence, with the next runs: what the person checks before saving. */}
+              {cron ? null : (
+                <GroupedFooter>
+                  {[sentence, upcoming.length > 0 ? `${t("routines.form.next")}: ${upcoming.join(" · ")}` : null]
+                    .filter(Boolean)
+                    .join("\n")}
+                </GroupedFooter>
+              )}
               {utc && !cron && !isUtc(d.rule.timezone) ? (
                 <View style={styles.utc}>
                   <Text variant="footnote" tone="faint">
@@ -560,18 +695,24 @@ function Form({ routine }: { routine: Routine | undefined }) {
                   </Pressable>
                 </View>
               ) : null}
-              <GroupedHeader>{t("routines.form.frequency")}</GroupedHeader>
-              <TextArea
-                value={phrase}
-                onChangeText={typePhrase}
-                placeholder={t("recurrence.phrasePlaceholder")}
-                accessibilityLabel={t("routines.form.frequency")}
-                multiline={false}
-                minHeight={50}
-                autoCorrect={false}
-                returnKeyType="done"
-                maxLength={300}
-              />
+              {showPhrase ? (
+                <>
+                  {/* Under Repetição, Dia and Horário: "Do seu jeito", what the rows don't hold. */}
+                  <GroupedHeader>{t("mobile.routines.when.custom")}</GroupedHeader>
+                  <TextArea
+                    value={phrase}
+                    onChangeText={typePhrase}
+                    placeholder={t("recurrence.phrasePlaceholder")}
+                    accessibilityLabel={t("routines.form.frequency")}
+                    multiline={false}
+                    minHeight={50}
+                    autoCorrect={false}
+                    autoFocus={writing && !phrase}
+                    returnKeyType="done"
+                    maxLength={300}
+                  />
+                </>
+              ) : null}
               {phraseError ? (
                 <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
                   {phraseError}

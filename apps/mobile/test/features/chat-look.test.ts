@@ -116,14 +116,18 @@ describe("the rows follow the same choice as the web", () => {
     }
   });
 
-  test("Conversa's DM previews draw it as the conversation does", async () => {
+  test("Conversa's preview draws it as the conversation does", async () => {
     const page = await read("me/ChatLookPage.tsx");
+    // One preview, in the look the conversation hands its rows, with the conversation's own words and frames.
     expect(page).toContain("const faced = !right && facesShown(style, dm);");
-    expect(page.match(/\{faced \? <View style=\{styles\.faceSlot\}>\{face\}<\/View> : null\}/g)).toHaveLength(2);
+    expect(page).toContain("<RowLookContext.Provider value={look}>");
+    expect(page).toContain("text: CHAT_TEXT[size]");
+    expect(page).toContain("<MessageText body={line.text}");
+    expect(page).toContain("lookRows.bubblesRow");
   });
 
   test("Você opens Conversa, which saves on the server", async () => {
-    expect(await read("me/MeScreen.tsx")).toContain('href: "/me/chat-look"');
+    expect(await read("me/MeScreen.tsx")).toContain('onPress={() => open("/me/chat-look")}');
     const page = await read("me/ChatLookPage.tsx");
     expect(page).toContain("useSetChatPrefs(orgId)");
     expect(page).toContain("save(dm ? { dmStyle: s } : { channelStyle: s })");
@@ -132,7 +136,7 @@ describe("the rows follow the same choice as the web", () => {
 
 describe("Tamanho do texto on the phone", () => {
   /** Points, before the system's own text size: the words and their line. */
-  const STEPS = { xs: [13, 18], sm: [14, 20], md: [15, 21], lg: [17, 24], xl: [19, 27] } as const;
+  const STEPS = { xs: [13, 18], sm: [15, 21], md: [17, 24], lg: [19, 27], xl: [21, 29] } as const;
 
   for (const step of CHAT_TEXT_SIZES)
     test(`${step}: the words and their line follow the step, the name a step under them`, () => {
@@ -148,14 +152,11 @@ describe("Tamanho do texto on the phone", () => {
       expect(chatCodeOf(CHAT_TEXT[step])).toEqual({ fontSize: fontSize - 2, lineHeight: lineHeight - 1 });
     });
 
-  test("the default is md: smaller than the system body the words had on both systems, the name as it was", () => {
+  test("the default is md: iOS's body on its line, the name a step under it", () => {
     expect(textSizeOf(undefined)).toBe("md");
     const md = CHAT_TEXT.md;
-    for (const os of ["ios", "android"] as const) expect(md.fontSize).toBeLessThan(typeScale(os).body.fontSize);
-    expect(md.lineHeight).toBeLessThan(24);
-    expect(chatNameOf(md)).toEqual({ fontSize: 14, lineHeight: 19 });
-    // `lg` is iOS's body on the line the words had, for whoever wants them back.
-    expect(CHAT_TEXT.lg).toEqual({ fontSize: typeScale("ios").body.fontSize, lineHeight: 24 });
+    expect(md).toEqual({ fontSize: typeScale("ios").body.fontSize, lineHeight: 24 });
+    expect(chatNameOf(md)).toEqual({ fontSize: 16, lineHeight: 22 });
     const sizes = CHAT_TEXT_SIZES.map((s) => CHAT_TEXT[s].fontSize);
     expect([...sizes].sort((a, b) => a - b)).toEqual(sizes);
   });
@@ -181,13 +182,12 @@ describe("Tamanho do texto on the phone", () => {
     expect(await read("chat/look.ts")).toContain("const text = CHAT_TEXT[textSizeOf(org?.chatPrefs)];");
     expect(await read("chat/look.ts")).toMatch(/ROW_LOOK_DEFAULT: RowLook = \{[^}]*\btext: null,?\s*\}/);
     const page = await read("me/ChatLookPage.tsx");
-    expect(page).toContain("save({ textSize: v as ChatTextSize })");
-    expect(page).toContain("<TextPreview size={textSize} style={style} tone={tone} dm={dm} />");
-    // Five steps that fit a phone's width: an A in each step's size, the default named, every step named aloud.
-    expect(page).toContain("<RNText style={{ fontSize: CHAT_TEXT[s].fontSize }}>A</RNText>");
-    expect(page).toContain("{s === DEFAULT_TEXT_SIZE ? ");
-    expect(page).toContain("accessibilityLabel: sizes[s],");
-    expect(await read("../ui/Segmented.tsx")).toContain("accessibilityLabel={item.accessibilityLabel}");
+    // A stepped slider (small A, five steps, big A) the preview follows while it moves; saved when it lands.
+    expect(page).toContain("save({ textSize: v })");
+    expect(page).toContain("<ChatPreview style={style} tone={tone} size={shownSize} dm={dm} />");
+    expect(page).toContain('accessibilityRole="adjustable"');
+    expect(page).toContain("accessibilityValue={{ text: labels[value] }}");
+    expect(page).toContain("{labels[DEFAULT_TEXT_SIZE]}");
     expect(page).toContain('t("settings.account.chat.textSizePhone")');
   });
 

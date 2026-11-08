@@ -35,6 +35,7 @@ import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { router } from "@/ui/navigation";
 import { AskWaiting } from "./AskWaiting";
+import { arriveIn } from "./arrive";
 import { EmailSteps } from "./EmailSteps";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
@@ -122,7 +123,7 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
       forgetInvite();
       await qc.invalidateQueries({ queryKey: keys.me });
       gate.choose(orgId);
-      router.replace("/");
+      void arriveIn(api, orgId);
     } catch (e) {
       const wrong = e instanceof ApiError && e.status === 403;
       setError(
@@ -314,7 +315,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
           onPress={() =>
             void qc.invalidateQueries({ queryKey: keys.me }).then(() => {
               gate.choose(orgId);
-              router.replace("/");
+              void arriveIn(api, orgId);
             })
           }
         />

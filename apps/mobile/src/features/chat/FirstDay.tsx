@@ -1,20 +1,61 @@
-import type { Agent } from "@agenteschat/client";
-import { useMemo } from "react";
+import { type Agent, useMe } from "@agenteschat/client";
+import { firstName } from "@agenteschat/client/lib/format";
+import { playSound } from "@agenteschat/client/lib/sounds";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
-import { CARD_PAD, Icon, Sky, Text } from "@/ui";
+import Animated, {
+  Easing,
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
+import { Button, Text, useReducedMotion } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { tapHaptic, useSurface } from "../shared/parts";
-import { agentIntro, firstAsks, isNewAgent } from "./intent";
+import { tapHaptic } from "../shared/parts";
+import { agentIntro, firstAskKind, firstAsks, isNewAgent } from "./intent";
+import { CHAT_TEXT_MAX_SCALE, chatNameOf, chatTimeOf, MSG_AVATAR, MSG_GAP, MSG_INSET } from "./logic";
+import { lookRows, useConversationLook } from "./look";
+
+/** The agents whose first message already arrived while the app runs: it wakes and lands once, then just is. */
+const ARRIVED = new Set<string>();
+
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** The face sleeps this long before it wakes and its words land. */
+const WAKE_MS = 420;
+/** The words: a short rise on the strong ease-out. */
+const WORDS_MS = 280;
+const WORDS_RISE = 8;
+/**
+ * The starts follow the words (overlap, never a queue): the first a beat after them, each next one sooner and from
+ * less far, so the three read as one wave rather than a metronome.
+ */
+const START_AFTER = [120, 180, 220] as const;
+const START_RISE = [6, 5, 4] as const;
+const START_MS = 240;
+
+/** A part that rises into place as its value goes from 0 to 1 (only opacity under reduced motion). */
+function useRise(value: SharedValue<number>, rise: number, moves: boolean) {
+  return useAnimatedStyle(() => ({
+    opacity: value.get(),
+    transform: [{ translateY: moves ? (1 - value.get()) * rise : 0 }],
+  }));
+}
 
 /**
- * The first conversation with an agent: under its sky, it says
- * who it is in plain words (what it does, else its role), then three first requests tied to what it
- * does. Tapping one sends it; the composer stays the other way in.
+ * An agent's first conversation, before anyone wrote: its first message, drawn by the app and never stored. The face,
+ * its name, what it does and "agora", a greeting in its words (what it does, else its role) and "Por onde começamos?",
+ * then three starts as tactile buttons with short words; a tap sends the whole request and the conversation begins.
+ * The composer stays the other way in.
+ *
+ * For a new agent, the first time its conversation opens while the app runs, the message arrives: the face sleeps a
+ * beat and wakes, the words rise in with the reply's sound, and the starts land after them. Later visits, an older
+ * agent and reduced motion draw it in place (reduced motion keeps a short fade, no movement, no wait).
  */
 export function FirstDay({
   agent,
@@ -31,22 +72,78 @@ export function FirstDay({
 }) {
   const { t } = useTranslation();
   const c = useColors();
-  const surface = useSurface();
-  const intro = agentIntro(agent);
+  const me = useMe();
+  const reduced = useReducedMotion();
+  const look = useConversationLook(true, agentLook(agent).color);
+  const text = look.text ?? undefined;
+  const nameSize = look.text ? chatNameOf(look.text) : undefined;
+  const timeSize = look.text ? chatTimeOf(look.text) : undefined;
+  const bubbled = look.style === "bubbles";
+
+  const kind = firstAskKind(agent);
   const asks = useMemo(() => firstAsks(agent), [agent]);
-  // The composer rides the keyboard; the welcome gives way with it instead of staying under the keys.
-  const keyboard = useReanimatedKeyboardAnimation();
-  const above = useAnimatedStyle(() => ({ paddingBottom: Math.max(0, -keyboard.height.value - keyboardLift) }));
-  const title = isNewAgent(agent.createdAt)
-    ? // No "o"/"a" before the name: guessing it from the name gave "O Atende".
-      t("mobile.chat.intent.arrived", { name: agent.name })
-    : t("mobile.chat.intent.meet", { name: agent.name });
-  const line =
+  const intro = agentIntro(agent);
+  const person = firstName(me.data?.user.name ?? "");
+  const hello = person
+    ? t("mobile.chat.intent.hello", { person, name: agent.name })
+    : t("mobile.chat.intent.helloNoName", { name: agent.name });
+  const about =
     intro.kind === "what"
       ? intro.text
       : intro.kind === "role"
-        ? t("mobile.chat.intent.roleIntro", { role: intro.role })
-        : t("mobile.chat.intent.noIntro");
+        ? t("mobile.chat.intent.helloRole", { role: intro.role })
+        : null;
+  const words = [hello, about, t("mobile.chat.intent.helloAsk")].filter(Boolean).join(" ");
+
+  // Decided once, on the first render: whether this visit is the arrival.
+  const [arrives] = useState(() => isNewAgent(agent.createdAt) && !ARRIVED.has(agent.id));
+  const plays = arrives && !reduced;
+  const [awake, setAwake] = useState(!plays);
+  const shown = useSharedValue(arrives ? 0 : 1);
+  const start0 = useSharedValue(arrives ? 0 : 1);
+  const start1 = useSharedValue(arrives ? 0 : 1);
+  const start2 = useSharedValue(arrives ? 0 : 1);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the arrival plays once, on mount
+  useEffect(() => {
+    if (!arrives) return;
+    ARRIVED.add(agent.id);
+    const starts = [start0, start1, start2];
+    if (reduced) {
+      // Everything together: a short fade, no movement and no wait.
+      const fade = { duration: 200, easing: EASE_OUT };
+      shown.set(withTiming(1, fade));
+      for (const s of starts) s.set(withTiming(1, fade));
+      return;
+    }
+    shown.set(withDelay(WAKE_MS, withTiming(1, { duration: WORDS_MS, easing: EASE_OUT })));
+    starts.forEach((s, i) => {
+      s.set(withDelay(WAKE_MS + START_AFTER[i as 0 | 1 | 2], withTiming(1, { duration: START_MS, easing: EASE_OUT })));
+    });
+    // The face wakes on the frame its words start, with the reply's sound: one cue for one arrival.
+    const wake = setTimeout(() => {
+      setAwake(true);
+      playSound("reply");
+    }, WAKE_MS);
+    return () => clearTimeout(wake);
+  }, []);
+
+  const wordsIn = useRise(shown, WORDS_RISE, plays);
+  const startIn = [
+    useRise(start0, START_RISE[0], plays),
+    useRise(start1, START_RISE[1], plays),
+    useRise(start2, START_RISE[2], plays),
+  ];
+
+  // The composer rides the keyboard; the message gives way with it instead of staying under the keys.
+  const keyboard = useReanimatedKeyboardAnimation();
+  const above = useAnimatedStyle(() => ({ paddingBottom: Math.max(0, -keyboard.height.get() - keyboardLift) }));
+
+  const body = (
+    <Text variant="body" tone="ink" style={text} maxFontSizeMultiplier={text ? CHAT_TEXT_MAX_SCALE : undefined}>
+      {words}
+    </Text>
+  );
 
   return (
     <Animated.View style={[styles.grow, above]}>
@@ -56,93 +153,83 @@ export function FirstDay({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <View style={[styles.welc, surface]}>
-          <Sky color={agentLook(agent).color} depth={0.8} surface="raised" style={styles.sky} />
-          <View style={styles.born}>
-            <AgentFace agentId={agent.id} size={BORN} />
+        <View style={styles.row}>
+          <View style={styles.avatar}>
+            <AgentFace agentId={agent.id} size={MSG_AVATAR} mode={awake ? "idle" : "sleep"} />
           </View>
-          <Text variant="display" style={styles.h2} accessibilityRole="header">
-            {title}
-          </Text>
-          <Text variant="callout" tone="muted" style={styles.p}>
-            {line}
-          </Text>
-        </View>
-        <Text variant="footnote" tone="faint" style={styles.h3}>
-          {t("mobile.chat.intent.firstTitle")}
-        </Text>
-        <View style={[styles.card, surface]}>
-          {asks.map((a, i) => {
-            const text = t(`mobile.chat.intent.first.${a.key}`);
-            return (
-              <Pressable
-                key={a.key}
-                onPress={() => {
-                  tapHaptic();
-                  onAsk(text);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={text}
-                accessibilityHint={t("mobile.chat.intent.sendHint")}
-                style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-              >
-                {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
-                <View style={styles.mark}>
-                  <Icon name={a.icon} size={18} color={c.ink2} />
-                </View>
-                <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
-                  {text}
+          <View style={styles.body}>
+            <Animated.View style={wordsIn}>
+              {/* Name, what it does and when, on the face's top line, as every message's. */}
+              <View style={styles.who}>
+                <Text
+                  variant="footnote"
+                  tone="ink2"
+                  style={[styles.name, nameSize]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={nameSize ? CHAT_TEXT_MAX_SCALE : undefined}
+                >
+                  {agent.name}
                 </Text>
-                <View style={styles.send}>
-                  <Icon name="send" size={16} color={c.faint} />
-                </View>
-              </Pressable>
-            );
-          })}
+                {agent.role ? (
+                  <Text
+                    variant="footnote"
+                    tone="faint"
+                    style={[styles.shrink, timeSize]}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={timeSize ? CHAT_TEXT_MAX_SCALE : undefined}
+                  >
+                    {agent.role}
+                  </Text>
+                ) : null}
+                <Text
+                  variant="footnote"
+                  tone="faint"
+                  style={[styles.time, timeSize]}
+                  maxFontSizeMultiplier={timeSize ? CHAT_TEXT_MAX_SCALE : undefined}
+                >
+                  {t("mobile.chat.intent.now")}
+                </Text>
+              </View>
+              {bubbled ? <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>{body}</View> : body}
+            </Animated.View>
+            <View style={styles.starts}>
+              {asks.map((a, i) => {
+                const step = a.key.split(".")[1];
+                return (
+                  <Animated.View key={a.key} style={startIn[i]}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      label={t(`mobile.chat.intent.start.${kind}.${step}`)}
+                      onPress={() => {
+                        tapHaptic();
+                        onAsk(t(`mobile.chat.intent.first.${a.key}`));
+                      }}
+                    />
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </View>
         </View>
       </ScrollView>
     </Animated.View>
   );
 }
 
-/** The agent's face on the welcome's sky, and where it stands: the title starts under it. */
-const BORN = 78;
-const BORN_TOP = 32;
-/** A suggestion's row: its inset, the 28 mark, the gap to the words, and the words' first line (callout). */
-const INSET = 14;
-const MARK = 28;
-const GAP = 12;
-const LINE = 21;
-
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8 },
-  welc: {
-    alignItems: "center",
-    paddingTop: BORN_TOP + BORN + 24,
-    paddingHorizontal: CARD_PAD,
-    paddingBottom: CARD_PAD,
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  sky: { position: "absolute", top: 0, left: 0, right: 0, height: 150 },
-  born: { position: "absolute", top: BORN_TOP, alignSelf: "center" },
-  h2: { textAlign: "center" },
-  p: { marginTop: 6, textAlign: "center", lineHeight: 21 },
-  h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 20, paddingBottom: 8 },
-  card: { borderRadius: 20, overflow: "hidden" },
-  // The channel's suggestions' rows (ChannelHello): a 28 mark (no tile inside the card), the first line's middle on
-  // its middle when a suggestion wraps, the send icon there too.
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: GAP,
-    minHeight: 52,
-    paddingHorizontal: INSET,
-    paddingVertical: 12,
-  },
-  sep: { position: "absolute", top: 0, left: INSET + MARK + GAP, right: 0, height: StyleSheet.hairlineWidth },
-  mark: { width: MARK, height: MARK, alignItems: "center", justifyContent: "center" },
-  ask: { fontWeight: "500", marginTop: (MARK - LINE) / 2 },
-  send: { marginTop: (MARK - 16) / 2 },
+  // The message sits at the bottom, over the composer, where a conversation's latest message is.
+  content: { flexGrow: 1, justifyContent: "flex-end", paddingTop: 8 },
+  // The chat's row: the face at the inset, the words on the chat's text column (MSG_TEXT).
+  row: { flexDirection: "row", gap: MSG_GAP, paddingLeft: MSG_INSET, paddingRight: 16 },
+  avatar: { width: MSG_AVATAR },
+  body: { flex: 1, minWidth: 0 },
+  // The name's line on the face's top: its first line and the face start together, as in MessageRow.
+  who: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 2 },
+  name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 0, maxWidth: "60%" },
+  shrink: { flexShrink: 1 },
+  time: { flexShrink: 0, fontVariant: ["tabular-nums"] },
+  // Three starts under the words: tactile buttons on the 8 rhythm, wrapping as the words need.
+  starts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
 });

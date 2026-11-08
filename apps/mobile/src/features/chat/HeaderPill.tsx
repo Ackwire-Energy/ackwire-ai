@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -32,6 +33,11 @@ const LINE_SPRING = { stiffness: 260, damping: 26, mass: 1 };
 const SKY_SPRING = { stiffness: 90, damping: 18, mass: 1 };
 /** How far a line rolls in and out. */
 const ROLL = 15;
+/** Breathing while an agent works: a scale this small reads as alive, never as motion. */
+const BREATH_SCALE = 1.012;
+const BREATH_MS = 1400;
+const BREATH_EASE = Easing.bezier(0.77, 0, 0.175, 1);
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 const rollIn: EntryExitAnimationFunction = () => {
   "worklet";
@@ -65,6 +71,9 @@ const rollOut: EntryExitAnimationFunction = () => {
  *
  * The bar lays its title out once: the slot keeps the width of the room beside the buttons, and only the pill
  * inside it changes, on the UI thread, so the native bar never lays out again during a spring.
+ *
+ * Reading up the conversation (`collapsed`), the pill closes to its lead alone, a glass circle: the screen is only
+ * messages. While an agent works it breathes (a scale too small to call motion), and the sky sweeps.
  */
 export function HeaderPill({
   lead,
@@ -78,6 +87,7 @@ export function HeaderPill({
   extraActions = 0,
   onHold,
   holdHint,
+  collapsed = false,
 }: {
   lead?: ReactNode;
   title: string;
@@ -85,6 +95,8 @@ export function HeaderPill({
   /** An agent's color: its sky lives in the pill. */
   color?: AgentColorName | undefined;
   working?: boolean;
+  /** Only the lead, in a circle (reading far up the conversation); the words fade and come back with the width. */
+  collapsed?: boolean;
   /** Faces of who is in (channels). */
   trailing?: ReactNode;
   onPress?: () => void;
@@ -109,11 +121,16 @@ export function HeaderPill({
   const chrome =
     PAD_LEFT + PAD_RIGHT + 2 * BORDER + (lead ? LEAD + GAP : 0) + (trailing ? trailingWidth + GAP + TRAILING_GAP : 0);
   const words = Math.max(nameWidth ?? 0, subtitle ? lineWidth : 0);
-  const target = nameWidth === null ? null : Math.min(room, Math.max(MIN_WIDTH, chrome + words));
+  // Closed, the pill is a circle around its lead (no lead to close around: it stays open).
+  const closed = collapsed && Boolean(lead);
+  const target = nameWidth === null ? null : closed ? HEIGHT : Math.min(room, Math.max(MIN_WIDTH, chrome + words));
 
   // -1 until the words are measured: the first width is set, not sprung.
   const pillWidth = useSharedValue(-1);
   const work = useSharedValue(working ? 1 : 0);
+  // The words' presence: they fade before the width closes on them and come back as it opens.
+  const open = useSharedValue(closed ? 0 : 1);
+  const breath = useSharedValue(1);
   useEffect(() => {
     if (target === null) return;
     pillWidth.value = reduced || pillWidth.value < 0 ? target : withSpring(target, WIDTH_SPRING);
@@ -121,11 +138,32 @@ export function HeaderPill({
   useEffect(() => {
     work.value = reduced ? (working ? 1 : 0) : withSpring(working ? 1 : 0, SKY_SPRING);
   }, [working, reduced, work]);
+  useEffect(() => {
+    open.value = withTiming(closed ? 0 : 1, { duration: closed ? 120 : 200, easing: EASE_OUT });
+  }, [closed, open]);
+  useEffect(() => {
+    if (working && !reduced) {
+      breath.value = withRepeat(
+        withSequence(
+          withTiming(BREATH_SCALE, { duration: BREATH_MS, easing: BREATH_EASE }),
+          withTiming(1, { duration: BREATH_MS, easing: BREATH_EASE }),
+        ),
+        -1,
+        false,
+      );
+      return;
+    }
+    cancelAnimation(breath);
+    breath.value = withTiming(1, { duration: 200, easing: EASE_OUT });
+  }, [working, reduced, breath]);
 
   const sized = useAnimatedStyle(() => ({
     width: pillWidth.value < 0 ? room : pillWidth.value,
     opacity: pillWidth.value < 0 ? 0 : 1,
   }));
+  // On the glass inside the press: the press's own scale lives on the outer view, and one transform would hide the other.
+  const breathing = useAnimatedStyle(() => ({ transform: [{ scale: breath.value }] }));
+  const wordsShown = useAnimatedStyle(() => ({ opacity: open.value }));
 
   const measured = (set: (width: number) => void) => (e: LayoutChangeEvent) =>
     set(Math.ceil(e.nativeEvent.layout.width));
@@ -171,33 +209,49 @@ export function HeaderPill({
         ]}
       >
         {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
-        <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
-          {color ? (
-            <Dither
-              kind="pill"
-              tones={softTones(color, colors.glassSolid)}
-              pixel={3}
-              clear
-              liveWidth={pillWidth}
-              liveWork={work}
-              style={[styles.sky, { width: room }]}
-            />
-          ) : null}
-          {lead ? <View style={styles.lead}>{lead}</View> : null}
-          <View style={styles.text} importantForAccessibility="no-hide-descendants">
-            <Text variant="callout" numberOfLines={1} style={styles.title}>
-              {title}
-            </Text>
-            {subtitle ? (
-              <StatusLine text={subtitle} natural={lineWidth} box={(target ?? room) - chrome} reduced={reduced} />
+        <Animated.View style={breathing}>
+          <Glass
+            liquid
+            intensity={70}
+            style={[styles.pill, closed && styles.pillClosed, { borderColor: colors.line2 }]}
+          >
+            {color ? (
+              <Dither
+                kind="pill"
+                tones={softTones(color, colors.glassSolid)}
+                pixel={3}
+                clear
+                liveWidth={pillWidth}
+                liveWork={work}
+                style={[styles.sky, { width: room }]}
+              />
             ) : null}
-          </View>
-          {trailing ? (
-            <View style={styles.trailing} onLayout={measured(setTrailingWidth)}>
-              {trailing}
-            </View>
-          ) : null}
-        </Glass>
+            {lead ? <View style={styles.lead}>{lead}</View> : null}
+            <Animated.View
+              style={[styles.text, wordsShown]}
+              importantForAccessibility="no-hide-descendants"
+              pointerEvents="none"
+            >
+              <Text variant="callout" numberOfLines={1} style={styles.title}>
+                {title}
+              </Text>
+              {subtitle ? (
+                <StatusLine
+                  text={subtitle}
+                  natural={lineWidth}
+                  // Closed, the line is faded out: no sliding to read it.
+                  box={(closed ? room : (target ?? room)) - chrome}
+                  reduced={reduced}
+                />
+              ) : null}
+            </Animated.View>
+            {trailing ? (
+              <Animated.View style={[styles.trailing, wordsShown]} onLayout={measured(setTrailingWidth)}>
+                {trailing}
+              </Animated.View>
+            ) : null}
+          </Glass>
+        </Animated.View>
       </PressScale>
     </View>
   );
@@ -279,6 +333,8 @@ const styles = StyleSheet.create({
     borderWidth: BORDER,
     overflow: "hidden",
   },
+  // A circle: the lead's box centered in the pill's height (the words, clipped, sit outside it).
+  pillClosed: { paddingRight: PAD_LEFT },
   // The drawing keeps the room's width and reads the pill's as a uniform: no canvas resize during a spring.
   sky: { position: "absolute", top: 0, left: 0, height: HEIGHT },
   lead: { alignItems: "center", justifyContent: "center", width: LEAD },

@@ -19,7 +19,15 @@ import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, refusalOf, refusalText, signUpClosed } from "./human-check";
 import { forgetInvite, rememberInvite } from "./invite";
-import { ErrorLine, InviteTerms, LockedEmail, OrgLine, useAgentsLine, useLeaveInvite } from "./invite-parts";
+import {
+  ErrorLine,
+  InviteCrew,
+  InviteTerms,
+  LockedEmail,
+  OrgLine,
+  useAgentsLine,
+  useLeaveInvite,
+} from "./invite-parts";
 import { EMAIL_ACTIONS, type EmailStep, emailBack, emailStart } from "./invite-steps";
 
 /**
@@ -246,7 +254,7 @@ export function EmailSteps({
   const expression = wrong ? "cross" : wink ? "wink" : secret ? "closed" : step === "sent" ? "happy" : undefined;
   const enterLabel = t("invite.enter", { org });
   const passwordField = (fresh: boolean) => (
-    <Locked when={pending}>
+    <Locked when={pending} keepKeyboard>
       <PasswordField
         value={password}
         onChangeText={(value) => {
@@ -287,7 +295,8 @@ export function EmailSteps({
             autoCapitalize="words"
             autoComplete="name"
             textContentType="name"
-            returnKeyType="next"
+            returnKeyType="continue"
+            enablesReturnKeyAutomatically
             onSubmitEditing={submit}
             autoFocus
           />
@@ -319,7 +328,7 @@ export function EmailSteps({
           <ErrorLine error={error} />
           {enterButton}
           {canReset ? (
-            <Locked when={pending}>
+            <Locked when={pending} keepKeyboard>
               <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} />
             </Locked>
           ) : null}
@@ -377,6 +386,10 @@ export function EmailSteps({
       expression={expression}
       overlay={human.view}
       footer={step === "name" || step === "newPassword" ? <InviteTerms /> : null}
+      // The team you're invited to, on the sky, before any field; later steps keep the app's agent.
+      hero={
+        step === start && (preview.agents?.length ?? 0) > 0 ? <InviteCrew agents={preview.agents ?? []} /> : undefined
+      }
     >
       {body}
     </AuthScaffold>

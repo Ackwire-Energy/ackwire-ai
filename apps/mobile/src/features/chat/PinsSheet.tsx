@@ -22,43 +22,59 @@ function usePinsHere(channelId: string, threadId: string | null) {
   return { pins, list };
 }
 
+/** How many pinned lines the pull reveals; the rest live in "Fixadas". */
+const PEEK_ROWS = 3;
+
 /**
- * The pinned bar under the conversation's header, only while something is pinned here: the latest pin (who wrote it,
- * its first line) and how many; a tap opens "Fixadas".
+ * The pinned messages revealed by pulling the conversation down past its top (no bar sits under the header any
+ * more): "Fixadas" with how many, then up to three compact lines (a 24 face, one line of the message, the pin), the
+ * latest pin first, and a hairline before the first message. A line goes to its message; the title opens "Fixadas".
  */
-export function PinnedBar({
+export function PinnedLines({
   channelId,
   threadId,
   onOpen,
+  onPick,
 }: {
   channelId: string;
   threadId: string | null;
   onOpen: () => void;
+  onPick: (pin: MessagePin) => void;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
   const c = useColors();
   const { list } = usePinsHere(channelId, threadId);
-  const latest = list[0];
-  if (!latest) return null;
+  if (list.length === 0) return null;
   return (
-    <Pressable
-      onPress={onOpen}
-      accessibilityRole="button"
-      accessibilityLabel={t("mobile.pins.bar", { count: list.length })}
-      // A 36-point bar: the slop reaches 44 into the conversation under it, never into the header above.
-      hitSlop={{ bottom: 8 }}
-      style={({ pressed }) => [styles.bar, { borderBottomColor: c.line2, backgroundColor: pressed ? c.sunken : c.bg }]}
-    >
-      <Icon name="pin" size={13} color={c.faint} />
-      <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.grow}>
-        <Text variant="footnote" tone="ink" style={styles.bold}>
-          {dir.nameOf(latest.message.author) || t("mobile.chat.someone")}
-        </Text>{" "}
-        {previewOf(textOrMedia(t, latest.message.body, latest.message.meta))}
-      </Text>
-      {list.length > 1 ? <Count value={list.length} size={13} /> : null}
-    </Pressable>
+    <View style={styles.peek} accessibilityLabel={t("mobile.pins.bar", { count: list.length })}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.pins.title")}
+        hitSlop={{ top: 8, bottom: 4 }}
+        style={({ pressed }) => [styles.peekHead, pressed && styles.pressed]}
+      >
+        <Text variant="subhead" tone="ink" style={styles.bold}>
+          {t("mobile.pins.peek")}
+        </Text>
+        <Count value={list.length} size={15} />
+      </Pressable>
+      {list.slice(0, PEEK_ROWS).map((pin) => (
+        <Pressable
+          key={pin.message.id}
+          onPress={() => onPick(pin)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.peekRow, pressed && { backgroundColor: c.sunken }]}
+        >
+          <Face who={pin.message.author} size={24} live={false} />
+          <Text variant="subhead" tone="ink2" numberOfLines={1} style={styles.grow}>
+            {previewOf(textOrMedia(t, pin.message.body, pin.message.meta)) || t("mobile.chat.approvalPreview")}
+          </Text>
+          <Icon name="pin" size={13} color={c.faint} />
+        </Pressable>
+      ))}
+      <View style={[styles.peekRule, { backgroundColor: c.line2 }]} />
+    </View>
   );
 }
 
@@ -139,16 +155,13 @@ export function PinsSheet({
 
 const styles = StyleSheet.create({
   empty: { paddingVertical: 8 },
-  bar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 36,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   grow: { flex: 1 },
   bold: { fontWeight: weights.semibold },
   meta: { flexDirection: "row", alignItems: "center", gap: 2 },
+  // Revealed by the pull: the title row, compact lines (24 face, one line), a hairline before the conversation.
+  peek: { paddingTop: 8, paddingBottom: 4 },
+  peekHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 4 },
+  peekRow: { flexDirection: "row", alignItems: "center", gap: 12, height: 36, paddingHorizontal: 16 },
+  peekRule: { height: StyleSheet.hairlineWidth, marginTop: 8, marginHorizontal: 16 },
+  pressed: { opacity: 0.6 },
 });

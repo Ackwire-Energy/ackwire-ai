@@ -62,12 +62,14 @@ test("a row's ⓘ sits right after its label, and a short fact about its value g
 
 test("no screen keeps a grouped row of its own at the old 50: its rows and fields read GROUPED_ROW", () => {
   // Not a grouped list's rows: the chat's receipt cards (a 50 row around a 32 action), a new channel's bordered name
-  // field and a sheet's title bar.
+  // field and the sheets' title bars (Novo, Compartilhar).
   const CARD_ROWS = new Set([
     "features/chat/TeamChecks.tsx",
     "features/chat/ReachLines.tsx",
     "features/new/NewChannelForm.tsx",
     "features/new/parts.tsx",
+    "features/new/NewScreen.tsx",
+    "features/share/ShareScreen.tsx",
   ]);
   const offenders = files(join(SRC, "features"))
     .filter((path) => !CARD_ROWS.has(relative(SRC, path)))

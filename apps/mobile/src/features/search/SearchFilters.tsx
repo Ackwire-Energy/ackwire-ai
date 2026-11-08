@@ -19,7 +19,7 @@ import {
   typingOperator,
 } from "@agenteschat/client/lib/search-filters";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import {
   Button,
@@ -29,6 +29,7 @@ import {
   PressScale,
   SCREEN_X,
   SectionHeader,
+  SkeletonList,
   Text,
   TOOL_H,
   useReducedMotion,
@@ -86,9 +87,65 @@ export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove
   );
 }
 
+/** With nothing typed: the recent searches first (what was looked for last is what is looked for again). */
+export function RecentSearches({
+  recent,
+  onPick,
+  onClear,
+}: {
+  recent: string[];
+  onPick: (search: string) => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  if (recent.length === 0) return null;
+  return (
+    <View>
+      <SectionHeader
+        title={t("mobile.find.recent")}
+        action={{ label: t("searchPage.clearRecent"), onPress: onClear, chevron: false }}
+      />
+      <View style={styles.list}>
+        <ActionList
+          items={recent.map((r) => ({ key: r, icon: "clock", label: r, oneLine: true, onPress: () => onPick(r) }))}
+        />
+      </View>
+    </View>
+  );
+}
+
 /**
- * With nothing typed: the operators to start a filter with (`from:`, `in:`…; `ops`, all by default), and the recent
- * searches.
+ * The filters in words over the search (ADR 0123 operators, said plainly): De, Em, Com arquivo, Data. Each starts
+ * its operator in the field; the picker under the field takes it from there. "Data" starts `before:` (the picker says
+ * how a date is written).
+ */
+const FILTER_WORDS: { key: "from" | "in" | "has" | "date"; op: SearchOp }[] = [
+  { key: "from", op: "from" },
+  { key: "in", op: "in" },
+  { key: "has", op: "has" },
+  { key: "date", op: "before" },
+];
+
+export function FilterWords({ onPick }: { onPick: (op: SearchOp) => void }) {
+  const { t } = useTranslation();
+  return (
+    <View>
+      <SectionHeader title={t("mobile.find.filters")} />
+      <Filters
+        items={FILTER_WORDS.map((f) => ({ key: f.key, label: t(`mobile.find.filterWord.${f.key}`) }))}
+        value=""
+        onChange={(key) => {
+          const f = FILTER_WORDS.find((x) => x.key === key);
+          if (f) onPick(f.op);
+        }}
+      />
+    </View>
+  );
+}
+
+/**
+ * With nothing typed inside one conversation's search: the operators to start a filter with (`from:`, `in:`…; `ops`,
+ * all by default), and the recent searches.
  */
 export function SearchOptions({
   words,
@@ -108,25 +165,13 @@ export function SearchOptions({
   const { t } = useTranslation();
   return (
     <View>
+      <RecentSearches recent={recent} onPick={onPickRecent} onClear={onClearRecent} />
       <SectionHeader title={t("searchPage.options")} />
       <Filters
         items={ops.map((op) => ({ key: op, label: `${words.ops[op]}:` }))}
         value=""
         onChange={(op) => onInsert(`${words.ops[op as keyof SearchWords["ops"]]}:`)}
       />
-      {recent.length > 0 ? (
-        <View>
-          <SectionHeader
-            title={t("searchPage.recent")}
-            action={{ label: t("searchPage.clearRecent"), onPress: onClearRecent, chevron: false }}
-          />
-          <View style={styles.list}>
-            <ActionList
-              items={recent.map((r) => ({ key: r, icon: "clock", label: r, onPress: () => onPickRecent(r) }))}
-            />
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -279,7 +324,8 @@ export function FilteredResults({
             </Pressable>
           ) : null}
         </View>
-        {hits.isLoading ? <ActivityIndicator color={c.muted} style={styles.empty} /> : null}
+        {/* The results' own shape while they come, never a spinner. */}
+        {hits.isLoading ? <SkeletonList rows={3} /> : null}
         {hits.isError && !hits.data ? (
           <View style={[styles.list, styles.failed]}>
             <Note icon="x">{t("common.loadFailed")}</Note>
@@ -352,5 +398,4 @@ const styles = StyleSheet.create({
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },
   pressed: { opacity: 0.6 },
-  empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

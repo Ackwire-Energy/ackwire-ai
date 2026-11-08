@@ -44,21 +44,31 @@ import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useQueryClient } from "@tanstack/react-query";
-import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { type GestureResponderEvent, Pressable, StyleSheet, View } from "react-native";
+import Animated, {
+  Easing,
+  type EntryExitAnimationFunction,
+  FadeOut,
+  LayoutAnimationConfig,
+  LinearTransition,
+  withTiming,
+} from "react-native-reanimated";
+import { readValueSync, STORED, writeValueSync } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
   CHROME_MAX_SCALE,
   Count,
   EventPillAction,
+  haptics,
   Icon,
   InkOrbit,
   LineIcon,
   PressScale,
   ProviderLogo,
   Text,
+  useReducedMotion,
   useTheme,
   useToast,
 } from "@/ui";
@@ -277,12 +287,63 @@ export const MessageRow = memo(function MessageRow({
     isAgent && m.agentRunId && !readOnly && !mediaAfter
       ? consultations.data?.find((x) => x.consultedRunId === m.agentRunId)
       : undefined;
-  const press = readOnly
-    ? undefined
-    : () => {
-        tapHaptic();
-        onLongPress?.(m);
-      };
+  // No `onLongPress` where the system's menu takes the hold (iOS): the row adds nothing of its own to it.
+  const press =
+    readOnly || !onLongPress
+      ? undefined
+      : () => {
+          tapHaptic();
+          onLongPress(m);
+        };
+  // Two taps on a message send the thumbs up without opening anything: one light tap, the emoji pops where the
+  // finger was and the pill grows in under the words; holding still opens the menu with every reaction. The line
+  // "Toque duplo = 👍" sits under one agent's message until it has been seen once.
+  const reduced = useReducedMotion();
+  const cachedReactions = useReactions(orgId, m.id, false);
+  const toggleThumbs = useToggleReaction(orgId, m.id);
+  const lastTap = useRef(0);
+  const [pop, setPop] = useState<{ x: number; y: number; at: number } | null>(null);
+  const canReact = !readOnly && !m.local;
+  const onTap = canReact
+    ? (e: GestureResponderEvent) => {
+        const at = Date.now();
+        if (at - lastTap.current > DOUBLE_TAP_MS) {
+          lastTap.current = at;
+          return;
+        }
+        lastTap.current = 0;
+        haptics.light();
+        const mine =
+          reactionPills(cachedReactions.data ?? m.reactions, meId).find((p) => p.reaction === THUMBS)?.mine ?? false;
+        toggleThumbs.mutate({ reaction: THUMBS, on: !mine });
+        setPop({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, at });
+        teachDoubleTap();
+      }
+    : undefined;
+  useEffect(() => {
+    if (!pop) return;
+    const timer = setTimeout(() => setPop(null), POP_MS);
+    return () => clearTimeout(timer);
+  }, [pop]);
+  const popNode = pop ? (
+    <Animated.View
+      key={pop.at}
+      pointerEvents="none"
+      entering={reduced ? undefined : POP_IN}
+      exiting={reduced ? undefined : POP_OUT}
+      style={[styles.pop, { left: pop.x - POP / 2, top: pop.y - POP / 2 }]}
+    >
+      <Text style={styles.popEmoji} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+        👍
+      </Text>
+    </Animated.View>
+  ) : null;
+  const hint = useDoubleTapHint(canReact && isAgent && !groupedIn ? m.id : null);
+  const hintNode = hint ? (
+    <Text variant="caption" tone="faint" style={styles.hint}>
+      {t("mobile.chat.doubleTapHint")}
+    </Text>
+  ) : null;
   const stopped = isAgent && m.agentRunId && !mediaAfter ? stoppedOf(meta) : null;
   // The reply of a run that reached its step limit: the same line, with Continuar.
   const atLimit = isAgent && m.agentRunId && !stopped && !mediaAfter ? stepLimitOf(meta) : null;
@@ -463,6 +524,7 @@ export const MessageRow = memo(function MessageRow({
     ) : null;
     return (
       <Pressable
+        onPress={onTap}
         onLongPress={press}
         delayLongPress={380}
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
@@ -510,6 +572,7 @@ export const MessageRow = memo(function MessageRow({
             <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />
           </View>
         ) : null}
+        {popNode}
       </Pressable>
     );
   }
@@ -666,6 +729,7 @@ export const MessageRow = memo(function MessageRow({
       {pair}
       {quote && !inBubble ? <QuoteAbove look={look} reply={quote} onJump={onQuote} gap={rowGap} /> : null}
       <Pressable
+        onPress={onTap}
         onLongPress={press}
         delayLongPress={380}
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
@@ -840,11 +904,53 @@ export const MessageRow = memo(function MessageRow({
             {missionDecision}
             {foot}
           </RowPartContext.Provider>
+          {hintNode}
         </View>
+        {popNode}
       </Pressable>
     </>
   );
 });
+
+/** Reactions are stored by name: the thumbs up is `+1` (feedback to the agent). */
+const THUMBS = "+1";
+const DOUBLE_TAP_MS = 300;
+/** The emoji that pops where the finger was: its box, and how long it stays. */
+const POP = 24;
+const POP_MS = 420;
+
+let taught: boolean | null = null;
+const isTaught = () => {
+  if (taught === null) taught = readValueSync(STORED.doubleTapTaught) === "1";
+  return taught;
+};
+function teachDoubleTap() {
+  if (taught === true) return;
+  taught = true;
+  writeValueSync(STORED.doubleTapTaught, "1");
+}
+/** The one row that carries the hint this time (the first agent's row to ask for it). */
+let hintOwner: string | null = null;
+/** How long the hint has to be on screen to count as seen. */
+const HINT_SEEN_MS = 6000;
+
+/**
+ * Whether this row shows "Toque duplo = 👍": one row per app run, never again once it has been on screen for a
+ * while or the person double tapped anywhere.
+ */
+function useDoubleTapHint(id: string | null): boolean {
+  const [shown] = useState(() => {
+    if (!id || isTaught()) return false;
+    if (hintOwner === null) hintOwner = id;
+    return hintOwner === id;
+  });
+  useEffect(() => {
+    if (!shown) return;
+    const timer = setTimeout(teachDoubleTap, HINT_SEEN_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  return shown;
+}
 
 /** My message on its way: "Enviando" only past half a second; offline, a clock and when it will go. */
 function Sending({ offline, end }: { offline: boolean; end: boolean }) {
@@ -1146,9 +1252,35 @@ function Reactions({ message: m, meId, end }: { message: Message; meId: string |
 }
 
 const REACT_SLOP = { top: 7, bottom: 7 };
-const PILL_IN = FadeIn.duration(160);
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** A pill arriving: from 0.95 and clear to whole, in 150 ms (never from nothing). */
+const PILL_IN: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.95 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 150, easing: EASE_OUT }),
+      transform: [{ scale: withTiming(1, { duration: 150, easing: EASE_OUT }) }],
+    },
+  };
+};
 const PILL_OUT = FadeOut.duration(120);
-const PILL_MOVE = LinearTransition;
+const PILL_MOVE = LinearTransition.duration(200);
+/** The emoji at the finger: in at once, rising a little as it leaves. */
+const POP_IN: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 0 }, { scale: 0.95 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 120, easing: EASE_OUT }),
+      transform: [
+        { translateY: withTiming(-10, { duration: 300, easing: EASE_OUT }) },
+        { scale: withTiming(1, { duration: 150, easing: EASE_OUT }) },
+      ],
+    },
+  };
+};
+const POP_OUT = FadeOut.duration(160);
 
 /** The turn's last corner, cut as a card's is, on the side my bubble stands. */
 const BUBBLE_CUT = 6;
@@ -1261,6 +1393,10 @@ const styles = StyleSheet.create({
   },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  // The thumbs up where the finger was, over the row.
+  pop: { position: "absolute", width: POP, height: POP, alignItems: "center", justifyContent: "center" },
+  popEmoji: { fontSize: 22, lineHeight: 26 },
+  hint: { marginTop: 4 },
   // The outline is always there (clear unless it is mine), so a pill keeps its size when I add or take mine.
   react: {
     minHeight: 30,

@@ -41,10 +41,17 @@ export async function connectToServer(target: { server: string; token?: string }
 export async function openWorkspace(server: string, orgId: string | null) {
   if (orgId) await writeValue(orgValueName(server), orgId);
   if (server === serverUrl()) return;
+  let closing = false;
   try {
-    router.dismissTo("/");
+    if (router.canDismiss()) {
+      router.dismissTo("/");
+      closing = true;
+    }
   } catch {
     // Nothing pushed.
   }
+  // The app's tree remounts for the new server: doing it while a sheet or a pushed screen is still closing leaves the
+  // native stack half drawn (a bare header over an empty screen), so the close finishes first.
+  if (closing) await new Promise((done) => setTimeout(done, 450));
   await setServer(server);
 }

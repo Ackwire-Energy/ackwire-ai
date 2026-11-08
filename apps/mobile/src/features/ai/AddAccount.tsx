@@ -393,10 +393,10 @@ function AddAccountFlow({
         <Text variant="title2" selectable accessibilityLabel={label} style={styles.codeText}>
           {code}
         </Text>
+        {/* Copying is a word beside the code, never a second button next to Send. */}
         <Button
           size="sm"
-          variant="secondary"
-          icon="copy"
+          variant="text"
           label={copied ? t("common.copied") : t("common.copy")}
           onPress={() => void copy()}
         />
@@ -639,6 +639,7 @@ const styles = StyleSheet.create({
   // The field's place and height (`PasteField`), so the step keeps most of its size.
   busy: { minHeight: 46, marginTop: 6, justifyContent: "center" },
   code: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginVertical: 4 },
-  codeText: { fontWeight: "700", letterSpacing: 2 },
+  // 22, tabular, spaced: read off one screen and typed on another, character by character.
+  codeText: { fontWeight: "700", letterSpacing: 2, fontVariant: ["tabular-nums"] },
   spinner: { alignSelf: "flex-start" },
 });

@@ -34,7 +34,23 @@ export interface AgentAvatarProps {
   framed?: boolean;
   /** Holds one face (the sign-in screens: eyes shut while a password is typed); writing still wins. */
   expression?: Expression;
+  /**
+   * Where it looks for a moment, up or down the screen (at a field being typed in, at a newcomer's row): the eyes and
+   * the head turn that way and hold, instead of wandering.
+   */
+  gaze?: Gaze;
+  /** Only its sky, no body (framed only): out on a routine, it comes back into the frame when the run ends. */
+  bodyless?: boolean;
 }
+
+/** Up or down the screen. */
+export type Gaze = "up" | "down";
+
+/** The eyes and the head turned toward `gaze` (fractions of the body, as the engine's `look` and `turn`). */
+const GAZE: Record<Gaze, { look: [number, number]; turn: [number, number] }> = {
+  up: { look: [0, -0.14], turn: [0, -0.35] },
+  down: { look: [0, 0.14], turn: [0, 0.35] },
+};
 
 /** One frame of an agent as drawing commands (the engine draws, the recorder keeps the commands). */
 export function agentFrame(
@@ -47,6 +63,7 @@ export function agentFrame(
   frame?: { dark: boolean },
   expression?: Expression,
   dark = frame?.dark ?? false,
+  extra?: { gaze?: Gaze | undefined; bodyless?: boolean | undefined },
 ) {
   const accessory = agent.accessory && agent.accessory !== "none" ? agent.accessory : undefined;
   const box = frame ? framedLayout(size, Boolean(accessory)) : agentLayout(size, Boolean(accessory));
@@ -62,13 +79,15 @@ export function agentFrame(
         rec.fillRect(x * cell, y * cell, cell, cell);
       }
   }
+  // Away on a routine: the frame keeps its sky and waits for it.
+  if (frame && extra?.bodyless) return compile(rec.commands);
+  const base = poseFor(mode, t, seed, reduced);
+  const looked = extra?.gaze ? { ...base, ...GAZE[extra.gaze] } : base;
   drawAgent(asCtx(rec), box.x, box.y, box.inner, {
     color: agent.color,
     eyes: agent.eyes,
     cells: box.cells,
-    pose: expression
-      ? { ...poseFor(mode, t, seed, reduced), expression, blink: false }
-      : poseFor(mode, t, seed, reduced),
+    pose: expression ? { ...looked, expression, blink: false } : looked,
     after: (ctx, side, body) => {
       if (box.withAccessory && accessory) drawAccessory(ctx, side, accessory, body, t, mode === "run");
       // A sleeping agent's zz: the body's darkest tone on a light page, white on a dark one.
@@ -86,7 +105,17 @@ export function agentFrame(
   return compile(rec.commands);
 }
 
-function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed, expression }: AgentAvatarProps) {
+function AgentAvatarView({
+  agent,
+  size,
+  mode = "idle",
+  live = true,
+  name,
+  framed,
+  expression,
+  gaze,
+  bodyless = false,
+}: AgentAvatarProps) {
   const reduced = useReducedMotion();
   const { scheme, colors: c } = useTheme();
   const tile = framed ?? framedByDefault(size);
@@ -106,9 +135,10 @@ function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed
       tile ? { dark } : undefined,
       expression,
       dark,
+      { gaze, bodyless },
     );
     return createPicture((canvas) => replay(canvas, frame), { width: size, height: size });
-  }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark, expression]);
+  }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark, expression, gaze, bodyless]);
   const label = name
     ? tr(mode === "run" ? "mobile.a11y.agentWorking" : "mobile.a11y.agent", { name })
     : tr("mobile.a11y.agentPlain");
@@ -148,6 +178,8 @@ export const AgentAvatar = memo(
     a.name === b.name &&
     a.framed === b.framed &&
     a.expression === b.expression &&
+    a.gaze === b.gaze &&
+    a.bodyless === b.bodyless &&
     a.agent.color === b.agent.color &&
     a.agent.eyes === b.agent.eyes &&
     a.agent.accessory === b.agent.accessory &&

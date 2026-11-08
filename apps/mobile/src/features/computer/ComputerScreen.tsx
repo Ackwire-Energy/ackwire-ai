@@ -3,6 +3,7 @@ import {
   browserOnlyWhy,
   controlledBy,
   handoffScreen,
+  screenSteps,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { cantShow, cantShowLine, liveSubLine } from "@agenteschat/client/lib/agent-computer";
@@ -31,9 +32,11 @@ import { SheetHostProvider } from "../shared/SheetHost";
 import { AgentScreen } from "./AgentScreen";
 import { Cover } from "./Cover";
 import { DockText } from "./EdgeDock";
+import { LiveTrail } from "./LiveTrail";
 import { offersSwitch, type PhoneStage, phoneStage, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
+import { usePickComputer } from "./usePickComputer";
 
 /** How often the screen's state is asked while no page shows; the page has a stream of its own. */
 const POLL_MS = 5_000;
@@ -118,6 +121,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const machine = view.machine;
   const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
+  const pickComputer = usePickComputer(agentId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
   // What leaving hands back: the agent's browser or screen in this person's hands.
   const mine = f?.handoff && controlledBy(f.handoff, f.userId) ? f.handoff : null;
@@ -235,17 +239,26 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       );
     } else {
       sub = since ? t("agentComputer.sub.offline", { time: since }) : t("machines.offline");
+      // What it did last (it may go on without the computer): its steps under the box, to see how far it got.
+      const steps = screenSteps(run?.work);
       body = (
-        <Cover
-          art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
-          text={t("agentComputer.state.offline", { computer })}
-          help={t("agentComputer.state.offlineHelpPlain", g)}
-          action={
-            offersSwitch(f, manages, Boolean(outage)) ? (
-              <DockText icon="swap" label={t("mobile.outage.switch")} onPress={() => openSwitchComputer(machine.id)} />
-            ) : null
-          }
-        />
+        <>
+          <Cover
+            art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
+            text={t("agentComputer.state.offline", { computer })}
+            help={t("agentComputer.state.offlineHelpPlain", g)}
+            action={
+              offersSwitch(f, manages, Boolean(outage)) ? (
+                <DockText
+                  icon="swap"
+                  label={t("mobile.outage.switch")}
+                  onPress={() => openSwitchComputer(machine.id)}
+                />
+              ) : null
+            }
+          />
+          {steps.length > 0 ? <LiveTrail steps={steps} color={agentLook(agent).color} now={now} /> : null}
+        </>
       );
     }
   } else if (stage === "joining") {
@@ -253,12 +266,13 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");
-    // The phone has no computer picker: who may choose one is told where.
+    // Who may choose one does it here, on the screen's own capsule, never sent to the website.
     body = (
       <Cover
-        icon="computerLinux"
+        art={<AgentFace agentId={agentId} size={44} framed={false} live={false} mode="rest" />}
         text={t("agentComputer.state.noComputer", g)}
-        help={manages ? t("agentComputer.phone.chooseOnWeb") : undefined}
+        {...(pickComputer ? { help: t("mobile.computer.pickHelp") } : {})}
+        action={pickComputer ? <DockText label={t("mobile.computer.pick")} onPress={pickComputer} /> : null}
       />
     );
   } else if (stage === "noScreen") {

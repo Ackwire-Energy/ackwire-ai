@@ -2,6 +2,7 @@ import { checkServer, normalizeServer, type ServerCheck, serverHost } from "@age
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Quiet } from "@/features/auth/AuthFlow";
 import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl, signedInServers } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
@@ -17,8 +18,9 @@ const SIGN_IN_WAIT_MS = 15_000;
 
 /**
  * A connect link, `agenteschat://connect?server=…[&token=…]` (the web app's QR code, the self-host setup):
- * the server is checked and shown in large type, and nothing changes until the person confirms, so a QR
- * code never points the app somewhere else on its own. With a token, the app lands signed in.
+ * the server is checked and shown under the question, on that server's own sky (dusk on a team's own: you see where
+ * you are going), and nothing changes until the person confirms, so a QR code never points the app somewhere else on
+ * its own. With a token, the app lands signed in.
  */
 export default function Connect() {
   const { t } = useTranslation();
@@ -69,6 +71,7 @@ export default function Connect() {
     );
 
   const target = check?.server ?? server;
+  const host = serverHost(target);
   // Every other server stays signed in (ADR 0154); a token replaces only whoever is in on this one.
   const plan = connectPlan(serverUrl(), { server: target, token }, signedInServers().includes(target));
 
@@ -86,18 +89,21 @@ export default function Connect() {
     router.replace(signedInServers().includes(check.server) ? "/" : "/sign-in");
   };
 
-  const problem = check && !check.ok ? t(problemText(check.problem, target), { host: serverHost(target) }) : null;
+  const problem = check && !check.ok ? t(problemText(check.problem, target), { host }) : null;
   // The token was refused, or its session never arrived: on to signing in with the email.
   const stuck = refused || slow;
   return (
     <AuthScaffold
-      // The question is the title; the address a line under it (a long host broke mid-word in large type).
+      // The question is the title; the address in ink under it, one line (a long host is cut in the middle).
       title={t(token ? "mobile.auth.connect.titleSignIn" : "mobile.auth.connect.title")}
-      subtitle={t("mobile.auth.connect.on", { host: serverHost(target) })}
+      subtitle={host}
+      subtitleStrong
+      skyHost={host}
       onBack={leave}
+      agentMode={!check || busy || signingIn ? "run" : "idle"}
     >
       {plan.signOut && !stuck ? (
-        <Text tone="muted" variant="small" style={CENTER}>
+        <Text tone="muted" variant="footnote" style={CENTER}>
           {t("mobile.auth.connect.leave")}
         </Text>
       ) : null}
@@ -119,7 +125,8 @@ export default function Connect() {
           onPress={() => void confirm()}
         />
       )}
-      {stuck ? null : <Button variant="ghost" wide label={t("mobile.common.cancel")} onPress={leave} />}
+      {/* "Agora não" as a quiet line under the one button, never a second button of the same weight. */}
+      {stuck ? null : <Quiet label={t("mobile.auth.connect.notNow")} onPress={leave} />}
     </AuthScaffold>
   );
 }

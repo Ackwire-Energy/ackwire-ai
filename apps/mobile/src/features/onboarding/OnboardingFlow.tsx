@@ -1,64 +1,61 @@
 import { keys, useApi, useMe } from "@agenteschat/client";
 import { settingUp } from "@agenteschat/client/lib/guards";
-import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
+import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
-import * as ImagePicker from "expo-image-picker";
-import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
-import {
-  AgentAvatar,
-  Button,
-  fieldText,
-  Icon,
-  type IconName,
-  LineIcon,
-  Locked,
-  Text,
-  textLineOf,
-  useTheme,
-} from "@/ui";
-import { WholeAccount } from "@/ui/auth/WholeAccount";
+import { Button, LineIcon, Locked, Text, useTheme } from "@/ui";
+import { AuthField } from "@/ui/auth/AuthField";
+import { AuthLink } from "@/ui/auth/AuthLink";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { router } from "@/ui/navigation";
-import { leadBox } from "@/ui/type-scale";
-import { fullLook } from "../agents/edit";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
-import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
-import { phoneTimezone, stepFailedText, zoneLabel } from "./logic";
+import { ZoneList } from "../me/AccountPage";
+import { chooseAction } from "../settings/parts";
+import { orgNameFromEmail, phoneTimezone, stepFailedText, zoneLabel } from "./logic";
 
 /**
- * The first run on the phone, signed in with no workspace to open yet: one question, the workspace's name (its logo
- * optional, its time zone from the phone), asked by its right hand; then the right hand's DM, where the rest of the
- * setup is cards (ADR 0137), as on the web. A workspace still being set up (an older onboarding left at any step,
- * here or on the web) is finished and opened there, never a second one. `onLeave`: opened over a workspace being
- * deleted, it goes back to it until a new one is made.
+ * The first run on the phone, signed in with no workspace to open yet: one question on the sign-in's own screen, the
+ * workspace's name (its time zone from the phone, said in one line; its logo later, in Configurações), the keyboard's
+ * return key as the action; then the right hand's DM, where the rest of the setup happens (ADR 0137), as on the web.
+ * A workspace still being set up (an older onboarding left at any step, here or on the web) is finished and opened
+ * there, never a second one. Nothing destructive lives here: leaving the account is a quiet line, deleting it stays
+ * on the website. `onLeave`: opened over a workspace being deleted, or from Adicionar workspace (ADR 0154), it goes
+ * back until a new one is made; `another`: the name of the workspace the person is still in meanwhile.
  */
-export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
+export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; another?: string | null } = {}) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
   const gate = useOrgGate();
   const me = useMe();
   const { colors: c } = useTheme();
-  const insets = useSafeAreaInsets();
   const [created, setCreated] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [logo, setLogo] = useState<{ base64: string; type: "image/jpeg" | "image/png" | "image/webp" } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const zone = phoneTimezone();
+  // The phone's zone, said in one line with Trocar beside it; the person may pick another before the workspace exists.
+  const [zone, setZone] = useState<string | null>(phoneTimezone);
+  const [pickingZone, setPickingZone] = useState(false);
   const orgName = name.trim();
+  // A work address names its company: the field starts with it, selected, so typing replaces it (`suggested`).
+  const [suggested, setSuggested] = useState<string | null>(null);
 
   // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the step says where it
   // went, until `me` says it's confirmed.
   const email = me.data?.user.email ?? "";
+  useEffect(() => {
+    if (another || created || name !== "" || suggested !== null || !email) return;
+    const guess = orgNameFromEmail(email);
+    setSuggested(guess ?? "");
+    if (guess) setName(guess);
+  }, [another, created, name, suggested, email]);
   const unconfirmed =
     email !== "" && confirmationSentTo() === email.toLowerCase() && me.data?.user.emailVerified !== true;
 
@@ -100,7 +97,6 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
       } else {
         await api.orgs.updateSettings(orgId, { name: orgName });
       }
-      if (logo) await api.orgs.setLogo(orgId, { imageBase64: logo.base64, contentType: logo.type });
       await open(orgId);
     });
 
@@ -113,25 +109,12 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
     void run(() => open(unfinished.id));
   });
 
-  const pickLogo = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-      base64: true,
-    });
-    const a = res.canceled ? null : res.assets[0];
-    if (!a?.base64 || a.base64.length > PHOTO_MAX_BASE64) return;
-    setLogo({ base64: a.base64, type: photoContentType(a.mimeType, a.fileName) });
-  };
-
   if (unfinished)
     return (
       <View style={[styles.screen, styles.wait, { backgroundColor: c.bg }]}>
         {error ? (
           <>
-            <Text tone="muted" style={styles.waitText}>
+            <Text tone="muted" style={CENTER}>
               {error}
             </Text>
             <Button
@@ -148,93 +131,112 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
       </View>
     );
 
+  const submit = () => {
+    if (orgName && !pending) void save();
+  };
+
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: c.bg }]} behavior="padding">
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.body, { paddingTop: insets.top + 32 }]}
-      >
-        {/* Its right hand asks: the face the person meets again in its DM. */}
-        <View style={styles.host}>
-          <AgentAvatar
-            agent={{ ...fullLook(RIGHT_HAND_DEFAULT.appearance), id: "right-hand" }}
-            size={52}
-            expression="happy"
+    <AuthScaffold
+      sky="low"
+      title={another ? t("mobile.onb.anotherTitle") : t("onboarding.workspace.title")}
+      subtitle={
+        another
+          ? t("mobile.onb.anotherLead", { org: another })
+          : suggested && name === suggested
+            ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
+            : t("onboarding.workspace.lead")
+      }
+      onBack={onLeave && !created ? onLeave : undefined}
+      agentMode={pending ? "run" : "idle"}
+      // Nothing destroys on screen: until a workspace is set up this is the only screen, so the way out of the account
+      // is one quiet "Sair", which offers Sair and, in red, Apagar conta in the system's list (a person must always
+      // reach deleting their account, App Store 5.1.1(v); the web's first run takes it from there).
+      footer={
+        pending ? null : (
+          <AuthLink
+            label={t("mobile.org.signOut")}
+            onPress={() =>
+              chooseAction(
+                email,
+                [
+                  { label: t("mobile.org.signOut"), onPress: () => void signOut() },
+                  {
+                    label: t("deleteAccount.menu"),
+                    destructive: true,
+                    onPress: () => openWebPath("/onboarding?account=delete"),
+                  },
+                ],
+                t("mobile.common.cancel"),
+              )
+            }
           />
-          <Text variant="body" style={styles.bold}>
-            {RIGHT_HAND_DEFAULT.name}
-          </Text>
-        </View>
-        <Text variant="display" accessibilityRole="header">
-          {t("onboarding.workspace.title")}
-        </Text>
-        <Text variant="callout" tone="muted">
-          {t("onboarding.workspace.lead")}
-        </Text>
-        <Locked when={pending} style={styles.answer}>
-          <Field
-            value={name}
-            onChangeText={setName}
-            placeholder={t("onboarding.workspace.namePlaceholder")}
-            label={t("onboarding.workspace.name")}
-            autoFocus
-            onSubmitEditing={orgName ? () => void save() : undefined}
-          />
-          <Line
-            lead={<Icon name="image" size={18} />}
-            title={t("mobile.onb.logo")}
-            sub={logo ? t("onboarding.workspace.logoChange") : t("mobile.onb.logoHelp")}
-            end={t("mobile.onb.logoPick")}
-            onPress={() => void pickLogo()}
-          />
-          {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} /> : null}
-          {unconfirmed ? <ConfirmationNote email={email} /> : null}
-        </Locked>
-      </ScrollView>
-      <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        {error ? (
-          <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-            {error}
-          </Text>
-        ) : null}
-        <Button
-          variant="primary"
-          wide
-          label={t("onboarding.actions.continue")}
-          loading={pending}
-          disabled={orgName.length === 0}
-          onPress={() => void save()}
+        )
+      }
+    >
+      <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
+        <AuthField
+          // Mounted again once the suggestion lands, so its focus selects it (`selectTextOnFocus`).
+          key={suggested ? "suggested" : "empty"}
+          value={name}
+          onChangeText={(value) => {
+            setName(value);
+            setError(null);
+          }}
+          placeholder={t("onboarding.workspace.namePlaceholder")}
+          accessibilityLabel={t("onboarding.workspace.name")}
+          autoCapitalize="words"
+          autoCorrect={false}
+          // The keyboard's blue key is the action ("continuar"); gray until a name is typed.
+          returnKeyType="continue"
+          enablesReturnKeyAutomatically
+          onSubmitEditing={submit}
+          // The suggested name comes selected: one keystroke replaces it, the blue key keeps it.
+          selectTextOnFocus={Boolean(suggested)}
+          autoFocus
         />
-        {/* Until a workspace is set up this is the only screen: the way out of a workspace made by mistake is here, and
-            of the account for someone with no other workspace that opens (deleting either on the website). */}
-        {onLeave && !created ? (
-          <Button variant="ghost" wide label={t("mobile.common.back")} disabled={pending} onPress={onLeave} />
-        ) : null}
-        {created ? (
-          <Button
-            variant="ghost"
-            wide
-            label={t("onboarding.deleteLink")}
-            disabled={pending}
-            onPress={() => openWebPath("/onboarding?delete=1")}
-          />
-        ) : null}
-        <Button
-          variant="ghost"
-          wide
-          label={t("mobile.org.signOut")}
+      </Locked>
+      {error ? (
+        <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
+          {error}
+        </Text>
+      ) : null}
+      {/* The keyboard's blue key is the only action, as on the sign-in; the agent above works while it saves. */}
+      {zone ? (
+        <Pressable
+          onPress={() => setPickingZone(true)}
           disabled={pending}
-          onPress={() => void signOut()}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })}. ${t("mobile.onb.zoneChange")}`}
+          hitSlop={12}
+          style={({ pressed }) => [styles.zone, pressed && styles.pressed]}
+        >
+          <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.shrink}>
+            {`${t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} · `}
+          </Text>
+          <Text variant="footnote" tone="ink2" style={styles.bold}>
+            {t("mobile.onb.zoneChange")}
+          </Text>
+        </Pressable>
+      ) : null}
+      {/* Outside the navigator (this screen covers it), so the list comes in a sheet of its own. */}
+      <Modal
+        visible={pickingZone}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPickingZone(false)}
+      >
+        <ZoneList
+          title={t("mobile.onb.zoneTitle")}
+          value={zone}
+          onClose={() => setPickingZone(false)}
+          onPick={(picked) => {
+            if (picked) setZone(picked);
+            setPickingZone(false);
+          }}
         />
-        {me.data ? (
-          <WholeAccount
-            orgs={me.data.organizations}
-            disabled={pending}
-            onDelete={() => openWebPath("/onboarding?account=delete")}
-          />
-        ) : null}
-      </View>
-    </KeyboardAvoidingView>
+      </Modal>
+      {unconfirmed ? <ConfirmationNote email={email} /> : null}
+    </AuthScaffold>
   );
 }
 
@@ -284,112 +286,14 @@ function ConfirmationNote({ email }: { email: string }) {
   );
 }
 
-function Field({ label, ...props }: { label: string } & ComponentProps<typeof TextInput>) {
-  const { colors: c } = useTheme();
-  return (
-    <TextInput
-      placeholderTextColor={c.faint}
-      accessibilityLabel={label}
-      autoCapitalize="none"
-      autoCorrect={false}
-      returnKeyType="done"
-      {...props}
-      style={[styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line2 }]}
-    />
-  );
-}
-
-function Line({
-  lead,
-  title,
-  sub,
-  end,
-  onPress,
-}: {
-  lead: ReactNode;
-  title: string;
-  sub?: string;
-  end?: string;
-  onPress: () => void;
-}) {
-  const { colors: c } = useTheme();
-  const { fontScale } = useWindowDimensions();
-  // A help line that wraps: the icon and the word on the right stay on the title's line, not the row's middle.
-  const line = sub ? textLineOf("body", fontScale) : null;
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.line,
-        line ? styles.lineTall : null,
-        { borderColor: c.line },
-        pressed ? { backgroundColor: c.sunken } : null,
-      ]}
-    >
-      <View style={[styles.lead, line ? leadBox(line, 18) : null]}>{lead}</View>
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold}>
-          {title}
-        </Text>
-        {sub ? (
-          <Text variant="small" tone="muted">
-            {sub}
-          </Text>
-        ) : null}
-      </View>
-      {end ? (
-        <View style={line ? [styles.end, { minHeight: line.height }] : null}>
-          <Text variant="small" style={styles.bold}>
-            {end}
-          </Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function Note({ icon, text }: { icon: IconName; text: string }) {
-  const { colors: c } = useTheme();
-  return (
-    <View style={styles.note}>
-      <LineIcon name={icon} size={15} color={c.faint} variant="small" />
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {text}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
-  waitText: { textAlign: "center" },
-  body: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24, gap: 10 },
-  host: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 },
-  answer: { gap: 12, marginTop: 12 },
-  dock: { gap: 8, paddingHorizontal: 24, paddingTop: 8 },
-  field: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    ...fieldText("body"),
-  },
-  line: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 56,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  lineTall: { alignItems: "flex-start", paddingVertical: 12 },
-  lead: { width: 38, alignItems: "center" },
-  end: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 8 },
+  zone: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8, maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
   linkButton: { alignSelf: "flex-start", marginTop: 2 },
   pressed: { opacity: 0.6 },
 });

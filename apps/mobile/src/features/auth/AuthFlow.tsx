@@ -14,6 +14,7 @@ import { openBrowserAsync } from "expo-web-browser";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, Pressable, type TextInput, View } from "react-native";
+import { PixelOrbit } from "@/agent/PixelOrbit";
 import { useLaunched } from "@/features/launch/launched";
 import { authClient } from "@/lib/auth";
 import { setServer, useServerToReturn } from "@/lib/server";
@@ -21,17 +22,15 @@ import { readValueSync, writeValue } from "@/lib/storage";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
-import { LanguageLine } from "@/ui/auth/LanguageLine";
 import { PasswordField } from "@/ui/auth/PasswordField";
-import { ServerLine } from "@/ui/auth/ServerLine";
+import { AuthFootLine } from "@/ui/auth/ServerLine";
+import { Shake } from "@/ui/auth/Shake";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
-import { Icon } from "@/ui/Icon";
 import { Locked } from "@/ui/Locked";
 import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
-import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
 import {
@@ -49,12 +48,19 @@ import { signInPurpose } from "./links";
 /**
  * Sign in and sign up in one flow (like the web's `AuthPage`): the e-mail
  * first, then the one next step the server says it needs (the password, the provider the account signs
- * in with, or the name and a new password). "Esqueci a senha" happens in place. The agent reacts: eyes
- * shut while a hidden password is typed, a wink when it's shown, a frown when it's wrong. On success the
+ * in with, or the name and a new password). "Esqueci a senha" happens in place. The keyboard stays up from the
+ * first step to the last and its return key is the action; the e-mail being answered for is the subtitle of the
+ * steps after it, and the back circle is the one way back to it. The agent reacts: eyes shut while a hidden
+ * password is typed, a wink when it's shown, a frown and a shake of the field when it's wrong. On success the
  * session gate moves to the app.
  */
 /** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
 export const LAST_EMAIL = "last-email";
+
+/** How often the e-mail's lookup tries again while there is no connection. */
+const OFFLINE_RETRY_MS = 5000;
+/** The no-connection line: the orbit on the first line of its words. */
+const OFFLINE_LINE = { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 } as const;
 
 type Step =
   | "email"
@@ -114,6 +120,8 @@ export function AuthFlow({
   // Under an invitation's screen (a request still waiting, reopened) it stays out of the way.
   const focused = useIsFocused();
   const emailField = useRef<ComponentRef<typeof TextInput>>(null);
+  const newPasswordField = useRef<ComponentRef<typeof TextInput>>(null);
+  const [offline, setOffline] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
@@ -152,6 +160,7 @@ export function AuthFlow({
       const found = await withHumanCheck(human.check, (token) =>
         api.account.signInOptions(requests.lookUp(value.trim()), token),
       );
+      setOffline(false);
       setOptions(found);
       setPassword("");
       // No password and no provider this server signs in with (the owner's account made by the desktop
@@ -160,11 +169,21 @@ export function AuthFlow({
       const usable = found.providers.some((p) => on?.[p] === true);
       go(lookUpStep(found, usable));
     } catch (e) {
-      if (!(e instanceof CheckCancelled)) setError(lookUpFailureText(t, e));
+      // No connection: the e-mail stays, a quiet line says so, and the lookup tries again by itself (below).
+      if (e instanceof TypeError && /network|fetch/i.test(e.message)) setOffline(true);
+      else if (!(e instanceof CheckCancelled)) setError(lookUpFailureText(t, e));
     } finally {
       setPending(false);
     }
   };
+
+  // Offline on the e-mail: one try every few seconds until the server answers, then on to the next step.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `lookUp` reads the e-mail as typed at each try
+  useEffect(() => {
+    if (!offline || step !== "email") return;
+    const id = setInterval(() => void lookUp(), OFFLINE_RETRY_MS);
+    return () => clearInterval(id);
+  }, [offline, step, email]);
 
   // Came with the e-mail ("Criar conta" from somewhere that knew it): straight to the next step, once the server
   // has said whether a bot check guards it.
@@ -300,7 +319,7 @@ export function AuthFlow({
       : step === "password"
         ? password.length > 0
         : step === "name"
-          ? name.trim().length > 0
+          ? name.trim().length > 0 && passwordState(password) === "ok"
           : step === "newPassword"
             ? passwordState(password) === "ok"
             : false;
@@ -309,7 +328,11 @@ export function AuthFlow({
     if (!ready || pending) return;
     if (step === "email") void lookUp();
     else if (step === "password") void signIn();
-    else if (step === "name") go("newPassword");
+    else if (step === "name" && nameIsPassword(name, password)) {
+      // The name field got the password: no account with a password for a name.
+      setPassword("");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "name") void signUp();
     else if (step === "newPassword" && nameIsPassword(name, password)) {
       // The name step got the password: no account with a password for a name.
       setPassword("");
@@ -329,13 +352,18 @@ export function AuthFlow({
   const first = name.trim().split(/\s+/)[0] ?? "";
   const providerNames = linkedProviders.map((p) => t(`auth.provider.${p}`)).join(" · ");
   // Steps without a subtitle: their field and buttons say it (the new password's meter gives the minimum).
+  const who = email.trim();
   const bubble: Record<Step, [string, string?]> = {
-    email: start === "up" ? [t("auth.flow.emailUp")] : [t("auth.flow.email"), purpose ?? t("auth.flow.emailLead")],
-    password: wrong ? [t("auth.flow.wrong")] : [t("auth.flow.password"), purpose ?? t("auth.flow.passwordLead")],
+    email:
+      start === "up"
+        ? [t("auth.flow.emailUp")]
+        : [t("mobile.auth.flow.email"), purpose ?? t("mobile.auth.flow.emailLead")],
+    password: wrong ? [t("auth.flow.wrong"), who] : [t("auth.flow.password"), purpose ?? who],
     social: [t("auth.flow.social", { providers: providerNames }), t("auth.flow.socialLead")],
     noPassword: [t("auth.flow.noPassword"), t("auth.flow.noPasswordLead")],
-    name: [t("auth.flow.name"), t("auth.flow.nameLead")],
-    newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
+    // New here: the name and the password on one screen, like the invitation's "Só falta você".
+    name: [t("mobile.auth.flow.signUp"), who],
+    newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"), who],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
     expired: [
       t("auth.flow.expired"),
@@ -347,6 +375,8 @@ export function AuthFlow({
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
   };
   const [title, lead] = bubble[step];
+  // The e-mail as the subtitle: in ink, one line (a 40-character address is cut in the middle, never wrapped).
+  const strongLead = lead === who && who !== "";
 
   const backTo = step === "forgot" && !options?.password ? "email" : BACK[step];
   // A server added while signed in to another (ADR 0154): its first step goes back there, nothing lost, when this
@@ -364,14 +394,15 @@ export function AuthFlow({
   const mail = webmailOf(email);
 
   const terms =
-    (step === "email" || step === "newPassword") && termsUrl && privacyUrl ? (
+    (step === "email" || step === "name" || step === "newPassword") && termsUrl && privacyUrl ? (
       <Terms termsUrl={termsUrl} privacyUrl={privacyUrl} />
     ) : null;
 
+  // The e-mail step has none: the keyboard's blue key ("continuar") is its action, and Apple, Google and GitHub take
+  // the place where the thumb is.
   const submitLabel: Partial<Record<Step, string>> = {
-    email: t("auth.flow.continue"),
     password: t("auth.signIn"),
-    name: t("auth.flow.continue"),
+    name: t("auth.createAccount"),
     newPassword: t("auth.createAccount"),
     forgot: t("auth.flow.sendLink"),
   };
@@ -385,30 +416,20 @@ export function AuthFlow({
       agentMode={pending ? "run" : "idle"}
       expression={expression}
       overlay={human.view}
+      subtitleStrong={strongLead}
       footer={
         step === "email" ? (
-          <View style={{ gap: 14, alignItems: "center" }}>
+          <>
             {terms}
-            <ServerLine />
-            <LanguageLine />
-          </View>
+            <AuthFootLine />
+          </>
         ) : (
           terms
         )
       }
     >
-      {step !== "email" && step !== "forgot" && step !== "sent" ? (
-        // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
-        <Locked when={pending}>
-          <Who
-            email={email.trim()}
-            onChange={step === "closed" || step === "expired" || step === "noPassword" ? undefined : () => go("email")}
-          />
-        </Locked>
-      ) : null}
-
       {step === "email" || step === "forgot" ? (
-        <Locked when={pending} style={{ gap: 10 }}>
+        <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
           <AuthField
             value={email}
             onChangeText={(value) => {
@@ -421,7 +442,9 @@ export function AuthFlow({
             autoCorrect={false}
             autoComplete="email"
             textContentType="username"
-            returnKeyType={step === "email" ? "next" : "send"}
+            // The keyboard's blue key is the action ("continuar" / "enviar"); it stays gray until something is typed.
+            returnKeyType={step === "email" ? "continue" : "send"}
+            enablesReturnKeyAutomatically
             onSubmitEditing={submit}
             accessibilityLabel={t("auth.email")}
             ref={emailField}
@@ -443,39 +466,74 @@ export function AuthFlow({
       ) : null}
 
       {step === "password" || step === "newPassword" ? (
-        <Locked when={pending}>
-          <PasswordField
-            value={password}
-            onChangeText={(value) => {
-              setPassword(value);
-              setWrong(false);
-            }}
-            fresh={step === "newPassword"}
-            onSecretChange={setSecret}
-            onShow={showWink}
-            onSubmitEditing={submit}
-            label={step === "newPassword" ? t("invite.createPassword") : t("auth.password")}
-          />
+        <Locked when={pending} keepKeyboard>
+          {/* Wrong: the title changes, the field shakes, the haptic warns, all in the same instant. */}
+          <Shake when={wrong}>
+            <PasswordField
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                setWrong(false);
+              }}
+              fresh={step === "newPassword"}
+              onSecretChange={setSecret}
+              onShow={showWink}
+              onSubmitEditing={submit}
+              label={step === "newPassword" ? t("invite.createPassword") : t("auth.password")}
+            />
+          </Shake>
         </Locked>
       ) : null}
 
       {step === "name" ? (
-        <Locked when={pending}>
-          <AuthField
-            value={name}
-            onChangeText={setName}
-            placeholder={t("auth.flow.namePlaceholder")}
-            autoComplete="name"
-            textContentType="name"
-            returnKeyType="next"
-            onSubmitEditing={submit}
-            accessibilityLabel={t("auth.yourName")}
-            autoFocus
-          />
+        <Locked when={pending} keepKeyboard>
+          <View style={{ gap: 8 }}>
+            <AuthField
+              value={name}
+              onChangeText={(value) => {
+                setName(value);
+                setError(null);
+              }}
+              placeholder={t("auth.flow.namePlaceholder")}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+              // Return hands the keyboard to the password, never closing it.
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => newPasswordField.current?.focus()}
+              accessibilityLabel={t("auth.yourName")}
+              autoFocus
+            />
+            {!error ? <NameHint name={name} /> : null}
+            <Shake when={wrong}>
+              <PasswordField
+                ref={newPasswordField}
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setError(null);
+                }}
+                fresh
+                autoFocus={false}
+                onSecretChange={setSecret}
+                onShow={showWink}
+                onSubmitEditing={submit}
+                label={t("invite.createPassword")}
+              />
+            </Shake>
+          </View>
         </Locked>
       ) : null}
-      {step === "name" && !error ? <NameHint name={name} /> : null}
 
+      {offline && step === "email" ? (
+        <View style={OFFLINE_LINE} accessibilityLiveRegion="polite">
+          <PixelOrbit color="sky" size={16} />
+          <Text variant="subhead" tone="muted" style={{ flexShrink: 1 }}>
+            {t("mobile.auth.errors.offlineRetry")}
+          </Text>
+        </View>
+      ) : null}
       {error ? (
         <Text tone="danger" variant="small" accessibilityLiveRegion="polite" style={CENTER}>
           {error}
@@ -492,13 +550,13 @@ export function AuthFlow({
       ) : null}
 
       {step === "email" ? (
-        <Locked when={pending}>
+        <Locked when={pending} keepKeyboard style={{ paddingTop: 8 }}>
           <SocialButtons providers={allProviders} onError={socialRefused} earlyAccess={access} />
         </Locked>
       ) : null}
 
       {step === "password" && canReset ? (
-        <Locked when={pending}>
+        <Locked when={pending} keepKeyboard>
           <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} />
         </Locked>
       ) : null}
@@ -542,46 +600,6 @@ export function AuthFlow({
         </>
       ) : null}
     </AuthScaffold>
-  );
-}
-
-/** The e-mail being answered for, with "Trocar". */
-function Who({ email, onChange }: { email: string; onChange?: () => void }) {
-  const { t } = useTranslation();
-  const { colors, shadows } = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        alignSelf: "center",
-        maxWidth: "100%",
-        minHeight: 32,
-        paddingLeft: 10,
-        paddingRight: onChange ? 4 : 10,
-        borderRadius: 10,
-        backgroundColor: colors.raised,
-        boxShadow: shadows.e1,
-      }}
-    >
-      <Icon name="mail" size={15} color={colors.muted} />
-      <Text variant="subhead" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {email}
-      </Text>
-      {onChange ? (
-        <Pressable
-          onPress={onChange}
-          accessibilityRole="button"
-          hitSlop={12}
-          style={({ pressed }) => ({ paddingHorizontal: 8, opacity: pressed ? 0.6 : 1 })}
-        >
-          <Text variant="subhead" style={{ fontWeight: "600" }}>
-            {t("auth.flow.change")}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
   );
 }
 

@@ -1,20 +1,19 @@
 import type { ManagedTask } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   agentCardLine,
   helpersOf,
   hiddenCount,
   linePlace,
   taskPlace,
-  taskProgram,
-  taskSince,
   taskTitle,
+  taskWaitGroups,
 } from "@agenteschat/client/lib/task-manager";
-import { formatDuration } from "@agenteschat/client/lib/work";
-import { useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Count, EmptyState, Icon, PixelStop, SCREEN_X, Text, useReducedMotion, weights } from "@/ui";
+import { EmptyState, haptics, Icon, SCREEN_X, SkeletonList, Text, useReducedMotion } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
@@ -22,16 +21,18 @@ import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks
 import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
+import { RetryLine } from "../shared/TeamSkyEmpty";
 import { useAgentTasks, useStopper } from "./hooks";
-import { type Place, rowState, taskStateWords, usingNow } from "./logic";
-import { StopButton, StopConfirm, TaskMark, useAgentColor, WaitLines } from "./parts";
+import { type Place, type RowState, rowState } from "./logic";
+import { StateLine, WaitLines } from "./parts";
 
 /**
- * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: three wells (Agora, Esperam você,
- * Feitas hoje), then its tasks (people's first, then its routines'),
- * the ones asked in that conversation tagged "aqui", each with its state, what it uses now and "Parar"; a task opens
- * its own screen. At the end, "Abrir no gerenciador" and "Parar todas", which asks first, in place. A task waiting for
- * room on its computer opens that computer's line in a sheet ("Ver fila"), as the conversation's bar opens it.
+ * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens, in the task manager's language: one
+ * line under the title says how its work stands ("6 trabalhando · 1 espera você · 2 feitas hoje"); a reason several
+ * tasks share (a plan at its limit until Wednesday) is said once, under it; then one 60-point row per task with its
+ * title, its own state or place in words and a chevron, since a task opens its own screen, where it is stopped. At
+ * the end, "Abrir no gerenciador" and, with more than one to stop, "Parar todas" in red, which asks with the system's
+ * alert. A task waiting for room on its computer keeps "Ver fila", as the conversation's bar has it.
  */
 export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Place | null }) {
   return (
@@ -43,24 +44,53 @@ export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Pla
 
 function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) {
   const { t } = useTranslation();
-  const c = useColors();
   const dir = useDirectory();
   const now = useNow(10_000);
   const { stopping, stop } = useStopper();
   const { view, doneToday, query } = useAgentTasks(agentId, { here: from, stopping });
   const pull = usePullRefresh(query.refetch);
-  const [asking, setAsking] = useState(false);
   // Tasks that start or end while the person watches fade, and the rest slide into place; nothing moves with reduced
   // motion.
   const reduced = useReducedMotion();
   const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
   const layout = reduced ? undefined : LinearTransition.duration(220);
   const name = dir.nameOf({ type: "agent", id: agentId }) || t("channel.unknownAgent");
-  const count = view?.rows.length ?? 0;
+  const rows = view?.rows ?? [];
   const hidden = hiddenCount(query.data?.hidden, agentId);
-  const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
-  const helpers = helpersOf((view?.rows ?? []).map((r) => r.task).filter((task) => stoppable.includes(task.runId)));
+  const helpers = helpersOf(rows.map((r) => r.task).filter((task) => stoppable.includes(task.runId)));
+  // The tasks whose wait is said once over them: their rows say only what is their own.
+  const shared = useMemo(
+    () => new Set(taskWaitGroups(rows.map((r) => r.task)).flatMap((g) => g.tasks.map((task) => task.runId))),
+    [rows],
+  );
+  const summary =
+    [
+      view && view.working > 0 ? t("taskManager.working", { count: view.working }) : null,
+      view && view.waiting > 0 ? t("taskManager.waiting", { count: view.waiting }) : null,
+      doneToday > 0 ? t("mobile.taskManager.doneToday", { count: doneToday }) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || t("mobile.taskManager.quiet");
+  // One alert, the system's: how many stop, and that what was done stays; helpers stop with them.
+  const askStopAll = () =>
+    Alert.alert(
+      helpers > 0
+        ? t("taskManager.confirm.chainTitle", { name, count: helpers })
+        : t("taskManager.confirm.title", { name, count: stoppable.length }),
+      helpers > 0 ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.body", agentGrammar(name)),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("taskManager.confirm.stop", { count: stoppable.length }),
+          style: "destructive",
+          onPress: () => {
+            haptics.medium();
+            stop(stoppable, undefined, helpers > 0);
+          },
+        },
+      ],
+    );
   return (
     <PushedLargeTitle
       title={t("taskManager.agentTasks", { name })}
@@ -72,89 +102,46 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {query.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        <SkeletonList rows={4} />
       ) : query.isError && !query.data ? (
-        <View style={styles.center}>
-          <Text tone="muted" style={styles.centerText}>
-            {t("mobile.taskManager.loadFailed")}
-          </Text>
-          <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void query.refetch()} />
-        </View>
+        <RetryLine onRetry={() => void query.refetch()} />
       ) : (
-        // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
+        // Loaded, the list fades in over the skeleton; the rows it starts with don't each fade again.
         <Animated.View {...fade}>
           <LayoutAnimationConfig skipEntering>
-            {/* The three numbers are said once, here (no line above repeating them). */}
-            <View style={styles.wells}>
-              <Well label={t("taskManager.agentPanel.wells.now")} value={count} />
-              <Well label={t("taskManager.agentPanel.wells.waiting")} value={waiting} />
-              <Well label={t("taskManager.agentPanel.wells.done")} value={doneToday} />
-            </View>
+            <Text variant="subhead" tone="muted" style={styles.summary}>
+              {summary}
+            </Text>
             {view ? (
               <>
-                <WaitLines tasks={view.rows.map((r) => r.task)} now={now} />
-                {view.rows.map(({ task, here }, i) => (
+                <WaitLines tasks={rows.map((r) => r.task)} now={now} />
+                {rows.map(({ task, here }, i) => (
                   <Animated.View key={task.runId} {...fade} layout={layout}>
                     <TaskRow
                       task={task}
                       here={here}
-                      stopping={stopping}
+                      shared={shared.has(task.runId)}
+                      state={rowState(task, stopping)}
                       now={now}
                       divider={i > 0}
-                      onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
                     />
                   </Animated.View>
                 ))}
               </>
             ) : (
-              <Animated.View {...fade}>
-                <EmptyState
-                  size="panel"
-                  agent={agentLook(dir.anyAgent(agentId))}
-                  mood="deal"
-                  title={hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
-                />
-              </Animated.View>
+              <EmptyState
+                size="panel"
+                agent={agentLook(dir.anyAgent(agentId))}
+                mood="deal"
+                title={hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
+              />
             )}
-            {asking && stoppable.length > 1 ? (
-              <Animated.View key="confirm" {...fade} layout={layout} style={styles.confirm}>
-                <StopConfirm
-                  agentId={agentId}
-                  count={stoppable.length}
-                  helpers={helpers}
-                  onCancel={() => setAsking(false)}
-                  onStop={(reason) => {
-                    setAsking(false);
-                    stop(stoppable, reason, helpers > 0);
-                  }}
-                />
-              </Animated.View>
-            ) : (
-              <Animated.View key="foot" {...fade} layout={layout} style={styles.foot}>
-                <Pressable
-                  onPress={() => router.push("/task-manager")}
-                  accessibilityRole="button"
-                  hitSlop={6}
-                  style={({ pressed }) => [styles.manager, pressed && styles.pressed]}
-                >
-                  <Text variant="small" tone="muted" style={styles.semibold}>
-                    {t("taskManager.actions.openManager")}
-                  </Text>
-                  <Icon name="right" size={15} color={c.muted} />
-                </Pressable>
-                {stoppable.length > 1 ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    label={t("taskManager.actions.stopAll")}
-                    leading={(ink) => <PixelStop size={10} color={ink} moving={false} />}
-                    onPress={() => setAsking(true)}
-                  />
-                ) : null}
-              </Animated.View>
-            )}
+            <View style={styles.actions}>
+              <ActionRow label={t("taskManager.actions.openManager")} onPress={() => router.push("/task-manager")} />
+              {stoppable.length > 1 ? (
+                <ActionRow label={t("taskManager.actions.stopAll")} danger divider onPress={askStopAll} />
+              ) : null}
+            </View>
           </LayoutAnimationConfig>
         </Animated.View>
       )}
@@ -162,81 +149,55 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   );
 }
 
-/** One of the three numbers at the top: a small sunken well, the label over the count. */
-function Well({ label, value }: { label: string; value: number }) {
-  const c = useColors();
-  return (
-    <View style={[styles.well, { backgroundColor: c.sunken }]} accessible accessibilityLabel={`${label}: ${value}`}>
-      <Text variant="caption" tone="muted" numberOfLines={1}>
-        {label}
-      </Text>
-      <Count value={value} size={20} color={c.ink} />
-    </View>
-  );
-}
-
 /**
- * One of the agent's tasks, on two lines: its mark (which says its state: the agent's orbit working, amber waiting on
- * a person, the clock in a line) on the title's first line, the title whole, and one quiet line under it: where
- * (this conversation, a channel, a routine), the program it uses and for how long; waiting for room, a plan or a
- * budget, that wait and what comes next, with "Ver fila" for a computer's line. "Parar" is the stop square at the
- * row's right, on the title's line. It opens the task's screen.
+ * A task, a 60-point row on the 16 margin: its title on one line and, under it, what is its own: its state in words
+ * (the orbit while it runs, amber while it waits on you, the time), or, when its wait is the one said over the list,
+ * only where it comes from (the conversation, a channel, a routine that isn't its title). A chevron, since it opens
+ * the task's screen, where it is stopped.
  */
 function TaskRow({
   task,
   here,
-  stopping,
+  shared,
+  state,
   now,
   divider,
-  onStop,
 }: {
   task: ManagedTask;
   here: boolean;
-  stopping: ReadonlySet<string>;
+  shared: boolean;
+  state: RowState;
   now: number;
   divider: boolean;
-  onStop: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const c = useColors();
-  const color = useAgentColor(task.agentId);
   const openQueue = useOpenQueue();
-  const state = rowState(task, stopping);
-  const words = taskStateWords(t, i18n.language, task, state, now);
   const title = taskTitle(t, task);
   const place = here ? t("taskManager.where.here") : taskPlace(t, task);
-  const waits = state === "ok" || state === "answer";
-  const program = usingNow(t, taskProgram(task), { locale: i18n.language })?.name ?? null;
-  // Working, or waiting on a person (the mark says which): where, the program, how long. Held or in a line: that
-  // wait and what comes next, then where. Stopping: only that.
-  const sub =
-    state === "working" || waits
-      ? [place, program, formatDuration(t, now - taskSince(task))]
-      : state === "stopping"
-        ? [words.state]
-        : [words.state, words.next, place];
-  const line = sub.filter(Boolean).join(" · ");
-  const label = [title, waits ? words.state : null, line].filter(Boolean).join(", ");
-  // What comes next shows under it; waiting for room on its computer, "Ver fila" opens the computer's line.
   const inLine = state === "stopping" ? null : linePlace(task);
+  const quiet = shared && state !== "stopping";
   return (
     <Pressable
       onPress={() => router.push(`/task-manager/${task.runId}`)}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={[title, place].filter(Boolean).join(", ")}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
     >
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-      <View style={styles.mark}>
-        <TaskMark state={state} color={color} />
-      </View>
       <View style={styles.text}>
-        <Text variant="subhead" style={styles.medium}>
+        <Text variant="body" numberOfLines={1}>
           {title}
         </Text>
-        <Text variant="footnote" tone="faint">
-          {line}
-        </Text>
+        {quiet ? (
+          place ? (
+            <Text variant="subhead" tone="muted" numberOfLines={1}>
+              {place}
+            </Text>
+          ) : null
+        ) : (
+          <StateLine task={task} state={state} now={now} />
+        )}
         {inLine ? (
           <Pressable
             onPress={() => openQueue(inLine.machineId)}
@@ -244,59 +205,63 @@ function TaskRow({
             hitSlop={12}
             style={({ pressed }) => [styles.see, pressed && styles.pressed]}
           >
-            <Text variant="footnote" tone="muted" style={styles.semibold}>
+            <Text variant="footnote" tone="muted">
               {t("taskManager.queue.see")}
             </Text>
             <Icon name="right" size={13} color={c.muted} />
           </Pressable>
         ) : null}
       </View>
-      {task.canStop ? (
-        <View style={styles.stop}>
-          <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} compact />
-        </View>
-      ) : null}
+      <Icon name="right" size={15} color={c.faint} />
     </Pressable>
   );
 }
 
-/** Where a task's words start: after its mark (16 + 16 + 10). */
-const TEXT_INSET = 42;
+/** One of the list's last rows: a way out to the whole manager (chevron), or "Parar todas" in red (no icon). */
+function ActionRow({
+  label,
+  danger = false,
+  divider = false,
+  onPress,
+}: {
+  label: string;
+  danger?: boolean;
+  divider?: boolean;
+  onPress: () => void;
+}) {
+  const c = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.action, pressed && { backgroundColor: c.sunken }]}
+    >
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
+      <Text variant="body" style={[styles.grow, danger ? { color: c.danger } : null]} numberOfLines={1}>
+        {label}
+      </Text>
+      {danger ? null : <Icon name="right" size={15} color={c.faint} />}
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
-  centerText: { textAlign: "center" },
-  wells: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
-  // The app's "tato com canto": round, the bottom left corner small.
-  well: {
-    flex: 1,
-    gap: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
-    borderBottomLeftRadius: 6,
-  },
-  // Everything on the title's first line (20 points): the mark (16) two points down, the stop square (32) six up.
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12, paddingHorizontal: 16 },
-  divider: { position: "absolute", top: 0, left: TEXT_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  mark: { paddingTop: 2 },
-  text: { flex: 1, minWidth: 0, gap: 2 },
-  stop: { marginTop: -6 },
-  medium: { fontWeight: weights.medium },
-  semibold: { fontWeight: weights.semibold },
-  free: { paddingHorizontal: SCREEN_X, paddingVertical: 12 },
-  confirm: { paddingHorizontal: 16, paddingTop: 16 },
-  foot: {
+  // Under the large title's words, as the manager's line.
+  summary: { paddingHorizontal: SCREEN_X, marginTop: -4, paddingBottom: 8 },
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
+    minHeight: 60,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    paddingTop: 16,
   },
-  manager: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 8, paddingHorizontal: 4 },
+  divider: { position: "absolute", top: 0, left: 16, right: 0, height: StyleSheet.hairlineWidth },
+  text: { flex: 1, minWidth: 0, gap: 2 },
+  grow: { flex: 1, minWidth: 0 },
+  // The way out and Parar todas: a section of their own, 24 under the tasks.
+  actions: { marginTop: 24 },
+  action: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52, paddingHorizontal: 16 },
   pressed: { opacity: 0.6 },
   see: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start", paddingVertical: 2 },
 });

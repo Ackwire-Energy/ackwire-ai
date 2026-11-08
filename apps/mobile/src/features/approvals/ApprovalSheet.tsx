@@ -11,30 +11,54 @@ import { nextLabel } from "@agenteschat/client/lib/format";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Button, HoldButton, Locked, SheetScreen, Text, useToast } from "@/ui";
+import {
+  Button,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  HoldButton,
+  IconButton,
+  Locked,
+  SheetScreen,
+  Text,
+  useToast,
+} from "@/ui";
+import { ExpiryLine } from "../chat/asks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { approvalAction, approvalRisk, approveAlwaysToast } from "./logic";
+import {
+  approvalAction,
+  approvalRisk,
+  approvalSaid,
+  approvalTable,
+  approvalTraits,
+  approveAlwaysHint,
+  approveAlwaysLabel,
+  approveAlwaysOffered,
+  approveAlwaysToast,
+} from "./logic";
 import {
   ApprovalAheadLine,
-  ApprovalDetails,
   ApprovalEmailLetter,
-  ApprovalFuse,
-  ApprovalSaid,
-  ApprovalTraits,
-  ApproveAlways,
   approvalTitleText,
   useCancelAhead,
+  useConnectorNamer,
   useOriginShort,
 } from "./parts";
 
+/** A value longer than this goes under its label, whole, instead of squeezed at the row's end. */
+const SHORT_VALUE = 22;
+
 /**
- * A request, from anywhere (deep link `approval/<id>`): who asks, the action
- * in words, the action itself (the whole email, else the detail and every value, whole), what the agent said, what it affects and the amber fuse. High risk
- * takes a hold; refusing can say why ("ajuda o agente a aprender").
+ * A request, from anywhere (deep link `approval/<id>`), as the system's sheets read: its title ("Pedido") and ×, who
+ * asks with the action in words, where and the fuse to its deadline; then the request in groups (why, the service
+ * it goes through, the values it runs with, what it affects) and, where its kind allows it, "Aprovar sempre" as a
+ * switch for next time. Two buttons side by side: Recusar and Aprovar (held, for high risk). Recusar writes the
+ * optional reason in the sheet (the deep link's `refuse` opens there; the cards ask in the system's alert).
  */
 export function ApprovalSheet({
   id,
@@ -57,7 +81,9 @@ export function ApprovalSheet({
   const cancelAhead = useCancelAhead();
   const [refusing, setRefusing] = useState(startRefusing);
   const [reason, setReason] = useState("");
+  const [always, setAlways] = useState(false);
   const a = approval.data;
+  const nameOf = useConnectorNamer({ connector: a?.connector ?? null });
   const agent = a ? dir.agentById.get(a.agentId) : undefined;
   const name = agent?.name ?? "";
   const g = genderOf(name);
@@ -65,21 +91,21 @@ export function ApprovalSheet({
   const origin = useOriginShort({ origin: a?.origin ?? null });
   const runAt = a?.runAt ? nextLabel(i18n.language, a.runAt) : null;
 
-  /** `always`: "Aprovar sempre", this one and the agent's next ones of its kind. */
-  const done = (decision: "approve" | "refuse", always = false) => {
+  /** `withAlways`: "Aprovar sempre", this one and the agent's next ones of its kind. */
+  const done = (decision: "approve" | "refuse", withAlways = false) => {
     if (!a) return;
     decide.mutate(
       {
         id: a.id,
         decision,
-        ...(always ? { always } : {}),
+        ...(withAlways ? { always: true } : {}),
         ...(decision === "refuse" && reason.trim() ? { reason: reason.trim() } : {}),
       },
       {
         onSuccess: () => {
           successHaptic();
           toast({
-            ...(always
+            ...(withAlways
               ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
               : {
                   title: decision === "approve" ? t("mobile.approval.approved") : t("mobile.approval.refused"),
@@ -99,6 +125,17 @@ export function ApprovalSheet({
     );
   };
 
+  const head = (
+    <View style={styles.bar}>
+      <Text variant="body" style={styles.semibold}>
+        {t("mobile.approval.sheet.title")}
+      </Text>
+      <View style={styles.barEnd}>
+        <IconButton icon="x" plate label={t("mobile.common.close")} onPress={onClose} />
+      </View>
+    </View>
+  );
+
   let body: ReactNode;
   if (!a) {
     body = approval.isError ? (
@@ -111,150 +148,156 @@ export function ApprovalSheet({
     const high = approvalRisk(a) === "high";
     const owner = approvalWaitsFor(a, a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined);
     const requester = requesterDecidesLine(t, a);
-    body = (
-      <>
-        <View style={styles.who}>
-          <AgentFace agentId={a.agentId} size={40} />
-          <View style={styles.grow}>
-            <Text variant="body" style={styles.bold}>
-              {name}
+    const said = approvalSaid(a);
+    const where = [name, channel ? `#${channel.name}` : null, origin].filter(Boolean).join(" · ");
+    // The request's facts: through which service, then the values it runs with, whole.
+    const facts = approvalTable(a, Number.POSITIVE_INFINITY, nameOf, true);
+    // A built-in tool's action in words; a connector's is in its facts, an email is the letter.
+    const detail = !a.connector && !a.email ? approvalDetail(a, i18n.language) : null;
+    const traits = approvalTraits(a).map((tr) => t(`mobile.approval.trait.${tr}`));
+    const foot = [traits.join(" · "), requester].filter(Boolean).join("\n");
+    const who = (
+      <View style={styles.who}>
+        <AgentFace agentId={a.agentId} size={40} />
+        <View style={styles.grow}>
+          <Text variant="body" numberOfLines={3} style={styles.semibold}>
+            {approvalTitleText(t, a)}
+          </Text>
+          <View style={styles.whereRow}>
+            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+              {where || t("mobile.approval.asksYou")}
             </Text>
-            <Text variant="small" tone="muted">
-              {refusing
-                ? t("mobile.approval.refuseTitle")
-                : channel
-                  ? t("mobile.approval.asksIn", { channel: channel.name })
-                  : t("mobile.approval.asksYou")}
-              {!refusing && origin ? ` · ${origin}` : ""}
-            </Text>
+            {pending ? <ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} /> : null}
           </View>
         </View>
-        <Text variant="title2">{approvalTitleText(t, a)}</Text>
-        {refusing ? null : <ApprovalAheadLine approval={a} />}
-        {refusing ? (
-          <>
-            <Locked when={decide.isPending}>
-              <TextArea
-                value={reason}
-                onChangeText={setReason}
-                placeholder={t(`mobile.approval.whyPlaceholder${g}`, { name })}
-                accessibilityLabel={t(`mobile.approval.whyPlaceholder${g}`, { name })}
-                autoFocus
-              />
-            </Locked>
-            <View style={styles.acts}>
-              <Button
-                variant="primary"
-                wide
-                label={t("mobile.approval.refuse")}
-                loading={decide.isPending}
-                onPress={() => done("refuse")}
-              />
-              <Button
-                variant="ghost"
-                wide
-                label={t("mobile.common.back")}
+      </View>
+    );
+    body = refusing ? (
+      <>
+        {who}
+        <Text variant="small" tone="muted">
+          {t("mobile.approval.refuseTitle")}
+        </Text>
+        <Locked when={decide.isPending}>
+          <TextArea
+            value={reason}
+            onChangeText={setReason}
+            placeholder={t(`mobile.approval.whyPlaceholder${g}`, { name })}
+            accessibilityLabel={t(`mobile.approval.whyPlaceholder${g}`, { name })}
+            autoFocus
+          />
+        </Locked>
+        <View style={styles.pair}>
+          <View style={styles.half}>
+            <Button
+              variant="secondary"
+              wide
+              label={t("mobile.common.back")}
+              disabled={decide.isPending}
+              onPress={() => setRefusing(false)}
+            />
+          </View>
+          <View style={styles.half}>
+            <Button
+              variant="primary"
+              wide
+              label={t("mobile.approval.refuse")}
+              loading={decide.isPending}
+              onPress={() => done("refuse")}
+            />
+          </View>
+        </View>
+      </>
+    ) : (
+      <>
+        {who}
+        <ApprovalAheadLine approval={a} />
+        {a.email ? <ApprovalEmailLetter email={a.email} full /> : null}
+        <View>
+          <GroupedHeader>{t("mobile.approval.sheet.request")}</GroupedHeader>
+          <GroupedList>
+            {said ? <GroupedRow key="why" label={t("mobile.approval.sheet.why")} sub={said} subLines={6} /> : null}
+            {detail ? <GroupedRow key="detail" label={detail} labelLines={4} /> : null}
+            {facts.map((f) => {
+              const label = f.label ?? t("mobile.approval.sheet.service");
+              return f.value.length > SHORT_VALUE ? (
+                <GroupedRow key={label} label={label} sub={f.value} subLines={8} />
+              ) : (
+                <GroupedRow key={label} label={label} value={f.value} />
+              );
+            })}
+          </GroupedList>
+          {foot ? <GroupedFooter>{foot}</GroupedFooter> : null}
+        </View>
+        {pending && a.canDecide && approveAlwaysOffered(a) ? (
+          <View>
+            <GroupedHeader>{t("mobile.approval.sheet.nextTime")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
+                label={approveAlwaysLabel(t, a)}
+                labelLines={2}
+                toggle={always}
                 disabled={decide.isPending}
-                onPress={() => setRefusing(false)}
+                onPress={() => setAlways((on) => !on)}
               />
+            </GroupedList>
+            <GroupedFooter>{approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}</GroupedFooter>
+          </View>
+        ) : null}
+        {pending ? (
+          a.canDecide ? (
+            <View style={styles.pair}>
+              <View style={styles.half}>
+                <Button
+                  variant="secondary"
+                  wide
+                  label={t("mobile.approval.refuse")}
+                  disabled={decide.isPending}
+                  onPress={() => setRefusing(true)}
+                />
+              </View>
+              <View style={styles.half}>
+                {high ? (
+                  <HoldButton
+                    label={t("mobile.approval.hold")}
+                    disabled={decide.isPending}
+                    onConfirm={() => done("approve", always)}
+                  />
+                ) : (
+                  <Button
+                    variant="primary"
+                    wide
+                    label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
+                    loading={decide.isPending}
+                    onPress={() => done("approve", always)}
+                  />
+                )}
+              </View>
             </View>
+          ) : (
+            <Text variant="small" tone="muted" style={styles.note}>
+              {owner ? t("mobile.approval.onlyOwner", { name: owner }) : t("mobile.approval.onlyAdmins")}
+            </Text>
+          )
+        ) : aheadPhase(a) === "scheduled" && runAt ? (
+          <>
+            <Text variant="small" tone="muted" style={styles.note}>
+              {t("mobile.approval.status.scheduled", { when: runAt })}
+            </Text>
+            {a.canCancel ? (
+              <Button
+                variant="secondary"
+                wide
+                label={t("approval.ahead.cancel")}
+                loading={cancelAhead.pending}
+                onPress={() => cancelAhead.cancel(a.id, onClose)}
+              />
+            ) : null}
           </>
         ) : (
-          <>
-            {a.email ? (
-              <ApprovalEmailLetter email={a.email} full />
-            ) : (
-              <>
-                {/* A connector's detail is its raw call (`tool · key=value`); its values are in the table, in words. */}
-                {!a.connector && approvalDetail(a, i18n.language) ? (
-                  <Text variant="body" tone="ink2" style={styles.detail}>
-                    {approvalDetail(a, i18n.language)}
-                  </Text>
-                ) : null}
-                <ApprovalDetails approval={a} max={Number.POSITIVE_INFINITY} long />
-              </>
-            )}
-            <ApprovalSaid approval={a} name={name} />
-            {requester ? (
-              <Text variant="small" tone="muted">
-                {requester}
-              </Text>
-            ) : null}
-            <ApprovalTraits approval={a} />
-            {pending ? (
-              <>
-                <ApprovalFuse approval={a} />
-                {a.canDecide ? (
-                  <>
-                    <View style={styles.acts}>
-                      {high ? (
-                        <HoldButton
-                          label={t("mobile.approval.hold")}
-                          disabled={decide.isPending}
-                          onConfirm={() => done("approve")}
-                        />
-                      ) : (
-                        <Button
-                          variant="primary"
-                          wide
-                          icon="check"
-                          label={
-                            approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")
-                          }
-                          loading={decide.isPending}
-                          onPress={() => done("approve")}
-                        />
-                      )}
-                      <Button
-                        variant="secondary"
-                        wide
-                        label={t("mobile.approval.refuse")}
-                        disabled={decide.isPending}
-                        onPress={() => setRefusing(true)}
-                      />
-                      <ApproveAlways
-                        approval={a}
-                        name={name}
-                        disabled={decide.isPending}
-                        onPress={() => done("approve", true)}
-                      />
-                    </View>
-                    <Text variant="caption" tone="faint" style={styles.note}>
-                      {high
-                        ? t("mobile.approval.holdNote")
-                        : runAt
-                          ? t("mobile.approval.tapNoteAhead", { when: runAt })
-                          : t("mobile.approval.tapNote")}
-                    </Text>
-                  </>
-                ) : (
-                  <Text variant="small" tone="muted" style={styles.note}>
-                    {owner ? t("mobile.approval.onlyOwner", { name: owner }) : t("mobile.approval.onlyAdmins")}
-                  </Text>
-                )}
-              </>
-            ) : aheadPhase(a) === "scheduled" && runAt ? (
-              <>
-                <Text variant="small" tone="muted" style={styles.note}>
-                  {t("mobile.approval.status.scheduled", { when: runAt })}
-                </Text>
-                {a.canCancel ? (
-                  <Button
-                    variant="secondary"
-                    wide
-                    icon="x"
-                    label={t("approval.ahead.cancel")}
-                    loading={cancelAhead.pending}
-                    onPress={() => cancelAhead.cancel(a.id, onClose)}
-                  />
-                ) : null}
-              </>
-            ) : (
-              <Text variant="small" tone="muted" style={styles.note}>
-                {aheadEndLine(t, a) ?? t(`mobile.approval.status.${a.status === "pending" ? "expired" : a.status}`)}
-              </Text>
-            )}
-          </>
+          <Text variant="small" tone="muted" style={styles.note}>
+            {aheadEndLine(t, a) ?? t(`mobile.approval.status.${a.status === "pending" ? "expired" : a.status}`)}
+          </Text>
         )}
       </>
     );
@@ -262,17 +305,23 @@ export function ApprovalSheet({
 
   return (
     <SheetScreen>
+      {head}
       <View style={styles.in}>{body}</View>
     </SheetScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  in: { gap: 12 },
-  who: { flexDirection: "row", alignItems: "center", gap: 10 },
-  grow: { flex: 1 },
-  bold: { fontWeight: "600" },
-  detail: { marginTop: -2 },
-  acts: { gap: 8 },
+  // The sheet's own bar: its title centered on the grabber's line, × at the end.
+  bar: { height: 44, alignItems: "center", justifyContent: "center", marginTop: -12 },
+  barEnd: { position: "absolute", right: -2, top: 0, bottom: 0, justifyContent: "center" },
+  semibold: { fontWeight: "600" },
+  in: { gap: 24 },
+  who: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  whereRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1 },
+  pair: { flexDirection: "row", gap: 8 },
+  half: { flex: 1 },
   note: { textAlign: "center" },
 });

@@ -2,13 +2,19 @@ import { describe, expect, test } from "bun:test";
 import type { Memory, WikiGraph } from "@agenteschat/client";
 import {
   aroundStar,
+  fitStars,
   frameStars,
+  linkCount,
+  linksOutOf,
   MAP_MEMORIES,
   memoryMap,
+  mostLinked,
   namedStars,
+  pagesMap,
   pixelsAlong,
   placeStars,
   ringAround,
+  strongest,
   wikiMap,
 } from "../../src/features/constellation/logic";
 import { agentFilters, justLearned, mostUsed, searchMemories } from "../../src/features/memory/logic";
@@ -174,5 +180,60 @@ describe("the lists under the sky", () => {
       summary: "Gravar senhas sem expô-las",
     });
     expect(searchMemories([...list, summed], "senhas").map((m) => m.id)).toEqual(["m9"]);
+  });
+});
+
+describe("the wiki's graph, as the web draws it", () => {
+  const graph: WikiGraph = {
+    nodes: [
+      { slug: "a", title: "Alpha", folder: "Produto", tags: [], agentId: "ada" },
+      { slug: "b", title: "Beta", folder: "", tags: [] },
+      { slug: "c", title: "Gama", folder: "Produto/Vendas", tags: [] },
+      { slug: "d", title: "Delta", folder: "", tags: [] },
+    ],
+    edges: [
+      { from: "a", to: "b" },
+      { from: "a", to: "c" },
+      { from: "c", to: "a" },
+      { from: "b", to: "b" },
+      { from: "a", to: "gone" },
+    ],
+  };
+
+  test("only pages and their links, each as heavy as it is linked, an agent's page with its agent", () => {
+    const map = pagesMap(graph);
+    expect(map.stars.every((s) => s.kind === "page")).toBe(true);
+    expect(map.links).toHaveLength(3);
+    expect(map.stars.find((s) => s.id === "a")).toMatchObject({ weight: 3, agentId: "ada" });
+    expect(map.stars.find((s) => s.id === "b")?.agentId).toBeUndefined();
+    expect(mostLinked(map)).toBe("a");
+    expect(linkCount(map, "c")).toBe(2);
+    expect(mostLinked({ stars: [], links: [] })).toBeNull();
+  });
+
+  test("what a page links to, each once, never itself", () => {
+    expect(linksOutOf(graph, "a")).toEqual(["b", "c", "gone"]);
+    expect(linksOutOf(graph, "b")).toEqual([]);
+  });
+
+  test("a big wiki's small sky keeps its most linked pages and only their links", () => {
+    const map = strongest(pagesMap(graph), 2);
+    expect(map.stars.map((s) => s.id).sort()).toEqual(["a", "c"]);
+    expect(map.links.every((l) => ["a", "c"].includes(l.from) && ["a", "c"].includes(l.to))).toBe(true);
+    expect(strongest(pagesMap(graph), 10).stars).toHaveLength(4);
+  });
+
+  test("a still sky spreads over its window, room for names at the edges, a lone star in the middle", () => {
+    const at = fitStars(
+      new Map([
+        ["a", { x: 0, y: 0 }],
+        ["b", { x: 100, y: 50 }],
+      ]),
+      360,
+      220,
+    );
+    expect(at.get("a")).toEqual({ x: 60, y: 28 });
+    expect(at.get("b")).toEqual({ x: 300, y: 180 });
+    expect(fitStars(new Map([["a", { x: 7, y: 7 }]]), 360, 220).get("a")).toEqual({ x: 180, y: 104 });
   });
 });

@@ -13,7 +13,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { BUTTON_SIZES, type ButtonSize, primaryLook } from "./Button";
 import { haptics } from "./haptics";
-import { Icon } from "./Icon";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -31,10 +30,11 @@ export interface HoldButtonProps {
 }
 
 /**
- * Hold to confirm (high-risk approvals): the button fills from the left while held, ticks a haptic,
- * confirms with a success haptic when full, and cancels when released early.
+ * Hold to confirm (high-risk approvals): the button rests a shade lighter and fills from the left in the ink's own
+ * tone while held, linearly (it shows time passing), with a light tap at the start and a success one when full.
+ * Released early it snaps back fast on an ease-out, nothing asked. No icon: the words are the button.
  */
-export function HoldButton({ label, onConfirm, durationMs = 1100, disabled = false, size = "md" }: HoldButtonProps) {
+export function HoldButton({ label, onConfirm, durationMs = 700, disabled = false, size = "md" }: HoldButtonProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const look = primaryLook(theme);
@@ -69,7 +69,7 @@ export function HoldButton({ label, onConfirm, durationMs = 1100, disabled = fal
     clearTimeout(timer.current);
     timer.current = null;
     cancelAnimation(fill);
-    fill.value = withTiming(0, { duration: 250, easing: Easing.bezier(0.2, 0.8, 0.2, 1) });
+    fill.value = withTiming(0, { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1) });
     press.value = theme.reducedMotion ? 0 : withSpring(0, theme.motion.press);
   };
 
@@ -100,17 +100,14 @@ export function HoldButton({ label, onConfirm, durationMs = 1100, disabled = fal
         accessibilityState={{ disabled }}
         style={[styles.face, { borderRadius: s.radius }]}
       >
-        <LinearGradient colors={look.gradient} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={[mixHex(look.gradient[0], bg, 0.3), mixHex(look.gradient[1], bg, 0.3)] as const}
+          style={StyleSheet.absoluteFill}
+        />
         <Animated.View style={[StyleSheet.absoluteFill, { transformOrigin: "left" }, fillStyle]} pointerEvents="none">
-          <LinearGradient
-            colors={[mixHex(look.gradient[1], bg, 0.22), mixHex(look.gradient[1], bg, 0.34)] as const}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <LinearGradient colors={look.gradient} style={StyleSheet.absoluteFill} />
         </Animated.View>
         <View style={[styles.edge, { backgroundColor: look.highlight }]} />
-        <Icon name="check" size={s.icon} color={look.text} />
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}

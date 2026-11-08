@@ -2,7 +2,7 @@ import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-rou
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { FadeIn, FadeOutUp, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
@@ -27,6 +27,11 @@ export interface LargeTitleScreenProps {
   backdrop?: ReactNode;
   children?: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
+  /**
+   * Drawn in the gap a pull-down opens above the content, where the system's wheel would be (pass the refresh
+   * control a clear tint on iOS): the pixel orbit (`PullOrbit`).
+   */
+  pullMark?: ReactNode;
   /** Room under the content (default 24; the system already keeps content clear of the tab bar). */
   bottomInset?: number;
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
@@ -36,6 +41,12 @@ export interface LargeTitleScreenProps {
    * stay on the plain (white, in light) background.
    */
   grouped?: boolean;
+  /**
+   * The large title folded away and the bar's own title in its place (a search field under it took the focus, as
+   * the system's search bar rises into the navigation); content that should slide up with it carries a
+   * `LinearTransition` layout.
+   */
+  collapsed?: boolean;
 }
 
 /**
@@ -57,9 +68,11 @@ export function LargeTitleScreen({
   backdrop,
   children,
   refreshControl,
+  pullMark,
   bottomInset = 24,
   onScrollBeginDrag,
   grouped = false,
+  collapsed = false,
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
@@ -76,9 +89,13 @@ export function LargeTitleScreen({
     () => ({
       ...actionOptions,
       title,
-      headerTitle: () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
+      // Folded, the bar's plain title stands (no fade to drive; set, not left out, as options merge); else it fades
+      // in as the large one leaves.
+      headerTitle: collapsed
+        ? title
+        : () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
     }),
-    [actionOptions, title, y],
+    [actionOptions, title, y, collapsed],
   );
   return (
     <View style={[styles.screen, { backgroundColor: grouped ? colors.grouped : colors.bg }]}>
@@ -109,19 +126,32 @@ export function LargeTitleScreen({
                 {backdrop}
               </CoverParallax>
             ) : null}
-            <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
-              <Text variant="display" accessibilityRole="header" numberOfLines={1}>
-                {title}
-              </Text>
-              {subtitle ? (
-                <Text variant="small" tone="muted" style={styles.subtitle}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </Animated.View>
+            {/* The title shows at once when the screen opens; it fades only when it comes back after a search. */}
+            <LayoutAnimationConfig skipEntering>
+              {collapsed ? null : (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOutUp.duration(180)}>
+                  <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
+                    <Text variant="display" accessibilityRole="header" numberOfLines={1}>
+                      {title}
+                    </Text>
+                    {subtitle ? (
+                      <Text variant="small" tone="muted" style={styles.subtitle}>
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </Animated.View>
+                </Animated.View>
+              )}
+            </LayoutAnimationConfig>
             {below}
           </View>
           {children}
+          {pullMark ? (
+            // On iOS the content starts under the bar's inset: the gap opens above that.
+            <View pointerEvents="none" style={[styles.pullMark, { top: -PULL_MARK - (IOS ? headerHeight : 0) }]}>
+              {pullMark}
+            </View>
+          ) : null}
         </Animated.ScrollView>
       </LivePause>
       <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} tone={grouped ? colors.grouped : colors.bg} />
@@ -139,9 +169,22 @@ const TITLE_GONE = 40;
 const BAR_TITLE_FROM = 28;
 const BAR_TITLE_TO = 48;
 
+/** The pull-down's gap, where the orbit sits (the system's wheel takes about as much). */
+const PULL_MARK = 56;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  // At the screen's sides (SCREEN_X), as the lists and cards under it.
   head: { paddingHorizontal: SCREEN_X, paddingTop: 2, paddingBottom: 10 },
+  // Above the content's top edge: only a pull-down brings it into view (the system's wheel sits there too).
+  pullMark: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: PULL_MARK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });

@@ -36,7 +36,6 @@ import {
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
-import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
@@ -77,7 +76,7 @@ function useZonePick(): string | null {
  * check what the team already did, the context every agent reads, and the usage report's switch for the
  * installation's owner. Every change saves by itself (the name when its field is left, the zone when picked,
  * the context while typing), and "Salvo" shows under the title; who can't change them reads them. Its owners
- * delete it on the website, in Geral's dialog.
+ * delete it from the workspace's page (`WorkspaceScreen`), the last row there.
  */
 export function GeneralScreen() {
   const { t, i18n } = useTranslation();
@@ -221,7 +220,10 @@ export function GeneralScreen() {
     }
     setUploading(true);
     try {
-      await api.orgs.setLogo(orgId, { imageBase64: a.base64, contentType: photoContentType(a.mimeType, a.fileName) });
+      await api.orgs.setLogo(orgId, {
+        imageBase64: a.base64,
+        contentType: photoContentType(a.mimeType, a.fileName, a.base64),
+      });
       refreshOrg();
       successHaptic();
       toast({ title: t("orgLogo.saved") });
@@ -369,20 +371,6 @@ export function GeneralScreen() {
       ) : null}
 
       <UsageStatistics />
-      {org?.role === "owner" ? (
-        <>
-          <Gap />
-          <GroupedList>
-            <GroupedRow
-              label={t("deleteOrg.card.title")}
-              danger
-              chevron
-              onPress={() => openWebPath(`/org/${orgId}/settings/general?delete=1`)}
-            />
-          </GroupedList>
-          <GroupedFooter>{t("deleteOrg.card.text", { name: org.name })}</GroupedFooter>
-        </>
-      ) : null}
     </SettingsPage>
   );
 }

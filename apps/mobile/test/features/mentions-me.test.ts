@@ -105,6 +105,10 @@ describe("Conta", () => {
   test("photo type the upload accepts", () => {
     expect(photoContentType("image/png")).toBe("image/png");
     expect(photoContentType(null, "a.webp")).toBe("image/webp");
+    // The bytes decide over the reported type: a cropped PNG comes back as JPEG bytes still called PNG.
+    expect(photoContentType("image/png", "logo.png", "/9j/4AAQSkZJRg")).toBe("image/jpeg");
+    expect(photoContentType("image/jpeg", null, "iVBORw0KGgoAAAANSUhEUg")).toBe("image/png");
+    expect(photoContentType(null, null, "data:image/webp;base64,UklGRiQAAABXRUJQ")).toBe("image/webp");
     expect(photoContentType("image/heic", "a.heic")).toBe("image/jpeg");
   });
 

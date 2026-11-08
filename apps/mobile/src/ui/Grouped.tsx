@@ -1,5 +1,5 @@
 import { Children, isValidElement, type ReactNode } from "react";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
@@ -7,11 +7,15 @@ import { useInfoHint } from "./InfoHint";
 import { GROUPED_ROW } from "./rhythm";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
+import { useFontScale } from "./text-scale";
 import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
-/** The leading column of a row with a face or a mark: whatever leads is centered in it. */
-const LEAD = 32;
+/**
+ * The leading column of a row with a face or a mark: whatever leads is centered in it. As wide as a framed face (36,
+ * the smaller of the two framed sizes), so a face never spills into the gap before the text.
+ */
+const LEAD = 36;
 /** A row's icon tile; its corner is 30% of it, as every tile's. */
 const TILE = 28;
 
@@ -19,6 +23,18 @@ const TILE = 28;
 const ROW_IN = FadeIn.duration(motion.fast);
 const ROW_OUT = FadeOut.duration(motion.fast);
 const SLIDE = LinearTransition.duration(motion.base);
+
+/**
+ * Whether a row of the list has a leading column (an icon's tile, a face): read off the row itself, or off the row a
+ * swipe (`SwipeRow`) or an opaque view wraps, so a swipeable row keeps its hairline where the others start.
+ */
+function leads(props: unknown, depth = 0): boolean {
+  if (!props || typeof props !== "object" || depth > 2) return false;
+  const p = props as { icon?: unknown; leading?: unknown; children?: unknown };
+  if (p.icon || p.leading) return true;
+  const inner = isValidElement(p.children) ? p.children.props : null;
+  return inner ? leads(inner, depth + 1) : false;
+}
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
@@ -50,11 +66,7 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                   {
                     backgroundColor: c.line2,
                     // A tile and a face share one leading column, so the text and its hairline start at one place.
-                    marginLeft:
-                      (child.props as { icon?: unknown; leading?: unknown }).icon ||
-                      (child.props as { leading?: unknown }).leading
-                        ? GROUPED_ROW.padX + LEAD + 12
-                        : GROUPED_ROW.padX,
+                    marginLeft: leads(child.props) ? GROUPED_ROW.padX + LEAD + 12 : GROUPED_ROW.padX,
                   },
                 ]}
               />
@@ -130,6 +142,11 @@ export function GroupedFooter({ children }: { children: ReactNode }) {
 
 export interface GroupedRowProps {
   label: string;
+  /**
+   * The label in parts, the ones that matched what was typed in semibold (Novo's filter); the same words as `label`,
+   * which still names the row for VoiceOver.
+   */
+  labelParts?: readonly { text: string; mark?: boolean }[];
   /** Lines the label may take (default 1): a setting's long name beside its switch. */
   labelLines?: number;
   /** A small line under the label. */
@@ -150,6 +167,11 @@ export interface GroupedRowProps {
   valueNote?: string;
   /** Drawn just before the value (a picked agent's face, a format's glyph). */
   valueLeading?: ReactNode;
+  /**
+   * The value changes in its row through the system's choice (an action list), not on a screen: the small up-down
+   * mark after the value, where a chevron would be.
+   */
+  menu?: boolean;
   /** A chevron: it opens a screen. */
   chevron?: boolean;
   /** Three dots: it opens a sheet of actions. */
@@ -188,6 +210,7 @@ function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string;
 
 function Row({
   label,
+  labelParts,
   labelLines = 1,
   sub,
   subLines = 1,
@@ -199,6 +222,7 @@ function Row({
   valueNote,
   valueLeading,
   chevron = false,
+  menu = false,
   more = false,
   checked,
   toggle,
@@ -211,7 +235,7 @@ function Row({
   labelAfter,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; labelAfter?: ReactNode }) {
   const { colors: c } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
   // A switch answers the finger as it flips, as `Toggle` does.
   const press =
@@ -250,7 +274,7 @@ function Row({
       ]}
     >
       {/* One column for whatever leads (an icon's tile, a 24 to 36 face, a mark): the text, and the hairline above,
-          start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
+          start at 64 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
         <View style={styles.lead}>
           <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
@@ -263,13 +287,35 @@ function Row({
         {labelAfter ? (
           <View style={styles.labelLine}>
             <Text variant="body" numberOfLines={labelLines} style={[styles.shrink, { color: tone }]}>
-              {label}
+              {labelParts
+                ? labelParts.map((part, i) =>
+                    part.mark ? (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                      <Text key={i} variant="body" style={[{ color: tone }, styles.marked]}>
+                        {part.text}
+                      </Text>
+                    ) : (
+                      part.text
+                    ),
+                  )
+                : label}
             </Text>
             {labelAfter}
           </View>
         ) : (
           <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
-            {label}
+            {labelParts
+              ? labelParts.map((part, i) =>
+                  part.mark ? (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                    <Text key={i} variant="body" style={[{ color: tone }, styles.marked]}>
+                      {part.text}
+                    </Text>
+                  ) : (
+                    part.text
+                  ),
+                )
+              : label}
           </Text>
         )}
         {sub ? (
@@ -310,6 +356,11 @@ function Row({
           <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
             {value}
           </Text>
+        </View>
+      ) : null}
+      {menu ? (
+        <View style={onLine(14)}>
+          <Icon name="swap" size={14} color={c.faint} />
         </View>
       ) : null}
       {checked ? (
@@ -430,6 +481,7 @@ function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { h
 }
 
 const styles = StyleSheet.create({
+  marked: { fontWeight: "600" },
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
   header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },

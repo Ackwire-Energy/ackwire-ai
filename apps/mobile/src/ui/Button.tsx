@@ -2,18 +2,22 @@ import { mixHex } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Text as RNText, StyleSheet, View } from "react-native";
-import { Icon, type IconName } from "./Icon";
+import type { IconName } from "./Icon";
 import { PressScale } from "./PressScale";
 import { systemText } from "./Text";
 import { type Theme, useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
-/** `text`: the ghost's words with no side padding, so its icon starts where the text above does (under a message). */
+/** `text`: the ghost's words with no side padding, so they start where the text above does (under a message). */
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "text";
 
 export interface ButtonProps {
   variant: ButtonVariant;
   size?: ButtonSize;
+  /**
+   * Kept for callers, never drawn: a button is its words (the design language has no icons inside buttons; a brand's
+   * mark, which is a name and not a picture, goes in `leading`).
+   */
   icon?: IconName;
   /** Drawn before the label instead of an icon (a brand's mark), given the label's color. */
   leading?: (color: string) => ReactNode;
@@ -24,6 +28,8 @@ export interface ButtonProps {
   disabled?: boolean;
   /** Working on it: a spinner in the icon's place, and it can't be pressed again meanwhile. */
   loading?: boolean;
+  /** What a screen reader hears after the label: the state the label is too short to say. */
+  hint?: string;
 }
 
 export const BUTTON_SIZES = {
@@ -51,13 +57,13 @@ export function primaryLook(theme: Pick<Theme, "colors">) {
 export function Button({
   variant,
   size = "md",
-  icon,
   leading,
   label,
   onPress,
   wide = false,
   disabled = false,
   loading = false,
+  hint,
 }: ButtonProps) {
   const theme = useTheme();
   const { colors, shadows } = theme;
@@ -73,6 +79,7 @@ export function Button({
       fill={false}
       accessibilityRole="button"
       accessibilityLabel={label}
+      {...(hint ? { accessibilityHint: hint } : {})}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[
         {
@@ -104,13 +111,7 @@ export function Button({
             ]}
           />
         ) : null}
-        {loading ? (
-          <ActivityIndicator size="small" color={textColor} />
-        ) : leading ? (
-          leading(textColor)
-        ) : icon ? (
-          <Icon name={icon} size={s.icon} color={textColor} />
-        ) : null}
+        {loading ? <ActivityIndicator size="small" color={textColor} /> : leading ? leading(textColor) : null}
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}

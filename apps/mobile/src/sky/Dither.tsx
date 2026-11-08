@@ -36,6 +36,8 @@ export interface DitherProps {
   animated?: boolean;
   /** Fade out to the bottom from this height share (2 = none). */
   fade?: number;
+  /** Come in from nothing, in dither steps, down to this height share (0 = none): a band that doesn't start at the top. */
+  fadeTop?: number;
   /** The first tone is see-through (a drawing over glass). */
   clear?: boolean;
   /** The drawing's width, from the UI thread, when it changes faster than a layout should (the canvas stays). */
@@ -57,6 +59,7 @@ export function Dither({
   extra,
   animated = true,
   fade = 2,
+  fadeTop = 0,
   clear = false,
   liveWidth,
   liveWork,
@@ -74,7 +77,16 @@ export function Dither({
   const { pal, last } = paletteUniform(tones);
   const moving = animated && !reduced && !paused;
   const clock = useClock();
-  const base = { size: [size.width, size.height], px: pixel, last, fade, clear: clear ? 1 : 0, pal, ...(extra ?? {}) };
+  const base = {
+    size: [size.width, size.height],
+    px: pixel,
+    last,
+    fade,
+    fadeTop,
+    clear: clear ? 1 : 0,
+    pal,
+    ...(extra ?? {}),
+  };
   const uniforms = useDerivedValue(() => ({
     ...base,
     ...(liveWidth ? { size: [Math.max(1, liveWidth.value), size.height] } : {}),

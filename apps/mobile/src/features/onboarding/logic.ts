@@ -1,5 +1,6 @@
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
+import { webmailOf } from "@agenteschat/client/lib/text";
 import type { TFunction } from "i18next";
 
 /**
@@ -32,4 +33,45 @@ export function zoneCity(zone: string): string {
  */
 export function zoneLabel(zone: string, locale: string): string {
   return platformZoneName(zone, locale) ?? zoneCity(zone);
+}
+
+/** Personal mailboxes beyond the big webmails (`webmailOf`): their domain names a provider, never a company. */
+const PERSONAL_DOMAINS = new Set([
+  "uol.com.br",
+  "bol.com.br",
+  "terra.com.br",
+  "ig.com.br",
+  "globo.com",
+  "globomail.com",
+  "r7.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "pm.me",
+  "gmx.com",
+  "gmx.net",
+  "yandex.com",
+  "mail.com",
+  "zoho.com",
+  "tutanota.com",
+  "hey.com",
+  "fastmail.com",
+]);
+
+/**
+ * A workspace name from a work address, for the first run's field: `ana@acme.com.br` → "Acme",
+ * `bruno@loja-sol.com` → "Loja Sol". Null for a personal mailbox (Gmail, Outlook, UOL…) or no usable domain, so
+ * the field starts empty there.
+ */
+export function orgNameFromEmail(email: string): string | null {
+  const domain = email.trim().toLowerCase().split("@")[1] ?? "";
+  if (!domain.includes(".") || webmailOf(email) || PERSONAL_DOMAINS.has(domain)) return null;
+  const labels = domain.split(".").filter((l) => l && l !== "www" && l !== "mail");
+  const first = labels[0];
+  if (!first || first.length < 2) return null;
+  return first
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toLocaleUpperCase() + w.slice(1))
+    .join(" ");
 }

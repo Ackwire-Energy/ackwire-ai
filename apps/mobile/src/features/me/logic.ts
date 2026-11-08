@@ -52,11 +52,20 @@ export function handleErrorKey(code: string | undefined): "handleInvalid" | "han
   return null;
 }
 
-/** The type the photo upload accepts (JPEG, PNG or WebP); anything else was re-encoded to JPEG by the picker. */
+/**
+ * The type the photo upload accepts (JPEG, PNG or WebP). The server checks the bytes against the declared type, and
+ * the picker's crop re-encodes to JPEG while it may still report the source's type (a PNG logo comes back as JPEG
+ * bytes named PNG), so the bytes decide first; the reported type and the name only when there are no bytes.
+ */
 export function photoContentType(
   mimeType: string | null | undefined,
   fileName?: string | null,
+  base64?: string | null,
 ): "image/jpeg" | "image/png" | "image/webp" {
+  const head = (base64 ?? "").replace(/^data:[^;]+;base64,/, "").slice(0, 16);
+  if (head.startsWith("/9j/")) return "image/jpeg";
+  if (head.startsWith("iVBORw0KGgo")) return "image/png";
+  if (head.startsWith("UklGR")) return "image/webp";
   const mime = mimeType?.toLowerCase() ?? "";
   const ext = fileName?.toLowerCase().split(".").pop() ?? "";
   if (mime === "image/png" || (!mime && ext === "png")) return "image/png";
@@ -64,8 +73,11 @@ export function photoContentType(
   return "image/jpeg";
 }
 
-/** The upload's limit (`imageBase64` max 3,000,000 characters on the server). */
-export const PHOTO_MAX_BASE64 = 3_000_000;
+/**
+ * The upload's limit in base64 characters: the server takes up to 2 MB of image (`AVATAR_LIMITS`), which is
+ * 2,796,204 characters of base64; its own 3,000,000-character cap on the field is looser than the image's.
+ */
+export const PHOTO_MAX_BASE64 = 2_796_000;
 
 /** "N com você" in Do workspace: open issues (not done or canceled) assigned to me. */
 export function openIssuesWithMe(
@@ -128,4 +140,23 @@ export function startHref(
   const place = startPlace(choice, { last: lastChannel && inChannel(lastChannel) ? (last ?? null) : null, inChannel });
   if (place.kind === "channel") return `/chat/${place.channelId}`;
   return place.kind === "last" ? place.place : null;
+}
+
+/**
+ * The workspaces beyond the one open, for Você's workspace row (ADR 0154): how many more there are, over the
+ * servers signed in to, and on how many other servers they sit (0: all on this one). A server that didn't answer
+ * counts as another server with nothing known of it, so the row still says there is more elsewhere.
+ */
+export function workspacesBeyond(
+  groups: readonly { current: boolean; orgs: readonly { id: string }[]; failed: boolean }[],
+  openOrgId: string | null,
+): { others: number; servers: number } {
+  let others = 0;
+  let servers = 0;
+  for (const g of groups) {
+    const here = g.orgs.filter((o) => !(g.current && o.id === openOrgId)).length;
+    others += here;
+    if (!g.current && (here > 0 || g.failed)) servers += 1;
+  }
+  return { others, servers };
 }

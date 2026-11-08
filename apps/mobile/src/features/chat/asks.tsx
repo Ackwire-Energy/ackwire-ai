@@ -59,6 +59,7 @@ import {
   useReducedMotion,
   useTheme,
 } from "@/ui";
+import { SparkCheck } from "@/ui/SparkCheck";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -428,6 +429,8 @@ export const ASK_ICON: Record<AskKind, IconName> = {
 export function AskCard({
   id,
   kind,
+  kindNote,
+  agentId,
   waitsFor,
   lead,
   well,
@@ -438,6 +441,8 @@ export function AskCard({
 }: {
   id: string;
   kind: AskKind;
+  /** Said after the kind on the top line ("sai da empresa" for a request that leaves the workspace). */
+  kindNote?: string | undefined;
   agentId: string;
   waitsFor: "you" | (string & {}) | null;
   lead: string;
@@ -452,9 +457,12 @@ export function AskCard({
   const ownTop = useCardTop(12);
   const { t } = useTranslation();
   const c = useColors();
+  const dir = useDirectory();
   const surface = useSurface();
   const reduced = useReducedMotion();
   const store = useAskStore();
+  // The asking agent's sky, faint across the card's top: the same card as Atividade's and the home's (`WaitingCard`).
+  const sky = agentLook(dir.agentById.get(agentId)).color;
   const slot = useRef<ComponentRef<typeof View>>(null);
   const [openHere, setOpen] = useState(false);
   const open = well?.more?.open ?? openHere;
@@ -506,15 +514,17 @@ export function AskCard({
         {more.content}
       </Animated.View>
     ) : null;
+  const kindWords = askKindWords(t, kind, waitsFor === "you");
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
     <View ref={slot} collapsable={false} style={ownTop}>
       <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
         <View style={styles.clip}>
+          <Sky color={sky} depth={0.55} fade={0.15} surface="raised" style={styles.sky} />
           <View style={styles.head}>
             <Icon name={ASK_ICON[kind]} size={13} color={c.muted} />
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
-              {askKindWords(t, kind, waitsFor === "you")}
+              {kindNote ? `${kindWords} · ${kindNote}` : kindWords}
             </Text>
             {waitsFor && waitsFor !== "you" ? (
               <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
@@ -624,10 +634,16 @@ export function AskDone({
   time,
   more,
   actions,
+  celebrate,
 }: {
   done: boolean;
   words: string;
   time?: string;
+  /**
+   * You approved it just now: the check bursts once in the agent's tones (its color), the decision's weight. Never on
+   * an old pill scrolling in.
+   */
+  celebrate?: string | null;
   /** `card`: what opens is a card of its own (the request as it was), drawn without the text's rule beside it. */
   more?: { label: string; content: ReactNode; card?: boolean } | null;
   actions?: ReactNode;
@@ -640,7 +656,7 @@ export function AskDone({
   return (
     <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.done, ownTop]}>
       <EventPill
-        mark={done ? "check" : "x"}
+        mark={done && celebrate ? <SparkCheck size={14} color={c.ok} tone={celebrate} /> : done ? "check" : "x"}
         markColor={done ? c.ok : c.faint}
         time={time}
         actions={[
@@ -798,7 +814,8 @@ export function AskBar({
           accessibilityLabel={`${plain}. ${t("ask.bar.see")}`}
           style={({ pressed }) => [styles.words, pressed && styles.pressed]}
         >
-          <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+          {/* The name in ink, what it waits for in amber: the one state the app colors, "espera você". */}
+          <Text variant="caption" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={{ color: c.amber }}>
             {parts.map((p, i) =>
               p.bold ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
@@ -850,6 +867,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 8,
   },
+  // Across the top, at half strength, under the kind line (as `WaitingCard`).
+  sky: { position: "absolute", top: 0, left: 0, right: 0, height: 56, opacity: 0.5 },
   head: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },

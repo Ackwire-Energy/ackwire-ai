@@ -42,6 +42,7 @@ import {
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -452,6 +453,7 @@ export function WorkingLine({
   onOpenBrowser,
   sight,
   onSee,
+  stop,
 }: {
   runs: LiveRun[];
   consults: LiveConsult[];
@@ -463,6 +465,11 @@ export function WorkingLine({
   sight: RowSight;
   /** "Ver": back to the live row of the agent the line speaks for. */
   onSee: (run: LiveRun) => void;
+  /**
+   * "Parar", the word, last in the line: the runs here the person may stop. The line is the one place that stops
+   * (the composer keeps only its send), so the state and its action read together.
+   */
+  stop?: { runs: LiveRun[]; onStop: (run: LiveRun) => void } | undefined;
 }) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
@@ -539,6 +546,8 @@ export function WorkingLine({
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
   // "Ver" once its row is in the conversation (before that, there is nothing to go back to).
   const seeable = away && turnShows(away) ? away : undefined;
+  // The line stops only the agents it speaks for: a row on screen has its own stop at its end.
+  const stopHere = stop ? stop.runs.filter((r) => !rowInView(r)) : [];
   // Back to the row is a scroll, so no haptic.
   const see = () => {
     if (seeable) onSee(seeable);
@@ -546,7 +555,9 @@ export function WorkingLine({
   return (
     <View style={styles.dock}>
       <Animated.View
-        entering={reduced ? undefined : FadeIn.duration(160)}
+        // In and out on an ease-out, under 200 ms: the line is chrome that comes and goes many times a day.
+        entering={reduced ? undefined : LINE_IN}
+        exiting={reduced ? undefined : LINE_OUT}
         style={[styles.pill, { backgroundColor: c.glassSolid, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
         accessibilityLiveRegion="polite"
       >
@@ -641,11 +652,17 @@ export function WorkingLine({
             </Pressable>
           </>
         ) : null}
-        {/* No stop here: the composer's, right under the line, is the one stop (two side by side read as noise). */}
+        {/* "Parar" as a word, last: the one stop on screen while the rows are out of view (the row's tail has its own
+            while it shows; the composer keeps only its send). */}
+        {stop && stopHere.length > 0 ? <LineStop runs={stopHere} onStop={stop.onStop} place="word" /> : null}
       </Animated.View>
     </View>
   );
 }
+
+const LINE_EASE = Easing.bezier(0.23, 1, 0.32, 1);
+const LINE_IN = FadeIn.duration(160).easing(LINE_EASE);
+const LINE_OUT = FadeOut.duration(120).easing(LINE_EASE);
 
 /**
  * "Parar": last in the requests' line's pill after a thin rule (while it takes the working line's place), or at the
@@ -662,7 +679,8 @@ export function LineStop({
   onStop: (run: LiveRun) => void;
   /** The thin rule before it (left out after "Ver", which has its own, and in the row). */
   rule?: boolean;
-  place?: "line" | "row";
+  /** `word`: "Parar" written out, at the end of the working line (one word for every run it stops). */
+  place?: "line" | "row" | "word";
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -674,6 +692,41 @@ export function LineStop({
     haptics.firm();
     onStop(run);
   };
+  if (place === "word") {
+    const stopping = runs.some((r) => r.stopping);
+    const live = runs.filter((r) => !r.stopping);
+    return (
+      <>
+        {rule ? <View style={[styles.sep, { backgroundColor: c.line }]} /> : null}
+        {stopping && live.length === 0 ? (
+          <View style={styles.stopping} accessible accessibilityLabel={t("run.stopping")}>
+            <ActivityIndicator size="small" color={c.muted} />
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => {
+              for (const r of live) stopNow(r);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={live.map((r) => `${t("run.stop")} · ${nameOf(r)}`).join(", ")}
+            // A 16-point word in a 28-point pill: 14 above and below makes the 44 a finger needs.
+            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            {({ pressed }) => (
+              <Text
+                variant="caption"
+                maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                style={[styles.ink, { color: pressed ? c.danger : c.ink }]}
+              >
+                {t("run.stop")}
+              </Text>
+            )}
+          </Pressable>
+        )}
+      </>
+    );
+  }
   const inRow = place === "row";
   const shape = inRow ? styles.rowStop : styles.stop;
   return (

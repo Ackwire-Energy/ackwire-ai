@@ -13,7 +13,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput } from "react-native";
 import { useOrg } from "@/providers/org";
-import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import {
+  GroupedField,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Text,
+  useFieldText,
+  useToast,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { Gap, SettingsPage } from "../settings/parts";
 import { useColors, useMeId, useOrgId } from "../shared/hooks";
@@ -136,6 +145,7 @@ export function NewCategoryScreen({ channelId }: { channelId?: string }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
+  const words = useFieldText("body");
   const toast = useToast();
   const channels = useChannels(orgId);
   const categories = useChannelCategories(orgId);
@@ -185,7 +195,7 @@ export function NewCategoryScreen({ channelId }: { channelId?: string }) {
             autoCapitalize="words"
             returnKeyType="done"
             onSubmitEditing={save}
-            style={[styles.input, { color: c.ink }]}
+            style={[styles.input, words, { color: c.ink }]}
           />
         </GroupedField>
       </GroupedList>
@@ -264,6 +274,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
+  const words = useFieldText("body");
   const toast = useToast();
   const channels = useChannels(orgId);
   const categories = useChannelCategories(orgId);
@@ -340,7 +351,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
             autoCapitalize="words"
             returnKeyType="done"
             onSubmitEditing={save}
-            style={[styles.input, { color: c.ink }]}
+            style={[styles.input, words, { color: c.ink }]}
           />
         </GroupedField>
       </GroupedList>
@@ -387,6 +398,6 @@ export function useMovesChannel(channelId: string) {
 }
 
 const styles = StyleSheet.create({
-  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0, fontSize: 17 },
+  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
   empty: { textAlign: "center", paddingVertical: 24 },
 });

@@ -78,6 +78,25 @@ const ANDROID: Record<TypeStyle, TypeMetrics> = {
   caption2: m(11, 16),
 };
 
+/**
+ * The person's text size (Você › Conversa › Tamanho do texto: `textSize`, packages/client/src/lib/chat-look.ts) for the
+ * whole app, as a multiplier over this scale: about 2 points a step on the 17 body (xs 13, sm 15, md 17, lg 19, xl 21),
+ * the same steps the conversation's words take (`CHAT_TEXT`). It stacks on the system's own text size.
+ */
+export const APP_TEXT_SCALE = { xs: 13 / 17, sm: 15 / 17, md: 1, lg: 19 / 17, xl: 21 / 17 } as const;
+export type AppTextSize = keyof typeof APP_TEXT_SCALE;
+
+/** A size and its line at `k`, in whole points, the line keeping the style's own ratio to its size. */
+export function scaleMetrics(
+  fontSize: number,
+  lineHeight: number,
+  k: number,
+): { fontSize: number; lineHeight: number } {
+  if (k === 1) return { fontSize, lineHeight };
+  const size = Math.round(fontSize * k);
+  return { fontSize: size, lineHeight: Math.round((size * lineHeight) / fontSize) };
+}
+
 export function typeScale(os: OS): Record<TypeStyle, TypeMetrics> {
   return os === "android" ? ANDROID : IOS;
 }

@@ -44,23 +44,17 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
-import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
+import { type ActionItem, ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 
 import { QUICK_REACTIONS, reactionName, reactionPills } from "./logic";
+import type { MenuSymbol } from "./MessageMenu";
 
 // ── Long press on a message ──────────────────────────────────────────────────
 
-export function MessageActions({
-  message: m,
-  canMission,
-  inThread,
-  thread,
-  onMission,
-  onRemind,
-  onReply,
-}: {
+/** What a message's menu is about, beyond the message: what the screen can do with it. */
+export interface MessageActionsContext {
   message: Message;
   /** "Transformar em missão" is offered (a channel or a DM, not a mission thread). */
   canMission: boolean;
@@ -70,15 +64,27 @@ export function MessageActions({
   onMission: (goal: string, threadId: string) => void;
   /** "Lembrar disso": the screen opens the reminder sheet for this message. */
   onRemind: (m: Message) => void;
-  /** "Responder" in a thread: the next message answers this one. Absent where nothing can be written. */
-  onReply?: (m: Message) => void;
-}) {
+  /** "Responder": the next message answers this one, in the conversation (a quote). Absent where nothing can be written. */
+  onReply?: ((m: Message) => void) | undefined;
+}
+
+/** One action of a message's menu: the sheet's row, with the system's symbol for the native menu. */
+export interface MessageAction extends ActionItem {
+  symbol?: MenuSymbol;
+}
+
+/**
+ * A message's actions, one list for the system's menu (iOS, on hold) and the app's sheet (Android): the quick
+ * reactions, then the actions in groups, as the hand expects them: answer (here, in a thread), keep (copy, pin,
+ * remind, a mission), and the rest (its link, a chart to a dashboard, the agent who wrote it). `close` runs before
+ * an action that opens something else (the sheet closes; the system's menu closes itself).
+ */
+export function useMessageActions(context: MessageActionsContext, close: () => void) {
+  const { message: m, canMission, inThread, thread, onMission, onRemind, onReply } = context;
   const { t } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
   const dir = useDirectory();
-  const surface = useSurface();
-  const sheet = useSheet();
   const toast = useToast();
   const qc = useQueryClient();
   const cached = useReactions(orgId, m.id, false);
@@ -86,7 +92,7 @@ export function MessageActions({
   const pin = usePinMessage(orgId);
   const pinned = Boolean(m.pinned);
   const togglePin = () => {
-    sheet.close();
+    close();
     const next = !pinned;
     // The mark shows at once; the server's answer (or its event) confirms it.
     cachePinned(qc, orgId, m.channelId, m.id, next);
@@ -110,7 +116,7 @@ export function MessageActions({
   // An agent's charts can be pinned to a dashboard as widgets (ADR 0135).
   const charts = m.local || m.author.type !== "agent" ? [] : chartBlocksOf(m.body);
   const pinChart = () => {
-    sheet.close();
+    close();
     setPinDraft({ messageId: m.id, agentId: m.author.id ?? "", blocks: charts });
     router.push("/widget-pin");
   };
@@ -119,16 +125,145 @@ export function MessageActions({
     const reaction = reactionName(emoji);
     const mine = pills.find((p) => p.reaction === reaction)?.mine ?? false;
     toggle.mutate({ reaction, on: !mine });
-    sheet.close();
+    close();
   };
+  const copied = (ok: boolean, title: string) =>
+    toast(ok ? { title, icon: "copy" } : { title: t("mobile.app.failed"), icon: "x" });
+  const answer: MessageAction[] = [
+    ...(!m.local && onReply
+      ? [
+          {
+            key: "reply",
+            icon: "replyTo" as const,
+            symbol: "arrowshape.turn.up.left" as const,
+            label: t("channel.reply"),
+            onPress: () => {
+              close();
+              onReply(m);
+            },
+          },
+        ]
+      : []),
+    ...(!inThread && !m.local
+      ? [
+          {
+            key: "thread",
+            icon: "reply" as const,
+            symbol: "bubble.left.and.bubble.right" as const,
+            label: thread ? t("mobile.chat.openThread") : t("mobile.chat.replyInThread"),
+            onPress: () => {
+              close();
+              router.push(chatHref(m.channelId, rootId));
+            },
+          },
+        ]
+      : []),
+  ];
+  const keep: MessageAction[] = [
+    ...(text
+      ? [
+          {
+            key: "copy",
+            icon: "copy" as const,
+            symbol: "doc.on.doc" as const,
+            label: t("mobile.chat.copy"),
+            onPress: () => {
+              close();
+              void copyText(m.body).then((ok) => copied(ok, t("mobile.chat.copied")));
+            },
+          },
+        ]
+      : []),
+    ...(!m.local
+      ? [
+          {
+            key: "pin",
+            icon: "pin" as const,
+            symbol: (pinned ? "pin.slash" : "pin") as MenuSymbol,
+            label: pinned ? t("mobile.pins.unpin") : t("mobile.pins.pin"),
+            onPress: togglePin,
+          },
+          {
+            key: "remind",
+            icon: "clock" as const,
+            symbol: "clock" as const,
+            label: t("mobile.remind.aboutThis"),
+            // The reminder's sheet takes this one's place (no close in between).
+            onPress: () => onRemind(m),
+          },
+        ]
+      : []),
+    ...(canMission && !m.local
+      ? [
+          {
+            key: "mission",
+            icon: "target" as const,
+            symbol: "target" as const,
+            label: t("mobile.chat.toMission"),
+            onPress: () => onMission(text, rootId),
+          },
+        ]
+      : []),
+  ];
+  const rest: MessageAction[] = [
+    ...(!m.local
+      ? [
+          {
+            key: "link",
+            icon: "link" as const,
+            symbol: "link" as const,
+            label: t("messageRefs.copy"),
+            onPress: () => {
+              close();
+              void copyText(`${serverUrl()}${messagePath(orgId, m)}`).then((ok) =>
+                copied(ok, t("contextMenu.linkCopied")),
+              );
+            },
+          },
+        ]
+      : []),
+    ...(charts.length > 0 && m.author.id
+      ? [
+          {
+            key: "dashboard",
+            icon: "chart" as const,
+            symbol: "chart.bar" as const,
+            label: t("widgets.pin.label"),
+            onPress: pinChart,
+          },
+        ]
+      : []),
+    ...(m.author.type === "agent" && m.author.id
+      ? [
+          {
+            key: "agent",
+            leading: <AgentFace agentId={m.author.id} size={20} live={false} />,
+            symbol: "person.crop.square" as const,
+            label: t("mobile.chat.seeAgent", { name: agentName }),
+            onPress: () => {
+              close();
+              router.push(`/agent/${m.author.id}`);
+            },
+          },
+        ]
+      : []),
+  ];
+  const groups = [answer, keep, rest].filter((g) => g.length > 0);
+  return { text, react, groups };
+}
+
+/**
+ * Holding a message where the platform has no menu of its own (Android): the app's sheet, in the menu's order. The
+ * reactions first (the hand already knows), the message under them, then the actions in their groups.
+ */
+export function MessageActions(props: MessageActionsContext) {
+  const { message: m } = props;
+  const { t } = useTranslation();
+  const surface = useSurface();
+  const sheet = useSheet();
+  const { text, react, groups } = useMessageActions(props, sheet.close);
   return (
     <>
-      <View style={[styles.preview, surface]}>
-        <Face who={m.author} size={24} live={false} />
-        <Text variant="small" tone="ink2" numberOfLines={3} style={styles.grow}>
-          {text || previewOf(textOrMedia(t, m.body, m.meta)) || t("mobile.chat.approvalPreview")}
-        </Text>
-      </View>
       {m.local ? null : (
         <View style={[styles.emorow, surface]}>
           {QUICK_REACTIONS.map((e) => (
@@ -146,127 +281,37 @@ export function MessageActions({
           ))}
         </View>
       )}
-      <ActionList
-        items={[
-          ...(inThread && !m.local && onReply
-            ? [
-                {
-                  key: "reply",
-                  icon: "reply" as const,
-                  label: t("channel.reply"),
-                  onPress: () => {
-                    sheet.close();
-                    onReply(m);
-                  },
-                },
-              ]
-            : []),
-          ...(!inThread && !m.local
-            ? [
-                {
-                  key: "thread",
-                  icon: "reply" as const,
-                  label: thread ? t("mobile.chat.openThread") : t("mobile.chat.replyInThread"),
-                  onPress: () => {
-                    sheet.close();
-                    router.push(chatHref(m.channelId, rootId));
-                  },
-                },
-              ]
-            : []),
-          ...(canMission && !m.local
-            ? [
-                {
-                  key: "mission",
-                  icon: "target" as const,
-                  label: t("mobile.chat.toMission"),
-                  onPress: () => onMission(text, rootId),
-                },
-              ]
-            : []),
-          ...(text
-            ? [
-                {
-                  key: "copy",
-                  icon: "copy" as const,
-                  label: t("mobile.chat.copy"),
-                  onPress: () => {
-                    sheet.close();
-                    void copyText(m.body).then((ok) =>
-                      toast(
-                        ok
-                          ? { title: t("mobile.chat.copied"), icon: "copy" }
-                          : { title: t("mobile.app.failed"), icon: "x" },
-                      ),
-                    );
-                  },
-                },
-              ]
-            : []),
-          ...(!m.local
-            ? [
-                {
-                  key: "link",
-                  icon: "link" as const,
-                  label: t("messageRefs.copy"),
-                  onPress: () => {
-                    sheet.close();
-                    void copyText(`${serverUrl()}${messagePath(orgId, m)}`).then((ok) =>
-                      toast(
-                        ok
-                          ? { title: t("contextMenu.linkCopied"), icon: "link" }
-                          : { title: t("mobile.app.failed"), icon: "x" },
-                      ),
-                    );
-                  },
-                },
-                {
-                  key: "pin",
-                  icon: "pin" as const,
-                  label: pinned ? t("mobile.pins.unpin") : t("mobile.pins.pin"),
-                  onPress: togglePin,
-                },
-                {
-                  key: "remind",
-                  icon: "clock" as const,
-                  label: t("mobile.remind.aboutThis"),
-                  onPress: () => onRemind(m),
-                },
-              ]
-            : []),
-          ...(charts.length > 0 && m.author.id
-            ? [{ key: "dashboard", icon: "chart" as const, label: t("widgets.pin.label"), onPress: pinChart }]
-            : []),
-          ...(m.author.type === "agent" && m.author.id
-            ? [
-                {
-                  key: "agent",
-                  leading: <AgentFace agentId={m.author.id} size={20} live={false} />,
-                  label: t("mobile.chat.seeAgent", { name: agentName }),
-                  onPress: () => {
-                    sheet.close();
-                    router.push(`/agent/${m.author.id}`);
-                  },
-                },
-              ]
-            : []),
-        ]}
-      />
+      <View style={[styles.preview, surface]}>
+        <Face who={m.author} size={24} live={false} />
+        <Text variant="small" tone="ink2" numberOfLines={3} style={styles.grow}>
+          {text || previewOf(textOrMedia(t, m.body, m.meta)) || t("mobile.chat.approvalPreview")}
+        </Text>
+      </View>
+      <View style={styles.groups}>
+        {groups.map((g) => (
+          <ActionList key={g[0]?.key ?? ""} items={g} />
+        ))}
+      </View>
     </>
   );
 }
 
 // ── "+" in the composer ──────────────────────────────────────────────────────
 
-export type PlusPick = "camera" | "photos" | "file" | "mission" | "summary" | "remind";
+export type PlusPick = "camera" | "photos" | "file" | "media" | "mission" | "summary" | "remind";
 
-export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
+/**
+ * The "+" of the chat: what goes with a message as tiles (camera, photos, file and, where they can be sent, the
+ * GIFs and stickers, so the field itself only sends), then what to start here, in words.
+ */
+export function PlusActions({ onPick, media = false }: { onPick: (pick: PlusPick) => void; media?: boolean }) {
   const { t } = useTranslation();
   const surface = useSurface();
-  const tiles: { key: PlusPick; icon: "camera" | "image" | "file"; label: string }[] = [
+  const tiles: { key: PlusPick; icon: "camera" | "image" | "file" | "sticker"; label: string }[] = [
     { key: "camera", icon: "camera", label: t("mobile.plus.camera") },
     { key: "photos", icon: "image", label: t("mobile.plus.photos") },
     { key: "file", icon: "file", label: t("mobile.plus.file") },
+    ...(media ? [{ key: "media" as const, icon: "sticker" as const, label: t("mobile.plus.media") }] : []),
   ];
   return (
     <>
@@ -296,7 +341,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "target",
             label: t("mobile.plus.mission"),
             hint: t("mobile.plus.missionHint"),
-            code: "/mission",
             onPress: () => onPick("mission"),
           },
           {
@@ -304,7 +348,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "sparkle",
             label: t("mobile.plus.summary"),
             hint: t("mobile.plus.summaryHint"),
-            code: "/summary",
             onPress: () => onPick("summary"),
           },
           {
@@ -312,7 +355,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "clock",
             label: t("mobile.plus.remind"),
             hint: t("mobile.plus.remindHint"),
-            code: "/remind",
             onPress: () => onPick("remind"),
           },
         ]}
@@ -803,6 +845,8 @@ const styles = StyleSheet.create({
   emo: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   emoPressed: { transform: [{ scale: 1.15 }] },
   emoText: { fontSize: 26, lineHeight: 34 },
+  // The action groups, divided as the menu divides them.
+  groups: { gap: 12 },
   tiles: { flexDirection: "row", justifyContent: "space-between" },
   tileBtn: { flex: 1 },
   tileIn: { alignItems: "center", gap: 8, paddingVertical: 6 },

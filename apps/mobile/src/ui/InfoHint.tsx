@@ -1,17 +1,10 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
-import {
-  AccessibilityInfo,
-  BackHandler,
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { AccessibilityInfo, BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { hintBack, hintClosed, hintOpened, hintTouched } from "./hints";
 import { Icon } from "./Icon";
 import { Text, type TextVariant, textLineOf } from "./Text";
+import { useFontScale } from "./text-scale";
 import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
@@ -39,7 +32,7 @@ export interface InfoHintOptions {
 export function useInfoHint({ name, text, variant, center = false }: InfoHintOptions) {
   const id = useId();
   const { colors: c, reducedMotion } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const [open, setOpen] = useState(false);
   useEffect(() => () => hintClosed(id), [id]);
   useEffect(() => {

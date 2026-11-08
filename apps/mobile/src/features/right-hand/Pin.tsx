@@ -1,28 +1,45 @@
-import { rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
+import { previewBody } from "@agenteschat/client/lib/message-body";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { rightHandSeen } from "@/lib/storage";
-import { Count, Text } from "@/ui";
+import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
+import type { AgentMode } from "@/agent/poses";
+import { Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import type { ConversationRow } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useMeId, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 
 /**
  * The right hand on Conversas (ADR 0137): one place to ask anything, under the greeting on the sky, shaped as the
  * conversation's composer ("Mensagem para Atlas", its face before it), the app's card with its cut corner. It opens
- * its DM (starting one when there is none yet); its unread count at the end, the red dot until its DM first opens on
- * this phone. It is not one of Agentes' rows.
+ * its DM (starting one when there is none yet). It never carries a count or a dot: when the right hand answered and
+ * you haven't read it, its last line takes the invitation's place, in the text's own color ("Atlas: deixei o
+ * resumo na sua conversa"). It is not one of Agentes' rows.
  */
-export function RightHandAsk({ row, onStart }: { row: ConversationRow; onStart: (agentId: string) => void }) {
+export function RightHandAsk({
+  row,
+  onStart,
+  faceMode = "idle",
+  faceStyle,
+}: {
+  row: ConversationRow;
+  onStart: (agentId: string) => void;
+  /** The face's mode: asleep under the splash, it wakes as Conversas arrives (`useWake`). */
+  faceMode?: AgentMode;
+  /** The face's own motion (the hop as it wakes). */
+  faceStyle?: StyleProp<ViewStyle>;
+}) {
   const { t } = useTranslation();
-  const c = useColors();
   const surface = useSurface();
-  const fresh = rightHandSeen.useFresh(rightHandSeenKey(useMeId() ?? "", useOrgId()));
   if (row.kind !== "dm") return null;
-  const words = t("mobile.chat.messageTo", { name: row.with.name });
+  const invite = t("mobile.chat.messageTo", { name: row.with.name });
+  // Its own last words, unread: shown in place of the invitation (a reply from you keeps the invitation).
+  const theirs =
+    row.unread > 0 && row.last && row.last.author?.type === row.with.type && row.last.author.id === row.with.id
+      ? previewBody(t, row.last.text, row.last.meta ?? null, row.last.mediaKind)
+      : "";
+  const words = theirs ? `${row.with.name}: ${theirs}` : invite;
   const open = () => {
     if (!row.channelId) onStart(row.with.id);
     else router.push(chatHref(row.channelId));
@@ -32,30 +49,28 @@ export function RightHandAsk({ row, onStart }: { row: ConversationRow; onStart: 
       onPress={open}
       accessibilityRole="button"
       accessibilityLabel={words}
+      accessibilityHint={theirs ? invite : undefined}
       style={({ pressed }) => [styles.field, surface, pressed && styles.pressed]}
     >
-      <AgentFace agentId={row.with.id} size={FACE} />
-      <Text variant="body" tone="faint" numberOfLines={1} style={styles.grow}>
+      <Animated.View style={faceStyle}>
+        <AgentFace agentId={row.with.id} size={FACE} mode={faceMode} />
+      </Animated.View>
+      <Text variant="body" tone={theirs ? "ink" : "faint"} numberOfLines={1} style={styles.grow}>
         {words}
       </Text>
-      {row.unread > 0 ? (
-        <Count value={row.unread} max={99} inverted />
-      ) : fresh ? (
-        <View style={[styles.dot, { backgroundColor: c.badge }]} />
-      ) : null}
     </Pressable>
   );
 }
 
-/** The field's height and its face: the face sits as far from the left edge as from the top and bottom. */
+/** The field's height and its face (framed in its sky at 36): the face sits as far from the left edge as from the top and bottom. */
 const HEIGHT = 52;
-const FACE = 34;
+const FACE = 36;
 
 const styles = StyleSheet.create({
   field: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     minHeight: HEIGHT,
     paddingLeft: (HEIGHT - FACE) / 2,
     paddingRight: 14,
@@ -64,6 +79,5 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   grow: { flex: 1, minWidth: 0 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
   pressed: { opacity: 0.85 },
 });

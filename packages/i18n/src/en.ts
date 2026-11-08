@@ -12854,8 +12854,8 @@ export const en = {
         /** The words of every message, in every look, smallest step first. */
         textSize: "Text size",
         textSizeHelp: "Of messages, in every conversation and on all your devices",
-        /** On the phone, under the steps: the system's own text size still applies on top. */
-        textSizePhone: "Your phone's own text size setting applies too",
+        /** On the phone, under the text size slider: the choice sizes the whole app, on top of the system's own setting. */
+        textSizePhone: "Applies to the whole app, on top of your phone's text size",
         textXs: "Smaller",
         textSm: "Small",
         textMd: "Default",

@@ -47,6 +47,8 @@ export type ConversationRow =
       unread: number;
       /** Unread mentions of me: the row's number, as on the web (even while muted). */
       mentions: number;
+      /** I muted it (it never looks unread): the swipe offers to turn it back on. Only set when true. */
+      muted?: boolean;
     }
   | {
       kind: "dm";
@@ -196,6 +198,7 @@ export function buildConversations(input: {
       at: last?.createdAt ?? null,
       unread: looksUnread(c) ? Math.max(0, c.unreadCount ?? 0) : 0,
       mentions: Math.max(0, c.mentionCount ?? 0),
+      ...(c.muted ? { muted: true } : {}),
     });
   }
   return rows.sort((a, b) => {
@@ -479,12 +482,18 @@ export type ThreadSection = (typeof THREAD_SECTIONS)[number];
 
 type ThreadRow = Extract<ConversationRow, { kind: "thread" | "mission" }>;
 
-/** Missões, then Threads, each by latest activity; empty ones left out. */
+/**
+ * Missões, then Threads, each by latest activity; empty ones left out. A closed thread goes after the open ones (the
+ * row carries no "closed" mark: its place says it), and a finished mission after the live ones likewise.
+ */
 export function threadSections(rows: ConversationRow[]): { key: ThreadSection; rows: ThreadRow[] }[] {
   const all = threadRows(rows).filter((r): r is ThreadRow => r.kind === "thread" || r.kind === "mission");
+  const over = (r: ThreadRow) =>
+    r.kind === "thread" ? r.closed : r.mission?.status === "done" || r.mission?.status === "canceled";
+  const settle = (list: ThreadRow[]) => [...list.filter((r) => !over(r)), ...list.filter(over)];
   return [
-    { key: "missions" as const, rows: all.filter((r) => r.kind === "mission") },
-    { key: "threads" as const, rows: all.filter((r) => r.kind === "thread") },
+    { key: "missions" as const, rows: settle(all.filter((r) => r.kind === "mission")) },
+    { key: "threads" as const, rows: settle(all.filter((r) => r.kind === "thread")) },
   ].filter((s) => s.rows.length > 0);
 }
 

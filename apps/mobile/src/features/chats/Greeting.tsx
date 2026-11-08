@@ -3,15 +3,16 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, CARD_PAD, Card, Icon, SCREEN_X, Sky, Text, WorkspaceSky } from "@/ui";
+import { AgentAvatar, Button, CARD_PAD, Card, Icon, PixelOrbit, SCREEN_X, Sky, Text, WorkspaceSky } from "@/ui";
 import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory } from "../shared/hooks";
-import { firstName, greetingKey } from "../shared/logic";
+import { agentLook, firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { FIRST_AGENT_EXAMPLES } from "./examples";
+import { Arrive } from "./HomeEntrance";
 import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
 /** The look of an agent still to be born (the new-agent sheet and the empty state). */
@@ -25,10 +26,10 @@ function useGreeting() {
   return name ? t(`mobile.home.greeting.${greetingKey()}`, { name }) : t(`mobile.home.hello.${greetingKey()}`);
 }
 
-/** Faces in the line's groups (who works, or everyone resting); the rest is the count. */
-const FACES = 4;
-/** The faces in the line: the size of its text, each in its own sky tile. */
+/** The face in the line (what one finished): the size of its text, in its own sky tile. */
 const FACE = 18;
+/** The orbit before who works: the line's own height, so it reads as a word of it. */
+const ORBIT = 16;
 
 /** Opens Agentes (who is working, doing what). */
 const openAgents = () => router.navigate("/agents");
@@ -47,15 +48,17 @@ export function GreetingSky() {
 
 /**
  * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Ana", then, only when there
- * is news, one short line with the agents' own faces in it: what one finished (its face before its name; opens where
- * it happened), else who works now (their faces, working, before the count; opens Agentes; the list below says what
- * each does). Nobody at work: the greeting alone. `after` follows on the sky (the right hand's field).
+ * is news, one short line: what one finished (its face before its name; opens where it happened), else who works
+ * now: the pixel orbit of the one at work and "Ada está trabalhando", or the orbit and how many when several are
+ * (opens Agentes; the list below says what each does). One mark, not a pile of faces: the list already shows them.
+ * Nobody at work: the greeting alone. `after` follows on the sky (the right hand's field).
  */
 export function Greeting({
   working,
   finished,
   onFinishedPress,
   after,
+  arrive = { armed: false, play: false },
 }: {
   working: readonly string[];
   /** The newest thing an agent finished (null: nothing new). */
@@ -64,12 +67,21 @@ export function Greeting({
   onFinishedPress?: (f: FinishedItem) => void;
   /** Under it, on the sky: the way to ask the right hand (`RightHandAsk`). */
   after?: ReactNode;
+  /** Conversas' arrival after the splash (`useHomeEntrance`): the greeting's words rise first, `after` on its own. */
+  arrive?: { armed: boolean; play: boolean };
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const greeting = useGreeting();
   const line = greetingLine(finished, working.length);
-  const workingText = line.kind === "working" ? t("mobile.chats.workingNowLine", { count: line.working }) : "";
+  // One at work: its name; several: the count. The orbit takes the first one's tones.
+  const firstWorking = working[0] ? dir.agentById.get(working[0]) : undefined;
+  const workingText =
+    line.kind !== "working"
+      ? ""
+      : line.working === 1 && firstWorking
+        ? t("mobile.chats.workingOne", { name: firstWorking.name })
+        : t("mobile.chats.workingNowLine", { count: line.working });
   const finishedName = line.kind === "finished" ? (dir.agentById.get(line.finished.agentId)?.name ?? "") : "";
   const finishedText =
     line.kind === "finished" ? t(finishedKey(line.finished), { what: line.finished.what ?? "" }) : "";
@@ -79,7 +91,7 @@ export function Greeting({
   };
   const workingPart = (
     <View style={styles.part}>
-      {working.length > 0 ? <Faces ids={working} mode="run" /> : null}
+      <PixelOrbit color={agentLook(firstWorking).color} size={ORBIT} />
       <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
         {workingText}
       </Text>
@@ -87,57 +99,46 @@ export function Greeting({
   );
   return (
     <View style={styles.mini}>
-      <Text variant="body" tone="ink2" numberOfLines={1}>
-        {greeting}
-      </Text>
-      {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
-      {line.kind === "idle" ? null : (
-        <View style={styles.line}>
-          {line.kind === "finished" ? (
-            <Pressable
-              onPress={() => openFinished(line.finished)}
-              accessibilityRole="button"
-              accessibilityLabel={`${finishedName} ${finishedText}`}
-              hitSlop={13}
-              style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
-            >
-              <AgentFace agentId={line.finished.agentId} size={FACE} framed />
-              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-                {finishedName ? (
-                  <Text variant="footnote" tone="ink2" style={styles.bold}>
-                    {`${finishedName} `}
-                  </Text>
-                ) : null}
-                {finishedText}
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={openAgents}
-              accessibilityRole="button"
-              accessibilityLabel={workingText}
-              hitSlop={13}
-              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
-            >
-              {workingPart}
-            </Pressable>
-          )}
-        </View>
-      )}
+      <Arrive {...arrive} rise={12} duration={520}>
+        <Text variant="body" tone="ink2" numberOfLines={1}>
+          {greeting}
+        </Text>
+        {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
+        {line.kind === "idle" ? null : (
+          <View style={styles.line}>
+            {line.kind === "finished" ? (
+              <Pressable
+                onPress={() => openFinished(line.finished)}
+                accessibilityRole="button"
+                accessibilityLabel={`${finishedName} ${finishedText}`}
+                hitSlop={13}
+                style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+              >
+                <AgentFace agentId={line.finished.agentId} size={FACE} framed />
+                <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                  {finishedName ? (
+                    <Text variant="footnote" tone="ink2" style={styles.bold}>
+                      {`${finishedName} `}
+                    </Text>
+                  ) : null}
+                  {finishedText}
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={openAgents}
+                accessibilityRole="button"
+                accessibilityLabel={workingText}
+                hitSlop={13}
+                style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
+              >
+                {workingPart}
+              </Pressable>
+            )}
+          </View>
+        )}
+      </Arrive>
       {after ? <View style={styles.after}>{after}</View> : null}
-    </View>
-  );
-}
-
-/** A few faces of the line, a little over each other (decorative: the line says who and how many). */
-function Faces({ ids, mode }: { ids: readonly string[]; mode: "run" | "rest" }) {
-  return (
-    <View style={styles.faces} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {ids.slice(0, FACES).map((id, i) => (
-        <View key={id} style={i > 0 ? styles.overlap : undefined}>
-          <AgentFace agentId={id} size={FACE} framed mode={mode} />
-        </View>
-      ))}
     </View>
   );
 }
@@ -218,14 +219,13 @@ const IDEA_GAP = 12;
 
 const styles = StyleSheet.create({
   sky: { opacity: 0.5 },
-  mini: { paddingHorizontal: SCREEN_X, paddingBottom: 16 },
+  // At the screen's sides, as the field under it and the list.
+  mini: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 16 },
   line: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  after: { marginTop: 14, marginHorizontal: -4 },
-  part: { flexDirection: "row", alignItems: "center", gap: 6 },
+  after: { marginTop: 16 },
+  part: { flexDirection: "row", alignItems: "center", gap: 8 },
   shrink: { flexShrink: 1 },
   pressed: { opacity: 0.6 },
-  faces: { flexDirection: "row" },
-  overlap: { marginLeft: -6 },
   empty: {
     marginHorizontal: 16,
     marginTop: 6,

@@ -40,9 +40,22 @@ function hostOf(url: string): string {
  * clouds drifting by, a server of one's own the same sky at dusk with a few stars (`@agenteschat/ui` sky/workspace,
  * drawn by the `workspace` shader). Tones 0..3 are the field's, 6 and 7 what is drawn over it.
  */
-export function WorkspaceSky({ fade = 0.55, style }: { fade?: number; style?: StyleProp<ViewStyle> }) {
+export function WorkspaceSky({
+  fade = 0.55,
+  fadeTop = 0,
+  host,
+  style,
+}: {
+  fade?: number;
+  /** Comes in from nothing down to this height share (a band mid-screen, never a hard top line); 0 = none. */
+  fadeTop?: number;
+  /** Another server's sky (where a connection leads, a workspace elsewhere: ADR 0154); the current server's by default. */
+  host?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { colors } = useTheme();
-  const hour = skyHourOf(hostOf(useServer()));
+  const current = useServer();
+  const hour = skyHourOf(host ?? hostOf(current));
   const tones = workspaceTones(hour, colors.bg);
   const ink = workspaceInk(hour, colors.bg);
   const deepest = tones[tones.length - 1] ?? colors.bg;
@@ -52,6 +65,7 @@ export function WorkspaceSky({ fade = 0.55, style }: { fade?: number; style?: St
       tones={[...tones, deepest, deepest, ink.dim, ink.bright]}
       pixel={4}
       fade={fade}
+      fadeTop={fadeTop}
       extra={{ hour: hour === "day" ? 0 : 1, top: tones.length - 1 }}
       style={style}
     />

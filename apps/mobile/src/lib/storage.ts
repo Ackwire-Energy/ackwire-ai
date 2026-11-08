@@ -52,12 +52,20 @@ export const STORED = {
   pushOff: "push-off",
   /** How many times our notifications sheet opened by itself (@agenteschat/client/lib/push-offer). */
   pushOffers: "push-offers",
+  /** The wiki pages last opened on this phone, per workspace (JSON: org id → slugs, newest first). */
+  wikiRecent: "wiki-recent",
+  /** When each workspace was last opened (JSON: org id → ms), for the channel's greeting of a new day (ADR 0090). */
+  channelVisits: "channel-visits",
+  /** The newcomers who closed their #general welcome (JSON list of "user:org"). */
+  arrivalClosed: "arrival-closed",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
   threadsCollapsed: "threads-collapsed",
   /** Agentes' groups the person collapsed, in every workspace (JSON list of group ids). */
   agentGroupsCollapsed: "agent-groups-collapsed",
+  /** The agent profile's tab last chosen (Hoje, Acesso, Memória): every profile opens on it (features/agents). */
+  agentProfileTab: "agent-profile-tab",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
   /** The request this phone made through a link, with the key that signs in once approved (features/auth/invite.ts). */
@@ -74,8 +82,12 @@ export const STORED = {
   conversationSearchRecent: "conversation-search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
+  /** The "Double tap = 👍" line under a message was shown once, or the person double tapped already ("1"). */
+  doubleTapTaught: "double-tap-taught",
   /** `<user id>.<org id>` entries (JSON list): the right hand's DM was opened there, so its "Novo" is gone. */
   rightHandSeen: "right-hand-seen",
+  /** The person held the send button to stop an agent and send once: the composer's hint is over ("1"). */
+  stopSendTaught: "stop-send-taught",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

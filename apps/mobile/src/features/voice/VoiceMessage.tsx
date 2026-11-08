@@ -13,9 +13,12 @@ import { Icon, PressScale, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { hasWords, nextSpeed } from "./logic";
 import { playingId, seekPlayback, setPlaybackSpeed, startPlayback, stopPlayback, subscribePlayback } from "./playback";
-import { barsPath, VoiceBars } from "./VoiceBars";
+import { PixelWave, wavePaths } from "./VoiceBars";
 
-const WAVE = 28;
+/** Six rows of the sky's cells. */
+const WAVE = 24;
+/** Past this many characters the first line is cut, so "Ver tudo" is offered without measuring the text. */
+const ONE_LINE = 40;
 /** The list recycles rows: what a message had open or where it stopped lives outside them. */
 const opened = new Set<string>();
 const positions = new Map<string, number>();
@@ -27,7 +30,7 @@ let speed = 1;
  * else; a tap opens the rest there. A recording the server no longer keeps stays as a dimmed wave with its words.
  */
 export const VoiceMessage = memo(function VoiceMessage({ message }: { message: Message }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const voice = voiceOf(message.meta);
@@ -36,7 +39,8 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
   const sending = Boolean(message.local);
   const playing = useSyncExternalStore(subscribePlayback, playingId) === clipId;
   const progress = useSharedValue(positions.get(clipId) ?? 0);
-  const path = useSharedValue(Skia.Path.Make());
+  const inner = useSharedValue(Skia.Path.Make());
+  const edge = useSharedValue(Skia.Path.Make());
   const [width, setWidth] = useState(0);
   const [time, setTime] = useState(durationMs);
   const [rate, setRate] = useState(speed);
@@ -53,8 +57,11 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
     setOpen(opened.has(message.id));
   }, [clipId, message.id]);
   useEffect(() => {
-    if (width > 0 && voice) path.value = barsPath(voice.peaks, width, WAVE);
-  }, [width, voice, path]);
+    if (width <= 0 || !voice) return;
+    const wave = wavePaths(voice.peaks, width, WAVE);
+    inner.value = wave.inner;
+    edge.value = wave.edge;
+  }, [width, voice, inner, edge]);
 
   const report = (at: number) => {
     progress.value = at;
@@ -134,6 +141,12 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
   const scrub = useExclusiveGestures(pan, tap);
 
   const words = useMemo(() => hasWords(message), [message]);
+  // The speed as the language writes it ("1,5×" in Portuguese).
+  const speedFormat = useMemo(
+    () => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }),
+    [i18n.language],
+  );
+  const more = words && !open && (message.body.length > ONE_LINE || message.body.includes("\n"));
   if (!voice) return null;
   return (
     <View style={styles.box}>
@@ -150,16 +163,17 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
               style={[styles.play, { backgroundColor: canPlay ? c.ink : c.sunken }]}
             >
               <View style={styles.center}>
-                <Icon name={playing ? "pause" : "play"} size={15} color={canPlay ? c.bg : c.muted} />
+                <Icon name={playing ? "pause" : "play"} size={14} color={canPlay ? c.bg : c.muted} />
               </View>
             </PressScale>
           )}
           <GestureDetector gesture={scrub}>
             <View style={[styles.wave, gone && styles.dim]} accessible={false}>
-              <VoiceBars
-                path={path}
+              <PixelWave
+                inner={inner}
+                edge={edge}
                 progress={progress}
-                on={c.ink}
+                tones={[c.ink, c.ink]}
                 off={gone ? c.line2 : c.faint}
                 onWidth={setWidth}
                 height={WAVE}
@@ -185,7 +199,7 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
               style={({ pressed }) => [styles.speed, { backgroundColor: c.sunken }, pressed && styles.pressed]}
             >
               <Text variant="caption" tone="muted" style={styles.speedText}>
-                {`${rate}×`}
+                {`${speedFormat.format(rate)}×`}
               </Text>
             </Pressable>
           ) : null}
@@ -202,6 +216,11 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
             <Text variant="small" tone="muted" numberOfLines={open ? undefined : 1} selectable={open}>
               {message.body}
             </Text>
+            {more ? (
+              <Text variant="footnote" tone="faint" numberOfLines={1}>
+                {t("mobile.voice.seeAll")}
+              </Text>
+            ) : null}
           </Pressable>
         ) : null}
       </View>
@@ -221,22 +240,23 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  player: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34 },
-  play: { width: 34, height: 34, borderRadius: 17 },
+  player: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 28 },
+  play: { width: 28, height: 28, borderRadius: 14 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   wave: { flex: 1, minWidth: 0, height: WAVE, flexDirection: "row" },
   dim: { opacity: 0.5, marginLeft: 6 },
   time: { minWidth: 30, textAlign: "right", fontVariant: ["tabular-nums"] },
+  // A count chip: the number on a sunken pill.
   speed: {
-    height: 24,
+    height: 22,
     minWidth: 32,
-    paddingHorizontal: 6,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   speedText: { fontVariant: ["tabular-nums"], fontWeight: "600" },
   pressed: { opacity: 0.6 },
-  // Under the wave, past the play button.
-  words: { paddingLeft: 42, paddingBottom: 2 },
+  // Under the wave, past the play button; "Ver tudo" on its own line below the words.
+  words: { paddingLeft: 38, paddingBottom: 2, gap: 2 },
 });

@@ -58,11 +58,12 @@ import {
   useApproveNow,
   useCancelAhead,
   useOriginShort,
+  useRefuseApproval,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { genderOf } from "../shared/logic";
+import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -110,6 +111,19 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
   return <ApprovalDone approval={a} />;
 }
 
+/** Approvals whose burst already played: a pill scrolling back into view, or remounted, stays quiet. */
+const celebrated = new Set<string>();
+/** How fresh a decision still bursts: the card turning into the pill, not an old one loading. */
+const CELEBRATE_MS = 10_000;
+
+/** The agent's color when I approved this one just now and it hasn't burst yet; null otherwise. */
+function celebrationFor(a: Approval, meId: string | null, color: string): string | null {
+  if (a.status !== "approved" || !meId || a.decidedByUserId !== meId || !a.decidedAt) return null;
+  if (celebrated.has(a.id) || Date.now() - new Date(a.decidedAt).getTime() > CELEBRATE_MS) return null;
+  celebrated.add(a.id);
+  return color;
+}
+
 /**
  * One decided request, as the conversation's event pill: how it ended and what it did ("Approved by you: Generate
  * image"), when it was decided; its values (so several of one tool are told apart), when it goes out if approved
@@ -121,6 +135,8 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
   const dir = useDirectory();
   const when = useWhen();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
+  // Approved by me a moment ago (the card turning into this pill): the check bursts once in the agent's tones.
+  const [celebrate] = useState(() => celebrationFor(a, meId, agentLook(dir.anyAgent(a.agentId)).color));
   // Approved ahead and still to run: when it goes out, said under its pill, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
@@ -133,6 +149,7 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
     <AskDone
       done={a.status === "approved"}
       words={`${outcome}: ${markName(approvalHeadline(t, a, i18n.language))}`}
+      celebrate={celebrate}
       time={a.decidedAt ? when.short(a.decidedAt) : undefined}
       actions={
         scheduled && a.canCancel ? (
@@ -429,6 +446,8 @@ function ApprovalGroupItem({
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
+  // "Recusar" asks once, in the system's alert, as the card of one request does.
+  const { refuse, pending: refusing } = useRefuseApproval(a);
   return (
     <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
       <View style={styles.itemRow}>
@@ -467,18 +486,18 @@ function ApprovalGroupItem({
                 <Button
                   variant="primary"
                   size="card"
-                  icon="check"
                   label={t("mobile.approval.approve")}
-                  disabled={busy}
+                  disabled={busy || refusing}
                   onPress={onApprove}
                 />
               )}
-              {always ? <ApproveAlwaysButton approval={a} disabled={busy} onPress={onAlways} /> : null}
+              {always ? <ApproveAlwaysButton approval={a} disabled={busy || refusing} onPress={onAlways} /> : null}
               <Button
                 variant="secondary"
                 size="card"
-                label={t("approval.notNow")}
-                onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+                label={t("mobile.approval.refuse")}
+                disabled={busy || refusing}
+                onPress={refuse}
               />
             </View>
           ) : null}
@@ -531,12 +550,13 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const c = useColors();
   const asks = useAskStore();
   const origin = useOriginShort(a);
-  const name = dir.agentById.get(a.agentId)?.name ?? "";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const requester = requesterDecidesLine(t, a);
-  // The same approving as Atividade's card: the haptic, the toast saying what follows.
+  // The same approving as Atividade's card: the haptic, the toast saying what follows; refusing asks once, in the
+  // system's alert, with the reason optional.
   const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
+  const { refuse, pending: refusing } = useRefuseApproval(a, () => asks?.settle(a.id));
   // A connector's detail is its raw call (`tool · key=value`), so its values in words instead, the call under "Ver
   // detalhes". An email's preview says to whom and about what: its line says only where it goes from.
   const source = useApprovalSource(a);
@@ -550,6 +570,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
     <AskCard
       id={a.id}
       kind="approval"
+      // A request that leaves the workspace (an e-mail, a post, a payment) says so before anything else.
+      kindNote={high ? t("mobile.approval.leaves") : undefined}
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? approvalAskLine(t, a.canDecide)}
@@ -592,30 +614,28 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       foot={
         <AskFoot>
           {a.canDecide ? (
-            <>
-              <View style={styles.itemActs}>
-                {high ? (
-                  <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="card"
-                    icon="check"
-                    label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
-                    disabled={pending}
-                    onPress={() => approve()}
-                  />
-                )}
-                <ApproveAlwaysButton approval={a} disabled={pending} onPress={() => approve(true)} />
+            // Aprovar and Recusar, the same two words as everywhere the request shows; "Aprovar sempre" is a switch
+            // in the request's sheet, not a third button here.
+            <View style={styles.itemActs}>
+              {high ? (
+                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
+              ) : (
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="card"
-                  label={t("approval.notNow")}
-                  onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+                  label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
+                  disabled={pending || refusing}
+                  onPress={() => approve()}
                 />
-              </View>
-              <ApproveAlwaysHint approval={a} name={name} />
-            </>
+              )}
+              <Button
+                variant="secondary"
+                size="card"
+                label={t("mobile.approval.refuse")}
+                disabled={pending || refusing}
+                onPress={refuse}
+              />
+            </View>
           ) : owner ? null : (
             <Text variant="small" tone="muted">
               {t("approval.waitingAdmin")}

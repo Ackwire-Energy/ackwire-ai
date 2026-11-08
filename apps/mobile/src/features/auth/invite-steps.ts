@@ -2,21 +2,23 @@ import { ApiError, type InvitationPreview, type JoinClaim } from "@agenteschat/c
 import type { HumanAction } from "@agenteschat/client/lib/human-check";
 import { isInviteToken } from "./links";
 
-/** Asking through a link, signed out, where email goes out (ADR 0090 §1): one question per screen, in this order. */
-export type AskStep = "email" | "code" | "name" | "password" | "note";
+/**
+ * Asking through a link, signed out, where email goes out (ADR 0090 §1): three screens. The e-mail, the code from it
+ * on its own, then everything about the person at once (name, password, an optional word for whoever approves) under
+ * one button. Five screens, one field each, made a request to join feel like a form.
+ */
+export type AskStep = "email" | "code" | "you";
 
-export const ASK_STEPS: readonly AskStep[] = ["email", "code", "name", "password", "note"];
+export const ASK_STEPS: readonly AskStep[] = ["email", "code", "you"];
 
-/** "Passo n de 5". */
+/** "1 de 3". */
 export const askProgress = (step: AskStep) => ({ n: ASK_STEPS.indexOf(step) + 1, total: ASK_STEPS.length });
 
 /** Where Back goes from each step: past the code, which a proven address doesn't type again; null leaves the screen. */
 const ASK_BACK: Record<AskStep, AskStep | null> = {
   email: null,
   code: "email",
-  name: "email",
-  password: "name",
-  note: "password",
+  you: "email",
 };
 
 export const askBack = (step: AskStep) => ASK_BACK[step];

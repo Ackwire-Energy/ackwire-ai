@@ -6,10 +6,8 @@ import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
 import { earlyAccessRequests, socialRefusalText, socialReturnText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
-import { readValueSync, writeValue } from "@/lib/storage";
+import { writeValue } from "@/lib/storage";
 import { Button } from "../Button";
-import { Icon } from "../Icon";
-import { Text } from "../Text";
 import { useTheme } from "../theme";
 import { OrDivider } from "./AuthLink";
 import { SocialMark } from "./SocialMarks";
@@ -17,8 +15,8 @@ import { SocialMark } from "./SocialMarks";
 const ORDER: SignInProvider[] = ["apple", "google", "github"];
 
 /**
- * How this phone signed in last ("Último usado"). Kept out of `STORED` on purpose: signing out clears
- * those, and this one is for the next sign-in.
+ * How this phone signed in last. Kept out of `STORED` on purpose: signing out clears those, and this one is for the
+ * next sign-in.
  */
 const LAST_SIGN_IN = "last-sign-in";
 export const rememberSignIn = (method: SignInProvider | "email") => void writeValue(LAST_SIGN_IN, method);
@@ -32,21 +30,22 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
 }
 
 /**
- * "Continue with Apple/Google/GitHub" for the given providers with their marks (as on the web), the last one
- * used marked.
- * On iOS, Apple uses the system button (Apple's rules) and a native sign-in sent to the server as an
- * ID token; the others go through the system browser and back on `agenteschat://`. A refusal there shows on the
- * server's sign-in page in that browser (apps/server auth.ts `onAPIError`).
+ * Apple full width (the system's button on iOS, Apple's rules), then Google and GitHub side by side in one row, each
+ * with its mark and only its name: three stacked "Continuar com …" buttons under the e-mail's own were the tallest
+ * thing on the screen. On iOS, Apple's native sign-in is sent to the server as an ID token; the others go through the
+ * system browser and back on `agenteschat://`. A refusal there shows on the server's sign-in page in that browser
+ * (apps/server auth.ts `onAPIError`).
  */
 export function SocialButtons({
   providers,
-  divider = true,
+  divider = false,
   onError,
   callbackURL = "/",
   onSignedIn,
   earlyAccess,
 }: {
   providers: SignInProvider[];
+  /** A thin "ou" above (off by default: a 8-point gap under the main answer is enough). */
   divider?: boolean;
   /** `email`: the address Apple's native sign-in was refused for (its ID token's), which the field may not hold. */
   onError: (message: string, email?: string) => void;
@@ -63,7 +62,6 @@ export function SocialButtons({
   const { scheme } = useTheme();
   const [nativeApple, setNativeApple] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [last] = useState(() => readValueSync(LAST_SIGN_IN));
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
@@ -116,56 +114,59 @@ export function SocialButtons({
     }
   };
 
-  const label: Record<SignInProvider, string> = {
+  const apple = providers.includes("apple");
+  const others = providers.filter((p) => p !== "apple");
+  // Alone in its row a provider says the whole sentence; beside another, only its name (the mark says the rest).
+  const full: Record<SignInProvider, string> = {
     google: t("auth.continueWithGoogle"),
     github: t("auth.continueWithGithub"),
     apple: t("auth.continueWithApple"),
   };
+  const label = (p: SignInProvider, short: boolean) => (short ? t(`auth.provider.${p}`) : full[p]);
 
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 8 }}>
       {divider ? <OrDivider label={t("mobile.common.or")} /> : null}
-      {providers.map((p) => (
-        <View key={p}>
-          {p === "apple" && nativeApple ? (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-              buttonStyle={
-                scheme === "dark"
-                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-              }
-              cornerRadius={15}
-              style={{ height: 48, alignSelf: "stretch" }}
-              onPress={() => void appleNative()}
-            />
-          ) : (
-            <Button
-              variant="secondary"
-              wide
-              leading={(color) => <SocialMark provider={p} color={color} />}
-              label={label[p]}
-              disabled={busy}
-              onPress={() => void browser(p)}
-            />
-          )}
-          {last === p ? <LastUsed /> : null}
+      {apple ? (
+        nativeApple ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={
+              scheme === "dark"
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+            }
+            cornerRadius={15}
+            style={{ height: 48, alignSelf: "stretch" }}
+            onPress={() => void appleNative()}
+          />
+        ) : (
+          <Button
+            variant="secondary"
+            wide
+            leading={(color) => <SocialMark provider="apple" color={color} />}
+            label={label("apple", false)}
+            disabled={busy}
+            onPress={() => void browser("apple")}
+          />
+        )
+      ) : null}
+      {others.length > 0 ? (
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {others.map((p) => (
+            <View key={p} style={{ flex: 1 }}>
+              <Button
+                variant="secondary"
+                wide
+                leading={(color) => <SocialMark provider={p} color={color} />}
+                label={label(p, others.length > 1)}
+                disabled={busy}
+                onPress={() => void browser(p)}
+              />
+            </View>
+          ))}
         </View>
-      ))}
-    </View>
-  );
-}
-
-/** "Último usado": a quiet line under the button this phone used last. */
-function LastUsed() {
-  const { t } = useTranslation();
-  const { colors } = useTheme();
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "center", marginTop: 2 }}>
-      <Icon name="clock" size={12} color={colors.muted} />
-      <Text variant="caption" tone="muted">
-        {t("auth.lastUsed")}
-      </Text>
+      ) : null}
     </View>
   );
 }

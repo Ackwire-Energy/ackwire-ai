@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
-import { Platform, Text as RNText, type TextProps as RNTextProps, type TextStyle } from "react-native";
+import { Platform, Text as RNText, type TextProps as RNTextProps, StyleSheet, type TextStyle } from "react-native";
+import { useTextScale } from "./text-scale";
 import { useTheme } from "./theme";
 import {
   CHROME_MAX_SCALE,
   type OS,
   readingMiddle,
+  scaleMetrics,
   type TypeStyle,
   typeStyle,
   type Weight,
@@ -58,6 +60,22 @@ export function systemText(style: TypeStyle, fontWeight?: Weight): TextStyle {
  */
 export function fieldText(style: TypeStyle, fontWeight?: Weight): TextStyle {
   const { lineHeight: _drop, ...rest } = typeStyle(os, style, fontWeight);
+  return rest;
+}
+
+/**
+ * `systemText` grown by the person's text size (`useTextScale`), for what people write and read as content in a raw
+ * `TextInput` (a text area, a note). Chrome (buttons, chips, the search bar) keeps `systemText`.
+ */
+export function useSystemText(style: TypeStyle, fontWeight?: Weight): TextStyle {
+  const k = useTextScale();
+  const base = typeStyle(os, style, fontWeight);
+  return k === 1 ? base : { ...base, ...scaleMetrics(base.fontSize, base.lineHeight, k) };
+}
+
+/** `useSystemText` for a one-line field: no line height, as `fieldText`. */
+export function useFieldText(style: TypeStyle, fontWeight?: Weight): TextStyle {
+  const { lineHeight: _drop, ...rest } = useSystemText(style, fontWeight);
   return rest;
 }
 
@@ -115,15 +133,31 @@ export function textLineOf(
   return { height, middle: readingMiddle(fontSize, height) };
 }
 
-/** Text in the design system's scale and tones. Names stay in ink; counts use `Count`. */
+/**
+ * Text in the design system's scale and tones. Names stay in ink; counts use `Count`.
+ *
+ * The person's text size (`useTextScale`) grows the variant's size and line. Text that sets its own `fontSize` keeps it
+ * (a conversation's words follow `CHAT_TEXT`, which already has the same steps; a drawn mark sizes itself). A cap
+ * (`maxFontSizeMultiplier`, or the variant's) bounds the two together: the app's step first, the system's text size
+ * only as far as the rest of the cap; a cap of 1 (fixed chrome) takes neither.
+ */
 export function Text({ variant = "body", tone, style, maxFontSizeMultiplier, ...rest }: TextProps) {
   const { colors } = useTheme();
+  const appScale = useTextScale();
   const color = colors[tone ?? DEFAULT_TONE[variant]];
+  const cap = maxFontSizeMultiplier ?? MAX_SCALE[variant];
+  const own = appScale === 1 ? null : StyleSheet.flatten(style);
+  const fixed = own?.fontSize != null || (cap != null && cap > 0 && cap <= 1);
+  const k = appScale === 1 || fixed ? 1 : cap != null && cap > 0 ? Math.min(appScale, cap) : appScale;
+  const base = variantStyle(variant);
+  const sized = k === 1 ? base : { ...base, ...scaleMetrics(base.fontSize ?? 17, base.lineHeight ?? 22, k) };
+  // A line set over the variant (and no size of its own) grows with the size, or the letters clip.
+  const line = k !== 1 && own?.lineHeight != null ? { lineHeight: Math.round(own.lineHeight * k) } : null;
   return (
     <RNText
       {...rest}
-      maxFontSizeMultiplier={maxFontSizeMultiplier ?? MAX_SCALE[variant]}
-      style={[variantStyle(variant), { color }, style]}
+      maxFontSizeMultiplier={k !== 1 && cap != null && cap > 0 ? Math.max(1, cap / k) : cap}
+      style={[sized, { color }, style, line]}
     />
   );
 }

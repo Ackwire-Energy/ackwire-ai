@@ -166,7 +166,7 @@ describe("what agents did under each reply: the person's own setting, off by def
 
   test("Você has the row and its page, and a secret request's card shows without its text", () => {
     const me = readFileSync(join(import.meta.dir, "../../src/features/me/MeScreen.tsx"), "utf8");
-    expect(me).toContain('href: "/me/activity"');
+    expect(me).toContain('onPress={() => open("/me/activity")}');
     const route = readFileSync(join(import.meta.dir, "../../app/(app)/me/activity.tsx"), "utf8");
     expect(route).toContain("<ActivityPage />");
     expect(source("logic.ts")).toMatch(/hidesBody = [^;]*secretRequestOf\(m\.meta\)/);
