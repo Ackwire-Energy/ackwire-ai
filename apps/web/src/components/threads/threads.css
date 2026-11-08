@@ -230,12 +230,13 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
 .thread-title {
   min-width: 0;
 }
-/* A question between two agents opened in the same panel: "Theo ⇄ Iris", the arrows quiet between the names. */
+/* A question between two agents opened in the same panel: "Theo ⇄ Iris", one line of words that wraps as words do,
+   the arrows quiet between the names, on their capitals. */
 .consult-title {
-  gap: 6px;
+  display: block;
 }
 .consult-title > .ac-icon {
-  flex: none;
+  margin-inline: 6px;
   color: var(--faint);
 }
 /* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
