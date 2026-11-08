@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes } from "node:crypto";
 import { deflateSync, gzipSync } from "node:zlib";
 import {
   DELETE_BRANCHES_POINTER,
@@ -17,6 +17,7 @@ import {
   createToolGateway,
   decideApproval,
   drainOutbox,
+  type GitHubAppConfig,
   type GitProxyDeps,
   getAgentAccess,
   handleGitProxy,
@@ -34,6 +35,7 @@ import {
   readPack,
   refRule,
   removeApprovalRule,
+  SIGNATURE_MARK,
   setAgentAccess,
   setAgentComputerTarget,
   setAgentHold,
@@ -229,15 +231,24 @@ function fakeGitHub(
     down?: boolean;
     /** Branches GitHub won't delete (422). */
     keep?: string[];
+    /** Our GitHub App on acme (installation 5), without these permissions (asking for one is a 422). */
+    app?: { lacks: string[] };
   } = {},
 ) {
-  const calls: { url: string; method: string; auth: string | null; body: number }[] = [];
+  const calls: { url: string; method: string; auth: string | null; body: number; text?: string }[] = [];
   const apiUrl = "https://api.github.test";
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const headers = new Headers(init?.headers);
     const body = init?.body ? ((init.body as Uint8Array).byteLength ?? 0) : 0;
-    calls.push({ url, method: init?.method ?? "GET", auth: headers.get("authorization"), body });
+    const text = typeof init?.body === "string" ? init.body : undefined;
+    calls.push({ url, method: init?.method ?? "GET", auth: headers.get("authorization"), body, text });
+    if (options.app && /\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 5 });
+    if (options.app && url.endsWith("/app/installations/5/access_tokens")) {
+      const asked = Object.keys((JSON.parse(text ?? "{}") as { permissions?: object }).permissions ?? {});
+      if (asked.some((p) => options.app?.lacks.includes(p))) return Response.json({ message: "no" }, { status: 422 });
+      return Response.json({ token: "ghs_app", expires_at: new Date(Date.now() + 3600_000).toISOString() });
+    }
     const api = url.startsWith(`${apiUrl}/repos/acme/app/`) ? url.slice(`${apiUrl}/repos/acme/app/`.length) : "";
     const named = (prefix: string) =>
       api.startsWith(prefix) ? api.slice(prefix.length).split("/").map(decodeURIComponent).join("/") : null;
@@ -966,5 +977,60 @@ describe("the computer", () => {
     expect(pr?.content).toContain("https://github.com/acme/app/pull/7");
     const post = github.calls.find((c) => c.method === "POST");
     expect(post?.auth).toBe(`Bearer ${GH_TOKEN}`);
+    // Signed for the person who asked (ADR 0156), though the model wrote no body.
+    expect(JSON.parse(post?.text ?? "{}").body).toBe(
+      `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no agentes.chat</sub>`,
+    );
+  });
+});
+
+describe("the git proxy and the GitHub App (ADR 0156)", () => {
+  const APP: GitHubAppConfig = {
+    appId: "123",
+    privateKey: generateKeyPairSync("rsa", { modulusLength: 2048 })
+      .privateKey.export({ type: "pkcs1", format: "pem" })
+      .toString(),
+  };
+  const bind = () =>
+    f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 5, accountLogin: "acme", accountType: "Organization" });
+
+  test("a push goes with the app's token, asking for workflow files first and contents alone where not granted", async () => {
+    const app = { lacks: [] as string[] };
+    const w = await world(undefined, fakeGitHub({ app }));
+    await bind();
+    w.deps.app = APP;
+    const push = async (repo: string) => {
+      const a = commitObject([], `base ${repo}`);
+      const res = await w.call(`${repo}.git/git-receive-pack`, {
+        method: "POST",
+        body: pushBody([{ old: ZERO_OID, new: a.oid, ref: "refs/heads/agentes/dev/ci" }], packOf([a])),
+      });
+      expect(await res.text()).toContain("unpack ok");
+      return w.github.calls
+        .filter((c) => c.url.endsWith("/access_tokens"))
+        .map((c) => JSON.parse(c.text ?? "{}").permissions);
+    };
+    expect(await push("acme/app")).toEqual([{ contents: "write", workflows: "write" }]);
+    const upstream = w.github.calls.find((c) => c.url.endsWith("/git-receive-pack"));
+    expect(upstream?.auth).toBe(`Basic ${Buffer.from("x-access-token:ghs_app").toString("base64")}`);
+    w.github.calls.length = 0;
+    app.lacks = ["workflows"];
+    expect(await push("acme/ci")).toEqual([{ contents: "write", workflows: "write" }, { contents: "write" }]);
+  });
+
+  test("GitHub through the app alone: a repository the app isn't on is refused with the way out", async () => {
+    const w = await world(undefined, fakeGitHub({ app: { lacks: [] } }));
+    await bind();
+    w.deps.app = APP;
+    await f.db
+      .update(schema.connectorConnections)
+      .set({ authType: "github_app", secretCiphertext: null, wrappedDataKey: null, kekId: null })
+      .where(eq(schema.connectorConnections.id, w.connection.id));
+    const refused = await w.call("other/thing.git/info/refs", { query: "?service=git-upload-pack" });
+    expect(refused.status).toBe(403);
+    expect(await refused.text()).toContain("isn't installed on other/thing");
+    expect((await w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(200);
   });
 });

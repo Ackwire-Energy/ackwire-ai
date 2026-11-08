@@ -671,7 +671,8 @@ internet instead, and need it public:
 
 - Routines started by a GitHub or Sentry webhook (the address the routine shows, `/api/webhooks/…`).
 - Routines started by a webhook of their own (the address on the routine's page, `/api/hooks/…`).
-- A GitHub App's events (`/api/github-app/webhook`, with `GITHUB_APP_*`).
+- A GitHub App's events (`/api/github-app/webhook`). Optional: without them, the GitHub panel in
+  **Settings → Connectors** checks the installations with GitHub when it opens.
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
 - AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
@@ -965,6 +966,44 @@ without an OAuth app) or the GitHub App.
 </details>
 
 <details>
+<summary><b>GitHub as an app</b></summary>
+
+Connected with a person's GitHub account, agents open pull requests and comment as that person. With the
+GitHub App, they do it as the app: pull requests, issues, comments and commits come from the app's bot, each
+body ends with one line naming the agent and the person it works for, and commits credit that person
+(`Co-authored-by`) when they signed in with GitHub. Where the app isn't installed, the account connection is
+used, as before.
+
+There are two ways to set the app up:
+
+- **From Settings.** The server's owner opens **Settings → Connectors** and, on the card **This server's GitHub
+  app**, chooses **Create the app on GitHub**. GitHub creates the app under their GitHub account with everything
+  filled in, and sends them back; the app's keys are kept sealed in the database (they open only with this
+  `AGENTES_SECRET`). To own it under a GitHub organization, transfer it on GitHub afterwards. Only the server's
+  owner sees the card. The phone app's **Create in the browser** opens it on the web.
+- **With environment variables** (they win when set): register a GitHub App by hand and set `GITHUB_APP_ID`,
+  `GITHUB_APP_PRIVATE_KEY` (the PEM, raw or base64), `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`,
+  `GITHUB_APP_CLIENT_SECRET` and, with a webhook, `GITHUB_APP_WEBHOOK_SECRET`. Register it with:
+  - Callback URL `{PUBLIC_URL}/api/app/github-app/callback`, with **Request user authorization (OAuth) during
+    installation** on.
+  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
+    installations with GitHub when it opens.
+  - Repository permissions: Actions, Checks, Commit statuses, Contents, Issues, Pull requests and Workflows read and
+    write; Metadata read. Installable by any account.
+
+Then an admin of each workspace installs it on the repositories its agents may use: connecting GitHub offers
+**The agentes.chat app** first, and **GitHub repositories** in **Settings → Connectors** has **Install the agentes.chat
+app** (on the web and the phone). Each account it's installed on has **Manage on GitHub**, GitHub's page where that
+account's repositories are picked, and **Remove**, which also uninstalls the app from that GitHub account. Without a
+GitHub account connected, the app alone is the workspace's GitHub (**Connect a GitHub account** adds one). GitHub
+Projects need an account. Admins who aren't the server's owner are told the owner can create the app while it's
+missing. Only an installation made from a workspace's install links to it: one installed on GitHub directly, or
+approved there from a member's request, is refused until it is removed on GitHub and installed again from
+**Settings → Connectors**.
+
+</details>
+
+<details>
 <summary><b>Agent computers</b></summary>
 
 Agents run commands and code, drive a browser, and can think with Claude Code or Codex on a
@@ -979,7 +1018,7 @@ curl -fsSL https://chat.example.com/api/machines/install.sh | sh
 
 The computer must reach `PUBLIC_URL`: it downloads the runner from there, sends files back through
 it, and clones and pushes the agents' GitHub repositories through it.
-With a GitHub App set up (`GITHUB_APP_*`) and installed for a repository, agents' computers fetch
+With the GitHub App set up (GitHub as an app, above) and installed for a repository, agents' computers fetch
 that repository straight from github.com (a one-hour, read-only token for that repository alone)
 and still push through your server, so the computer must reach github.com too; without the App,
 clones go through your server. A computer runs at most two clones at once, and a clone goes on when

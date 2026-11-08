@@ -33,7 +33,11 @@ const GIPHY_DEVELOPERS = "https://developers.giphy.com/dashboard/";
 /** Save is on from this length, the shortest key the server takes. */
 const GIF_KEY_MIN = 8;
 
-const CHIP: Record<GifKey["state"], { icon?: IconName; tone?: ChipTone; word: "off" | "on" | "invalid" }> = {
+/** A server key's state as its card's chip (the GIPHY key's, the server's GitHub App's). */
+export const KEY_STATE_CHIP: Record<
+  GifKey["state"],
+  { icon?: IconName; tone?: ChipTone; word: "off" | "on" | "invalid" }
+> = {
   off: { word: "off" },
   ok: { icon: "check", tone: "done", word: "on" },
   invalid: { icon: "alert", tone: "waiting", word: "invalid" },
@@ -139,7 +143,7 @@ export function GifKeyCard({ jevMissing }: { jevMissing: boolean }) {
   });
   if (!view) return null;
   const env = view.source === "env";
-  const chip = CHIP[view.state];
+  const chip = KEY_STATE_CHIP[view.state];
   const close = () => {
     setSteps(null);
     setDraft("");

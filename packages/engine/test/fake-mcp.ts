@@ -7,7 +7,7 @@ import { type McpConnect, mcpSessionOver } from "../src";
  * An in-process MCP server shaped like GitHub's (no network). Records every
  * call and the auth headers each session was opened with.
  */
-export function fakeGithubMcp(options: { issueWrite?: boolean } = {}) {
+export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean } = {}) {
   const calls: { tool: string; args: Record<string, unknown> }[] = [];
   const sessions: { serverUrl: string; headers: Record<string, string> }[] = [];
   const pr = { owner: z.string(), repo: z.string(), pullNumber: z.number().int() };
@@ -55,6 +55,31 @@ export function fakeGithubMcp(options: { issueWrite?: boolean } = {}) {
           return { content: [{ type: "text", text: "Created issue #1" }] };
         },
       );
+    }
+    // What agents write on GitHub (ADR 0156): bodies, commit messages, an account-wide read and Projects.
+    if (options.writes) {
+      const repo = { owner: z.string(), repo: z.string() };
+      const tools: Record<string, Record<string, z.ZodType>> = {
+        add_issue_comment: { ...repo, issue_number: z.number(), body: z.string() },
+        update_issue_comment: { ...repo, comment_id: z.number(), body: z.string() },
+        issue_write: { ...repo, method: z.string(), title: z.string().optional(), body: z.string().optional() },
+        create_pull_request: {
+          ...repo,
+          title: z.string(),
+          head: z.string(),
+          base: z.string(),
+          body: z.string().optional(),
+        },
+        push_files: { ...repo, branch: z.string(), files: z.array(z.unknown()), message: z.string() },
+        list_issue_types: { owner: z.string() },
+        projects_list: { owner: z.string() },
+      };
+      for (const [name, inputSchema] of Object.entries(tools)) {
+        server.registerTool(name, { description: name, inputSchema }, async (args) => {
+          calls.push({ tool: name, args });
+          return { content: [{ type: "text", text: `${name} done` }] };
+        });
+      }
     }
     return server;
   };

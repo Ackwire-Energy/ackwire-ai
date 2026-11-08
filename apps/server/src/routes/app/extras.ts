@@ -4,6 +4,7 @@ import type {
   BrowserLive,
   ContextDeps,
   GifKey,
+  GitHubAppSettings,
   GitProxyDeps,
   JevKey,
   McpConnect,
@@ -63,6 +64,8 @@ export interface AppExtras {
    * servers) = those routes answer 404.
    */
   gifKey?: GifKey;
+  /** The server's GitHub App (ADR 0156): env or made from Settings; absent = `GITHUB_APP_*` alone. */
+  githubApp?: GitHubAppSettings;
   /** Speech engines and what voice messages need (ADR 0100); absent: no voice messages. */
   speech?: SpeechSettings;
   voice?: VoiceDeps;

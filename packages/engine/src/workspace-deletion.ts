@@ -38,7 +38,8 @@ import {
 } from "./email-codes";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { type OrgDeletingEvent, publishOrgEvent } from "./events";
-import { forgetInstallationTokens } from "./git/github-app";
+import { forgetInstallationTokens, uninstallInstallation } from "./git/github-app";
+import type { GitHubAppAccess } from "./git/github-call";
 import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
 import type { MachineHub } from "./machine-hub";
 import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
@@ -600,6 +601,8 @@ export interface PurgeDeps {
   pubsub?: PubSub;
   /** Revokes its GitHub OAuth grants at GitHub (absent, or without the GitHub app: none can be). */
   connectors?: ConnectorDeps;
+  /** Uninstalls the server's GitHub App from the workspace's GitHub accounts (absent, or no app: none can be). */
+  githubApp?: GitHubAppAccess;
   /** Has Composio forget its mailboxes (absent, or without it: none can be). */
   mail?: MailAdapters | null;
   log?: {
@@ -744,8 +747,9 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
  * Link it made for one (never revoked there: Composio's apps share one grant across toolkits and workspaces) and its
  * mailboxes (their triggers, and the accounts, which revokes them at Google or Microsoft unless another connection
  * still uses the same grant), MillionSend the webhooks of inboxes left from the withdrawn path whose boot cleanup
- * failed (their sealed keys go with the workspace), and GitHub its OAuth tokens. Each is marked as it goes, so a
- * retry skips it. Returns the ids of the mailboxes, connections and Composio accounts that failed; never a token.
+ * failed (their sealed keys go with the workspace), and GitHub its OAuth tokens and the app's installations. Each is
+ * marked as it goes, so a retry skips it. Returns the ids of the mailboxes, connections, Composio accounts and
+ * installations that failed; never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const { db } = deps;
@@ -846,6 +850,23 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
         continue;
       }
       await db.update(connectorConnections).set({ revokedAt: new Date() }).where(eq(connectorConnections.id, grant.id));
+    }
+  }
+  // The app's installations reach the workspace's repositories with no one left to use them: uninstalled there, as
+  // removing one does (ADR 0156); left installed, anyone who can see one could bind it to another workspace.
+  const app = deps.githubApp?.app();
+  if (app && deps.githubApp) {
+    const installs = await db
+      .select({ id: githubAppInstallations.id, installationId: githubAppInstallations.installationId })
+      .from(githubAppInstallations)
+      .where(eq(githubAppInstallations.orgId, orgId));
+    for (const i of installs) {
+      if ((await uninstallInstallation(app, deps.githubApp.http, i.installationId)) === "refused") {
+        left.push(i.id);
+        continue;
+      }
+      await db.delete(githubAppInstallations).where(eq(githubAppInstallations.id, i.id));
+      forgetInstallationTokens(i.installationId);
     }
   }
   return left;

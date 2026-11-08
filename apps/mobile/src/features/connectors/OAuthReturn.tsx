@@ -1,6 +1,13 @@
-import { type Connection, type CustomServer, keys, useCatalog, useCompleteOAuth } from "@agenteschat/client";
+import {
+  type Connection,
+  type CustomServer,
+  keys,
+  useCatalog,
+  useCompleteGitHubApp,
+  useCompleteOAuth,
+} from "@agenteschat/client";
 import { connectedItems, outcomeText } from "@agenteschat/client/lib/connected";
-import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -9,14 +16,15 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, successHaptic } from "../shared/parts";
-import { isFinishing } from "./logic";
+import { installationIdOf, isFinishing } from "./logic";
 import { returnHref } from "./review";
 
 /**
  * A connector's sign-in that came back to the app through its link (Android opens the app with it; iOS hands
  * it to the open sheet). When the sheet that started it is still finishing, this screen just steps aside;
  * otherwise (the app was closed meanwhile) it finishes here and lands on Conectores, on a new account's tools
- * (a new sign-in for an account, or the same account again, lands on that account's screen).
+ * (a new sign-in for an account, or the same account again, lands on that account's screen). The agentes.chat
+ * GitHub app's install comes back with its `installation_id` and lands on Conectores.
  */
 export function ConnectorOAuthReturn() {
   const { t } = useTranslation();
@@ -26,7 +34,9 @@ export function ConnectorOAuthReturn() {
   const qc = useQueryClient();
   const catalog = useCatalog();
   const complete = useCompleteOAuth(orgId);
-  const { state, code, error } = useLocalSearchParams<{ state?: string; code?: string; error?: string }>();
+  const completeApp = useCompleteGitHubApp(orgId);
+  const params = useLocalSearchParams<{ state?: string; code?: string; error?: string; installation_id?: string }>();
+  const { state, code, error } = params;
   const ran = useRef(false);
   useEffect(() => {
     if (ran.current) return;
@@ -34,9 +44,31 @@ export function ConnectorOAuthReturn() {
     const leave = () => goBack("/connectors");
     if (state && isFinishing(state)) return leave();
     if (error || !state || !code) {
-      errorHaptic();
-      toast({ title: t("mobile.connectors.failed"), icon: "x" });
+      // The GitHub account's owner was asked to install: news, not a failure.
+      if (error !== "requested") errorHaptic();
+      toast({
+        title: error ? oauthReturnText(t, error) : t("mobile.connectors.failed"),
+        icon: error === "requested" ? "info" : "x",
+      });
       return void router.replace("/connectors");
+    }
+    const installationId = installationIdOf(params.installation_id);
+    if (installationId) {
+      return completeApp.mutate(
+        { state, code, installationId },
+        {
+          onSettled: (_done, failed) => {
+            if (failed) errorHaptic();
+            else successHaptic();
+            toast(
+              failed
+                ? { title: knownErrorText(t, failed) ?? t("mobile.connectors.failed"), icon: "x" }
+                : { title: t("githubApp.installed") },
+            );
+            router.replace("/connectors");
+          },
+        },
+      );
     }
     complete.mutate(
       { state, code },
@@ -62,7 +94,7 @@ export function ConnectorOAuthReturn() {
         },
       },
     );
-  }, [state, code, error, complete, toast, t, qc, orgId, catalog.data]);
+  }, [state, code, error, params.installation_id, complete, completeApp, toast, t, qc, orgId, catalog.data]);
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <ActivityIndicator color={c.muted} />

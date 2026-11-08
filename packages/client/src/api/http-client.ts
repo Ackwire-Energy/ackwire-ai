@@ -92,7 +92,9 @@ import type {
   FormerAgent,
   GifKey,
   GifPage,
+  GitHubAppInfo,
   GitHubAppInstallation,
+  GitHubAppSetup,
   GitHubOrgAccess,
   GitHubRepositories,
   Health,
@@ -1044,11 +1046,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
     },
     githubApp: {
-      info: (orgId) =>
-        request<{ installable: boolean; installations: GitHubAppInstallation[] }>(`${org(orgId)}/github-app`),
+      info: (orgId) => request<GitHubAppInfo>(`${org(orgId)}/github-app`),
       install: async (orgId, returnTo) =>
         (await request<{ installUrl: string }>(`${org(orgId)}/github-app/install`, { json: { returnTo } })).installUrl,
-      remove: (orgId, id) => request<void>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
+      complete: (orgId, input) =>
+        request<{ installation: GitHubAppInstallation }>(`${org(orgId)}/github-app/complete`, { json: input }),
+      remove: (orgId, id) =>
+        request<{ uninstalled: boolean }>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
+      startManifest: async (returnTo) =>
+        (await request<{ startUrl: string }>("/api/app/github-app/manifest", { json: { returnTo } })).startUrl,
+      removeSettings: () => request<GitHubAppSetup>("/api/app/github-app/settings", { method: "DELETE" }),
       repositories: (orgId) => request<GitHubRepositories>(`${org(orgId)}/github/repositories`),
       access: (orgId) => request<GitHubOrgAccess>(`${org(orgId)}/github/access`),
     },

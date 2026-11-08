@@ -27,6 +27,11 @@ export interface ConnectorTool {
    * lists and denies it by that name.
    */
   ours?: boolean;
+  /**
+   * Where the agent's own words go on GitHub (ADR 0156): a `body` gets the agent's signature line when given
+   * (`always`: an empty one too), a commit `message` the person's credit.
+   */
+  sign?: { field: "body" | "message"; always?: true };
 }
 
 /** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
@@ -114,20 +119,21 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       list_releases: { scope: "repo.read" },
       get_latest_release: { scope: "repo.read" },
       create_branch: { scope: "repo.write" },
-      push_files: { scope: "repo.write" },
-      create_or_update_file: { scope: "repo.write" },
+      push_files: { scope: "repo.write", sign: { field: "message" } },
+      create_or_update_file: { scope: "repo.write", sign: { field: "message" } },
       pull_request_read: { scope: "pr.read" },
       list_pull_requests: { scope: "pr.read" },
       search_pull_requests: { scope: "pr.read" },
-      create_pull_request: { scope: "pr.write" },
-      update_pull_request: { scope: "pr.write" },
+      create_pull_request: { scope: "pr.write", sign: { field: "body", always: true } },
+      update_pull_request: { scope: "pr.write", sign: { field: "body" } },
       update_pull_request_branch: { scope: "pr.write" },
       add_comment_to_pending_review: { scope: "pr.write" },
-      add_reply_to_pull_request_comment: { scope: "pr.write" },
+      add_reply_to_pull_request_comment: { scope: "pr.write", sign: { field: "body" } },
       // Its `submit_pending` and `create` methods can approve a pull request: never approved for good.
       pull_request_review_write: {
         scope: "pr.write",
         sensitive: true,
+        sign: { field: "body" },
         title: "Review PR #{pullNumber} in {owner}/{repo}",
       },
       merge_pull_request: {
@@ -141,10 +147,10 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       search_issues: { scope: "issues.read" },
       list_issue_types: { scope: "issues.read" },
       get_label: { scope: "issues.read" },
-      issue_write: { scope: "issues.write" },
+      issue_write: { scope: "issues.write", sign: { field: "body" } },
       sub_issue_write: { scope: "issues.write" },
-      add_issue_comment: { scope: "issues.write" },
-      update_issue_comment: { scope: "issues.write" },
+      add_issue_comment: { scope: "issues.write", sign: { field: "body" } },
+      update_issue_comment: { scope: "issues.write", sign: { field: "body" } },
       actions_list: { scope: "actions.read" },
       actions_get: { scope: "actions.read" },
       get_job_logs: { scope: "actions.read" },

@@ -6,11 +6,13 @@ import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact, fileReach } fro
 import { recordAudit } from "../audit";
 import { connectorKeyOf } from "../connector-usage";
 import { cutText } from "../format";
+import { type GitHubAppAccess, githubCallAuth, githubListingHeaders } from "../git/github-call";
+import { creditedMessage, runCoAuthor, signatureLine, signedBody } from "../git/signature";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
 import { replyThreadOf } from "../runs";
 import { alwaysAsks, MAX_RESULT_CHARS } from "../tools/gateway";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
-import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
+import { CONNECTOR_CATALOG, type ConnectorTool, connectorScope, fillTitle } from "./catalog";
 import { sqlArgOf } from "./classify";
 import { composioFailure, composioServiceOf } from "./composio";
 import {
@@ -18,6 +20,7 @@ import {
   type ConnectorConnection,
   type ConnectorDeps,
   connectionHeaders,
+  GITHUB_APP_AUTH,
   toolPrefixOfConnection,
 } from "./connections";
 import {
@@ -229,14 +232,22 @@ export function createConnectorToolSource(
     log?: { warn(message: string, data?: Record<string, unknown>): void };
     /** Tells connector admins live when a server changes an approved tool. */
     pubsub?: PubSub;
+    /** The server's GitHub App (ADR 0156): GitHub's tools act as it wherever the workspace installed it. */
+    githubApp?: GitHubAppAccess;
   },
 ): ToolSource {
   const connect = deps.connect ?? connectOverHttp;
   const cache = new Map<string, { at: number; tools: McpTool[] }>();
+  const github = { fetch: deps.http ?? fetch, apiUrl: "https://api.github.com", ...deps.githubApp?.http };
 
-  async function withSession<T>(connection: ConnectorConnection, fn: (s: McpSession) => Promise<T>): Promise<T> {
+  /** A session with the connection's own sign-in, or `auth` when the call goes as someone else (the GitHub App). */
+  async function withSession<T>(
+    connection: ConnectorConnection,
+    fn: (s: McpSession) => Promise<T>,
+    auth?: Record<string, string>,
+  ): Promise<T> {
     const extra = isCustom(connection) ? undefined : CONNECTOR_CATALOG[connection.connector]?.headers;
-    const session = await connect(connection, { ...extra, ...(await connectionHeaders(deps, connection)) });
+    const session = await connect(connection, { ...extra, ...(auth ?? (await connectionHeaders(deps, connection))) });
     try {
       return await fn(session);
     } finally {
@@ -248,10 +259,36 @@ export function createConnectorToolSource(
     const key = `${connection.id}:${connection.updatedAt.getTime()}`;
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < LIST_TTL_MS) return hit.tools;
-    const listed = await withSession(connection, (s) => s.listTools());
+    const auth =
+      connection.authType === GITHUB_APP_AUTH
+        ? await githubListingHeaders(deps, deps.githubApp, { db: deps.db, orgId: connection.orgId }, connection)
+        : undefined;
+    if (auth === null) throw new Error("no installation of the GitHub App to list GitHub's tools with");
+    const listed = await withSession(connection, (s) => s.listTools(), auth);
     const tools = await applyToolPins(deps, connection, listed, pinnedTool(connection));
     cache.set(key, { at: Date.now(), tools });
     return tools;
+  }
+
+  /**
+   * What the agent writes to GitHub, signed (ADR 0156): a body ends with its line naming the agent and the person it
+   * works for, a commit message credits that person. The approval card showed the agent's own words.
+   */
+  async function signed(
+    input: Record<string, unknown>,
+    sign: ConnectorTool["sign"],
+    at: ToolContext & { token: string | null },
+  ): Promise<Record<string, unknown>> {
+    if (!sign) return input;
+    const given = input[sign.field];
+    if (sign.field === "body") {
+      if (typeof given !== "string" && !sign.always) return input;
+      const line = await signatureLine(at.db, at);
+      return { ...input, body: signedBody(typeof given === "string" ? given : "", line) };
+    }
+    if (typeof given !== "string") return input;
+    const trailer = await runCoAuthor({ db: at.db, http: github, token: at.token }, at);
+    return trailer ? { ...input, message: creditedMessage(given, trailer) } : input;
   }
 
   /** Which of a connection's tools keep their approved text (ADR 0117): not Composio's (pinned by toolkit version), not ours. */
@@ -389,9 +426,12 @@ export function createConnectorToolSource(
         } catch {
           continue; // an unreachable server hides its tools for this turn
         }
+        const appAlone = connection.authType === GITHUB_APP_AUTH;
         for (const tool of listed) {
           const mapped = def.tools[tool.name];
           if (!mapped || mapped.ours) continue; // not in our catalog, or one we serve: never exposed
+          // GitHub Apps can't reach a person's Projects: through the app alone, they'd only ever fail.
+          if (appAlone && mapped.scope.startsWith("projects.")) continue;
           out.push({
             name: exposedToolName(prefix, tool.name),
             description: cutText(`[${connection.label}] ${tool.description ?? tool.name}`, 1024),
@@ -411,8 +451,23 @@ export function createConnectorToolSource(
                 .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
                 .join(" · ")}`,
             }),
-            execute: async (input) => {
-              const result = await withSession(connection, (s) => s.callTool(tool.name, input));
+            execute: async (input, ctx) => {
+              let auth: Record<string, string> | undefined;
+              let args = input;
+              if (def.id === "github") {
+                const call = { tool: tool.name, scope: mapped.scope, input };
+                const how = await githubCallAuth(deps, deps.githubApp, ctx, connection, call);
+                if ("refused" in how) {
+                  return {
+                    content: how.refused,
+                    isError: true,
+                    data: { connector: def.id, tool: tool.name, isError: true },
+                  };
+                }
+                auth = how.headers;
+                args = await signed(input, mapped.sign, { ...ctx, token: how.token });
+              }
+              const result = await withSession(connection, (s) => s.callTool(tool.name, args), auth);
               return {
                 content: result.content,
                 isError: result.isError,

@@ -295,6 +295,10 @@ const PLAIN_LINE = new Set([
   "endpoint.model_id",
   "endpoint.prices",
   "endpoint.style",
+  // The GitHub App: installing is offered only where the server has it, and the manifest's failure comes back as
+  // `github_app_error=failed` on the page it returns to.
+  "github_app.manifest_failed",
+  "github_app.not_configured",
   "import.file_path",
   "import.secret_file",
   "import.too_many_items",

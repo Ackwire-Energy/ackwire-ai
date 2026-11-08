@@ -181,9 +181,10 @@ export async function createTestServer(
     jevFetch: options.jevFetch,
     routerQuietMs: 0,
   });
-  // As at boot: the saved Jev and GIPHY keys are read before anything serves.
+  // As at boot: the saved Jev and GIPHY keys and GitHub App are read before anything serves.
   await engine.jevKey.ready();
   await gifKey.ready();
+  await engine.githubApp.ready();
   const { handlers } = engine;
   const auth = createAuth({
     db,
@@ -225,6 +226,7 @@ export async function createTestServer(
         streams: engine.streams,
         jevKey: engine.jevKey,
         gifKey,
+        githubApp: engine.githubApp,
         speech: engine.speech,
         voice: engine.voice,
       },

@@ -570,7 +570,7 @@ export const envVars = {
   GITHUB_APP_ID: {
     schema: z.string().optional(),
     description:
-      "Id of a GitHub App for agents' git and pull requests. With `GITHUB_APP_PRIVATE_KEY`, the git proxy uses short installation tokens scoped to one repository (1 hour) where the organization installed the app from agentes.chat, and the org's GitHub connection elsewhere.",
+      "Id of the GitHub App agents act as on GitHub (ADR 0156). With `GITHUB_APP_PRIVATE_KEY`, every GitHub call an agent makes (tools, git pushes and fetches) goes with a short installation token for that repository where the workspace installed the app from agentes.chat, so pull requests, issues, comments and commits come from the app's bot; the workspace's own GitHub connection elsewhere. Repository permissions: contents, pull requests, issues and workflows read and write; checks, commit statuses and actions read; metadata read. Without these variables, the server's owner can create the app from Settings › Connectors (GitHub's manifest flow); set here, they win.",
     section: "Connectors",
   },
   GITHUB_APP_PRIVATE_KEY: {
@@ -593,13 +593,13 @@ export const envVars = {
   GITHUB_APP_SLUG: {
     schema: z.string().optional(),
     description:
-      "URL name of that GitHub App (`github.com/apps/{slug}`). Organizations install it from the app; only installations made that way are used.",
+      "URL name of that GitHub App (`github.com/apps/{slug}`). Workspaces install it from the app; only installations made that way are used.",
     section: "Connectors",
   },
   GITHUB_APP_CLIENT_ID: {
     schema: z.string().optional(),
     description:
-      "Client id of that GitHub App (user authorization during installation must be on). Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
+      "Client id of that GitHub App, with Request user authorization (OAuth) during installation on. Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
     section: "Connectors",
   },
   GITHUB_APP_CLIENT_SECRET: {
@@ -611,7 +611,7 @@ export const envVars = {
   GITHUB_APP_WEBHOOK_SECRET: {
     schema: z.string().optional(),
     description:
-      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes).",
+      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes). Optional: without the webhook, reading the GitHub panel checks the installations with GitHub.",
     section: "Connectors",
     secret: true,
   },

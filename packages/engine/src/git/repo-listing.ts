@@ -3,7 +3,7 @@ import { activeConnections, type ConnectorDeps } from "../connectors/connections
 import { NotFoundError } from "../errors";
 import { requirePermission } from "../organizations";
 import { connectionToken } from "./branches";
-import { boundInstallations, type GitHubAppConfig, type GitHubHttp, installationReadToken } from "./github-app";
+import { boundInstallations, type GitHubAppConfig, type GitHubHttp, installationToken } from "./github-app";
 
 export interface GitHubRepositoryView {
   /** `owner/name`, as GitHub spells it. */
@@ -112,9 +112,7 @@ export async function listOrgRepositories(
   const installations = deps.app ? await boundInstallations(deps.db, orgId) : [];
   for (const i of installations) {
     if (!deps.app) break;
-    const token = await installationReadToken(deps.app, github, { db: deps.db, orgId }, i.installationId).catch(
-      () => null,
-    );
+    const token = await installationToken(deps.app, github, { db: deps.db, orgId }, i.installationId).catch(() => null);
     if (!token) continue;
     await read(
       token,

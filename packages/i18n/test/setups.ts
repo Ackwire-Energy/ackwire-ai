@@ -169,6 +169,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // The catalog's line for a server without Composio (`composioOffText`): the Cloud always has its key.
     "connectors.composio.off_one",
     "connectors.composio.off_other",
+    // The server's own GitHub App card goes only to its pinned owner off agentes.chat (`setup` is null elsewhere), and
+    // the admins' line about it only where `ownerCreates` (false on agentes.chat, ADR 0156).
+    "githubApp.server.",
+    "githubApp.ownerHint",
   ],
   email: [
     "auth.newLinkSent",

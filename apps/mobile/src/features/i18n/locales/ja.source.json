@@ -3962,6 +3962,15 @@
   "connectors.fromAgent": {
     "value": "Connect a service"
   },
+  "connectors.githubApp.useApp": {
+    "value": "Use the agentes.chat app"
+  },
+  "connectors.githubApp.useAccount": {
+    "value": "Use a GitHub account"
+  },
+  "connectors.githubApp.createInBrowser": {
+    "value": "Create in the browser"
+  },
   "connectors.review.stepAbout": {
     "value": "What it can do"
   },

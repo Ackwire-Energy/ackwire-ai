@@ -9796,18 +9796,64 @@
   },
   "githubApp": {
     "title": "GitHub 仓库",
-    "text": "在智能体可用于代码和 pull request 的账号与仓库上安装 GitHub 应用。从这里安装的内容只有 {{org}} 使用。",
-    "install": "安装 GitHub 应用",
+    "text": "在安装了 agentes.chat 应用的地方，智能体以应用的身份提交 pull request、issue、评论和 commit，并附上智能体的名字和提出请求的人。从这里安装的内容只有 {{org}} 使用。",
+    "install": "安装 agentes.chat 应用",
+    "installMore": "安装到另一个账号",
     "none": "还没有 GitHub 账号。",
+    "usingAccount": "目前智能体在 GitHub 上显示为 {{account}}。安装应用后，它们会显示为 agentes.chat 应用。",
     "allRepos": "所有仓库",
     "someRepos": "已选仓库",
     "suspended": "已在 GitHub 上暂停",
+    "manage": "在 GitHub 上管理",
+    "manageName": "在 GitHub 上管理 {{account}}",
     "remove": "移除",
     "removeName": "移除 {{account}}",
-    "removed": "已移除 {{account}}。它仍安装在 GitHub 上，如有需要请在那里卸载。",
-    "installed": "GitHub 应用已安装。",
-    "requested": "我们已请该 GitHub 账号的所有者安装应用，安装后会显示在这里。",
-    "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。"
+    "removeTitle": "从 {{account}} 移除应用？",
+    "removeText": "agentes.chat 应用会从 GitHub 上的 {{account}} 卸载，智能体也不再通过它使用该账号的仓库。",
+    "removeLast": "这是最后一个，所以在有人安装应用或连接账号之前，智能体都无法使用 GitHub。",
+    "removed": "已从 {{account}} 移除应用，并在 GitHub 上卸载。",
+    "notUninstalled": "已在这里移除应用，但 GitHub 没有确认从 {{account}} 卸载。请在 GitHub 上卸载。",
+    "openPage": "打开",
+    "installed": "agentes.chat 应用已安装。",
+    "requested": "只有该 GitHub 账号的所有者可以安装应用。请让对方在这个工作区的 连接器 › GitHub 中安装。",
+    "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。",
+    "otherWorkspace": "这个 GitHub 账号已关联到另一个工作区。请先在那里移除应用，再在这里安装。",
+    "installedOutside": "这个 GitHub 账号上的应用是在 agentes.chat 之外安装的。请在 GitHub 上移除它，再从 连接器 › GitHub 重新安装。",
+    "connectAccount": "连接 GitHub 账号",
+    "ownerHint": "这台服务器的所有者可以在这里的连接器中创建 GitHub 应用。",
+    "viaApp": "通过 {{accounts}} 上的 agentes.chat 应用",
+    "disconnectApp": "agentes.chat 应用也会从 GitHub 上的 {{accounts}} 卸载。",
+    "disconnectKeepsApp": "智能体会继续通过 {{accounts}} 上的 agentes.chat 应用使用 GitHub。",
+    "keptApp": "GitHub 账号已断开连接。智能体会继续通过 agentes.chat 应用使用 GitHub。",
+    "signature": {
+      "forPerson": "{{agent}}，{{person}} 在 agentes.chat 上的智能体",
+      "alone": "{{agent}}，agentes.chat 上的智能体"
+    },
+    "manifestPage": {
+      "title": "正在创建 GitHub 应用",
+      "continue": "在 GitHub 上继续"
+    },
+    "server": {
+      "title": "这台服务器的 GitHub 应用",
+      "lead": "有了它，智能体在 GitHub 上显示为应用，而不是某个人的账号。",
+      "without": "GitHub 会在你的账号下创建一个已填好所有内容的应用，然后回到这里。若要归属某个组织，之后在 GitHub 上转移即可。",
+      "create": "在 GitHub 上创建应用",
+      "state": {
+        "off": "已关闭",
+        "on": "已开启",
+        "invalid": "无效"
+      },
+      "line": {
+        "env": "已在此服务器的设置中配置（GITHUB_APP_ID）。",
+        "invalid": "此服务器无法打开已保存的应用。请移除后重新创建。"
+      },
+      "open": "在 GitHub 上打开",
+      "remove": "移除应用",
+      "removeTitle": "移除这台服务器的 GitHub 应用？",
+      "removeText": "这里的所有工作区会立即无法通过它访问 GitHub。应用仍留在 GitHub 上，你可以在那里删除。",
+      "created": "GitHub 应用已创建。这里的工作区现在可以安装了。",
+      "removed": "已从这台服务器移除 GitHub 应用。"
+    }
   },
   "oauthReturn": {
     "cancelled": "连接已取消。没有任何改动。",
@@ -10673,6 +10719,15 @@
     "namePlaceholder": "例如：客服",
     "continueIn": "在 {{name}} 上继续",
     "continueInComposio": "在 Composio 上继续",
+    "github": {
+      "how": "智能体如何访问 GitHub",
+      "app": "agentes.chat 应用",
+      "recommended": "推荐",
+      "appText": "智能体显示为应用，仓库在 GitHub 上选择。",
+      "account": "GitHub 账号",
+      "accountText": "智能体显示为该账号。GitHub Projects 需要账号。",
+      "appNote": "在 GitHub 上选择账号和仓库，然后回到这里。"
+    },
     "githubOrgs": {
       "title": "可访问的组织",
       "none": "还没有组织。",

@@ -37,7 +37,7 @@ import type {
   FormerAgent,
   Gif,
   GifKey,
-  GitHubAppInstallation,
+  GitHubAppInfo,
   GitHubRepositories,
   HttpApi,
   ImportedSource,
@@ -247,8 +247,11 @@ export interface FakeState {
   /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
   approvalRules?: Record<string, ApprovalRule[]>;
   connections: Connection[];
-  /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
-  githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
+  /**
+   * GitHub App installations bound to the org and the server's app (`githubApp.info`); undefined = none, app not
+   * installable. `uninstallRefused`: GitHub doesn't confirm a removal's uninstall.
+   */
+  githubApp?: GitHubAppInfo & { uninstallRefused?: boolean };
   githubAccess?: { orgs: string[] | null; manageUrl: string | null };
   /** The workspace's Composio calls this month (default: none counted, no cap). */
   composioUsage?: ComposioUsage;
@@ -3298,15 +3301,33 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             manageUrl: "https://github.com/settings/connections/applications/client-id",
           },
         ),
-      info: async () => structuredClone(state.githubApp ?? { installable: false, installations: [] }),
+      info: async () => {
+        const { uninstallRefused: _, ...info } = state.githubApp ?? { installable: false, installations: [] };
+        return structuredClone(info);
+      },
       install: async (orgId, returnTo) => {
         log("githubApp.install", orgId, returnTo);
         return "https://github.com/apps/agentes-chat/installations/new?state=s";
+      },
+      complete: async (orgId, input) => {
+        log("githubApp.complete", orgId, input);
+        throw new Error("the web app finishes the install in the callback");
       },
       remove: async (orgId, installId) => {
         log("githubApp.remove", orgId, installId);
         if (state.githubApp)
           state.githubApp.installations = state.githubApp.installations.filter((i) => i.id !== installId);
+        return { uninstalled: !state.githubApp?.uninstallRefused };
+      },
+      startManifest: async (returnTo) => {
+        log("githubApp.startManifest", returnTo);
+        return "https://chat.example.com/api/app/github-app/manifest/start?state=s";
+      },
+      removeSettings: async () => {
+        log("githubApp.removeSettings");
+        const setup = { source: null, slug: null, htmlUrl: null, state: "off" as const, canCreate: true };
+        if (state.githubApp) state.githubApp = { ...state.githubApp, installable: false, setup };
+        return setup;
       },
       repositories: async () =>
         structuredClone(state.githubRepos ?? { connected: false, accounts: [], truncated: false }),

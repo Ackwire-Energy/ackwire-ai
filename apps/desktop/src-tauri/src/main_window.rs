@@ -31,6 +31,9 @@ const BROWSER_SIGN_IN: &str = "/desktop/sign-in";
 const SIGNED_IN: &str = "/desktop/signed-in";
 /// The help pages: background reading opens in the browser, never in place of the conversation.
 const HELP: &str = "/help/";
+/// The server's page that posts its GitHub App manifest to github.com (ADR 0156): the window would hand that post to
+/// the browser without its form, so the whole page opens there.
+const GITHUB_APP_MANIFEST: &str = "/api/app/github-app/manifest/start";
 /// Cloudflare Turnstile, the bot check of the site's sign-in pages: its frame loads inside the page. On macOS and
 /// Linux the web view asks about frames too, so sent outside it would open a tab on every sign-in page and never
 /// load in the window.
@@ -90,7 +93,7 @@ fn outside_or_drop(url: &Url) -> Route {
 fn route(url: &Url, site: &Url) -> Route {
     match url.scheme() {
         "http" | "https" if same_site(url, site) => match url.path() {
-            BROWSER_SIGN_IN => Route::Outside,
+            BROWSER_SIGN_IN | GITHUB_APP_MANIFEST => Route::Outside,
             SIGNED_IN => Route::Front,
             path if path.starts_with(HELP) => Route::Outside,
             _ => Route::Stay,
@@ -1162,6 +1165,7 @@ mod tests {
             assert_eq!(r(&format!("{site}/org/x/c/y"), site), Route::Stay);
             assert_eq!(r(&format!("{site}/desktop/sign-in?provider=google&challenge=a"), site), Route::Outside);
             assert_eq!(r(&format!("{site}/desktop/signed-in?to=%2F"), site), Route::Front);
+            assert_eq!(r(&format!("{site}/api/app/github-app/manifest/start?state=s"), site), Route::Outside);
             assert_eq!(r(&format!("blob:{site}/abc"), site), Route::Stay);
         }
         let own = "https://agentes.tail1234.ts.net";

@@ -2069,14 +2069,61 @@ export function useCompleteOAuth(orgId: string) {
   });
 }
 
-export const useGitHubApp = (orgId: string) => {
+export const useGitHubApp = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.githubApp(orgId), queryFn: () => api.githubApp.info(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.githubApp(orgId),
+    queryFn: () => api.githubApp.info(orgId),
+    enabled,
+    staleTime: 30_000,
+  });
 };
 
 export function useInstallGitHubApp(orgId: string) {
   const api = useApi();
   return useMutation({ mutationFn: (returnTo: string) => api.githubApp.install(orgId, returnTo) });
+}
+
+/**
+ * What changes with the organization's installations: the app's list, its GitHub connection (the app alone is one),
+ * the repositories it reaches, and every agent's grants (a first installation gives them, the last one takes them).
+ */
+const githubAppChanged = (qc: QueryClient, orgId: string) =>
+  Promise.all([
+    qc.invalidateQueries({ queryKey: keys.githubApp(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.githubRepos(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+  ]);
+
+/** The phone finishes an install it opened in the browser (`APP_OAUTH_RETURN`). */
+export function useCompleteGitHubApp(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { state: string; code: string; installationId: number }) =>
+      api.githubApp.complete(orgId, input),
+    // Its callers say why it failed in words of their own (oauthReturnText), once.
+    meta: { silent: true },
+    onSuccess: () => githubAppChanged(qc, orgId),
+  });
+}
+
+/** The server's owner starts making this server's GitHub App: the page to open, which sends the manifest to GitHub. */
+export function useStartGitHubAppManifest() {
+  const api = useApi();
+  return useMutation({ mutationFn: (returnTo: string) => api.githubApp.startManifest(returnTo) });
+}
+
+/** The server's owner removes the app made from Settings: every workspace's view of it changes. */
+export function useRemoveGitHubAppSettings() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.githubApp.removeSettings(),
+    onSuccess: () =>
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[2] === "github-app" }),
+  });
 }
 
 /** The repositories the organization's GitHub reaches (the picker of an agent's repositories). */
@@ -2139,7 +2186,7 @@ export function useRemoveGitHubApp(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.githubApp.remove(orgId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.githubApp(orgId) }),
+    onSuccess: () => githubAppChanged(qc, orgId),
   });
 }
 
@@ -2151,6 +2198,8 @@ export function useDisconnect(orgId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.connections(orgId) });
       void qc.invalidateQueries({ queryKey: keys.githubRepos(orgId) });
+      // GitHub through the app alone goes with its installations.
+      void qc.invalidateQueries({ queryKey: keys.githubApp(orgId) });
       // Agents lose the scopes of that connection.
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[4] === "scopes" });
     },

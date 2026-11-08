@@ -46,9 +46,14 @@ export const isDesktopReturn = (returnTo: string) => returnTo.startsWith(DESKTOP
 /** The path on our site a desktop authorization lands on once finished. */
 export const desktopReturnPath = (returnTo: string) => returnTo.slice(DESKTOP_OAUTH_RETURN.length) || "/";
 
-/** The app's deep link with what the provider sent back (or why it refused). */
-export function appOAuthRedirect(input: { state?: string; code?: string; error?: string }): string {
-  return withParams(APP_OAUTH_REDIRECT, input);
+/**
+ * The app's deep link with what the provider sent back (or why it refused). GitHub's return from installing the
+ * GitHub App adds its `installation_id` (the app finishes with `…/github-app/complete`).
+ */
+export function appOAuthRedirect(input: { state?: string; code?: string; error?: string; installationId?: number }) {
+  const url = new URL(withParams(APP_OAUTH_REDIRECT, input));
+  if (input.installationId) url.searchParams.set("installation_id", String(input.installationId));
+  return url.toString();
 }
 
 /** The desktop app's deep link with the organization and what the provider sent back (or why it refused). */
