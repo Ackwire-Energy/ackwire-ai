@@ -4,6 +4,7 @@ import { cx } from "../cx";
 import { Icon } from "../icons/Icon";
 import { Button } from "./Button";
 import { CountChip } from "./Chip";
+import { UnsavedContext, useUnsavedForms } from "./Dialog";
 
 export interface DetailsDialogPageLink {
   /** "Abrir em página própria". */
@@ -58,6 +59,8 @@ export interface DetailsDialogProps {
    * inner step to back out of first, like a reason being typed).
    */
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  /** It holds edits not saved yet: a press outside or Esc leaves it open, as `Dialog`'s `unsaved`. */
+  unsaved?: boolean;
 }
 
 /**
@@ -86,6 +89,7 @@ export function DetailsDialog({
   children,
   className,
   onEscapeKeyDown,
+  unsaved = false,
 }: DetailsDialogProps) {
   // Controlled: no Radix Trigger to return focus to, so remember it.
   const wasOpen = useRef(false);
@@ -94,6 +98,8 @@ export function DetailsDialog({
     returnTo.current = document.activeElement as HTMLElement | null;
   }
   wasOpen.current = open;
+  const forms = useUnsavedForms();
+  const keep = () => unsaved || forms.held();
   const inline = !eyebrow && !titleHidden;
   const heading = titleHidden ? (
     <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
@@ -162,7 +168,13 @@ export function DetailsDialog({
             className,
           )}
           aria-describedby={undefined}
-          onEscapeKeyDown={onEscapeKeyDown}
+          onEscapeKeyDown={(e) => {
+            onEscapeKeyDown?.(e);
+            if (keep()) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (keep()) e.preventDefault();
+          }}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {
@@ -171,14 +183,16 @@ export function DetailsDialog({
             }
           }}
         >
-          {side ? (
-            <>
-              <div className="ac-details__main">{main}</div>
-              <div className="ac-details__side">{side}</div>
-            </>
-          ) : (
-            main
-          )}
+          <UnsavedContext.Provider value={forms.report}>
+            {side ? (
+              <>
+                <div className="ac-details__main">{main}</div>
+                <div className="ac-details__side">{side}</div>
+              </>
+            ) : (
+              main
+            )}
+          </UnsavedContext.Provider>
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

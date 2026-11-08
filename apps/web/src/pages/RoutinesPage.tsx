@@ -151,6 +151,7 @@ import { RoutineTemplateSelect } from "@/components/RoutineTemplates";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
@@ -2334,6 +2335,7 @@ function RoutineDialog({
   const info = described.data?.ok ? described.data : null;
   // The picker opens on demand ("Ajustar"); the sentence and next runs always show.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const unsaved = useEdited(open, [prompt, name, phrase]);
   const upcoming = info?.nextRuns.length
     ? info.nextRuns.slice(0, 3).map((iso) => runLabel(i18n.language, iso, rule.timezone))
     : upcomingLabels(i18n.language, rule);
@@ -2533,6 +2535,7 @@ function RoutineDialog({
       onOpenChange={(o) => !o && onClose()}
       title={part ? t(part === "when" ? "routines.panel.when" : "routines.panel.where") : t("routines.new")}
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={560}
     >
       <form

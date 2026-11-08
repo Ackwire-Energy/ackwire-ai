@@ -113,6 +113,7 @@ export function CorrectionDialog({
       }}
       title={t("channel.correctTitle", g)}
       closeLabel={t("common.close")}
+      unsaved={text.trim() !== ""}
       width={480}
     >
       <form

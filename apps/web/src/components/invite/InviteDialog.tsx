@@ -55,6 +55,7 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { MembersFull } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEdited } from "@/hooks/useEdited";
 import { TYPED_VALUES } from "@/i18n";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
@@ -166,6 +167,8 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   const [sends, setSends] = useState(0);
   const screen: Screen = byLink ? "link" : at;
   const index = STEPS.indexOf(screen as Step);
+  // Once sent, nothing is left to lose.
+  const unsaved = useEdited(open, [chips, draft, note]) && screen !== "sent";
   const emailsField = useRef<HTMLInputElement>(null);
   const noteField = useRef<HTMLTextAreaElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
@@ -717,6 +720,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           : undefined
       }
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={600}
       initialFocus={screen === "who" ? emailsField : undefined}
     >

@@ -31,6 +31,7 @@ import { PendingTile } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
 import { WhoSeesButton, WhoSeesDialog } from "@/components/WhoSees";
 import { useComposerFiles } from "@/hooks/useComposerFiles";
+import { useEdited } from "@/hooks/useEdited";
 import { columnIdOf, columnsOf, PRIORITIES, splitCriteria, useColumnTitle } from "@/lib/issues";
 import { useToast } from "@/lib/toast";
 
@@ -131,6 +132,7 @@ export function NewIssueDialog({
     onClose();
   };
   const ready = title.trim() !== "" && !files.uploading && !action.isPending;
+  const unsaved = useEdited(open, [title, text, description, criteria, draftCriterion, due, files.items.length]);
   const submit = () => {
     if (!ready) return;
     const body = wide
@@ -239,6 +241,7 @@ export function NewIssueDialog({
       title={t("issues.new")}
       subtitle={wide && chosenColumn ? t("issues.newIn", { column: columnTitle(chosenColumn) }) : undefined}
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={wide ? 1040 : 640}
       className={cx("issue-new", wide && "issue-new--wide")}
       actions={

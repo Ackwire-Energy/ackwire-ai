@@ -509,6 +509,7 @@ function ItemDialog({
       open
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("common.close")}
+      unsaved={dirty}
       className="vlt-details"
       size="lg"
       title={item.title}

@@ -220,6 +220,31 @@ describe("Issues (board and list)", () => {
     expect(created.artifacts).toHaveLength(1);
   });
 
+  test("Nova tarefa: a stray press outside or Esc keeps what was written; × still closes it", async () => {
+    await go("issues");
+    await click(screen().getByRole("button", { name: "Nova tarefa" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
+    // Empty, Esc closes it as before.
+    await key(within(dialog).getByLabelText("Título"), "Escape");
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Nova tarefa" })).toBeNull();
+    await click(screen().getByRole("button", { name: "Nova tarefa" }));
+    const again = screen().getByRole("dialog", { name: "Nova tarefa" });
+    await type(within(again).getByLabelText("Título"), "Exportar agenda");
+    await key(within(again).getByLabelText("Título"), "Escape");
+    const scrim = document.querySelector(".ac-dialog__scrim") as HTMLElement;
+    await act(async () => {
+      fireEvent.pointerDown(scrim);
+      fireEvent.click(scrim);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await settle(2);
+    expect((within(again).getByLabelText("Título") as HTMLInputElement).value).toBe("Exportar agenda");
+    await click(within(again).getByRole("button", { name: "Fechar" }));
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Nova tarefa" })).toBeNull();
+  });
+
   test("Nova tarefa → formulário completo: the text splits into description and criteria, and comes back", async () => {
     await go("issues");
     await click(screen().getByRole("button", { name: "Nova tarefa" }));

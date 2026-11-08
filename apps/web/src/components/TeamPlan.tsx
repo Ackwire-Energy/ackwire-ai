@@ -47,6 +47,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEdited } from "@/hooks/useEdited";
 import { lookOf } from "@/lib/look";
 import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
@@ -553,12 +554,14 @@ function AdjustDialog({
     firstTask: agent.firstTask ?? "",
   });
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const unsaved = useEdited(true, v);
   return (
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
       title={t("teamPlan.adjust.title", { name: agent.name })}
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={560}
       leading={<AgentAvatar name={v.name || agent.name} appearance={lookOf(agent)} size="md" />}
     >
