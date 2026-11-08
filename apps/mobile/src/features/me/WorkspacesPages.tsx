@@ -66,10 +66,10 @@ export function useWorkspacesAcross(): { groups: ServerWorkspaces[]; elsewhere: 
 
 /**
  * Opens a workspace from a list of them: the current server's by choosing it; another server's by moving there, the
- * toast saying where you are now ("Agora em …", on the axis it came from; nothing signs out, ADR 0154). `before`:
- * closes the list first (a sheet), so the move is seen on the screen under it.
+ * toast saying where you are now ("Agora em …", on the axis it came from; nothing signs out, ADR 0154). The one close
+ * (`dismissTo`) also takes down the sheet the list may sit in.
  */
-export function useOpenWorkspaceRow(before?: () => void) {
+export function useOpenWorkspaceRow() {
   const { t } = useTranslation();
   const toast = useToast();
   const org = useOrg();
@@ -77,7 +77,8 @@ export function useOpenWorkspaceRow(before?: () => void) {
     const here = g.current && o.id === org.orgId;
     if (here) return;
     haptics.light();
-    before?.();
+    // One close only: `dismissTo` below (or `openWorkspace`'s) also closes the sheet the list may sit in; closing it
+    // separately raced the switch and left the stack half drawn.
     if (g.current) {
       org.setOrgId(o.id);
       router.dismissTo("/");

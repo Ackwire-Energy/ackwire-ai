@@ -15,7 +15,7 @@ import { useOpenWorkspaceRow, useWorkspacesAcross, WorkspaceGroups } from "./Wor
 export function WorkspacesSheet() {
   const { t } = useTranslation();
   const { groups } = useWorkspacesAcross();
-  const open = useOpenWorkspaceRow(goBack);
+  const open = useOpenWorkspaceRow();
   return (
     <SheetScreen>
       <SheetHeader title={t("mobile.me.workspaces")} />
