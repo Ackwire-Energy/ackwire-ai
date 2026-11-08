@@ -12,38 +12,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../cx";
+import { hoverless, movesByKeys } from "../device";
 import { Icon, type IconName } from "../icons/Icon";
 import { MenuAt } from "./Menu";
-
-/**
- * A bubble's time sits at the bubble's end, so its details open to the left of it, unless they don't fit there (a
- * short bubble on the left): then to the right, or to the side with more room, wrapping within the row
- * (`--tip-room`). Measured as the pointer or the focus arrives, the tooltip still hidden.
- */
-function placeStampTip(stamp: HTMLElement) {
-  const tip = stamp.querySelector<HTMLElement>(".ac-msg__tip");
-  const row = stamp.closest(".ac-msg")?.getBoundingClientRect();
-  const anchor = tip?.parentElement?.getBoundingClientRect();
-  if (!tip || !row || !anchor) return;
-  stamp.style.removeProperty("--tip-room");
-  const left = anchor.right - row.left - 8;
-  const right = row.right - anchor.left - 8;
-  const side = tip.offsetWidth <= left || left >= right ? "end" : "start";
-  stamp.dataset.tip = side;
-  stamp.style.setProperty("--tip-room", `${Math.max(side === "end" ? left : right, 120)}px`);
-}
-
-/** The stamp's ref: `placeStampTip` as the pointer enters it or the focus reaches its time. */
-function stampTipRef(stamp: HTMLElement | null) {
-  if (!stamp) return;
-  const place = () => placeStampTip(stamp);
-  stamp.addEventListener("pointerenter", place);
-  stamp.addEventListener("focusin", place);
-  return () => {
-    stamp.removeEventListener("pointerenter", place);
-    stamp.removeEventListener("focusin", place);
-  };
-}
+import { Tip } from "./Tip";
 
 /**
  * How the rows under it are drawn. Every row reads it, so a view sets it once: `comfortable` keeps my rows on the right
@@ -138,8 +110,7 @@ const MENU_ROOM = 140;
 
 /** A tap on touch on the row itself, not on a link or a button in it. */
 function touchTap(e: MouseEvent<HTMLElement>) {
-  if (typeof window.matchMedia !== "function") return false;
-  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return false;
+  if (!(navigator.maxTouchPoints > 0) || !hoverless()) return false;
   // The menu's own taps bubble here through its portal.
   if (!(e.target instanceof Element) || !e.currentTarget.contains(e.target)) return false;
   return e.target === e.currentTarget || !e.target.closest(INTERACTIVE);
@@ -180,6 +151,8 @@ export function Message({
   menu,
   className,
   onClick,
+  onFocus,
+  onBlur,
   style,
   ...rest
 }: MessageProps) {
@@ -196,6 +169,8 @@ export function Message({
   const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
   const menuOpen = Boolean(menu) && menuAt !== null;
   const footed = mine && !inBubble && (run === "end" || run === "solo");
+  // The keys' focus in my row: its head is hidden, so its time's details open under its bubble.
+  const [keysIn, setKeysIn] = useState(false);
   useEffect(() => {
     if (!menuOpen) return;
     // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
@@ -211,17 +186,21 @@ export function Message({
     });
     return () => cancelAnimationFrame(frame);
   }, [menuOpen]);
-  const tip = meta ? (
-    <span className="ac-msg__meta ac-msg__tip" role="tooltip" id={tipId}>
-      {meta}
-    </span>
-  ) : null;
   const clock = meta ? (
-    // Focusable so the details are reachable without a mouse.
-    <span className="ac-msg__time ac-msg__time--details" tabIndex={grouped || mine ? -1 : 0} aria-describedby={tipId}>
+    // Focusable so the details are reachable without a mouse. A bubble's time ends it: its details open to its left.
+    <Tip
+      className="ac-msg__time ac-msg__time--details"
+      tip={meta}
+      look="ac-msg__tip"
+      align={inBubble ? "end" : "start"}
+      tabIndex={grouped || mine ? -1 : 0}
+      aria-describedby={tipId}
+    >
       {time}
-      {tip}
-    </span>
+      <span id={tipId} hidden>
+        {meta}
+      </span>
+    </Tip>
   ) : (
     <span className="ac-msg__time">{time}</span>
   );
@@ -240,12 +219,20 @@ export function Message({
       {(!inBubble || mine) && clock}
       {note && (
         // Focusable so the reason is reachable without a mouse.
-        <span className="ac-msg__note" tabIndex={grouped ? -1 : 0} aria-describedby={noteId}>
+        <Tip
+          className="ac-msg__note"
+          tip={note.tip}
+          look="ac-msg__note-tip ac-glass"
+          align="center"
+          delay={0}
+          tabIndex={grouped ? -1 : 0}
+          aria-describedby={noteId}
+        >
           {note.label}
-          <span className="ac-msg__note-tip ac-glass" role="tooltip" id={noteId}>
+          <span id={noteId} hidden>
             {note.tip}
           </span>
-        </span>
+        </Tip>
       )}
       {/* A run's earlier row of mine has no line under it once sent, so none while it sends: its hidden head
           reads the state out. */}
@@ -256,13 +243,18 @@ export function Message({
   // What a bubble ends with: the time, what the row is doing (a send in flight stands in the time's place, as under
   // a bubble of mine), and the receipt's mark.
   const stamp = inBubble ? (
-    <span className="ac-msg__stamp" ref={stampTipRef}>
+    <span className="ac-msg__stamp">
       {mine ? (
         (statusNode ?? (
-          <span className="ac-msg__time ac-msg__time--details" aria-hidden="true">
+          <Tip
+            className="ac-msg__time ac-msg__time--details"
+            tip={meta}
+            look="ac-msg__tip"
+            align="end"
+            aria-hidden="true"
+          >
             {time}
-            {meta && <span className="ac-msg__tip">{meta}</span>}
-          </span>
+          </Tip>
         ))
       ) : (
         <>
@@ -299,6 +291,14 @@ export function Message({
       data-names={inBubble && look?.names === false ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}
       data-menu-open={menuOpen ? "true" : undefined}
+      onFocus={(e) => {
+        onFocus?.(e);
+        if (footed) setKeysIn(movesByKeys());
+      }}
+      onBlur={(e) => {
+        onBlur?.(e);
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setKeysIn(false);
+      }}
       onClick={(e) => {
         onClick?.(e);
         if (!menu || !touchTap(e)) return;
@@ -317,10 +317,9 @@ export function Message({
       {mine ? null : grouped ? (
         // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
         <span className="ac-msg__gutter" aria-hidden="true">
-          <span className="ac-msg__gutter-time">
+          <Tip className="ac-msg__gutter-time" tip={meta} look="ac-msg__tip">
             {time}
-            {meta && <span className="ac-msg__tip">{meta}</span>}
-          </span>
+          </Tip>
         </span>
       ) : (
         <span className="ac-msg__avatar">{avatar}</span>
@@ -351,10 +350,16 @@ export function Message({
               </span>
             ) : (
               <>
-                <span className="ac-msg__own-time" aria-hidden="true">
+                <Tip
+                  className="ac-msg__own-time"
+                  tip={meta}
+                  look="ac-msg__tip"
+                  align="end"
+                  open={keysIn}
+                  aria-hidden="true"
+                >
                   {time}
-                  {meta && <span className="ac-msg__tip">{meta}</span>}
-                </span>
+                </Tip>
                 {aside && <span className="ac-msg__aside">{aside}</span>}
               </>
             )}

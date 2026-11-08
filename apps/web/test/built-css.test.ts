@@ -168,6 +168,18 @@ test("the built stylesheet keeps touch's bar for the keyboard only, and the lit 
   expect(declarations(css, more)).toEqual(expect.arrayContaining(declarations(kit, more)));
 });
 
+test("the built stylesheet keeps a tip on the floating layer, fixed to the window, a word too long for it broken inside", async () => {
+  const tip = declarations(await builtCss(), ".ac-tip");
+  for (const kept of [
+    ["position", "fixed"],
+    ["z-index", "var(--z-floating)"],
+    ["max-width", "calc(100vw - 24px)"],
+    ["overflow-wrap", "anywhere"],
+    ["pointer-events", "none"],
+  ] as const)
+    expect(tip).toContainEqual(kept);
+});
+
 test("no rule sets translate, rotate or scale beside transform: the build's minifier drops or merges them", async () => {
   const pairs: string[] = [];
   for (const dir of ["apps/web/src", "packages/ui/src", "apps/desktop/src"])

@@ -193,7 +193,6 @@ html:not([data-pointer]) .ap-card:focus-visible {
 }
 /* Only the connector's logo, the chips' height; its name shows on hover and focus. */
 .ap-conn-mark {
-  position: relative;
   display: inline-flex;
   border-radius: 7px;
 }
@@ -208,23 +207,15 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ap-conn-mark:hover::after,
-html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
+/* Its name (`Tip`, on the floating layer). */
+.ap-conn-mark__tip {
   padding: 5px 8px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
   color: var(--bg);
   background: var(--ink);
   box-shadow: var(--e2);
-  pointer-events: none;
-  z-index: 5;
 }
 .ap-conn__own {
   width: 24px;

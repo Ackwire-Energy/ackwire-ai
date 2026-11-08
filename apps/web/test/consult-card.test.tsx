@@ -249,8 +249,15 @@ describe("an agent that joined on its own (meta.joined)", () => {
     const note = row.querySelector(".ac-msg__note") as HTMLElement;
     expect(note.getAttribute("tabindex")).toBe("0");
     expect(note.textContent).toContain("entrou na conversa");
-    expect(row.querySelector(".ac-msg__note-tip")?.textContent).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
-    expect(note.getAttribute("aria-describedby")).toBe(row.querySelector(".ac-msg__note-tip")?.id ?? "");
+    expect(document.getElementById(note.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Ninguém chamou a Ada. Ela entrou para ajudar.",
+    );
+    // The glass tip that shows it to the eye opens over the page, as the time's details do.
+    await act(async () => fireEvent.pointerEnter(note, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 10)));
+    const tip = document.querySelector(".ac-tip.ac-msg__note-tip");
+    expect(tip?.textContent).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(tip?.parentElement).toBe(document.body);
     // Others' replies don't say it.
     expect(rowWith("Achei a causa")?.querySelector(".ac-msg__note") ?? null).toBeNull();
   });

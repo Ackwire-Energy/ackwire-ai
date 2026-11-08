@@ -1243,21 +1243,11 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   font-size: 12px;
   color: var(--faint);
 }
-.ac-msg__meta {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
-}
 /*
- * Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header. Focus counts
+ * Details behind the time (date, model, tokens): a tip (`Tip`) on hover or focus, never in the header. Focus counts
  * for the keys only (`data-pointer`): a panel or a dialog closing with Esc hands the focus back by script, which a
  * browser calls :focus-visible after any key.
  */
-.ac-msg__time--details,
-.ac-msg__gutter-time {
-  position: relative;
-}
 .ac-msg__time--details {
   cursor: default;
   border-radius: var(--radius-cut);
@@ -1266,11 +1256,34 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ac-msg__tip {
-  position: absolute;
+/*
+ * A tip (`Tip`): on the floating layer, in <body> and fixed to the window where `placeTip` puts it, so nothing that
+ * clips or scrolls cuts it and no row's bar covers it. As wide as its words, wrapping only where the window is
+ * narrower, with the floating layers' room on both sides; a word longer than that (a mailbox) breaks inside it.
+ */
+.ac-tip {
+  position: fixed;
+  top: 0;
   left: 0;
-  bottom: calc(100% + 6px);
-  z-index: var(--z-sticky);
+  z-index: var(--z-floating);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-tip {
+    animation: ac-tip-in 120ms ease both;
+  }
+}
+@keyframes ac-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+.ac-msg__tip {
   padding: var(--space-1) var(--space-2);
   background: var(--surface-raised);
   color: var(--ink);
@@ -1281,33 +1294,6 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 16px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-.ac-msg__time--details:hover .ac-msg__tip,
-html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
-.ac-msg__gutter-time:hover .ac-msg__tip,
-.ac-msg__own-time:hover .ac-msg__tip {
-  visibility: visible;
-  opacity: 1;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .ac-msg__tip {
-    transform: translateY(2px);
-    transition:
-      opacity 120ms ease,
-      transform 120ms ease,
-      visibility 0s linear 120ms;
-  }
-  .ac-msg__time--details:hover .ac-msg__tip,
-  html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
-  .ac-msg__gutter-time:hover .ac-msg__tip,
-  .ac-msg__own-time:hover .ac-msg__tip {
-    transform: none;
-    transition-delay: 250ms, 250ms, 0s;
-  }
 }
 /* A person-facing state on the header line ("enviando…"): icon + word, muted */
 .ac-msg__status {
@@ -5977,17 +5963,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 }
 /* Under the run's last bubble: its time (its details on hover), or "enviando…" in its place on the same line. */
 .ac-msg__own-time {
-  position: relative;
   min-height: 16px;
   font-size: 11px;
   line-height: 16px;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.ac-msg__own-time > .ac-msg__tip {
-  left: auto;
-  right: 0;
 }
 /*
  * The receipt's mark (agents saw it, answered it; a DM's "Vista por" face) ends the time's line, its right on the
@@ -6061,11 +6042,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
     position: absolute;
     inset: -14px -10px;
   }
-}
-/* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
-html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
-  visibility: visible;
-  opacity: 1;
 }
 /*
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
@@ -9253,14 +9229,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-msg__actions {
     right: 8px;
   }
-  /* The time's details and a note's reason: on a tap, not only on hover. */
-  .ac-msg__time--details:focus .ac-msg__tip {
-    visibility: visible;
-    opacity: 1;
-  }
-  .ac-msg__note:focus .ac-msg__note-tip {
-    display: block;
-  }
   .ac-emoji__cell:hover {
     transform: none;
   }
@@ -9333,17 +9301,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   max-width: calc(100vw - 24px);
 }
 @media (max-width: 640px) {
-  /* The time sits mid-row: anchor its tooltip to the message row instead, so it never runs past the screen. */
-  .ac-msg__time--details,
-  .ac-msg__gutter-time {
-    position: static;
-  }
-  .ac-msg__tip {
-    left: 12px;
-    width: max-content;
-    max-width: calc(100% - 24px);
-    white-space: normal;
-  }
   .ac-suggest {
     width: calc(100vw - 24px);
   }
@@ -10174,7 +10131,6 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 }
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
 .ac-msg__note {
-  position: relative;
   font-size: 12px;
   color: var(--faint);
   border-bottom: 1px dotted var(--line2);
@@ -10186,38 +10142,22 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   border-radius: 4px;
 }
 .ac-msg__note-tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  z-index: var(--z-sticky);
-  width: max-content;
   max-width: min(260px, 70vw);
   border-radius: 12px;
   padding: 7px 11px;
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--ink2);
-  display: none;
-}
-.ac-msg__note:hover .ac-msg__note-tip,
-html:not([data-pointer]) .ac-msg__note:focus-visible .ac-msg__note-tip {
-  display: block;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ac-msg__note:hover .ac-msg__note-tip,
-  .ac-msg__note:focus .ac-msg__note-tip {
+  .ac-msg__note-tip {
     animation: ac-note-tip-in 0.18s var(--spring) both;
   }
 }
 @keyframes ac-note-tip-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%);
+    transform: translateY(6px) scale(0.97);
   }
 }
 
