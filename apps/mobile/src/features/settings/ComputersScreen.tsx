@@ -255,7 +255,11 @@ function OtherComputers() {
   const noneCopy = firstUseCopy("computers", pairs);
   return (
     <>
-      <GroupedHeader>{t("computers.other.title")}</GroupedHeader>
+      <GroupedHeader
+        hint={{ name: t("common.about", { label: t("computers.other.title") }), text: t("computers.other.text") }}
+      >
+        {t("computers.other.title")}
+      </GroupedHeader>
       {machines.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {machines.isError && !machines.data ? (
         <View style={styles.note}>
@@ -282,7 +286,6 @@ function OtherComputers() {
           ))}
         </GroupedList>
       ) : null}
-      {list.length > 0 ? <GroupedFooter>{t("computers.other.text")}</GroupedFooter> : null}
       {pairs ? <ConnectComputer /> : null}
     </>
   );

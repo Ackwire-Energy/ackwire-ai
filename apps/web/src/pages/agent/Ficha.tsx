@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  GroupHeading,
   Icon,
   Meter,
   PlanMeter,
@@ -157,9 +158,7 @@ export function Ficha() {
       />
 
       <div className="agp-work">
-        <h2 className="agp-ficha__h" id="agp-ficha-with">
-          {t("agentPage.ficha.with")}
-        </h2>
+        <GroupHeading id="agp-ficha-with" title={t("agentPage.ficha.with")} />
         <section className="agp-ficha__card" aria-labelledby="agp-ficha-with">
           <Cell
             row

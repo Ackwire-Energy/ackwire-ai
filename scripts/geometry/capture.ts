@@ -1,7 +1,7 @@
 /**
  * `bun test --preload ./scripts/geometry/capture.ts <paths>` with GEOMETRY_OUT set: while the tests run, saves every
  * distinct screen they reach as HTML, for `check.ts` to lay out in Chromium. Two screens are the same when their tags
- * and classes are, whatever their words.
+ * and classes are, whatever their words, in the same language (the page's `lang`).
  */
 import { beforeEach } from "bun:test";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -28,7 +28,8 @@ if (OUT) {
     try {
       const html = document.body?.innerHTML;
       if (!html || html.length < 200) return;
-      const id = Bun.hash(shapeOf(html)).toString(36);
+      // A screen in another language is another screen: its longer words are what the check measures there.
+      const id = Bun.hash(document.documentElement.lang + shapeOf(html)).toString(36);
       if (seen.has(id)) return;
       seen.add(id);
       const file = `${OUT}/${id}.html`;
@@ -39,6 +40,9 @@ if (OUT) {
       // A screen that can't be read is one state fewer, never a failed test.
     }
   };
+
+  // A change that only rewrites words (another language) moves no element: a test saves that screen itself.
+  (globalThis as { geometrySnapshot?: () => void }).geometrySnapshot = snapshot;
 
   // The state a test ends on is the one it asserted: taken as its root unmounts, whatever the time since the last one.
   const client = createRequire(new URL("../../packages/ui/package.json", import.meta.url))("react-dom/client");

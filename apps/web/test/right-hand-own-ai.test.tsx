@@ -53,13 +53,13 @@ test("Lodi's settings: the face opens the look, the plan is its logo and name on
   await settle(2);
   // Sua IA isn't here: these are the team's settings, the workspace's AI names the plan.
   expect(body.querySelector(".rh-mine")).toBeNull();
-  const lines = [...body.querySelectorAll(".rh-set__planline")];
+  const lines = [...body.querySelectorAll(".settings-row__value")];
   expect(lines.length).toBe(1);
   for (const line of lines) {
     expect(line.querySelector(".ac-provider-logo, svg, img")).toBeTruthy();
     expect(line.textContent).toContain("Trabalho");
-    // Under the row's text, never beside the control.
-    expect(line.closest(".settings-row__help")).toBeTruthy();
+    // A value before the row's control, on the row's line.
+    expect(line.nextElementSibling?.matches(".settings-row__end")).toBe(true);
   }
   const share = within(body).getByRole("switch", { name: "Atende outras pessoas" });
   expect(share.closest(".settings-row")).toBeTruthy();

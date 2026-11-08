@@ -47,30 +47,34 @@ import {
   agentGradient,
   Button,
   Card,
-  Checkbox,
+  CountChip,
+  cx,
   Dialog,
   DialogBody,
   EmptyState,
   EventPillAction,
+  FilterToggle,
+  GroupHeading,
   Icon,
   InfoHint,
   Input,
   Locked,
   Meter,
-  Radio,
-  RadioGroup,
   RoleMark,
   Segmented,
   Select,
+  Switch,
   TabPanel,
   Tabs,
+  Toolbar,
   UsageDays,
   UsageSwatch,
 } from "@agenteschat/ui";
+
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, Fragment, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { AskAgentButton } from "@/components/AskAgentButton";
@@ -167,7 +171,7 @@ function placeLine(t: TFunction, place: UsagePlace, agent: string) {
 function UseMeter({ p, plansOnly }: { p: PersonRow; plansOnly: boolean }) {
   const { t, i18n } = useTranslation();
   const amount = formatUsd(i18n.language, p.monthUsd);
-  const shown = plansOnly ? t("peopleUsage.meter.estimate", { amount }) : amount;
+  const shown = plansOnly ? t("peopleUsage.meter.approx", { amount }) : amount;
   return (
     <div className="pu-meter" data-state={p.state}>
       <span className="pu-meter__line">
@@ -246,15 +250,29 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
                 : t("peopleUsage.about")}
             </InfoHint>
           </h3>
-          <span className="muted">
-            {t("peopleUsage.sub", {
-              month,
-              count: data.people.length,
-              amount: data.plansOnly
-                ? t("peopleUsage.meter.estimate", { amount: formatUsd(i18n.language, data.totalUsd) })
-                : formatUsd(i18n.language, data.totalUsd),
-            })}
-          </span>
+          {data.plansOnly ? (
+            // What plans' use would cost through the API: said as that, with why behind the ⓘ.
+            <span className="muted ac-hintline">
+              <span>
+                {t("peopleUsage.subPlans", {
+                  month,
+                  count: data.people.length,
+                  amount: t("peopleUsage.meter.estimate", { amount: formatUsd(i18n.language, data.totalUsd) }),
+                })}
+              </span>
+              <InfoHint name={t("common.about", { label: t("usageViews.apiPrice") })}>
+                {t("usageViews.apiPriceHint")}
+              </InfoHint>
+            </span>
+          ) : (
+            <span className="muted">
+              {t("peopleUsage.sub", {
+                month,
+                count: data.people.length,
+                amount: formatUsd(i18n.language, data.totalUsd),
+              })}
+            </span>
+          )}
         </div>
         <span className="pu-head__acts">
           <Button
@@ -272,7 +290,7 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
           {switcher}
         </span>
       </div>
-      <div className="pu-toolbar">
+      <Toolbar size="sm">
         <Select
           size="sm"
           aria-label={t("peopleUsage.periodLabel")}
@@ -304,22 +322,17 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
             ...dir.agents.map((a) => ({ value: a.id, label: a.name })),
           ]}
         />
-        {PEOPLE_CHIPS.map((c) => {
-          const on = chips.includes(c);
-          return (
-            <button
-              key={c}
-              type="button"
-              className="pu-chip"
-              aria-pressed={on}
-              onClick={() => setChips((l) => (on ? l.filter((x) => x !== c) : [...l, c]))}
-            >
-              {t(`peopleUsage.chips.${c}`)}
-              <span className="pu-chip__n tabular">{counts[c]}</span>
-            </button>
-          );
-        })}
-      </div>
+        {PEOPLE_CHIPS.map((c) => (
+          <FilterToggle
+            key={c}
+            pressed={chips.includes(c)}
+            onPressedChange={(on) => setChips((l) => (on ? [...l, c] : l.filter((x) => x !== c)))}
+            count={counts[c]}
+          >
+            {t(`peopleUsage.chips.${c}`)}
+          </FilterToggle>
+        ))}
+      </Toolbar>
       <p className="pu-summary">
         <span data-tone="near">{t("peopleUsage.summary.near", { n: counts.near })}</span>
         {" · "}
@@ -444,7 +457,7 @@ function LiveCard({ live }: { live: PeopleUsage["live"] }) {
       <h4 id="pu-live-title" className="pu-live__title">
         <span className="pu-live__dot" aria-hidden="true" />
         {t("peopleUsage.live.title")}
-        <span className="pu-chip__n tabular">{people}</span>
+        <CountChip>{people}</CountChip>
       </h4>
       <ul className="pu-live__list">
         {live.slice(0, 8).map((w) => {
@@ -772,8 +785,9 @@ function PersonDrawer({ userId, onClose }: { userId: string | null; onClose: () 
 }
 
 type Choice = "default" | "none" | "amount";
-const choiceOf = (v: number | null | undefined, has: boolean): Choice =>
-  !has ? "default" : v === null || v === undefined ? "none" : "amount";
+/** What a limit's select shows: the default where it may follow it, else "Sem limite" or an amount, never an empty box. */
+const choiceOf = (v: number | null | undefined, has: boolean, allowDefault: boolean): Choice =>
+  !has && allowDefault ? "default" : v === null || v === undefined ? "none" : "amount";
 
 /** One limit: "Usar o padrão" (not for the default itself), "Sem limite" or an amount a month. */
 function LimitPick({
@@ -792,13 +806,30 @@ function LimitPick({
   onChange: (next: { has: boolean; value: number | null }) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const choice = choiceOf(value, has);
+  const choice = choiceOf(value, has, allowDefault);
   const [text, setText] = useState(value ? new Intl.NumberFormat(i18n.language).format(value) : "");
   return (
     <span className="pu-pick">
+      {choice === "amount" && (
+        <span className="pu-usd">
+          <span aria-hidden="true">US$</span>
+          <Input
+            aria-label={label}
+            inputMode="decimal"
+            value={text || (value ? String(value) : "")}
+            onChange={(e) => {
+              setText(e.target.value);
+              const n = parseAmount(e.target.value);
+              if (n > 0) onChange({ has: true, value: n });
+            }}
+            className="pu-amount"
+          />
+        </span>
+      )}
       <Select<Choice>
         size="sm"
         id={id}
+        className="pu-pick__select"
         aria-label={label}
         value={choice}
         onValueChange={(c) =>
@@ -816,22 +847,6 @@ function LimitPick({
           { value: "amount", label: t("peopleUsage.limits.amount") },
         ]}
       />
-      {choice === "amount" && (
-        <span className="pu-usd">
-          <span aria-hidden="true">US$</span>
-          <Input
-            aria-label={label}
-            inputMode="decimal"
-            value={text || (value ? String(value) : "")}
-            onChange={(e) => {
-              setText(e.target.value);
-              const n = parseAmount(e.target.value);
-              if (n > 0) onChange({ has: true, value: n });
-            }}
-            className="pu-amount"
-          />
-        </span>
-      )}
     </span>
   );
 }
@@ -867,38 +882,77 @@ function LimitsView({ switcher }: { switcher: ReactNode }) {
     else delete copy[id];
     set({ [field]: copy });
   };
+  const row = (label: ReactNode, pick: ReactNode, lead?: ReactNode) => (
+    <div className={cx("settings-row ac-actrow", lead !== undefined && "settings-row--lead")}>
+      {lead !== undefined && (
+        <span className="settings-row__icon" aria-hidden="true">
+          {lead}
+        </span>
+      )}
+      <span className="settings-row__text ac-actrow__text">{label}</span>
+      <span className="settings-row__end">{pick}</span>
+    </div>
+  );
+  const hinted = (id: string, label: string, hint: string) => (
+    <span className="ac-hintline">
+      <label className="settings-row__label" htmlFor={id}>
+        {label}
+      </label>
+      <InfoHint name={t("common.about", { label })}>{hint}</InfoHint>
+    </span>
+  );
   return (
     <>
       <div className="pu-head">
-        <h3 className="pu-title">{t("peopleUsage.limits.title")}</h3>
+        <div className="pu-head__text">
+          <h3 className="pu-title ac-hintline">
+            <span>{t("peopleUsage.limits.title")}</span>
+            <InfoHint name={t("common.about", { label: t("peopleUsage.limits.title") })}>
+              {t("common.joinSentences", { a: t("peopleUsage.limits.leadMore"), b: t("peopleUsage.limits.rule") })}
+            </InfoHint>
+          </h3>
+          <span className="muted">{t("peopleUsage.limits.lead")}</span>
+        </div>
         {switcher}
       </div>
       <Card className="pu-limits">
-        <p className="pu-lead">{t("peopleUsage.limits.lead")}</p>
         <Locked when={save.isPending}>
-          <div className="pu-limits__row">
-            <span className="pu-limits__label">
-              <b>{t("peopleUsage.limits.default")}</b>
-              <span className="muted">{t("peopleUsage.limits.defaultHint")}</span>
-            </span>
-            <LimitPick
-              id="pu-default"
-              label={t("peopleUsage.limits.default")}
-              value={draft.defaultUsd}
-              has={draft.defaultUsd !== null}
-              allowDefault={false}
-              onChange={(n) => set({ defaultUsd: n.value })}
-            />
-          </div>
-          <div className="pu-limits__row pu-limits__row--list">
-            <b className="pu-limits__label">{t("peopleUsage.limits.byRole")}</b>
-            <ul className="pu-limits__list">
-              {roleList.map((r) => (
-                <li key={r.id}>
-                  <span className="pu-limits__who">
-                    <RoleMark color={r.color} icon={r.icon} size={18} />
-                    {r.name}
-                  </span>
+          <div className="settings-rows">
+            {row(
+              hinted("pu-default", t("peopleUsage.limits.default"), t("peopleUsage.limits.defaultHint")),
+              <LimitPick
+                id="pu-default"
+                label={t("peopleUsage.limits.default")}
+                value={draft.defaultUsd}
+                has={draft.defaultUsd !== null}
+                allowDefault={false}
+                onChange={(n) => set({ defaultUsd: n.value })}
+              />,
+            )}
+            {row(
+              hinted("pu-when", t("peopleUsage.limits.whenTitle"), t("peopleUsage.limits.whenHint")),
+              <Select
+                size="sm"
+                id="pu-when"
+                className="pu-pick__select"
+                aria-label={t("peopleUsage.limits.whenTitle")}
+                value={draft.onLimit}
+                onValueChange={(v) => set({ onLimit: v })}
+                options={(["block", "notify"] as const).map((v) => ({
+                  value: v,
+                  label: t(v === "block" ? "peopleUsage.limits.blockShort" : "peopleUsage.limits.notify"),
+                }))}
+              />,
+            )}
+            {row(
+              hinted("pu-warn", t("peopleUsage.limits.warn"), t("peopleUsage.limits.warnHint")),
+              <Switch id="pu-warn" checked={draft.warn} onCheckedChange={(on) => set({ warn: on })} />,
+            )}
+            {roleList.length > 0 && <GroupHeading level={4} title={t("peopleUsage.limits.byRole")} />}
+            {roleList.map((r) => (
+              <Fragment key={r.id}>
+                {row(
+                  <span className="settings-row__label">{r.name}</span>,
                   <LimitPick
                     id={`pu-role-${r.id}`}
                     label={r.name}
@@ -906,20 +960,39 @@ function LimitsView({ switcher }: { switcher: ReactNode }) {
                     has={r.id in draft.roles}
                     allowDefault
                     onChange={(n) => setIn("roles", r.id, n)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="pu-limits__row pu-limits__row--list">
-            <b className="pu-limits__label">{t("peopleUsage.limits.people")}</b>
-            <ul className="pu-limits__list">
-              {people.map((m) => (
-                <li key={m.userId}>
-                  <span className="pu-limits__who">
-                    <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="xs" />
-                    {m.name}
-                  </span>
+                  />,
+                  <RoleMark color={r.color} icon={r.icon} size={20} />,
+                )}
+              </Fragment>
+            ))}
+            {people.length + others.length > 0 && (
+              <GroupHeading
+                level={4}
+                title={t("peopleUsage.limits.people")}
+                aside={
+                  others.length > 0 && (
+                    <Select
+                      size="sm"
+                      className="pu-pick__select"
+                      aria-label={t("peopleUsage.limits.addPerson")}
+                      placeholder={t("peopleUsage.limits.addPerson")}
+                      value={undefined}
+                      align="end"
+                      onValueChange={(id) => setIn("people", id, { has: true, value: draft.defaultUsd ?? 20 })}
+                      options={others.map((m) => ({
+                        value: m.userId,
+                        label: m.name,
+                        leading: <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="sm" />,
+                      }))}
+                    />
+                  )
+                }
+              />
+            )}
+            {people.map((m) => (
+              <Fragment key={m.userId}>
+                {row(
+                  <span className="settings-row__label">{m.name}</span>,
                   <LimitPick
                     id={`pu-person-${m.userId}`}
                     label={m.name}
@@ -927,48 +1000,11 @@ function LimitsView({ switcher }: { switcher: ReactNode }) {
                     has
                     allowDefault
                     onChange={(n) => setIn("people", m.userId, n)}
-                  />
-                </li>
-              ))}
-              {others.length > 0 && (
-                <li>
-                  <Select
-                    size="sm"
-                    aria-label={t("peopleUsage.limits.addPerson")}
-                    placeholder={t("peopleUsage.limits.addPerson")}
-                    value={undefined}
-                    onValueChange={(id) => setIn("people", id, { has: true, value: draft.defaultUsd ?? 20 })}
-                    options={others.map((m) => ({
-                      value: m.userId,
-                      label: m.name,
-                      leading: <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="sm" />,
-                    }))}
-                  />
-                </li>
-              )}
-            </ul>
-          </div>
-          <p className="pu-rule muted">{t("peopleUsage.limits.rule")}</p>
-          <div className="pu-when">
-            <b id="pu-when">{t("peopleUsage.limits.whenTitle")}</b>
-            <RadioGroup
-              value={draft.onLimit}
-              onValueChange={(v) => set({ onLimit: v })}
-              aria-labelledby="pu-when"
-              className="pu-radios"
-            >
-              {(["block", "notify"] as const).map((v) => (
-                <label key={v} htmlFor={`pu-on-${v}`} className="pu-radio">
-                  <Radio value={v} id={`pu-on-${v}`} />
-                  {t(`peopleUsage.limits.${v}`)}
-                </label>
-              ))}
-            </RadioGroup>
-            <label htmlFor="pu-warn" className="pu-radio">
-              <Checkbox id="pu-warn" checked={draft.warn} onCheckedChange={(on) => set({ warn: on === true })} />
-              {t("peopleUsage.limits.warn")}
-              <span className="muted">{t("peopleUsage.limits.warnHint")}</span>
-            </label>
+                  />,
+                  <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="xs" />,
+                )}
+              </Fragment>
+            ))}
           </div>
         </Locked>
         {editable && (

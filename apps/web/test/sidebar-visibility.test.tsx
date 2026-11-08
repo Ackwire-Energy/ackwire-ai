@@ -190,8 +190,9 @@ describe("an agent's row", () => {
     await go(state);
     const row = nav().querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
     const text = row?.querySelector(":scope > .sidebar__item-text");
+    // A name over a role is a face line: the name's capitals on the face's top.
     expect([...(text?.children ?? [])].map((el) => [el.className, el.textContent])).toEqual([
-      ["sidebar__item-label", "Ada"],
+      ["sidebar__item-label ac-captop", "Ada"],
       ["sidebar__item-role", "Assistente de e-mails e agenda da diretoria"],
     ]);
     // Nothing at the row's end shares the name's line with the role: only the lock.

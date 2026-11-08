@@ -74,8 +74,10 @@ export function ComputerNow() {
     });
   };
   const tone = state.kind === "needsYou" ? "warn" : state.kind === "needsOther" ? "asked" : undefined;
+  const marked = state.kind === "held" || state.kind === "problem" || state.kind === "needsOther";
   const status = (
-    <span className="cmp-entry__line">
+    // Its icon on the first line's capitals when the words wrap.
+    <span className={marked ? "cmp-entry__line ac-iconline" : "cmp-entry__line"}>
       {state.kind === "held" && <Icon name="pause" size={14} />}
       {state.kind === "problem" && <Icon name="alert" size={14} />}
       {state.kind === "needsOther" && <Icon name="clock" size={14} />}

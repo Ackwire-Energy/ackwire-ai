@@ -5,6 +5,7 @@ import { Count } from "./Count";
 import type { FiltersProps } from "./Filters";
 import { haptics } from "./haptics";
 import { Icon } from "./Icon";
+import { TOOL_H, TOUCH } from "./rhythm";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -19,7 +20,8 @@ export type SegmentedProps = FiltersProps & {
 
 /** The track's inset around the segments; a segment's corner is the track's less it, so the two stay concentric. */
 const PAD = 4;
-const RADIUS = 14;
+/** 30% of the control's height, as every control's corner. */
+const RADIUS = Math.round(TOOL_H * 0.3);
 
 /** A segmented control: a sunken track, the selected segment raised; the raised plate slides to a new choice. */
 export function Segmented({ items, value, onChange, wide = false }: SegmentedProps) {
@@ -82,14 +84,14 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
               wide === "fit" ? { flexGrow: 1 } : wide ? { flex: 1 } : null,
               pressed && !on ? { opacity: 0.6 } : null,
             ]}
-            // A 28-point segment: the slop gives it the 44 a finger needs, past the track's own padding.
-            hitSlop={{ top: 8, bottom: 8 }}
+            // The slop gives a segment the 44 a finger needs, past the track's own padding.
+            hitSlop={{ top: (TOUCH - TOOL_H) / 2 + PAD, bottom: (TOUCH - TOOL_H) / 2 + PAD }}
           >
             <View
               style={[
                 {
-                  // 28 inside the 4 pt inset: the control stays 36 tall.
-                  minHeight: 28,
+                  // Inside the track's inset: the control is a toolbar's 32.
+                  minHeight: TOOL_H - 2 * PAD,
                   paddingHorizontal: 12,
                   borderRadius: RADIUS - PAD,
                   flexDirection: "row",

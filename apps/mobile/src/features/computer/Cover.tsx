@@ -1,7 +1,7 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
-import { ComputerSky, Glass, Icon, type IconName, PixelOrbit, Text, useTheme } from "@/ui";
+import { CARD_PAD, ComputerSky, Glass, Icon, type IconName, PixelOrbit, Text, useTheme } from "@/ui";
 import { withAlpha } from "@/ui/palette";
 import { DOCK_HANG, EdgeDock } from "./EdgeDock";
 import { DEFAULT_DESKTOP } from "./screen-view";
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: CARD_PAD,
   },
   stage: { aspectRatio: DEFAULT_DESKTOP.width / DEFAULT_DESKTOP.height },
   // The capsule's hang and a little air, as the live screen's.

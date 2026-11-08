@@ -122,6 +122,7 @@ import {
   DialogFooter,
   DialogSearchList,
   EffortPixels,
+  GroupHeading,
   Icon,
   type IconName,
   InfoHint,
@@ -138,6 +139,7 @@ import {
   SettingNote,
   Switch,
 } from "@agenteschat/ui";
+
 import { extraUsageOn } from "@agenteschat/ui/plan-state";
 import { matchesWords } from "@agenteschat/ui/search";
 import { useQueryClient } from "@tanstack/react-query";
@@ -246,8 +248,10 @@ export function Cell({
         >
           {value}
           {more && <span className="agp-cell__more"> · {more}</span>}
+          {/* A row of the fact sheet says its note on the value's line. */}
+          {row && sub && <span className="agp-cell__sub">{sub}</span>}
         </span>
-        {sub && <span className="agp-cell__sub">{sub}</span>}
+        {!row && sub && <span className="agp-cell__sub">{sub}</span>}
       </span>
     </>
   );
@@ -369,9 +373,7 @@ export function WorkCard({
   );
   return (
     <div className="agp-work">
-      <h2 className="agp-ficha__h" id="agp-ficha-work">
-        {t("agentPage.work.cell.label", g)}
-      </h2>
+      <GroupHeading id="agp-ficha-work" title={t("agentPage.work.cell.label", g)} />
       <section className="agp-workcard agp-ficha__card" aria-labelledby="agp-ficha-work">
         {before}
         {/* The Cloud's agents all work on the workspace's own computer, whose state the page's computer entry says:
@@ -1619,7 +1621,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         >
           <DialogBody>
             <section className="agp-advgroup">
-              <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.think")}</h3>
+              <GroupHeading level={3} title={t("agentPage.work.brain.advanced.think")} />
               {kind !== "model" &&
                 (isAuto(planModel) ? (
                   // "Automático" picks the effort too: said where the ramp would be, as the phone's row says it.
@@ -1646,7 +1648,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             </section>
             {kind !== "model" && (
               <section className="agp-advgroup">
-                <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.answers")}</h3>
+                <GroupHeading level={3} title={t("agentPage.work.brain.advanced.answers")} />
                 {agent.ownerUserId && accountKind && (
                   <PlanReplies
                     agent={agent.name}
@@ -1936,7 +1938,12 @@ function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: 
   const label = t("agentPage.work.brain.speed");
   return (
     <div className="agp-brainfield">
-      <span className="ac-effort__head">{label}</span>
+      <span className="ac-effort__head">
+        <span className="ac-hintline">
+          <span>{label}</span>
+          <InfoHint name={t("common.about", { label })}>{t("agentPage.work.brain.speedText")}</InfoHint>
+        </span>
+      </span>
       <Segmented
         className="agp-brainseg"
         label={label}
@@ -1944,7 +1951,6 @@ function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (value: 
         onValueChange={onChange}
         options={SPEEDS.map((s) => ({ value: s, label: t(`agentPage.work.brain.speeds.${s}`) }))}
       />
-      <span className="agp-brainfield__hint">{t("agentPage.work.brain.speedText")}</span>
     </div>
   );
 }

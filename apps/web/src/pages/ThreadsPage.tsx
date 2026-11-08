@@ -15,6 +15,7 @@ import {
   FilterBar,
   FilterChip,
   FilterToggle,
+  GroupHeading,
   Icon,
   Menu,
   MenuItem,
@@ -286,20 +287,23 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           <ThreadsEmpty tab={tab} filtered={filtered} onClear={clearFilters} onAll={() => setTab("all")} />
         )}
         {!missions && threads.length > 0 && (
-          <div className="threads-groups" data-selecting={picked.size > 0 || undefined}>
+          <div className="ac-groups threads-groups" data-selecting={picked.size > 0 || undefined}>
             {byPlace(threads).map((group) => {
               const shut = collapsed.has(group.key);
               const label = group.dm ? t("threads.dms") : `#${group.name}`;
               return (
                 <section key={group.key} className="threads-group" aria-label={label}>
-                  <h2 className="list-group-head threads-group__head">
-                    <button type="button" aria-expanded={!shut} onClick={() => toggleGroup(group.key)}>
-                      <Icon name="chevronDown" size={14} className="threads-group__chev" />
-                      <Icon name={group.dm ? "person" : "channel"} size={14} />
-                      {group.dm ? label : group.name}
-                    </button>
-                    <span className="list-group-head__count">{group.threads.length}</span>
-                  </h2>
+                  <GroupHeading
+                    className="threads-group__head"
+                    title={
+                      <button type="button" aria-expanded={!shut} onClick={() => toggleGroup(group.key)}>
+                        <Icon name="chevronDown" size={14} className="threads-group__chev" />
+                        <Icon name={group.dm ? "person" : "channel"} size={14} />
+                        {group.dm ? label : group.name}
+                      </button>
+                    }
+                    count={group.threads.length}
+                  />
                   {!shut && (
                     <div className="list-card">
                       {group.threads.map((thread) => (

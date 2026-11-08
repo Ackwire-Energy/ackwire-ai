@@ -18,6 +18,7 @@ import {
   Card,
   CardHeader,
   cx,
+  InfoHint,
   Message,
   MessageLookContext,
   MessageText,
@@ -25,6 +26,7 @@ import {
   RadioGroup,
   Segmented,
 } from "@agenteschat/ui";
+
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -180,8 +182,12 @@ export function ChatLookSettings() {
         <div className="chat-look__group">
           <div className="chat-look__top">
             <span className="settings-row__text ac-actrow__text">
-              <span className="settings-row__label">{t("settings.account.chat.density")}</span>
-              <span className="settings-row__help">{t("settings.account.chat.densityHelp")}</span>
+              <span className="ac-hintline">
+                <span className="settings-row__label">{t("settings.account.chat.density")}</span>
+                <InfoHint name={t("common.about", { label: t("settings.account.chat.density") })}>
+                  {t("settings.account.chat.densityHelp")}
+                </InfoHint>
+              </span>
             </span>
             <Segmented
               size="sm"
@@ -214,11 +220,17 @@ export function ChatLookSettings() {
         {style === "bubbles" && (
           <div className="settings-row ac-actrow">
             <span className="settings-row__text ac-actrow__text">
-              <span className="settings-row__label">
-                {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
-              </span>
-              <span className="settings-row__help">
-                {t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp")}
+              <span className="ac-hintline">
+                <span className="settings-row__label">
+                  {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
+                </span>
+                <InfoHint
+                  name={t("common.about", {
+                    label: t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels"),
+                  })}
+                >
+                  {t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp")}
+                </InfoHint>
               </span>
             </span>
             <div className="settings-row__end">
@@ -237,8 +249,12 @@ export function ChatLookSettings() {
         )}
         <div className="chat-look__group">
           <span className="settings-row__text ac-actrow__text">
-            <span className="settings-row__label">{t("settings.account.chat.textSize")}</span>
-            <span className="settings-row__help">{t("settings.account.chat.textSizeHelp")}</span>
+            <span className="ac-hintline">
+              <span className="settings-row__label">{t("settings.account.chat.textSize")}</span>
+              <InfoHint name={t("common.about", { label: t("settings.account.chat.textSize") })}>
+                {t("settings.account.chat.textSizeHelp")}
+              </InfoHint>
+            </span>
           </span>
           <Segmented
             size="sm"

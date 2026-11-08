@@ -247,10 +247,10 @@ describe("RadioCard", () => {
 });
 
 describe("Field", () => {
-  test("label, help and error are wired to the control", () => {
+  test("label, example and error are wired to the control", () => {
     render(
       <>
-        <Field label="Senha" id="pw" help="Pelo menos 8 caracteres.">
+        <Field label="Senha" id="pw" example="Pelo menos 8 caracteres.">
           <Input type="password" />
         </Field>
         <Field label="Orçamento" id="b" error="Use um valor maior que zero.">

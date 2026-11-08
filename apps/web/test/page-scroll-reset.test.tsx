@@ -24,9 +24,18 @@ async function app() {
   const page = () => (
     <main className="shell__main">
       <div className="settings page-split">
-        <nav className="settings__nav" data-scroll-restoration-id="settings-nav" />
+        {/* The nav's head and a section's head as the app's, so the geometry check measures a real page top. */}
+        <nav className="settings__nav" data-scroll-restoration-id="settings-nav">
+          <div className="settings__head">
+            <h1 className="settings__title">Configurações</h1>
+          </div>
+        </nav>
         <div className="settings__body" data-scroll-restoration-id="settings-section">
-          <h2 id="jev">Jev</h2>
+          <header className="ac-pagehead">
+            <h2 id="jev" className="ac-pagehead__title">
+              Jev
+            </h2>
+          </header>
         </div>
       </div>
     </main>

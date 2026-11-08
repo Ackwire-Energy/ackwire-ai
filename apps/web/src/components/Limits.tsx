@@ -37,7 +37,7 @@ export function MembersFull() {
   const billing = useBillingAccess();
   if (!full) return null;
   return (
-    <SettingRow title={membersFullText(t, full.members, full.limit)} description={membersFullWho(t, limits, billing)}>
+    <SettingRow title={membersFullText(t, full.members, full.limit)} status={membersFullWho(t, limits, billing)}>
       {billing && (
         <BillingLinkButton orgId={org.id} from="invite_full" size="sm">
           {t("billing.open")}
@@ -102,7 +102,7 @@ export function StorageMeter() {
             ? t("limits.storage.full", { limit })
             : t(tight ? "limits.storage.near" : "limits.storage.meter", { used, limit })
         }
-        description={tight && billing ? t("limits.storage.fullAdmin") : undefined}
+        status={tight && billing ? t("limits.storage.fullAdmin") : undefined}
       >
         {tight && billing && (
           <BillingLinkButton orgId={org.id} from="storage" size="sm">

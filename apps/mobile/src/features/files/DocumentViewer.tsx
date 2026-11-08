@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-import { Button, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
+import { Button, CARD_PAD, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
 import { CodeText, RawToggle } from "../chat/CodeCard";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 6 },
   page: { flex: 1, marginTop: 4, marginHorizontal: 16, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
   clip: { overflow: "hidden" },
-  pageInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
+  pageInner: { paddingHorizontal: CARD_PAD, paddingTop: CARD_PAD, paddingBottom: 32 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
   json: { gap: 10, alignItems: "flex-start" },
   web: { flex: 1, backgroundColor: "transparent" },

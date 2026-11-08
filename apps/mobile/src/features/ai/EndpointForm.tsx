@@ -165,7 +165,10 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
               style={input}
             />
           </GroupedField>
-          <GroupedField label={t("endpoint.key")}>
+          <GroupedField
+            label={t("endpoint.key")}
+            hint={{ name: t("common.about", { label: t("endpoint.key") }), text: t("endpoint.keyHelp") }}
+          >
             <TextInput
               value={draft.apiKey}
               onChangeText={(apiKey) => set({ apiKey })}
@@ -177,9 +180,7 @@ export function EndpointForm({ orgId, onDone }: { orgId: string; onDone: () => v
             />
           </GroupedField>
         </GroupedList>
-        <GroupedFooter>
-          {t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })} {t("endpoint.keyHelp")}
-        </GroupedFooter>
+        <GroupedFooter>{t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })}</GroupedFooter>
       </Locked>
       <GroupedHeader
         aside={

@@ -67,7 +67,11 @@ export function ApprovalsPage() {
       <GroupedFooter>{t("approvalCover.subtitle")}</GroupedFooter>
       {cover ? (
         <>
-          <GroupedHeader>{t("approvalCover.when")}</GroupedHeader>
+          <GroupedHeader
+            hint={{ name: t("common.about", { label: t("approvalCover.when") }), text: t("approvalCover.whenHelp") }}
+          >
+            {t("approvalCover.when")}
+          </GroupedHeader>
           <GroupedList>
             <GroupedRow
               label={t("approvalCover.whileOut")}
@@ -80,7 +84,6 @@ export function ApprovalsPage() {
               onPress={() => save({ mode: "always" })}
             />
           </GroupedList>
-          <GroupedFooter>{t("approvalCover.whenHelp")}</GroupedFooter>
           <GroupedHeader>{t("approvalCover.until")}</GroupedHeader>
           <GroupedList>
             <GroupedRow label={t("approvalCover.noDate")} checked={!endDay} onPress={() => save({ endsAt: null })} />
@@ -196,7 +199,14 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
       </GroupedList>
       {on ? (
         <>
-          <GroupedHeader>{t("rightHandApprovals.budget")}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("rightHandApprovals.budget") }),
+              text: t("rightHandApprovals.budgetHelp"),
+            }}
+          >
+            {t("rightHandApprovals.budget")}
+          </GroupedHeader>
           <GroupedList>
             {[...new Set([...BUDGETS, budget])]
               .sort((a, b) => a - b)
@@ -209,8 +219,14 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
                 />
               ))}
           </GroupedList>
-          <GroupedFooter>{t("rightHandApprovals.budgetHelp")}</GroupedFooter>
-          <GroupedHeader>{t("rightHandApprovals.guidanceLabel", { name })}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("rightHandApprovals.guidanceLabel", { name }) }),
+              text: t("rightHandApprovals.guidanceHelp", { name }),
+            }}
+          >
+            {t("rightHandApprovals.guidanceLabel", { name })}
+          </GroupedHeader>
           <TextArea
             value={guidance ?? view.guidance}
             onChangeText={setGuidance}
@@ -223,7 +239,6 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
             placeholder={t("rightHandApprovals.guidancePlaceholder")}
             accessibilityLabel={t("rightHandApprovals.guidanceLabel", { name })}
           />
-          <GroupedFooter>{t("rightHandApprovals.guidanceHelp", { name })}</GroupedFooter>
           <View style={styles.gap} />
         </>
       ) : null}

@@ -20,7 +20,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { AgentAvatar, Button, Card, Icon, LineIcon, Locked, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { AgentAvatar, Button, CARD_PAD, Card, Icon, LineIcon, Locked, LogoMark, Text, Toggle, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   reading: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   failure: { gap: 8, alignItems: "flex-start" },
-  request: { gap: 8, padding: 14, alignItems: "flex-start" },
+  request: { gap: 8, padding: CARD_PAD, alignItems: "flex-start" },
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },

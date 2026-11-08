@@ -320,7 +320,10 @@ function AboutDialog({
         </div>
         <Field
           label={t("agentSetup.firstRun.about.line")}
-          help={other ? undefined : t("agentSetup.firstRun.about.optional")}
+          hint={{
+            name: t("common.about", { label: t("agentSetup.firstRun.about.line") }),
+            text: other ? undefined : t("agentSetup.firstRun.about.optional"),
+          }}
         >
           <Input value={line} onChange={(e) => setLine(e.target.value)} maxLength={500} required={other} />
         </Field>

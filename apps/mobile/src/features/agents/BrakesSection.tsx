@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput } from "react-native";
 import { useOrg } from "@/providers/org";
-import { fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow } from "@/ui";
+import { fieldText, GROUPED_ROW, GroupedFooter, GroupedHeader, GroupedList, GroupedRow } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 
@@ -42,24 +42,24 @@ export function BrakesSection({ agent }: { agent: Agent }) {
         <GroupedRow
           icon="shield"
           label={t("brakes.costly")}
-          sub={t("brakes.costlyHelp")}
-          subLines={4}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.costly") }), text: t("brakes.costlyHelp") }}
           toggle={b.costly === "ask"}
           disabled={!editable}
           onPress={() => save({ costly: b.costly === "ask" ? "go" : "ask" })}
         />
         <GroupedRow
           label={t("brakes.atOnce")}
-          sub={t("brakes.atOnceHelp")}
-          subLines={3}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.atOnce") }), text: t("brakes.atOnceHelp") }}
           value={String(b.maxUnrequested)}
           disabled={!editable}
           onPress={() => save({ maxUnrequested: nextOf(AT_ONCE, b.maxUnrequested) })}
         />
         <GroupedRow
           label={t("brakes.prs")}
-          sub={t("brakes.prsHelp")}
-          subLines={3}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.prs") }), text: t("brakes.prsHelp") }}
           value={String(b.maxPrsPerHour)}
           disabled={!editable}
           onPress={() => save({ maxPrsPerHour: nextOf(PRS, b.maxPrsPerHour) })}
@@ -107,7 +107,9 @@ export function BrakesSection({ agent }: { agent: Agent }) {
             ))
           : null}
       </GroupedList>
-      <GroupedHeader>{t("brakes.project")}</GroupedHeader>
+      <GroupedHeader hint={{ name: t("common.about", { label: t("brakes.project") }), text: t("brakes.projectHelp") }}>
+        {t("brakes.project")}
+      </GroupedHeader>
       <GroupedList>
         <TextInput
           value={project}
@@ -120,7 +122,7 @@ export function BrakesSection({ agent }: { agent: Agent }) {
           accessibilityLabel={t("brakes.project")}
           style={[styles.field, fieldText("body"), { color: c.ink }]}
         />
-        {/* With a project, in the project's group: the note under it speaks of both. */}
+        {/* With a project, in the project's group: its ⓘ speaks of both. */}
         {b.project ? (
           <GroupedRow
             label={t("brakes.otherProjects")}
@@ -130,7 +132,6 @@ export function BrakesSection({ agent }: { agent: Agent }) {
           />
         ) : null}
       </GroupedList>
-      <GroupedFooter>{t("brakes.projectHelp")}</GroupedFooter>
       <GroupedFooter>{t("brakes.peopleNote")}</GroupedFooter>
     </>
   );
@@ -138,5 +139,9 @@ export function BrakesSection({ agent }: { agent: Agent }) {
 
 const styles = StyleSheet.create({
   // A field row of a group, as "Create agent"'s.
-  field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
+  field: {
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.tallPadY,
+  },
 });

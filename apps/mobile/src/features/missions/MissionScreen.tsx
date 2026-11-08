@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
 import {
   Button,
+  CARD_PAD,
   Card,
   Chip,
   Count,
@@ -14,6 +15,7 @@ import {
   LineIcon,
   PixelOrbit,
   PlanTrack,
+  SCREEN_X,
   Section,
   Text,
   useReducedMotion,
@@ -361,7 +363,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   scroll: { paddingTop: 4 },
-  head: { paddingHorizontal: 20, gap: 4 },
+  head: { paddingHorizontal: SCREEN_X, gap: 4 },
   progCard: { marginHorizontal: 16, marginTop: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   // Two sizes of text on one line: they share a baseline.
@@ -370,7 +372,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
-  prog: { padding: 14, gap: 10 },
+  prog: { padding: CARD_PAD, gap: 10 },
   progHead: { flexDirection: "row", alignItems: "baseline", gap: 8 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
   btn: { flexDirection: "row", paddingHorizontal: 16, marginTop: 16 },

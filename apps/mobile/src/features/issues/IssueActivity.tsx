@@ -4,7 +4,7 @@ import { issueEventText } from "@agenteschat/client/lib/issues";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Chip, Icon, type IconName, SectionHeader, Text, useReducedMotion } from "@/ui";
+import { Chip, Icon, type IconName, SCREEN_X, SectionHeader, Text, useReducedMotion } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { MessageFiles } from "../files/MessageFiles";
 import { Face } from "../shared/Face";
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   files: { marginTop: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  none: { paddingHorizontal: 20 },
-  event: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 20, paddingVertical: 6 },
-  comment: { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  none: { paddingHorizontal: SCREEN_X },
+  event: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: SCREEN_X, paddingVertical: 6 },
+  comment: { flexDirection: "row", gap: 10, paddingHorizontal: SCREEN_X, paddingVertical: 10 },
 });

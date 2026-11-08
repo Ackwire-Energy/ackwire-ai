@@ -437,6 +437,7 @@
       "share.groupRoles"
     ],
     "fr": [
+      "filters.kinds",
       "settings.about.version",
       "wiki.bulk.agents",
       "deleteAccount.agentCount",
@@ -1635,7 +1636,6 @@
       "drive.count",
       "drive.filters",
       "drive.kind",
-      "drive.kinds",
       "drive.sort.kind",
       "drive.type",
       "emoji.categories.smileys",

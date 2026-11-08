@@ -43,7 +43,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
         ".ac-captail",
         ".ac-optrow__desc",
         ".ac-card__sub",
-        ".ac-field__help",
+        ".ac-field__example",
       ],
     ],
   ];
@@ -74,7 +74,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
   for (const selector of [
     ".ac-optrow__desc",
     ".ac-card__sub",
-    ".ac-field__help",
+    ".ac-field__example",
     ".catalog-feat__desc",
     ".catalog-tile__desc",
     ".newag__role-desc",

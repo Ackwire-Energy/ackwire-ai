@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOutUp, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text } from "@/ui";
+import { SCREEN_X, Text } from "@/ui";
 import { FadingHeaderTitle, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { useColors } from "./hooks";
 import { FocusLive, PushedHeader } from "./parts";
@@ -97,5 +97,5 @@ const BAR_TITLE_TO = 48;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  head: { paddingHorizontal: SCREEN_X, paddingTop: 2, paddingBottom: 10 },
 });

@@ -41,6 +41,7 @@ import {
   AgentAvatar,
   Button,
   EmptyState,
+  GROUPED_ROW,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -91,6 +92,7 @@ import {
   type DidLine,
   didLines,
   knownAboutMe,
+  modelRow,
   plainRole,
   spendOf,
   statusCardShown,
@@ -631,9 +633,15 @@ function Profile({ id }: { id: string }) {
       </GroupedFooter>
       {learned.playbook.length > 0 ? (
         <>
-          <GroupedHeader>{t("agentPage.memory.playbook", agentGrammar(name))}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("agentPage.memory.playbook", agentGrammar(name)) }),
+              text: t("agentPage.memory.playbookNote"),
+            }}
+          >
+            {t("agentPage.memory.playbook", agentGrammar(name))}
+          </GroupedHeader>
           <GroupedList>{learned.playbook.map(memoryRow)}</GroupedList>
-          <GroupedFooter>{t("agentPage.memory.playbookNote")}</GroupedFooter>
           {learned.people.length === 0 ? <GroupedFooter>{editFoot}</GroupedFooter> : null}
         </>
       ) : null}
@@ -733,7 +741,11 @@ function Profile({ id }: { id: string }) {
               <GroupedRow
                 icon="brain"
                 label={t("rightHand.profile.model")}
-                value={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+                {...modelRow(
+                  t,
+                  agent.brain,
+                  agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model),
+                )}
               />
             </GroupedList>
           </View>
@@ -1085,9 +1097,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.padY,
   },
   // One leading column for a tile or a mark, as `GroupedRow`'s: the text starts at 58 in every row.
   lead: { width: 32, alignItems: "center", justifyContent: "center" },

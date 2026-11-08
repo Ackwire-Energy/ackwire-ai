@@ -27,7 +27,7 @@ import { HTML_SANDBOX, HtmlFrame, withShim } from "@/components/artifacts/HtmlFr
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 const saved: { url: string; name: string }[] = [];
 const copied: string[] = [];
@@ -500,7 +500,15 @@ describe("Drive", () => {
   };
   beforeEach(() => localStorage.removeItem("agentes.drive.view"));
 
-  test("lists everything, newest update first; search and kind chips narrow it", async () => {
+  /** Tipo, one filter of the bar (FilterChip): its trigger. */
+  const kindTrigger = () =>
+    screen()
+      .getAllByRole("button")
+      .find((b) => b.classList.contains("ac-filter__trigger") && /Tipo|tipos/.test(b.textContent ?? "")) as HTMLElement;
+  const pressEscape = () =>
+    act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+
+  test("lists everything, newest update first; search and Tipo narrow it", async () => {
     await goDrive();
     expect(screen().getByRole("heading", { level: 1, name: "Drive" })).toBeTruthy();
     // Grid by default, grouped by date.
@@ -519,29 +527,36 @@ describe("Drive", () => {
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "");
     await settle(4);
 
-    // A kind chip: a toggle with the kind's icon and its count.
-    const kinds = screen().getByRole("group", { name: "Tipos" });
-    const diffs = within(kinds).getByRole("button", { name: "Alterações de código: 1" });
+    // Tipo: one filter of the bar, never a row of its own; each kind with its icon and how many there are.
+    expect(screen().queryByRole("group", { name: "Tipos" })).toBeNull();
+    await click(kindTrigger());
+    const kinds = screen().getByRole("listbox", { name: "Tipo" });
+    const diffs = within(kinds).getByRole("option", { name: /^Alterações de código/ });
     expect(diffs.querySelector("svg")).not.toBeNull();
+    expect(diffs.querySelector(".ac-countchip")?.textContent).toBe("1");
     await click(diffs);
     await settle(4);
-    expect(diffs.getAttribute("aria-pressed")).toBe("true");
+    expect(diffs.getAttribute("aria-selected")).toBe("true");
     expect(names()).toEqual(["Corrige o checkout com carrinho vazio"]);
     // Two kinds: either of them.
-    await click(within(kinds).getByRole("button", { name: "Diagramas: 1" }));
+    await click(within(kinds).getByRole("option", { name: /^Diagramas/ }));
+    await pressEscape();
     await settle(4);
     expect(names()).toEqual(["Organograma do time", "Corrige o checkout com carrinho vazio"]);
+    expect(kindTrigger().textContent).toContain("2 tipos");
 
     // Nothing matches → explained, with a way out that also clears the search.
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "nada disso");
     await settle(4);
     expect(screen().getByText("Nenhum arquivo com esses filtros.")).toBeTruthy();
-    await click(screen().getByRole("button", { name: "Limpar filtros" }));
+    // The bar's own "Limpar filtros" shows too, with Tipo active: the empty state's clears the search as well.
+    const empty = screen().getByText("Nenhum arquivo com esses filtros.").closest(".ac-empty") as HTMLElement;
+    await click(within(empty).getByRole("button", { name: "Limpar filtros" }));
     await settle(4);
     expect(names()).toHaveLength(5);
   });
 
-  test("past 100 files: Carregar mais brings the next ones, and the kind chips count every file", async () => {
+  test("past 100 files: Carregar mais brings the next ones, and Tipo counts every file", async () => {
     const api = createFakeApi(seedState(), { seed: true });
     for (let i = 1; i <= 100; i++)
       await api.artifacts.create(ORG_ID, { title: `Nota ${i}`, content: { kind: "document", markdown: "x" } });
@@ -549,8 +564,11 @@ describe("Drive", () => {
     expect(documents).toBeGreaterThan(100);
     await goDrive({ api });
     expect(names()).toHaveLength(100);
-    const kinds = screen().getByRole("group", { name: "Tipos" });
-    expect(within(kinds).getByRole("button", { name: `Documentos: ${documents}` })).toBeTruthy();
+    await click(kindTrigger());
+    const kinds = screen().getByRole("listbox", { name: "Tipo" });
+    const docs = within(kinds).getByRole("option", { name: /^Documentos/ });
+    expect(docs.querySelector(".ac-countchip")?.textContent).toBe(String(documents));
+    await pressEscape();
     await click(screen().getByRole("button", { name: "Carregar mais" }));
     await settle(6);
     expect(names()).toHaveLength(105);
@@ -606,6 +624,44 @@ describe("Drive", () => {
     expect(screen().getByRole("button", { name: "2 canais" })).toBeTruthy();
   });
 
+  // The worst case for CI's geometry check (the capture keeps each of these screens): German words, a long channel,
+  // every filter in use and Typ open, then Japanese. One toolbar, on two rows only where one can't hold it.
+  test("German and Japanese with every filter in use: still one toolbar, Typ among its filters", async () => {
+    const state = seedState();
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) eng.name = "produkteinfuehrung-herbstkampagne-2026";
+    const { services, api } = await goDrive({ api: createFakeApi(state, { seed: true }) });
+    await showIn(services, "de");
+    const trigger = (name: RegExp) =>
+      screen()
+        .getAllByRole("button")
+        .find((b) => b.classList.contains("ac-filter__trigger") && name.test(b.textContent ?? "")) as HTMLElement;
+    // Typ first, while every kind is there to pick.
+    await click(trigger(/^Typ/));
+    const kinds = screen().getByRole("listbox", { name: "Typ" });
+    for (const kind of [/^Dokumente/, /^Codeänderungen/])
+      await click(within(kinds).getByRole("option", { name: kind }));
+    await pressEscape();
+    await settle(4);
+    await click(trigger(/Kanal/));
+    await click(
+      within(screen().getByRole("listbox", { name: "Kanal" })).getByRole("option", {
+        name: "#produkteinfuehrung-herbstkampagne-2026",
+      }),
+    );
+    await pressEscape();
+    await settle(4);
+    const me = (await api.account.me())?.user.name ?? "";
+    await click(trigger(/Person oder Agent/));
+    await click(within(screen().getByRole("listbox", { name: "Person oder Agent" })).getByRole("option", { name: me }));
+    await pressEscape();
+    await settle(4);
+    expect(trigger(/Typen/).textContent).toContain("2 Typen");
+    expect(document.querySelectorAll(".drive .ac-toolbar")).toHaveLength(1);
+    await showIn(services, "ja");
+    expect(screen().getByRole("searchbox", { name: "ファイルを検索" })).toBeTruthy();
+  });
+
   test("empty state when there is nothing yet", async () => {
     await goDrive({ seed: false });
     expect(screen().getByText("Tudo o que o time cria, num só lugar")).toBeTruthy();
@@ -650,7 +706,7 @@ describe("Drive", () => {
       "Relatório de incidente: checkout",
     ]);
     await pickRadio(/^Organizar:/, "Canal");
-    expect(document.querySelector(".drive-group__title")?.textContent).toMatch(/^#/);
+    expect(document.querySelector(".drive-group__head .ac-grouphead__title")?.textContent).toMatch(/^#/);
   });
 
   test("a click shows the details: preview, Abrir, Baixar, Copiar link, versions, where", async () => {
@@ -727,7 +783,9 @@ describe("Drive", () => {
   test("a DM's file: in Privado, says only the two of us see it, and opens that DM (never a channel)", async () => {
     const { router } = await withDmFile();
     // Its own section, last, apart from what the team sees.
-    const heads = Array.from(document.querySelectorAll(".drive-group__title")).map((h) => h.textContent);
+    const heads = Array.from(document.querySelectorAll(".drive-group__head .ac-grouphead__title")).map(
+      (h) => h.firstChild?.nextSibling?.textContent,
+    );
     expect(heads.at(-1)).toBe("Privado");
     const privateSection = document.querySelectorAll(".drive-group")[heads.length - 1] as HTMLElement;
     expect(within(privateSection).getByRole("button", { name: "Rascunho da proposta" })).toBeTruthy();

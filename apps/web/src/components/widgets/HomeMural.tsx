@@ -1,5 +1,6 @@
 import type { Dashboard, HomeTile } from "@agenteschat/client";
 import { useHomeBoard } from "@agenteschat/client";
+import { GroupHeading } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -58,25 +59,25 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
   };
   return (
     <section className="home-sec home-mural" aria-label={title}>
-      <div className="list-group-head ac-actrow">
-        <span className="list-group-head__title ac-actrow__text">
-          <h2>{title}</h2>
-          {count > 0 && <span className="list-group-head__count">{count}</span>}
-        </span>
-        <span className="home-sec__acts">
-          <Link className="home-sec__more" to="/org/$orgId/dashboards" params={{ orgId }}>
-            {t("dashboards.seeAll")}
-          </Link>
-          {editable && (
-            <BoardActionsPill
-              label={title}
-              arranging={arranging}
-              onArrange={() => setArranging((v) => !v)}
-              onAdd={!chosen || chosen.canEdit ? () => setAdding(true) : undefined}
-            />
-          )}
-        </span>
-      </div>
+      <GroupHeading
+        title={title}
+        count={count > 0 ? count : undefined}
+        aside={
+          <span className="home-sec__acts">
+            <Link className="home-sec__more" to="/org/$orgId/dashboards" params={{ orgId }}>
+              {t("dashboards.seeAll")}
+            </Link>
+            {editable && (
+              <BoardActionsPill
+                label={title}
+                arranging={arranging}
+                onArrange={() => setArranging((v) => !v)}
+                onAdd={!chosen || chosen.canEdit ? () => setAdding(true) : undefined}
+              />
+            )}
+          </span>
+        }
+      />
       {/* One grid: the fixed tiles among the widgets of what Início shows, so either moves anywhere in it. */}
       {chosen ? (
         <WidgetBoard

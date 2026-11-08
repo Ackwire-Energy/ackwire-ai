@@ -145,7 +145,7 @@ describe("Notificações", () => {
     expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     // The day groups' head: the title and how many, nothing else.
-    expect(waiting.querySelector(".list-group-head")?.textContent).toBe("Esperando você1");
+    expect(waiting.querySelector(".ac-grouphead")?.textContent).toBe("Esperando você1");
     // The question as the conversation's request card, stopped until I answer.
     const card = waiting.querySelector(".rq") as HTMLElement;
     expect(card.querySelector(".rq__kind")?.textContent).toContain("Pergunta");
@@ -166,7 +166,8 @@ describe("Notificações", () => {
     // My own @mention is highlighted.
     expect(today.querySelector(".ac-mention")?.textContent).toBe("@walter");
     // The list ends with its last day: no note under it.
-    expect(document.querySelector(".nt")?.lastElementChild?.getAttribute("aria-label")).toBe("Ontem");
+    expect(document.querySelector(".nt > .ac-groups")?.lastElementChild?.getAttribute("aria-label")).toBe("Ontem");
+    expect(document.querySelector(".nt")?.lastElementChild?.matches(".ac-groups")).toBe(true);
     const filters = screen().getByRole("radiogroup", { name: "Filtrar notificações" });
     expect(within(filters).getByRole("radio", { name: /Tudo/ }).textContent).toContain("4");
     expect(within(filters).getByRole("radio", { name: /Não lidas/ }).textContent).toContain("3");

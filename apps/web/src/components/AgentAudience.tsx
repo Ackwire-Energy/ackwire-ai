@@ -270,7 +270,10 @@ export function AudienceChoice({
       {offersConsultable(value, onPlan) && (
         <SettingRow
           title={t("audience.consultable", g)}
-          description={t("audience.consultableHint", g)}
+          hint={{
+            name: t("common.about", { label: t("audience.consultable", g) }),
+            text: t("audience.consultableHint", g),
+          }}
           htmlFor={`${idPrefix}-consultable`}
         >
           <Switch

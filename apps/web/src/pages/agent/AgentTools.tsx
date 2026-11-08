@@ -4,7 +4,7 @@ import type { ConnectedItem } from "@agenteschat/client/lib/connected";
 import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { labelIsName } from "@agenteschat/client/lib/tool-labels";
 import { partsOf, type ReviewTool, reviewTool, toolName } from "@agenteschat/client/lib/tool-review";
-import { Button, DetailsDialog, Icon } from "@agenteschat/ui";
+import { Button, DetailsDialog, GroupHeading, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -134,11 +134,16 @@ export function AgentAsksLine({
         <div className="agp-tools">
           {shown.map((g) => (
             <section key={g.resource.id} className="agp-tools__conn" aria-label={g.name}>
-              <h3 className="agp-tools__h">
-                <ResourceIcon resource={g.resource} items={items} name={g.name} />
-                <span>{g.name}</span>
-                {g.asks > 0 && <span className="agp-tools__n">{t("toolReview.many.approval", { count: g.asks })}</span>}
-              </h3>
+              <GroupHeading
+                level={3}
+                title={
+                  <>
+                    <ResourceIcon resource={g.resource} items={items} name={g.name} />
+                    {g.name}
+                  </>
+                }
+                aside={g.asks > 0 && t("toolReview.many.approval", { count: g.asks })}
+              />
               <ToolLevelsView tools={g.tools} />
             </section>
           ))}

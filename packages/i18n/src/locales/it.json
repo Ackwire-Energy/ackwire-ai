@@ -1369,7 +1369,7 @@
       "calendar": "Riunioni e scadenze",
       "team": "Chi è chi: persone, agenti e i loro gruppi",
       "dashboards": "Numeri e grafici che gli agenti tengono aggiornati",
-      "taskManager": "Cosa sta facendo ogni agente ora, e fermare ciò che serve"
+      "taskManager": "Cosa fa ogni agente ora, e fermare ciò che serve"
     },
     "customizeSidebar": "Personalizza la barra laterale",
     "sidebarMenu": {
@@ -1605,7 +1605,7 @@
     "list": {
       "agents": "Agenti",
       "people": "Persone",
-      "search": "Cerca per nome, ruolo o canale",
+      "search": "Cerca nel team",
       "filterLabel": "Mostra agenti",
       "filter": {
         "mine": "Miei",
@@ -8366,6 +8366,9 @@
     "people_one": "{{count}} persona o agente",
     "people_many": "{{count}} persone o agenti",
     "people_other": "{{count}} persone o agenti",
+    "kinds_one": "{{count}} tipo",
+    "kinds_many": "{{count}} tipi",
+    "kinds_other": "{{count}} tipi",
     "clearAll": "Cancella filtri",
     "clearSearch": "Cancella ricerca"
   },
@@ -10520,7 +10523,6 @@
     "searchHint": "Scorciatoia per cercare",
     "who": "Creato da",
     "everyone": "Tutti",
-    "kinds": "Tipi",
     "kindMany": {
       "document": "Documenti",
       "table": "Tabelle",
@@ -10532,7 +10534,6 @@
       "poll": "Sondaggi",
       "choices": "Scelte"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Vista",
     "viewGrid": "Griglia",
     "viewList": "Elenco",
@@ -13789,6 +13790,9 @@
     "sub_one": "{{month}} · {{count}} persona · {{amount}} di IA",
     "sub_many": "{{month}} · {{count}} persone · {{amount}} di IA",
     "sub_other": "{{month}} · {{count}} persone · {{amount}} di IA",
+    "subPlans_one": "{{month}} · {{count}} persona · {{amount}}",
+    "subPlans_many": "{{month}} · {{count}} persone · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} persone · {{amount}}",
     "periodLabel": "Periodo",
     "period": {
       "month": "Questo mese",
@@ -13836,7 +13840,8 @@
     "meter": {
       "of": "su {{limit}}",
       "noLimit": "· senza limite",
-      "estimate": "≈ {{amount}} tramite l'API"
+      "estimate": "≈ {{amount}} a prezzo API",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Ora",
@@ -13877,7 +13882,8 @@
     },
     "limits": {
       "title": "Limite di utilizzo per persona",
-      "lead": "Quanta IA può usare ogni persona al mese, sommando tutti gli agenti. Conta ciò che chiede e le routine che ha creato.",
+      "lead": "Quanta IA può usare ogni persona al mese, sommando tutti gli agenti.",
+      "leadMore": "Conta ciò che chiede e le routine che ha creato.",
       "default": "Predefinito del workspace",
       "defaultHint": "Vale per chi non ha un limite da un ruolo né un'eccezione.",
       "byRole": "Per ruolo",
@@ -13888,7 +13894,8 @@
       "amount": "Limite al mese",
       "rule": "Vale il limite della persona. Senza, il più alto tra i suoi ruoli. Senza nessuno, il predefinito. I proprietari non hanno limite.",
       "whenTitle": "Quando qualcuno raggiunge il limite",
-      "block": "Gli agenti smettono di iniziare nuovo lavoro per quella persona",
+      "whenHint": "Fermare il nuovo lavoro: gli agenti smettono di iniziare nuovo lavoro per quella persona. Solo avvisare: il lavoro continua e gli admin ricevono un avviso.",
+      "blockShort": "Fermare il nuovo lavoro",
       "notify": "Avvisa solo gli admin",
       "warn": "Avvisa all'80%",
       "warnHint": "La persona riceve un avviso, e gli admin ne ricevono un altro al 100%.",
@@ -13927,7 +13934,9 @@
     "usesNow": "lo usa ora",
     "monthTokens": "{{tokens}} token questo mese",
     "tokens": "{{tokens}} token",
-    "equivalent": "≈ {{amount}} tramite API",
+    "equivalent": "≈ {{amount}} a prezzo API",
+    "apiPrice": "il prezzo dell'API",
+    "apiPriceHint": "Quando gli agenti usano i piani, nessuno paga a consumo. Questo importo è quanto costerebbe lo stesso uso tramite l'API.",
     "thisMonth": "Questo mese",
     "moreAgents_one": "+{{count}} agente",
     "moreAgents_many": "+{{count}} agenti",

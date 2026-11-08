@@ -197,6 +197,7 @@ export {
   type FilterChipProps,
   type FilterOption,
 } from "./components/FilterChip";
+export { GroupHeading } from "./components/GroupHeading";
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";

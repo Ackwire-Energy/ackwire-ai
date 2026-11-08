@@ -31,6 +31,7 @@ import {
   PersonAvatar,
   PressScale,
   ProviderLogo,
+  SCREEN_X,
   Text,
   useTheme,
   WithPresence,
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
   gapBig: { height: 24 },
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 999, borderWidth: 3 },
-  crew: { gap: 14, paddingHorizontal: 20, paddingVertical: 4 },
+  crew: { gap: 14, paddingHorizontal: SCREEN_X, paddingVertical: 4 },
   crewItem: { width: 62 },
   crewIn: { alignItems: "center", gap: 6 },
   add: {
@@ -464,5 +465,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   meter: { marginTop: 6, marginBottom: 4 },
-  version: { paddingHorizontal: 20, paddingTop: 14 },
+  version: { paddingHorizontal: SCREEN_X, paddingTop: 14 },
 });

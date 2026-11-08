@@ -242,7 +242,7 @@ describe("finding the settings", () => {
       await go("settings/account", state);
       const item = screen().getByRole("button", { name: /^Fuso horário/ });
       // On a line of its own, as Perfil's: a long name ("Los Angeles (Pacífico dos EUA)") has the row's width.
-      const line = item.querySelector(".settings-row__help")?.textContent;
+      const line = item.querySelector(".settings-row__status")?.textContent;
       expect({ zone, line }).toEqual({ zone, line: words });
       cleanup();
     }

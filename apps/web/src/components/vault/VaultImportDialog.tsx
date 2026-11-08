@@ -195,7 +195,7 @@ export function VaultImportDialog({
                       { value: "team", label: t("vault.scope.team") },
                     ]}
                   />
-                  <span className="ac-field__help">
+                  <span className="ac-field__example">
                     {scope === "team" ? t("vault.import.asTeam") : t("vault.import.asPersonal")}
                   </span>
                 </div>

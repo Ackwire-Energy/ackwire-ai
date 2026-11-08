@@ -19,6 +19,7 @@ import {
   Card,
   Chip,
   EmptyState,
+  GroupHeading,
   Icon,
   Meter,
   type MonthDay,
@@ -226,7 +227,6 @@ export function ActivityTab() {
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
         <Toolbar
           size="sm"
-          className="agp-toolbar agp-toolbar--in"
           search={
             <SearchField
               size="sm"
@@ -304,10 +304,10 @@ export function ActivityTab() {
             {q.trim() ? t("agent.runsEmpty", { q }) : t("agentPage.activity.noneFilter")}
           </EmptyState>
         ) : (
-          <div className="agp-runs">
+          <div className="ac-groups">
             {days.map((d) => (
-              <section key={d.day} className="agp-day" aria-label={dayLabel(t, locale, d.runs[0]?.createdAt ?? "")}>
-                <h3 className="agp-day__label">{dayLabel(t, locale, d.runs[0]?.createdAt ?? "")}</h3>
+              <section key={d.day} aria-label={dayLabel(t, locale, d.runs[0]?.createdAt ?? "")}>
+                <GroupHeading level={3} title={dayLabel(t, locale, d.runs[0]?.createdAt ?? "")} />
                 <ul className="agp-list">
                   {d.runs.map((r) => {
                     const x = extra(r);

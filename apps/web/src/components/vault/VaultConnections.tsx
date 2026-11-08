@@ -200,7 +200,7 @@ function ConnectForm({
                   { value: "personal", label: t("vault.scope.personal") },
                 ]}
               />
-              <span className="ac-field__help">
+              <span className="ac-field__example">
                 {canManageTeam
                   ? t(scope === "team" ? "vault.connections.forTeam" : "vault.connections.forPersonal")
                   : t("vault.connections.teamLocked")}

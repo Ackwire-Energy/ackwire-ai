@@ -25,44 +25,15 @@
   font-size: 13px;
   color: var(--muted);
 }
-.drive-count {
-  font-size: 12.5px;
-  color: var(--faint);
-  letter-spacing: 0;
-  text-transform: none;
-}
 
 /* Groups. */
-.drive-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
 /* "Carregar mais": the next page of files, centred under them. */
 .drive-more {
   display: flex;
   justify-content: center;
 }
-/* A head with a hint (private files): on a narrow page the hint drops to a line of its own rather than wrapping beside the
-   title, so the lock, title and count stay on one centred line. */
-.drive-group__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 8px;
-  min-height: 24px;
-  margin: 0 2px 10px;
-  color: var(--ink2);
-}
-.drive-group__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.005em;
-}
 .drive-group__stack {
   display: inline-flex;
-  margin-left: 2px;
 }
 .drive-group__stack > * + * {
   margin-left: -5px;
@@ -200,7 +171,7 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   }
 }
 
-/* List. */
+/* List: the groups' heads inside its card, where its rows' words start. */
 .drive-table {
   overflow: hidden;
   border-radius: var(--radius-section);
@@ -650,7 +621,7 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   container-type: inline-size;
 }
 .drive-trash__row {
-  padding: 10px 12px;
+  padding: var(--row-py) 12px;
   border-top: 1px solid var(--line);
 }
 .drive-trash__row:first-child {

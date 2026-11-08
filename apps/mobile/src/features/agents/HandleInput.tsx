@@ -1,5 +1,5 @@
 import { StyleSheet, TextInput, View } from "react-native";
-import { fieldText, Icon, Text } from "@/ui";
+import { fieldText, GROUPED_ROW, Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -42,7 +42,7 @@ export function HandleInput({
         placeholder={placeholder}
         placeholderTextColor={c.faint}
         accessibilityLabel={label}
-        style={[styles.affixInput, fieldText("body"), { color: c.ink }]}
+        style={[styles.affixInput, grouped && styles.rowInput, fieldText("body"), { color: c.ink }]}
       />
       {ok ? <Icon name="check" size={18} color={c.ok} /> : null}
     </View>
@@ -62,6 +62,7 @@ export function ErrorLine({ text }: { text: string }) {
 const styles = StyleSheet.create({
   affix: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 14 },
   field: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
-  row: { minHeight: 50 },
+  row: { minHeight: GROUPED_ROW.minHeight, paddingHorizontal: GROUPED_ROW.padX },
   affixInput: { flex: 1, paddingVertical: 12 },
+  rowInput: { paddingVertical: GROUPED_ROW.tallPadY },
 });

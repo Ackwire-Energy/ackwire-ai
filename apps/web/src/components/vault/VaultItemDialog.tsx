@@ -184,7 +184,13 @@ export function ItemFields({
     </Field>
   );
   const description = filled(draft.description) && (
-    <Field label={t("vault.field.description")} help={readOnly ? undefined : t("vault.field.descriptionHelp")}>
+    <Field
+      label={t("vault.field.description")}
+      hint={{
+        name: t("common.about", { label: t("vault.field.description") }),
+        text: readOnly ? undefined : t("vault.field.descriptionHelp"),
+      }}
+    >
       <Textarea
         rows={2}
         autoGrow
@@ -223,7 +229,7 @@ export function ItemFields({
               { value: "site", label: t("vault.match.site") },
             ]}
           />
-          <span className="ac-field__help">
+          <span className="ac-field__example">
             {draft.match === "exact"
               ? origin
                 ? t("vault.match.exactHelp", { origin })
@@ -256,7 +262,10 @@ export function ItemFields({
         <Field
           label={t("vault.field.keyName")}
           error={errors.keyName}
-          help={errors.keyName || readOnly ? undefined : t("vault.field.keyNameHelp")}
+          hint={{
+            name: t("common.about", { label: t("vault.field.keyName") }),
+            text: errors.keyName || readOnly ? undefined : t("vault.field.keyNameHelp"),
+          }}
         >
           <Input
             className="vlt-mono"
@@ -319,7 +328,11 @@ function SecretValue({
   const label = t(item.kind === "login" ? "vault.field.password" : "vault.field.value");
   if (value !== null)
     return (
-      <Field label={label} error={error} help={error ? undefined : t("vault.item.newValueHelp")}>
+      <Field
+        label={label}
+        error={error}
+        hint={{ name: t("common.about", { label: label }), text: error ? undefined : t("vault.item.newValueHelp") }}
+      >
         <span className="vlt-secret__change">
           <Input
             type="password"
@@ -363,7 +376,7 @@ function SecretValue({
       {error ? (
         <span className="ac-field__error">{error}</span>
       ) : (
-        canChange && item.hasSecret && <span className="ac-field__help">{t("vault.item.sealedHelp")}</span>
+        canChange && item.hasSecret && <span className="ac-field__example">{t("vault.item.sealedHelp")}</span>
       )}
     </div>
   );

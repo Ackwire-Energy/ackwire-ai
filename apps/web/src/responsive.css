@@ -154,6 +154,22 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* A DM's name keeps its line, its pill 8 after it on its capitals, and under it when both don't fit. */
+  .dm-who .channel__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+  }
+  .dm-who .channel__title > .channel__name {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dm-who .channel__title > .ac-chip {
+    flex: none;
+  }
   .channel__topic {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -183,8 +199,7 @@
 /* ── Pages ── */
 @media (max-width: 640px) {
   .page {
-    gap: 20px;
-    padding: 20px 16px 28px;
+    padding-bottom: 28px;
   }
   .page-title {
     font-size: 24px;
@@ -194,8 +209,7 @@
     min-width: min(220px, 100%);
   }
   .settings {
-    gap: 20px;
-    padding: 20px 16px 28px;
+    padding-bottom: 28px;
   }
   .tabs-bar .ac-toolbar {
     flex: 1 1 100%;
@@ -267,7 +281,6 @@
     /* The grid's "start" would shrink every card to its content (and the Ficha, sized by its own width, to nothing). */
     align-items: stretch;
     gap: 16px;
-    max-width: 820px;
   }
 }
 @media (max-width: 900px) {
@@ -296,9 +309,7 @@
   }
 }
 @media (max-width: 760px) {
-  /* The cover stays edge to edge: the page's own padding (above) is the gutter under it. */
   .agp {
-    --agp-gutter: 16px;
     padding: 0 0 28px;
   }
 }
@@ -319,16 +330,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-quick {
-    margin-left: 0;
-  }
-  /* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
-  .agp-toolbar .ac-seg {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
   /* The tokens go on the time's line: beside the words they kept their one line and squeezed a failure's reason to a
      word a line. */
   .agp-run {
@@ -345,9 +346,6 @@
   }
   .agp-run__r {
     grid-row: 1;
-  }
-  .agp-card.ac-card {
-    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;
@@ -378,7 +376,6 @@
     /* The grid's "start" would shrink every card to its content (and the Ficha, sized by its own width, to nothing). */
     align-items: stretch;
     gap: 16px;
-    max-width: 820px;
   }
 }
 @container agp-side (max-width: 900px) {
@@ -411,11 +408,6 @@
     margin-left: 4px;
   }
 }
-@container agp-side (max-width: 760px) {
-  .agp {
-    --agp-gutter: 16px;
-  }
-}
 @container agp-side (max-width: 640px) {
   .agp-cells {
     grid-template-columns: minmax(0, 1fr);
@@ -433,16 +425,6 @@
     padding: 0 10px;
     font-size: 13.5px;
   }
-  .agp-quick {
-    margin-left: 0;
-  }
-  /* The track keeps the ruler's height: it scrolls sideways instead of wrapping. */
-  .agp-toolbar .ac-seg {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
   .agp-run {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 10px;
@@ -457,9 +439,6 @@
   }
   .agp-run__r {
     grid-row: 1;
-  }
-  .agp-card.ac-card {
-    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;

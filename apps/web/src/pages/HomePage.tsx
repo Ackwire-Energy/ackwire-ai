@@ -28,7 +28,7 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Composer, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
+import { Composer, EmptyState, GroupHeading, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -337,23 +337,25 @@ function Section({
   const { org } = useOrg();
   return (
     <section className="home-sec" aria-label={title}>
-      <div className="list-group-head">
-        <h2>{title}</h2>
-        {count !== undefined && <span className="list-group-head__count">{count}</span>}
-        {to === "taskManager" ? (
-          <Link className="home-sec__more" to="/org/$orgId/task-manager" params={{ orgId: org.id }}>
-            {t("taskManager.actions.openManager")}
-          </Link>
-        ) : to === "routines" ? (
-          <Link className="home-sec__more" to="/org/$orgId/routines" params={{ orgId: org.id }}>
-            {t("home.seeAll")}
-          </Link>
-        ) : more ? (
-          <Link className="home-sec__more" to="/org/$orgId/notifications" params={{ orgId: org.id }}>
-            {t("home.seeAll")}
-          </Link>
-        ) : null}
-      </div>
+      <GroupHeading
+        title={title}
+        count={count}
+        aside={
+          to === "taskManager" ? (
+            <Link className="home-sec__more" to="/org/$orgId/task-manager" params={{ orgId: org.id }}>
+              {t("taskManager.actions.openManager")}
+            </Link>
+          ) : to === "routines" ? (
+            <Link className="home-sec__more" to="/org/$orgId/routines" params={{ orgId: org.id }}>
+              {t("home.seeAll")}
+            </Link>
+          ) : more ? (
+            <Link className="home-sec__more" to="/org/$orgId/notifications" params={{ orgId: org.id }}>
+              {t("home.seeAll")}
+            </Link>
+          ) : null
+        }
+      />
       <ul className="list-card home-list">{children}</ul>
     </section>
   );

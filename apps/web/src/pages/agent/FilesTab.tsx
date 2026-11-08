@@ -79,7 +79,6 @@ export function FilesTab() {
       {any && (
         <Toolbar
           size="sm"
-          className="agp-toolbar agp-toolbar--in"
           search={
             <SearchField
               size="sm"

@@ -585,7 +585,7 @@ function RenameDialog({ item, onClose }: { item: ConnectedItem | null; onClose: 
             <Field
               label={t("connectFlow.name")}
               id="connector-rename"
-              help={t("connectors.renameHelp")}
+              hint={{ name: t("common.about", { label: t("connectFlow.name") }), text: t("connectors.renameHelp") }}
               error={error ?? undefined}
             >
               <Input

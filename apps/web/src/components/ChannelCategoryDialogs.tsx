@@ -131,7 +131,10 @@ export function NewCategoryDialog({
             <Field
               label={t("channelCategories.name")}
               id="category-name"
-              help={t("channelCategories.newCategoryHelp")}
+              hint={{
+                name: t("common.about", { label: t("channelCategories.name") }),
+                text: t("channelCategories.newCategoryHelp"),
+              }}
               error={
                 showError && error === "empty"
                   ? t("channelCategories.nameEmpty")

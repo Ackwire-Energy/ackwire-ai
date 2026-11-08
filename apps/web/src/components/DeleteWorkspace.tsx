@@ -253,7 +253,7 @@ export function DeletionProofField({ proof }: { proof: DeletionProofState }) {
   return (
     <Field
       label={t("proof.code")}
-      help={t("proof.sent", { email: proof.sent.email })}
+      example={t("proof.sent", { email: proof.sent.email })}
       error={said}
       labelAside={
         <button

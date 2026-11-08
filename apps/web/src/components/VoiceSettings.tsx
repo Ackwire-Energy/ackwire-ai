@@ -88,7 +88,8 @@ export function VoiceSettingsCard({
           id="media-voice-on"
           icon="mic"
           label={t("voice.settings.on")}
-          help={available ? t("voice.settings.onHelp") : t("voice.settings.noEngine")}
+          hint={available ? t("voice.settings.onHelp") : undefined}
+          status={!available && t("voice.settings.noEngine")}
           control={
             <Switch
               checked={available && on}
@@ -195,7 +196,7 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
         ) : tested ? (
           <SettingNote icon="check">{t("voice.settings.tested")}</SettingNote>
         ) : (
-          <p className="ac-field__help">{local ? t("voice.settings.ownHelp") : t("voice.settings.sealed")}</p>
+          <p className="ac-field__example">{local ? t("voice.settings.ownHelp") : t("voice.settings.sealed")}</p>
         )}
         {!local && <SettingNote icon="info">{t("voice.settings.leaves", { name })}</SettingNote>}
         {view.state === "invalid" && <SettingNote icon="alert">{t("voice.settings.invalid")}</SettingNote>}

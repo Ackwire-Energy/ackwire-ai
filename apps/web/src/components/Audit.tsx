@@ -30,6 +30,7 @@ import {
   Chip,
   type ChipProps,
   EmptyState,
+  GroupHeading,
   Icon,
   Menu,
   MenuItem,
@@ -82,7 +83,14 @@ export function AuditSection({ agent }: { agent?: string }) {
     })),
   ];
 
-  let day = "";
+  // The rows by day, as the list shows them: each day a group under its heading.
+  const days: [string, AuditRow[]][] = [];
+  for (const row of rows) {
+    const label = dayLabel(t, i18n.language, row.at);
+    const last = days.at(-1);
+    if (last?.[0] === label) last[1].push(row);
+    else days.push([label, [row]]);
+  }
   return (
     <section className="audit" aria-label={t("settings.section.audit")}>
       <Toolbar
@@ -135,36 +143,37 @@ export function AuditSection({ agent }: { agent?: string }) {
           </EmptyState>
         )
       ) : (
-        <ul className="audit__list">
-          {rows.map((row) => {
-            const label = dayLabel(t, i18n.language, row.at);
-            const heading = label !== day ? label : null;
-            day = label;
-            return (
-              <li key={row.id}>
-                {heading && <h3 className="audit__day">{heading}</h3>}
-                <button
-                  type="button"
-                  className="audit-row"
-                  aria-pressed={row.id === openId}
-                  onClick={() => setOpenId(row.id)}
-                >
-                  <Face row={row} />
-                  <span className="audit-row__text">
-                    <span className="audit-row__title">
-                      <Sentence row={row} />
-                    </span>
-                    <span className="audit-row__sub">{auditSubLine(t, row)}</span>
-                  </span>
-                  <OutcomeChip row={row} />
-                  <time className="audit-row__time" dateTime={row.at}>
-                    {formatTime(i18n.language, row.at)}
-                  </time>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="ac-groups">
+          {days.map(([label, list]) => (
+            <div key={label}>
+              <GroupHeading level={3} title={label} />
+              <ul className="audit__list">
+                {list.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      className="audit-row"
+                      aria-pressed={row.id === openId}
+                      onClick={() => setOpenId(row.id)}
+                    >
+                      <Face row={row} />
+                      <span className="audit-row__text">
+                        <span className="audit-row__title">
+                          <Sentence row={row} />
+                        </span>
+                        <span className="audit-row__sub">{auditSubLine(t, row)}</span>
+                      </span>
+                      <OutcomeChip row={row} />
+                      <time className="audit-row__time" dateTime={row.at}>
+                        {formatTime(i18n.language, row.at)}
+                      </time>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
       {audit.hasNextPage && (
         <div className="audit__more">

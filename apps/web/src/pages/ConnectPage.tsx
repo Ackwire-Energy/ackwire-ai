@@ -235,14 +235,22 @@ export function ConnectPage({ code }: { code: string }) {
             </p>
           ) : (
             <Locked when={busy}>
-              <Field label={t("connect.org")} id="connect-org" help={t("connect.orgHelp")}>
+              <Field
+                label={t("connect.org")}
+                id="connect-org"
+                hint={{ name: t("common.about", { label: t("connect.org") }), text: t("connect.orgHelp") }}
+              >
                 <Select
                   value={orgId}
                   onValueChange={setOrgId}
                   options={orgs.map((o) => ({ value: o.id, label: workspaceLabel(o.name, notes.get(o.id)) }))}
                 />
               </Field>
-              <Field label={t("machines.name")} id="connect-name" help={t("machines.nameHelp")}>
+              <Field
+                label={t("machines.name")}
+                id="connect-name"
+                hint={{ name: t("common.about", { label: t("machines.name") }), text: t("machines.nameHelp") }}
+              >
                 <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </Field>
             </Locked>

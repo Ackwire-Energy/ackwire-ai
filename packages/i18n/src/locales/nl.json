@@ -1554,7 +1554,7 @@
     "list": {
       "agents": "Agenten",
       "people": "Mensen",
-      "search": "Zoeken op naam, rol of kanaal",
+      "search": "Zoeken in het team",
       "filterLabel": "Agenten tonen",
       "filter": {
         "mine": "Mijn",
@@ -8092,6 +8092,8 @@
     "channels_other": "{{count}} kanalen",
     "people_one": "{{count}} persoon of agent",
     "people_other": "{{count}} mensen of agents",
+    "kinds_one": "{{count}} soort",
+    "kinds_other": "{{count}} soorten",
     "clearAll": "Filters wissen",
     "clearSearch": "Zoekopdracht wissen"
   },
@@ -10184,7 +10186,6 @@
     "searchHint": "Sneltoets om te zoeken",
     "who": "Gemaakt door",
     "everyone": "Iedereen",
-    "kinds": "Types",
     "kindMany": {
       "document": "Documenten",
       "table": "Tabellen",
@@ -10196,7 +10197,6 @@
       "poll": "Peilingen",
       "choices": "Keuzes"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Weergave",
     "viewGrid": "Raster",
     "viewList": "Lijst",
@@ -13379,6 +13379,8 @@
     "plansAbout": "Het abonnement is al betaald. Dit bedrag vergelijkt alleen het gebruik tussen personen.",
     "sub_one": "{{month}} · {{count}} persoon · {{amount}} aan AI",
     "sub_other": "{{month}} · {{count}} personen · {{amount}} aan AI",
+    "subPlans_one": "{{month}} · {{count}} persoon · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} personen · {{amount}}",
     "periodLabel": "Periode",
     "period": {
       "month": "Deze maand",
@@ -13426,7 +13428,8 @@
     "meter": {
       "of": "van {{limit}}",
       "noLimit": "· zonder limiet",
-      "estimate": "≈ {{amount}} via de API"
+      "estimate": "≈ {{amount}} tegen API-prijzen",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Nu",
@@ -13466,7 +13469,8 @@
     },
     "limits": {
       "title": "Gebruikslimiet per persoon",
-      "lead": "Hoeveel AI iedereen per maand mag gebruiken, over alle agents samen. Het telt wat iemand vraagt en de routines die diegene maakte.",
+      "lead": "Hoeveel AI iedereen per maand mag gebruiken, over alle agents samen.",
+      "leadMore": "Het telt wat iemand vraagt en de routines die diegene maakte.",
       "default": "Standaard van de workspace",
       "defaultHint": "Geldt voor wie geen limiet via een rol of uitzondering heeft.",
       "byRole": "Per rol",
@@ -13477,7 +13481,8 @@
       "amount": "Limiet per maand",
       "rule": "De eigen limiet van de persoon geldt. Zonder die de hoogste van hun rollen. Zonder enige de standaard. Eigenaren hebben geen limiet.",
       "whenTitle": "Als iemand de limiet bereikt",
-      "block": "Agents beginnen geen nieuw werk meer voor die persoon",
+      "whenHint": "Nieuw werk stoppen: agents beginnen geen nieuw werk meer voor die persoon. Alleen laten weten: het werk gaat door en de admins krijgen een melding.",
+      "blockShort": "Nieuw werk stoppen",
       "notify": "Alleen de admins laten weten",
       "warn": "Waarschuwen bij 80%",
       "warnHint": "De persoon krijgt een melding, en de admins krijgen er nog een bij 100%.",
@@ -13516,7 +13521,9 @@
     "usesNow": "gebruikt het nu",
     "monthTokens": "{{tokens}} tokens deze maand",
     "tokens": "{{tokens}} tokens",
-    "equivalent": "≈ {{amount}} via de API",
+    "equivalent": "≈ {{amount}} tegen API-prijzen",
+    "apiPrice": "de API-prijs",
+    "apiPriceHint": "Als agents abonnementen gebruiken, betaalt niemand per gebruik. Dit bedrag is wat hetzelfde gebruik via de API zou kosten.",
     "thisMonth": "Deze maand",
     "moreAgents_one": "+{{count}} andere agent",
     "moreAgents_other": "+{{count}} andere agents",

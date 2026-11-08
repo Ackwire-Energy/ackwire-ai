@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
-import { Count, Icon, LIST_INSET, Text, useReducedMotion, weights } from "@/ui";
+import { Count, Icon, LIST_INSET, SCREEN_X, Text, useReducedMotion, weights } from "@/ui";
 import { useColors } from "../shared/hooks";
 import {
   HOME_SECTIONS,
@@ -138,7 +138,14 @@ export function SeeAllRow({ label, onPress }: { label: string; onPress: () => vo
 
 const styles = StyleSheet.create({
   // The kit's `SectionHeader` and the widgets' head on the same screen leave 8 under the title, not 6.
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 20,
+    paddingHorizontal: SCREEN_X,
+    paddingBottom: 8,
+  },
   pressed: { opacity: 0.6 },
   title: { fontWeight: "600", flexShrink: 1 },
   grow: { flex: 1 },

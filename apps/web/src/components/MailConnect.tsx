@@ -360,7 +360,14 @@ export function ImapStep({
           <Field
             label={t("mail.address")}
             id="mail-address"
-            help={webmail ? t("mail.icloudHint", { name: webmail }) : undefined}
+            hint={
+              webmail
+                ? {
+                    name: t("common.about", { label: t("mail.address") }),
+                    text: t("mail.icloudHint", { name: webmail }),
+                  }
+                : undefined
+            }
             error={addressError}
           >
             <Input
@@ -372,7 +379,12 @@ export function ImapStep({
               onChange={(e) => setAddress(e.target.value)}
             />
           </Field>
-          <Field label={t("mail.password")} id="mail-password" help={t("mail.passwordHelp")} error={passwordError}>
+          <Field
+            label={t("mail.password")}
+            id="mail-password"
+            hint={{ name: t("common.about", { label: t("mail.password") }), text: t("mail.passwordHelp") }}
+            error={passwordError}
+          >
             <Input
               type="password"
               autoComplete="off"
@@ -396,7 +408,11 @@ export function ImapStep({
             >
               <summary>{t("mail.advanced")}</summary>
               <div className="cflow__key">
-                <Field label={t("mail.username")} id="mail-username" help={t("mail.usernameHelp")}>
+                <Field
+                  label={t("mail.username")}
+                  id="mail-username"
+                  hint={{ name: t("common.about", { label: t("mail.username") }), text: t("mail.usernameHelp") }}
+                >
                   <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
                 </Field>
                 {custom && (
@@ -481,7 +497,7 @@ function AddressesFields({ account, draft }: { account: MailAccount; draft: Retu
       <AddressList
         id={`mail-aliases-${account.id}`}
         label={t("mail.addresses.others")}
-        help={
+        example={
           draft.searching
             ? t("mail.addresses.searching")
             : draft.found
@@ -498,7 +514,10 @@ function AddressesFields({ account, draft }: { account: MailAccount; draft: Retu
         <Field
           label={t("mail.addresses.newFrom")}
           id={`mail-new-from-${account.id}`}
-          help={t("mail.addresses.newFromHelp")}
+          hint={{
+            name: t("common.about", { label: t("mail.addresses.newFrom") }),
+            text: t("mail.addresses.newFromHelp"),
+          }}
         >
           <Select
             value={draft.defaultFrom}
@@ -1059,7 +1078,7 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
             <Field
               label={t("mail.password")}
               id="mail-reconnect-password"
-              help={t("mail.passwordHelp")}
+              hint={{ name: t("common.about", { label: t("mail.password") }), text: t("mail.passwordHelp") }}
               error={touched && !password.trim() ? t("mail.passwordInvalid") : undefined}
             >
               <Input
