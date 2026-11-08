@@ -210,8 +210,8 @@ describe("Criar agente: steps", () => {
     expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("false");
 
     await proceed();
-    // "Automático" comes first and is chosen for every role; the fixed models follow.
-    expect(brainBox().textContent).toBe("AutomáticoEscolhe o modelo e o esforço para cada tarefa");
+    // "Automático" comes first and is chosen for every role; the fixed models follow. A select shows only its choice.
+    expect(brainBox().textContent).toBe("Automático");
     const list = await openBrain();
     const [auto, ...rest] = within(list).getAllByRole("option");
     expect(auto?.getAttribute("aria-selected")).toBe("true");

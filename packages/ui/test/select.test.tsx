@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Field, Select } from "../src";
+import { Field, SearchSelect, Select } from "../src";
 
 const roles = [
   { value: "member", label: "Membro", description: "Conversa, cria issues" },
@@ -139,6 +139,17 @@ describe("Select", () => {
     for (const option of options) expect(option.lastElementChild?.getAttribute("class")).toBe("ac-menu__check");
     expect(options[0]?.getAttribute("data-state")).toBe("checked");
     expect(options[1]?.getAttribute("data-state")).toBe("unchecked");
+  });
+
+  test("a searchable select's trigger shows the chosen face too, as a select's does", () => {
+    const faces = [{ value: "ada", label: "Ada", leading: <span className="ac-avatar">A</span> }];
+    const labels = { search: "Buscar", searchPlaceholder: "Buscar", noResults: "Nada", list: "Pessoas" };
+    render(
+      <SearchSelect<string> aria-label="Quem" value="ada" onValueChange={() => {}} options={faces} labels={labels} />,
+    );
+    const lead = body().getByRole("combobox", { name: "Quem" }).querySelector(".ac-select__lead");
+    expect(lead?.textContent).toBe("A");
+    expect(lead?.nextElementSibling?.textContent).toBe("Ada");
   });
 
   test("a value without a lead shows its words alone, and a value drawn by the caller keeps its drawing", () => {

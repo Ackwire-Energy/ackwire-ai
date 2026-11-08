@@ -14,13 +14,13 @@ export function useActorFilterOptions(): FilterOption[] {
       value: `agent:${a.id}`,
       label: a.name,
       group: t("drive.agents"),
-      leading: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
+      leading: <AgentAvatar agentId={a.id} size="sm" name={a.name} />,
     })),
     ...dir.members.map((m) => ({
       value: `person:${m.userId}`,
       label: m.name,
       group: t("drive.people"),
-      leading: <ActorAvatar actor={{ type: "person", id: m.userId }} size="xs" name={m.name} />,
+      leading: <ActorAvatar actor={{ type: "person", id: m.userId }} size="sm" name={m.name} />,
     })),
   ];
 }

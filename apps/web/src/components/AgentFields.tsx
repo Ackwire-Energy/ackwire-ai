@@ -10,6 +10,7 @@ import {
   Avatar,
   agentGradient,
   Carousel,
+  ChosenValue,
   ColorPicker,
   colorKey,
   Field,
@@ -115,7 +116,7 @@ export function BrainPickSelect({
         list: t("models.list"),
       }}
       renderValue={(o) =>
-        o ? pickerValue({ ...o, label: o.title }) : <span className="newag__sel-value">{fallback}</span>
+        o ? <ChosenValue option={{ ...o, label: o.title }} /> : <span className="newag__sel-value">{fallback}</span>
       }
     />
   );
@@ -149,7 +150,7 @@ export function ModelSelect({
         noResults: t("models.noResults"),
         list: t("models.list"),
       }}
-      renderValue={(o) => (o ? pickerValue(o) : value)}
+      renderValue={(o) => (o ? <ChosenValue option={o} /> : value)}
     />
   );
 }
@@ -396,17 +397,6 @@ export function LookRows({
   );
 }
 
-/** A picker shaped like the cards around it: the option's leading, name and description. */
-export const pickerValue = (o: SelectOption) => (
-  <span className="newag__sel-value">
-    {o.leading}
-    <span className="newag__sel-text">
-      <b>{o.label}</b>
-      {o.description && <span>{o.description}</span>}
-    </span>
-  </span>
-);
-
 /** "Responsável": a member (you marked) or "Sem responsável". */
 export function OwnerSelect({
   value,
@@ -444,7 +434,6 @@ export function OwnerSelect({
           ),
         },
       ]}
-      renderValue={pickerValue}
     />
   );
 }
@@ -495,7 +484,6 @@ export function KeySelect({
       onValueChange={onChange}
       placeholder={t("newAgent.noKeys")}
       options={options}
-      renderValue={pickerValue}
     />
   );
 }

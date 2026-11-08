@@ -133,8 +133,8 @@ function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }
   );
 }
 
-/** The chosen option in the trigger: a person's face or a maker's logo before the name, as in the list. */
-function ChosenValue<V extends string>({ option }: { option: SelectOption<V> }) {
+/** The chosen option in a trigger: a person's face or a maker's logo before the name, as in the list. */
+export function ChosenValue<V extends string>({ option }: { option: SelectOption<V> }) {
   return (
     <>
       {option.leading && (

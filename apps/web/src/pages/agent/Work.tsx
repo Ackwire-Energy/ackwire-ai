@@ -145,13 +145,7 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
-import {
-  modelOptions as apiModelOptions,
-  DEFAULT_KEY,
-  keyOptions,
-  ModelSelect,
-  pickerValue,
-} from "@/components/AgentFields";
+import { modelOptions as apiModelOptions, DEFAULT_KEY, keyOptions, ModelSelect } from "@/components/AgentFields";
 import { AddAccount, OpenPage } from "@/components/ai/AddAccountFlow";
 import { accountOption, PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies } from "@/components/ai/PlanReplies";
@@ -1306,7 +1300,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 setAccount(v === HERE ? null : v);
               }}
               options={shownAccounts}
-              renderValue={pickerValue}
             />
           )}
           {usage && <PlanMeter usage={usage} text={meterText} />}
@@ -1438,7 +1431,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           aria-label={t("agentPage.work.brain.planModel")}
           value={shownModel}
           onValueChange={setPlanModel}
-          renderValue={pickerValue}
           options={planModelOptionsShown}
         />
         {modelHow}
@@ -1478,7 +1470,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           value={key}
           onValueChange={setKey}
           placeholder={t("newAgent.noKeys")}
-          renderValue={pickerValue}
           options={keyChoices}
         />
       </BrainField>
@@ -1916,16 +1907,15 @@ function AdvancedRow({
     <div className="ac-select agp-brainsel agp-advrow">
       <button type="button" className="ac-select__trigger" onClick={onOpen}>
         <span className="ac-select__value">
-          {pickerValue({
-            value: "advanced",
-            label,
-            description: line,
-            leading: (
-              <span className="newag__ib">
-                <Icon name={icon} size={16} />
-              </span>
-            ),
-          })}
+          <span className="newag__sel-value">
+            <span className="newag__ib">
+              <Icon name={icon} size={16} />
+            </span>
+            <span className="newag__sel-text">
+              <b>{label}</b>
+              <span>{line}</span>
+            </span>
+          </span>
         </span>
         <Icon name="chevronRight" size={16} className="agp-advrow__chev" />
       </button>

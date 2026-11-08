@@ -1633,7 +1633,7 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(tip()).toBe("Precisa da região Global no OpenCode.");
     await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
     // Chosen, what it needs is said once: under it, how to give it, with the plan's page.
-    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("DeepSeek V4.1 FlashEconômico");
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("DeepSeek V4.1 Flash");
     expect(d.textContent).toContain(
       "Ligue a região Global no OpenCode, em Settings\u00a0›\u00a0Privacy. Sem ela, este modelo não responde.",
     );
@@ -1668,14 +1668,12 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(await offered(d, "Conta")).toEqual(["Planochave …4f2a", "Plano 2chave …9f3c", "Adicionar conta"]);
     // Claude: its models from Sonnet, its own accounts.
     await choose(d, /^Claude/);
-    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe(
-      "SonnetEquilibrado. Bom para quase tudo.",
-    );
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("Sonnet");
     expect(await offered(d, "Modelo")).toHaveLength(4);
     expect(await offered(d, "Conta")).toEqual(["Pessoal · Max", "Adicionar conta"]);
     // Back on OpenCode Go: what it had.
     await choose(d, /^OpenCode Go/);
-    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("DeepSeek V4.1 FlashEconômico");
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("DeepSeek V4.1 Flash");
     expect(within(d).getByRole("combobox", { name: "Conta" }).textContent).toContain("Plano");
   });
 
@@ -1774,9 +1772,9 @@ describe("Quem pensa: a coding plan's models", () => {
     await onPlan("zai", { model: "opus", effectiveModel: "opus" });
     let d = await brainDialog();
     expect(within(d).queryByRole("radiogroup", { name: "Modelo" })).toBeNull();
-    // An alias the plan leaves out runs its main model: shown as that one, with what it's sold as.
+    // An alias the plan leaves out runs its main model: shown as that one (what it's sold as stays in the list).
     const trigger = within(d).getByRole("combobox", { name: "Modelo" });
-    expect(trigger.textContent).toBe("GLM-5.3Topo de linha");
+    expect(trigger.textContent).toBe("GLM-5.3");
     trigger.focus();
     await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
     expect(
@@ -2003,7 +2001,7 @@ describe("Quem pensa: Automático", () => {
     expect(ramp.getAttribute("aria-valuetext")).toBe("Médio");
     await done(a);
     await model(d, /^Automático/);
-    expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("Automático");
     // The model picks the effort too: no ramp to set, and the place says so and how to set it.
     expect(row()).toContain("Janela de contexto e quem atende");
     expect(row()).not.toContain("Esforço");
