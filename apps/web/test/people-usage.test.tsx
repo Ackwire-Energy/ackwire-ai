@@ -7,7 +7,7 @@ import type { Message, OrgRole, PeopleUsage, PersonUsage } from "@agenteschat/cl
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
 
@@ -226,10 +226,7 @@ describe("Orçamento e uso › Pessoas", () => {
       ["de", "Nach Rolle"],
       ["ja", "ロール別"],
     ] as const) {
-      await act(async () => {
-        await services.i18n.changeLanguage(lang);
-      });
-      await settle(4);
+      await showIn(services, lang);
       expect(limits.querySelectorAll(".settings-rows > .ac-grouphead")).toHaveLength(2);
       expect(text(limits)).toContain(byRole);
       expect(text(limits)).toContain("Kundenbetreuung und Qualitätssicherung");

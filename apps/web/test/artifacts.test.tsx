@@ -27,7 +27,7 @@ import { HTML_SANDBOX, HtmlFrame, withShim } from "@/components/artifacts/HtmlFr
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 const saved: { url: string; name: string }[] = [];
 const copied: string[] = [];
@@ -631,10 +631,7 @@ describe("Drive", () => {
     const eng = state.channels.find((c) => c.id === ENG_ID);
     if (eng) eng.name = "produkteinfuehrung-herbstkampagne-2026";
     const { services, api } = await goDrive({ api: createFakeApi(state, { seed: true }) });
-    await act(async () => {
-      await services.i18n.changeLanguage("de");
-    });
-    await settle(4);
+    await showIn(services, "de");
     const trigger = (name: RegExp) =>
       screen()
         .getAllByRole("button")
@@ -661,10 +658,7 @@ describe("Drive", () => {
     await settle(4);
     expect(trigger(/Typen/).textContent).toContain("2 Typen");
     expect(document.querySelectorAll(".drive .ac-toolbar")).toHaveLength(1);
-    await act(async () => {
-      await services.i18n.changeLanguage("ja");
-    });
-    await settle(4);
+    await showIn(services, "ja");
     expect(screen().getByRole("searchbox", { name: "ファイルを検索" })).toBeTruthy();
   });
 

@@ -26,7 +26,12 @@ async function app() {
       <div className="settings page-split">
         <nav className="settings__nav" data-scroll-restoration-id="settings-nav" />
         <div className="settings__body" data-scroll-restoration-id="settings-section">
-          <h2 id="jev">Jev</h2>
+          {/* A section's head as the app's, so the geometry check measures a real page top. */}
+          <header className="ac-pagehead">
+            <h2 id="jev" className="ac-pagehead__title">
+              Jev
+            </h2>
+          </header>
         </div>
       </div>
     </main>

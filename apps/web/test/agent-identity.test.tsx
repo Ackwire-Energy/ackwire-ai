@@ -161,7 +161,12 @@ describe("the agent's identity as a card", () => {
     const tag = card().querySelector(".agp-roletag") as HTMLElement;
     expect(tag.tagName).toBe("SPAN");
     expect(tag.textContent).toBe("Dev");
-    expect(card().textContent).toContain("É como todo mundo vê o agente. O @ acompanha o nome.");
+    // What the card is for sits behind the ⓘ on its section's head, not under the name.
+    expect(card().textContent).not.toContain("É como todo mundo vê o agente.");
+    const about = screen().getByRole("button", { name: "Sobre Identidade e jeito" });
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "É como todo mundo vê o agente. O @ acompanha o nome.",
+    );
 
     cleanup();
     const noRole = member();

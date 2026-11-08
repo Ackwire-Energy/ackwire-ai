@@ -6,7 +6,7 @@ setupDom();
 import type { AuditRow } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
 
@@ -117,10 +117,7 @@ describe("Configurações → Auditoria", () => {
       ["de", "Abgelehnt und fehlgeschlagen"],
       ["ja", "却下と失敗"],
     ] as const) {
-      await act(async () => {
-        await r.services.i18n.changeLanguage(lang);
-      });
-      await settle(4);
+      await showIn(r.services, lang);
       const audit = document.querySelector(".audit") as HTMLElement;
       expect(audit.querySelectorAll(":scope > .ac-toolbar")).toHaveLength(1);
       expect(audit.querySelector(".ac-toolbar")?.textContent).toContain(problems);

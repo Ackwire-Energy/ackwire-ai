@@ -11,7 +11,7 @@ import { pick, rowMenu } from "./catalog";
 import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
 import { pick as pickOption } from "./new-agent-flow";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
 
@@ -830,10 +830,7 @@ test("Sua conta and Notificações in German and Japanese: every row keeps its �
       ["de", "Einstellungen"],
       ["ja", "設定"],
     ] as const) {
-      await act(async () => {
-        await services.i18n.changeLanguage(lang);
-      });
-      await settle(4);
+      await showIn(services, lang);
       expect(document.body.textContent).toContain(title);
       const rows = [...document.querySelectorAll(".settings-row")];
       expect(rows.length).toBeGreaterThan(2);
