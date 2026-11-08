@@ -5,6 +5,7 @@ import {
   acceptVoiceClip,
   createLocalKeyWrapper,
   createSpeechSettings,
+  envSpeechEngines,
   previewMediaKind,
   previewMeta,
   readableBody,
@@ -182,6 +183,34 @@ describe("sending", () => {
     expect((await clipOf(clipId)).status).toBe("pending");
     await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
     expect((await messageOf(clipId))?.body).toBe("oi");
+  });
+
+  test("SPEECH_ENGINES=local,deepinfra: DeepInfra takes what our server is too busy for or doesn't know", async () => {
+    f = await setup();
+    for (const status of [503, 422]) {
+      const urls: string[] = [];
+      const fetch = (async (url: string | URL | Request) => {
+        urls.push(String(url));
+        return String(url).startsWith("http://speech:8000/")
+          ? Response.json({ error: { message: "not now" } }, { status })
+          : Response.json({ text: "Oi, tudo bem?" });
+      }) as unknown as typeof globalThis.fetch;
+      const engines = envSpeechEngines(
+        "local,deepinfra",
+        { local: { baseUrl: "http://speech:8000/v1" }, deepinfra: { apiKey: "fake-deepinfra-key" } },
+        { fetch },
+      );
+      const deps = voiceDeps(engines);
+      const { clipId } = await accept(deps);
+      await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+      expect((await messageOf(clipId))?.body).toBe("Oi, tudo bem?");
+      expect(urls).toEqual([
+        "http://speech:8000/v1/audio/transcriptions",
+        "https://api.deepinfra.com/v1/openai/audio/transcriptions",
+      ]);
+      // 3 s at $0.012 an hour, with no minimum.
+      expect(await clipOf(clipId)).toMatchObject({ status: "sent", engine: "deepinfra", costNanoUsd: 10_000 });
+    }
   });
 });
 

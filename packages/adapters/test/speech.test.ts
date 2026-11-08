@@ -66,10 +66,11 @@ describe("providers", () => {
     expect(deleted).toEqual(["https://api.soniox.com/v1/transcriptions/t1", "https://api.soniox.com/v1/files/f1"]);
   });
 
-  test("Groq, OpenAI and a local server speak the same format", async () => {
+  test("Groq, OpenAI, DeepInfra and a local server speak the same format", async () => {
     for (const [provider, credentials, url] of [
       ["groq", { apiKey: "key" }, "https://api.groq.com/openai/v1/audio/transcriptions"],
       ["openai", { apiKey: "key" }, "https://api.openai.com/v1/audio/transcriptions"],
+      ["deepinfra", { apiKey: "key" }, "https://api.deepinfra.com/v1/openai/audio/transcriptions"],
       ["local", { baseUrl: "http://whisper:8000/v1/" }, "http://whisper:8000/v1/audio/transcriptions"],
     ] as const) {
       const f = fake(Response.json({ text: "oi" }));
@@ -77,6 +78,19 @@ describe("providers", () => {
       expect(f.calls[0]?.url).toBe(url);
       expect(form(f.calls[0]).get("prompt")).toBe("Ada, Theo");
     }
+  });
+
+  test("DeepInfra gets Whisper large v3 turbo and its key, never the app's language or the workspace", async () => {
+    const f = fake(Response.json({ text: "Oi, tudo bem?" }));
+    const engine = createSpeechEngine("deepinfra", { apiKey: "fake-deepinfra-key" }, options(f));
+    expect(await engine?.file({ ...input, orgId: "org-1" })).toEqual({ text: "Oi, tudo bem?" });
+    const [call] = f.calls;
+    expect(call?.url).toBe("https://api.deepinfra.com/v1/openai/audio/transcriptions");
+    expect(call?.init?.method).toBe("POST");
+    expect(call?.init?.headers).toEqual({ authorization: "Bearer fake-deepinfra-key" });
+    expect(form(call).get("model")).toBe("openai/whisper-large-v3-turbo");
+    expect(form(call).get("file")).toBeInstanceOf(File);
+    expect(form(call).get("language")).toBeNull();
   });
 
   test("the app's language goes only where it is a hint: every other engine hears the language in the audio", async () => {
@@ -166,25 +180,29 @@ describe("providers", () => {
 
   test("what a provider needs is required", () => {
     expect(createSpeechEngine("groq", {})).toBeNull();
+    expect(createSpeechEngine("deepinfra", {})).toBeNull();
     expect(createSpeechEngine("local", {})).toBeNull();
   });
 });
 
 describe("errors", () => {
   test("say whether another try can work, and never carry the key", async () => {
-    for (const [status, reason] of [
-      [401, "auth"],
-      [429, "busy"],
-      [500, "busy"],
-      [400, "refused"],
-    ] as const) {
-      const f = fake(new Response("nope", { status }));
-      const error = await createSpeechEngine("elevenlabs", { apiKey: "secret-key" }, options(f))
-        ?.file(input)
-        .catch((e) => e);
-      expect(error).toBeInstanceOf(SpeechError);
-      expect((error as SpeechError).reason).toBe(reason);
-      expect((error as SpeechError).message).not.toContain("secret-key");
+    for (const provider of ["elevenlabs", "deepinfra"] as const) {
+      for (const [status, reason] of [
+        [401, "auth"],
+        [429, "busy"],
+        [500, "busy"],
+        [503, "busy"],
+        [400, "refused"],
+      ] as const) {
+        const f = fake(new Response("nope", { status }));
+        const error = await createSpeechEngine(provider, { apiKey: "secret-key" }, options(f))
+          ?.file(input)
+          .catch((e) => e);
+        expect(error).toBeInstanceOf(SpeechError);
+        expect((error as SpeechError).reason).toBe(reason);
+        expect((error as SpeechError).message).not.toContain("secret-key");
+      }
     }
   });
 });

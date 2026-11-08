@@ -34,6 +34,7 @@ const PROVIDERS: { id: SpeechProvider; name: string }[] = [
   { id: "soniox", name: "Soniox" },
   { id: "groq", name: "Groq" },
   { id: "openai", name: "OpenAI" },
+  { id: "deepinfra", name: "DeepInfra" },
 ];
 
 /** Configurações › Voz (ADR 0100). Who configures the workspace changes it; everyone else reads it. */

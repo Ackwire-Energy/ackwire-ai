@@ -56,18 +56,26 @@ On agentes.chat's servers only: a person and a workspace have a number of minute
 ## Addendum (2026-11-07): Parakeet on our own server, the language heard in the audio
 
 **The decision.** agentes.chat's Cloud turns voice into text on its own production server: NVIDIA's Parakeet TDT 0.6B v3
-(int8, on ONNX Runtime) in the compose file's `speech` profile (`deploy/speech`), with `SPEECH_ENGINES=local,groq`. When
-that service is busy, down, or not for the language spoken, Groq's `whisper-large-v3-turbo` takes the recording, the
-cheapest hosted engine ($0.04 an audio hour, billed for 10 s at least). No model runs on the workspaces' computers,
-which are the agents' to work on. Published measurements on 2 vCPUs give Parakeet about 6 s per minute of audio, about
-3 s end to end for a short note, and 1.2 to 1.8 GB of memory; our own server's numbers come from a benchmark run there.
+(int8, on ONNX Runtime) in the compose file's `speech` profile (`deploy/speech`), with `SPEECH_ENGINES=local,deepinfra`.
+When that service is busy, down, or not for the language spoken, DeepInfra's `whisper-large-v3-turbo` takes the
+recording, the cheapest hosted engine (below). No model runs on the workspaces' computers, which are the agents' to work
+on. Published measurements on 2 vCPUs give Parakeet about 6 s per minute of audio, about 3 s end to end for a short
+note, and 1.2 to 1.8 GB of memory; our own server's numbers come from a benchmark run there.
+
+**DeepInfra after our server.** The engines are assemblyai, elevenlabs, soniox, groq, openai, local and deepinfra, and
+with `SPEECH_ENGINES` empty every one with a key is tried in that order. DeepInfra (`DEEPINFRA_API_KEY`) speaks the
+OpenAI format (`https://api.deepinfra.com/v1/openai`) and runs the same Whisper as Groq (`openai/whisper-large-v3-turbo`)
+for $0.012 an audio hour, billed by the second, where Groq asks $0.04 and bills 10 s at least. A test with a real key
+turned a 4.4 s Portuguese note into the right words in 1.8 s, for $0.0000146, about 7.6 times less than Groq bills for
+it, and past 10 s DeepInfra costs 3.3 times less. Groq can still follow it (`SPEECH_ENGINES=local,deepinfra,groq`) for
+the minutes DeepInfra is busy.
 
 **The language comes from the audio.** The apps send their interface language, and someone with the app in English may
-speak Portuguese. Engines that detect the language themselves (Groq, OpenAI, AssemblyAI, ElevenLabs and our own server)
-no longer get it: Whisper takes `language` as an order, so the words came out wrong or translated. Soniox still gets it,
-as `language_hints`, which is a hint. Our server never reads it: Whisper tiny guesses the language from the first 30 s,
-and when the shares of Parakeet's 25 European languages add up to `SPEECH_LANGUAGE_MIN` (0.7) or more, Parakeet
-transcribes; it detects which of them by itself. Anything else, or a guess that unsure, answers 422
+speak Portuguese. Engines that detect the language themselves (Groq, DeepInfra, OpenAI, AssemblyAI, ElevenLabs and our
+own server) no longer get it: Whisper takes `language` as an order, so the words came out wrong or translated. Soniox
+still gets it, as `language_hints`, which is a hint. Our server never reads it: Whisper tiny guesses the language from
+the first 30 s, and when the shares of Parakeet's 25 European languages add up to `SPEECH_LANGUAGE_MIN` (0.7) or
+more, Parakeet transcribes; it detects which of them by itself. Anything else, or a guess that unsure, answers 422
 `unsupported_language`, which the adapter reads as `refused`: the next engine tries at once, in the same attempt, and
 with no next engine the message goes out as audio with no words, as for any refusal. A recording with no signal at all
 (a muted microphone, the silent second a key test sends) has no words and runs no model. Parakeet hearing no words in

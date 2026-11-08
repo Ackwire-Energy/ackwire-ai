@@ -626,6 +626,7 @@ export function buildEngine(o: EngineOptions) {
         soniox: { apiKey: config.SONIOX_API_KEY },
         groq: { apiKey: config.GROQ_API_KEY },
         openai: { apiKey: config.OPENAI_SPEECH_API_KEY },
+        deepinfra: { apiKey: config.DEEPINFRA_API_KEY },
         local: {
           baseUrl: config.LOCAL_SPEECH_URL,
           model: config.LOCAL_SPEECH_MODEL,

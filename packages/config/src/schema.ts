@@ -471,7 +471,7 @@ export const envVars = {
   SPEECH_ENGINES: {
     schema: z.string().optional(),
     description:
-      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
+      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai, local and deepinfra. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
     section: "Chat",
     example: "assemblyai,groq",
   },
@@ -502,6 +502,12 @@ export const envVars = {
   OPENAI_SPEECH_API_KEY: {
     schema: z.string().optional(),
     description: "OpenAI key for voice messages, optional (ADR 0100). The audio goes to OpenAI to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  DEEPINFRA_API_KEY: {
+    schema: z.string().optional(),
+    description: "DeepInfra key for voice messages, optional (ADR 0100). The audio goes to DeepInfra to become text.",
     section: "Chat",
     secret: true,
   },

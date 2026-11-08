@@ -48,7 +48,7 @@ export class SpeechError extends Error {
 
 export type SpeechFetch = typeof fetch;
 
-export const SPEECH_PROVIDERS = ["assemblyai", "elevenlabs", "soniox", "groq", "openai", "local"] as const;
+export const SPEECH_PROVIDERS = ["assemblyai", "elevenlabs", "soniox", "groq", "openai", "local", "deepinfra"] as const;
 export type SpeechProviderId = (typeof SPEECH_PROVIDERS)[number];
 
 export interface SpeechCredentials {
@@ -255,7 +255,7 @@ function soniox(apiKey: string, options: SpeechOptions): SpeechEngine {
   };
 }
 
-/** The OpenAI format: OpenAI itself, Groq, and a server of one's own (Speaches, a local Whisper or Parakeet). */
+/** The OpenAI format: OpenAI itself, Groq, DeepInfra, and a server of one's own (Speaches, a local Whisper or Parakeet). */
 function openAiFormat(
   config: {
     id: SpeechProviderId;
@@ -361,6 +361,20 @@ export function createSpeechEngine(
         model: "whisper-large-v3-turbo",
         nanoUsdPerHour: 0.04 * USD,
         minBilledSeconds: 10,
+      },
+      options,
+    );
+  }
+  if (provider === "deepinfra") {
+    return openAiFormat(
+      {
+        id: "deepinfra",
+        label: "DeepInfra",
+        baseUrl: "https://api.deepinfra.com/v1/openai",
+        apiKey,
+        model: "openai/whisper-large-v3-turbo",
+        nanoUsdPerHour: 0.012 * USD,
+        minBilledSeconds: 0,
       },
       options,
     );

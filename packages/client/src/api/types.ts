@@ -50,7 +50,7 @@ export interface GifKey {
 }
 
 /** Who can turn voice into text on this server (ADR 0100). */
-export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local";
+export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local" | "deepinfra";
 
 /**
  * The installation's speech engine, for its pinned owner on a server that isn't agentes.chat's own (`GET
