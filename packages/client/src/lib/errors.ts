@@ -23,6 +23,7 @@ const KNOWN = {
   "webhook.github_failed": "errors.webhook.githubFailed",
   "webhook.invalid_secret": "errors.webhook.invalidSecret",
   "webhook.invalid_repo": "errors.webhook.invalidRepo",
+  "github_event.answered": "errors.githubEvent.answered",
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",

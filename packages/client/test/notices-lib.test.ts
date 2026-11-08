@@ -295,6 +295,12 @@ describe("what people read of a notice", () => {
     answer: "Versão 8 confirmada",
     agentHandles: "ivy",
     messageId: "m1",
+    event: "comment",
+    item: "pull_request",
+    who: "Bia",
+    number: "12",
+    repo: "acme/app",
+    url: "https://github.com/acme/app/pull/12#issuecomment-1",
   };
   const AGENT_TEXT = "Check run 42 via github_actions_list and tell #releases";
   const engineKinds = [
@@ -320,8 +326,14 @@ describe("what people read of a notice", () => {
     const missing: string[] = [];
     for (const kind of seen) {
       for (const reason of ["audience", "callable"]) {
-        // A routine's report is what it found for people; every other notice's text is the agent's.
-        const said = kind === "routine_handoff" ? "3 erros novos no checkout" : AGENT_TEXT;
+        // A routine's report is what it found for people, a GitHub event what someone wrote there; every other
+        // notice's text is the agent's.
+        const said =
+          kind === "routine_handoff"
+            ? "3 erros novos no checkout"
+            : kind === "github_event"
+              ? "Pode cobrir o token expirado?"
+              : AGENT_TEXT;
         const view = noticeView(
           { body: said, meta: { notice: { kind, text: said, from: "@ivy", refs: { ...refs, reason } } } },
           names,
@@ -338,7 +350,7 @@ describe("what people read of a notice", () => {
         // What "Show" opens is the app's words or what people wrote, never the agent's English.
         if (view.detail && "content" in view.detail) {
           expect(view.detail.content).not.toContain("github_actions_list");
-          expect(["routine_handoff", "consult_reply"]).toContain(kind);
+          expect(["routine_handoff", "consult_reply", "github_event"]).toContain(kind);
         }
       }
     }
@@ -368,6 +380,40 @@ describe("what people read of a notice", () => {
     });
     // An older line that didn't keep whom: no names to say, nothing to open.
     expect(view({})).toMatchObject({ key: "chat.notice.wakeSkippedAnon", detail: null });
+  });
+
+  test("what happened on GitHub: its line by event and item, what they wrote and the link, and who may ask", () => {
+    const view = (r: Record<string, string>, text = "Pode revisar?") =>
+      noticeView(
+        { body: AGENT_TEXT, meta: { notice: { kind: "github_event", text, refs: { who: "drive-by", ...r } } } },
+        names,
+        when,
+      );
+    const at = { number: "12", repo: "acme/app", url: "https://github.com/acme/app/pull/12" };
+    expect(view({ ...at, event: "comment", item: "pull_request", outside: "1" })).toMatchObject({
+      key: "chat.notice.github.comment",
+      values: { who: "drive-by", number: "12", repo: "acme/app", name: "Rex" },
+      detail: { content: "Pode revisar?\n\nhttps://github.com/acme/app/pull/12" },
+      answer: true,
+    });
+    // Someone already asked: no button on it, and the new notice says who asked.
+    expect(view({ ...at, event: "comment", item: "issue", outside: "1", answeredBy: "u1" })).toMatchObject({
+      key: "chat.notice.github.commentIssue",
+      answer: false,
+    });
+    expect(view({ ...at, event: "comment", answerFor: "m1", personId: "u1", asker: "Bia" })).toMatchObject({
+      key: "chat.notice.github.asked",
+      values: { asker: "Bia", name: "Rex", who: "drive-by" },
+      answer: false,
+    });
+    expect(view({ ...at, event: "review", state: "changes_requested" })?.key).toBe("chat.notice.github.changes");
+    expect(view({ ...at, event: "closed", item: "issue" })?.key).toBe("chat.notice.github.closedIssue");
+    // A merge has no words of anyone's: "Show" opens the link.
+    expect(view({ ...at, event: "merged" }, "")).toMatchObject({
+      key: "chat.notice.github.merged",
+      detail: { content: "https://github.com/acme/app/pull/12" },
+      answer: false,
+    });
   });
 
   test("a follow-up's line has nothing to open: its note to itself is the agent's", () => {

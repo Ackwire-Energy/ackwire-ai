@@ -1212,6 +1212,7 @@ describe("automatic lines (notices) and fast replies", () => {
       values: { routine: "Sentry diário" },
       detail: { content: "3 erros novos" },
       pending: false,
+      answer: false,
     });
     const fromOnly = eventLineOf(
       agentMsg("n2", { notice: { kind: "routine_handoff", text: "x", from: "Rotina «Bom dia»" } }),
@@ -1220,6 +1221,26 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(fromOnly?.values).toEqual({ routine: "Bom dia" });
     const anon = eventLineOf(agentMsg("n3", { notice: { kind: "routine_handoff", text: "x" } }), names);
     expect(anon?.key).toBe("chat.notice.routineHandoffAnon");
+  });
+
+  test("what someone wrote on GitHub: its line, their words and the link, and a way to ask for a reply", () => {
+    const refs = { event: "comment", item: "issue", who: "drive-by", number: "5", repo: "acme/app" };
+    const line = eventLineOf(
+      agentMsg("n4", {
+        notice: {
+          kind: "github_event",
+          text: "Pode revisar?",
+          refs: { ...refs, url: "https://github.com/acme/app/issues/5", outside: "1" },
+        },
+      }),
+      names,
+    );
+    expect(line).toMatchObject({
+      key: "chat.notice.github.commentIssue",
+      values: { who: "drive-by", number: "5", repo: "acme/app" },
+      detail: { content: "Pode revisar?\n\nhttps://github.com/acme/app/issues/5" },
+      answer: true,
+    });
   });
 
   test("another agent's answer and note say its name, not the agent-facing handle (no @)", () => {

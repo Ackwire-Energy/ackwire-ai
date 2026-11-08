@@ -11141,8 +11141,10 @@
       },
       "line": {
         "env": "Ustawiona w ustawieniach tego serwera (GITHUB_APP_ID).",
-        "invalid": "Ten serwer nie może otworzyć zapisanej aplikacji. Usuń ją i utwórz ponownie."
+        "invalid": "Ten serwer nie może otworzyć zapisanej aplikacji. Usuń ją i utwórz ponownie.",
+        "events": "Aby agenci słyszeli, co dzieje się w GitHub, zaznacz w aplikacji te zdarzenia: {{events}}."
       },
+      "events": "Zaznacz zdarzenia",
       "open": "Otwórz w GitHub",
       "remove": "Usuń aplikację",
       "removeTitle": "Usunąć aplikację GitHub tego serwera?",
@@ -12821,6 +12823,9 @@
       "githubFailed": "GitHub nie utworzył webhooka w {{repo}} ({{status}}). Wykonaj kroki poniżej, żeby utworzyć go ręcznie.",
       "invalidSecret": "Wklej cały Client Secret, bez spacji.",
       "invalidRepo": "Wpisz repozytorium jako właściciel/nazwa."
+    },
+    "githubEvent": {
+      "answered": "Ktoś już poprosił o tę odpowiedź. Agent się tym zajmuje."
     },
     "issue": {
       "assigneeOutside": "Ta osoba nie widzi tego zadania. Najpierw dodaj ją do Kto to widzi.",
@@ -14676,6 +14681,21 @@
       "wakeSkippedAnon": "Wzmianka {{name}} nie dotarła do innego agenta",
       "wakeSkippedAudience": "Tylko niektóre osoby mogą wywołać {{agents}}, a ta praca {{name}} nie pochodzi od żadnej z nich. Ktoś, kto może wywołać {{agents}}, może przekazać prośbę dalej.",
       "wakeSkippedCallable": "Ustawienia {{name}} nie pozwalają wywołać {{agents}} (inny projekt albo spoza listy agentów, których może wywołać). Osoba, która opiekuje się {{name}}, może to zmienić na stronie agenta.",
+      "github": {
+        "comment": "{{who}} skomentował(a) PR #{{number}} ({{repo}}) w GitHub",
+        "commentIssue": "{{who}} skomentował(a) issue #{{number}} ({{repo}}) w GitHub",
+        "commentDiscussion": "{{who}} skomentował(a) dyskusję #{{number}} ({{repo}}) w GitHub",
+        "opened": "{{who}} wywołał(a) aplikację agentes.chat w #{{number}} ({{repo}}) w GitHub",
+        "reviewed": "{{who}} zrecenzował(a) PR #{{number}} ({{repo}}) w GitHub",
+        "approved": "{{who}} zatwierdził(a) PR #{{number}} ({{repo}}) w GitHub",
+        "changes": "{{who}} poprosił(a) o zmiany w PR #{{number}} ({{repo}}) w GitHub",
+        "reviewRequested": "{{who}} poprosił(a) {{name}} o recenzję PR #{{number}} ({{repo}}) w GitHub",
+        "merged": "PR #{{number}} ({{repo}}) scalony w GitHub przez {{who}}",
+        "closed": "PR #{{number}} ({{repo}}) zamknięty w GitHub przez {{who}}",
+        "closedIssue": "Issue #{{number}} ({{repo}}) zamknięte w GitHub przez {{who}}",
+        "ask": "Poproś o odpowiedź",
+        "asked": "{{asker}} poprosił(a) {{name}} o odpowiedź dla {{who}} w GitHub"
+      },
       "show": "Pokaż",
       "hide": "Ukryj",
       "talker": "w trakcie pracy",

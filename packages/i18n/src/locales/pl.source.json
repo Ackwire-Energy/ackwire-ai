@@ -25233,6 +25233,12 @@
   "githubApp.server.line.invalid": {
     "value": "This server can't open the saved app. Remove it and create it again."
   },
+  "githubApp.server.line.events": {
+    "value": "For agents to hear what happens on GitHub, tick these events on the app: {{events}}."
+  },
+  "githubApp.server.events": {
+    "value": "Tick the events"
+  },
   "githubApp.server.open": {
     "value": "Open on GitHub"
   },
@@ -28944,6 +28950,9 @@
   },
   "errors.webhook.invalidRepo": {
     "value": "Write the repository as owner/name."
+  },
+  "errors.githubEvent.answered": {
+    "value": "Someone already asked for this reply. The agent is on it."
   },
   "errors.issue.assigneeOutside": {
     "value": "This person can't see this task. Add them to who sees it first."
@@ -33305,6 +33314,45 @@
   },
   "chat.notice.wakeSkippedCallable": {
     "value": "{{name}}'s settings don't let it call {{agents}} (another project, or not on its list of agents to call). Whoever looks after {{name}} can change that on the agent's page."
+  },
+  "chat.notice.github.comment": {
+    "value": "{{who}} commented on PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.commentIssue": {
+    "value": "{{who}} commented on issue #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.commentDiscussion": {
+    "value": "{{who}} commented on discussion #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.opened": {
+    "value": "{{who}} called the agentes.chat app in #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.reviewed": {
+    "value": "{{who}} reviewed PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.approved": {
+    "value": "{{who}} approved PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.changes": {
+    "value": "{{who}} asked for changes on PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.reviewRequested": {
+    "value": "{{who}} asked {{name}} to review PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.merged": {
+    "value": "{{who}} merged PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.closed": {
+    "value": "{{who}} closed PR #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.closedIssue": {
+    "value": "{{who}} closed issue #{{number}} ({{repo}}) on GitHub"
+  },
+  "chat.notice.github.ask": {
+    "value": "Ask for a reply"
+  },
+  "chat.notice.github.asked": {
+    "value": "{{asker}} asked {{name}} to reply to {{who}} on GitHub"
   },
   "chat.notice.show": {
     "value": "Show"

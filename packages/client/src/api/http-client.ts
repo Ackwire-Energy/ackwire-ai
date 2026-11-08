@@ -981,6 +981,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       cancelFollowUp: (orgId, messageId) =>
         request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
+      answerGitHub: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/github-answer`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),

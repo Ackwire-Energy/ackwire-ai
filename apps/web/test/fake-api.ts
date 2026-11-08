@@ -3005,6 +3005,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
         if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
       },
+      answerGitHub: async (orgId, messageId) => {
+        log("chat.answerGitHub", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, answeredBy: "me" };
+      },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
           m.type === "agent"
