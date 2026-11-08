@@ -290,8 +290,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
           <GroupedRow
             label={t("rolesPage.hoist")}
             labelLines={2}
-            sub={t("rolesPage.hoistDesc")}
-            subLines={2}
+            hint={{ name: t("common.about", { label: t("rolesPage.hoist") }), text: t("rolesPage.hoistDesc") }}
             toggle={role.hoist}
             disabled={Boolean(locked)}
             onPress={() => patch({ hoist: !role.hoist })}

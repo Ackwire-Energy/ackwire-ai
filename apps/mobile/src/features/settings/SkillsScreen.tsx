@@ -130,6 +130,10 @@ export function SkillsScreen() {
                 <GroupedRow
                   label={t("skills.agentsImprove")}
                   labelLines={2}
+                  hint={{
+                    name: t("common.about", { label: t("skills.agentsImprove") }),
+                    text: t("skills.agentsImproveHelp"),
+                  }}
                   toggle={settings.data.agentsImprove}
                   disabled={action.isPending}
                   onPress={() =>
@@ -137,7 +141,6 @@ export function SkillsScreen() {
                   }
                 />
               </GroupedList>
-              <GroupedFooter>{t("skills.agentsImproveHelp")}</GroupedFooter>
             </>
           ) : null}
           {list.length > SKILLS_INLINE ? (
@@ -495,6 +498,7 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
       <GroupedList>
         <GroupedRow
           label={t("skills.autoUpdate")}
+          hint={{ name: t("common.about", { label: t("skills.autoUpdate") }), text: t("skills.autoUpdateHelp") }}
           toggle={s.autoUpdate ?? false}
           disabled={action.isPending}
           onPress={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: !s.autoUpdate } })}
@@ -509,7 +513,6 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           />
         ) : null}
       </GroupedList>
-      <GroupedFooter>{t("skills.autoUpdateHelp")}</GroupedFooter>
     </>
   );
 }
@@ -806,7 +809,11 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
       </View>
       {tab === "github" ? (
         <>
-          <GroupedHeader>{t("skills.githubUrl")}</GroupedHeader>
+          <GroupedHeader
+            hint={{ name: t("common.about", { label: t("skills.githubUrl") }), text: t("skills.githubHelp") }}
+          >
+            {t("skills.githubUrl")}
+          </GroupedHeader>
           <TextArea
             value={url}
             onChangeText={(next) => {
@@ -824,9 +831,9 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
             onSubmitEditing={() => void submit()}
             accessibilityLabel={t("skills.githubUrl")}
           />
-          <GroupedFooter>
-            {choices ? t("skills.pickLead", { count: choices.length + skipped.length }) : t("skills.githubHelp")}
-          </GroupedFooter>
+          {choices ? (
+            <GroupedFooter>{t("skills.pickLead", { count: choices.length + skipped.length })}</GroupedFooter>
+          ) : null}
           {said ? (
             <View style={styles.hidden}>
               <Note icon="lock" live>
@@ -932,15 +939,20 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
             minHeight={50}
             accessibilityLabel={t("skills.name")}
           />
-          <GroupedHeader>{t("skills.description")}</GroupedHeader>
+          <GroupedHeader
+            hint={{ name: t("common.about", { label: t("skills.description") }), text: t("skills.descriptionHelp") }}
+          >
+            {t("skills.description")}
+          </GroupedHeader>
           <TextArea
             value={form.description}
             onChangeText={(description) => setForm((f) => ({ ...f, description }))}
             minHeight={64}
             accessibilityLabel={t("skills.description")}
           />
-          <GroupedFooter>{t("skills.descriptionHelp")}</GroupedFooter>
-          <GroupedHeader>{t("skills.body")}</GroupedHeader>
+          <GroupedHeader hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.bodyHelp") }}>
+            {t("skills.body")}
+          </GroupedHeader>
           <TextArea
             value={form.body}
             onChangeText={(body) => setForm((f) => ({ ...f, body }))}
@@ -948,7 +960,6 @@ function InstallSkill({ initialUrl }: { initialUrl?: string }) {
             autoCapitalize="none"
             accessibilityLabel={t("skills.body")}
           />
-          <GroupedFooter>{t("skills.bodyHelp")}</GroupedFooter>
         </>
       )}
       {error ? (
@@ -1018,7 +1029,9 @@ export function EditSkillScreen({ id }: { id: string }) {
             minHeight={64}
             accessibilityLabel={t("skills.description")}
           />
-          <GroupedHeader>{t("skills.body")}</GroupedHeader>
+          <GroupedHeader hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.newVersion") }}>
+            {t("skills.body")}
+          </GroupedHeader>
           <TextArea
             value={form.body}
             onChangeText={(body) => setForm({ ...form, body })}
@@ -1026,7 +1039,6 @@ export function EditSkillScreen({ id }: { id: string }) {
             autoCapitalize="none"
             accessibilityLabel={t("skills.body")}
           />
-          <GroupedFooter>{t("skills.newVersion")}</GroupedFooter>
           <Gap />
           <GroupedList>
             <GroupedRow

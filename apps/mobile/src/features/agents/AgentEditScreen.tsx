@@ -167,7 +167,11 @@ export function AgentEditScreen({ id }: { id: string }) {
 
           {fields.has("name") ? (
             <>
-              <GroupedHeader>{t("agent.nameLabel")}</GroupedHeader>
+              <GroupedHeader
+                hint={{ name: t("common.about", { label: t("agent.nameLabel") }), text: t("agent.identityHelp") }}
+              >
+                {t("agent.nameLabel")}
+              </GroupedHeader>
               <GroupedList>
                 <TextInput
                   value={draft.name}
@@ -184,13 +188,9 @@ export function AgentEditScreen({ id }: { id: string }) {
                 <View style={styles.foot}>
                   <ErrorLine text={t("newAgent.errors.nameRequired")} />
                 </View>
-              ) : (
-                <GroupedFooter>
-                  {moved && !handleIssue
-                    ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
-                    : t("agent.identityHelp")}
-                </GroupedFooter>
-              )}
+              ) : moved && !handleIssue ? (
+                <GroupedFooter>{t("agent.handleMoves", { handle: draft.handle, old: agent.handle })}</GroupedFooter>
+              ) : null}
               <GroupedHeader>{t("agent.handleLabel")}</GroupedHeader>
               <GroupedList>
                 <HandleInput
@@ -233,8 +233,10 @@ export function AgentEditScreen({ id }: { id: string }) {
                     icon="agent"
                     label={t("audience.consultable", agentGrammar(agent.name))}
                     labelLines={2}
-                    sub={t("audience.consultableHint", agentGrammar(agent.name))}
-                    subLines={4}
+                    hint={{
+                      name: t("common.about", { label: t("audience.consultable", agentGrammar(agent.name)) }),
+                      text: t("audience.consultableHint", agentGrammar(agent.name)),
+                    }}
                     toggle={draft.audience.consultable !== false}
                     disabled={
                       !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))

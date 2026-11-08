@@ -2,17 +2,7 @@ import { useRoles, type VaultAccess, type VaultScope } from "@agenteschat/client
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import {
-  Button,
-  fieldText,
-  GroupedField,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  OPTION_ROW,
-  Text,
-} from "@/ui";
+import { Button, fieldText, GroupedField, GroupedHeader, GroupedList, GroupedRow, OPTION_ROW, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -52,6 +42,7 @@ export function InputField({
   onChange,
   editable = true,
   mono = false,
+  hint,
   ...input
 }: {
   label: string;
@@ -60,6 +51,8 @@ export function InputField({
   editable?: boolean;
   /** Code (a variable's name). */
   mono?: boolean;
+  /** What the field is for, behind an ⓘ beside its label. */
+  hint?: { name: string; text: string };
 } & Pick<
   TextInputProps,
   | "placeholder"
@@ -75,7 +68,7 @@ export function InputField({
   const c = useColors();
   const font = mono ? styles.mono : fieldText("callout");
   return (
-    <GroupedField label={label}>
+    <GroupedField label={label} {...(hint ? { hint } : {})}>
       {editable ? (
         <TextInput
           value={value}
@@ -153,7 +146,14 @@ export function AgentRows({
   const agents = usePickableAgents();
   return (
     <>
-      <GroupedHeader>{t("mobile.vault.agents.title")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("mobile.vault.agents.title") }),
+          text: scope === "personal" ? t("mobile.vault.agents.personalHelp") : t("mobile.vault.agents.teamHelp"),
+        }}
+      >
+        {t("mobile.vault.agents.title")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           icon="agent"
@@ -176,9 +176,6 @@ export function AgentRows({
           />
         ))}
       </GroupedList>
-      <GroupedFooter>
-        {scope === "personal" ? t("mobile.vault.agents.personalHelp") : t("mobile.vault.agents.teamHelp")}
-      </GroupedFooter>
     </>
   );
 }

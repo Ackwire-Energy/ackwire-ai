@@ -582,7 +582,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
           ) : null}
           {d.kind === "event" ? (
             <>
-              <View style={styles.gap} />
+              <GroupedHeader
+                hint={{
+                  name: t("common.about", { label: t("routines.form.event") }),
+                  text: t("routines.form.eventHelp", { org: org?.name ?? "" }),
+                }}
+              >
+                {t("routines.form.event")}
+              </GroupedHeader>
               <GroupedList>
                 {ROUTINE_EVENTS.map((e) => (
                   <GroupedRow
@@ -594,7 +601,6 @@ function Form({ routine }: { routine: Routine | undefined }) {
                   />
                 ))}
               </GroupedList>
-              <GroupedFooter>{t("routines.form.eventHelp", { org: org?.name ?? "" })}</GroupedFooter>
               {eventWebhook(d.event) ? <EventWebhookSetup provider={eventWebhook(d.event) ?? "github"} /> : null}
             </>
           ) : null}
@@ -786,7 +792,11 @@ function Form({ routine }: { routine: Routine | undefined }) {
             )
           ) : null}
 
-          <GroupedHeader>{t("routines.form.report")}</GroupedHeader>
+          <GroupedHeader
+            hint={{ name: t("common.about", { label: t("routines.form.report") }), text: t("routines.report.hint") }}
+          >
+            {t("routines.form.report")}
+          </GroupedHeader>
           <GroupedList>
             {(["always", "when_new"] as const).map((v) => (
               <GroupedRow
@@ -797,7 +807,6 @@ function Form({ routine }: { routine: Routine | undefined }) {
               />
             ))}
           </GroupedList>
-          <GroupedFooter>{t("routines.report.hint")}</GroupedFooter>
           {routineReachWarnings(d.prompt, dir.agents, {
             agentId: d.agentId || null,
             creatorUserId: creator === me ? null : creator,

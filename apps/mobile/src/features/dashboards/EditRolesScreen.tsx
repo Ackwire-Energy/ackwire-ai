@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useTheme } from "@/ui";
+import { GroupedHeader, GroupedList, GroupedRow, useTheme } from "@/ui";
 import { goBack, PushedHeader } from "../shared/parts";
 import { updateEditRoles, useEditRolesPick } from "./edit-roles";
 import { useCustomRoles } from "./hooks";
@@ -39,7 +39,14 @@ export function EditRolesScreen() {
       >
         {pick ? (
           <>
-            <GroupedHeader>{t("dashboards.edit.roles")}</GroupedHeader>
+            <GroupedHeader
+              hint={{
+                name: t("common.about", { label: t("dashboards.edit.roles") }),
+                text: t("dashboards.edit.rolesNote"),
+              }}
+            >
+              {t("dashboards.edit.roles")}
+            </GroupedHeader>
             <GroupedList>
               {roles.map((r) => {
                 const sees = roleSeesBoard(pick, r.id);
@@ -57,7 +64,6 @@ export function EditRolesScreen() {
                 );
               })}
             </GroupedList>
-            <GroupedFooter>{t("dashboards.edit.rolesNote")}</GroupedFooter>
           </>
         ) : null}
       </ScrollView>

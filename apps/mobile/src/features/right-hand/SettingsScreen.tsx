@@ -193,9 +193,9 @@ function PlanRows({
           <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
         )}
       </GroupedList>
-      <GroupedFooter>{t("rightHand.settings.planHelp")}</GroupedFooter>
       {view ? (
         <>
+          <Gap />
           <GroupedList>
             <GroupedRow
               icon="members"
@@ -241,9 +241,30 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
           void qc.invalidateQueries({ queryKey: key });
       })
       .catch(failed);
-  if (hold) return <PlanHoldNote org={org} />;
+  const header = (
+    <GroupedHeader
+      {...(plans.length > 0 && !hold
+        ? {
+            hint: {
+              name: t("common.about", { label: t("rightHand.settings.workspacePlan") }),
+              text: t("rightHand.settings.workspacePlanHelp", g),
+            },
+          }
+        : {})}
+    >
+      {t("rightHand.settings.workspacePlan")}
+    </GroupedHeader>
+  );
+  if (hold)
+    return (
+      <>
+        {header}
+        <PlanHoldNote org={org} />
+      </>
+    );
   return (
     <>
+      {header}
       {plans.length > 0 ? (
         <GroupedList>
           {plans.map((a) => {
@@ -262,9 +283,7 @@ function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
           })}
         </GroupedList>
       ) : null}
-      <GroupedFooter>
-        {t(plans.length > 0 ? "rightHand.settings.workspacePlanHelp" : "rightHand.settings.noPlans", g)}
-      </GroupedFooter>
+      {plans.length === 0 ? <GroupedFooter>{t("rightHand.settings.noPlans", g)}</GroupedFooter> : null}
     </>
   );
 }
@@ -308,7 +327,14 @@ function Form({ agent }: { agent: Agent }) {
   const reach = agentsReach(audience, false, agent.ownerUserId);
   return (
     <SettingsPage title={agent.name} subtitle={t("rightHand.label")}>
-      <GroupedHeader>{t("rightHand.settings.name")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("rightHand.settings.name") }),
+          text: t("rightHand.settings.nameHelp", { ...g, label: t("rightHand.label") }),
+        }}
+      >
+        {t("rightHand.settings.name")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           leading={<AgentFace agentId={agent.id} size={36} live={false} />}
@@ -318,9 +344,15 @@ function Form({ agent }: { agent: Agent }) {
           onPress={() => openAgentEdit(agent.id)}
         />
       </GroupedList>
-      <GroupedFooter>{t("rightHand.settings.nameHelp", { ...g, label: t("rightHand.label") })}</GroupedFooter>
 
-      <GroupedHeader>{t("rightHand.settings.workspace")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("rightHand.settings.workspace") }),
+          text: t(planKind ? "rightHand.settings.planHelp" : "rightHand.settings.workspaceHelp", g),
+        }}
+      >
+        {t("rightHand.settings.workspace")}
+      </GroupedHeader>
       {planKind ? (
         <PlanRows agent={agent} kind={planKind} dir={dir} />
       ) : (
@@ -334,13 +366,18 @@ function Form({ agent }: { agent: Agent }) {
               onPress={() => openAgentAi(agent.id)}
             />
           </GroupedList>
-          <GroupedFooter>{t("rightHand.settings.workspaceHelp", g)}</GroupedFooter>
-          <GroupedHeader>{t("rightHand.settings.workspacePlan")}</GroupedHeader>
           <WorkspacePlanRows agent={agent} dir={dir} />
         </>
       )}
 
-      <GroupedHeader>{t("rightHand.settings.budget")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("rightHand.settings.budget") }),
+          text: t("rightHand.settings.budgetHelp", g),
+        }}
+      >
+        {t("rightHand.settings.budget")}
+      </GroupedHeader>
       <GroupedList>
         <View style={styles.budget}>
           <Text variant="body" tone="muted">
@@ -361,7 +398,6 @@ function Form({ agent }: { agent: Agent }) {
           </Text>
         </View>
       </GroupedList>
-      <GroupedFooter>{t("rightHand.settings.budgetHelp", g)}</GroupedFooter>
 
       <TeamWeekRows name={agent.name} />
 
@@ -420,6 +456,10 @@ function TeamWeekRows({ name }: { name: string }) {
         <GroupedRow
           icon="clock"
           label={label}
+          hint={{
+            name: t("common.about", { label }),
+            text: t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name)),
+          }}
           toggle={on}
           onPress={() => save(admin ? { off: !prefs.off } : on ? { daily: false } : { daily: true, off: false })}
         />
@@ -443,9 +483,6 @@ function TeamWeekRows({ name }: { name: string }) {
           />
         )}
       </GroupedList>
-      <GroupedFooter>
-        {t(admin ? "teamWeek.settings.help" : "teamWeek.settings.dayHelp", agentGrammar(name))}
-      </GroupedFooter>
     </>
   );
 }

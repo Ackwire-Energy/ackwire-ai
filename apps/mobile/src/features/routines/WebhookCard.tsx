@@ -113,7 +113,14 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
         />
       </GroupedList>
 
-      <GroupedHeader>{t("routines.webhook.signature")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("routines.webhook.signature") }),
+          text: t("routines.webhook.signedHelp"),
+        }}
+      >
+        {t("routines.webhook.signature")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           icon="lock"
@@ -130,12 +137,7 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
           />
         ) : null}
       </GroupedList>
-      <GroupedFooter>
-        {t("common.joinSentences", {
-          a: t(data.signed ? "routines.webhook.signedOn" : "routines.webhook.signedOff"),
-          b: t("routines.webhook.signedHelp"),
-        })}
-      </GroupedFooter>
+      <GroupedFooter>{t(data.signed ? "routines.webhook.signedOn" : "routines.webhook.signedOff")}</GroupedFooter>
       {secret && data.signed ? (
         <>
           <GroupedFooter>{t("routines.webhook.secretOnce")}</GroupedFooter>
@@ -143,7 +145,14 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
         </>
       ) : null}
 
-      <GroupedHeader>{t("routines.webhook.methods")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("routines.webhook.methods") }),
+          text: t("routines.webhook.methodsHelp"),
+        }}
+      >
+        {t("routines.webhook.methods")}
+      </GroupedHeader>
       <GroupedList>
         {ROUTINE_HOOK_METHODS.map((m) => (
           <GroupedRow
@@ -155,7 +164,6 @@ export function WebhookCard({ routine: r, runs }: { routine: Routine; runs: Rout
           />
         ))}
       </GroupedList>
-      <GroupedFooter>{t("routines.webhook.methodsHelp")}</GroupedFooter>
 
       <GroupedHeader>{t("routines.webhook.example")}</GroupedHeader>
       <CommandBlock

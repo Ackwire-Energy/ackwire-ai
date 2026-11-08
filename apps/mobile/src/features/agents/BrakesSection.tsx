@@ -42,24 +42,24 @@ export function BrakesSection({ agent }: { agent: Agent }) {
         <GroupedRow
           icon="shield"
           label={t("brakes.costly")}
-          sub={t("brakes.costlyHelp")}
-          subLines={4}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.costly") }), text: t("brakes.costlyHelp") }}
           toggle={b.costly === "ask"}
           disabled={!editable}
           onPress={() => save({ costly: b.costly === "ask" ? "go" : "ask" })}
         />
         <GroupedRow
           label={t("brakes.atOnce")}
-          sub={t("brakes.atOnceHelp")}
-          subLines={3}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.atOnce") }), text: t("brakes.atOnceHelp") }}
           value={String(b.maxUnrequested)}
           disabled={!editable}
           onPress={() => save({ maxUnrequested: nextOf(AT_ONCE, b.maxUnrequested) })}
         />
         <GroupedRow
           label={t("brakes.prs")}
-          sub={t("brakes.prsHelp")}
-          subLines={3}
+          labelLines={2}
+          hint={{ name: t("common.about", { label: t("brakes.prs") }), text: t("brakes.prsHelp") }}
           value={String(b.maxPrsPerHour)}
           disabled={!editable}
           onPress={() => save({ maxPrsPerHour: nextOf(PRS, b.maxPrsPerHour) })}
@@ -107,7 +107,9 @@ export function BrakesSection({ agent }: { agent: Agent }) {
             ))
           : null}
       </GroupedList>
-      <GroupedHeader>{t("brakes.project")}</GroupedHeader>
+      <GroupedHeader hint={{ name: t("common.about", { label: t("brakes.project") }), text: t("brakes.projectHelp") }}>
+        {t("brakes.project")}
+      </GroupedHeader>
       <GroupedList>
         <TextInput
           value={project}
@@ -120,7 +122,7 @@ export function BrakesSection({ agent }: { agent: Agent }) {
           accessibilityLabel={t("brakes.project")}
           style={[styles.field, fieldText("body"), { color: c.ink }]}
         />
-        {/* With a project, in the project's group: the note under it speaks of both. */}
+        {/* With a project, in the project's group: its ⓘ speaks of both. */}
         {b.project ? (
           <GroupedRow
             label={t("brakes.otherProjects")}
@@ -130,7 +132,6 @@ export function BrakesSection({ agent }: { agent: Agent }) {
           />
         ) : null}
       </GroupedList>
-      <GroupedFooter>{t("brakes.projectHelp")}</GroupedFooter>
       <GroupedFooter>{t("brakes.peopleNote")}</GroupedFooter>
     </>
   );
