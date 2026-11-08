@@ -637,7 +637,6 @@ describe("issues", () => {
 
   test("assigning a task to another agent says it doesn't start it, and how to hand it the job", async () => {
     f = await setup();
-    const deps = { db: f.db, pubsub: f.pubsub };
     await createAgent(f.db, f.owner.id, f.org.id, { name: "Bia", handle: "bia" }, { model: "claude-sonnet-5-5" });
     const ctx = {
       db: f.db,
@@ -648,7 +647,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const run = async (name: string, input: Record<string, unknown>) =>
       (await tools.find((t) => t.name === name)?.execute(input, ctx))?.content ?? "";
     const created = await run("create_issue", { title: "Revisar o contrato", assignee: "@bia" });
