@@ -47,6 +47,10 @@ test("what a row says wraps instead of losing its end to an ellipsis", () => {
     expect([selector, last(top, selector, "text-overflow")]).toEqual([selector, undefined]);
     expect([selector, last(top, selector, "white-space")]).toEqual([selector, undefined]);
   }
+  // An agent's and a connector's names wrap by words, never a letter a line; a level stays whole.
+  expect(last(top, ".level-matrix th", "white-space")).toBe("normal");
+  expect(last(top, ".level-matrix th", "overflow-wrap")).toBe("break-word");
+  expect(last(top, ".level-matrix td", "white-space")).toBe("nowrap");
 });
 
 test("usage on a phone: the figures under the name, as wide as the row, not squeezed into a column beside it", () => {

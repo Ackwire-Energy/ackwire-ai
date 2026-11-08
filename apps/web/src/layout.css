@@ -3576,17 +3576,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 .level-matrix tbody th {
   font-weight: 600;
 }
+/* An agent's name and role, and a connector's name, wrap by words, their face or icon on the first line: a long one
+   keeps the levels in the table instead of pushing them past its edge. A level stays whole. Breaking anywhere would let
+   the table squeeze them a letter a line. */
+.level-matrix th {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 /* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
   }
-}
-.level-matrix__head,
-.level-matrix__agent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .level-matrix__head .connector-icon {
   width: 24px;
