@@ -1,4 +1,4 @@
-import { connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
+import { connectorOAuthApps } from "@agenteschat/config";
 import {
   agentMadeSkills,
   agentSkillList,
@@ -31,6 +31,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
+import { githubAppOf } from "../github-app";
 import {
   type AppDeps,
   body,
@@ -193,7 +194,9 @@ export function skillRoutes(deps: AppDeps) {
       publicUrl: deps.config.PUBLIC_URL,
       http: deps.extras?.http,
     },
-    app: githubAppConfig(deps.config),
+    get app() {
+      return githubAppOf(deps);
+    },
   };
   const skills = (): SkillDeps => {
     const blobs = deps.extras?.artifacts?.blobs;

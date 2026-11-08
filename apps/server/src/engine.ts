@@ -42,6 +42,7 @@ import {
   createDesktopToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
+  createGitHubAppSettings,
   createGitToolSource,
   createHandOffToolSource,
   createIssueToolSource,
@@ -310,13 +311,27 @@ export function buildEngine(o: EngineOptions) {
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
   };
-  const githubApp = githubAppConfig(config);
+  // The server's GitHub App (ADR 0153): `GITHUB_APP_*`, else the one its owner made from Settings, read on every call
+  // (through the getters below), so one made or removed there works without a restart.
+  const githubApp = createGitHubAppSettings({
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    env: githubAppConfig(config),
+  });
+  const githubHttp = o.github ? { apiUrl: o.github.apiUrl, fetch: o.github.fetch } : undefined;
+  const githubAppAccess = {
+    app: () => githubApp.current(),
+    http: githubHttp ?? { apiUrl: "https://api.github.com", fetch: o.http ?? fetch },
+  };
   const gitProxy: GitProxyDeps = {
     db,
     secret: config.AGENTES_SECRET,
     connectors: connectorDeps,
     upstream: o.github,
-    app: githubApp,
+    get app() {
+      return githubApp.current();
+    },
   };
   // Skills read from their links (installing, updating): private repositories through the workspace's GitHub.
   const skillDeps: SkillDeps = {
@@ -324,7 +339,12 @@ export function buildEngine(o: EngineOptions) {
     blobs: artifacts.blobs,
     fetch: o.http,
     resolveHost: o.resolveHost,
-    github: { connectors: connectorDeps, app: githubApp },
+    github: {
+      connectors: connectorDeps,
+      get app() {
+        return githubApp.current();
+      },
+    },
     pubsub: adapters.pubsub,
   };
   // The Vault (ADR 0144): built-in items sealed with the installation's key wrapper, plus the external sources
@@ -417,7 +437,13 @@ export function buildEngine(o: EngineOptions) {
       }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context }),
       createContextToolSource(context),
-      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log, pubsub: adapters.pubsub }),
+      createConnectorToolSource({
+        ...connectorDeps,
+        artifacts,
+        log: o.log,
+        pubsub: adapters.pubsub,
+        githubApp: githubAppAccess,
+      }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
       createMailToolSource({
         keyWrappers,
@@ -466,8 +492,10 @@ export function buildEngine(o: EngineOptions) {
       createGitToolSource({
         sandbox,
         connectors: connectorDeps,
-        app: githubApp,
-        github: o.github ? { apiUrl: o.github.apiUrl, fetch: o.github.fetch } : undefined,
+        get app() {
+          return githubApp.current();
+        },
+        github: githubHttp,
         pubsub: adapters.pubsub,
       }),
       ...(o.toolSources ?? []),
@@ -540,19 +568,21 @@ export function buildEngine(o: EngineOptions) {
         });
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
-  const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
-    prepareAgentCode(
+  const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) => {
+    const app = githubApp.current();
+    return prepareAgentCode(
       {
         db,
         hub: machineHub,
         git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
-        github: githubApp ? { app: githubApp, http: o.github ?? { apiUrl: "https://api.github.com", fetch } } : null,
+        github: app ? { app, http: githubAppAccess.http } : null,
       },
       turn,
       {
         signal,
       },
     );
+  };
   // A background run (a routine's) keeps no computer process alive after its turn.
   const brains: RunExecutorDeps["brains"] = {
     claude_code: (_agent, run, setup) =>
@@ -750,6 +780,8 @@ export function buildEngine(o: EngineOptions) {
     talker,
     /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
     jevKey,
+    /** Likewise: the server's GitHub App (ADR 0153). */
+    githubApp,
     /** Likewise: the speech engines, read before the first voice message. */
     speech,
     voice,

@@ -15,6 +15,7 @@ import {
   createApiKeyConnection,
   desktopOAuthRedirect,
   desktopReturnPath,
+  GITHUB_APP_AUTH,
   getAgent,
   isAgentesCloud,
   isAppReturn,
@@ -22,6 +23,7 @@ import {
   isDesktopReturn,
   listAgentScopes,
   listConnections,
+  listGitHubAppInstallations,
   NotFoundError,
   peekOAuthState,
   presetForServer,
@@ -32,11 +34,13 @@ import {
   setAgentScopes,
   startOAuth,
   syncCustomTools,
+  uninstallInstallation,
   withComposio,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sessionUser } from "../../auth";
 import { isExpectedError } from "../../http/errors";
+import { githubAccess } from "../github-app";
 import { Outcome } from "./connectors-custom";
 import {
   type AppDeps,
@@ -69,7 +73,10 @@ const Connection = z
     connector: z.string(),
     label: z.string(),
     serverUrl: z.string(),
-    authType: z.string(),
+    authType: z.string().openapi({
+      description:
+        "`oauth`, `api_key`, `none`, or `github_app`: GitHub through the workspace's GitHub App installations alone (ADR 0153), whose accounts are `accountLabel`; it has no Reconectar.",
+    }),
     accountLabel: z.string().nullable(),
     tokenExpiresAt: z.string().nullable(),
     createdAt: z.string(),
@@ -260,12 +267,23 @@ export function connectorRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Disconnect (agents lose its scopes)",
+      description:
+        "GitHub (ADR 0153): an account's connection in a workspace with GitHub App installations stays as GitHub through the app alone (`authType: github_app`, the same id, grants kept); disconnecting that removes the installations too, and uninstalls the app from their GitHub accounts.",
       request: { params: OrgParams.extend({ connectionId: z.uuid() }) },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, connectionId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "manage_connectors");
+      const userId = c.get("user").id;
+      await requirePermission(db, userId, orgId, "manage_connectors");
+      const rows = await listConnections(db, userId, orgId);
+      const github = githubAccess(deps);
+      const githubApp = github.app;
+      if (githubApp && rows.find((r) => r.id === connectionId)?.authType === GITHUB_APP_AUTH) {
+        for (const i of await listGitHubAppInstallations(db, userId, orgId)) {
+          await uninstallInstallation(githubApp, github.http, i.installationId);
+        }
+      }
       await revokeAtProvider(connectorDeps, orgId, connectionId).catch(() => false);
       await revokeConnection(db, c.get("user").id, orgId, connectionId, composio);
       return c.body(null, 204);

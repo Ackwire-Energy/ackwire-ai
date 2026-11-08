@@ -221,6 +221,7 @@ export function oauthFailure(error: unknown, refusals: readonly string[] = []): 
   if (code === "oauth.link_used") return "used";
   if (code === "oauth.other_account") return "other_account";
   if (code === "github_app.not_visible") return "not_visible";
+  if (code === "github_app.other_workspace") return "other_workspace";
   return error instanceof ForbiddenError ? "not_allowed" : "failed";
 }
 
