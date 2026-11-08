@@ -633,6 +633,8 @@ export interface ApiClient {
     /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
     mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;
+    /** An archived agent back in the team (who manages agents); never a deleted one. */
+    unarchive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */

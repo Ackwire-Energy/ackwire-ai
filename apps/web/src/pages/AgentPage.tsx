@@ -625,7 +625,18 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     mutationFn: () => api.agents.archive(org.id, agent.id),
     onSuccess: () => {
       setArchiving(false);
-      toast.show(t("agentPage.archive.done", g));
+      // Desfazer runs after this page closed: the call's own promise, never a mutation's callbacks.
+      toast.show(t("agentPage.archive.done", g), "success", {
+        label: t("agentPage.undo"),
+        run: () =>
+          void api.agents
+            .unarchive(org.id, agent.id)
+            .then(async () => {
+              await qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+              await navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId: agent.id } });
+            })
+            .catch((e: unknown) => toast.show(errorText(t, e), "error")),
+      });
       void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
       leave();
     },

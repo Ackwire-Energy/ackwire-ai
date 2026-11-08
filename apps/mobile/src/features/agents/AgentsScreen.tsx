@@ -5,9 +5,11 @@ import {
   useApprovals,
   useDms,
   useFormerAgents,
+  useUnarchiveAgent,
   useWorkingRuns,
 } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
@@ -19,16 +21,18 @@ import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
-import { Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text, useToast } from "@/ui";
 import { usePlanHold } from "../ai/parts";
 import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
 import { usePins } from "../chats/pins";
 import { mayCreate } from "../new/logic";
 import { useMachineOutages } from "../outages/queries";
+import { chooseAction } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { successHaptic } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
@@ -73,9 +77,30 @@ export function AgentsScreen() {
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch(), groups.refetch()]),
   );
   const total = agents.length;
-  // Archived agents have no profile: admins delete them for good from here (ADR 0082).
+  // Archived agents have no profile: admins bring them back, or delete them for good (ADR 0082), from here.
   const admin = can(org, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
+  const restore = useUnarchiveAgent(orgId);
+  const toast = useToast();
+  const archivedActions = (a: (typeof archived)[number]) =>
+    chooseAction(
+      a.name,
+      [
+        {
+          label: t("team.restore"),
+          onPress: () =>
+            restore.mutate(a.id, {
+              onSuccess: () => {
+                successHaptic();
+                toast({ title: t("team.restored", agentGrammar(a.name)), icon: "check" });
+              },
+              onError: (error) => toast({ title: errorText(t, error), icon: "x" }),
+            }),
+        },
+        { label: t("agentPage.delete.button"), destructive: true, onPress: () => openAgentDelete(a.id) },
+      ],
+      t("common.cancel"),
+    );
   // A server without the task manager shows no way into it.
   const tasks = useTasksToday({ pollMs: TASKS_POLL_MS });
   const tasksAction =
@@ -131,9 +156,9 @@ export function AgentsScreen() {
           {archived.map((a, i) => (
             <ListRow
               key={a.id}
-              onPress={() => openAgentDelete(a.id)}
+              onPress={() => archivedActions(a)}
               accessibilityRole="button"
-              accessibilityLabel={t("agentPage.delete.action", agentGrammar(a.name))}
+              accessibilityLabel={a.name}
               divider={i > 0}
               leading={<AgentFace agentId={a.id} size={50} mode="rest" live={false} />}
               title={a.name}

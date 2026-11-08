@@ -643,6 +643,18 @@ export const useFormerAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
 };
 
+/** Restaurar on an archived agent (Equipe, the phone's Agentes): back in the team and its lists. */
+export function useUnarchiveAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentId: string) => api.agents.unarchive(orgId, agentId),
+    onSuccess: () => {
+      for (const key of [keys.agents(orgId), keys.team(orgId)]) void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();

@@ -3782,6 +3782,15 @@
   "team.archived": {
     "value": "Archived"
   },
+  "team.restore": {
+    "value": "Restore"
+  },
+  "team.restoreAction": {
+    "value": "Restore {{name}}"
+  },
+  "team.restored": {
+    "value": "{{name}} is back on the team."
+  },
   "team.emptyTitle": {
     "value": "Build your team of agents"
   },

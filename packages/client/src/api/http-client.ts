@@ -745,6 +745,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           })
         ).mailboxes,
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      unarchive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/unarchive`, { json: {} }),
       purge: (orgId, agentId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
       former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,

@@ -1,5 +1,13 @@
 import type { FormerAgent } from "@agenteschat/client";
-import { useAgentGroups, useAiStatus, useChannels, useFormerAgents, useTeam } from "@agenteschat/client";
+import {
+  useAgentGroups,
+  useAiStatus,
+  useChannels,
+  useFormerAgents,
+  useTeam,
+  useUnarchiveAgent,
+} from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -19,6 +27,7 @@ import { TeamUsage } from "@/components/team/TeamUsage";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { useToast } from "@/lib/toast";
 import "./team.css";
 
 const VIEWS = ["list", "chart", "map", "sectors", "usage"] as const;
@@ -50,11 +59,18 @@ export function TeamPage() {
   };
   const data = team.data;
   const agents = data?.agents.filter((a) => !isRightHand(dir.agentById.get(a.id))) ?? [];
-  // Archived agents have no page: admins delete them for good here (ADR 0082).
+  // Archived agents have no page: admins bring them back, or delete them for good (ADR 0082), here.
   const admin = can(org, "manage_agents");
   const former = useFormerAgents(org.id);
   const archived = (former.data ?? []).filter((a) => !a.deleted);
   const [deleting, setDeleting] = useState<FormerAgent | null>(null);
+  const restore = useUnarchiveAgent(org.id);
+  const toast = useToast();
+  const restoreAgent = (a: FormerAgent) =>
+    restore.mutate(a.id, {
+      onSuccess: () => toast.show(t("team.restored", agentGrammar(a.name))),
+      onError: (e) => toast.show(errorText(t, e), "error"),
+    });
   // Setores and the map read these two: before they answer, "no setor yet" or "no channel yet" would be a lie.
   const lookups = [sectors, channels];
   const lookupFailed = lookups.find((q) => q.isError && !q.data);
@@ -136,15 +152,27 @@ export function TeamPage() {
                 <b>{a.name}</b>
                 {a.role && <span className="small muted">{a.role}</span>}
               </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="trash"
-                aria-label={t("agentPage.delete.action", agentGrammar(a.name))}
-                onClick={() => setDeleting(a)}
-              >
-                {t("agentPage.delete.button")}
-              </Button>
+              <span className="ac-acts">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="undo"
+                  aria-label={t("team.restoreAction", agentGrammar(a.name))}
+                  disabled={restore.isPending}
+                  onClick={() => restoreAgent(a)}
+                >
+                  {t("team.restore")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  aria-label={t("agentPage.delete.action", agentGrammar(a.name))}
+                  onClick={() => setDeleting(a)}
+                >
+                  {t("agentPage.delete.button")}
+                </Button>
+              </span>
             </div>
           ))}
         </Card>

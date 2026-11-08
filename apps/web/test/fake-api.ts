@@ -2295,6 +2295,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return state.mailLoss?.[agentId] ?? [];
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
+      unarchive: async (orgId, agentId) => {
+        log("agents.unarchive", orgId, agentId);
+        state.former = (state.former ?? []).filter((a) => a.id !== agentId || a.deleted);
+      },
       purge: async (orgId, agentId) => {
         log("agents.purge", orgId, agentId);
         const was =

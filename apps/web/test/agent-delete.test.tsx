@@ -123,6 +123,38 @@ describe("deleting an agent (ADR 0082)", () => {
     expect(screen().queryByRole("heading", { name: "Arquivados" })).toBeNull();
   });
 
+  test("an archived agent comes back from Equipe › Arquivados with Restaurar", async () => {
+    const state = seedState();
+    state.former = [{ id: "agent-old", name: "New agent", role: "", appearance: null, deleted: false }];
+    await go("team", state);
+    const card = screen().getByRole("heading", { name: "Arquivados" }).closest(".team-archived") as HTMLElement;
+    await click(within(card).getByRole("button", { name: "Restaurar o New agent" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "agents.unarchive")?.args).toEqual([ORG_ID, "agent-old"]);
+    expect(document.body.textContent).toContain("O New agent voltou para o time.");
+    expect(screen().queryByRole("heading", { name: "Arquivados" })).toBeNull();
+  });
+
+  test("archiving an agent: Desfazer in its toast brings it back, on its page", async () => {
+    const { state, router } = await go(`agents/${ADA_ID}`);
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Arquivar a Ada" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Arquivar a Ada?" })).getByRole("button", { name: "Arquivar" }),
+    );
+    await settle(6);
+    expect(state.calls.some((c) => c.method === "agents.archive")).toBe(true);
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "agents.unarchive")?.args).toEqual([ORG_ID, ADA_ID]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
+  });
+
   test("members see no archived list", async () => {
     const state = seedState();
     state.former = [{ id: "agent-old", name: "New agent", role: "", appearance: null, deleted: false }];
