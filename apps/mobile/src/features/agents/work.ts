@@ -19,3 +19,9 @@ export function agoText(t: TFunction, ago: Ago): string {
   const key = { minutes: "minutesAgo", hours: "hoursAgo", days: "daysAgo" }[ago.unit];
   return t(`mobile.time.${key}`, { count: ago.count });
 }
+
+/** "4 min", "2 h", "3 d", "agora": the figure at a list row's right, where "ago" is already understood. */
+export function agoShort(t: TFunction, ago: Ago): string {
+  if (ago.unit === "now") return t("mobile.time.short.now");
+  return t(`mobile.time.short.${ago.unit}`, { count: ago.count });
+}

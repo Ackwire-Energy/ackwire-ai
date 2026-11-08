@@ -1,35 +1,39 @@
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
-import {
-  endedState,
-  linePlace,
-  taskClock,
-  taskSince,
-  taskState,
-  taskTitle,
-} from "@agenteschat/client/lib/task-manager";
-import { type ReactNode, useState } from "react";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { endedState, linePlace, taskClock, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, Text, weights } from "@/ui";
+import {
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  PixelDone,
+  PixelFail,
+  PixelStopped,
+  Section,
+  Text,
+  weights,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace, OpensAgent } from "../shared/Face";
+import { AgentFace, Face, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useStopper, useTasksToday } from "./hooks";
 import { endedText, rowState, taskSubline } from "./logic";
-import { StateLine, StopConfirm, UsingLine } from "./parts";
+import { StateLine } from "./parts";
 
 /**
- * A task's screen (ADR 0128), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
- * it stands (its place when it waits for room on its computer, with "Ver fila"), for how long, what it uses now and
- * where it runs, its steps so far, "Abrir na conversa" and "Parar tarefa". Once it ends, how it ended (the list it
- * came from keeps what ended today).
+ * A task's screen (ADR 0128), pushed from the task manager or an agent's tasks: whose it is (its face running while it
+ * works) and how it stands, on one head; who asked and where, a row that opens the conversation; its steps so far;
+ * its place in its computer's line, when it waits for room; and "Parar tarefa" as the list's red row, confirmed by
+ * a system alert that says what happens. Once it ends, how it ended and how long it took.
  */
 export function TaskScreen({ runId }: { runId: string }) {
   return (
@@ -47,8 +51,8 @@ function Task({ runId }: { runId: string }) {
   const ended = task ? null : (tasks.data?.ended.find((x) => x.runId === runId) ?? null);
   if (!task && !ended)
     return (
-      <View style={[styles.screen, { backgroundColor: c.bg }]}>
-        <PushedHeader title="" solid={false} />
+      <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+        <PushedHeader title="" solid={false} grouped />
         <View style={styles.center}>
           {tasks.isLoading ? (
             <ActivityIndicator color={c.muted} />
@@ -74,61 +78,33 @@ function Live({ task }: { task: ManagedTask }) {
   const inLine = state === "stopping" ? null : linePlace(task);
   const dir = useDirectory();
   const nameOf = (id: string) => dir.anyAgent(id)?.name;
-  const [asking, setAsking] = useState(false);
+  const name = nameOf(task.agentId) ?? t("channel.unknownAgent");
+  // One alert, the system's: what stops and what the agent does; a task that asked other agents stops them too.
+  const ask = () =>
+    Alert.alert(
+      t("mobile.taskManager.stopTitle", { title }),
+      task.helpers ? t("taskManager.confirm.chainBody") : t("mobile.taskManager.stopBody", agentGrammar(name)),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("taskManager.confirm.stop", { count: 1 + (task.helpers ?? 0) }),
+          style: "destructive",
+          onPress: () => stop([task.runId], undefined, true),
+        },
+      ],
+    );
   return (
     <Page
       task={task}
       title={title}
-      sub={taskSubline(t, task, meId, title, nameOf)}
-      rows={[
-        {
-          key: "state",
-          label: t("taskManager.columns.state"),
-          value: <StateLine task={task} state={state} now={now} />,
-        },
-        {
-          key: "time",
-          label: t("taskManager.columns.time"),
-          value: <Value text={taskClock(now - taskSince(task))} />,
-        },
-        { key: "using", label: t("taskManager.columns.using"), value: <UsingLine task={task} /> },
-        {
-          key: "computer",
-          label: t("taskManager.columns.computer"),
-          value: <Value text={task.machine?.name ?? t("taskManager.servers")} />,
-        },
-      ]}
+      state={<StateLine task={task} state={state} now={now} />}
+      working={taskState(task) === "working"}
+      request={taskSubline(t, task, meId, title, nameOf)}
       steps={{ calls: task.steps, live: taskState(task) === "working" }}
       line={inLine?.machineId ?? null}
-      stop={
-        !task.canStop ? null : asking ? (
-          <StopConfirm
-            agentId={task.agentId}
-            count={1}
-            helpers={task.helpers}
-            onCancel={() => setAsking(false)}
-            onStop={(reason) => {
-              setAsking(false);
-              stop([task.runId], reason, true);
-            }}
-          />
-        ) : (
-          <>
-            {task.delegation ? (
-              <Text variant="footnote" tone="muted">
-                {t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" })}
-              </Text>
-            ) : null}
-            <Button
-              variant="primary"
-              wide
-              label={t(task.helpers ? "taskManager.actions.stopAll" : "taskManager.actions.stopTask")}
-              leading={(ink) => <PixelStop size={11} color={ink} moving={false} />}
-              loading={state === "stopping"}
-              onPress={() => (task.helpers ? setAsking(true) : stop([task.runId]))}
-            />
-          </>
-        )
+      stop={task.canStop && state !== "stopping" ? ask : null}
+      stopNote={
+        task.delegation ? t("taskManager.delegated.stopNote", { name: nameOf(task.delegation.agentId) ?? "" }) : null
       }
     />
   );
@@ -145,60 +121,60 @@ function Ended({ task }: { task: EndedTask }) {
     <Page
       task={task}
       title={title}
-      sub={taskSubline(t, { ...task, requester: null, plan: null }, meId, title)}
-      rows={[
-        {
-          key: "state",
-          label: t("taskManager.columns.state"),
-          value: (
-            <View style={styles.row}>
-              {state === "done" ? (
-                <PixelDone size={12} />
-              ) : state === "failed" ? (
-                <PixelFail size={12} />
-              ) : (
-                <PixelStopped size={10} />
-              )}
-              <Text variant="footnote" tone="ink2" style={[styles.semibold, styles.shrink]}>
-                {endedText(t, task, meId)}
-              </Text>
-            </View>
-          ),
-        },
-        { key: "time", label: t("taskManager.columns.time"), value: <Value text={taskClock(took)} /> },
-      ]}
+      state={
+        <View style={styles.row}>
+          {state === "done" ? (
+            <PixelDone size={12} />
+          ) : state === "failed" ? (
+            <PixelFail size={12} />
+          ) : (
+            <PixelStopped size={10} />
+          )}
+          <Text variant="footnote" tone="ink2" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
+            {endedText(t, task, meId)}
+          </Text>
+          <Text variant="footnote" tone="faint" style={styles.num}>
+            {`· ${taskClock(took)}`}
+          </Text>
+        </View>
+      }
+      working={false}
+      request={taskSubline(t, { ...task, requester: null, plan: null }, meId, title)}
       steps={{ calls: 0, live: false }}
       stop={null}
+      stopNote={null}
     />
   );
 }
 
-function Value({ text }: { text: string }) {
-  return (
-    <Text variant="footnote" tone="ink2" numberOfLines={1} style={[styles.semibold, styles.num]}>
-      {text}
-    </Text>
-  );
-}
-
-/** The screen both kinds share: the head, the facts, the actions and the steps. */
+/** The screen both kinds share: the head, who asked, the steps, the line and the red row. */
 function Page({
   task,
   title,
-  sub,
-  rows,
+  state,
+  working,
+  request,
   steps,
   line = null,
   stop,
+  stopNote,
 }: {
-  task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background" | "betweenAgents">;
+  task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background" | "betweenAgents"> & {
+    requester?: ManagedTask["requester"];
+  };
   title: string;
-  sub: string;
-  rows: { key: string; label: string; value: ReactNode }[];
+  /** How it stands, under the agent's name. */
+  state: ReactNode;
+  working: boolean;
+  /** Where it is and who asked ("#produto · Ana pediu"). */
+  request: string;
   steps: { calls: number; live: boolean };
-  /** It waits for room on this computer: "Ver fila" opens its line (`QueueSheet`). */
+  /** It waits for room on this computer: its row opens its line (`QueueSheet`). */
   line?: string | null;
-  stop: ReactNode;
+  /** Asks and stops it; null when this person can't, or it is already stopping. */
+  stop: (() => void) | null;
+  /** Under the red row: stopping a delegated task tells the agent that asked. */
+  stopNote: string | null;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -206,70 +182,75 @@ function Page({
   const insets = useSafeAreaInsets();
   const openQueue = useOpenQueue();
   const agent = dir.anyAgent(task.agentId);
+  const requester = task.requester ?? null;
+  const opens = !(task.background || task.betweenAgents);
   return (
-    <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <PushedHeader title={title} solid={false} />
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={title} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
       >
+        {/* Whose it is and how it stands, on one head: the title is already in the bar. */}
         <View style={styles.head}>
-          <View style={styles.row}>
-            <OpensAgent agentId={task.agentId}>
-              <AgentFace agentId={task.agentId} size={24} live={false} />
-            </OpensAgent>
-            <Text variant="small" tone="muted" style={[styles.semibold, styles.shrink]}>
+          <OpensAgent agentId={task.agentId}>
+            <AgentFace agentId={task.agentId} size={36} mode={working ? "run" : "idle"} />
+          </OpensAgent>
+          <View style={styles.grow}>
+            <Text variant="title" numberOfLines={1}>
               {agent?.name ?? t("channel.unknownAgent")}
             </Text>
+            {state}
           </View>
-          <Text variant="title2" accessibilityRole="header">
-            {title}
-          </Text>
-          {sub ? (
-            <Text variant="body" tone="muted">
-              {sub}
-            </Text>
-          ) : null}
         </View>
-        <Card style={styles.facts}>
-          {rows.map((r, i) => (
-            <View
-              key={r.key}
-              style={[styles.fact, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
-            >
-              <Text variant="footnote" tone="muted" style={styles.label}>
-                {r.label}
-              </Text>
-              <View style={styles.value}>{r.value}</View>
-            </View>
-          ))}
-        </Card>
-        <View style={styles.actions}>
-          {line ? (
-            <Button
-              variant="secondary"
-              wide
-              icon="laptop"
-              label={t("taskManager.queue.see")}
-              onPress={() => {
-                if (line) openQueue(line);
-              }}
-            />
-          ) : null}
-          {task.background || task.betweenAgents ? null : (
-            <Button
-              variant="secondary"
-              wide
-              icon="chat"
-              label={t("taskManager.actions.open")}
-              onPress={() => router.push(chatHref(task.channelId, task.threadId))}
-            />
-          )}
-          {stop}
-        </View>
+        {request ? (
+          <>
+            <GroupedHeader>{t("mobile.taskManager.request")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
+                leading={
+                  requester ? (
+                    <Face who={{ type: "person", id: requester.userId }} size={28} />
+                  ) : (
+                    <AgentFace agentId={task.agentId} size={28} live={false} />
+                  )
+                }
+                label={request}
+                labelLines={2}
+                {...(opens
+                  ? { chevron: true, onPress: () => router.push(chatHref(task.channelId, task.threadId)) }
+                  : {})}
+              />
+            </GroupedList>
+          </>
+        ) : null}
         <Section title={t("taskManager.panel.steps")}>
           <RunSteps runId={task.runId} color={agentLook(agent).color} calls={steps.calls} live={steps.live} />
         </Section>
+        {line ? (
+          <View style={styles.apart}>
+            <GroupedList>
+              <GroupedRow
+                icon="laptop"
+                label={t("taskManager.queue.see")}
+                chevron
+                onPress={() => openQueue(line)}
+              />
+            </GroupedList>
+          </View>
+        ) : null}
+        {stop ? (
+          <View style={styles.apart}>
+            <GroupedList>
+              <GroupedRow label={t("taskManager.actions.stopTask")} danger onPress={stop} />
+            </GroupedList>
+            {stopNote ? (
+              <Text variant="footnote" tone="faint" style={styles.note}>
+                {stopNote}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -277,23 +258,14 @@ function Page({
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
+  grow: { flex: 1, minWidth: 0, gap: 2 },
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  scroll: { paddingTop: 4 },
-  head: { paddingHorizontal: 20, gap: 6 },
-  row: { flexDirection: "row", alignItems: "center", gap: 6 },
+  scroll: { paddingTop: 4, paddingHorizontal: 16 },
+  head: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 12, paddingBottom: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   semibold: { fontWeight: weights.semibold },
   num: { fontVariant: ["tabular-nums"] },
-  facts: { marginHorizontal: 16, marginTop: 16 },
-  fact: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  label: { width: 104 },
-  value: { flex: 1, minWidth: 0 },
-  actions: { gap: 10, paddingHorizontal: 16, marginTop: 16 },
+  apart: { marginTop: 24 },
+  note: { paddingTop: 8, paddingHorizontal: 16 },
 });
