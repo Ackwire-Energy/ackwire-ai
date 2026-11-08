@@ -973,10 +973,11 @@ used, as before.
 
 There are two ways to set the app up:
 
-- **From Settings.** The server's owner opens **Settings → Connectors → GitHub repositories** and chooses
-  **Create the app on GitHub**. GitHub creates the app under their GitHub account with everything filled in, and
-  sends them back; the app's keys are kept sealed in the database (they open only with this `AGENTES_SECRET`). To
-  own it under a GitHub organization, transfer it on GitHub afterwards.
+- **From Settings.** The server's owner opens **Settings → Connectors** and, on the card **This server's GitHub
+  app**, chooses **Create the app on GitHub**. GitHub creates the app under their GitHub account with everything
+  filled in, and sends them back; the app's keys are kept sealed in the database (they open only with this
+  `AGENTES_SECRET`). To own it under a GitHub organization, transfer it on GitHub afterwards. Only the server's
+  owner sees the card. The phone app's **Create in the browser** opens it on the web.
 - **With environment variables** (they win when set): register a GitHub App by hand and set `GITHUB_APP_ID`,
   `GITHUB_APP_PRIVATE_KEY` (the PEM, raw or base64), `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`,
   `GITHUB_APP_CLIENT_SECRET` and, with a webhook, `GITHUB_APP_WEBHOOK_SECRET`. Register it with:
@@ -987,9 +988,13 @@ There are two ways to set the app up:
   - Repository permissions: Contents, Pull requests, Issues and Workflows read and write; Checks, Commit statuses
     and Actions read; Metadata read. Installable by any account.
 
-Then an admin of each workspace installs it on the repositories its agents may use (**Install the GitHub app**).
-Without a GitHub account connected, the app alone is the workspace's GitHub. GitHub Projects need an account.
-Removing an installation in Settings also uninstalls the app from that GitHub account.
+Then an admin of each workspace installs it on the repositories its agents may use: connecting GitHub offers
+**The agentes.chat app** first, and **GitHub repositories** in **Settings → Connectors** has **Install the agentes.chat
+app** (on the web and the phone). Each account it's installed on has **Manage on GitHub**, GitHub's page where that
+account's repositories are picked, and **Remove**, which also uninstalls the app from that GitHub account. Without a
+GitHub account connected, the app alone is the workspace's GitHub (**Connect a GitHub account** adds one). GitHub
+Projects need an account. Admins who aren't the server's owner are told the owner can create the app while it's
+missing.
 
 </details>
 

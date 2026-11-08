@@ -10,7 +10,9 @@
   `github-call.ts` (`githubCallAuth`, `githubListingHeaders`, `appPermissionsFor`), `signature.ts`;
   `connectors/connections.ts` (`syncGitHubAppConnection`, `GITHUB_APP_AUTH`, `revokeConnection`), `connectors/mcp.ts`,
   `connectors/catalog.ts` (`sign`); `git/machine.ts` (bot author, the turn's credit line), `git/proxy.ts`, `git/tools.ts`;
-  `apps/server/src/routes/github-app.ts`; migration 0246
+  `apps/server/src/routes/github-app.ts`; migration 0246; screens: `packages/client/src/lib/github-app.ts` (what the
+  panel shows, shared by the web and the phone), `apps/web/src/components/GitHubAppPanel.tsx` (the panel and the
+  server's app card), `ConnectFlow.tsx`, `Connectors.tsx`, `apps/mobile/src/features/connectors/GitHubApp.tsx`
 
 ## Context
 
@@ -62,6 +64,17 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
 8. **No webhook needed.** Reading the panel asks GitHub about each installation, at most once a minute per
    workspace: uninstalled there, it is unbound as `installation.deleted` does; otherwise its account, selection and
    suspension are refreshed. The webhook still works when set up.
+
+9. **The app first, in every place GitHub is connected.** Where the server has the app, connecting GitHub (Settings ›
+   Conectores, an agent's connect card, the phone's sheet) offers **O app agentes.chat** (recommended) before **Uma
+   conta do GitHub**, which stays for what the app can't reach (GitHub Projects). **Repositórios do GitHub** lists each
+   account the app is installed on with its reach, **Gerenciar no GitHub** (GitHub's page of the installation, where
+   its repositories are picked) and **Remover** (asked first, it uninstalls, and says when GitHub didn't confirm,
+   with its page as the way out); a workspace using an account sees who agents act as today. GitHub through the app
+   alone has no Reconectar and offers **Conectar uma conta do GitHub**; Desconectar says what happens to the app. The
+   phone does the same: the install opens GitHub in the browser and comes back to the app, which finishes it. The
+   server's own app is a card for its pinned owner (`setup`), made in the web's browser session; the other admins
+   are told the owner can make it (`ownerCreates`, false on agentes.chat).
 
 ## Consequences
 
