@@ -390,7 +390,7 @@ export function NewIssueDialog({
                   </Field>
                 )}
                 <Field label={t("whoSees.label")} id="ni-sees">
-                  <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />
+                  <WhoSeesButton select value={audience} onClick={() => setChoosing(true)} />
                 </Field>
                 <Field label={t("issues.form.priority")} id="ni-pri">
                   <Select

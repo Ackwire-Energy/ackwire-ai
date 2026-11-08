@@ -851,7 +851,7 @@ function Details({ issue: i }: { issue: Issue }) {
         <Select size="sm" value={f.who.value} onValueChange={f.who.onChange} options={f.who.options} />
       </Field>
       <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
-        <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
+        <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
         {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>

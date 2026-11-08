@@ -5074,14 +5074,11 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
   padding: 0;
   margin-bottom: var(--field-gap);
 }
+/* A number's unit at its field's end. */
 .mail-rules__unit {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.mail-rules__unit > input,
-.mail-rules__cap {
-  max-width: 96px;
+  padding-inline-end: var(--control-px-md);
+  font-size: 13px;
+  color: var(--ink-muted);
 }
 /* Two parts: what the agent reads, what it sends. */
 .mail-rules__part {
