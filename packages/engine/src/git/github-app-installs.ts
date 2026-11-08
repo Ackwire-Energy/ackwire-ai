@@ -114,21 +114,23 @@ export async function startGitHubAppInstall(
 
 interface UserInstallation {
   id: number;
-  account?: { login?: string; type?: string } | null;
+  account?: { id?: number; login?: string; type?: string } | null;
   repository_selection?: string;
   suspended_at?: string | null;
 }
+
+const userHeaders = (token: string) => ({
+  authorization: `Bearer ${token}`,
+  accept: "application/vnd.github+json",
+  "user-agent": "agentes.chat",
+});
 
 /** Installations of our app the person can see on GitHub (their user token). */
 async function userInstallations(h: ReturnType<typeof http>, token: string): Promise<UserInstallation[]> {
   const found: UserInstallation[] = [];
   for (let page = 1; page <= 10; page++) {
     const res = await h.fetch(`${h.apiUrl}/user/installations?per_page=100&page=${page}`, {
-      headers: {
-        authorization: `Bearer ${token}`,
-        accept: "application/vnd.github+json",
-        "user-agent": "agentes.chat",
-      },
+      headers: userHeaders(token),
     });
     if (!res.ok) throw new ValidationError(`GitHub refused to list installations (${res.status})`);
     const body = (await res.json()) as { installations?: UserInstallation[] };
@@ -142,9 +144,9 @@ async function userInstallations(h: ReturnType<typeof http>, token: string): Pro
 /**
  * GitHub's redirect after installing (user authorization during installation on): checks the state (exists, unused,
  * not expired, same person, still an admin), exchanges the code for the person's token and requires the installation
- * to be one they can see — so nobody can claim another account's installation by its id. Then binds it to the
- * organization, whose GitHub it becomes when it has no connection yet (ADR 0153); an installation bound to another
- * organization is refused (`github_app.other_workspace`).
+ * to be one they can see, and a personal account's to be theirs — so nobody can claim another account's installation
+ * by its id. Then binds it to the organization, whose GitHub it becomes when it has no connection yet (ADR 0153); an
+ * installation bound to another organization is refused (`github_app.other_workspace`).
  */
 export async function completeGitHubAppInstall(
   deps: GitHubAppInstallDeps,
@@ -186,8 +188,16 @@ export async function completeGitHubAppInstall(
     throw new ValidationError(`GitHub refused the authorization: ${token.error ?? res.status}`);
   }
   const seen = (await userInstallations(h, token.access_token)).find((i) => i.id === input.installationId);
-  if (!seen)
-    throw new ForbiddenError("This installation isn't visible to your GitHub account", "github_app.not_visible");
+  const notVisible = () =>
+    new ForbiddenError("This installation isn't visible to your GitHub account", "github_app.not_visible");
+  if (!seen) throw notVisible();
+  // A personal account's installation shows to collaborators on its repositories too: only that account may link it.
+  if (seen.account?.type === "User") {
+    const me = await h.fetch(`${h.apiUrl}/user`, { headers: userHeaders(token.access_token) });
+    if (!me.ok) throw new ValidationError(`GitHub didn't say who authorized (${me.status})`);
+    const { id } = (await me.json()) as { id?: unknown };
+    if (typeof id !== "number" || id !== seen.account.id) throw notVisible();
+  }
 
   const values = {
     accountLogin: seen.account?.login ?? "",
@@ -344,15 +354,18 @@ export function validGitHubAppSignature(secret: string, body: string, given: str
 
 /**
  * Keeps bindings in step with GitHub: `installation` deleted → unbound (and GitHub through the app alone with its
- * last one); suspend/unsuspend → `suspended_at`; `installation_repositories` → repository selection. Installations
- * nobody bound are ignored (they only bind through the install flow). Returns what changed, for the response.
+ * last one); suspend/unsuspend → `suspended_at`, as GitHub has it now when `github` can ask (a delivery sent again
+ * later, as GitHub's Redeliver does, changes nothing); `installation_repositories` → repository selection.
+ * Installations nobody bound are ignored (they only bind through the install flow). Returns what changed, for the
+ * response.
  */
 export async function handleGitHubAppWebhook(
   db: Database,
   event: string | null,
   payload: Record<string, unknown>,
-  now: Date = new Date(),
+  options: { now?: Date; github?: { app: GitHubAppConfig; http: GitHubHttp } } = {},
 ): Promise<"removed" | "suspended" | "unsuspended" | "updated" | "ignored"> {
+  const now = options.now ?? new Date();
   const installation = payload.installation as { id?: unknown; repository_selection?: unknown } | undefined;
   const id = typeof installation?.id === "number" ? installation.id : null;
   if (id === null) return "ignored";
@@ -375,14 +388,22 @@ export async function handleGitHubAppWebhook(
     return "removed";
   }
   if (event === "installation" && (action === "suspend" || action === "unsuspend")) {
+    const facts = options.github ? await installationStatus(options.github.app, options.github.http, id) : null;
+    if (facts === "gone") {
+      await unbind(db, bound, system, "github_app.uninstalled");
+      return "removed";
+    }
+    const suspended = facts ? facts.suspendedAt !== null : action === "suspend";
+    const said = suspended ? "suspended" : "unsuspended";
+    if (suspended === (bound.suspendedAt !== null)) return said;
     await db
       .update(githubAppInstallations)
-      .set({ suspendedAt: action === "suspend" ? now : null, updatedAt: now })
+      .set({ suspendedAt: suspended ? (facts?.suspendedAt ?? now) : null, updatedAt: now })
       .where(where);
     forgetInstallationTokens(id);
     forgetOrgRepositories(bound.orgId);
-    await audit(action === "suspend" ? "suspended" : "unsuspended");
-    return action === "suspend" ? "suspended" : "unsuspended";
+    await audit(said);
+    return said;
   }
   if (event === "installation_repositories" || (event === "installation" && action === "new_permissions_accepted")) {
     const selection = installation?.repository_selection;

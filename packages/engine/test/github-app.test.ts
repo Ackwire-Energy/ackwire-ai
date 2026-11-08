@@ -37,11 +37,14 @@ const WEB = "https://github.test";
 /**
  * Fake GitHub: `repos` maps "owner/repo" → installation id; `visible` maps a user token → installation ids that user
  * can see; codes → user tokens. `lacks` lists permissions an installation wasn't granted (asking for one is a 422);
- * `gone` installations answer 404; `uninstall` is the status `DELETE /app/installations/{id}` answers.
+ * `gone` installations answer 404; `uninstall` is the status `DELETE /app/installations/{id}` answers. `personal` maps
+ * an installation on a personal account → that account's GitHub id; `ids` maps a user token → its GitHub id.
  */
 function fakeGitHub(state: {
   repos: Record<string, number>;
   visible: Record<string, number[]>;
+  personal?: Record<number, number>;
+  ids?: Record<string, number>;
   lacks?: string[];
   gone?: number[];
   uninstall?: number;
@@ -96,17 +99,24 @@ function fakeGitHub(state: {
     if (/\/users\/[^/]+%5Bbot%5D$/.test(url)) {
       return state.bot === null ? new Response("down", { status: 502 }) : Response.json({ id: state.bot ?? 4242 });
     }
+    const auth = new Headers(init?.headers).get("authorization")?.replace("Bearer ", "") ?? "";
     if (url.startsWith(`${API}/user/installations`)) {
-      const auth = new Headers(init?.headers).get("authorization")?.replace("Bearer ", "") ?? "";
       const ids = state.visible[auth] ?? [];
       return Response.json({
         installations: ids.map((id) => ({
           id,
-          account: { login: `acct${id}`, type: "Organization" },
+          account:
+            state.personal?.[id] === undefined
+              ? { login: `acct${id}`, type: "Organization" }
+              : { id: state.personal[id], login: `acct${id}`, type: "User" },
           repository_selection: "selected",
           suspended_at: null,
         })),
       });
+    }
+    if (url === `${API}/user`) {
+      const id = state.ids?.[auth];
+      return id ? Response.json({ id, login: `u${id}` }) : new Response("bad credentials", { status: 401 });
     }
     return new Response("unexpected", { status: 500 });
   }) as typeof fetch;
@@ -130,6 +140,8 @@ async function world() {
   const gh = {
     repos: { "a/app": 1, "b/secret": 2, "a/tools": 1, "c/lib": 3 } as Record<string, number>,
     visible: {} as Record<string, number[]>,
+    personal: {} as Record<number, number>,
+    ids: {} as Record<string, number>,
     lacks: [] as string[],
     gone: [] as number[],
     uninstall: 204,
@@ -188,6 +200,15 @@ describe("GitHub App installations are bound to one organization", () => {
     expect(w.fake.calls.filter((c) => c.includes("/access_tokens"))).toHaveLength(1);
   });
 
+  test("a workspace with nothing installed asks GitHub nothing, on any call", async () => {
+    const w = await world();
+    const tenant = { db: w.db, orgId: w.orgA.id };
+    expect(await appRepoToken(APP, http(w), tenant, "a", "app", { contents: "read" })).toEqual({
+      miss: "not_installed",
+    });
+    expect(w.fake.calls).toEqual([]);
+  });
+
   test("a cached token stops when the binding goes away", async () => {
     const w = await world();
     const { installation } = await w.install(w.ana, w.orgA.id, 1);
@@ -203,6 +224,19 @@ describe("GitHub App installations are bound to one organization", () => {
     // Ana tries to claim installation 2 (org B's GitHub) by its id: her GitHub user can't see it.
     await expect(w.install(w.ana, w.orgA.id, 2, [1])).rejects.toMatchObject({ code: "github_app.not_visible" });
     expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toHaveLength(0);
+  });
+
+  test("a personal account's installation only by that account: a collaborator who sees it can't link it", async () => {
+    const w = await world();
+    w.gh.personal[5] = 900;
+    w.gh.ids[`user-${w.ana.id}`] = 901;
+    await expect(w.install(w.ana, w.orgA.id, 5)).rejects.toMatchObject({ code: "github_app.not_visible" });
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toHaveLength(0);
+    w.gh.ids[`user-${w.ana.id}`] = 900;
+    expect((await w.install(w.ana, w.orgA.id, 5)).installation).toMatchObject({
+      installationId: 5,
+      accountType: "User",
+    });
   });
 
   test("an installation bound to another organization is refused as other_workspace", async () => {
@@ -461,5 +495,30 @@ describe("GitHub App webhook", () => {
     expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toHaveLength(0);
     expect(await appTokenForRepo(APP, http(w), tenant, "a", "app", read)).toBeNull();
     expect((await w.github(w.orgA.id)).live).toEqual([]);
+  });
+
+  test("a suspension sent again later changes nothing: what GitHub says now wins", async () => {
+    const w = await world();
+    await w.install(w.ana, w.orgA.id, 1);
+    const tenant = { db: w.db, orgId: w.orgA.id };
+    const github = { app: APP, http: http(w) };
+    const suspend = { action: "suspend", installation: { id: 1 } };
+    // Redelivered after the account lifted it: GitHub has it running, so it keeps working.
+    expect(await handleGitHubAppWebhook(w.db, "installation", suspend, { github })).toBe("unsuspended");
+    expect(await appTokenForRepo(APP, http(w), tenant, "a", "app", { contents: "read" })).not.toBeNull();
+    w.gh.accounts[1] = { login: "acct1", selection: "selected", suspended: new Date().toISOString() };
+    expect(await handleGitHubAppWebhook(w.db, "installation", suspend, { github })).toBe("suspended");
+    expect(await appTokenForRepo(APP, http(w), tenant, "a", "app", { contents: "read" })).toBeNull();
+    const audits = await w.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.orgId, w.orgA.id));
+    expect(audits.filter((a) => a.action === "github_app.suspended")).toHaveLength(1);
+    // Uninstalled there meanwhile: gone here too.
+    w.gh.gone.push(1);
+    expect(await handleGitHubAppWebhook(w.db, "installation", { ...suspend, action: "unsuspend" }, { github })).toBe(
+      "removed",
+    );
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toHaveLength(0);
   });
 });

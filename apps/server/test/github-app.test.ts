@@ -221,6 +221,8 @@ test("GitHub's return that didn't install: why as a code where it started, never
   expect(await back(owner, "code=c&installation_id=7&setup_action=request")).toBe(
     "http://localhost:3000/?github_app_error=requested",
   );
+  // Repositories changed on GitHub's own page, which comes back on its own: no failure to show.
+  expect(await back(owner, "code=c&installation_id=7&setup_action=update")).toBe("http://localhost:3000/");
 });
 
 test("an installation bound to another workspace comes back as other_workspace", async () => {

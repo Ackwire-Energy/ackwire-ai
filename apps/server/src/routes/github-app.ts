@@ -347,7 +347,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "GitHub's redirect after installing (browser navigation)",
       description:
-        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `not_allowed` or `failed`. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
+        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `not_allowed` or `failed`. `setup_action=update` without a state (repositories changed on GitHub's own page) lands on the web app with nothing to finish. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
       request: {
         query: z.object({
           state: z.string().optional(),
@@ -371,6 +371,8 @@ export function githubAppRoutes(deps: AppDeps) {
         }
         return c.redirect(appOAuthRedirect({ state: q.state, code: q.code, installationId: q.installation_id }), 302);
       }
+      // Repositories changed on GitHub's own page (the app redirects on update): nothing of ours to finish or to fail.
+      if (!q.state && q.setup_action === "update" && !q.error) return c.redirect(`${base}/`, 302);
       const fail = (reason: string) =>
         c.redirect(oauthFailedUrl(base, started?.returnTo ?? "/", "github_app_error", reason), 302);
       if (refused) return fail(refused);
@@ -547,8 +549,9 @@ export function githubAppRoutes(deps: AppDeps) {
  */
 export function registerGitHubAppWebhook(api: OpenAPIHono, deps: AppDeps) {
   api.post("/github-app/webhook", async (c) => {
-    const secret = githubAppOf(deps)?.webhookSecret;
-    if (!secret) return c.json({ error: "not configured" }, 404);
+    const app = githubAppOf(deps);
+    const secret = app?.webhookSecret;
+    if (!app || !secret) return c.json({ error: "not configured" }, 404);
     const raw = await readWebhookText(c.req.raw, 5_000_000);
     if (raw === null) return c.json({ error: "too large" }, 413);
     if (!validGitHubAppSignature(secret, raw, c.req.header("x-hub-signature-256") ?? null)) {
@@ -560,7 +563,8 @@ export function registerGitHubAppWebhook(api: OpenAPIHono, deps: AppDeps) {
     } catch {
       return c.json({ error: "invalid JSON" }, 400);
     }
-    const result = await handleGitHubAppWebhook(deps.db, c.req.header("x-github-event") ?? null, payload);
+    const github = { app, http: githubAccess(deps).http };
+    const result = await handleGitHubAppWebhook(deps.db, c.req.header("x-github-event") ?? null, payload, { github });
     return c.json({ ok: true, result }, 202);
   });
 }

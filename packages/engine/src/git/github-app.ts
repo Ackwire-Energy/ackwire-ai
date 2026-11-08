@@ -141,7 +141,10 @@ export async function appRepoToken(
     return { miss: "not_installed" };
   }
   try {
-    const inst = await http.fetch(`${http.apiUrl}/repos/${owner}/${repo}/installation`, { headers: appHeaders(app) });
+    // A workspace with nothing installed (most, on every GitHub call) has nothing to ask GitHub.
+    if ((await boundInstallations(tenant.db, tenant.orgId)).length === 0) return { miss: "not_installed" };
+    const path = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    const inst = await http.fetch(`${http.apiUrl}/repos/${path}/installation`, { headers: appHeaders(app) });
     if (inst.status === 404) return { miss: "not_installed" };
     if (!inst.ok) return { miss: inst.status >= 500 || inst.status === 429 ? "unreachable" : "refused" };
     const { id } = (await inst.json()) as { id?: number };
