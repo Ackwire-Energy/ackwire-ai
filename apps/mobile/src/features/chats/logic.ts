@@ -12,6 +12,7 @@ import type {
 import { hiddenAgentIds, hiddenDm } from "@agenteschat/client/lib/audience";
 import type { FirstStepId } from "@agenteschat/client/lib/home";
 import { dmActivityAt } from "@agenteschat/client/lib/recent";
+import type { ServerCheck, ServerProblem } from "@agenteschat/client/lib/server";
 import { looksUnread, unreadTotal } from "@agenteschat/client/lib/unread";
 import type { IconName } from "@/ui";
 import { previewOf } from "../shared/logic";
@@ -549,3 +550,22 @@ export const FIRST_STEP_SCREENS: Record<Exclude<FirstStepId, "plan">, { icon: Ic
   team: { icon: "members", href: "/me/members" },
   routine: { icon: "clock", href: "/routines/new" },
 };
+
+// ── Conversas when it can't load ────────────────────────────────────────────
+
+/**
+ * Why Conversas didn't load (pure): no internet on the phone; the server answered its own check, so it is reachable
+ * and the list failed for another reason (never "open Tailscale" then); off a tailnet, a server that worked before and
+ * doesn't answer is down; else what its check says.
+ */
+export function serverTrouble(input: {
+  offline: boolean;
+  check: ServerCheck | null;
+  tailnet: boolean;
+}): { kind: "offline" } | { kind: "answered" } | { kind: "down" } | { kind: "problem"; problem: ServerProblem } {
+  if (input.offline) return { kind: "offline" };
+  if (input.check?.ok) return { kind: "answered" };
+  const problem = input.check && !input.check.ok ? input.check.problem : "unreachable";
+  if (problem === "unreachable" && !input.tailnet) return { kind: "down" };
+  return { kind: "problem", problem };
+}

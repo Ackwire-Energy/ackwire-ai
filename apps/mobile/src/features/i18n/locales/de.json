@@ -165,6 +165,7 @@
     "title": "Chats",
     "serverError": {
       "offline": "Dein Handy hat kein Internet.",
+      "answered": "{{host}} hat geantwortet, aber deine Chats wurden nicht geladen. Versuch es gleich noch einmal.",
       "text": "Er ist vielleicht offline oder außerhalb deines Netzwerks. Deine Chats erscheinen von selbst, sobald er wieder da ist.",
       "kept": "Du siehst, was schon in der App war."
     },

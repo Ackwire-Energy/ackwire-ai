@@ -177,6 +177,7 @@
     "title": "Czaty",
     "serverError": {
       "offline": "Brak internetu w telefonie.",
+      "answered": "{{host}} odpowiedział, ale Twoje rozmowy się nie wczytały. Spróbuj ponownie za chwilę.",
       "text": "Serwer może nie działać albo być poza twoją siecią. Czaty pojawią się same, gdy wróci.",
       "kept": "Pokazujemy to, co było już w aplikacji."
     },

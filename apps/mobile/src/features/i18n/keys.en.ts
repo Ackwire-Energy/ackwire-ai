@@ -169,6 +169,7 @@ export const featureKeysEn = {
     title: "Chats",
     serverError: {
       offline: "No internet on your phone.",
+      answered: "{{host}} answered, but your chats didn't load. Try again in a moment.",
       text: "It may be down or outside your network. Your chats show up on their own when it's back.",
       kept: "Showing what was already in the app.",
     },

@@ -8,6 +8,7 @@ import { Button, EmptyState, LineIcon, Text } from "@/ui";
 import { problemText } from "../server";
 import { useColors } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
+import { serverTrouble } from "./logic";
 
 /** While Conversas can't reach the server, it asks again this often (it fills in on its own when it answers). */
 const RETRY_EVERY_MS = 15_000;
@@ -43,14 +44,16 @@ function useServerTrouble(retry: () => Promise<unknown>) {
   const server = check?.server ?? serverUrl();
   const host = serverHost(server);
   const offline = network.isConnected === false || network.isInternetReachable === false;
-  const problem = check && !check.ok ? check.problem : "unreachable";
-  // Off a tailnet, "unreachable" is a server that worked before: down, not a wrong address.
-  const plain = !offline && problem === "unreachable" && !isTailnet(server);
-  const title = offline
-    ? t("mobile.chats.serverError.offline")
-    : plain
-      ? t("mobile.auth.server.down.line", { host })
-      : t(problemText(problem, server), { host });
+  const trouble = serverTrouble({ offline, check, tailnet: isTailnet(server) });
+  const plain = trouble.kind === "down";
+  const title =
+    trouble.kind === "offline"
+      ? t("mobile.chats.serverError.offline")
+      : trouble.kind === "answered"
+        ? t("mobile.chats.serverError.answered", { host })
+        : trouble.kind === "down"
+          ? t("mobile.auth.server.down.line", { host })
+          : t(problemText(trouble.problem, server), { host });
   const again = () => {
     setChecking(true);
     void Promise.allSettled([checkServer(serverUrl()).then(setCheck), retry()]).then(() => setChecking(false));

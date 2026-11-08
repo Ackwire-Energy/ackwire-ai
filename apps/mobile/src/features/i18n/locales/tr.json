@@ -165,6 +165,7 @@
     "title": "Sohbetler",
     "serverError": {
       "offline": "Telefonunuzda internet yok.",
+      "answered": "{{host}} yanıt verdi ama sohbetlerin yüklenmedi. Birazdan tekrar dene.",
       "text": "Sunucu kapalı ya da ağınızın dışında olabilir. Tekrar açıldığında sohbetleriniz kendiliğinden görünür.",
       "kept": "Uygulamada zaten olanlar gösteriliyor."
     },

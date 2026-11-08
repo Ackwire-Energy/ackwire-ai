@@ -174,6 +174,7 @@ export const featureKeysPtBR = {
     title: "Conversas",
     serverError: {
       offline: "Sem internet no celular.",
+      answered: "{{host}} respondeu, mas suas conversas não carregaram. Tente de novo daqui a pouco.",
       text: "Ele pode estar fora do ar ou fora da sua rede. Suas conversas aparecem sozinhas quando ele voltar.",
       kept: "Mostrando o que já estava no app.",
     },
