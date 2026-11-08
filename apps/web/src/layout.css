@@ -6025,16 +6025,19 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
   letter-spacing: var(--track-tight);
 }
 
-/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
+/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. Its words on the
+   baseline of the words around it (the name's, Ver relatório after it), its glyph or face in their line's middle. */
 .msg-reminder {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
   margin-left: 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  vertical-align: middle;
+}
+.msg-reminder > :is(.ac-icon, .ac-brand, .ac-avatar) {
+  align-self: center;
 }
 .msg-reminder--link {
   text-decoration: none;
@@ -8026,21 +8029,25 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
    to a letter a line. Those go on the line under them, the actions at its end. */
 @media (max-width: 640px) {
   .pf-list {
-    grid-template-columns: max-content max-content minmax(0, 1fr);
+    display: block;
+  }
+  .pf-list > .machine-page__agent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-bottom: 10px;
   }
   .pf-list > .machine-page__agent-row > .machine-page__agent {
-    grid-column: 1 / -1;
+    flex: 1 0 100%;
   }
   .pf-list .pf-stack {
-    justify-self: start;
-    padding: 0 8px 10px 14px;
+    padding: 0 8px 0 14px;
   }
   .pf-list .pf-count {
-    padding-bottom: 10px;
+    padding-right: 8px;
   }
   .pf-list .pf-acts {
-    justify-self: end;
-    padding-bottom: 10px;
+    margin-left: auto;
   }
 }
 .machine-page__agent {
