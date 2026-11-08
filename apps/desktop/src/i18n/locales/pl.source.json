@@ -362,6 +362,18 @@
   "first.own": {
     "value": "Use your own server"
   },
+  "first.addTitle": {
+    "value": "Add a workspace"
+  },
+  "first.addLead": {
+    "value": "The ones you have stay here, each with its own sign-in."
+  },
+  "first.addCloud": {
+    "value": "Create a workspace on agentes.chat"
+  },
+  "first.addOwn": {
+    "value": "Use your team's server"
+  },
   "own.title": {
     "value": "Your own server"
   },
@@ -718,6 +730,21 @@
   },
   "servers.removed": {
     "value": "{{host}} left this app"
+  },
+  "servers.workspaces": {
+    "value": {
+      "one": "{{count}} workspace",
+      "other": "{{count}} workspaces"
+    }
+  },
+  "servers.signedOut": {
+    "value": "Not signed in"
+  },
+  "servers.newsOne": {
+    "value": "1 new notification"
+  },
+  "servers.newsMany": {
+    "value": "{{n}} new notifications"
   },
   "server.title": {
     "value": "agentes.chat on this {{device}}"

@@ -100,10 +100,11 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { useSidebarPins } from "@/hooks/useSidebarPins";
 import { useUnreadTitle } from "@/hooks/useUnreadTitle";
+import { useWorkspaceGroups } from "@/hooks/useWorkspaceGroups";
 import { requestAgentPanel } from "@/lib/agent-panel-ask";
 import { requestChannelDetails } from "@/lib/channel-details";
 import type { MenuEntry } from "@/lib/context-menu";
-import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { onPhoneAsk, takePhoneAsk, thisMac } from "@/lib/desktop";
 import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
@@ -2047,6 +2048,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const notes = workspaceNotes(t, i18n.language, me.organizations);
+  const groups = useWorkspaceGroups({ orgs: me.organizations, currentOrgId: org.id });
   const navigate = useNavigate();
   const overview = useOverview(org.id);
   const managesAgents = can(org, "manage_agents");
@@ -2107,34 +2109,87 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
         </MenuOverlayItem>
       </MenuOverlayGroup>
       <MenuOverlayGroup heading={t("shell.yourWorkspaces")}>
-        {me.organizations.map((o) => (
-          <MenuOverlayItem
-            key={o.id}
-            leading={<OrgMark logo={o.logo} size={32} />}
-            description={[t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ")}
-            current={o.id === org.id}
-            hint={o.id === org.id ? t("shell.youAreHere") : undefined}
-            onSelect={() => {
-              onDone();
-              if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
-            }}
-          >
-            {o.name}
-          </MenuOverlayItem>
-        ))}
-        {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
-        {me.user.canCreateWorkspace !== false && (
+        {groups ? (
           <>
+            {/* The desktop app (ADR 0154): every server's workspaces, by server, each with its unread count. */}
+            {groups.map((g) => (
+              <Fragment key={g.server}>
+                {groups.length > 1 && (
+                  <span className="sidebar__menu-server">
+                    <Icon name={g.cloud ? "cloud" : "computer"} size={14} />
+                    {g.name}
+                    {!g.cloud && <em>· {t("shell.yourServer")}</em>}
+                  </span>
+                )}
+                {g.rows.map((o) => {
+                  const here = g.here ? me.organizations.find((m) => m.id === o.id) : undefined;
+                  return (
+                    <MenuOverlayItem
+                      key={o.id}
+                      leading={<OrgMark logo={o.logo} size={32} />}
+                      description={
+                        here ? [t(`roles.${here.role}`), notes.get(o.id)].filter(Boolean).join(" · ") : undefined
+                      }
+                      current={o.current}
+                      hint={
+                        o.current ? t("shell.youAreHere") : o.unread > 0 ? <CountChip>{o.unread}</CountChip> : undefined
+                      }
+                      onSelect={() => {
+                        onDone();
+                        if (!g.here) void thisMac.openWorkspace(g.server, o.id).catch(() => {});
+                        else if (!o.current) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
+                      }}
+                    >
+                      {o.name}
+                    </MenuOverlayItem>
+                  );
+                })}
+              </Fragment>
+            ))}
             <MenuOverlaySeparator />
             <MenuOverlayItem
               icon="plus"
+              description={t("shell.addWorkspaceHint")}
               onSelect={() => {
                 onDone();
-                void navigate({ to: "/onboarding" });
+                void thisMac.addWorkspace().catch(() => {});
               }}
             >
-              {t("shell.newWorkspace")}
+              {t("shell.addWorkspace")}
             </MenuOverlayItem>
+          </>
+        ) : (
+          <>
+            {me.organizations.map((o) => (
+              <MenuOverlayItem
+                key={o.id}
+                leading={<OrgMark logo={o.logo} size={32} />}
+                description={[t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ")}
+                current={o.id === org.id}
+                hint={o.id === org.id ? t("shell.youAreHere") : undefined}
+                onSelect={() => {
+                  onDone();
+                  if (o.id !== org.id) void navigate({ to: "/org/$orgId", params: { orgId: o.id } });
+                }}
+              >
+                {o.name}
+              </MenuOverlayItem>
+            ))}
+            {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
+            {me.user.canCreateWorkspace !== false && (
+              <>
+                <MenuOverlaySeparator />
+                <MenuOverlayItem
+                  icon="plus"
+                  onSelect={() => {
+                    onDone();
+                    void navigate({ to: "/onboarding" });
+                  }}
+                >
+                  {t("shell.newWorkspace")}
+                </MenuOverlayItem>
+              </>
+            )}
           </>
         )}
       </MenuOverlayGroup>

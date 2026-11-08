@@ -100,7 +100,13 @@ function fakeCheck(server: string, waits: boolean): ServerCheck {
 export function createFakeHost(
   initial: WindowName,
   scenario: Scenario,
-  options: { link?: string | null; found?: boolean; here?: HereOptions; someCommands?: boolean; welcomeAdd?: boolean } = {},
+  options: {
+    link?: string | null;
+    found?: boolean;
+    here?: HereOptions;
+    someCommands?: boolean;
+    welcomeAdd?: boolean;
+  } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
   const lineListeners = new Set<(homeId: string, line: string) => void>();

@@ -132,7 +132,11 @@
     "cloud": "agentes.chat'e giriş yap",
     "create": "Burada yeni misiniz?",
     "createLink": "Hesap oluştur",
-    "own": "Kendi sunucunuzu kullanın"
+    "own": "Kendi sunucunuzu kullanın",
+    "addTitle": "Çalışma alanı ekle",
+    "addLead": "Zaten sahip olduklarınız, her biri kendi girişiyle burada kalır.",
+    "addCloud": "agentes.chat'te çalışma alanı oluştur",
+    "addOwn": "Ekibinizin sunucusunu kullanın"
   },
   "own": {
     "title": "Kendi sunucunuz",
@@ -271,7 +275,12 @@
     "removeTitle": "{{host}} bu uygulamadan kaldırılsın mı?",
     "removeBody": "Sunucu ve oradaki hesabınız olduğu gibi kalır.",
     "removeAgents": "Çalışma alanlarının ajanları bu {{device}} üzerinde çalışmayı bırakır.",
-    "removed": "{{host}} bu uygulamadan kaldırıldı"
+    "removed": "{{host}} bu uygulamadan kaldırıldı",
+    "workspaces_one": "{{count}} çalışma alanı",
+    "workspaces_other": "{{count}} çalışma alanı",
+    "signedOut": "Giriş yapılmadı",
+    "newsOne": "1 yeni bildirim",
+    "newsMany": "{{n}} yeni bildirim"
   },
   "server": {
     "title": "Bu {{device}} üzerindeki agentes.chat",

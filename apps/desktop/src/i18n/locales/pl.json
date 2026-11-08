@@ -136,7 +136,11 @@
     "cloud": "Zaloguj się do agentes.chat",
     "create": "Pierwszy raz tutaj?",
     "createLink": "Utwórz konto",
-    "own": "Użyj własnego serwera"
+    "own": "Użyj własnego serwera",
+    "addTitle": "Dodaj przestrzeń roboczą",
+    "addLead": "Te, które już masz, zostają tutaj, każda z własnym logowaniem.",
+    "addCloud": "Utwórz przestrzeń roboczą w agentes.chat",
+    "addOwn": "Użyj serwera twojego zespołu"
   },
   "own": {
     "title": "Twój własny serwer",
@@ -275,7 +279,14 @@
     "removeTitle": "Usunąć {{host}} z tej aplikacji?",
     "removeBody": "Serwer i twoje konto na nim zostają bez zmian.",
     "removeAgents": "Agenci z jego przestrzeni roboczych przestaną pracować na tym urządzeniu ({{device}}).",
-    "removed": "Usunięto {{host}} z tej aplikacji"
+    "removed": "Usunięto {{host}} z tej aplikacji",
+    "workspaces_one": "{{count}} przestrzeń robocza",
+    "workspaces_few": "{{count}} przestrzenie robocze",
+    "workspaces_many": "{{count}} przestrzeni roboczych",
+    "workspaces_other": "{{count}} przestrzeni roboczej",
+    "signedOut": "Nie zalogowano",
+    "newsOne": "1 nowe powiadomienie",
+    "newsMany": "Nowe powiadomienia: {{n}}"
   },
   "server": {
     "title": "agentes.chat na tym urządzeniu ({{device}})",
