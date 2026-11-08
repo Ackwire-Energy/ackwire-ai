@@ -1,9 +1,17 @@
 /* The right side of a DM with an agent (AgentSidebar.tsx): the members column's surface and place, wider, its sky
-   running edge to edge. Floating (narrow windows): the panels' sheet, on the same surface. */
+   running edge to edge. Floating (narrow windows): the panels' sheet, on the same surface. Either way it scrolls in
+   `.dm-side__scroll`, whose scrollbar's room the side takes back (threads.css), the column being its container. */
 .members-side.dm-side {
   flex-basis: 320px;
   width: 320px;
-  padding: 0 0 24px;
+  overflow: hidden;
+  padding: 0;
+  container-type: inline-size;
+}
+.members-side.dm-side > .dm-side__scroll {
+  box-sizing: border-box;
+  height: 100%;
+  padding-bottom: 24px;
 }
 .thread-panel.dm-side--float {
   background: var(--side);
@@ -18,6 +26,7 @@
 .dm-side__scroll {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 .dm-side__close.ac-btn {

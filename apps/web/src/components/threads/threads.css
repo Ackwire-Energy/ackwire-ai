@@ -952,7 +952,18 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel__page {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+}
+/*
+ * What opens in a panel (an agent's page, a task, Auditoria's details, an agent's side in a DM) is the panel's width,
+ * its sides even: the room the kit's scrollbar takes at the scroller's end comes back out of the view's own end, under
+ * the scrollbar. That room is the panel's width (100cqw, the panel being the nearest container) less the scroller's
+ * content box (100%) and its side padding (`--pane-x`), so it is 0 wherever a scrollbar takes none (a touch screen,
+ * overlay scrollbars, the geometry check's Chromium) and follows the scrollbar as it comes and goes.
+ */
+:is(.thread-panel, .members-side) > :is(.thread-panel__page, .dm-side__scroll) > * {
+  margin-inline-end: calc(100% + 2 * var(--pane-x, 0px) - 100cqw);
 }
 /* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. */
 .thread-panel--wide {

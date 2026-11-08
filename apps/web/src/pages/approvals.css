@@ -774,7 +774,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  max-width: 780px;
 }
 .ap-review__facts .connector-icon,
 .ap-review__facts .ap-conn__own {
@@ -852,7 +851,6 @@ html:not([data-pointer]) .ap-li:focus-visible {
   position: sticky;
   bottom: 16px;
   z-index: 4;
-  max-width: 780px;
   margin-top: auto;
   padding: 10px 10px 10px 18px;
   border-radius: 18px;

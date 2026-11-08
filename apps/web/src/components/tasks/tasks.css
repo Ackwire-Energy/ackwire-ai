@@ -293,10 +293,11 @@
   }
 }
 .tm-panel__body {
+  --pane-x: 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 14px 18px 18px;
+  padding: 14px var(--pane-x) 18px;
 }
 .tm-panel__now {
   display: flex;

@@ -99,7 +99,7 @@ export function AgentSidebar({ agent, onClose }: { agent: Agent; onClose?: () =>
   if (!onClose) {
     return (
       <aside className="members-side dm-side" aria-label={t("agentSide.label")}>
-        {body}
+        <div className="dm-side__scroll">{body}</div>
       </aside>
     );
   }
