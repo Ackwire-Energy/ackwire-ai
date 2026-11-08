@@ -21,7 +21,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Icon, type IconName, Text } from "@/ui";
+import { Button, Card, Icon, type IconName, MEDIA_ROW, MediaRow, Text } from "@/ui";
 import { openConnectAi } from "../../ai/NoAiCard";
 import { usePlanHold } from "../../ai/parts";
 import { requestComposerText } from "../../chat/composer-request";
@@ -283,27 +283,28 @@ export function SetupCardView({
         </View>
         <View accessibilityLiveRegion="polite">
           {rows.map((r, i) => (
+            // A MediaRow: the step's icon (a check once done) in the face's place, its name on that line, what it says
+            // and its buttons under them at the card's width, as on the web.
             <View
               key={r.key}
               style={[styles.row, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
             >
-              {r.done ? (
-                <View style={[styles.check, { backgroundColor: c.ink }]}>
-                  <Icon name="check" size={12} color={c.bg} />
-                </View>
-              ) : (
-                <View style={styles.lead}>
-                  <Icon name={r.icon} size={18} color={r.dim ? c.faint : c.ink2} />
-                </View>
-              )}
-              <View style={styles.fill}>
-                <Text
-                  variant="small"
-                  tone={r.done ? "ink2" : r.dim ? "muted" : "ink"}
-                  style={r.done || r.dim ? undefined : styles.bold}
-                >
-                  {r.title}
-                </Text>
+              <MediaRow
+                size="row"
+                name={r.title}
+                quiet={r.done ? "ink2" : r.dim ? "muted" : undefined}
+                face={
+                  r.done ? (
+                    <View style={[styles.check, { backgroundColor: c.ink }]}>
+                      <Icon name="check" size={12} color={c.bg} />
+                    </View>
+                  ) : (
+                    <View style={styles.lead}>
+                      <Icon name={r.icon} size={18} color={r.dim ? c.faint : c.ink2} />
+                    </View>
+                  )
+                }
+              >
                 {r.saying ? (
                   <Text variant="caption" tone="ok">
                     {r.saying}
@@ -313,31 +314,33 @@ export function SetupCardView({
                     {r.desc}
                   </Text>
                 ) : null}
-                {!r.done && r.skip ? (
-                  <View style={styles.skip}>
-                    <Button
-                      variant="text"
-                      size="sm"
-                      label={r.skip.label}
-                      disabled={r.skip.busy}
-                      onPress={r.skip.onPress}
-                    />
+                {(!r.done && r.skip) || r.action ? (
+                  <View style={styles.acts}>
+                    {!r.done && r.skip ? (
+                      <Button
+                        variant="text"
+                        size="sm"
+                        label={r.skip.label}
+                        disabled={r.skip.busy}
+                        onPress={r.skip.onPress}
+                      />
+                    ) : null}
+                    {r.action ? (
+                      r.done ? (
+                        <Button variant="text" size="sm" label={r.action.label} onPress={r.action.onPress} />
+                      ) : (
+                        <Button
+                          variant={r.action.primary ? "primary" : "secondary"}
+                          size="sm"
+                          label={r.action.label}
+                          disabled={r.skip?.busy}
+                          onPress={r.action.onPress}
+                        />
+                      )
+                    ) : null}
                   </View>
                 ) : null}
-              </View>
-              {r.action ? (
-                r.done ? (
-                  <Button variant="text" size="sm" label={r.action.label} onPress={r.action.onPress} />
-                ) : (
-                  <Button
-                    variant={r.action.primary ? "primary" : "secondary"}
-                    size="sm"
-                    label={r.action.label}
-                    disabled={r.skip?.busy}
-                    onPress={r.action.onPress}
-                  />
-                )
-              ) : null}
+              </MediaRow>
             </View>
           ))}
         </View>
@@ -412,10 +415,16 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   meter: { flexDirection: "row", gap: 4, marginTop: 10, marginBottom: 4 },
   seg: { flex: 1, height: 4, borderRadius: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
-  lead: { width: 22, alignItems: "center" },
-  check: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  skip: { alignSelf: "flex-start", marginTop: 2 },
+  row: { paddingVertical: 12 },
+  lead: { flex: 1, alignItems: "center", justifyContent: "center" },
+  check: {
+    width: MEDIA_ROW.row.face,
+    height: MEDIA_ROW.row.face,
+    borderRadius: MEDIA_ROW.row.face / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   foot: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, paddingBottom: 8, gap: 8 },
   task: {
     flexDirection: "row",

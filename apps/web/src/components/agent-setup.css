@@ -53,30 +53,24 @@
 .setup-cl__meter i[data-on] {
   background: var(--ok);
 }
+/* The rows' buttons drop under their words by the card's width, not the window's: a thread is narrow on a desktop too. */
 .setup-cl__rows {
   list-style: none;
   margin: 0;
   padding: 0;
+  container-type: inline-size;
 }
 
-/* One step: its icon (a check once done), what it is in the agent's words, and the button while it is to do. */
+/* One step, a MediaRow (the kit's `.ac-mediarow`): its icon (a check once done) in the face's place, what it is on the
+   name's line with its button at the end, what the agent says of it under them. */
 .setup-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  min-height: 60px;
   padding: 12px 16px;
   border-top: 1px solid var(--line);
 }
-.setup-row > .ac-icon {
-  width: 20px;
-  height: 20px;
+.setup-row > .ac-mediarow__face > .ac-icon {
   color: var(--ink-muted);
 }
 .setup-row[data-done] {
-  grid-template-columns: 20px minmax(0, 1fr);
-  min-height: 48px;
   padding-top: 10px;
   padding-bottom: 10px;
 }
@@ -84,26 +78,16 @@
   animation: setup-row-pop 0.45s var(--spring) both;
 }
 .setup-row__check {
-  width: 20px;
-  height: 20px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--ok) 14%, var(--surface-raised));
   color: var(--ok);
 }
-.setup-row__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.setup-row__text b {
-  font-weight: 600;
+.setup-row__title {
   font-size: 14.5px;
-  line-height: 20px;
 }
-.setup-row[data-done] .setup-row__text b {
+.setup-row[data-done] .setup-row__title {
   font-weight: 500;
   color: var(--ink2);
 }
@@ -119,7 +103,6 @@
 .setup-row__link {
   all: unset;
   cursor: pointer;
-  margin-left: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-muted);
@@ -152,14 +135,6 @@ html:not([data-pointer]) .setup-row__link:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .setup-row[data-new] {
     animation: none;
-  }
-}
-@media (max-width: 640px) {
-  .setup-row {
-    grid-template-columns: 20px minmax(0, 1fr);
-  }
-  .setup-row__act {
-    grid-column: 2;
   }
 }
 
@@ -300,13 +275,9 @@ html:not([data-pointer]) .setup-task:focus-visible {
 }
 
 /* The right hand's first run (ADR 0155 §6): a row that waits for the plan, or for the team card in the chat. */
-.setup-row[data-dim] .setup-row__text b,
-.setup-row[data-dim] > .ac-icon {
+.setup-row[data-dim] .setup-row__title,
+.setup-row[data-dim] > .ac-mediarow__face > .ac-icon {
   color: var(--ink-muted);
-}
-.setup-row__act {
-  display: flex;
-  gap: 8px;
 }
 .setup-dlg__error {
   color: var(--danger);

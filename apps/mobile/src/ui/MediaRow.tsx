@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { MEDIA_ROW, type MediaRowSize, mediaRowAxis } from "./media-row";
-import { Text, textLineOf } from "./Text";
+import { Text, type TextTone, textLineOf } from "./Text";
 import { weights } from "./type-scale";
 
 export interface MediaRowProps {
@@ -16,10 +16,12 @@ export interface MediaRowProps {
   children?: ReactNode;
   /** `card` (face 32) in a card's head, `row` (face 24) in a list. */
   size?: MediaRowSize;
+  /** A quieter name (a step done, or waiting on another): in this tone, at the text's own weight. */
+  quiet?: TextTone;
 }
 
 /** A face, the name and what it is on one line, and the rest under them at full width (the web's MediaRow). */
-export function MediaRow({ face, name, meta, end, children, size = "card" }: MediaRowProps) {
+export function MediaRow({ face, name, meta, end, children, size = "card", quiet }: MediaRowProps) {
   const { face: side, gap } = MEDIA_ROW[size];
   const axis = mediaRowAxis(side, textLineOf("subhead", useWindowDimensions().fontScale));
   return (
@@ -27,7 +29,7 @@ export function MediaRow({ face, name, meta, end, children, size = "card" }: Med
       <View style={[styles.head, { gap }]}>
         <View style={{ width: side, height: side, marginTop: axis.face }}>{face}</View>
         <Text variant="subhead" style={[styles.words, { paddingTop: axis.words }]}>
-          <Text variant="subhead" style={styles.name}>
+          <Text variant="subhead" tone={quiet} style={quiet ? undefined : styles.name}>
             {name}
           </Text>
           {meta ? (
