@@ -25,12 +25,20 @@
   flex-basis: 188px;
 }
 
-/* A request or an invitation: face, two lines, its state, its actions; a note in a well under the words. */
+/* A request, an invitation or a suggestion, a MediaRow: the face and who on one line, the actions at its end (under
+   everything where the list is under 480px), what it is and its state under them, a note in a well last. */
+.ac-list:has(> .members-row) {
+  container-type: inline-size;
+}
 .members-row__name {
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.members-row__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
 }
 .members-row__sub {
   overflow-wrap: anywhere;
@@ -57,17 +65,12 @@
 .members-row__state[data-tone="ok"] > .ac-icon {
   color: var(--ok);
 }
-/* A row breaks before it shrinks, so the actions go under the words whole when the row runs out of width; their
-   buttons wrap among themselves only when even a line of their own is too narrow (the list clips what overflows). */
+/* The buttons wrap among themselves only when even a line of their own is too narrow. */
 .members-row__acts {
-  flex: 0 1 auto;
   min-width: 0;
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
-  margin-left: auto;
 }
 /* The role picker as wide as its words, beside the buttons, not the field-wide trigger it is in a form. */
 .members-row__acts .roles-picker.ac-btn {
@@ -78,14 +81,14 @@
 .members-row__acts.ac-acts {
   gap: var(--space-2) calc(2 * var(--ghost-plate));
 }
-/* Why approving can't let them in at once: in the row's flow beside the state. */
+/* Why approving can't let them in at once: in the line beside the state. */
 .members-row__flag {
   display: contents;
 }
-/* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
+/* What the person wrote: last, as quoted, in a well at the row's width. */
 .members-row__note {
-  flex-basis: 100%;
-  margin: 0 0 2px calc(36px + var(--space-3));
+  order: 2;
+  margin: 0 0 2px;
   padding: 8px 12px;
   border-radius: 12px 12px 12px 3px;
   background: var(--card-well);
@@ -145,25 +148,6 @@
 }
 .members-person > .members-roles:empty {
   display: none;
-}
-@media (max-width: 640px) {
-  /* The person and the state on the first line (the state's words wrap beside its icon), the actions under them on
-     the right. */
-  .members-page .ac-list__row.members-row > .ac-avatar:first-child + .list-col {
-    flex-basis: 0;
-  }
-  .members-row__state {
-    max-width: 45%;
-  }
-  .members-row__acts {
-    flex-basis: 100%;
-  }
-  /* On a line of its own under the words, so it never squeezes the name nor pushes the actions apart. */
-  .members-row__flag {
-    display: block;
-    flex-basis: 100%;
-    margin-left: calc(36px + var(--space-3));
-  }
 }
 
 /* Remover do workspace: what goes with the person, one fact per line. */

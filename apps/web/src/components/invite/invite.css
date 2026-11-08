@@ -132,29 +132,19 @@
   margin: 0;
 }
 /* "Prefere mandar um link?": a well pressed into the dialog, its icon on a key-like tile. */
+/* A MediaRow on a well: the tile, the question and its button on one line, what it means under them; the button under
+   that too where the well is under 480px. */
 .invite-orlink {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  container-type: inline-size;
   padding: 12px 14px;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-cut);
   background: var(--card-well, var(--sunken));
   box-shadow: var(--card-well-shadow, none);
 }
 .invite-orlink__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-  line-height: 19px;
-}
-.invite-orlink__text b {
-  font-weight: 600;
-}
-.invite-orlink__text span {
   color: var(--muted);
   font-size: 13px;
+  line-height: 18px;
 }
 .invite-tile {
   flex: none;

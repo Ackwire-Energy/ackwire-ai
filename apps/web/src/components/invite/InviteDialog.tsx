@@ -414,17 +414,21 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
               ? t("members.dialog.leftOut")
               : t("members.dialog.pasteHelp")}
         </p>
-        <div className="invite-orlink">
-          <span className="invite-tile" aria-hidden="true">
-            <Icon name="link" size={18} />
+        <div className="invite-orlink ac-mediarow">
+          <span className="ac-mediarow__face">
+            <span className="invite-tile" aria-hidden="true">
+              <Icon name="link" size={18} />
+            </span>
           </span>
-          <span className="invite-orlink__text">
+          <span className="ac-mediarow__head">
             <b>{t("members.dialog.orLink.title")}</b>
-            <span>{t("members.dialog.orLink.text")}</span>
           </span>
-          <Button size="sm" onClick={() => setAt("link")}>
-            {t("members.dialog.orLink.open")}
-          </Button>
+          <span className="ac-mediarow__end ac-mediarow__end--wrap">
+            <Button size="sm" onClick={() => setAt("link")}>
+              {t("members.dialog.orLink.open")}
+            </Button>
+          </span>
+          <span className="ac-mediarow__body invite-orlink__text">{t("members.dialog.orLink.text")}</span>
         </div>
       </>
     );
@@ -455,10 +459,19 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
         {/* biome-ignore lint/a11y/useSemanticElements: option cards named by the host's question, not a fieldset */}
         <div className="invite-roles" role="group" aria-labelledby="invite-dialog-ask">
           {choices.map((c) => (
-            <OptionCard key={c.value} pressed={known(role) === c.value} onClick={() => setRole(c.value)}>
-              <RoleSeal role={c.role ?? everyone ?? null} />
-              <span className="ac-option__text">
+            <OptionCard
+              key={c.value}
+              pressed={known(role) === c.value}
+              onClick={() => setRole(c.value)}
+              className="ac-mediarow"
+            >
+              <span className="ac-mediarow__face">
+                <RoleSeal role={c.role ?? everyone ?? null} />
+              </span>
+              <span className="ac-mediarow__head">
                 <span className="ac-option__title">{c.label}</span>
+              </span>
+              <span className="ac-mediarow__body">
                 <span className="ac-option__desc">{c.description}</span>
               </span>
             </OptionCard>
@@ -784,7 +797,7 @@ function HostAsk({
 
 /** A role's mark on its card (ADR 0085): Membro takes `everyone`'s, the base every person has. */
 function RoleSeal({ role }: { role: OrgRole | null }) {
-  if (role) return <RoleMark color={role.color} icon={role.icon} size={36} />;
+  if (role) return <RoleMark color={role.color} icon={role.icon} size={32} />;
   return (
     <span className="invite-tile" aria-hidden="true">
       <Icon name="person" size={18} />
