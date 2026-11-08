@@ -227,6 +227,8 @@ export const ANYWHERE: readonly string[] = [
   "desktop.connect.",
   "desktop.link.",
   "desktop.servers.",
+  // The desktop app's workspaces by server: the line under a server that isn't agentes.chat, whichever server this is.
+  "shell.yourServer",
 ];
 
 /** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */
