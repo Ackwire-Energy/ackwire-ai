@@ -511,6 +511,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       signInOptions: (input, humanCheck) =>
         request<SignInOptions>("/api/app/sign-in-options", { json: input, headers: humanCheckHeaders(humanCheck) }),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),
+      unread: () =>
+        nullOn(401, () =>
+          request<{ organizations: { orgId: string; unread: number; waiting: number }[] }>("/api/app/me/unread"),
+        ),
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),

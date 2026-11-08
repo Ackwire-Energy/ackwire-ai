@@ -63,13 +63,13 @@ const TOKEN_BIA_EN = "ExponentPushToken[bia-tablet-0001]";
 const FCM_BIA = `bia-android:APA91b${"a".repeat(140)}`;
 
 /** Bia in #general with a phone (pt-BR), and the fake sender wired into the job handlers. */
-async function withPhone(options: { unregistered?: string[]; goneLater?: string[] } = {}) {
+async function withPhone(options: { unregistered?: string[]; goneLater?: string[]; pushServer?: string } = {}) {
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   await listMembers(f.db, f.org.id); // assigns handles
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
   await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
   const push = createFakePushSender({ unregistered: options.unregistered, goneLater: options.goneLater });
-  const handlers = createJobHandlers({ ...f.jobDeps, push });
+  const handlers = createJobHandlers({ ...f.jobDeps, push, pushServer: options.pushServer });
   const drain = () => drainOutbox(f.db, handlers);
   return { bia, push, drain };
 }
@@ -230,6 +230,14 @@ describe("push delivery", () => {
     // A retried job sends nothing new (one job per notification).
     await drain();
     expect(push.sent).toHaveLength(1);
+  });
+
+  test("each push names the server it came from, so a phone on several servers opens the right one", async () => {
+    f = await setup();
+    const { push, drain } = await withPhone({ pushServer: "https://agentes.exemplo.com.br" });
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia olha isso" });
+    await drain();
+    expect(push.sent[0]?.data).toMatchObject({ orgId: f.org.id, server: "https://agentes.exemplo.com.br" });
   });
 
   test("a DM from a person pushes; each device gets its own language", async () => {

@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { connectToServer, problemText } from "@/features/server";
-import { ALLOW_HTTP, serverUrl } from "@/lib/server";
+import { ALLOW_HTTP, serverUrl, signedInServers } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { useSession } from "@/providers/session";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
@@ -68,19 +68,21 @@ export default function Connect() {
     );
 
   const target = check?.server ?? server;
-  const plan = connectPlan(serverUrl(), session.signedIn, { server: target, token });
+  // Every other server stays signed in (ADR 0154); a token replaces only whoever is in on this one.
+  const plan = connectPlan(serverUrl(), { server: target, token }, signedInServers().includes(target));
 
   const confirm = async () => {
     if (!check?.ok) return;
     setBusy(true);
-    const ok = await connectToServer({ server: check.server, token }, session.signedIn);
+    const ok = await connectToServer({ server: check.server, token });
     if (token && ok) return setSigningIn(true);
     if (token) {
       haptics.warning();
       setBusy(false);
       return setRefused(true);
     }
-    router.replace(plan.move || !session.signedIn ? "/sign-in" : "/");
+    // Signed in there already: its workspaces; otherwise its sign-in.
+    router.replace(signedInServers().includes(check.server) ? "/" : "/sign-in");
   };
 
   const problem = check && !check.ok ? t(problemText(check.problem, target), { host: serverHost(target) }) : null;

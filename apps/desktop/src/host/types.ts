@@ -10,7 +10,7 @@ import type {
   Tailnet,
 } from "../control/local-server";
 import type { Platform } from "../control/platform";
-import type { ServerList } from "../control/server";
+import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 
@@ -85,6 +85,10 @@ export interface Host {
    * given (`/login`, `/signup`, a link's handover or owner page).
    */
   chooseServer(server: string, page?: string): Promise<void>;
+  /** Every server's workspaces, as the app last read them with each one's session (ADR 0154). */
+  workspaces(): Promise<ServerWorkspaces[]>;
+  /** How the welcome window opens, taken once: `add` from the site's "Add a workspace", else null. */
+  welcomeMode(): Promise<"add" | null>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */
   removeServer(server: string): Promise<void>;
   /** Where a server may be: this computer and the person's Tailscale network, not checked yet. */

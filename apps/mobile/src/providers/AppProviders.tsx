@@ -9,9 +9,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { frameClock } from "@/agent/clock";
 import { createApi } from "@/lib/api";
 import { authClient } from "@/lib/auth";
-import { outboxStore } from "@/lib/outbox";
+import { outboxStoreFor } from "@/lib/outbox";
 import { useServer } from "@/lib/server";
-import { snapshotStore } from "@/lib/snapshot";
+import { snapshotStoreFor } from "@/lib/snapshot";
 import { hintTouches } from "@/ui/hints";
 import { ToastHost } from "@/ui/Toast";
 import { ThemeProvider } from "@/ui/theme";
@@ -34,7 +34,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const server = useServer();
   // Each server gets its own cache, API client and auth client, so no data or session crosses servers.
   const scope = useMemo(
-    () => ({ queryClient: createQueryClient(), api: createApi(server), auth: authClient() }),
+    () => ({ server, queryClient: createQueryClient(), api: createApi(server), auth: authClient(server) }),
     [server],
   );
 
@@ -43,18 +43,20 @@ export function AppProviders({ children }: { children: ReactNode }) {
   // when the app goes to the background. Leaving a server clears its cache, and with it the saved snapshot.
   useEffect(() => {
     const { queryClient } = scope;
-    const snapshot = createSnapshot(queryClient, snapshotStore);
+    const snapshot = createSnapshot(queryClient, snapshotStoreFor(scope.server));
     const stop = snapshot.start();
     // What waits for the connection outlives the app being closed, and shows again in its conversation.
-    const stopOutbox = outbox.keep(queryClient, outboxStore);
+    const stopOutbox = outbox.keep(queryClient, outboxStoreFor(scope.server));
     void snapshot.restore().then(() => outbox.show(queryClient));
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "background") void snapshot.flush();
     });
     return () => {
-      queryClient.clear();
-      stop();
+      // Another server (ADR 0154): this one's snapshot and waiting messages stay in its own files. They let go of
+      // them before the cache clears, which would otherwise empty both as if the person had signed out.
       stopOutbox();
+      stop();
+      queryClient.clear();
       sub.remove();
     };
   }, [scope]);
@@ -73,7 +75,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
             <I18nextProvider i18n={i18n}>
               <QueryClientProvider client={scope.queryClient}>
                 <ApiProvider client={scope.api}>
-                  <SessionProvider auth={scope.auth}>
+                  <SessionProvider auth={scope.auth} server={server}>
                     <OrgProvider>
                       <RealtimeProvider>
                         <PushProvider>

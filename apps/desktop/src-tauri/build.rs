@@ -52,6 +52,8 @@ const COMMANDS: &[&str] = &[
     "local_server_sync",
     "tailscale_status",
     "tailscale_open",
+    "workspaces_get",
+    "welcome_mode_take",
 ];
 
 fn main() {

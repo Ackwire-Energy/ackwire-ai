@@ -260,51 +260,16 @@ describe("choosing a server", () => {
     expect(savedServer(cloud, cloud)).toBeNull();
   });
 
-  test("another server is left first: signing out, or only forgetting the cookie when nobody is in", () => {
-    expect(connectPlan(cloud, true, { server: box })).toEqual({
-      move: true,
-      signOut: true,
-      forget: false,
-      token: null,
-    });
-    expect(connectPlan(cloud, false, { server: box })).toEqual({
-      move: true,
-      signOut: false,
-      forget: true,
-      token: null,
-    });
-    expect(connectPlan(cloud, false, { server: box, token: "t" })).toEqual({
-      move: true,
-      signOut: false,
-      forget: true,
-      token: "t",
-    });
-    expect(connectPlan(cloud, true, { server: box, token: "t" })).toEqual({
-      move: true,
-      signOut: true,
-      forget: false,
-      token: "t",
-    });
+  test("another server: the app moves there and nothing signs out (ADR 0154)", () => {
+    expect(connectPlan(cloud, { server: box }, false)).toEqual({ move: true, signOut: false, token: null });
+    // Signed in there already: still nothing to leave; it opens on that session.
+    expect(connectPlan(cloud, { server: box }, true)).toEqual({ move: true, signOut: false, token: null });
+    expect(connectPlan(cloud, { server: box, token: "t" }, false)).toEqual({ move: true, signOut: false, token: "t" });
   });
 
-  test("a token on the same server replaces whoever is in", () => {
-    expect(connectPlan(box, true, { server: box, token: "t" })).toEqual({
-      move: false,
-      signOut: true,
-      forget: false,
-      token: "t",
-    });
-    expect(connectPlan(box, false, { server: box, token: "t" })).toEqual({
-      move: false,
-      signOut: false,
-      forget: false,
-      token: "t",
-    });
-    expect(connectPlan(box, true, { server: box })).toEqual({
-      move: false,
-      signOut: false,
-      forget: false,
-      token: null,
-    });
+  test("a token on a server someone is signed in to replaces them there, and only there", () => {
+    expect(connectPlan(cloud, { server: box, token: "t" }, true)).toEqual({ move: true, signOut: true, token: "t" });
+    expect(connectPlan(box, { server: box, token: "t" }, true)).toEqual({ move: false, signOut: true, token: "t" });
+    expect(connectPlan(box, { server: box }, true)).toEqual({ move: false, signOut: false, token: null });
   });
 });

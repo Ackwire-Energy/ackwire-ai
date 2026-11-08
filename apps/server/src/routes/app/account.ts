@@ -28,6 +28,7 @@ import {
   NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
+  notificationCountsByOrg,
   ONBOARDING_STEPS,
   orgLogoFile,
   pinnedOwner,
@@ -148,6 +149,7 @@ export function accountRoutes(deps: AppDeps) {
     );
   for (const path of [
     "/me",
+    "/me/unread",
     "/me/password",
     "/phone-sign-in",
     "/account",
@@ -578,6 +580,33 @@ export function accountRoutes(deps: AppDeps) {
         200,
       );
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/me/unread",
+      tags,
+      security,
+      summary: "Unread and waiting in each of the person's workspaces",
+      description:
+        "The inbox counts of `GET /organizations/{orgId}/notifications/count` for every workspace the person reads, in one call: the phone and desktop apps list workspaces from several servers with their unread counts (ADR 0154).",
+      responses: {
+        200: json(
+          z.object({
+            organizations: z.array(
+              z.object({ orgId: z.string(), unread: z.number().int(), waiting: z.number().int() }),
+            ),
+          }),
+        ),
+        401: errors[401],
+      },
+    }),
+    async (c) =>
+      c.json(
+        { organizations: await notificationCountsByOrg({ db, pubsub: deps.adapters.pubsub }, c.get("user").id) },
+        200,
+      ),
   );
 
   app.openapi(

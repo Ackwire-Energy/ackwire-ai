@@ -11672,6 +11672,20 @@ html[data-menu-overlay] .shell {
   }
 }
 /* The workspace menu's meta line: the first agents, alive, next to "2 membros · 4 agentes". */
+/* The desktop app's "Your workspaces" by server (ADR 0154): the server's name above its workspaces. */
+.sidebar__menu-server {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.sidebar__menu-server em {
+  font-style: normal;
+  font-weight: 500;
+}
 .sidebar__menu-crew {
   display: inline-flex;
   align-items: center;

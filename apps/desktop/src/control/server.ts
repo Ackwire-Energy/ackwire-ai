@@ -8,6 +8,23 @@ export interface ServerList {
   servers: string[];
 }
 
+/** A workspace of a server, as the app read it with that server's session (`workspaces.rs`, ADR 0154). */
+export interface ServerWorkspace {
+  id: string;
+  name: string;
+  /** A data URL; null shows the workspace's mark. */
+  logo: string | null;
+  unread: number;
+  waiting: number;
+}
+
+/** A server's workspaces; `signedIn` false lists none (signed out there). */
+export interface ServerWorkspaces {
+  server: string;
+  signedIn: boolean;
+  orgs: ServerWorkspace[];
+}
+
 /** agentes.chat, a server on this computer, one on the person's Tailscale network, or one elsewhere. */
 export type ServerKind = "cloud" | "here" | "tailnet" | "own";
 

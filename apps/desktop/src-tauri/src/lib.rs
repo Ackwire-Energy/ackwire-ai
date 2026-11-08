@@ -21,6 +21,7 @@ mod servers;
 mod tailscale;
 mod tray;
 mod window_state;
+mod workspaces;
 
 use std::io::{self, Read};
 use std::path::Path;
@@ -582,6 +583,8 @@ pub fn run() {
         .manage(deep_link::PendingLink::default())
         .manage(main_window::Bridge::default())
         .manage(main_window::Notices::default())
+        .manage(workspaces::Workspaces::default())
+        .manage(workspaces::WelcomeMode::default())
         .manage(menus::Zoom::default())
         .manage(cover::Cover::default())
         .manage(dock::Dock::default())
@@ -633,6 +636,8 @@ pub fn run() {
             main_window::this_mac_reply,
             main_window::this_mac_listening,
             main_window::notify_site_set,
+            workspaces::workspaces_get,
+            workspaces::welcome_mode_take,
             dock::dock_set,
             menus::app_menu_set,
             menus::context_menu,
@@ -726,6 +731,8 @@ pub fn run() {
             local_server::load(&handle);
             app.state::<Runners>().start_all(&handle);
             host_sync::start(&handle);
+            // Every server's workspaces, for the site's menu and Preferences (ADR 0154).
+            workspaces::start(&handle);
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
             // the server open now, or the first run while there is none.

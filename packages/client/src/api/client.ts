@@ -376,6 +376,8 @@ export interface ApiClient {
     signInOptions(input: { email: string; access?: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
+    /** Unread and waiting in each workspace, in one call (`GET /me/unread`, ADR 0154); null signed out. */
+    unread(): Promise<{ organizations: { orgId: string; unread: number; waiting: number }[] } | null>;
     /** My app language (emails and pushes are written in it). */
     updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */

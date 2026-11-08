@@ -6,8 +6,10 @@ import { mobilePtBR } from "../../../apps/mobile/src/i18n/keys.pt-BR";
 import {
   appLink,
   appOnThisMachine,
+  askableRequirements,
   COMPOSE_FILES,
   checkJevKey,
+  checkRequirements,
   computerCommand,
   computerInstall,
   computerOf,
@@ -41,11 +43,13 @@ import {
   type PlanInput,
   PROBLEMS,
   parseOptions,
+  parseRequirements,
   plainStep,
   planSteps,
   privateStart,
   qrCode,
   quoteEnvValue,
+  type Requirement,
   readTailscaleStatus,
   resolveChoice,
   secretEntries,
@@ -629,6 +633,7 @@ describe("the agents' computer", () => {
   const GB = 1024 ** 3;
   const server: ThisMachine = {
     platform: "linux",
+    arch: "x64",
     memory: 8 * GB,
     root: true,
     systemd: true,
@@ -647,15 +652,16 @@ describe("the agents' computer", () => {
   };
 
   test("yes by default on a Linux server with room for agents' screens, and on a Mac", () => {
-    expect(computerOffer(server, null, false)).toEqual({ mac: false, yes: true, why: null });
+    expect(computerOffer(server, null, false)).toEqual({ mac: false, simple: false, yes: true, why: null });
     // A "4 GB" server reports a little less.
     expect(computerOffer({ ...server, memory: 3.8 * GB }, null, false)).toMatchObject({ yes: true });
-    expect(computerOffer(mac, null, false)).toEqual({ mac: true, yes: true, why: null });
+    expect(computerOffer(mac, null, false)).toEqual({ mac: true, simple: false, yes: true, why: null });
   });
 
   test("no by default under 4 GB, or without apt-get for the screens' and browsers' packages, saying why", () => {
     expect(computerOffer({ ...server, memory: 2 * GB }, null, false)).toEqual({
       mac: false,
+      simple: false,
       yes: false,
       why: "This machine has 2 GB of memory. Each agent's screen needs about 0.2 GB, and its browser 0.6 GB more.",
     });
@@ -664,6 +670,7 @@ describe("the agents' computer", () => {
     });
     expect(computerOffer({ ...server, apt: false }, null, false)).toEqual({
       mac: false,
+      simple: false,
       yes: false,
       why: "This machine has no apt-get, so the packages agents' screens and browsers need would be yours to install.",
     });
@@ -688,13 +695,8 @@ describe("the agents' computer", () => {
     expect(why(server, "MACHINE_PROVISIONING=off\n")).toBeNull();
     expect(why({ ...server, root: false })?.error).toContain("needs root");
     expect(why({ ...server, systemd: false })?.error).toContain("systemd isn't running");
-    // Ubuntu's systemd: no agent's process would start.
-    expect(why({ ...server, bpf: false })).toEqual({
-      check: "computer",
-      error:
-        "This machine's systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't), which keeps each agent's user off the others' ports.",
-      fix: "Use Debian 13 for it, or connect a computer later in Settings → Computers.",
-    });
+    // Ubuntu's systemd can't keep each agent its own user: offered in simple mode instead (ADR 0153 §5).
+    expect(why({ ...server, bpf: false })).toBeNull();
     expect(why(server, null, true)?.fix).toBe(
       "Run the installer on the server for this folder instead, with --dir <folder> --computer yes: https://agentes.chat/docs/install-on-a-server#computers",
     );
@@ -1152,7 +1154,8 @@ describe("the plan", () => {
     tailscale: "ask",
     domain: null,
     email: "skip",
-    computer: { state: "on", mac: false, commands: true, install: linux, kept: false },
+    computer: { state: "on", mac: false, simple: false, commands: true, install: linux, kept: false },
+    requirements: { present: [], install: [] },
     telemetry: { value: "on", kept: false },
     jev: "off",
     compose: null,
@@ -1188,7 +1191,7 @@ describe("the plan", () => {
     });
     const steps = planSteps({
       ...base,
-      computer: { state: "on", mac: true, commands: false, install: onMac, kept: false },
+      computer: { state: "on", mac: true, simple: false, commands: false, install: onMac, kept: false },
     });
     expect(steps).toContain(
       "agents' computer: this Mac, agents working as you in folders of their own, commands off (HOST_COMPUTER_TOKEN, also in host-computer-token)",
@@ -1222,6 +1225,45 @@ describe("the plan", () => {
     expect(skipped).toContain("usage statistics: keep what .env has (TELEMETRY=off)");
     // Without starting, the install waits for the run that starts it.
     expect(planSteps({ ...base, start: false }).some((s) => s.includes("install.sh"))).toBe(false);
+  });
+
+  test("simple mode and what the agents need: said before, installed as root, then the computer as its user", () => {
+    const simple = computerInstall({
+      mac: false,
+      simple: true,
+      server: "http://127.0.0.1:3000",
+      tokenFile: "/opt/agentes/host-computer-token",
+      commands: true,
+    });
+    expect(simple).toEqual({
+      server: "http://127.0.0.1:3000",
+      script: "http://127.0.0.1:3000/api/machines/install.sh",
+      args: ["--server", "http://127.0.0.1:3000", "--host-token-file", "/home/agentes/host-computer-token"],
+      user: "agentes",
+    });
+    const steps = planSteps({
+      ...base,
+      computer: { state: "on", mac: false, simple: true, commands: true, install: simple, kept: false },
+      requirements: { present: ["claude"], install: ["browser", "desktop", "codex"] },
+    });
+    expect(steps).toContain(
+      "agents' computer: this machine in simple mode, every agent as the user agentes (no sudo), commands on (HOST_COMPUTER_TOKEN, also in host-computer-token)",
+    );
+    expect(steps).toContain("already here for the agents: claude");
+    const at = (start: string) => steps.findIndex((l) => l.startsWith(start));
+    expect(steps[at("install for the agents")]).toBe(
+      "install for the agents: curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --requirements browser,desktop,codex",
+    );
+    expect(steps[at("user agentes")]).toBe(
+      "user agentes: create it if missing (no sudo), keep its services running (loginctl enable-linger), give it /home/agentes/host-computer-token",
+    );
+    expect(steps[at("agents' computer: curl")]).toBe(
+      "agents' computer: curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | runuser -u agentes -- sh -s -- --server http://127.0.0.1:3000 --host-token-file /home/agentes/host-computer-token, then wait up to 90 s for it to answer",
+    );
+    // In that order, after agentes.chat is up.
+    expect(at("start: docker compose up -d,")).toBeLessThan(at("install for the agents"));
+    expect(at("install for the agents")).toBeLessThan(at("user agentes"));
+    expect(at("user agentes")).toBeLessThan(at("agents' computer: curl"));
   });
 
   test("Jev: a key given is checked when the setup runs; one in .env stays; none says nothing", () => {
@@ -1414,5 +1456,78 @@ describe("the compose file the setup drives", () => {
       Web: web,
       AllowFunnel: { "agentes.tail1234.ts.net:443": true },
     });
+  });
+});
+
+describe("what the agents need", () => {
+  const all: Requirement[] = ["browser", "desktop", "claude", "codex"];
+  test("--requirements: all, none, or a list in the order they're installed", () => {
+    expect(parseRequirements("all")).toEqual(all);
+    expect(parseRequirements("NONE")).toEqual([]);
+    expect(parseRequirements("codex, browser")).toEqual(["browser", "codex"]);
+    expect(parseRequirements("browser,chrome")).toBeNull();
+    expect(parseOptions(["--requirements", "claude"], {})).toMatchObject({ options: { requirements: ["claude"] } });
+    expect(parseOptions([], { AGENTES_SETUP_REQUIREMENTS: "none" })).toMatchObject({ options: { requirements: [] } });
+    expect(parseOptions(["--requirements", "x"], {})).toEqual({
+      error: "--requirements is all, none, or some of browser, desktop, claude, codex (comma-separated).",
+    });
+  });
+
+  test("checked where the runner looks for each; system mode's installer brings the browser and screens itself", () => {
+    const has = (paths: string[]) => (p: string) => paths.includes(p);
+    const nothing = checkRequirements({ mac: false, simple: true, arch: "arm64", exists: has([]) });
+    expect(nothing.map((c) => [c.id, c.present, c.withComputer])).toEqual([
+      ["browser", false, false],
+      ["desktop", false, false],
+      ["claude", false, false],
+      ["codex", false, false],
+    ]);
+    expect(nothing[0]?.label).toStartWith("Chromium");
+    expect(askableRequirements(nothing).map((c) => c.id)).toEqual(all);
+    // Ubuntu's snap Chromium on ARM, the screens' packages and Claude Code there already.
+    const some = checkRequirements({
+      mac: false,
+      simple: true,
+      arch: "arm64",
+      exists: has(["/snap/bin/chromium", "/usr/bin/Xtigervnc", "/usr/bin/xfce4-session", "/usr/local/bin/claude"]),
+    });
+    expect(askableRequirements(some).map((c) => c.id)).toEqual(["codex"]);
+    // On x86_64 only Google Chrome counts.
+    const x64 = checkRequirements({ mac: false, simple: true, arch: "x64", exists: has(["/usr/bin/chromium"]) });
+    expect(x64[0]).toMatchObject({ present: false, label: expect.stringMatching(/^Google Chrome/) });
+    // System mode: only the coding CLIs are asked about.
+    const system = checkRequirements({ mac: false, simple: false, arch: "x64", exists: has([]) });
+    expect(askableRequirements(system).map((c) => c.id)).toEqual(["claude", "codex"]);
+    expect(checkRequirements({ mac: true, simple: false, arch: "arm64", exists: has([]) })).toEqual([]);
+  });
+
+  test("Ubuntu (no BPF_FRAMEWORK) is offered simple mode, yes by default where there's room and apt", () => {
+    const ubuntu: ThisMachine = {
+      platform: "linux",
+      arch: "arm64",
+      memory: 24 * 1024 ** 3,
+      root: true,
+      systemd: true,
+      bpf: false,
+      apt: true,
+      connected: false,
+    };
+    expect(computerOffer(ubuntu, null, false)).toEqual({ mac: false, simple: true, yes: true, why: null });
+    const decided = decideComputer({
+      offer: computerOffer(ubuntu, null, false),
+      content: null,
+      installed: null,
+      answers: { on: true },
+      server: "http://127.0.0.1:3000",
+      tokenFile: "/opt/agentes/host-computer-token",
+    });
+    expect("plan" in decided && decided.plan).toMatchObject({
+      state: "on",
+      simple: true,
+      commands: true,
+      install: { user: "agentes", args: expect.not.arrayContaining(["--system"]) },
+    });
+    // Still root and systemd: simple mode makes its user and runs its service.
+    expect(computerOffer({ ...ubuntu, root: false }, null, false)).toMatchObject({ problem: { check: "computer" } });
   });
 });

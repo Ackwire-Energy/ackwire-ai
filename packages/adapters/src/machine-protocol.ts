@@ -960,6 +960,24 @@ export const CHROME_DOWNLOAD_URL = "https://www.google.com/chrome/";
 export const CHROME_NEEDED = `The agents' browser needs Google Chrome, which this computer doesn't have: install it from ${CHROME_DOWNLOAD_URL}`;
 
 /**
+ * Linux on ARM, where Google makes no Chrome, runs the distribution's Chromium instead (ADR 0153): Debian's package
+ * (`/usr/bin/chromium`), else Ubuntu's snap (`/snap/bin/chromium`), Ubuntu having no Chromium package of its own.
+ */
+export const CHROMIUM_LINUX = ["/usr/bin/chromium", "/snap/bin/chromium"] as const;
+
+/** Whether this computer's agents' browser is Chromium (`CHROMIUM_LINUX`) rather than Google Chrome (ADR 0153). */
+export const usesChromium = (platform: string = process.platform, arch: string = process.arch) =>
+  platform === "linux" && arch === "arm64";
+
+/** `CHROME_NEEDED` on Linux on ARM (`usesChromium`). */
+export const CHROMIUM_NEEDED =
+  "The agents' browser needs Chromium, which this computer doesn't have (Google makes no Chrome for Linux on ARM): install it with sudo apt install chromium (Debian) or sudo snap install chromium (Ubuntu)";
+
+/** What a runner's update or install says on this computer without its browser (`CHROME_NEEDED`, `CHROMIUM_NEEDED`). */
+export const browserNeeded = (platform: string = process.platform, arch: string = process.arch) =>
+  usesChromium(platform, arch) ? CHROMIUM_NEEDED : CHROME_NEEDED;
+
+/**
  * What the agent is told, in plain words, when the computer's Google Chrome fails it (a `browser_unavailable` error,
  * whose message starts with one of these): missing (`missingServer` where root installs it), not starting (more may
  * follow: the libraries it lacks), the agent's profile not opening, or Chrome older than the one that last opened the
@@ -968,6 +986,9 @@ export const CHROME_NEEDED = `The agents' browser needs Google Chrome, which thi
  */
 export const CHROME_FAILURES = {
   missing: "Google Chrome isn't installed on this computer. Install it from google.com/chrome, then try again.",
+  /** `missing` on Linux on ARM (`usesChromium`): the same start, so `chromeFailureKind` reads it as missing. */
+  missingChromium:
+    "Google Chrome isn't installed on this computer, and Google makes none for Linux on ARM: install Chromium on it (sudo apt install chromium on Debian, sudo snap install chromium on Ubuntu), then try again.",
   missingServer:
     "Google Chrome isn't installed on this computer. Its admin should run the agentes.chat installer on it again.",
   start: "Google Chrome didn't start on this computer.",

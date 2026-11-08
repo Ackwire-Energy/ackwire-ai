@@ -227,10 +227,11 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // The site knows it is in the app and on which system (its own title bar, sign-in through the
         // browser, the device's name in its words), that `this_mac` takes `servers` and `files` (older apps
         // refuse them, so the sign-in's other server and Storage's "Show the folder" show only where this says
-        // so), and that a connector's sign-in and the window's own browser sign-in come back here (`deep_link.rs`,
-        // older apps don't take them); nothing else.
+        // so), that a connector's sign-in and the window's own browser sign-in come back here (`deep_link.rs`,
+        // older apps don't take them), and that it lists the other servers' workspaces (`workspaces`,
+        // ADR 0154); nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true, workspaces: true }});"
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
@@ -745,6 +746,17 @@ fn checked(request: &Value) -> Result<Value, String> {
         Some("requests") => Ok(json!({ "kind": "requests" })),
         Some("signIn") => Ok(json!({ "kind": "signIn" })),
         Some("servers") => Ok(json!({ "kind": "servers" })),
+        // Every server's workspaces (ADR 0154): the app reads them; the page asks nothing of its own.
+        Some("workspaces") => Ok(json!({ "kind": "workspaces" })),
+        Some("addWorkspace") => Ok(json!({ "kind": "addWorkspace" })),
+        // A workspace of another server of the app's list: only its origin and the workspace's id.
+        Some("openWorkspace") => {
+            let server = text("server").unwrap_or_default();
+            if servers::origin_of(server).as_deref() != Some(server) {
+                return Err("bad server".into());
+            }
+            Ok(json!({ "kind": "openWorkspace", "server": server, "orgId": org()? }))
+        }
         // The folder is the app's to know: the page names none.
         Some("files") => Ok(json!({ "kind": "files" })),
         Some("connect") => {
@@ -848,8 +860,14 @@ fn notice_fits(sent: &mut VecDeque<Instant>, now: Instant) -> bool {
 }
 
 fn notify(app: &AppHandle, request: &Value, site: &Url) {
-    let in_front = app.get_window(LABEL).and_then(|w| w.is_focused().ok()).unwrap_or(false);
     let Ok(url) = site.join(request["path"].as_str().unwrap_or("/")) else { return };
+    notice(app, request["title"].as_str().unwrap_or_default(), request["body"].as_str().unwrap_or_default(), url);
+}
+
+/// A notification with the site's limits: `url` (a page of a server of the app's list, the one open or another,
+/// ADR 0154) opens when the app comes back within 30 seconds.
+pub fn notice(app: &AppHandle, title: &str, body: &str, url: Url) {
+    let in_front = app.get_window(LABEL).and_then(|w| w.is_focused().ok()).unwrap_or(false);
     {
         let notices = app.state::<Notices>();
         let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
@@ -858,17 +876,14 @@ fn notify(app: &AppHandle, request: &Value, site: &Url) {
         }
         state.pending = Some((url, Instant::now()));
     }
-    let _ = app
-        .notification()
-        .builder()
-        .title(request["title"].as_str().unwrap_or_default())
-        .body(request["body"].as_str().unwrap_or_default())
-        .show();
+    let _ = app.notification().builder().title(title).body(body).show();
 }
 
-/// The main window came to the front: within 30 seconds of a notification, its page.
+/// The main window came to the front: within 30 seconds of a notification, its page (on its server, which
+/// becomes the one open); and the other servers' workspaces are read again.
 pub fn focused(app: &AppHandle) {
     keep_lights(app);
+    crate::workspaces::on_focus(app);
     let pending = {
         let notices = app.state::<Notices>();
         let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
@@ -876,7 +891,11 @@ pub fn focused(app: &AppHandle) {
     };
     if let Some((url, at)) = pending {
         if at.elapsed() <= NOTIFY_OPENS_FOR {
-            let _ = open(app, Some(url));
+            let app = app.clone();
+            // Another server's page loads the window anew: not from inside the focus event.
+            std::thread::spawn(move || {
+                let _ = show_url(&app, url);
+            });
         }
     }
 }
@@ -977,6 +996,32 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
         // Only a window of the app's own: the person picks and confirms the server there.
         Some("servers") => {
             crate::present(&app, "welcome")?;
+            return Ok(json!({}));
+        }
+        // The other servers' workspaces, as last read (the page's own server lists its own).
+        Some("workspaces") => {
+            if crate::workspaces::stale(&app) {
+                crate::workspaces::trigger(&app);
+            }
+            let others: Vec<_> = crate::workspaces::list(&app).into_iter().filter(|s| s.server != origin).collect();
+            return Ok(json!({ "servers": others }));
+        }
+        // "Add a workspace": the welcome window, in that mode.
+        Some("addWorkspace") => {
+            *app.state::<crate::workspaces::WelcomeMode>().0.lock().unwrap_or_else(|e| e.into_inner()) = Some("add");
+            crate::present(&app, "welcome")?;
+            return Ok(json!({}));
+        }
+        // A workspace on another server of the list: the window goes there (already signed in, its cookies).
+        Some("openWorkspace") => {
+            let server = request["server"].as_str().unwrap_or_default();
+            if !servers::get(&app).servers.iter().any(|s| s == server) {
+                return Err("not a server of this app".into());
+            }
+            let url: Url = format!("{server}/org/{}", request["orgId"].as_str().unwrap_or_default())
+                .parse()
+                .map_err(|_| "not a URL")?;
+            show_url(&app, url)?;
             return Ok(json!({}));
         }
         _ => {}
@@ -1192,6 +1237,24 @@ mod tests {
             Ok(json!({ "kind": "files" }))
         );
         assert!(checked(&json!({ "kind": "runner_send" })).is_err());
+    }
+
+    #[test]
+    fn workspaces_across_servers() {
+        assert_eq!(checked(&json!({ "kind": "workspaces", "server": "x" })), Ok(json!({ "kind": "workspaces" })));
+        assert_eq!(checked(&json!({ "kind": "addWorkspace", "page": "/x" })), Ok(json!({ "kind": "addWorkspace" })));
+        assert_eq!(
+            checked(&json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "o-1", "path": "/x" })),
+            Ok(json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "o-1" }))
+        );
+        for bad in [
+            json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br/org/x", "orgId": "o-1" }),
+            json!({ "kind": "openWorkspace", "server": "http://evil.example", "orgId": "o-1" }),
+            json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "../x" }),
+            json!({ "kind": "openWorkspace", "orgId": "o-1" }),
+        ] {
+            assert!(checked(&bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

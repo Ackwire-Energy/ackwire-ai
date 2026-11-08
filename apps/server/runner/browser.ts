@@ -1,7 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -25,12 +34,14 @@ import {
   type BrowserViewport,
   browserViewportOf,
   CHROME_FAILURES,
+  CHROMIUM_LINUX,
   type MachineReplies,
   type MachineRequest,
   parseBrowserInputEvent,
   type RunnerBrowserInfo,
   type RunnerFrame,
   SITE_SECRET_TTL_MS,
+  usesChromium,
   type VaultTypeRefusal,
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
@@ -96,7 +107,8 @@ import {
  * - Chrome: Google Chrome stable, the computer's own install at its standard
  *   path (`findChrome`), never a copy of our own: it updates itself the normal
  *   way (Google's apt repository on Linux, Google's updater on macOS and
- *   Windows), with no version pinned. Each agent has its own profile, so the
+ *   Windows), with no version pinned. On Linux on ARM, where Google makes
+ *   none, the distribution's Chromium (ADR 0153). Each agent has its own profile, so the
  *   person's own Chrome profile is never touched, and our Chrome never starts
  *   Google's updater itself (`--disable-updater-scheduler`: macOS blamed our
  *   app for it, "agentes was prevented from modifying apps"). A new version on
@@ -477,11 +489,15 @@ export function isWebPage(url: string): boolean {
   }
 }
 
-/** Where Google Chrome stable installs itself, in the order looked at. */
+/**
+ * Where Google Chrome stable installs itself, in the order looked at. On Linux on ARM, where Google makes no Chrome,
+ * the distribution's Chromium after it (`CHROMIUM_LINUX`, ADR 0153).
+ */
 export function chromeCandidates(
   home: string = os.homedir(),
   platform: string = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  arch: string = process.arch,
 ): string[] {
   if (platform === "darwin") {
     const app = path.join("Google Chrome.app", "Contents", "MacOS", "Google Chrome");
@@ -492,17 +508,28 @@ export function chromeCandidates(
       .filter((dir): dir is string => !!dir)
       .map((dir) => path.win32.join(dir, "Google", "Chrome", "Application", "chrome.exe"));
   }
-  return [GOOGLE_CHROME_LINUX];
+  return usesChromium(platform, arch) ? [GOOGLE_CHROME_LINUX, ...CHROMIUM_LINUX] : [GOOGLE_CHROME_LINUX];
 }
 
-/** The computer's Google Chrome, or null when it has none. */
+/** The computer's Google Chrome (Chromium on Linux on ARM), or null when it has none. */
 export function findChrome(
   home: string = os.homedir(),
   platform: string = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  arch: string = process.arch,
 ): string | null {
-  return chromeCandidates(home, platform, env).find((exe) => existsSync(exe)) ?? null;
+  return chromeCandidates(home, platform, env, arch).find((exe) => existsSync(exe)) ?? null;
 }
+
+/** What people call the browser at `exe`: "Chromium" for one of `CHROMIUM_LINUX`, else "Google Chrome". */
+export const chromeName = (exe: string) =>
+  (CHROMIUM_LINUX as readonly string[]).includes(exe) ? "Chromium" : "Google Chrome";
+
+/**
+ * Whether the browser at `exe` is a snap (Ubuntu's Chromium), which reads no hidden folder at the top of the home
+ * (`~/.agentes-runner` included), so its agents' start pages go in their own folders (`agentStartDir`).
+ */
+export const confinedChrome = (exe: string | null) => !!exe?.startsWith("/snap/");
 
 const VERSION = /^\d+\.\d+\.\d+\.\d+$/;
 
@@ -660,6 +687,20 @@ export function chromeEnv(on: ChromeDisplay, base: NodeJS.ProcessEnv = process.e
     if (v !== undefined && k !== "WAYLAND_DISPLAY" && k !== "DBUS_SESSION_BUS_ADDRESS") env[k] = v;
   }
   return { ...env, DISPLAY: `:${on.display}`, XAUTHORITY: on.xauthority };
+}
+
+/**
+ * `on` for a snap's Chromium (`confinedChrome`): it can't read the desktop's Xauthority under the runner's hidden
+ * home, so it gets a copy beside the agent's profile (`.agentes/Xauthority`, owner only), made at each start since the
+ * desktop writes a new one when it starts again (ADR 0153 §2).
+ */
+export function readableDisplay(on: ChromeDisplay, folder: string): ChromeDisplay {
+  const dir = path.join(folder, path.dirname(AGENT_BROWSER_PROFILE));
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const xauthority = path.join(dir, "Xauthority");
+  copyFileSync(on.xauthority, xauthority);
+  chmodSync(xauthority, 0o600);
+  return { ...on, xauthority };
 }
 
 /** The version of Chrome that last ran on `profile` (its `extensions.last_chrome_version`), or null. */
@@ -1657,8 +1698,9 @@ export class BrowserManager {
         reason: `The agent browser doesn't run on this system (${process.platform} ${process.arch})`,
       };
     }
-    const chrome = this.chrome()
-      ? { chrome: version ? `Google Chrome ${version}` : "Google Chrome" }
+    const exe = this.chrome();
+    const chrome = exe
+      ? { chrome: version ? `${chromeName(exe)} ${version}` : chromeName(exe) }
       : { chromeMissing: true as const };
     if (recent) return { available: false, version: AGENT_BROWSER_VERSION, reason: recent.reason, ...chrome };
     return { available: true, version: AGENT_BROWSER_VERSION, ...chrome };
@@ -2371,7 +2413,16 @@ export class BrowserManager {
     if (this.closed) throw new RunnerError("browser_unavailable", "The runner is stopping");
     const agentId = String(agent.id ?? "");
     const existing = this.sessions.get(agentId);
-    if (existing) {
+    if (existing && existing.folder !== folder) {
+      // Its folder moved (its handle changed): commands would run in a folder that's gone, so this session closes and
+      // one opens in the new folder, its profile moved along with it.
+      this.opts.log(`the browser of ${agent.handle} moves to its renamed folder`);
+      this.sessions.delete(agentId);
+      // Run from the folder that exists now: the old one is gone.
+      existing.folder = folder;
+      await this.run(existing, ["close"], { timeoutMs: QUICK_TIMEOUT_MS }).catch(() => undefined);
+      await this.stopChrome(existing);
+    } else if (existing) {
       existing.lastUsed = this.now();
       return existing;
     }
@@ -2475,7 +2526,11 @@ export class BrowserManager {
       if (!exe) {
         throw new RunnerError(
           "browser_unavailable",
-          this.opts.installedByRoot ? CHROME_FAILURES.missingServer : CHROME_FAILURES.missing,
+          this.opts.installedByRoot
+            ? CHROME_FAILURES.missingServer
+            : usesChromium()
+              ? CHROME_FAILURES.missingChromium
+              : CHROME_FAILURES.missing,
         );
       }
       const version = this.diskVersion(true);
@@ -2492,11 +2547,7 @@ export class BrowserManager {
         prepareProfile(profile);
         const startPage = this.opts.startPageDirectory
           ? path.join(this.opts.startPageDirectory, START_FILE)
-          : prepareStartPage(
-              path.join(this.opts.home, "start", agentFolderName(agent).suffix),
-              agent,
-              this.opts.startPageData?.(agent),
-            );
+          : prepareStartPage(this.startDir(agent, session.folder, exe), agent, this.opts.startPageData?.(agent));
         await forgetTabs(profile);
         const args = chromeLaunchArgs(
           version,
@@ -2510,7 +2561,8 @@ export class BrowserManager {
           this.opts.privateNetwork?.(),
         );
         try {
-          const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
+          const display = on && confinedChrome(exe) ? readableDisplay(on, session.folder) : on;
+          const started = await start(exe, args, profile, display ? chromeEnv(display) : undefined);
           if (on) started.display = on.display;
           return started;
         } catch (err) {
@@ -2819,7 +2871,10 @@ export class BrowserManager {
     }
     if (!s.chrome || this.closed) return;
     const lastUsed = s.lastUsed;
-    this.opts.log(`the browser of ${s.name} restarts on Google Chrome ${version} (was ${s.version ?? "unknown"})`);
+    const exe = this.chrome();
+    this.opts.log(
+      `the browser of ${s.name} restarts on ${exe ? chromeName(exe) : "Chrome"} ${version} (was ${s.version ?? "unknown"})`,
+    );
     await this.ensureOwnChrome(s.agent, s, s.chrome.display !== undefined, s.allowed ?? [], false, undefined, true);
     s.lastUsed = lastUsed;
   }
@@ -3716,11 +3771,22 @@ export class BrowserManager {
     };
   }
 
+  /**
+   * The folder of the agent's start page: under the runner's home, or, for a snap's Chromium (`confinedChrome`), which
+   * can't read that hidden folder, beside its profile in the agent's own folder (`.agentes/start`).
+   */
+  private startDir(agent: AgentScope, folder: string, exe: string | null = this.chrome()): string {
+    return confinedChrome(exe)
+      ? path.join(folder, path.dirname(AGENT_BROWSER_PROFILE), "start")
+      : path.join(this.opts.home, "start", agentFolderName(agent).suffix);
+  }
+
   updateStartPages() {
     if (this.opts.startPageDirectory) return;
+    const exe = this.chrome();
     for (const session of this.sessions.values()) {
       prepareStartPage(
-        path.join(this.opts.home, "start", agentFolderName(session.agent).suffix),
+        this.startDir(session.agent, session.folder, exe),
         session.agent,
         this.opts.startPageData?.(session.agent),
       );

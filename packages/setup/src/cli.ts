@@ -7,6 +7,7 @@ import { spawn, spawnSync } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import {
   chmodSync,
+  chownSync,
   closeSync,
   existsSync,
   openSync,
@@ -21,12 +22,14 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import {
   appOnThisMachine,
+  askableRequirements,
   COMPOSE_FILES,
   COMPOSE_URL,
   COMPUTER_PROBLEMS,
   COMPUTER_WAIT_S,
   type ComputerPlan,
   checkJevKey,
+  checkRequirements,
   computerFiles,
   computerOffer,
   computerUpToDate,
@@ -74,8 +77,17 @@ import {
   planSteps,
   privateStart,
   qrCode,
+  REQUIREMENTS,
+  type Requirement,
+  type RequirementCheck,
   readTailscaleStatus,
+  requirementsCommand,
   resolveChoice,
+  SIMPLE_HOME,
+  SIMPLE_MODE_WHY,
+  SIMPLE_RUNNER_HOME,
+  SIMPLE_TOKEN_FILE,
+  SIMPLE_USER,
   SYSTEM_RUNNER_HOME,
   secretEntries,
   senderAt,
@@ -123,7 +135,10 @@ It asks only for what it needs and fills in only what's missing, so running it a
                                       and 4 GB of memory or more.
   --computer-commands <yes|no>        Whether agents may run commands there (default no on a Mac,
                                       where they work as you, and yes on Linux, where each agent is
-                                      its own user)
+                                      its own user). Linux without BPF_FRAMEWORK (Ubuntu) offers simple
+                                      mode instead: every agent as the user ${SIMPLE_USER}, without sudo
+  --requirements <all|none|list>      What to install there for the agents when missing, without
+                                      asking: ${REQUIREMENTS.join(", ")} (default: asked, yes each)
   --telemetry <on|off>                Send anonymous usage statistics to agentes.chat (default on)
   --typesafe-key <key>                TypeSafe key for Jev, optional (${TYPESAFE_KEYS})
   --no-start                          Write .env and docker-compose.yml, start nothing
@@ -700,19 +715,23 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   const email = await emailEntries(opts, ui, preset, content, network, domain, entries);
 
   const mac = process.platform === "darwin";
-  const files = computerFiles(mac, homedir(), RUNNER_HOME);
   const machine: ThisMachine = {
     platform: process.platform,
+    arch: process.arch,
     memory: totalmem(),
     root: process.getuid?.() === 0,
     systemd: existsSync("/run/systemd/system"),
     bpf: /\+BPF_FRAMEWORK\b/.test(spawnSync("systemctl", ["--version"], { encoding: "utf8" }).stdout ?? ""),
     apt: spawnSync("sh", ["-c", "command -v apt-get"], { stdio: "ignore" }).status === 0,
-    connected: connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))),
+    connected:
+      connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))) ||
+      (!mac && connectedConfig(readOrNull(join(SIMPLE_RUNNER_HOME, "config.json")))),
   };
+  const offer = computerOffer(machine, content, image);
+  const files = computerFiles(mac, homedir(), RUNNER_HOME, !("problem" in offer) && offer.simple);
   const asked = listQuestions ? questions : null;
   const computer = await chooseComputer(opts, ui, {
-    offer: computerOffer(machine, content, image),
+    offer,
     content,
     installed: installedCommands(readOrNull(files.service)),
     server: appOnThisMachine(content),
@@ -720,6 +739,11 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     questions: asked,
     entries,
   });
+  const checks =
+    computer.state === "on"
+      ? checkRequirements({ mac: computer.mac, simple: computer.simple, arch: process.arch, exists: existsSync })
+      : [];
+  const requirements = await chooseRequirements(opts, ui, checks, asked);
   const telemetry = await chooseTelemetry(opts, ui, content, asked, entries);
   // Checked with TypeSafe before anything is written: a key it refuses stops the setup here.
   const jev = await jevStep({ flag: opts.typesafeKey, content, dryRun: opts.dryRun, check: (key) => checkJevKey(key) });
@@ -727,7 +751,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   Object.assign(entries, jev.entries);
   if (jev.said?.ok) ui.ok(jev.said.text);
   else if (jev.said) ui.warn(jev.said.text);
-  const choices: Choices = { computer, telemetry: telemetry.value, jev: jev.value };
+  const choices: Choices = { computer, requirements, telemetry: telemetry.value, jev: jev.value };
 
   const plan = planSteps({
     docker: dockerCheck && "problem" in dockerCheck ? `${dockerCheck.problem.error} ${dockerCheck.problem.fix}` : null,
@@ -742,6 +766,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     domain,
     email,
     computer,
+    requirements: { present: checks.filter((c) => c.present).map((c) => c.id), install: requirements },
     telemetry,
     jev: jev.value,
     compose: composeFile,
@@ -796,11 +821,18 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
 /** What this run decided beyond the way in, carried to the end. */
 interface Choices {
   computer: ComputerPlan;
+  /** What the run installs for the agents (`--requirements`). */
+  requirements: Requirement[];
   telemetry: OnOff;
   jev: JevChoice;
 }
 
-const results = (c: Choices) => ({ computer: c.computer.state, telemetry: c.telemetry, jev: c.jev });
+const results = (c: Choices) => ({
+  computer: c.computer.state,
+  requirements: c.requirements,
+  telemetry: c.telemetry,
+  jev: c.jev,
+});
 
 /** A file readable by its owner only, like .env. */
 function saveSecret(file: string, content: string) {
@@ -845,26 +877,31 @@ async function chooseComputer(
       return next.plan;
     }
     const mac = !("problem" in c.offer) && c.offer.mac;
+    const simple = !("problem" in c.offer) && c.offer.simple;
     if (next.ask === "computer") {
       const why = !mac && !("problem" in c.offer) && c.offer.why ? [c.offer.why] : [];
       answers.on = await yesOrNo(
         ui,
         c.questions,
-        `${mac ? "this Mac" : "this machine"} as your agents' computer`,
+        `${mac ? "this Mac" : "this machine"} as your agents' computer${simple ? ` (simple mode: every agent as the user ${SIMPLE_USER})` : ""}`,
         next.yes,
         () =>
           ui.confirm(
             "Agents' computer",
             mac
               ? "Use this Mac as your agents' computer? They work as you, in folders of their own."
-              : "Use this machine as your agents' computer?",
+              : simple
+                ? "Use this machine as your agents' computer, in simple mode?"
+                : "Use this machine as your agents' computer?",
             next.yes,
             mac
               ? ["Agents need a computer to work on: a browser and a folder each. This Mac can be it."]
-              : [
-                  "Agents need a computer to work on: their own screen, a browser and a folder each. This machine can be it. Each agent gets a user of its own here, with about 0.2 GB of memory for its screen (0.6 GB more while its browser is open).",
-                  ...why,
-                ],
+              : simple
+                ? [...SIMPLE_MODE_WHY, ...why]
+                : [
+                    "Agents need a computer to work on: their own screen, a browser and a folder each. This machine can be it. Each agent gets a user of its own here, with about 0.2 GB of memory for its screen (0.6 GB more while its browser is open).",
+                    ...why,
+                  ],
           ),
       );
     } else {
@@ -875,6 +912,32 @@ async function chooseComputer(
       );
     }
   }
+}
+
+/**
+ * What the agents need here (`checkRequirements`): what's there is said, and each missing one the computer's own
+ * installer doesn't bring is asked about, yes by default (`--requirements` answers all; without a terminal, yes).
+ */
+async function chooseRequirements(
+  opts: Options,
+  ui: Ui,
+  checks: RequirementCheck[],
+  questions: string[] | null,
+): Promise<Requirement[]> {
+  if (checks.length === 0) return [];
+  const askable = askableRequirements(checks);
+  if (opts.requirements) return askable.filter((c) => opts.requirements?.includes(c.id)).map((c) => c.id);
+  const present = checks.filter((c) => c.present);
+  if (present.length && !questions)
+    ui.ok(`Already here for the agents: ${present.map((c) => c.label.split(" (")[0]).join(", ")}`);
+  const chosen: Requirement[] = [];
+  for (const c of askable) {
+    const yes = await yesOrNo(ui, questions, `install ${c.label}`, true, () =>
+      ui.confirm("For the agents", `Install ${c.label}?`, true),
+    );
+    if (yes) chosen.push(c.id);
+  }
+  return chosen;
 }
 
 /** The usage statistics, as `decideTelemetry` says: asked once, then .env keeps `TELEMETRY=on|off`. */
@@ -1351,20 +1414,90 @@ const succeeds = (command: string, args: string[]) =>
  * `COMPUTER_WAIT_S` for its first answer to the server, read from its own log. Not answering yet is a
  * warning: it keeps trying on its own. One kept from an earlier run is left alone while it's up to date.
  */
-async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "on" }>) {
+/**
+ * Simple mode's user (`SIMPLE_USER`): made when missing (no sudo, no password), its services kept running without a
+ * login (`loginctl enable-linger`), and given its own copy of the token. Returns its uid.
+ */
+async function prepareSimpleUser(): Promise<number> {
+  const idOf = (flag: string) => Number(spawnSync("id", [flag, SIMPLE_USER], { encoding: "utf8" }).stdout.trim());
+  if (!succeeds("id", ["-u", SIMPLE_USER])) {
+    const made = await exec("useradd", ["-m", "-d", SIMPLE_HOME, "-s", "/bin/bash", SIMPLE_USER], 30_000);
+    if (made.code !== 0) {
+      throw new SetupError({
+        check: "computer.user",
+        error: `Making the user ${SIMPLE_USER} failed: ${lastLine(made.stderr)}`,
+        fix: `Make it yourself (useradd -m -s /bin/bash ${SIMPLE_USER}), then run the setup again: agentes.chat itself is up.`,
+      });
+    }
+  }
+  const uid = idOf("-u");
+  const gid = idOf("-g");
+  const linger = await exec("loginctl", ["enable-linger", SIMPLE_USER], 30_000);
+  const bus = `/run/user/${uid}/bus`;
+  for (let i = 0; i < 30 && !existsSync(bus); i++) await sleep(500);
+  if (linger.code !== 0 || !existsSync(bus)) {
+    throw new SetupError({
+      check: "computer.user",
+      error: `The user ${SIMPLE_USER}'s services didn't start (loginctl enable-linger ${SIMPLE_USER}): ${lastLine(linger.stderr) || `no ${bus}`}`,
+      fix: "Check that systemd-logind runs here, then run the setup again: agentes.chat itself is up.",
+    });
+  }
+  writeFileSync(SIMPLE_TOKEN_FILE, readFileSync(join(process.cwd(), HOST_TOKEN_FILE)), { mode: 0o600 });
+  chmodSync(SIMPLE_TOKEN_FILE, 0o600);
+  chownSync(SIMPLE_TOKEN_FILE, uid, gid);
+  return uid;
+}
+
+async function setUpComputer(
+  ui: Ui,
+  computer: Extract<ComputerPlan, { state: "on" }>,
+  requirements: Requirement[] = [],
+) {
   const what = computer.mac ? "this Mac" : "this machine";
-  const files = computerFiles(computer.mac, homedir(), RUNNER_HOME);
-  // Its unit's journal on Linux, its log file on a Mac: since a time or an offset, or the latest lines.
+  const files = computerFiles(computer.mac, homedir(), RUNNER_HOME, computer.simple);
+  // Its unit's journal on Linux (the user unit's in simple mode), its log file on a Mac: since a time or an offset,
+  // or the latest lines.
+  const unit = computer.simple ? [`_SYSTEMD_USER_UNIT=${HOST_SERVICE}.service`] : ["-u", HOST_SERVICE];
   const log = async (since: { at: number; offset: number } | null) =>
     files.log
       ? readFrom(files.log, since ? since.offset : null)
       : (
           await exec(
             "journalctl",
-            ["-u", HOST_SERVICE, "-o", "cat", "--no-pager", ...(since ? ["--since", `@${since.at}`] : ["-n", "1000"])],
+            [...unit, "-o", "cat", "--no-pager", ...(since ? ["--since", `@${since.at}`] : ["-n", "1000"])],
             10_000,
           )
         ).stdout;
+  let script: string | null = null;
+  const installer = async () => {
+    if (script !== null) return script;
+    try {
+      const response = await fetch(computer.install.script, { signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      script = await response.text();
+      return script;
+    } catch (error) {
+      throw new SetupError({
+        check: "computer.install",
+        error: `Couldn't download the agents' computer's installer from ${computer.install.script}: ${(error as Error).message}`,
+        fix: "Run the setup again: agentes.chat itself is up.",
+      });
+    }
+  };
+  // What the agents need, first: as root, whatever mode they run in.
+  if (requirements.length) {
+    ui.wait(`Installing for the agents: ${requirements.join(", ")}`, "A few minutes the first time.");
+    const run = await streamed(ui, "sh", ["-s", "--", "--requirements", requirements.join(",")], await installer());
+    if (run.code !== 0) {
+      showTail(ui, run.output);
+      throw new SetupError({
+        check: "computer.requirements",
+        error: `Installing what the agents need failed: ${lastLine(run.output)}`,
+        fix: `Fix what the output above says, then run the setup again (or ${requirementsCommand(computer.install, requirements)}): agentes.chat itself is up.`,
+      });
+    }
+    ui.ok(`Installed for the agents: ${requirements.join(", ")}`);
+  }
   if (computer.kept) {
     ui.wait(`Checking ${what} as your agents' computer`);
     const served = await fetch(`${computer.install.server}/runner/agentes-runner.mjs`, {
@@ -1374,7 +1507,9 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
       .catch(() => null);
     const running = computer.mac
       ? succeeds("launchctl", ["print", `gui/${process.getuid?.() ?? 0}/${HOST_LAUNCHD_LABEL}`])
-      : succeeds("systemctl", ["is-active", "--quiet", HOST_SERVICE]);
+      : computer.simple
+        ? succeeds("systemctl", ["--user", "-M", `${SIMPLE_USER}@`, "is-active", "--quiet", HOST_SERVICE])
+        : succeeds("systemctl", ["is-active", "--quiet", HOST_SERVICE]);
     const state = hostState(await log(null));
     if (computerUpToDate({ kept: true, running, state, installed: readOrNull(files.bundle), served })) {
       ui.ok(`Agents' computer: ${what}`);
@@ -1383,25 +1518,41 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
   }
   ui.wait(
     `Setting up ${what} for your agents`,
-    computer.mac ? null : "A user and a screen for each, and the packages they need: a few minutes the first time.",
+    computer.mac
+      ? null
+      : computer.simple
+        ? `In simple mode, as the user ${SIMPLE_USER}.`
+        : "A user and a screen for each, and the packages they need: a few minutes the first time.",
   );
   const since = {
     at: Math.floor(Date.now() / 1000),
     offset: files.log && existsSync(files.log) ? statSync(files.log).size : 0,
   };
-  let script: string;
-  try {
-    const response = await fetch(computer.install.script, { signal: AbortSignal.timeout(30_000) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    script = await response.text();
-  } catch (error) {
-    throw new SetupError({
-      check: "computer.install",
-      error: `Couldn't download the agents' computer's installer from ${computer.install.script}: ${(error as Error).message}`,
-      fix: "Run the setup again: agentes.chat itself is up.",
-    });
+  const text = await installer();
+  let run: { code: number | null; output: string };
+  if (computer.simple) {
+    const uid = await prepareSimpleUser();
+    run = await streamed(
+      ui,
+      "runuser",
+      [
+        "-u",
+        SIMPLE_USER,
+        "--",
+        "env",
+        `HOME=${SIMPLE_HOME}`,
+        `XDG_RUNTIME_DIR=/run/user/${uid}`,
+        `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid}/bus`,
+        "sh",
+        "-s",
+        "--",
+        ...computer.install.args,
+      ],
+      text,
+    );
+  } else {
+    run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], text);
   }
-  const run = await streamed(ui, "sh", ["-s", "--", ...computer.install.args], script);
   if (run.code !== 0) {
     showTail(ui, run.output);
     throw new SetupError({
@@ -1415,12 +1566,12 @@ async function setUpComputer(ui: Ui, computer: Extract<ComputerPlan, { state: "o
   for (;;) {
     const state = hostState(await log(since));
     if (state === "on") {
-      ui.ok(`Agents' computer: ${what}`);
+      ui.ok(`Agents' computer: ${what}${computer.simple ? ` (simple mode, as ${SIMPLE_USER})` : ""}`);
       return;
     }
     if (state === "off" || state === "refused" || state === "no_token") throw new SetupError(COMPUTER_PROBLEMS[state]);
     if (Date.now() > deadline) {
-      const where = files.log ?? `journalctl -u ${HOST_SERVICE}`;
+      const where = files.log ?? `journalctl ${unit.join(" ")}`;
       ui.warn(`Agents' computer: set up, but it hasn't answered agentes.chat yet. It keeps trying. Its log: ${where}`);
       return;
     }
@@ -1440,7 +1591,7 @@ async function finish(
   let failed: Problem | null = null;
   if (choices?.computer.state === "on") {
     try {
-      await setUpComputer(ui, choices.computer);
+      await setUpComputer(ui, choices.computer, choices.requirements);
     } catch (error) {
       if (!(error instanceof SetupError)) throw error;
       failed = error.problem;

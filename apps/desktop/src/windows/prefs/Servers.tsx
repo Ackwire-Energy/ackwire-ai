@@ -3,7 +3,14 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { isHereServer, type LocalServerStatus, type ReachStage, type ServeProblem } from "../../control/local-server";
-import { homeServer, type ServerKind, type ServerList, serverKind, serverName } from "../../control/server";
+import {
+  homeServer,
+  type ServerKind,
+  type ServerList,
+  type ServerWorkspaces,
+  serverKind,
+  serverName,
+} from "../../control/server";
 import { pairedHomes } from "../../control/store";
 import { useLocalServer, useOnShown, useTailnet } from "../../hooks";
 import { ReachProblem, ReachProgress, ReachRow, ServerTile } from "../../ui/here";
@@ -18,7 +25,10 @@ const KIND_SUB: Record<ServerKind, string> = {
   own: "desktop.servers.ownSub",
 };
 
-/** Preferences › Servers: where this app opens agentes.chat. Each keeps its own sign-in (cookies are per origin). */
+/**
+ * Preferences › Servers: where this app opens agentes.chat, each with its workspaces (ADR 0154). Each keeps its own
+ * sign-in (cookies are per origin).
+ */
 export function Servers() {
   const { t } = useTranslation();
   const host = useHost();
@@ -26,15 +36,21 @@ export function Servers() {
   const snap = useSnapshot();
   const toast = useToast();
   const [list, setList] = useState<ServerList>({ current: null, servers: [] });
+  const [spaces, setSpaces] = useState<ServerWorkspaces[]>([]);
   const local = useLocalServer();
   const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const read = () =>
+  const read = () => {
     void host
       .servers()
       .then(setList)
       .catch(() => {});
+    void host
+      .workspaces()
+      .then(setSpaces)
+      .catch(() => {});
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: again when the server here's address moves
   useEffect(read, [host, local.publicUrl, local.run]);
   useOnShown("prefs", read);
@@ -80,12 +96,14 @@ export function Servers() {
             {others.map((server) => {
               const kind = serverKind(server);
               const now = server === list.current;
+              const known = spaces.find((s) => s.server === server);
               return (
                 <PrefRow
                   key={server}
                   lead={<ServerTile kind={kind} />}
                   title={serverName(server)}
-                  desc={t(KIND_SUB[kind])}
+                  desc={[t(KIND_SUB[kind]), known && workspacesLine(t, known)].filter(Boolean).join(" · ")}
+                  under={known?.signedIn && known.orgs.length > 0 ? <WorkspaceChips orgs={known.orgs} /> : undefined}
                   end={
                     <>
                       {now ? (
@@ -151,6 +169,26 @@ export function Servers() {
         </DialogFooter>
       </Dialog>
     </>
+  );
+}
+
+/** "2 workspaces", or that the app isn't signed in there. */
+function workspacesLine(t: (key: string, o?: Record<string, unknown>) => string, s: ServerWorkspaces) {
+  return s.signedIn ? t("desktop.servers.workspaces", { count: s.orgs.length }) : t("desktop.servers.signedOut");
+}
+
+/** A server's workspaces under its row, each with its logo and unread count. */
+function WorkspaceChips({ orgs }: { orgs: ServerWorkspaces["orgs"] }) {
+  return (
+    <span className="dk-ws-list">
+      {orgs.map((o) => (
+        <Chip key={o.id}>
+          {o.logo && <img className="dk-ws-logo" src={o.logo} alt="" width={16} height={16} />}
+          {o.name}
+          {o.unread > 0 && <span className="dk-ws-count">{o.unread}</span>}
+        </Chip>
+      ))}
+    </span>
   );
 }
 

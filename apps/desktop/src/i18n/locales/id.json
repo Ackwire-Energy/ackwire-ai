@@ -130,7 +130,11 @@
     "cloud": "Masuk ke agentes.chat",
     "create": "Baru di sini?",
     "createLink": "Buat akun",
-    "own": "Pakai servermu sendiri"
+    "own": "Pakai servermu sendiri",
+    "addTitle": "Tambah ruang kerja",
+    "addLead": "Yang sudah kamu punya tetap di sini, masing-masing dengan login sendiri.",
+    "addCloud": "Buat ruang kerja di agentes.chat",
+    "addOwn": "Pakai server timmu"
   },
   "own": {
     "title": "Servermu sendiri",
@@ -269,7 +273,11 @@
     "removeTitle": "Hapus {{host}} dari aplikasi ini?",
     "removeBody": "Server dan akunmu di sana tetap seperti semula.",
     "removeAgents": "Agen dari ruang kerjanya berhenti bekerja di {{device}} ini.",
-    "removed": "{{host}} dihapus dari aplikasi ini"
+    "removed": "{{host}} dihapus dari aplikasi ini",
+    "workspaces_other": "{{count}} ruang kerja",
+    "signedOut": "Belum masuk",
+    "newsOne": "1 notifikasi baru",
+    "newsMany": "{{n}} notifikasi baru"
   },
   "server": {
     "title": "agentes.chat di {{device}} ini",

@@ -84,6 +84,8 @@ const PROBLEM_HOSTLESS: ReadonlySet<ConnectProblem> = new Set(["invalid"]);
 export function FirstRun() {
   const host = useHost();
   const [screen, setScreen] = useState<FirstScreen>("choose");
+  // Opened by the site's "Add a workspace" (ADR 0154): its first screen says so.
+  const [adding, setAdding] = useState(false);
   const [trail, setTrail] = useState<FirstScreen[]>([]);
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView } | null>(null);
   // This build carries the server (Mac and Linux): "Run agentes.chat on this computer" is offered.
@@ -161,6 +163,17 @@ export function FirstRun() {
     [host, finish],
   );
 
+  // How it opened: taken when it's made, and each time it shows again.
+  const takeMode = useCallback(
+    () =>
+      void host
+        .welcomeMode()
+        .then((mode) => setAdding(mode === "add"))
+        .catch(() => setAdding(false)),
+    [host],
+  );
+  useEffect(takeMode, [takeMode]);
+
   useEffect(() => {
     void host
       .localServer()
@@ -183,6 +196,7 @@ export function FirstRun() {
 
   // Opened again ("Add a server…"): from the start, unless a link or the setup is on screen.
   useOnShown("welcome", () => {
+    takeMode();
     if (screen === "link" || settingUp.current) return;
     setTrail([]);
     setScreen("choose");
@@ -206,7 +220,11 @@ export function FirstRun() {
     <div className="dk-fr" data-screen={screen}>
       <div className="dk-fr__body" key={screen}>
         {screen === "choose" && (
-          <Choose onCloud={(page) => void finish(CLOUD_SERVER, page)} onOwn={() => go(ownServerScreen(canRunHere))} />
+          <Choose
+            adding={adding}
+            onCloud={(page) => void finish(CLOUD_SERVER, page)}
+            onOwn={() => go(ownServerScreen(canRunHere))}
+          />
         )}
         {screen === "own" && <Own onBack={back} onConnect={() => go("connect")} onHere={() => go("here")} />}
         {screen === "connect" && (
@@ -245,8 +263,11 @@ export function FirstRun() {
   );
 }
 
-/** agentes.chat, big; your own server, small. */
-function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: () => void }) {
+/**
+ * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): a new workspace on
+ * agentes.chat is the big one, and the team's server the small one; the workspaces already there stay.
+ */
+function Choose({ adding, onCloud, onOwn }: { adding: boolean; onCloud: (page: string) => void; onOwn: () => void }) {
   const { t } = useTranslation();
   return (
     <>
@@ -254,10 +275,15 @@ function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: ()
         <span className="dk-fr__mark">
           <BrandFace size="xl" />
         </span>
-        <h1>{t("desktop.first.title")}</h1>
-        <p className="dk-lead">{t("desktop.first.lead")}</p>
-        <Button variant="primary" className="dk-btn-lg dk-fr__cloud" autoFocus onClick={() => onCloud("/login")}>
-          {t("desktop.first.cloud")}
+        <h1>{t(adding ? "desktop.first.addTitle" : "desktop.first.title")}</h1>
+        <p className="dk-lead">{t(adding ? "desktop.first.addLead" : "desktop.first.lead")}</p>
+        <Button
+          variant="primary"
+          className="dk-btn-lg dk-fr__cloud"
+          autoFocus
+          onClick={() => onCloud(adding ? "/onboarding" : "/login")}
+        >
+          {t(adding ? "desktop.first.addCloud" : "desktop.first.cloud")}
           <Icon name="arrowRight" size={16} />
         </Button>
         <span className="dk-help">
@@ -268,7 +294,7 @@ function Choose({ onCloud, onOwn }: { onCloud: (page: string) => void; onOwn: ()
         </span>
       </div>
       <button type="button" className="dk-fr__own" onClick={onOwn}>
-        {t("desktop.first.own")}
+        {t(adding ? "desktop.first.addOwn" : "desktop.first.own")}
         <Icon name="chevronRight" size={14} />
       </button>
     </>

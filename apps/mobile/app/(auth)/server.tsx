@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { API_URL } from "@/config";
 import { connectToServer, problemText } from "@/features/server";
 import { ALLOW_HTTP, serverUrl } from "@/lib/server";
-import { useSession } from "@/providers/session";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
@@ -22,7 +21,6 @@ import { useToast } from "@/ui/Toast";
 export default function Server() {
   const { t } = useTranslation();
   const toast = useToast();
-  const session = useSession();
   const custom = serverUrl() !== API_URL;
   const [address, setAddress] = useState(custom ? serverHost(serverUrl()) : "");
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +28,7 @@ export default function Server() {
 
   const switchTo = async (server: string) => {
     setBusy(true);
-    await connectToServer({ server }, session.signedIn);
+    await connectToServer({ server });
     toast({ title: t("mobile.auth.server.now", { host: serverHost(server) }) });
     router.back();
   };

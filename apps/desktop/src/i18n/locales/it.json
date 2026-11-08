@@ -134,7 +134,11 @@
     "cloud": "Accedi ad agentes.chat",
     "create": "Sei nuovo?",
     "createLink": "Crea un account",
-    "own": "Usa il tuo server"
+    "own": "Usa il tuo server",
+    "addTitle": "Aggiungi uno spazio di lavoro",
+    "addLead": "Quelli che hai già restano qui, ognuno con il suo accesso.",
+    "addCloud": "Crea uno spazio di lavoro su agentes.chat",
+    "addOwn": "Usa il server del tuo team"
   },
   "own": {
     "title": "Il tuo server",
@@ -273,7 +277,13 @@
     "removeTitle": "Rimuovere {{host}} da questa app?",
     "removeBody": "Il server e il tuo account lì restano come sono.",
     "removeAgents": "Gli agenti dei suoi spazi di lavoro smettono di lavorare su questo {{device}}.",
-    "removed": "{{host}} è stato rimosso da questa app"
+    "removed": "{{host}} è stato rimosso da questa app",
+    "workspaces_one": "{{count}} spazio di lavoro",
+    "workspaces_many": "{{count}} spazi di lavoro",
+    "workspaces_other": "{{count}} spazi di lavoro",
+    "signedOut": "Accesso non effettuato",
+    "newsOne": "1 nuova notifica",
+    "newsMany": "{{n}} nuove notifiche"
   },
   "server": {
     "title": "agentes.chat su questo {{device}}",

@@ -3323,6 +3323,15 @@
   "shell.newWorkspace": {
     "value": "New workspace"
   },
+  "shell.addWorkspace": {
+    "value": "Add workspace"
+  },
+  "shell.addWorkspaceHint": {
+    "value": "A new one on agentes.chat, or your team's server"
+  },
+  "shell.yourServer": {
+    "value": "Your server"
+  },
   "shell.wiki": {
     "value": "Wiki"
   },

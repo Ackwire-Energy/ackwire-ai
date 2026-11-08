@@ -1,8 +1,10 @@
 import { isTailnet, type ServerProblem } from "@agenteschat/client/lib/server";
-import { signOut } from "@/features/account";
-import { forgetSession, signInOneTime } from "@/lib/auth";
-import { serverUrl, setServer } from "@/lib/server";
+import { router } from "expo-router";
+import { signOutOf } from "@/features/account";
+import { signInOneTime } from "@/lib/auth";
+import { orgValueName, serverUrl, setServer, signedInServers } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
+import { writeValue } from "@/lib/storage";
 
 /** Why a server can't be used, in the person's words (each takes `{ host }`). */
 export const PROBLEM_TEXT: Record<ServerProblem, string> = {
@@ -21,14 +23,28 @@ export const problemText = (problem: ServerProblem, server: string): string =>
   problem === "unreachable" && isTailnet(server) ? "mobile.auth.server.unreachableTailscale" : PROBLEM_TEXT[problem];
 
 /**
- * Moves the app to `target.server`, leaving the current one first so nothing crosses servers (`connectPlan`),
- * and signs in there with the one-time token from the web app's QR code, when there is one. False when the
- * token was refused (expired or already used).
+ * Moves the app to `target.server` (ADR 0154: every other server stays signed in, each with its own session), and
+ * signs in there with the one-time token from the web app's QR code, when there is one: a token on a server someone
+ * is signed in to replaces them there (`connectPlan`). False when the token was refused (expired or already used).
  */
-export async function connectToServer(target: { server: string; token?: string }, signedIn: boolean) {
-  const plan = connectPlan(serverUrl(), signedIn, target);
-  if (plan.signOut) await signOut();
-  if (plan.forget) await forgetSession();
+export async function connectToServer(target: { server: string; token?: string }) {
+  const plan = connectPlan(serverUrl(), target, signedInServers().includes(target.server));
+  if (plan.signOut) await signOutOf(target.server);
   if (plan.move) await setServer(target.server);
-  return plan.token ? signInOneTime(plan.token) : true;
+  return plan.token ? signInOneTime(plan.token, target.server) : true;
+}
+
+/**
+ * Opens a workspace, on this server or another one signed in to (ADR 0154): remembered as that server's workspace,
+ * the screens of this one closed, then the app moves there. Nothing signs out.
+ */
+export async function openWorkspace(server: string, orgId: string | null) {
+  if (orgId) await writeValue(orgValueName(server), orgId);
+  if (server === serverUrl()) return;
+  try {
+    router.dismissTo("/");
+  } catch {
+    // Nothing pushed.
+  }
+  await setServer(server);
 }

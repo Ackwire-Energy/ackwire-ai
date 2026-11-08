@@ -132,7 +132,11 @@
     "cloud": "Bei agentes.chat anmelden",
     "create": "Neu hier?",
     "createLink": "Konto erstellen",
-    "own": "Eigenen Server nutzen"
+    "own": "Eigenen Server nutzen",
+    "addTitle": "Workspace hinzufügen",
+    "addLead": "Die du schon hast, bleiben hier, jeder mit seiner eigenen Anmeldung.",
+    "addCloud": "Workspace bei agentes.chat erstellen",
+    "addOwn": "Den Server deines Teams nutzen"
   },
   "own": {
     "title": "Dein eigener Server",
@@ -271,7 +275,12 @@
     "removeTitle": "{{host}} aus dieser App entfernen?",
     "removeBody": "Der Server und dein Konto dort bleiben, wie sie sind.",
     "removeAgents": "Agenten seiner Workspaces arbeiten nicht mehr auf diesem {{device}}.",
-    "removed": "{{host}} wurde aus dieser App entfernt"
+    "removed": "{{host}} wurde aus dieser App entfernt",
+    "workspaces_one": "{{count}} Workspace",
+    "workspaces_other": "{{count}} Workspaces",
+    "signedOut": "Nicht angemeldet",
+    "newsOne": "1 neue Benachrichtigung",
+    "newsMany": "{{n}} neue Benachrichtigungen"
   },
   "server": {
     "title": "agentes.chat auf diesem {{device}}",
