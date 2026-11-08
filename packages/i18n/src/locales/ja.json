@@ -10396,6 +10396,7 @@
   },
   "toolNames": {
     "order": "verb-last",
+    "catalog": "none",
     "verb": {
       "get": "取得",
       "list": "一覧",

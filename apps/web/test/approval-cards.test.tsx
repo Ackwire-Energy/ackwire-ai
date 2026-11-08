@@ -117,7 +117,7 @@ describe("Approvals: the request beside the list", () => {
     await settle(6);
     const list = screen().getByRole("navigation", { name: "Pedidos" });
     expect(list.contains(row("ap-merge"))).toBe(true);
-    expect(row("ap-merge").querySelector(".ap-li__line")?.textContent).toBe("Ada quer adicionar comentários da issue");
+    expect(row("ap-merge").querySelector(".ap-li__line")?.textContent).toBe("Ada quer comentar numa issue");
     expect(row("ap-merge").querySelector(".ap-li__where")?.textContent).toBe("acme/loja #45");
     // Nothing chosen: the first row (closest to expiring) is open.
     expect(row("ap-deploy").getAttribute("aria-current")).toBe("true");
@@ -127,7 +127,7 @@ describe("Approvals: the request beside the list", () => {
     expect(row("ap-merge").getAttribute("aria-current")).toBe("true");
     expect(row("ap-deploy").getAttribute("aria-current")).toBeNull();
     // The server's title was only the tool's name: the tool in words.
-    expect(title()).toBe("Adicionar comentários da issue");
+    expect(title()).toBe("Comentar numa issue");
     const facts = review().querySelector(".ac-facts") as HTMLElement;
     expect([...facts.querySelectorAll(".ac-facts__label")].map((d) => d.textContent)).toEqual([
       "Onde",
@@ -142,7 +142,7 @@ describe("Approvals: the request beside the list", () => {
     expect(review().querySelector(".ap-review__text")?.textContent).toContain("Os testes passaram. Pode revisar?");
     const bar = review().querySelector(".ap-bar") as HTMLElement;
     expect(bar.querySelector(".ap-bar__text")?.textContent).toBe(
-      "Ada vai adicionar comentários da issue, só desta vez e com estes valores.",
+      "Ada vai comentar numa issue, só desta vez e com estes valores.",
     );
     await click(bar.querySelector('[data-approve="ap-merge"]') as HTMLElement);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
@@ -157,7 +157,7 @@ describe("Approvals: the request beside the list", () => {
     };
     expect(title()).toBe("Fazer um deploy");
     await key(document.body, "j");
-    expect(title()).toBe("Adicionar comentários da issue");
+    expect(title()).toBe("Comentar numa issue");
     expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
     expect(document.activeElement).toBe(row("ap-merge"));
     await key(document.body, "k");

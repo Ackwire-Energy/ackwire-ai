@@ -11,10 +11,10 @@ import type { CustomServer, CustomTool, ToolAccess, ToolDecision } from "../api/
 export const defaultAccess = (tool: Pick<CustomTool, "readOnlyHint">): ToolAccess =>
   tool.readOnlyHint === true ? "read" : "approval";
 
-/** `list_tickets` → `List tickets` (when the server gives no name). */
+/** `list_tickets`, `github.list-tickets` → `List tickets`, `Github list tickets` (when the server gives no name). */
 export const humanize = (name: string) => {
   const words = name
-    .replace(/[_-]+/g, " ")
+    .replace(/[_.-]+/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .trim()
     .toLowerCase();

@@ -13,7 +13,7 @@ afterEach(() => cleanup());
 const EXECUTOR = "COMPOSIO_MULTI_EXECUTE_TOOL";
 const TITLE = "Composio: GITHUB_CREATE_AN_ISSUE_COMMENT";
 const HINT =
-  "Cobre Criar comentário da issue (Github), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.";
+  "Cobre Comentar numa issue (GitHub), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.";
 
 /** The seed's first request (Ada's card in #eng) as one through Composio's executor, which offers "Aprovar sempre". */
 function withComposio(state = seedState()) {
@@ -111,7 +111,7 @@ describe("Aprovar sempre on a request", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.textContent).toContain(
-      "Cobre só leituras de Executar sql, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
+      "Cobre só leituras de Rodar SQL, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar sempre leituras" }));
@@ -140,7 +140,7 @@ describe("Aprovar sempre on a request", () => {
     const risky = screen().getByRole("region", { name: "Fazer um deploy" });
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(document.querySelector('.ap-li[data-id="ap-merge"]') as HTMLElement);
-    const pane = screen().getByRole("region", { name: /\(Github\)$/ });
+    const pane = screen().getByRole("region", { name: /\(GitHub\)$/ });
     expect(pane.textContent).toContain(HINT);
     // Beside Refuse and Approve, first in the bar.
     const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(".ac-locked > button") ?? [])];
@@ -210,10 +210,10 @@ describe("Ferramentas e acesso: Aprovado sempre", () => {
     expect(list.textContent).toContain("Roda sem pedir, com qualquer valor.");
     const rows = [...list.querySelectorAll("li")].map((li) => li.querySelector(".level-row__text")?.textContent);
     expect(rows).toEqual([
-      "ComposioCriar comentário da issue (Github)Aprovado por João · agora",
+      "ComposioComentar numa issue (GitHub)Aprovado por João · agora",
       "ComposioFechar chamadoAprovado · agora",
     ]);
-    expect(within(list).getByText("Criar comentário da issue (Github)").getAttribute("title")).toBe(
+    expect(within(list).getByText("Comentar numa issue (GitHub)").getAttribute("title")).toBe(
       "GITHUB_CREATE_AN_ISSUE_COMMENT",
     );
     await click(within(list).getByRole("button", { name: "Voltar a pedir: Fechar chamado" }));
@@ -243,12 +243,81 @@ describe("Ferramentas e acesso: Aprovado sempre", () => {
       within(card() as HTMLElement)
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label")),
-    ).toEqual(["Voltar a pedir: Criar comentário da issue (Github)", "Voltar a pedir: Fechar chamado"]);
+    ).toEqual(["Voltar a pedir: Comentar numa issue (GitHub)", "Voltar a pedir: Fechar chamado"]);
     cleanup();
 
     await page();
     expect(document.body.textContent).toContain("Merge, deploy e rollback sempre pedem aprovação no chat.");
     expect(card()).toBeNull();
+  });
+});
+
+describe("a custom server's own tool, as Higgsfield's", () => {
+  /** The seed's first request as one of a server connected by address, a tool that asks only because of its level. */
+  const withImage = (state = seedState()) => {
+    const first = state.approvals[0];
+    if (!first) throw new Error("no approval");
+    Object.assign(first, {
+      tool: "higgsfield_generate_image",
+      scope: "custom:conn-higgsfield:approval",
+      title: "Higgsfield: Generate image",
+      detail: "generate_image · prompt=Capa do episódio 12 · model=nano_banana_2",
+      params: { prompt: "Capa do episódio 12", model: "nano_banana_2", resolution: "2k" },
+      connector: "custom:conn-higgsfield",
+      approveAlways: { tool: "generate_image", actions: [] },
+    });
+    return state;
+  };
+
+  test("the card says what it does in words, never the tool's code name, and offers Aprovar sempre", async () => {
+    const state = withImage();
+    const api = createFakeApi(state);
+    // The server it goes through, by its own name on the card.
+    const connected = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://mcp.higgsfield.example/mcp",
+      label: "Higgsfield",
+      apiKey: "fake-key-for-tests",
+      returnTo: "/",
+    });
+    if (connected.status !== "connected") throw new Error("not connected");
+    const [first] = state.approvals;
+    if (first) first.connector = `custom:${connected.server.id}`;
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.querySelector(".rq__wt b")?.textContent).toBe("Gerar imagem");
+    expect(card.textContent).not.toContain("generate_image");
+    expect(card.textContent).toContain(
+      "Cobre Gerar imagem, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
+    );
+    await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
+  });
+
+  test("on Ada's page its rule reads in words, and × makes her ask again", async () => {
+    const state = seedState();
+    state.approvalRules = {
+      [ADA_ID]: [
+        {
+          id: "rule-img",
+          connectionId: "conn-higgsfield",
+          server: "Higgsfield",
+          tool: "generate_image",
+          toolLabel: "Generate image",
+          action: "",
+          createdByUserId: "u-joao",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: createFakeApi(state) });
+    await settle(8);
+    const list = screen().getByRole("region", { name: "Aprovado sempre" });
+    expect(list.querySelector("li .level-row__text")?.textContent).toBe(
+      "HiggsfieldGerar imagemAprovado por João · agora",
+    );
+    await click(within(list).getByRole("button", { name: "Voltar a pedir: Gerar imagem" }));
+    expect(state.calls.find((c) => c.method === "approvals.removeRule")?.args).toEqual([ORG_ID, ADA_ID, "rule-img"]);
   });
 });
 

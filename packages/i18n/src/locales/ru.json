@@ -11602,6 +11602,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Получить",
       "list": "Показать",

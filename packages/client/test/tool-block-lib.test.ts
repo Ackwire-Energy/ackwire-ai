@@ -219,7 +219,7 @@ describe("the block's lines", () => {
     const l = { kind: "consulting" as const, app: "GitHub", tool: "github_search_issues" };
     expect(toolPhrase(t, { ...l, state: "run" })).toBe('Chat.activity.consulting|{"app":"GitHub"}…');
     expect(toolPhrase(t, { ...l, state: "done" })).toBe(
-      'chat.work.step.consulting|{"app":"GitHub","tool":"github search issues"}',
+      'chat.work.step.consulting|{"app":"GitHub","tool":"search issues"}',
     );
     expect(toolPhrase(t, { ...l, state: "fail" })).toBe(
       'chat.work.erred|{"activity":"chat.activity.consulting|{\\"app\\":\\"GitHub\\"}"}',

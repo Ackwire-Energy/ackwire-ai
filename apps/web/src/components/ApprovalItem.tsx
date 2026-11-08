@@ -12,6 +12,7 @@ import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approv
 import {
   aheadEndLine,
   alwaysRoutineName,
+  approvalDetail,
   approvalSummary,
   approvalTitle,
   approvalWaitsFor,
@@ -329,11 +330,7 @@ export function InlineApproval({
       detail={
         approval.email
           ? expires || undefined
-          : [
-              approval.connector ? approvalSummary(approval, i18n.language) : approval.detail,
-              requesterDecidesLine(t, approval),
-              expires,
-            ]
+          : [approvalDetail(approval, i18n.language), requesterDecidesLine(t, approval), expires]
               .filter(Boolean)
               .join(" · ")
       }

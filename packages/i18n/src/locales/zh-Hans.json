@@ -10457,6 +10457,7 @@
   },
   "toolNames": {
     "order": "modifiers-first",
+    "catalog": "none",
     "verb": {
       "get": "获取",
       "list": "列出",

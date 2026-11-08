@@ -807,7 +807,7 @@ export async function dropRunFailure(deps: NotificationDeps, orgId: string, key:
 
 /**
  * Access lost: a person's notifications from a channel they left go for good, snippets included. Approvals stay:
- * who decides them is `approverIds`, not the channel (`stillDecides`).
+ * who is told is `notifiedIds` and who keeps one is who may decide it (`stillDecides`), not the channel.
  */
 export async function clearChannelNotifications(
   deps: NotificationDeps,

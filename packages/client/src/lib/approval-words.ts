@@ -5,6 +5,7 @@ import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./a
 import { humanize } from "./custom-tools";
 import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
 import { agentGrammar } from "./grammar";
+import { catalogLabel, labelIsName, toolKey } from "./tool-labels";
 import { partsOf, toolName } from "./tool-review";
 
 /**
@@ -35,10 +36,13 @@ const GITHUB_TITLES = new Set(["merge_pull_request", "pull_request_review_write"
 /** What `request_approval` was asked for (mission tools): `approval.titles.request_approval.*`. */
 const ASKED_ACTIONS = new Set(["merge", "deploy", "rollback"]);
 
-/** A connection's tools start with its id, or its name in a word: "Slack (Acme): Send" → `slack`, `slack_2`. */
+/**
+ * A connection's tools start with its id, or for a server connected by address (`custom:…`) its name in a word:
+ * "Slack (Acme): Send" → `slack`, `slack_2`.
+ */
 function connectionPrefix(approval: Pick<Approval, "title"> & Partial<Pick<Approval, "connector">>) {
   const named = serviceKey(approval.title.split(": ")[0] ?? "").replace(/[^a-z0-9_]/g, "");
-  return approval.connector && approval.connector !== "custom" ? approval.connector : named;
+  return approval.connector && !approval.connector.startsWith("custom") ? approval.connector : named;
 }
 
 /** The tool's own name, without what its connection adds: `slack_2_SLACK_SEND_MESSAGE` → `SEND_MESSAGE`. */
@@ -107,7 +111,11 @@ function wordedTitle(t: TFunction, approval: TitledApproval): string | null {
   // The action is guessed from any word of the name: a read that names one ("list_merge_requests") is still a read.
   const action = approvalAction({ tool: approval.tool, scope: approval.scope ?? "" });
   if (action !== "other" && !(parts.verb && READ_VERBS.has(parts.verb))) return t(`approval.titles.action.${action}`);
-  return parts.verb ? toolName(t, parts, own) : null;
+  // A custom server's tool someone named on its review keeps that name (the server's title says it after the colon).
+  const named = approval.title.includes(": ") ? said : "";
+  if (approval.connector?.startsWith("custom") && named && !labelIsName(named, own)) return null;
+  // A common tool by the catalog's words, a verb in its name or not ("Gerar imagem", not "Higgsfield: Generate image").
+  return catalogLabel(t, own) ?? (parts.verb ? toolName(t, parts, own) : null);
 }
 
 /**
@@ -231,17 +239,33 @@ export const approvalSummary = (approval: Pick<Approval, "params" | "connector" 
     .map(([label, value]) => `${label}: ${value}`)
     .join(" · ");
 
+/**
+ * A request's line under its title: a connector's values in words (`approvalSummary`); any other's own detail, but
+ * not the tool's code name it may start with (`github.merge_pull_request · …`, a call kept after its connection
+ * went), which the title already says in words: its values in words instead, else the rest of the line.
+ */
+export function approvalDetail(
+  approval: Pick<Approval, "detail" | "tool" | "params" | "connector" | "email">,
+  locale: string,
+) {
+  if (approval.connector) return approvalSummary(approval, locale);
+  const [first = "", ...rest] = approval.detail.split(" · ");
+  if (rest.length === 0 || toolKey(first).key !== toolKey(approval.tool).key) return approval.detail;
+  return approvalSummary(approval, locale) || rest.join(" · ");
+}
+
 /** Articles in an action's slug (`GITHUB_CREATE_AN_ISSUE_COMMENT`) that only make its words longer. */
 const SLUG_ARTICLES = new Set(["a", "an", "the"]);
 
 /**
- * An action a tool runs for the agent (Composio's slugs), in words: what it does, then its app ("Criar issue
- * comment (Github)"). The slug itself is for a title on hover.
+ * An action a tool runs for the agent (Composio's slugs), in words: what it does, then its app as it writes its name
+ * ("Comentar numa issue (GitHub)"). The slug itself is for a title on hover.
  */
 export function actionName(t: TFunction, slug: string) {
-  const [app = "", ...rest] = slug.toLowerCase().split("_");
-  const name = rest.filter((w) => !SLUG_ARTICLES.has(w)).join("_");
-  return name ? `${toolName(t, partsOf(name, null, true), name)} (${humanize(app)})` : humanize(slug);
+  const known = toolKey(slug);
+  const [first = "", ...rest] = slug.toLowerCase().split("_");
+  const name = known.app ? known.key : rest.filter((w) => !SLUG_ARTICLES.has(w)).join("_");
+  return name ? `${toolName(t, partsOf(name, null, true), name)} (${known.app ?? humanize(first)})` : humanize(slug);
 }
 
 /** One of a routine's own actions (`Routine.ownActions`) in words: a Composio slug (upper case) by its app, else the tool's name. */
@@ -330,7 +354,8 @@ export function approvalRuleWords(
   }
   if (rule.tool === BRANCH_PUSH && rule.action) return pushWords(t, rule.action);
   if (rule.tool === COMMAND_RULE_TOOL && !rule.connectionId) return rule.action;
-  return rule.action ? actionName(t, rule.action) : rule.toolLabel;
+  if (rule.action) return actionName(t, rule.action);
+  return labelIsName(rule.toolLabel, rule.tool) ? toolName(t, partsOf(rule.tool), rule.tool) : rule.toolLabel;
 }
 
 /** How an action prepared ahead ended without running, in a line (its card, Aprovações, the phone's sheet). */

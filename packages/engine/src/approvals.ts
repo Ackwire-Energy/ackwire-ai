@@ -33,7 +33,7 @@ import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
 import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/preview";
-import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
+import { notifyApproval, notifyNewcomers, resolveApprovalNotifications } from "./notification-producers";
 import { can, type Membership, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { maySql, type RolePermission } from "./permissions";
@@ -542,17 +542,16 @@ export function coveredFor(approval: Coverable, actorId: string, covers: ActiveC
   return cover?.fromUserId ?? null;
 }
 
+type Askable = Pick<Approval, "orgId" | "ownerUserId"> &
+  Partial<Pick<Approval, "tool" | "approvers" | "params" | "requestedByUserId" | "highRisk">>;
+
 /**
- * The people asked to decide (the card's badge, the inbox, push, email): whoever holds its `decidingKeys` (ADR 0085)
+ * The people asked to decide (the card's badge, the live Aprovações list): whoever holds its `decidingKeys` (ADR 0085)
  * and the agent's owner (`adminsDecide` aside); for one asked with `request_approval`, the people it names instead,
  * without the person whose request it was unless they approve by role (ADR 0126). Nobody left: the admins. One that
- * `required` its people: only them.
+ * `required` its people: only them. `notified`: who is told (inbox, push, email), `notifiedIds`.
  */
-export async function approverIds(
-  db: Database,
-  approval: Pick<Approval, "orgId" | "ownerUserId"> &
-    Partial<Pick<Approval, "tool" | "approvers" | "params" | "requestedByUserId" | "highRisk">>,
-) {
+export async function approverIds(db: Database, approval: Askable, notified = false) {
   const keys = decidingKeys({ tool: approval.tool ?? "", params: approval.params ?? {} });
   const members = await db
     .select({
@@ -569,15 +568,14 @@ export async function approverIds(
   const member = new Set(members.map((m) => m.userId));
   const named = approval.approvers;
   if (named?.required) return named.userIds.filter((id) => member.has(id));
+  const owner =
+    approval.ownerUserId && member.has(approval.ownerUserId) && !adminsDecide({ tool: approval.tool ?? "" })
+      ? approval.ownerUserId
+      : null;
   const ids = new Set(
     named?.userIds.length
       ? named.userIds.filter((id) => member.has(id))
-      : [
-          ...admins,
-          ...(approval.ownerUserId && member.has(approval.ownerUserId) && !adminsDecide({ tool: approval.tool ?? "" })
-            ? [approval.ownerUserId]
-            : []),
-        ],
+      : [...(notified && owner ? [] : admins), ...(owner ? [owner] : [])],
   );
   const requester = named?.requestedBy;
   if (requester && !named.requesterDecides && !admins.includes(requester)) ids.delete(requester);
@@ -591,6 +589,13 @@ export async function approverIds(
   }
   return ids.size > 0 ? [...ids] : admins;
 }
+
+/**
+ * Who is told an approval waits (inbox, its sound, push, email): the agent's responsável alone when it has one (and
+ * whoever covers them), as its picker promises; the admins only for an agent with none. Admins still find it in
+ * Aprovações and may decide it, silently.
+ */
+export const notifiedIds = (db: Database, approval: Askable) => approverIds(db, approval, true);
 
 /** People's names as a card says who decides: "Ana, Bruno e Caio" is the app's; here "Ana, Bruno, Caio +2". */
 export const namesLabel = (names: string[]) =>
@@ -650,9 +655,8 @@ export async function repointApprovals(
       current = { ...row, approvers };
     }
     await resolveApprovalNotifications(deps, current).catch(() => {});
-    if (ownerUserId && (await approverIds(deps.db, current)).includes(ownerUserId)) {
-      await notifyApproval(deps, current, [ownerUserId]).catch(() => {});
-    }
+    // The new owner is told; with none left, the admins.
+    await notifyNewcomers(deps, current).catch(() => {});
   }
 }
 
@@ -701,9 +705,9 @@ export async function publishApproval(
       approval: { ...view, canDecide: true, canCancel: approval.status === "approved" && aheadLive(approval) },
     });
   }
-  // The inbox: waiting for whoever may decide; out of it once decided or expired.
+  // The inbox: waiting for whoever is told (`notifiedIds`); out of it once decided or expired.
   if (type === "approval.created" && approval.status === "pending") {
-    await notifyApproval(deps, approval, deciders).catch(() => {});
+    await notifyApproval(deps, approval, await notifiedIds(deps.db, approval)).catch(() => {});
   } else if (type === "approval.decided") {
     await resolveApprovalNotifications(deps, approval).catch(() => {});
   }

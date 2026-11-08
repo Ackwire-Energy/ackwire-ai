@@ -11250,6 +11250,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Vedi",
       "list": "Elenca",

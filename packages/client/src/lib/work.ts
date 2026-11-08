@@ -7,6 +7,7 @@ import { POSTGRES_MARK } from "./databases";
 import { capitalize, joinNames, lowerFirst, shortTarget } from "./format";
 import { workDuration } from "./long-work";
 import { MAIL_BRANDS } from "./mail";
+import { catalogLabel, toolKey } from "./tool-labels";
 
 /**
  * Whether a finished reply shows what the agent did ("Usou 4 ferramentas"): only for a person who turned it on in this
@@ -16,6 +17,12 @@ export const showsActivity = (org: Pick<OrgSummary, "showActivity"> | null | und
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
+
+/** A tool in "Usou a ferramenta …": the catalog's words, else its own name in words, without the app it starts with. */
+function toolWords(t: TFunction, tool: string) {
+  const worded = catalogLabel(t, tool);
+  return worded ? lowerFirst(worded) : toolLabel(toolKey(tool).key || tool);
+}
 
 /** One thing the agent did (a tool call), for the work summary: what it did, in which service. */
 export interface WorkItem extends Activity {
@@ -63,9 +70,18 @@ export function autoApprovedWords(t: TFunction, a: AutoApproved): string {
   return t(a.reads ? "chat.work.autoApprovedReads" : "chat.work.autoApproved", { name: a.by });
 }
 
-/** A line's grey words: none beside code, who approved it for good where a rule did, else its hint. */
-export const toolLineHint = (t: TFunction, l: Pick<ToolLine, "code" | "hint" | "autoApproved">) =>
-  l.code ? null : l.autoApproved ? autoApprovedWords(t, l.autoApproved) : l.hint;
+/**
+ * A line's grey words: none beside code, who approved it for good where a rule did, else its hint, a connector
+ * tool's name by the catalog's words where it has them ("Buscar issues", not "search issues").
+ */
+export const toolLineHint = (t: TFunction, l: Pick<ToolLine, "code" | "hint" | "autoApproved" | "kind">) =>
+  l.code
+    ? null
+    : l.autoApproved
+      ? autoApprovedWords(t, l.autoApproved)
+      : l.kind === "consulting" && l.hint
+        ? (catalogLabel(t, l.hint) ?? l.hint)
+        : l.hint;
 
 /** What the agent said before a model call's tools (`model_call` step: `narration`, `turn`). */
 export interface WorkNarration {
@@ -323,9 +339,9 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
   };
 }
 
-/** "Consultou o Himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
+/** "Consultou o Himetrica", "Atualizou o plano", and for a tool with no words of its own "Usou a ferramenta enviar e-mail". */
 export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool">) {
-  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolLabel(s.tool) });
+  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolWords(t, s.tool) });
 }
 
 /**
@@ -689,7 +705,7 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
   if (l.state === "fail" && l.kind === "runningCommand") return t("chat.work.refused", { app: appLabel(l) });
   if (l.state === "fail" && l.kind === "runningCommandAny") return t("chat.work.refusedAny");
   if (l.state === "fail") return t("chat.work.erred", { activity: verb });
-  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolLabel(l.tool) });
+  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolWords(t, l.tool) });
 }
 
 /** A turn quicker than this shows nothing new: its step line says the agent's own words only past it. */

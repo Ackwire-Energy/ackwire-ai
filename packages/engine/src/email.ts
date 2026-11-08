@@ -18,7 +18,7 @@ import { formatMoneyUsd } from "@agenteschat/i18n/format";
 import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
-import { approverIds } from "./approvals";
+import { notifiedIds } from "./approvals";
 import { isComputerBrain, planName } from "./brains/types";
 import { invitationMailProof } from "./crypto";
 import { inertText } from "./email/inert";
@@ -1279,8 +1279,8 @@ export async function queuePlanLent(
 
 /**
  * Worker: approvals pending longer than `afterHours` get one digest email per
- * approver (owner of the agent + admins), and are marked so nobody is emailed
- * twice about the same request.
+ * person told about them (`notifiedIds`: the agent's owner, else the admins), and are marked so nobody is
+ * emailed twice about the same request.
  */
 export async function queueApprovalDigests(db: Database, publicUrl: string, afterHours: number, now = new Date()) {
   const due = await db
@@ -1305,7 +1305,7 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
     const mine = due.filter((a) => a.orgId === orgId);
     const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
     const byUser = new Map<string, typeof mine>();
-    for (const a of mine) for (const u of await approverIds(db, a)) byUser.set(u, [...(byUser.get(u) ?? []), a]);
+    for (const a of mine) for (const u of await notifiedIds(db, a)) byUser.set(u, [...(byUser.get(u) ?? []), a]);
     const people = new Map(
       (byUser.size
         ? await db

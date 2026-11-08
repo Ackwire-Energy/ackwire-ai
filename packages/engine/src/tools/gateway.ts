@@ -92,6 +92,28 @@ export const alwaysAsks = (name: string) => {
   );
 };
 
+/** Words of a tool that runs whatever its arguments say: a script, a shell, code, a raw request. */
+const RUNS_ANYTHING = new Set([
+  "exec",
+  "eval",
+  "bash",
+  "shell",
+  "script",
+  "command",
+  "code",
+  "request",
+  "http",
+  "curl",
+]);
+/**
+ * A custom server's own tool name, its verb first with no app before it (`run_script`), that "Aprovar sempre" never
+ * covers: what `alwaysAsks` says, a leading verb that runs on its own, or a word that runs anything.
+ */
+export const customAlwaysAsks = (name: string) => {
+  const words = nameWords(name);
+  return alwaysAsks(name) || NEVER_LEADS.has(words[0] ?? "") || words.some((w) => RUNS_ANYTHING.has(w));
+};
+
 /** What a mailbox's scopes say is not high risk: a draft stays in the mailbox, reading and filing change nothing. */
 const MAIL_QUIET = new Set(["mail:draft", "mail:read", "mail:organize"]);
 /** Production, can't be undone, or leaves the company; mirrors the client's `approvalRisk` (`approval-kind.ts`). */

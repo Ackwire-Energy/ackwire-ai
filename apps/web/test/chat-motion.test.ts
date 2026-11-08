@@ -279,7 +279,7 @@ describe("humanized activity", () => {
     expect(step("search_wiki")).toBe("Leu a wiki");
     expect(step("mcp__github__list_prs")).toBe("Consultou o GitHub");
     // Unknown: a generic sentence around the humanized name.
-    expect(step("send_email")).toBe("Usou a ferramenta send email");
+    expect(step("send_email")).toBe("Usou a ferramenta enviar e-mail");
     expect(activityText(t, [entry("Theo", toolActivity("update_plan"))])).toBe("Theo está atualizando o plano…");
   });
 

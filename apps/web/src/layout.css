@@ -1554,8 +1554,8 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   bottom: 8px;
 }
 
-/* Unread: a bold label. A row's number only for what calls on me (a mention of me in a channel, a DM's unread),
-   Discord's red pill. */
+/* Unread: a bold label and the row's number. Red only for what calls on me (a mention of me in a channel, a DM's
+   unread), Discord's red pill; a channel's other unread messages in a neutral one. */
 .sidebar__item[data-unread="true"] .sidebar__item-label {
   font-weight: 600;
 }
@@ -1570,6 +1570,10 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   font-size: 11.5px;
   font-weight: 700;
   font-variant-numeric: normal;
+}
+.sidebar__unread--quiet {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
 }
 .sidebar__label-row {
   display: flex;
