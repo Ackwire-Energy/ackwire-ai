@@ -306,9 +306,11 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* When it runs is the row's fact: it wraps in its column, never cut short ("De segunda a sexta às 09:00" on a tablet). */
 .routine-row__when-text b,
 .routine-row__when-text small {
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .routine-row__when-text b {
   font-size: 13px;

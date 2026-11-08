@@ -57,8 +57,8 @@ test("a DM's sidebar: a settings row's words keep the column, and its buttons wr
   expect(rule(".dm-side__sec .settings-row > .settings-row__text")).toContain("flex: 1 1 0");
   const buttons = rule(".dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end");
   expect(buttons).toContain("flex-basis: 100%");
-  // The name's 22px box belongs beside the words, never around buttons under them.
-  expect(buttons).toContain("height: auto");
+  // Raised to the name's line beside the words, never under them.
+  expect(buttons).toContain("translate: none");
   expect(rule(".dm-side__sec .rh-set__acts")).toContain("flex-wrap: wrap");
   // Only there: Settings' rows keep their layout.
   expect(css.match(/^[^\n]*settings-row[^\n]*\{$/gm)?.every((line) => /^(\.dm-side )?\.dm-side__sec/.test(line))).toBe(

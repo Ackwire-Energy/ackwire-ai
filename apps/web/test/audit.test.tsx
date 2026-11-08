@@ -109,6 +109,19 @@ describe("Configurações → Auditoria", () => {
     expect([...section().querySelectorAll(".audit__day")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
   });
 
+  test("a row that didn't end in anything keeps its time in the last column, on a phone too", async () => {
+    await go();
+    const change = [...section().querySelectorAll(".audit-row")].at(-1) as HTMLElement;
+    expect(change.textContent).toContain("Walter criou uma rotina");
+    // An empty box in the outcome's place takes the time's cell on a phone's three columns.
+    expect([...change.children].filter((c) => c.childElementCount === 0 && !c.textContent?.trim())).toHaveLength(0);
+    const css = (await Bun.file(new URL("../src/components/audit.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    expect(css).toMatch(/\.audit-row__time \{[^}]*grid-column: -2;/);
+  });
+
   test("the shortcuts: what went wrong, what waits, people's changes", async () => {
     await go();
     await click(within(section()).getByRole("radio", { name: "Recusadas e falhas" }));

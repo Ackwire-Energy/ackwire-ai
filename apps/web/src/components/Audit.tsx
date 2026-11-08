@@ -217,7 +217,7 @@ const MARK_ICON: Record<AuditMark, ChipProps["icon"]> = {
 function OutcomeChip({ row }: { row: AuditRow }) {
   const { t } = useTranslation();
   const look = auditOutcome(t, row);
-  if (!look) return <span />;
+  if (!look) return null;
   const tone = look.mood === "done" || look.mood === "waiting" ? look.mood : undefined;
   const mood = look.mood === "refused" || look.mood === "failed" ? `audit-chip--${look.mood}` : undefined;
   return (

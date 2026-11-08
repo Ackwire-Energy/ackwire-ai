@@ -331,7 +331,7 @@ export function AccessMatrixSection() {
                   const name = resourceName(t, r, items);
                   return (
                     <th key={r.id} scope="col">
-                      <span className="level-matrix__head">
+                      <span className="level-matrix__head ac-iconline">
                         <ResourceIcon resource={r} items={items} name={name} />
                         {name}
                       </span>
@@ -347,7 +347,7 @@ export function AccessMatrixSection() {
                 return (
                   <tr key={a.id}>
                     <th scope="row">
-                      <span className="level-matrix__agent">
+                      <span className="level-matrix__agent ac-iconline">
                         <AgentAvatar agentId={a.id} name={a.name} size="sm" />
                         <span>
                           {a.name}

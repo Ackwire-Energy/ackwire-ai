@@ -3623,17 +3623,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 .level-matrix tbody th {
   font-weight: 600;
 }
+/* An agent's name and role, and a connector's name, wrap by words, their face or icon on the first line: a long one
+   keeps the levels in the table instead of pushing them past its edge. A level stays whole. Breaking anywhere would let
+   the table squeeze them a letter a line. */
+.level-matrix th {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 /* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
   }
-}
-.level-matrix__head,
-.level-matrix__agent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .level-matrix__head .connector-icon {
   width: 24px;
@@ -4010,6 +4011,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 }
 .settings__nav {
   flex: 0 0 216px;
+  min-width: 0;
   position: sticky;
   top: 24px;
   display: flex;
@@ -4029,18 +4031,15 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   font-weight: 700;
   letter-spacing: -0.015em;
 }
+/* The workspace's name wraps under the mark, which stays on its first line: a long one never widens the nav. */
 .settings__org {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
   color: var(--ink-muted);
   font-size: 13px;
 }
 .settings__org > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .settings__groups {
   display: flex;
@@ -11418,7 +11417,7 @@ html:not([data-pointer]) .msg-mem:focus-visible {
 .agp-inplace {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   min-width: 0;
   max-width: calc(100% + 16px);
   margin: -4px -8px;
@@ -11441,11 +11440,14 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
   background: var(--sunken);
   box-shadow: var(--focus-ring);
 }
-/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. */
+/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. It stays on the
+   first line of a name that wraps, in the middle of a box as tall as that line (as `.ac-captail`). */
 .agp-inplace__pen {
   display: inline-flex;
+  align-items: center;
   flex: none;
   width: 0;
+  height: 1.25em;
   margin-left: 0;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11454,6 +11456,11 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
     width 0.15s,
     margin 0.15s,
     opacity 0.15s;
+}
+@supports (top: 1lh) {
+  .agp-inplace__pen {
+    height: 1lh;
+  }
 }
 .agp-inplace:hover .agp-inplace__pen,
 html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
@@ -11493,16 +11500,17 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
 }
 
 /* The role as a tag (RoleTag): the role's icon and name, a pencil on hover; the field it turns into keeps its shape,
-   the roles the app knows in a list under it. Who can't change it reads the same tag, still. */
+   the roles the app knows in a list under it. Who can't change it reads the same tag, still. A long role wraps inside
+   the tag, its icon and pencil on its first 20px line (28px tall with one). */
 .agp-roletag {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 28px;
-  padding: 0 10px 0 8px;
+  min-height: 28px;
+  padding: 4px 10px 4px 8px;
   border: 0;
   border-radius: 9px 9px 9px 3px;
   background: var(--plate);
@@ -11510,20 +11518,20 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 20px;
+  text-align: left;
   transition:
     background 0.15s,
     box-shadow 0.15s;
 }
 .agp-roletag > .ac-icon {
   flex: none;
+  margin-block: 2px;
   color: var(--ink2);
 }
 .agp-roletag__text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agp-roletag[data-empty] .agp-roletag__text {
   color: var(--ink-muted);
@@ -11543,6 +11551,7 @@ html:not([data-pointer]) button.agp-roletag:focus-visible {
   display: inline-flex;
   flex: none;
   width: 0;
+  margin-block: 3px;
   margin-left: -6px;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11566,7 +11575,10 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   max-width: 100%;
 }
 .agp-roletag.agp-roletag--edit {
+  align-items: center;
   width: 100%;
+  height: 28px;
+  padding-block: 0;
   background: var(--field-bg);
   box-shadow:
     inset 0 0 0 1px var(--field-line),
@@ -11667,11 +11679,15 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   gap: 8px;
   font-size: 11.5px;
 }
-/* Phones: the tile above its card, both on the left edge; the role's field takes the rest of its line (wrapping
-   under the @ when that is short), its list as wide as it. */
+/* Phones: the tile above its card, both on the left edge, the card as wide as the page (sized to its words, a long
+   role or name ran past the edge); the role's field takes the rest of its line (wrapping under the @ when that is
+   short), its list as wide as it. */
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
+  }
+  .agp-id__fields {
+    align-self: stretch;
   }
   .agp-roleedit {
     flex: 1 1 auto;
@@ -13561,8 +13577,9 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   height: 30px;
   font-size: 12px;
 }
-/* On a phone the icon, the words and a switch or a chevron stay on one line. A choice of several goes under the
-   words, from their edge (the 30px icon and the 14px gap). */
+/* On a phone the icon, the words and a switch or a chevron stay on one line. Any other control (a choice of several,
+   a select, a field, buttons) goes under the words, from their edge (the 30px icon and the 14px gap), so the rows of
+   one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
     flex-direction: row;
@@ -13576,28 +13593,30 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   .settings-row--lead > .settings-row__end {
     margin-left: auto;
   }
-  .settings-row--lead > .settings-row__end:has(> .ac-seg) {
+  .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
     flex-basis: 100%;
     box-sizing: border-box;
+    min-width: 0;
     padding-left: 44px;
   }
 }
 /*
  * With a line under its name, what ends a row (a switch, a choice, the chevron) belongs to the name's line, never to
- * the row's middle however far that line wraps: a box as tall as the name's 22px line, centred on it (as
- * `.ac-captail`). A choice that goes under the words on a phone keeps its own height there.
+ * the row's middle however far that line wraps: centred on the name's 22px line (as an `.ac-iconline` lead), but a
+ * control taller than that line rises only to `--action-clear` under the hairline above, and the row grows under it.
+ * A control that goes under the words on a phone sits where it falls.
  */
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end {
   align-self: flex-start;
-  height: 22px;
+  translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
 }
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__chevron {
   align-self: flex-start;
   margin-block: 3px;
 }
 @media (max-width: 760px) {
-  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:has(> .ac-seg) {
-    height: auto;
+  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:not(:has(> .ac-switch)) {
+    translate: none;
   }
 }
 /* A plain row (its label beside its control, the help under the label) does the same where the two sit side by
@@ -13607,7 +13626,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     align-items: flex-start;
   }
   .settings-row:has(> .settings-row__text > .settings-row__help) > :is(.settings-row__control, .settings-row__end) {
-    height: 22px;
+    translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
   }
 }
 
@@ -13847,9 +13866,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone. */
+/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone: a row with an icon
+   keeps the icon and the words on one line, and what ends it goes under them from their edge, where it falls. */
 @container agp-side (max-width: 479px) {
-  .agp-card .settings-row {
+  .agp-card .settings-row:not(.settings-row--lead) {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -13857,6 +13877,20 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   .agp-card .settings-row__control {
     flex: none;
     justify-content: flex-start;
+  }
+  .agp-card .settings-row--lead {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .agp-card .settings-row--lead > .settings-row__text {
+    flex: 1 1 160px;
+  }
+  .agp-card .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
+    flex-basis: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    padding-left: 44px;
+    translate: none;
   }
 }
 /* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a
