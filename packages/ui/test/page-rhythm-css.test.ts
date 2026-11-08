@@ -139,9 +139,12 @@ describe("the toolbar", () => {
     expect(stacked).toContain("order: 2;");
     expect(stacked).toContain("flex: 1 1 100%;");
     expect(stacked).toContain("overflow-x: auto;");
-    // The filter bar inside the row doesn't scroll on its own, so the row's 4px keep its controls' rings whole.
+    // The filter bar inside the row doesn't scroll on its own, so the row's 4px on every side keep its controls'
+    // rings whole (an active filter's ring too), pulled back by as much so the row keeps its place.
     expect(kit).not.toMatch(/\.ac-filterbar[^{}]*\{[^}]*overflow-x: auto/);
-    expect(body(".ac-toolbar__filters", phone)).toContain("padding: 2px 4px;");
+    expect(body(".ac-toolbar__filters", phone)).toContain("padding: 4px;");
+    expect(body(".ac-toolbar__filters", phone)).toContain("margin: -2px -4px;");
+    expect(stacked).toContain("padding: 4px;");
   });
 
   test("an empty search field gives the hidden hint's room back to its words", () => {

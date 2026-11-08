@@ -66,7 +66,8 @@ test("every page starts at the page's top and side: lists, Settings, the wiki, t
   // The wiki's bar starts on the page's top and sticks there, its face reaching over the room above it.
   expect(last(topLevel(wiki), ".wiki-top", "top")).toBe("0");
   expect(declarations(wiki, ".wiki-top").filter(([p]) => p === "margin-top")).toEqual([]);
-  expect(last(topLevel(wiki), ".wiki-top::before", "height")).toBe("var(--page-top)");
+  expect(last(topLevel(wiki), ".wiki-top::before", "inset")).toBe("calc(-1 * var(--page-top)) 0 0");
+  expect(declarations(wiki, ".wiki-top").filter(([p]) => p === "background")).toEqual([]);
   const calendar = await read("pages/calendar.css");
   expect(last(topLevel(calendar), ".cal-page__header", "padding")).toBe("var(--page-top) var(--page-x) 16px");
   expect(last(topLevel(calendar), ".cal-page__body", "padding")).toBe("0 var(--page-x) 16px");

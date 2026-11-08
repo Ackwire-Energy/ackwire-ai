@@ -8857,6 +8857,11 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   font: inherit;
   color: inherit;
 }
+/* A lead before the words (a stage's icon, a channel's mark, a face): on their capitals' middle, as `.ac-iconline`'s. */
+.ac-grouphead__title > :is(.ac-icon, .ac-avatar):first-child {
+  flex: none;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
 .ac-grouphead__count {
   font-weight: 500;
   color: var(--faint);
@@ -9023,8 +9028,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   }
   .ac-toolbar__filters {
     max-width: calc(100% + 8px);
-    margin: 0 -4px;
-    padding: 2px 4px;
+    margin: -2px -4px;
+    padding: 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -9049,8 +9054,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   flex: 1 1 100%;
   flex-wrap: nowrap;
   max-width: calc(100% + 8px);
-  margin: 0 -4px;
-  padding: 2px 4px;
+  margin: -2px -4px;
+  padding: 4px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;

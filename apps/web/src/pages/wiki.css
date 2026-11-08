@@ -722,14 +722,14 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   gap: 12px;
   min-height: 40px;
   padding: 0 0 10px;
-  background: var(--bg);
 }
+/* Its face, under its controls, from the scroll area's top to its own bottom: no plate of its own on the bar. */
 .wiki-top::before {
   content: "";
   position: absolute;
-  inset: auto 0 100%;
-  height: var(--page-top);
-  background: inherit;
+  z-index: -1;
+  inset: calc(-1 * var(--page-top)) 0 0;
+  background: var(--bg);
 }
 .wiki-top .wiki-crumbs {
   flex: 1;
