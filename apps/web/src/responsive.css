@@ -199,8 +199,7 @@
 /* ── Pages ── */
 @media (max-width: 640px) {
   .page {
-    gap: 20px;
-    padding: 20px 16px 28px;
+    padding-bottom: 28px;
   }
   .page-title {
     font-size: 24px;
@@ -210,8 +209,7 @@
     min-width: min(220px, 100%);
   }
   .settings {
-    gap: 20px;
-    padding: 20px 16px 28px;
+    padding-bottom: 28px;
   }
   .tabs-bar .ac-toolbar {
     flex: 1 1 100%;
