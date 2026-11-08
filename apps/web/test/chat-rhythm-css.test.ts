@@ -209,7 +209,8 @@ test("a failed reply's reason sits under the name like the text it stands for, i
   // Its fix (a key, a model) on a line of its own under the reason: beside it, a long reason went a word per line.
   const fix = ".ac-msg__error-row > .ac-btn:not(.ac-btn--icon)";
   const bare = (value: string | undefined) => value?.replace(/\s/g, "");
-  expect(bare(last(fix, "grid-area"))).toBe("2/1/3/-1");
+  // In the reason's column only: spanning the ×'s too, its width went to that column and squeezed the reason.
+  expect(bare(last(fix, "grid-area"))).toBe("2/1");
   expect(bare(last(".ac-msg__error-row", "grid-template-columns"))).toBe("minmax(0,max-content)max-content");
   for (const [margin, height] of [
     [button, px(last(":root", "--control-h-sm"))],

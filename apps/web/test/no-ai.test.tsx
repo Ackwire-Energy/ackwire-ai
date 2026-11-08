@@ -1316,7 +1316,13 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     await push(socket, { type: "message.claimed", messageId: asked.id, agentId: ADA_ID, runId: "r1" });
     await push(socket, { type: "agent.run", ...r1, status: "failed", ...failure });
     await push(socket, { type: "run.finished", ...r1, status: "failed", ...failure });
-    await push(socket, { type: "message.handled", messageId: asked.id, agentId: ADA_ID, runId: "r1", status: "failed" });
+    await push(socket, {
+      type: "message.handled",
+      messageId: asked.id,
+      agentId: ADA_ID,
+      runId: "r1",
+      status: "failed",
+    });
     await settle(2);
     expect(document.querySelectorAll(".ac-msg__error-row")).toHaveLength(1);
 
@@ -1374,7 +1380,14 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
       await push(socket, { type: "message.claimed", messageId: asked.id, agentId, runId });
       await push(socket, { type: "agent.run", ...run, status: "failed", ...failure });
       await push(socket, { type: "run.finished", ...run, status: "failed", ...failure });
-      await push(socket, { type: "message.handled", messageId: asked.id, agentId, runId, status: "failed", ...failure });
+      await push(socket, {
+        type: "message.handled",
+        messageId: asked.id,
+        agentId,
+        runId,
+        status: "failed",
+        ...failure,
+      });
       await settle(2);
     };
     await sendText("@ada e o login?");
