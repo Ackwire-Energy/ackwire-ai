@@ -14,16 +14,24 @@ const { accounts, organizationMembers, users } = schema;
  * credit that person (`Co-authored-by`) when they linked GitHub to sign in, never with their email.
  */
 
-/** Where the line starts in a body: an edit replaces everything from it on, so lines never pile up. */
+/** Where the line starts in a body, so an edit can replace it. */
 export const SIGNATURE_MARK = "<!-- agentes.chat -->";
 
-/** A name as GitHub shows it: no markup, no @mention, no link. */
-const escapeLine = (s: string) => s.replace(/[&<>@#*_`~|\\[\]]/g, (c) => `&#${c.charCodeAt(0)};`);
+/**
+ * A line of ours left in a body the agent sends again (an edit): the mark on a line of its own, then the line. One
+ * quoted from another comment (`> `) is the agent's text, and so is everything around it.
+ */
+const OWN_LINE = /[\r\n]*^[ \t]*<!-- agentes\.chat -->[ \t]*\r?\n<sub>[^<\r\n]*<\/sub>[ \t]*$/gm;
 
-/** `body` with the agent's line at its end, once (an old line is replaced). */
+/** A name as GitHub shows it: one line, no markup, no @mention, no link. */
+const escapeLine = (s: string) => s.replace(/\s+/g, " ").replace(/[&<>@#*_`~|\\[\]]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** `body` with the agent's line at its end, once (an old line of ours is taken out, nothing else). */
 export function signedBody(body: string, line: string) {
-  const at = body.indexOf(SIGNATURE_MARK);
-  const text = (at === -1 ? body : body.slice(0, at)).trimEnd();
+  const text = body
+    .replace(OWN_LINE, "")
+    .replace(/^[\r\n]+/, "")
+    .trimEnd();
   return `${text ? `${text}\n\n` : ""}${SIGNATURE_MARK}\n<sub>${escapeLine(line)}</sub>`;
 }
 

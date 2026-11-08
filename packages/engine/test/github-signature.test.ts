@@ -23,7 +23,14 @@ describe("the line and the credit (ADR 0153)", () => {
     expect(signed).toBe(
       `Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev, agent for &#64;everyone &#60;b&#62;x&#60;/b&#62; on agentes.chat</sub>`,
     );
-    expect(signedBody(`${signed}\n\nmore`, "Dev")).toBe(`Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
+    expect(signedBody(signed, "Dev")).toBe(`Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
+    // An edit that wrote on after the old line keeps all it wrote; the old line goes.
+    expect(signedBody(`${signed}\n\nmore`, "Dev")).toBe(`Fixes #1\n\nmore\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
+    expect(signedBody(signed.replaceAll("\n", "\r\n"), "Dev")).toBe(`Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
+    // A signed comment quoted in a reply is the reply's text: nothing after it is lost.
+    const quoted = `> ${signed.replaceAll("\n", "\n> ")}\n\nAgreed, done in #2.`;
+    expect(signedBody(quoted, "Dev")).toBe(`${quoted}\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
+    expect(signedBody("", "Dev\nfor Ana")).toBe(`${SIGNATURE_MARK}\n<sub>Dev for Ana</sub>`);
     const trailer = "Co-authored-by: Ana <1+ana@users.noreply.github.com>";
     expect(creditedMessage("Fix login", trailer)).toBe(`Fix login\n\n${trailer}`);
     expect(creditedMessage("Fix: login", trailer)).toBe(`Fix: login\n\n${trailer}`);
