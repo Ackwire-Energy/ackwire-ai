@@ -80,3 +80,34 @@ describe("one group heading", () => {
     expect(body(".ac-groups")).toContain("gap: 24px;");
   });
 });
+
+describe("one menu rhythm", () => {
+  test("rows of 32 (40 on touch), a description adding its line to the same room, Mais 2 apart as menus are", () => {
+    expect(body(":root")).toContain("--menu-item-h: 32px;");
+    expect(body(":root", media("(pointer: coarse)"))).toContain("--menu-item-h: 40px;");
+    expect(body(".ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)")).toBe("");
+    expect(kit).not.toContain(".ac-menu:has(.ac-menu__desc) .ac-menu__item {");
+    expect(body(".ac-popover:has(> .ac-menu__item)")).toContain("gap: 2px;");
+  });
+
+  test("a search's list, a filter's and the workspace menu take the same rows", () => {
+    for (const row of [".ac-tz__option", ".ac-filter__option"]) {
+      expect(body(row)).toContain("min-height: var(--menu-item-h);");
+      expect(body(row)).toContain("padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);");
+      expect(body(row)).toContain("line-height: 20px;");
+    }
+    expect(body(".ac-tz__list")).toContain("gap: 2px;");
+    expect(body(".ac-tz__list > div")).toContain("gap: 2px;");
+    expect(body(".ac-filter__list")).toContain("gap: 2px;");
+    expect(body('.ac-menu--select [role="group"]')).toContain("gap: 2px;");
+    // The full-screen menu's 15px rows are the touch ones under any pointer: 20px of line and 10 above and below.
+    expect(body(".ac-mo__item")).toContain("padding: 10px 14px;");
+    expect(body(".ac-suggest__item")).not.toContain("min-height");
+  });
+
+  test("a face list keeps its own rows over the menu's", () => {
+    expect(body(":is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar) .ac-menu__item")).toContain(
+      "min-height: var(--option-h);",
+    );
+  });
+});

@@ -2046,12 +2046,12 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 }
 
 /*
- * Menu (listbox of the Select, dropdown menus, the right click). Its rows are as dense as the message's hover bar:
- * one height and side padding for every menu's item (taller under a finger, below), and one room between the menu's
- * edge and its rows on all four sides (`--menu-pad`).
+ * Menu (listbox of the Select, dropdown menus, the right click, a popover drawn as a menu, a search's list). One
+ * rhythm for every menu: a line 32, a name over its description 50, a row with a face 36 (40, 58 and 44 under a
+ * finger, below), rows 2 apart, and one room between the menu's edge and its rows on all four sides (`--menu-pad`).
  */
 :root {
-  --menu-item-h: 28px;
+  --menu-item-h: 32px;
   --menu-item-px: 8px;
   --menu-pad: var(--space-1);
 }
@@ -2090,6 +2090,12 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   flex-direction: column;
   gap: 2px;
   padding-block: var(--menu-pad);
+}
+/* A group of options under its heading keeps the list's rhythm. */
+.ac-menu--select [role="group"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .ac-menu--dropdown {
   min-width: 200px;
@@ -2270,15 +2276,6 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
-}
-/* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
-.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
-  padding-block: var(--menu-item-px);
-}
-/* A list that mixes two-line rows with one-line ones (an option and "+ Nova categoria…"): every row gets the same room,
-   so the action row's padding matches the options above it. */
-.ac-menu:has(.ac-menu__desc) .ac-menu__item {
-  padding-block: var(--menu-item-px);
 }
 .ac-menu__desc {
   font-size: 13px;
@@ -3716,6 +3713,10 @@ html:not([data-pointer]) .ac-receipt__action:focus-visible {
 }
 .ac-popover:focus {
   outline: none;
+}
+/* Rows of a menu (Mais): a menu's 2 between them, so its separator has a menu's room too. */
+.ac-popover:has(> .ac-menu__item) {
+  gap: 2px;
 }
 .ac-popover__title {
   padding: 4px 6px;
@@ -6748,9 +6749,6 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
   width: 330px;
   max-width: calc(100vw - 32px);
 }
-.ac-suggest__item {
-  min-height: 40px;
-}
 
 /* Composer: header (reply), files, formatting toolbar, drop target */
 .ac-composer__header {
@@ -8602,6 +8600,12 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   padding: var(--menu-pad);
   border-bottom: 1px solid var(--line);
 }
+.ac-tz__list,
+.ac-tz__list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .ac-tz__list {
   flex: 1 1 auto;
   min-height: 0;
@@ -8619,8 +8623,9 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  min-height: 36px;
-  padding: 9px 10px;
+  min-height: var(--menu-item-h);
+  padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);
+  line-height: 20px;
   box-sizing: border-box;
   border-radius: var(--radius-item);
   cursor: pointer;
@@ -9249,6 +9254,9 @@ html:not([data-pointer]) .ac-filter__clear:focus-visible {
   overflow: hidden;
 }
 .ac-filter__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   max-height: 340px;
   overflow-y: auto;
   padding: var(--menu-pad);
@@ -9259,14 +9267,15 @@ html:not([data-pointer]) .ac-filter__clear:focus-visible {
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 34px;
-  padding: 4px 10px;
+  min-height: var(--menu-item-h);
+  padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);
   border: 0;
   border-radius: var(--radius-item);
   background: transparent;
   color: var(--ink);
   font: inherit;
   font-size: 13.5px;
+  line-height: 20px;
   text-align: left;
   cursor: pointer;
 }
@@ -10508,10 +10517,11 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
 .ac-mo__group > .ac-menu__heading {
   padding: 6px 14px 4px;
 }
+/* The touch row (40) under any pointer: a menu that fills the screen in 15px type. */
 .ac-mo__item {
   align-items: center;
   gap: var(--space-3);
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: calc(var(--radius-section) - var(--space-2));
   font-size: 15px;
   line-height: 20px;

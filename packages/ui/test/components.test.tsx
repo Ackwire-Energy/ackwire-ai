@@ -873,7 +873,7 @@ describe("Message aside and foot", () => {
         .join(";");
     const value = (selector: string, prop: string) =>
       [...decls(selector).matchAll(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`, "g"))].at(-1)?.[1]?.trim();
-    expect(css).toContain(":root {\n  --menu-item-h: 28px;\n  --menu-item-px: 8px;\n  --menu-pad: var(--space-1);\n}");
+    expect(css).toContain(":root {\n  --menu-item-h: 32px;\n  --menu-item-px: 8px;\n  --menu-pad: var(--space-1);\n}");
     expect(value(".ac-menu__item", "padding")).toBe("calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px)");
     expect(value(".ac-menu__item", "min-height")).toBe("var(--menu-item-h)");
     expect(value(".ac-menu__item", "line-height")).toBe("20px");
