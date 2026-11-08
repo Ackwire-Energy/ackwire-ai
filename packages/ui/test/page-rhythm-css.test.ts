@@ -99,6 +99,9 @@ describe("one menu rhythm", () => {
     expect(body(".ac-tz__list")).toContain("gap: 2px;");
     expect(body(".ac-tz__list > div")).toContain("gap: 2px;");
     expect(body(".ac-filter__list")).toContain("gap: 2px;");
+    // The composer's suggestions and the palette group their rows in a listbox: the rows keep the 2 there too.
+    for (const list of ['.ac-suggest > [role="listbox"] > [role="presentation"]', ".ac-palette__list > [role=\"presentation\"]"])
+      expect(body(list)).toContain("gap: 2px;");
     expect(body(':is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions)')).toContain(
       "gap: 2px;",
     );

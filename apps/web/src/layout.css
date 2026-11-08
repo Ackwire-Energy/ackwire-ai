@@ -6312,7 +6312,7 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   top: 48px;
   width: 300px;
   max-width: calc(100% - 32px);
-  padding: 6px;
+  padding: var(--menu-pad);
   z-index: var(--z-floating);
 }
 /* "Salvar na wiki" */

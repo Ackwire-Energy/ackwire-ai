@@ -2098,8 +2098,14 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   gap: 2px;
   padding-block: var(--menu-pad);
 }
-/* A group of options or items under its heading keeps the list's rhythm (a select's, a dropdown's radio group). */
-:is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions) {
+/* A group of options or items under its heading keeps the list's rhythm (a select's, a dropdown's radio group, the
+   composer's suggestions' listbox and its groups, the palette's list). */
+:is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions),
+.ac-suggest > [role="listbox"],
+.ac-suggest > [role="listbox"] > [role="presentation"],
+.ac-palette__list,
+.ac-palette__list > [role="presentation"],
+.ac-palette__list > [role="group"] {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2258,18 +2264,19 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   width: 16px;
 }
 /*
- * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
- * small face or a stack of them) sits on the first line's capitals, as an `.ac-iconline` lead does. A 30px tile stays
- * centred on both lines, which starts the first line's capitals at its top.
+ * An option with a description under its name (a menu's, a select's, SearchSelect's): a lead no taller than 1.25 of
+ * its 20px lines (an icon, a mark, a small face or a stack of them) sits on the first line's capitals, as an
+ * `.ac-iconline` lead does. A 30px tile stays centred on both lines, which starts the first line's capitals at its
+ * top.
  */
-.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+:is(.ac-menu__item, .ac-search__option):has(> .ac-menu__label > .ac-menu__desc)
 > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
   align-self: flex-start;
   /* Browsers without the lh unit: the option's 20px line. */
   translate: 0 calc(10px - var(--cap-mid) - 50%);
 }
 @supports (top: 1lh) {
-  .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+  :is(.ac-menu__item, .ac-search__option):has(> .ac-menu__label > .ac-menu__desc)
     > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
