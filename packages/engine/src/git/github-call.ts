@@ -35,8 +35,10 @@ const SCOPE_PERMISSIONS: Record<string, AppPermissions[]> = {
   "pr.read": [{ pull_requests: "read", checks: "read", statuses: "read" }],
   "pr.write": [{ pull_requests: "write", contents: "read" }],
   "pr.merge": [{ contents: "write", pull_requests: "write" }],
-  "issues.read": [{ issues: "read" }],
-  "issues.write": [{ issues: "write" }],
+  // A pull request's number goes through the issues endpoints too (comments, labels, assignees), and GitHub refuses
+  // an app token without `pull_requests` there ("Resource not accessible by integration").
+  "issues.read": [{ issues: "read", pull_requests: "read" }, { issues: "read" }],
+  "issues.write": [{ issues: "write", pull_requests: "write" }, { issues: "write" }],
   "actions.read": [{ actions: "read" }],
   // An installation that hasn't accepted it refuses, and an account's connection runs it.
   "actions.run": [{ actions: "write" }],
