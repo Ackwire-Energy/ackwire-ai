@@ -137,7 +137,7 @@ describe("a teammate's settings, on the right hand's card", () => {
   test("who may decide reads each line then and proposed, and Aplicar applies it as them", async () => {
     const { state } = await go(withCard(seedState(), settingsRow()));
     const c = card("Mudar as configurações da Ada");
-    for (const shown of ["Propõe uma mudança", "esperando você", "A Ada no Haiku", "Ada · Configurações", "@ada · Dev"])
+    for (const shown of ["Propõe uma mudança", "A Ada no Haiku", "Ada · Configurações", "@ada · Dev"])
       expect(c.textContent).toContain(shown);
     const lines = [...c.querySelectorAll(".rq__setting")].map((l) => [
       l.querySelector("dt")?.textContent,

@@ -23,28 +23,46 @@ const labels: VideoPlayerProps["labels"] = {
   open: "Abrir",
 };
 const player = (props: Partial<VideoPlayerProps> = {}) =>
-  render(<VideoPlayer src="/f?version=2" name="abertura.mp4" size="7,5 MB" labels={labels} {...props} />);
+  render(<VideoPlayer src="/f?version=2" name="abertura.mp4" labels={labels} {...props} />);
 
 describe("VideoPlayer", () => {
-  test("stopped: the first frame, a play key named after the file, the caption and the corner button", () => {
+  test("stopped: the first frame, a play key named after the file, its length, and the corner group", () => {
     let opened = 0;
-    player({ onOpen: () => opened++ });
+    let saved = 0;
+    player({
+      onOpen: () => opened++,
+      actions: (
+        <button type="button" onClick={() => saved++}>
+          Baixar
+        </button>
+      ),
+    });
     const video = document.querySelector("video");
     // `#t`: the first frame shows before it plays; only its details load until then.
     expect(video?.getAttribute("src")).toBe("/f?version=2#t=0.001");
     expect(video?.getAttribute("preload")).toBe("metadata");
     expect(screen.getByRole("button", { name: "Tocar: abertura.mp4" })).toBeTruthy();
-    expect(document.querySelector(".ac-video__caption")?.textContent).toContain("abertura.mp4");
-    expect(document.querySelector(".ac-video__caption")?.textContent).toContain("7,5 MB");
+    // No name over the picture (a picture's tile has none): only its length, once it is known.
+    expect(document.querySelector(".ac-video__caption")).toBeNull();
+    expect(document.querySelector(".ac-video__length")).toBeNull();
+    Object.defineProperty(video, "duration", { configurable: true, value: 161 });
+    fireEvent.loadedMetadata(video as HTMLVideoElement);
+    expect(document.querySelector(".ac-video__length")?.textContent).toBe("2:41");
     // The bar waits, out of the tab order, until it plays.
     expect(document.querySelector(".ac-video__bar")?.hasAttribute("inert")).toBe(true);
+    // The corner group: open in the viewer, then the caller's actions; a click there never plays the video.
+    const group = document.querySelector(".ac-video__acts") as HTMLElement;
+    expect(
+      Array.from(group.querySelectorAll("button")).map((b) => b.getAttribute("aria-label") ?? b.textContent),
+    ).toEqual(["Abrir", "Baixar"]);
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-    expect(opened).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Baixar" }));
+    expect([opened, saved]).toEqual([1, 1]);
   });
 
-  test("the viewer has no caption and no corner button", () => {
+  test("the viewer has no length badge and no corner button", () => {
     player({ variant: "viewer", onOpen: () => undefined });
-    expect(document.querySelector(".ac-video__caption")).toBeNull();
+    expect(document.querySelector(".ac-video__acts")).toBeNull();
     expect(screen.queryByRole("button", { name: "Abrir" })).toBeNull();
   });
 

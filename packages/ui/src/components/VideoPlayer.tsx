@@ -25,15 +25,15 @@ export interface VideoPlayerLabels {
 export interface VideoPlayerProps {
   /** Where it plays from (a URL that answers in parts). */
   src: string;
-  /** The file's name, on the tile's caption and in the big play button's name. */
+  /** The file's name, in the big play button's name. */
   name: string;
-  /** After the length on the caption ("7,5 MB"). */
-  size?: string;
   /** `tile` in the chat (its own proportions, capped; a corner button opens the viewer), `viewer` fills its box. */
   variant?: "tile" | "viewer";
   labels: VideoPlayerLabels;
   /** The tile's corner button. */
   onOpen?: () => void;
+  /** Beside the corner button, in the same glass group on hover (a chat tile's Download and More actions). */
+  actions?: ReactNode;
   /** It can't play here (a codec this browser lacks, the file gone): the caller shows the file instead. */
   onFailed?: () => void;
   /** Over the picture's top left (the viewer's own buttons). */
@@ -152,18 +152,18 @@ function Rail({
 }
 
 /**
- * A video with our own controls: stopped, its first frame with a play key in the middle and "name · length · size"
- * at its foot (like a picture's tile); playing, a glass bar over its foot (play, timeline, time, speed, sound, full
+ * A video with our own controls: stopped, its first frame with a play key in the middle and its length in a small
+ * badge at its foot (no name over the picture, as a picture's tile has none); playing, a glass bar over its foot (play, timeline, time, speed, sound, full
  * screen) that hides when the pointer rests. A click on the picture plays or pauses it (a touch shows the bar first);
  * Space or K, ← →, M and F from the keyboard. One thing plays at a time, voice messages included.
  */
 export function VideoPlayer({
   src,
   name,
-  size,
   variant = "tile",
   labels,
   onOpen,
+  actions,
   onFailed,
   children,
   className,
@@ -280,7 +280,6 @@ export function VideoPlayer({
   const tile = variant === "tile";
   const playLabel = phase === "ended" ? labels.replay : phase === "playing" ? labels.pause : labels.play;
   const lengthText = duration > 0 ? clock(duration) : "";
-  const caption = [lengthText, size].filter(Boolean).join(" · ");
   const progress = duration > 0 ? clamp(time / duration) : 0;
   const silent = muted || volume === 0;
 
@@ -379,27 +378,31 @@ export function VideoPlayer({
         </span>
       )}
 
-      {tile && phase === "idle" && (
-        <span className="ac-video__caption small">
-          <span className="ac-video__name">{name}</span>
-          {caption && <span className="tabular">{caption}</span>}
+      {tile && phase === "idle" && lengthText && (
+        <span className="ac-video__length tabular" aria-hidden="true">
+          {lengthText}
         </span>
       )}
 
-      {tile && onOpen && (
-        <button
-          type="button"
-          className="ac-video__open"
-          aria-label={labels.open}
-          title={labels.open}
-          onClick={(e) => {
-            e.stopPropagation();
-            video.current?.pause();
-            onOpen();
-          }}
-        >
-          <Icon name="expand" size={16} />
-        </button>
+      {tile && (onOpen || actions) && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: only keeps a click on its buttons off the picture
+        <span className="ac-video__acts" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          {onOpen && (
+            <button
+              type="button"
+              className="ac-video__open"
+              aria-label={labels.open}
+              title={labels.open}
+              onClick={() => {
+                video.current?.pause();
+                onOpen();
+              }}
+            >
+              <Icon name="expand" size={16} />
+            </button>
+          )}
+          {actions}
+        </span>
       )}
 
       {children}

@@ -11,17 +11,18 @@ import { LiveBlockCard } from "../blocks/LiveBlock";
 import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
+import { AttachmentTile } from "./AttachmentTile";
 import { ImageStack } from "./ImageStack";
-import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight, VIDEO_EXT } from "./logic";
+import { encodeFileList, extensionOf, type FileInfo, fileInfo, IMAGE_EXT, singleImageHeight, VIDEO_EXT } from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
 import { VideoPlayer } from "./VideoPlayer";
 
 /**
- * A message's files: a picture inline at its own shape, or several as a deck to swipe through (`ImageStack`),
- * tapping opens the viewer at that picture; a video plays right there (its corner button opens the file screen);
- * other files as a card with the type's tile, the real name and
- * "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own message, its files sit
- * on the right.
+ * A message's files. Pictures alone: one inline at its own shape, or several as a deck to swipe through
+ * (`ImageStack`), tapping opens the viewer at that picture. Any other attachment: tiles of one size, two to a row
+ * (`AttachmentTile`: what it holds drawn small, its name, kind and size under it), with the pictures beside them as
+ * tiles too. A video plays right there (its corner button opens the file screen). `align="end"`: the viewer's own
+ * message, its files sit on the right.
  */
 
 export interface MessageFile {
@@ -33,7 +34,8 @@ export interface MessageFile {
 
 /** Widest a picture block gets in a message. */
 const MAX_WIDTH = 300;
-const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif"]);
+/** Between two tiles in a row. */
+const GAP = 8;
 
 export function MessageFiles({ files, align = "start" }: { files: MessageFile[]; align?: "start" | "end" }) {
   const orgId = useOrgId();
@@ -65,8 +67,12 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   });
   const removed = files.filter((f) => f.deleted);
   const blockWidth = Math.min(width || MAX_WIDTH, MAX_WIDTH);
+  // Beside other attachments, pictures are tiles too: one grid, never a deck next to a file.
+  const tiles = others.length > 0 ? [...images.map((i) => ({ ...i, failed: false })), ...others] : [];
+  const pictures = tiles.length > 0 ? [] : images;
+  const tileWidth = tiles.length === 1 ? blockWidth : Math.floor((blockWidth - GAP) / 2);
 
-  const [only] = images;
+  const [only] = pictures;
   // Opening a file or a picture is plain navigation: the press shows it, with no haptic.
   const openOnly = () => {
     if (!only) return;
@@ -81,8 +87,8 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[styles.wrap, align === "end" && styles.end]}>
-      {images.length > 1 ? <ImageStack images={images} width={blockWidth} /> : null}
-      {only && images.length === 1 ? (
+      {pictures.length > 1 ? <ImageStack images={pictures} width={blockWidth} /> : null}
+      {only && pictures.length === 1 ? (
         <View style={{ width: blockWidth }}>
           <InlineImage
             file={only.file}
@@ -105,9 +111,20 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
           <LiveBlockCard key={b.id} id={b.id} version={b.shownVersion} />
         ),
       )}
-      {others.map(({ file, detail, failed }) => (
-        <FileCard key={file.id} file={file} detail={detail} failed={failed} />
-      ))}
+      {tiles.length > 0 ? (
+        <View style={[styles.grid, { width: blockWidth }, align === "end" && styles.gridEnd]}>
+          {tiles.map(({ file, detail, failed }) => (
+            <AttachmentTile
+              key={file.id}
+              file={file}
+              detail={detail}
+              failed={failed}
+              width={tileWidth}
+              single={tiles.length === 1}
+            />
+          ))}
+        </View>
+      ) : null}
       {removed.map((file) => (
         <RemovedCard key={file.id} />
       ))}
@@ -179,7 +196,6 @@ function InlineVideo({
   detail: ArtifactDetail | undefined;
   width: number;
 }) {
-  const { i18n } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
   const version = detail?.shownVersion ?? file.version;
@@ -189,7 +205,7 @@ function InlineVideo({
     () => (link.data ? { uri: link.data.uri, ...(link.data.headers ? { headers: link.data.headers } : {}) } : null),
     [link.data],
   );
-  if (failed || link.isError) return <FileCard file={file} detail={detail} failed={false} />;
+  if (failed || link.isError) return <AttachmentTile file={file} detail={detail} width={width} single />;
   const info = detail ? fileInfo(detail) : null;
   const open = () => {
     if (!detail) return;
@@ -205,7 +221,6 @@ function InlineVideo({
           key={source.uri}
           source={source}
           name={info?.name || file.title}
-          size={info?.size != null ? formatBytes(i18n.language || "en", info.size) : undefined}
           width={width}
           onOpen={detail ? open : undefined}
           onFailed={() => setFailed(true)}
@@ -255,48 +270,6 @@ export function FileTile({ ext, size = "md" }: { ext: string; size?: "md" | "lg"
   );
 }
 
-function FileCard({
-  file,
-  detail,
-  failed,
-}: {
-  file: MessageFile;
-  detail: ArtifactDetail | undefined;
-  failed: boolean;
-}) {
-  const { t } = useTranslation();
-  const surface = useSurface();
-  const line = useFileLine();
-  const info = detail ? fileInfo(detail) : null;
-  const name = info?.name || file.title || t("mobile.chat.file");
-  const open = () => {
-    if (!detail) return;
-    router.push({
-      pathname: "/file/[id]",
-      params: { id: file.id, ...(detail.shownVersion < detail.version ? { v: String(detail.shownVersion) } : {}) },
-    });
-  };
-  return (
-    <Pressable
-      onPress={open}
-      disabled={!detail}
-      accessibilityRole="button"
-      accessibilityLabel={info ? `${name}, ${line(info)}` : name}
-      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
-    >
-      <FileTile ext={info?.ext ?? extensionOf(file.title).slice(0, 4).toUpperCase()} />
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold} numberOfLines={1}>
-          {name}
-        </Text>
-        <Text variant="footnote" tone="faint" numberOfLines={1}>
-          {info ? line(info) : failed ? t("mobile.files.loadFailed") : t("mobile.common.loading")}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
 function RemovedCard() {
   const { t } = useTranslation();
   const c = useColors();
@@ -315,6 +288,8 @@ function RemovedCard() {
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "stretch", gap: 8 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
+  gridEnd: { justifyContent: "flex-end" },
   end: { alignItems: "flex-end" },
   shot: { borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   center: {

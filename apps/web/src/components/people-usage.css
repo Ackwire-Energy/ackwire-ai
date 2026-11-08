@@ -524,8 +524,7 @@ th.pu-num .pu-sort {
   font-size: 14px;
   white-space: nowrap;
 }
-/* Under a waiting row's text, in its column (like a change request's card). */
+/* Right under a waiting row's card, as a change request's card is. */
 .nt-wr > .pu-asks {
-  grid-column: 2;
   margin-top: 0;
 }

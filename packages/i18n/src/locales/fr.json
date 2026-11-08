@@ -10251,6 +10251,12 @@
     "moreFiles_one": "+ {{count}} fichier",
     "moreFiles_many": "+ {{count}} fichiers",
     "moreFiles_other": "+ {{count}} fichiers",
+    "rows_one": "{{count}} ligne",
+    "rows_many": "{{count}} lignes",
+    "rows_other": "{{count}} lignes",
+    "files_one": "{{count}} fichier",
+    "files_many": "{{count}} fichiers",
+    "files_other": "{{count}} fichiers",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} lignes ajoutées, {{removed}} retirées",
     "htmlPreview": "Page interactive. Ouvrez-la pour la voir.",
@@ -15738,7 +15744,8 @@
     "where": {
       "dm": "Conversation directe",
       "routine": "Routine « {{name}} »",
-      "background": "En arrière-plan"
+      "background": "En arrière-plan",
+      "here": "Cette conversation"
     },
     "askedBy": "Demande de {{name}}",
     "askedByYou": "Votre demande",
@@ -15987,7 +15994,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> a signalé « {{title}} »",
-      "failed": "« {{title}} » ne se met plus à jour",
+      "failed": "<b>{{name}}</b> n’a pas pu mettre à jour « {{title}} »",
       "proposal": "<b>{{name}}</b> veut publier un tableau de bord",
       "proposalWorkspace": "« {{title}} » pour tout l'espace de travail · vous seul le voyez aujourd'hui",
       "proposalRoles": "« {{title}} » pour {{roles}} · vous seul le voyez aujourd'hui",

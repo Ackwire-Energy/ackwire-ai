@@ -9501,6 +9501,8 @@
     "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
     "moreRows_other": "+ {{count}} baris",
     "moreFiles_other": "+ {{count}} file",
+    "rows_other": "{{count}} baris",
+    "files_other": "{{count}} file",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} baris ditambahkan, {{removed}} dihapus",
     "htmlPreview": "Halaman interaktif. Buka untuk melihatnya.",
@@ -14704,7 +14706,8 @@
     "where": {
       "dm": "Pesan langsung",
       "routine": "Rutinitas «{{name}}»",
-      "background": "Di latar belakang"
+      "background": "Di latar belakang",
+      "here": "Percakapan ini"
     },
     "askedBy": "{{name}} meminta",
     "askedByYou": "Kamu meminta",
@@ -14939,7 +14942,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> menandai “{{title}}”",
-      "failed": "“{{title}}” berhenti diperbarui",
+      "failed": "<b>{{name}}</b> gagal memperbarui “{{title}}”",
       "proposal": "<b>{{name}}</b> ingin memublikasikan dasbor",
       "proposalWorkspace": "“{{title}}” untuk seluruh ruang kerja · saat ini hanya kamu yang melihatnya",
       "proposalRoles": "“{{title}}” untuk {{roles}} · saat ini hanya kamu yang melihatnya",

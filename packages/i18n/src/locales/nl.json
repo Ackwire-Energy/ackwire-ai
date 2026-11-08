@@ -9934,6 +9934,10 @@
     "moreRows_other": "+ {{count}} rijen",
     "moreFiles_one": "+ {{count}} bestand",
     "moreFiles_other": "+ {{count}} bestanden",
+    "rows_one": "{{count}} rij",
+    "rows_other": "{{count}} rijen",
+    "files_one": "{{count}} bestand",
+    "files_other": "{{count}} bestanden",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} regels toegevoegd, {{removed}} verwijderd",
     "htmlPreview": "Interactieve pagina. Open hem om te bekijken.",
@@ -15305,7 +15309,8 @@
     "where": {
       "dm": "Direct bericht",
       "routine": "Routine «{{name}}»",
-      "background": "Op de achtergrond"
+      "background": "Op de achtergrond",
+      "here": "Dit gesprek"
     },
     "askedBy": "{{name}} vroeg het",
     "askedByYou": "Jij vroeg het",
@@ -15547,7 +15552,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> heeft “{{title}}” gemarkeerd",
-      "failed": "“{{title}}” wordt niet meer bijgewerkt",
+      "failed": "<b>{{name}}</b> kon “{{title}}” niet bijwerken",
       "proposal": "<b>{{name}}</b> wil een dashboard publiceren",
       "proposalWorkspace": "“{{title}}” voor de hele werkruimte · vandaag zie alleen jij het",
       "proposalRoles": "“{{title}}” voor {{roles}} · vandaag zie alleen jij het",

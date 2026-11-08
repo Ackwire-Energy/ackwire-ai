@@ -829,7 +829,7 @@ test("a session moves to another folder's project as the sign-in's user, followi
 // ── The self-check ────────────────────────────────────────────────────────────
 
 const FAKE_CLAUDE = path.join(import.meta.dir, "fake-claude.mjs");
-const SWITCH = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+const SWITCH = { refresh: "A" as const };
 const rootOwned = (() => ({
   uid: 0,
   mode: 0o755,
@@ -908,7 +908,7 @@ test.if(process.platform !== "win32")("what the agent's user tries counts only w
   expect(answers({ proc: "cat: read error: Input/output error" })).not.toBe(0);
 });
 
-test("the self-check says why: off, no systemd, an untrusted path, a version nobody validated", async () => {
+test("the self-check says why: off, no systemd, an untrusted path", async () => {
   const off = selfCheck();
   off.check.config = { mode: "system" };
   expect(await accountSelfCheck(off.check)).toContain("off");
@@ -918,12 +918,24 @@ test("the self-check says why: off, no systemd, an untrusted path, a version nob
   expect(await accountSelfCheck(selfCheck({ systemd: false }).check)).toContain("systemd");
   const writable = (() => ({ ...(rootOwned as unknown as () => object)(), mode: 0o777 })) as unknown;
   expect(await accountSelfCheck(selfCheck({ stat: writable as SelfCheck["stat"] }).check)).toContain("Claude CLI");
-  const old = selfCheck({}, { version: { code: 0, output: "2.1.299 (Claude Code)" } });
-  expect(await accountSelfCheck(old.check)).toContain("2.1.299");
-  const newer = selfCheck({}, { version: { code: 0, output: "2.1.321 (Claude Code)" } });
-  expect(await accountSelfCheck(newer.check)).toContain("2.1.321");
-  expect(await accountSelfCheck(selfCheck({}, { version: { code: 127, output: "" } }).check)).toContain("no version");
 });
+
+test.if(process.platform !== "win32")(
+  "the self-check takes any Claude CLI version, and a failure names the one installed",
+  async () => {
+    for (const output of ["2.1.299 (Claude Code)", "9.0.0 (Claude Code)", ""]) {
+      expect(await accountSelfCheck(selfCheck({}, { version: { code: 0, output } }).check)).toBeNull();
+    }
+    expect(await accountSelfCheck(selfCheck({}, { version: { code: 127, output: "" } }).check)).toBeNull();
+    const failed = selfCheck(
+      {},
+      { pgrep: { code: 1, output: "" }, version: { code: 0, output: "9.0.0 (Claude Code)" } },
+    );
+    expect(await accountSelfCheck(failed.check)).toBe("The Claude CLI's process wasn't found (Claude CLI 9.0.0)");
+    const silent = selfCheck({}, { pgrep: { code: 1, output: "" }, version: { code: 127, output: "" } });
+    expect(await accountSelfCheck(silent.check)).toBe("The Claude CLI's process wasn't found");
+  },
+);
 
 test.if(process.platform !== "win32")(
   "the self-check holds the relay's script to what it holds its runtime",

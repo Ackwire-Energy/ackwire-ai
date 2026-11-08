@@ -206,6 +206,8 @@ export * from "./plan-usage";
 export * from "./profile";
 export * from "./push";
 export * from "./push-messages";
+export * from "./push-relay";
+export * from "./push-relay-client";
 export * from "./questions";
 export * from "./recovery";
 export * from "./reply-policy";

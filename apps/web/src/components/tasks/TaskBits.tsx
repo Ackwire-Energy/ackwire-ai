@@ -327,13 +327,17 @@ export function ProgramStack({ tasks }: { tasks: ManagedTask[] }) {
   );
 }
 
-/** "Parar": the stop square and the word; "Parando…" with the orbit once pressed. */
+/**
+ * "Parar": the stop square and the word; "Parando…" with the orbit once pressed. `compact`: only the square (the
+ * agent's panel, where the word crowds the title), its words for screen readers and on hover.
+ */
 export function StopTaskButton({
   label,
   stopping = false,
   onClick,
   title,
   className,
+  compact = false,
 }: {
   label: string;
   stopping?: boolean;
@@ -341,8 +345,28 @@ export function StopTaskButton({
   /** The task it stops, for screen readers ("Parar: Corrigir o link"). */
   title?: string;
   className?: string;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
+  const said = stopping ? t("taskManager.state.stopping") : label;
+  if (compact)
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        iconOnly
+        className={cx("tm-stop", className)}
+        disabled={stopping}
+        aria-label={title && !stopping ? `${label}: ${title}` : said}
+        title={said}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        {stopping ? <Spinner size={14} /> : <PixelStop size={12} />}
+      </Button>
+    );
   return (
     <Button
       size="sm"

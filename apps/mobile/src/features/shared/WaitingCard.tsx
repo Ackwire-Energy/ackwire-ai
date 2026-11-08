@@ -38,9 +38,10 @@ export interface WaitingCardProps {
 /**
  * One thing waiting on you, as Atividade, Conversas' strip and an agent's profile show it, read as the chat's request
  * card: the card with its cut corner (square bottom left, as the chat's blocks), the asking agent's sky faint across
- * the top (gray when no agent asks), its face with the name and the kind under it (the icon in amber, the waiting
- * color) and, at the right, the fuse to its deadline or where and when; then the request in words, why in muted, what
- * it goes through on one quiet line, and the decision (or its one action) wide under it.
+ * the top (gray when no agent asks), its face with the name and the kind under it (its icon quiet: no "waiting for
+ * you" mark, the card itself is the ask) and, at the right, where and when; then the request in words, why in muted,
+ * what it goes through on one quiet line, the decision (or its one action) wide under it and, at its end, the fuse to
+ * its deadline.
  */
 export function WaitingCard({
   agentId,
@@ -95,15 +96,13 @@ export function WaitingCard({
                 </Text>
               ) : null}
               <View style={styles.kind}>
-                <Icon name={kind.icon} size={13} color={c.amber} />
+                <Icon name={kind.icon} size={13} color={c.muted} />
                 <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.shrink]}>
                   {kind.label}
                 </Text>
               </View>
             </View>
-            {expires ? (
-              <ExpiryLine createdAt={expires.createdAt} expiresAt={expires.expiresAt} />
-            ) : where ? (
+            {where ? (
               <Text variant="footnote" tone="faint" numberOfLines={1} style={[styles.when, styles.where]}>
                 {where}
               </Text>
@@ -116,7 +115,16 @@ export function WaitingCard({
           ) : null}
           {children}
         </Pressable>
-        {foot ? <View style={styles.ft}>{foot}</View> : null}
+        {foot || expires ? (
+          <View style={styles.ft}>
+            {foot}
+            {expires ? (
+              <View style={styles.expiry}>
+                <ExpiryLine createdAt={expires.createdAt} expiresAt={expires.expiresAt} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         {footer ? <View style={[styles.footer, { borderTopColor: c.line2 }]}>{footer}</View> : null}
       </View>
     </View>
@@ -151,6 +159,8 @@ const styles = StyleSheet.create({
   sourceMark: { flexShrink: 0 },
   // The decision under the request, as the chat card's foot (its 8 + 4 points above).
   ft: { paddingHorizontal: 16, paddingTop: 12 },
+  // The deadline at the foot's end, right-aligned under the decision (as the chat's card).
+  expiry: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10 },
   when: { fontVariant: ["tabular-nums"] },
   // Where and when never take the name's room: at most half the line.
   where: { flexShrink: 1, maxWidth: "50%" },

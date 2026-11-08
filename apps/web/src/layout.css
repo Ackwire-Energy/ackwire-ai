@@ -1102,10 +1102,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .ac-msg--own .artifact-cards {
   justify-content: flex-end;
 }
-/* A tile wider than its thumbnail (or a file's row): the thumbnail keeps to its right edge, under the bubble. */
-.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row, .ac-video) {
-  margin-left: auto;
-}
+
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
 .ac-msg--own .ac-msg__text .md__table {
   background: var(--bg);
@@ -1586,178 +1583,388 @@ html:not([data-pointer]) .member-row--add:focus-visible {
 
 /* ── Artifacts: chat card, viewer, Drive ─────────────────────────────────── */
 /* Cards take the full row; file tiles (images, files) sit side by side and wrap. */
+/* ── Attachments on a message: tiles of one size, side by side ─────────────
+   Each a cover on top (what it holds, drawn small: a document's start, a table's first rows, a change's files, a
+   diagram, a page, a picture) and its name with its kind and size under it. One surface: a hairline and the cut
+   corner, nothing raised inside. Alone on its message a tile is wider; a picture alone shows whole. */
 .artifact-cards {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   max-width: var(--msg-card-w);
 }
+/* What isn't a tile (a live block, a vote, a choice) takes the whole row. */
 .artifact-cards > * {
   flex: 1 1 100%;
-}
-.artifact-cards > .artifact-tile,
-.artifact-cards > .artifact-card--removed {
-  flex: 0 1 auto;
   min-width: 0;
+}
+.artifact-cards > :is(.artifact-tile, .artifact-card--removed) {
+  flex: none;
   max-width: 100%;
-}
-.artifact-cards > .artifact-card--loading {
-  flex: 0 1 240px;
-}
-.artifact-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 12px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  min-width: 0;
-}
-.artifact-card:hover {
-  border-color: var(--ink-muted);
-}
-html:not([data-pointer]) .artifact-card:has(.artifact-card__open:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-.artifact-card--loading {
-  min-height: 88px;
-  background: var(--surface-sunken);
 }
 .artifact-card--missing {
   display: block;
+  padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px;
+  box-shadow: 0 0 0 1px var(--line2);
 }
-.artifact-card__open {
+.artifact-tile {
+  /* Three to a row in a message's 640px. */
+  --tile-w: 206px;
+  --tile-cover: 140px;
+  position: relative;
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
+  flex-direction: column;
+  width: var(--tile-w);
+  overflow: hidden;
+  background: var(--raised);
+  border-radius: 16px 16px 16px 4px;
+  box-shadow: 0 0 0 1px var(--line2);
+  transition: box-shadow 0.2s var(--out);
 }
-html:not([data-pointer]) .artifact-card__open:focus-visible {
-  outline: none;
+.artifact-tile:hover {
+  box-shadow:
+    0 0 0 1px var(--line2),
+    var(--e2);
 }
-/* The whole card opens the viewer. */
-.artifact-card__open::after {
-  content: "";
+html:not([data-pointer]) .artifact-tile:has(.artifact-tile__open:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+/* Lengths, never `min(100%, …)`: a percentage counts as no cap while my own row sizes to what it holds. */
+.artifact-cards > .artifact-tile:only-child {
+  --tile-w: 320px;
+  --tile-cover: 180px;
+}
+.artifact-tile--loading {
+  height: calc(var(--tile-cover) + 52px);
+  background: var(--sunken);
+  box-shadow: none;
+}
+/* The whole tile opens the viewer; its corner actions sit above this button. */
+.artifact-tile__open {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-}
-.artifact-card__icon,
-.artifact-card__thumb > .ac-icon {
-  display: inline-flex;
-  padding: 6px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  flex: none;
-}
-.artifact-card__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.artifact-card__title {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.artifact-card__version {
-  align-self: start;
-}
-.artifact-card__preview {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 18px;
-}
-.artifact-card__doc p {
-  margin: 0;
-  color: var(--ink-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.artifact-card__table {
-  border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
-}
-.artifact-card__table th,
-.artifact-card__table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.artifact-card__table th {
-  font-weight: 600;
-}
-.artifact-card__files {
-  list-style: none;
-  margin: 0;
+  z-index: 1;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: pointer;
 }
-.artifact-card__files li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
+html:not([data-pointer]) .artifact-tile__open:focus-visible {
+  outline: none;
 }
-.artifact-card__files code,
-.artifact-file__head code {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+.artifact-tile__cover {
+  position: relative;
+  height: var(--tile-cover);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+  pointer-events: none;
 }
-.artifact-card__thumb {
+.artifact-tile__foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 64px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 9px 12px 10px;
+  color: var(--faint);
 }
-/* A live thumbnail of an HTML page: drawn at 1000px wide and scaled down, never clickable itself. */
-.artifact-card__page {
-  position: relative;
-  height: 140px;
+.artifact-tile__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.artifact-tile__title {
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  pointer-events: none;
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 18px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.artifact-card__page-frame {
+.artifact-tile__meta {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Download and More over the cover's corner on hover (always shown on touch). */
+.artifact-tile__acts {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-item);
+  background: var(--glass-solid);
+  box-shadow: var(--e1);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.artifact-tile:hover .artifact-tile__acts,
+.artifact-tile:focus-within .artifact-tile__acts,
+.artifact-tile__acts:has([data-state="open"]) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .artifact-tile__acts {
+    opacity: 1;
+  }
+}
+/* The covers. A document: its own headings, paragraphs and lists, smaller, fading at the foot. */
+.artifact-tile__cover .artifact-tile__doc {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink2);
+  -webkit-mask-image: linear-gradient(#000 55%, transparent);
+  mask-image: linear-gradient(#000 55%, transparent);
+}
+.artifact-tile__cover .artifact-tile__doc > * {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 17px;
+}
+.artifact-tile__cover .artifact-tile__doc > :is(h1, h2, h3, h4, h5, h6) {
+  margin: 2px 0 4px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.artifact-tile__cover .artifact-tile__doc :is(ul, ol) {
+  padding-left: 16px;
+}
+/* A table's first rows: numbers on the right, a signed percentage in its tone. */
+.artifact-tile__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11.5px;
+}
+.artifact-tile__table :is(th, td) {
+  padding: 5px 8px 5px 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-tile__table th {
+  padding-top: 7px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.artifact-tile__table td {
+  color: var(--ink2);
+}
+.artifact-tile__table :is(th, td):first-child {
+  padding-left: 12px;
+}
+.artifact-tile__table :is(th, td):last-child {
+  padding-right: 12px;
+}
+.artifact-tile__table .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.artifact-tile__table .is-up {
+  color: var(--ok);
+}
+.artifact-tile__table .is-down {
+  color: var(--danger);
+}
+/* A code change: its files with their counts. */
+.artifact-tile__files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.artifact-tile__files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+/* A path keeps its file's name whole: the folders before it give way first. */
+.artifact-tile__files code {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.artifact-tile__dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--faint);
+}
+.artifact-tile__files code > :last-child {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.artifact-tile__added {
+  color: var(--ok);
+}
+.artifact-tile__removed {
+  color: var(--danger);
+}
+/* A text file's first lines (code in the code font). */
+.artifact-tile__code,
+.artifact-tile__text {
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  color: var(--ink2);
+  -webkit-mask-image: linear-gradient(#000 60%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+.artifact-tile__code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: pre;
+}
+.artifact-tile__text {
+  font-size: 12px;
+  line-height: 17px;
+  white-space: pre-line;
+}
+/* No preview: the type's icon and extension, quiet in the middle. */
+.artifact-tile__type {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+/* The kit draws icons at 14 to 20 px; the cover's type icon is the one place that reads larger. */
+.artifact-tile__type .ac-icon {
+  width: 28px;
+  height: 28px;
+}
+/* A page: drawn at 1000px wide and scaled to the tile. */
+.artifact-tile__page {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+}
+.artifact-tile__page-frame {
   position: absolute;
   top: 0;
   left: 0;
   width: 1000px;
-  height: 560px;
+  height: 900px;
   border: 0;
   transform: scale(var(--page-scale, 0.25));
   transform-origin: top left;
   background: #fff;
+}
+.artifact-tile__cover .artifact-diagram--compact {
+  height: 100%;
+  max-height: none;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  align-items: center;
+}
+.artifact-tile__cover .artifact-diagram--compact img {
+  max-width: 100%;
+  max-height: calc(var(--tile-cover) - 16px);
+}
+/* A picture fills its cover. */
+.artifact-tile__picture {
+  display: block;
+  height: 100%;
+  background: var(--sunken);
+}
+.artifact-tile__picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.artifact-tile[data-media] {
+  box-shadow: 0 0 0 1px var(--line);
+}
+.artifact-tile[data-media] .artifact-tile__open {
+  cursor: zoom-in;
+}
+/* A picture alone on its message: whole, at its own proportions, no name under it (Download and More stay). */
+.artifact-cards > .artifact-tile[data-media]:only-child {
+  --tile-w: fit-content;
+  max-width: 420px;
+}
+.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__cover {
+  height: auto;
+  border-bottom: 0;
+}
+.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__foot {
+  display: none;
+}
+.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture img {
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
+  height: auto;
+  min-height: 140px;
+  max-height: 320px;
+}
+/* Its loading size (the lone tile's `height: auto` would collapse it until the picture decodes). */
+.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture[data-loading] {
+  width: 240px;
+  height: 180px;
+}
+/* A video is its player, at its own proportions. */
+.artifact-tile[data-kind="video"] {
+  width: fit-content;
+  max-width: 100%;
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+/* On a phone: two to a row (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to
+   its size. */
+@media (max-width: 640px) {
+  .artifact-tile {
+    --tile-w: calc(50% - 5px);
+    --tile-cover: 120px;
+  }
+  .artifact-tile__table :is(th, td):nth-child(n + 3) {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-tile {
+    transition: none;
+  }
 }
 /* A diagram taller than the box scrolls inside it, at its own proportions (not stretched to the box's height). */
 .artifact-diagram {
@@ -5655,50 +5862,6 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 }
 
 /* ── Design system 2026-10 in the app (docs/design/refresh-2026-10.md) ── */
-/* Artifact cards: raised, hairline + e1 + top light; lift on hover; documents get a page thumbnail. */
-.artifact-card {
-  border: 0;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--e1), var(--top);
-  transition:
-    box-shadow 0.2s var(--out),
-    transform 0.2s var(--spring);
-}
-.artifact-card:hover {
-  border-color: transparent;
-  box-shadow: var(--e2), var(--top);
-  transform: translateY(-1px);
-}
-.artifact-card--loading {
-  box-shadow: none;
-}
-.artifact-thumb {
-  width: 42px;
-  height: 52px;
-  flex: none;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 7px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--raised), var(--sunken));
-  box-shadow: 0 0 0 1px var(--line);
-}
-.artifact-thumb span {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--line2);
-}
-@media (prefers-reduced-motion: reduce) {
-  .artifact-card {
-    transition: none;
-  }
-  .artifact-card:hover {
-    transform: none;
-  }
-}
-
 /* Sidebar: on the sky's paper, nothing raised in it. The active item is the page's
    white with a hairline, painted on the item itself (no sliding); counts are plain numbers. */
 .sidebar {
@@ -7160,137 +7323,6 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-/* A file on a chat message, as a tile: an image thumbnail (opens the viewer), or the type, name, size and Baixar. */
-.file-thumb {
-  position: relative;
-  display: block;
-  height: 200px;
-  /* A length, not `min(100%, …)`: a percentage counts as no cap when my own row sizes to what it holds (`.ac-gif`). */
-  max-width: 360px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-  box-shadow: var(--e1), var(--top);
-  cursor: zoom-in;
-}
-.file-thumb img {
-  display: block;
-  height: 100%;
-  width: auto;
-  min-width: 140px;
-  max-width: 100%;
-  object-fit: cover;
-}
-/* Alone on the message: the image at its own proportions, a bit taller. */
-.artifact-tile:only-child .file-thumb {
-  height: auto;
-  max-width: 420px;
-}
-/* A wide, short picture (a strip of a screen) still shows above its caption: at least 140px tall, cropped to fit. */
-.artifact-tile:only-child .file-thumb img {
-  height: auto;
-  min-height: 140px;
-  max-height: 320px;
-}
-/* Also when alone on the message (its `height: auto` would otherwise collapse the tile until the image decodes). */
-.file-thumb[data-loading],
-.artifact-tile:only-child .file-thumb[data-loading] {
-  width: 240px;
-  height: 180px;
-}
-.file-thumb__caption {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 10px;
-  border-radius: var(--radius-item);
-  background: var(--glass-solid);
-  color: var(--ink);
-  box-shadow: var(--e1);
-}
-.file-thumb__caption > .tabular {
-  flex: none;
-}
-.file-thumb__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-html:not([data-pointer]) .file-thumb:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .file-thumb {
-    transition:
-      box-shadow 0.2s var(--out),
-      transform 0.2s var(--spring);
-  }
-  .file-thumb img {
-    transition: transform 0.3s var(--out);
-  }
-  .file-thumb:hover {
-    box-shadow: var(--e2), var(--top);
-    transform: translateY(-1px);
-  }
-  .file-thumb:hover img {
-    transform: scale(1.02);
-  }
-}
-.file-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 260px;
-  max-width: 100%;
-  padding: 8px 6px 8px 8px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  box-shadow: var(--e1), var(--top);
-}
-.file-row:hover {
-  box-shadow: var(--e2), var(--top);
-}
-html:not([data-pointer]) .file-row:has(.file-row__open:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-.file-row__open {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-html:not([data-pointer]) .file-row__open:focus-visible {
-  outline: none;
-}
-.file-row .file-summary__icon {
-  width: 40px;
-  height: 40px;
-  background: var(--sunken);
-  color: var(--ink2);
-}
-@media (max-width: 640px) {
-  .file-thumb {
-    height: 160px;
-  }
-  .file-thumb img {
-    min-width: 110px;
-  }
 }
 .file-view {
   display: flex;

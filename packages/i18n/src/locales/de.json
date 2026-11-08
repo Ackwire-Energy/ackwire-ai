@@ -9869,6 +9869,10 @@
     "moreRows_other": "+ {{count}} Zeilen",
     "moreFiles_one": "+ {{count}} Datei",
     "moreFiles_other": "+ {{count}} Dateien",
+    "rows_one": "{{count}} Zeile",
+    "rows_other": "{{count}} Zeilen",
+    "files_one": "{{count}} Datei",
+    "files_other": "{{count}} Dateien",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} Zeilen hinzugefügt, {{removed}} entfernt",
     "htmlPreview": "Interaktive Seite. Öffne sie, um sie zu sehen.",
@@ -15130,7 +15134,8 @@
     "where": {
       "dm": "Direkte Unterhaltung",
       "routine": "Routine „{{name}}“",
-      "background": "Im Hintergrund"
+      "background": "Im Hintergrund",
+      "here": "Diese Unterhaltung"
     },
     "askedBy": "Auftrag von {{name}}",
     "askedByYou": "Dein Auftrag",
@@ -15372,7 +15377,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> hat „{{title}}“ markiert",
-      "failed": "„{{title}}“ wird nicht mehr aktualisiert",
+      "failed": "<b>{{name}}</b> konnte „{{title}}“ nicht aktualisieren",
       "proposal": "<b>{{name}}</b> möchte ein Dashboard veröffentlichen",
       "proposalWorkspace": "„{{title}}“ für den ganzen Workspace · heute siehst nur du es",
       "proposalRoles": "„{{title}}“ für {{roles}} · heute siehst nur du es",

@@ -149,7 +149,10 @@ describe("Notificações", () => {
     // The question as the conversation's request card, stopped until I answer.
     const card = waiting.querySelector(".rq") as HTMLElement;
     expect(card.querySelector(".rq__kind")?.textContent).toContain("Pergunta");
-    expect(card.querySelector(".rq__state")?.textContent).toBe("esperando você");
+    // Who asks comes first: away from the conversation, the face alone doesn't say it.
+    expect(card.querySelector(".rq__kind > .rq__who")?.textContent).toBeTruthy();
+    // Waiting for me needs no words on the card (its buttons say it).
+    expect(card.querySelector(".rq__state")).toBeNull();
     expect(card.querySelector(".rq__lead")?.textContent).toBe(question.text);
     expect(card.querySelector(".rq__end")?.textContent).toMatch(/^Parada há /);
     expect(within(waiting).getByRole("button", { name: "Usa o cupom antigo" })).toBeTruthy();
@@ -196,7 +199,7 @@ describe("Notificações", () => {
     const region = screen().getByRole("region", { name: "Esperando você" });
     const card = region.querySelector(".rq") as HTMLElement;
     expect(card.getAttribute("data-ask-kind")).toBe("approval");
-    expect(card.querySelector(".rq__kind")?.textContent).toBe("Pede sua aprovação");
+    expect(card.querySelector(".rq__kind")?.textContent).toBe("Atlas · Pede sua aprovação");
     expect(card.querySelector(".rq__well")).toBeTruthy();
     // Decided right here: a deploy takes a hold, and Agora não asks for the reason. Remind me later and Done end it.
     expect(within(card).getByRole("button", { name: /segure para confirmar/ })).toBeTruthy();
@@ -961,7 +964,9 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     // What only points somewhere is a request card itself: no corners or padding of its own, its face on the kind's
     // line as every waiting item's.
     expect(rule(".nt-wr__main")).not.toMatch(/border-radius|padding/);
-    expect(px(".nt-wi > .nt-face", "padding-top")).toBe(12);
+    // The face inside the card, at a day row's place: over the card's top left, on the kind's line.
+    expect(value(".nt-wi > .nt-face", "position")).toBe("absolute");
+    expect(px(".nt-wi > .nt-face", "top")).toBe(12);
     expect(value(".nt-wr .rq__lead.nt-what", "white-space")).toBe("normal");
     expect(value(".nt-wr__sub", "-webkit-line-clamp")).toBe("2");
     // On a phone the tap opens: Open leaves the eye but stays a button for screen readers and the keyboard. The faces
@@ -969,7 +974,7 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     expect(css).not.toMatch(/\.nt-wr__open[^{]*\{[^}]*display: none/);
     expect(value(".nt-wr__open:not(:focus-visible)", "position", phone)).toBe("absolute");
     expect(value(".nt-wr__open:not(:focus-visible)", "clip-path", phone)).toBe("inset(50%)");
-    expect(rule(".nt-av32", phone)).toBe("");
+    expect(rule(".nt-av28", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
     // A day's row clips: its ring goes inside. A waiting item is a face and a card, its ring around it.
     expect(value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow")).toBe("var(--focus-ring-inset)");

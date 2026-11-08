@@ -1,12 +1,11 @@
 import type { ArtifactFileContent } from "@agenteschat/client";
 import { useArtifactBlob } from "@agenteschat/client";
 import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind, previewType } from "@agenteschat/client/lib/files";
-import { Button, Icon, Spinner, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
-import { useEffect, useMemo, useState } from "react";
+import { Icon, Spinner, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
-import { fileSaver } from "./fileSaver";
 import { ImageZoom } from "./ImageZoom";
 
 /** Object URLs for blobs (swappable: test DOMs may lack `URL.createObjectURL`). */
@@ -80,93 +79,39 @@ export function usePreviewUrl(artifactId: string, version: number, contentType: 
 }
 
 /**
- * A file on a chat message, as a tile that sits beside the others: images show
- * their thumbnail (a click opens the viewer); videos play right there (a corner
- * button opens the viewer); the rest show the type, name and size (a click
- * opens the viewer) with Baixar.
+ * A video on a chat message: our player at its own proportions, played right there in parts (it starts at once,
+ * whatever its size); its corner group opens the viewer, then the caller's actions. One this browser can't play (a
+ * codec it lacks) shows `fallback` instead, the file's tile.
  */
-export function FileCardPreview({
+export function FileVideo({
   content,
   artifactId,
   version,
-  title,
   onOpen,
+  actions,
+  fallback,
 }: {
   content: ArtifactFileContent;
   artifactId: string;
   version: number;
-  title: string;
   onOpen: () => void;
+  actions?: ReactNode;
+  fallback: ReactNode;
 }) {
-  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
-  const kind = previewKind(content.contentType);
-  const image = kind === "image" && content.size <= MAX_THUMB_BYTES;
-  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, image);
-  // The tile keeps its loading size until the image is decoded: its size changes once, not to nothing and back.
-  const [decoded, setDecoded] = useState<string | null>(null);
-  // A video this browser can't play (a codec it lacks) falls back to the file's row.
-  const [videoFailed, setVideoFailed] = useState(false);
-  const videoLabels = useVideoLabels();
-  const fileUrl = api.artifacts.fileUrl(org.id, artifactId, { version });
-  const download = () => fileSaver.save(fileUrl, content.name);
-  if (kind === "video" && !videoFailed) {
-    // Played straight from the download, in parts: it starts at once, whatever its size.
-    return (
-      <VideoPlayer
-        src={fileUrl}
-        name={content.name}
-        size={formatBytes(i18n.language, content.size)}
-        labels={videoLabels}
-        onOpen={onOpen}
-        onFailed={() => setVideoFailed(true)}
-      />
-    );
-  }
-  if (image && !failed) {
-    return (
-      <button
-        type="button"
-        className="file-thumb"
-        data-loading={url && decoded === url ? undefined : "true"}
-        onClick={onOpen}
-        aria-label={t("artifacts.open", { title })}
-      >
-        {url && (
-          <img
-            src={url}
-            alt={t("files.imageAlt", { title })}
-            onLoad={() => setDecoded(url)}
-            onError={() => setDecoded(url)}
-          />
-        )}
-        <span className="file-thumb__caption small">
-          <span className="file-thumb__name">{content.name}</span>
-          <span className="tabular">{formatBytes(i18n.language, content.size)}</span>
-        </span>
-      </button>
-    );
-  }
+  const [failed, setFailed] = useState(false);
+  const labels = useVideoLabels();
+  if (failed) return <>{fallback}</>;
   return (
-    <div className="file-row">
-      <button
-        type="button"
-        className="file-row__open"
-        onClick={onOpen}
-        aria-label={t("artifacts.open", { title })}
-        title={content.name}
-      >
-        <FileSummary content={content} />
-      </button>
-      <Button
-        size="sm"
-        variant="ghost"
-        icon="download"
-        iconOnly
-        aria-label={t("artifacts.download")}
-        title={t("artifacts.download")}
-        onClick={download}
+    <div className="artifact-tile" data-kind="video">
+      <VideoPlayer
+        src={api.artifacts.fileUrl(org.id, artifactId, { version })}
+        name={content.name}
+        labels={labels}
+        onOpen={onOpen}
+        actions={actions}
+        onFailed={() => setFailed(true)}
       />
     </div>
   );

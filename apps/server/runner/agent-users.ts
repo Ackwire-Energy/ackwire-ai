@@ -637,7 +637,7 @@ export function accountLauncher(
       TMPDIR: "/tmp",
       CLAUDE_CONFIG_DIR: path.join(store, "config"),
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
-      // Undocumented, so also what `neutralizeFileMentions` is there for: validated per CLI version.
+      // Undocumented, so `neutralizeFileMentions` covers a CLI that ignores it.
       CLAUDE_CODE_DISABLE_FILE_MENTIONS: "1",
       DISABLE_AUTOUPDATER: "1",
     },

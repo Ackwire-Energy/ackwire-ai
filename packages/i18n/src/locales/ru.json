@@ -10597,6 +10597,14 @@
     "moreFiles_few": "+ {{count}} файла",
     "moreFiles_many": "+ {{count}} файлов",
     "moreFiles_other": "+ {{count}} файла",
+    "rows_one": "{{count}} строка",
+    "rows_few": "{{count}} строки",
+    "rows_many": "{{count}} строк",
+    "rows_other": "{{count}} строки",
+    "files_one": "{{count}} файл",
+    "files_few": "{{count}} файла",
+    "files_many": "{{count}} файлов",
+    "files_other": "{{count}} файла",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "Добавлено строк: {{added}}, удалено: {{removed}}",
     "htmlPreview": "Интерактивная страница. Откройте, чтобы посмотреть.",
@@ -16108,7 +16116,8 @@
     "where": {
       "dm": "Личные сообщения",
       "routine": "Регулярная задача «{{name}}»",
-      "background": "В фоне"
+      "background": "В фоне",
+      "here": "Этот разговор"
     },
     "askedBy": "Попросил(а) {{name}}",
     "askedByYou": "Вы попросили",
@@ -16364,7 +16373,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b>: оповещение по «{{title}}»",
-      "failed": "«{{title}}» больше не обновляется",
+      "failed": "<b>{{name}}</b>: «{{title}}» больше не обновляется",
       "proposal": "<b>{{name}}</b> хочет опубликовать дашборд",
       "proposalWorkspace": "«{{title}}» для всего рабочего пространства · сейчас его видите только вы",
       "proposalRoles": "«{{title}}» для ролей: {{roles}} · сейчас его видите только вы",

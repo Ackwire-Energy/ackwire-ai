@@ -5,13 +5,11 @@ import { parseAccess, type RunnerAccess, type RunnerPause } from "@agenteschat/a
 import { validateNetworkMark } from "./network-mark";
 
 /**
- * Claude's own login for all agents of a system-mode computer, on when present. The versions and the refresh mode are
- * what real-Linux validation recorded (`A`: the CLIs share a refresh safely; `B`: only with root holding new CLIs
- * while the refresh lock is there).
+ * Claude's own login for all agents of a system-mode computer, on when present, with whatever Claude CLI is
+ * installed. The refresh mode is what real-Linux validation recorded (`A`: the CLIs share a refresh safely; `B`: only
+ * with root holding new CLIs while the refresh lock is there).
  */
 export interface ClaudeSharedLogin {
-  minVersion: string;
-  maxVersion: string;
   refresh: "A" | "B";
   /** `B`: the name in the CLI's config folder that says a refresh is under way, as validation found it. */
   refreshLock?: string;
@@ -160,14 +158,12 @@ function parsePaused(v: unknown): RunnerConfig["paused"] {
   return { until: null };
 }
 
+/** A config that still carries a version range (`minVersion`, `maxVersion`) reads the same as one without. */
 function parseClaudeSharedLogin(v: unknown): ClaudeSharedLogin | undefined {
-  const { minVersion, maxVersion, refresh, refreshLock } = (v ?? {}) as Partial<
-    Record<keyof ClaudeSharedLogin, unknown>
-  >;
-  const version = (s: unknown): s is string => typeof s === "string" && /^\d+\.\d+\.\d+$/.test(s);
-  if (!version(minVersion) || !version(maxVersion) || (refresh !== "A" && refresh !== "B")) return undefined;
+  const { refresh, refreshLock } = (v ?? {}) as Partial<Record<keyof ClaudeSharedLogin, unknown>>;
+  if (refresh !== "A" && refresh !== "B") return undefined;
   const lock = typeof refreshLock === "string" && /^[\w.-]{1,64}$/.test(refreshLock) ? { refreshLock } : {};
-  return { minVersion, maxVersion, refresh, ...lock };
+  return { refresh, ...lock };
 }
 
 /** The file's fields, checked one by one (unknown or malformed ones are dropped). Null when there is no file. */

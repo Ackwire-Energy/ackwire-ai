@@ -14,10 +14,6 @@
 }
 
 /* Avatars at the design's sizes (the engine draws to the box). */
-.nt-av32 {
-  width: 32px;
-  height: 32px;
-}
 .nt-av28 {
   width: 28px;
   height: 28px;
@@ -66,7 +62,8 @@
 }
 
 /* ── "Esperando você": what blocks an agent or a decision ───────────────── */
-/* The day groups' head, then each request as the conversation draws it: the agent's face beside its card. */
+/* The day groups' head, then each request on a card of its own, the face inside it where a day's row has it, so a
+   waiting card and the day's list share both edges and the words' column. */
 .nt-wait {
   display: flex;
   flex-direction: column;
@@ -77,23 +74,38 @@
   margin-bottom: -4px;
 }
 .nt-wi {
+  --nt-wi-side: 16px;
+  --nt-wi-text: 56px;
   position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 0 10px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   border-radius: 18px;
   outline: none;
   cursor: pointer;
 }
-/* The face on the card's first line (its kind), as in the conversation. */
+/* The face on the card's first line (who asks, its kind), at a day's row's place and size; over the card. */
 .nt-wi > .nt-face {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: var(--nt-wi-side);
   display: flex;
-  padding-top: 12px;
+  pointer-events: none;
 }
 .nt-wi > .rq {
   max-width: none;
   margin: 0;
+}
+/* The card's words start where a day's row's do; its footer strip stays edge to edge, its buttons on that column. */
+.nt-wi > :is(.rq, .nt-wr__main) {
+  padding-left: var(--nt-wi-text);
+}
+.nt-wi > :is(.rq, .nt-wr__main) > .rq__foot,
+.nt-wi > .rq > .rq__form > .ac-locked > .rq__foot,
+.nt-wi > .rq > .ac-locked > .rq__foot {
+  margin-left: calc(-1 * var(--nt-wi-text));
+  padding-left: var(--nt-wi-text);
 }
 /* The one the keys are on (J/K): its card's edge a step stronger. */
 .nt-wi.is-cur > :is(.rq, .nt-wr__main) {
@@ -126,9 +138,6 @@ html:not([data-pointer]) .nt-item:focus-visible {
 }
 
 /* ── What only points somewhere: a card of the requests' shape, opened by a click on it ── */
-.nt-wr > :not(.nt-face, .nt-wr__main) {
-  grid-column: 2;
-}
 .nt-wr__main {
   max-width: none;
   margin: 0;
@@ -540,20 +549,11 @@ html:not([data-pointer]) .nt-more:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
-/* The bar floats over the row's end: the row's words always stop short of it, as many buttons as it has, so hovering
-   a row never moves them. */
+/* The time ends every row at the card's edge, the same place on each, and the bar floats over it while it shows: no
+   room kept per row for buttons that aren't there (it put each row's time somewhere else). */
 @media (min-width: 721px) {
-  .nt-item > .nt-c {
-    padding-right: var(--nt-acts-room, 48px);
-  }
-  .nt-item:has(.nt-acts > :nth-child(2)) {
-    --nt-acts-room: 82px;
-  }
-  .nt-item:has(.nt-acts > :nth-child(3)) {
-    --nt-acts-room: 116px;
-  }
-  .nt-item:has(.nt-acts > :nth-child(4)) {
-    --nt-acts-room: 150px;
+  .nt-item:is(:hover, :focus-within, .is-cur, :has([data-state="open"])):not(.is-replying) .nt-tm {
+    visibility: hidden;
   }
 }
 .nt-nb {
@@ -903,7 +903,6 @@ html:not([data-pointer]) .nt-fails .nt-rep:focus-visible {
 }
 /* A change someone sent to whoever decides (ADR 0137): its card under the words, decided right here. */
 .nt-wr__card {
-  grid-column: 2;
   min-width: 0;
   cursor: auto;
 }

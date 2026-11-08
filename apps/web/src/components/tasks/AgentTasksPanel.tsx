@@ -12,7 +12,7 @@ import {
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { Button, Chip, EmptyState, Icon, PixelStop } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, PixelStop } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +30,15 @@ import { useEscClose } from "@/hooks/useEscClose";
 import { useNow } from "@/hooks/useNow";
 import { lookOf } from "@/lib/look";
 import { useAgentTasks } from "./agent-tasks-context";
-import { StopAllInline, StopTaskButton, TaskMark, TaskWaitLines, taskAge, useTaskStop } from "./TaskBits";
+import {
+  StopAllInline,
+  StopTaskButton,
+  TaskMark,
+  TaskWaitLines,
+  taskAge,
+  useProgramText,
+  useTaskStop,
+} from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
@@ -229,20 +237,25 @@ function TaskCard({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const programText = useProgramText();
   const [open, setOpen] = useState(false);
   // The computer whose line is open ("Ver fila"): kept once the task leaves the line, so the dialog stays put.
   const [queueOf, setQueueOf] = useState<string | null>(null);
   const working = taskState(task) === "working" && !stopping;
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
-  const where = taskPlace(t, task);
+  const where = here ? t("taskManager.where.here") : taskPlace(t, task);
   const wait = taskWaitWords(t, i18n.language, task, now);
   const place = linePlace(task);
-  const sub = wait
-    ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
-    : taskState(task) === "queued"
-      ? [t("taskManager.state.queued"), where].filter(Boolean).join(" · ")
-      : [where, formatDuration(t, taskAge(task, now))].filter(Boolean).join(" · ");
+  const program = programText(task)?.name ?? null;
+  // Working, or waiting on a person (its mark says which): where, the program, how long. Held or in a line: that
+  // wait and what comes next, then where.
+  const sub =
+    wait && !waitsOnPerson(task)
+      ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
+      : taskState(task) === "queued"
+        ? [t("taskManager.state.queued"), where].filter(Boolean).join(" · ")
+        : [where, program, formatDuration(t, taskAge(task, now))].filter(Boolean).join(" · ");
   const name = dir.anyAgent(task.agentId)?.name ?? t("channel.unknownAgent");
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
   return (
@@ -252,10 +265,8 @@ function TaskCard({
         <span className="tm-taskcard__label ac-actrow__text">
           <span className="tm-taskcard__title">
             <b>{title}</b>
-            {here && <Chip className="tm-here">{t("taskManager.strip.here")}</Chip>}
           </span>
-          {/* Amber only for what waits on a person; a computer's line, a plan or a budget stay grey. */}
-          <small data-wait={waitsOnPerson(task) || undefined}>{sub}</small>
+          <small>{sub}</small>
         </span>
         {place && (
           <Button size="sm" variant="ghost" onClick={() => setQueueOf(place.machineId)}>
@@ -269,7 +280,13 @@ function TaskCard({
           </Button>
         )}
         {task.canStop && (
-          <StopTaskButton label={t("taskManager.actions.stop")} title={title} stopping={stopping} onClick={onStop} />
+          <StopTaskButton
+            label={t("taskManager.actions.stop")}
+            title={title}
+            stopping={stopping}
+            onClick={onStop}
+            compact
+          />
         )}
       </div>
       {open && (

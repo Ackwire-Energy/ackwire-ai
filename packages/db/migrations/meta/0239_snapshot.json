@@ -1,5 +1,5 @@
 {
-  "id": "fe788bbf-cdb5-4e54-a607-0046f3c1fc7e",
+  "id": "fd00d82c-6ef3-40c9-aee9-c12a958bcb37",
   "prevId": "e27ca09f-95c0-4d61-83c8-f194a202a6e1",
   "version": "7",
   "dialect": "postgresql",
@@ -380,12 +380,6 @@
           "notNull": true,
           "default": 0
         },
-        "reports_to_agent_id": {
-          "name": "reports_to_agent_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "builtin": {
           "name": "builtin",
           "type": "text",
@@ -568,19 +562,6 @@
           "tableTo": "agent_groups",
           "columnsFrom": [
             "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "agents_reports_to_agent_id_agents_id_fk": {
-          "name": "agents_reports_to_agent_id_agents_id_fk",
-          "tableFrom": "agents",
-          "tableTo": "agents",
-          "columnsFrom": [
-            "reports_to_agent_id"
           ],
           "columnsTo": [
             "id"
@@ -13199,6 +13180,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "relay_url": {
+          "name": "relay_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relay_instance_id": {
+          "name": "relay_instance_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relay_secret": {
+          "name": "relay_secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp with time zone",
@@ -13348,6 +13347,66 @@
           "nullsNotDistinct": false,
           "columns": [
             "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.push_relay_instances": {
+      "name": "push_relay_instances",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "secret_hash": {
+          "name": "secret_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent": {
+          "name": "sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "blocked_at": {
+          "name": "blocked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_relay_instances_secretHash_unique": {
+          "name": "push_relay_instances_secretHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "secret_hash"
           ]
         }
       },

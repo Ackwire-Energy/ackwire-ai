@@ -1,6 +1,6 @@
 import {
   EXPO_PUSH_TOKEN,
-  PUSH_PLATFORMS,
+  FCM_PUSH_TOKEN,
   PUSH_STALE_MAX,
   registerPushDevice,
   stalePushNotifications,
@@ -13,10 +13,17 @@ import { type AppDeps, body, createAppRouter, errors, json, noContent, requireSe
 
 const tags = ["Push"];
 
-const Token = z
+/** An iPhone's Expo push token. */
+const IosToken = z
   .string()
   .regex(EXPO_PUSH_TOKEN, "must be an Expo push token")
   .openapi({ example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" });
+
+/** An Android phone's FCM registration token (ADR 0152). */
+const AndroidToken = z
+  .string()
+  .regex(FCM_PUSH_TOKEN, "must be an FCM registration token")
+  .openapi({ example: "dXNlcl9mY21fdG9rZW4:APA91bHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" });
 
 const Locale = z.string().trim().min(2).max(35).openapi({ description: "Device language, e.g. `pt-BR`." });
 
@@ -26,7 +33,8 @@ const base64url = (min: number, max: number) =>
 
 const bytesOf = (s: string) => Buffer.from(s.replace(/=+$/, ""), "base64url");
 
-const PhoneDevice = z.object({ token: Token, platform: z.enum(PUSH_PLATFORMS), locale: Locale });
+const AndroidDevice = z.object({ token: AndroidToken, platform: z.literal("android"), locale: Locale });
+const IosDevice = z.object({ token: IosToken, platform: z.literal("ios"), locale: Locale });
 
 /** A browser's Web Push subscription (ADR 0071), as `PushSubscription.toJSON()` gives it. */
 const WebDevice = z.object({
@@ -47,7 +55,8 @@ const WebDevice = z.object({
 });
 
 /**
- * Push devices (ADR 0035, ADR 0071): the phone app's Expo tokens and browsers' Web Push subscriptions.
+ * Push devices (ADR 0035, ADR 0071, ADR 0152): the phone app's tokens (Android's FCM token, the iPhone's Expo
+ * token) and browsers' Web Push subscriptions.
  * Per person: one device hears every organization of its person.
  */
 export function pushRoutes(deps: AppDeps) {
@@ -82,8 +91,8 @@ export function pushRoutes(deps: AppDeps) {
       security,
       summary: "Register this phone or browser for push notifications",
       description:
-        "Upsert by token (a browser's endpoint): registering again refreshes it, and one registered by someone else moves to you. Phones send their Expo token; browsers their Web Push subscription, which then belongs to this session: signing out (everywhere too) or the session running out stops it. Call on every launch or page load after sign-in.",
-      request: { body: body(z.union([PhoneDevice, WebDevice])) },
+        "Upsert by token (a browser's endpoint): registering again refreshes it, and one registered by someone else moves to you. Android phones send their FCM registration token, iPhones their Expo push token; browsers their Web Push subscription, which then belongs to this session: signing out (everywhere too) or the session running out stops it. Call on every launch or page load after sign-in.",
+      request: { body: body(z.union([AndroidDevice, IosDevice, WebDevice])) },
       responses: { 204: noContent[204], 429: errorResponse("Too many registrations"), ...errors },
     }),
     async (c) => {
@@ -140,7 +149,7 @@ export function pushRoutes(deps: AppDeps) {
       security,
       summary: "Stop push notifications on this browser or phone",
       description:
-        "Only your own devices; anything else is a no-op. The token (a browser's endpoint, a phone's Expo token) goes in the body: an endpoint is a URL, and its encoded slashes in a path don't survive every proxy.",
+        "Only your own devices; anything else is a no-op. The token (a browser's endpoint, a phone's push token) goes in the body: an endpoint is a URL, and its encoded slashes in a path don't survive every proxy.",
       request: { body: body(z.object({ token: z.string().min(1).max(2048) })) },
       responses: { 204: noContent[204], ...errors },
     }),

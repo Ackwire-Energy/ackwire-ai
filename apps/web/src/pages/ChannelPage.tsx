@@ -4070,7 +4070,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       );
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
-    if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
+    if (!a && !p) return `@${handle}`;
     const isMe = !!p && p.userId === me.user.id;
     const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
     const shown = a?.name ?? p?.name ?? handle;

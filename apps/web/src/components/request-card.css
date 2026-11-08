@@ -27,8 +27,10 @@
 .rq__form {
   display: contents;
 }
+/* As tall as the card's corner radius: a shorter band scales its rounded corners down (CSS shrinks radii that don't
+   fit their box), and their tighter curve showed outside the card's. */
 .rq > .ac-approval__sky {
-  height: 10px;
+  height: 16px;
   opacity: 0.7;
 }
 .rq__head {
@@ -51,7 +53,7 @@
   font-weight: 500;
   color: var(--faint);
 }
-/* The state as words, no pill: waiting for you in the warning tone with its pulsing mark; someone else, muted. */
+/* Who else it waits for, as words, muted (waiting for the viewer says nothing: the buttons say it). */
 .rq__state {
   display: inline-flex;
   align-items: center;
@@ -76,45 +78,59 @@
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
+/*
+ * The object's line, as an attachment's name under its cover: edge to edge under a hairline, the app's mark loose
+ * (no tile), its title and values, "Ver …" on the right. Nothing with a background of its own inside the card.
+ */
 .rq__well {
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px -16px 0;
+  padding: 10px 12px 10px 16px;
+  border-top: 1px solid var(--line);
+}
+/* The mark and "Ver …" stand on the title's line (20px), never in the middle of a tall detail. */
+.rq__well > .rq__logo {
+  height: 20px;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 12px 12px 12px 4px;
-  background: var(--card-well);
-  box-shadow: var(--card-well-shadow);
+}
+.rq__well > .rq__more {
+  margin-top: -2px;
+}
+.rq__preview + .rq__well {
+  margin-top: 0;
 }
 .rq__logo {
   flex: none;
   display: inline-flex;
 }
-/* A connector's mark fills the tile; our own icons sit on a raised tile of the same size. */
+/* A connector's mark and our own icons, loose at the line's size. */
 .rq__logo .ap-conn-mark :is(.connector-icon, .ap-conn__own),
 .rq__tile {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
 }
-.rq__logo .ap-conn-mark {
-  border-radius: 9px;
+.rq__logo .ap-conn-mark,
+.rq__logo .ap-conn-mark .ap-conn__own {
+  border-radius: 6px;
+  box-shadow: none;
+  background: none;
 }
 .rq__tile {
   display: inline-grid;
   place-items: center;
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--line2);
   color: var(--ink2);
 }
 .rq__tile .brw-site-icon {
   width: 16px;
   height: 16px;
 }
-/* A face (the agent a proposal would create) stands where the tile would, at its size. */
+/* A face (the agent a proposal would create) stands where the mark would, a step larger. */
 .rq__logo .ac-avatar {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
 }
 .rq__wt {
   flex: 1;
@@ -172,6 +188,57 @@ html:not([data-pointer]) .rq__more:focus-visible {
   transform: rotate(90deg);
 }
 /* What "Ver …" opens: the whole action. "Aprovar sempre" and where the request came from live here too. */
+/* On a card it is the card's own surface, edge to edge under a hairline (the pills keep their box below). */
+.rq > .rq__details,
+.rq__item > .rq__details {
+  margin: 0 -16px;
+  padding: 12px 16px;
+  border-radius: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  box-shadow: none;
+}
+.rq__item > .rq__details {
+  margin: 10px -12px 0 -16px;
+}
+/*
+ * What will happen, drawn as an attachment's cover: edge to edge between hairlines, its start fading at the foot (an
+ * email as it will go out).
+ */
+.rq__preview {
+  position: relative;
+  max-height: 168px;
+  margin: 12px -16px 0;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+.rq-mail {
+  padding: 10px 16px 12px;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink2);
+}
+.rq-mail__subject {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.rq-mail__to {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.rq-mail__body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .rq__details {
   display: flex;
   flex-direction: column;
@@ -465,43 +532,86 @@ html:not([data-pointer]) .rq__choice:focus-visible {
   color: var(--faint);
 }
 
-/* Several requests on one card: each item a well of its own, decided ones quieter with how they ended. */
+/*
+ * Several requests on one card: each item one row edge to edge under a hairline, its line on the left and its own
+ * decision at the row's right end, centered on it; decided ones quieter with how they ended. When the card is too
+ * narrow for both, the decision goes under the words, on their column.
+ */
+.rq {
+  container-type: inline-size;
+}
 .rq__items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 12px 0 0;
+  margin: 12px -16px 0;
   padding: 0;
   list-style: none;
 }
-.rq__items .rq__well {
-  margin-top: 0;
+.rq__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 10px 12px 10px 16px;
+  border-top: 1px solid var(--line);
 }
-/* An item's decision: one row under its values, left-aligned, every button the footer's height. */
+.rq__item > :not(.rq__well, .rq__item-acts) {
+  grid-column: 1 / -1;
+}
+.rq__items .rq__well {
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+}
+/* "Ver detalhes" of an item: a quiet link under its words (the row's end holds its decision). */
+.rq__item .rq__more {
+  height: 22px;
+  margin: 2px 0 0 -6px;
+  align-self: flex-start;
+}
+.rq__item .rq__wt {
+  align-items: flex-start;
+}
+/* An item's decision: at its row's right end, every button the footer's height. */
 .rq__item-acts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   row-gap: 8px;
-  margin-top: 8px;
+}
+@container (max-width: 520px) {
+  .rq__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rq__item-acts {
+    justify-content: flex-start;
+    margin: 8px 0 0 32px;
+  }
+}
+/* The footer right under a line that already ends with a hairline of its own: no gap between them. */
+.rq__well + .ac-locked > .rq__foot:first-child,
+.rq__well + .rq__form > .ac-locked > .rq__foot:first-child,
+.rq__details + .ac-locked > .rq__foot:first-child,
+.rq__details + .rq__form > .ac-locked > .rq__foot:first-child,
+.rq__items + .rq__foot,
+.rq__items + .rq__note + .rq__foot {
+  margin-top: 0;
 }
 .rq__item-acts > .ac-btn {
   height: 32px;
 }
 .rq__item-outcome {
-  margin: 6px 0 0;
+  margin: 4px 0 0 32px;
   font-size: 12.5px;
   color: var(--muted);
 }
-/* A run's requests, unfolded under its buttons. */
+/* A run's requests, unfolded under its line: each a row of its own, indented on the words' column. */
 .rq__run > .rq__items {
-  margin-top: 8px;
+  margin: 10px -12px -10px 16px;
 }
-/* An approval's values read whole across the card (the well's other kinds keep one line). */
+/* An approval's values read whole across the card, never cut mid-sentence (the line's other kinds keep one line). */
 .rq[data-ask-kind="approval"] .rq__wt small {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -519,6 +629,11 @@ html:not([data-pointer]) .rq__choice:focus-visible {
 }
 .rq__item .ap-refuse {
   margin-top: 8px;
+}
+.rq__items + .rq__note {
+  margin: 0 -16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
 }
 .rq__note {
   margin: 10px 0 0;

@@ -438,9 +438,9 @@ describe("agent questions (ask_user)", () => {
     );
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");
-    // A request card: what kind of request and that it waits for you; the choices in its footer.
+    // A request card: what kind of request (waiting for me needs no words); the choices in its footer.
     expect(card.getAttribute("data-ask-kind")).toBe("question");
-    expect(card.querySelector(".rq__head")?.textContent).toBe("Perguntaesperando você");
+    expect(card.querySelector(".rq__head")?.textContent).toBe("Pergunta");
     // With choices, writing another answer is "Outra resposta": a field opens in the card, focused.
     await click(within(card).getByRole("button", { name: "Outra resposta" }));
     expect(document.activeElement === within(card).getByRole("textbox", { name: "Sua resposta" })).toBe(true);

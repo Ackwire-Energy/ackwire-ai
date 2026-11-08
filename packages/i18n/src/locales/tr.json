@@ -9809,6 +9809,10 @@
     "moreRows_other": "+ {{count}} satır",
     "moreFiles_one": "+ {{count}} dosya",
     "moreFiles_other": "+ {{count}} dosya",
+    "rows_one": "{{count}} satır",
+    "rows_other": "{{count}} satır",
+    "files_one": "{{count}} dosya",
+    "files_other": "{{count}} dosya",
     "counts": "+{{added}} −{{removed}}",
     "countsLabel": "{{added}} satır eklendi, {{removed}} satır kaldırıldı",
     "htmlPreview": "Etkileşimli sayfa. Görmek için açın.",
@@ -15060,7 +15064,8 @@
     "where": {
       "dm": "Doğrudan mesaj",
       "routine": "«{{name}}» rutini",
-      "background": "Arka planda"
+      "background": "Arka planda",
+      "here": "Bu konuşma"
     },
     "askedBy": "{{name}} istedi",
     "askedByYou": "Siz istediniz",
@@ -15302,7 +15307,7 @@
     },
     "notice": {
       "alert": "<b>{{name}}</b> “{{title}}” için uyardı",
-      "failed": "“{{title}}” artık güncellenmiyor",
+      "failed": "<b>{{name}}</b> “{{title}}” güncelleyemedi",
       "proposal": "<b>{{name}}</b> bir pano yayımlamak istiyor",
       "proposalWorkspace": "“{{title}}” tüm çalışma alanı için · bugün yalnızca siz görüyorsunuz",
       "proposalRoles": "“{{title}}” {{roles}} için · bugün yalnızca siz görüyorsunuz",

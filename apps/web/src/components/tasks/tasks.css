@@ -429,12 +429,19 @@
   gap: 0;
   overflow: hidden;
 }
+/* Everything on the title's first line (19px): the mark (14) under it by 2, the buttons (28) up by 4. */
 .tm-taskcard__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-height: 56px;
-  padding: 8px 10px 8px 14px;
+  padding: 10px 10px 10px 14px;
+}
+.tm-taskcard__row > .tm-mark {
+  margin-top: 2px;
+}
+.tm-taskcard__row > .ac-btn {
+  margin-top: -4px;
 }
 .tm-taskcard__label {
   display: flex;
@@ -449,24 +456,17 @@
   gap: 6px;
   min-width: 0;
 }
+/* The title whole (never cut mid-sentence); the line under it quiet: its mark says the state. */
 .tm-taskcard__title b {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tm-taskcard__title b {
   font-size: 14px;
   font-weight: 500;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 .tm-taskcard__label small {
   font-size: 12.5px;
   color: var(--faint);
-}
-.tm-taskcard__label small[data-wait] {
-  font-weight: 600;
-  color: var(--warn);
 }
 .tm-taskcard__steps {
   padding: 8px 10px 10px;

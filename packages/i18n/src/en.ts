@@ -9784,6 +9784,12 @@ export const en = {
     moreRows_other: "+ {{count}} rows",
     moreFiles_one: "+ {{count}} file",
     moreFiles_other: "+ {{count}} files",
+    /** A table tile's size, after its kind ("Table · 15 rows"). */
+    rows_one: "{{count}} row",
+    rows_other: "{{count}} rows",
+    /** A code change tile's size, before its line counts ("5 files · +58 −31"). */
+    files_one: "{{count}} file",
+    files_other: "{{count}} files",
     counts: "+{{added}} −{{removed}}",
     countsLabel: "{{added}} lines added, {{removed}} removed",
     htmlPreview: "Interactive page. Open to see it.",
@@ -14951,7 +14957,13 @@ export const en = {
         "{{what}} waiting: {{model}} hit its limit and comes back {{when}}. The plan's other models keep working.",
       budgetOut: "{{what}} waiting: this month's budget ran out and comes back {{when}}.",
     },
-    where: { dm: "Direct conversation", routine: "Routine «{{name}}»", background: "In the background" },
+    /** A task asked in the conversation the list is read from ("here"), on its line. */
+    where: {
+      dm: "Direct conversation",
+      routine: "Routine «{{name}}»",
+      background: "In the background",
+      here: "This conversation",
+    },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",
     servers: "Our servers",
@@ -15169,7 +15181,7 @@ export const en = {
     },
     notice: {
       alert: "<b>{{name}}</b> flagged “{{title}}”",
-      failed: "“{{title}}” stopped updating",
+      failed: "<b>{{name}}</b> couldn't update “{{title}}”",
       proposal: "<b>{{name}}</b> wants to publish a dashboard",
       proposalWorkspace: "“{{title}}” for the whole workspace · only you see it today",
       proposalRoles: "“{{title}}” for {{roles}} · only you see it today",
