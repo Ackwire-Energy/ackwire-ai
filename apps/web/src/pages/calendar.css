@@ -473,6 +473,11 @@ html:not([data-pointer]) .cal-marks:focus-visible {
   align-items: flex-start;
   padding-top: 12px;
 }
+/* On the first lane of bars, however many there are: the 14px mark in the middle of a 22px bar. */
+.cal-week__gutter--lane {
+  align-items: flex-start;
+  padding-top: 4px;
+}
 .cal-band {
   display: flex;
   flex-direction: column;

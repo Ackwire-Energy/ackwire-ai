@@ -247,7 +247,9 @@ export function TimeGrid({
       </div>
       {lanes > 0 && (
         <div className="cal-week__bars">
-          <div className="cal-week__gutter small muted">{t("calendar.allDay")}</div>
+          <div className="cal-week__gutter cal-week__gutter--lane muted" title={t("calendar.allDay")}>
+            <Icon name="calendar" size={14} label={t("calendar.allDay")} />
+          </div>
           <div className="cal-week__barlane">
             {bars.map((b) => (
               <EventChip

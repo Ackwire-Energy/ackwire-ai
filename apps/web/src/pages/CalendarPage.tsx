@@ -50,8 +50,10 @@ import { MonthView } from "@/components/calendar/MonthView";
 import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
 import { TimeGrid } from "@/components/calendar/TimeGrid";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { PHONE_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { matchesNow } from "@/hooks/useMatchMedia";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./calendar.css";
@@ -101,7 +103,8 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const reminders = useReminderAction(org.id);
   const [today] = useState(() => todayProp ?? new Date());
   const [now, setNow] = useState(() => new Date());
-  const [view, setView] = useState<CalendarView>("week");
+  // A phone's width holds one day's column, not a week of seven unreadable ones.
+  const [view, setView] = useState<CalendarView>(() => (matchesNow(PHONE_QUERY) ? "day" : "week"));
   // A link to an event (an invitation's email) says its day, so the view starts on its week.
   const [linked, setLinked] = useOpenParam("open", WITH_OPEN);
   const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));

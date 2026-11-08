@@ -265,6 +265,37 @@ describe("Calendário: views, moves and series", () => {
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByText("Nada marcado. Arraste para criar ou aperte N")).toBeTruthy();
   });
+
+  test("the all-day lane's gutter is a mark named Dia todo, never words that wrap in the hours' 44px column", async () => {
+    await go((api) =>
+      api.calendar.create(ORG_ID, {
+        title: "Feriado",
+        start: at(0).toISOString(),
+        end: at(23, 59).toISOString(),
+        allDay: true,
+        recurrence: "none",
+        participants: [],
+      }),
+    );
+    const gutter = document.querySelector(".cal-week__bars:not(.cal-week__bars--routines) > .cal-week__gutter");
+    expect(gutter?.textContent?.trim()).toBe("");
+    expect(within(gutter as HTMLElement).getByRole("img", { name: "Dia todo" })).toBeTruthy();
+  });
+
+  test("on a phone it opens on the day, not on a week of seven columns too narrow to read", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      query === "(max-width: 640px)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      await go();
+      expect(screen().getByRole("radio", { name: "Dia" }).getAttribute("aria-checked")).toBe("true");
+      expect(document.querySelectorAll(".cal-week__col")).toHaveLength(1);
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
 });
 
 describe("Calendário: reminders", () => {
