@@ -804,10 +804,12 @@ export function DatabaseRow({
         relativeTime(t, i18n.language, connection.createdAt),
       ];
   return (
-    <div className="ac-list__row connected-row">
-      <DatabaseIcon size="lg" />
-      <span className="list-col connected-row__text">
-        <span className="list-title ac-captop">
+    <div className="ac-list__row connected-row ac-mediarow">
+      <span className="ac-mediarow__face">
+        <DatabaseIcon />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span>{name}</span>
           {connection.status === "needs_reconnect" ? (
             <Chip icon="alert" tone="waiting">
@@ -820,58 +822,60 @@ export function DatabaseRow({
           )}
           <Chip icon="eyeOff">{t("database.readOnlyChip")}</Chip>
         </span>
+      </span>
+      <div className="ac-mediarow__body">
         <span className="small muted">{meta.join(" · ")}</span>
-      </span>
-      <span className="connected-row__who small muted">
-        {using.length > 0 && (
-          <AvatarStack>
-            {using.slice(0, 5).map((a) => (
-              <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
-            ))}
-          </AvatarStack>
-        )}
-        {using.length > 0
-          ? t("connectors.usedBy", { count: using.length, total: agents.length })
-          : t("connectors.usedByNone")}
-      </span>
-      {admin && (
-        <div className="connected-row__actions">
-          {connection.status === "needs_reconnect" && (
-            <Button size="sm" variant="primary" aria-label={t("mail.reconnectName", { name })} onClick={onReconnect}>
-              {t("mail.reconnect")}
-            </Button>
+        <span className="connected-row__who small muted">
+          {using.length > 0 && (
+            <AvatarStack>
+              {using.slice(0, 5).map((a) => (
+                <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
+              ))}
+            </AvatarStack>
           )}
-          {connection.wholeServer && (
+          {using.length > 0
+            ? t("connectors.usedBy", { count: using.length, total: agents.length })
+            : t("connectors.usedByNone")}
+        </span>
+        {admin && (
+          <div className="connected-row__actions">
+            {connection.status === "needs_reconnect" && (
+              <Button size="sm" variant="primary" aria-label={t("mail.reconnectName", { name })} onClick={onReconnect}>
+                {t("mail.reconnect")}
+              </Button>
+            )}
+            {connection.wholeServer && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={t("database.refreshName", { name })}
+                disabled={servers.refresh.isPending}
+                loading={servers.refresh.isPending}
+                onClick={() => servers.refresh.mutate()}
+              >
+                {t("database.refresh")}
+              </Button>
+            )}
+            <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
+              {t("connectors.who")}
+            </Button>
+            <Button size="sm" variant="ghost" aria-label={t("database.scopeEditName", { name })} onClick={onScope}>
+              {t("database.scopeEdit")}
+            </Button>
+            <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
+              {t("connectors.tools")}
+            </Button>
             <Button
               size="sm"
               variant="ghost"
-              aria-label={t("database.refreshName", { name })}
-              disabled={servers.refresh.isPending}
-              loading={servers.refresh.isPending}
-              onClick={() => servers.refresh.mutate()}
+              aria-label={t("connectors.disconnectName", { name })}
+              onClick={onDisconnect}
             >
-              {t("database.refresh")}
+              {t("connectors.disconnect")}
             </Button>
-          )}
-          <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
-            {t("connectors.who")}
-          </Button>
-          <Button size="sm" variant="ghost" aria-label={t("database.scopeEditName", { name })} onClick={onScope}>
-            {t("database.scopeEdit")}
-          </Button>
-          <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
-            {t("connectors.tools")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("connectors.disconnectName", { name })}
-            onClick={onDisconnect}
-          >
-            {t("connectors.disconnect")}
-          </Button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

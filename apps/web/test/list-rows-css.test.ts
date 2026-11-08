@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
-import { atRule, builtCss, declarations, topLevel } from "./built-css";
+import { builtCss, declarations, topLevel } from "./built-css";
 
 const SRC = path.join(import.meta.dir, "../src");
 const last = (sheet: string, selector: string, property: string) =>
@@ -17,24 +17,20 @@ test("a settings row's title line is one text line, and one gap token sits under
   expect(last(top, ".ac-chip", "height")).toBe("22px");
   expect(last(top, ".list-title", "align-items")).toBe("center");
   expect(last(top, ".list-title:not(:last-child)", "margin-block-end")).toBe("var(--list-part-gap)");
-  expect(last(top, ".connected-row", "row-gap")).toBe("var(--list-part-gap)");
-  // The leading icon or logo keeps its top on the name's capitals (the name rises: `.ac-captop`), however far the
-  // details wrap.
-  expect(last(top, ".connected-row", "align-items")).toBe("start");
-  expect(last(top, ".app-row", "align-items")).toBe("flex-start");
+  // The rows are MediaRows: the leading tile and the name share one line, the details, who uses it and the actions go
+  // under them at the row's width (the kit's `.ac-mediarow`), so no page sheet lays the rows out on its own.
+  for (const row of [".connected-row", ".app-row", ".machine-row"]) {
+    for (const p of ["display", "grid-template-columns", "align-items", "gap", "column-gap"])
+      expect(last(top, row, p)).toBeUndefined();
+  }
   // Nothing else adds to the gap under the title: the details' column and the other lists' columns have none.
-  for (const col of [".list-col", ".connected-row__text", ".machine-row__main", ".app-row__main"]) {
+  for (const col of [".list-col", ".connected-row__text"]) {
     expect(last(top, col, "gap")).toBeUndefined();
   }
   // The details wrap whole: no "…" that hides what they say.
   expect(last(top, ".connected-row__text>.small", "text-overflow")).toBeUndefined();
   expect(last(top, ".connected-row__text", "overflow-wrap")).toBe("anywhere");
-  // Rows with actions stack them under the text at every width; only a row without them puts who uses it beside.
-  expect(last(top, ".connected-row__actions", "grid-column")).toBe("2");
-  const wide = atRule(css, "@container (width > 720px)");
-  expect(last(wide, ".connected-row:not(:has(>.connected-row__actions))", "grid-template-columns")).toBe(
-    "auto minmax(0,1fr) 10.5rem",
-  );
+  expect(last(top, ".connected-row__actions", "grid-column")).toBeUndefined();
 });
 
 test("every settings list with a name and pills uses the shared title line", async () => {

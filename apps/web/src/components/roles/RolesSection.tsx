@@ -170,14 +170,19 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
             />
           </span>
         )}
-        <button type="button" className="roles-row" onClick={() => onOpen(role.id)}>
-          <RoleMark color={role.color} icon={role.icon} size={36} />
-          <span className="roles-row__text">
-            <b>{roleName(t, role)}</b>
-            <span>{roleSummary(t, i18n.language, role, everyone)}</span>
+        <button type="button" className="roles-row ac-mediarow ac-mediarow--row" onClick={() => onOpen(role.id)}>
+          <span className="ac-mediarow__face">
+            <RoleMark color={role.color} icon={role.icon} size={24} />
           </span>
-          <PeopleStack people={peopleWith(role, people)} />
-          <Icon name="chevronRight" size={18} />
+          <span className="ac-mediarow__head">
+            <b>{roleName(t, role)}</b>
+            {isEveryone(role) && <Chip className="roles-base-chip">{t("rolesPage.base")}</Chip>}
+          </span>
+          <span className="ac-mediarow__end">
+            <PeopleStack people={peopleWith(role, people)} />
+            <Icon name="chevronRight" size={18} />
+          </span>
+          <span className="ac-mediarow__body roles-row__sum">{roleSummary(t, i18n.language, role, everyone)}</span>
         </button>
       </div>
     );
@@ -199,18 +204,21 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
       />
       <Card className="roles-list" aria-label={t("settings.section.roles")}>
         <div className="roles-line">
-          <button type="button" className="roles-row" onClick={() => onOpen(OWNER_ID)}>
-            <RoleMark color="violet" icon="audienceOwner" size={36} />
-            <span className="roles-row__text">
-              <b>{t("roles.owner")}</b>
-              <span>{t("rolesPage.summary.owner")}</span>
+          <button type="button" className="roles-row ac-mediarow ac-mediarow--row" onClick={() => onOpen(OWNER_ID)}>
+            <span className="ac-mediarow__face">
+              <RoleMark color="violet" icon="audienceOwner" size={24} />
             </span>
-            <PeopleStack people={owners} />
-            <Icon name="chevronRight" size={18} />
+            <span className="ac-mediarow__head">
+              <b>{t("roles.owner")}</b>
+            </span>
+            <span className="ac-mediarow__end">
+              <PeopleStack people={owners} />
+              <Icon name="chevronRight" size={18} />
+            </span>
+            <span className="ac-mediarow__body roles-row__sum">{t("rolesPage.summary.owner")}</span>
           </button>
         </div>
         {custom.map(row)}
-        <span className="roles-label">{t("rolesPage.base")}</span>
         {everyone && row(everyone)}
         <CardFooter>
           <span className="roles-foot">

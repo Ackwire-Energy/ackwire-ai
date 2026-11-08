@@ -42,43 +42,49 @@ export function OverviewTab() {
         {(approvals > 0 || pending.length > 0) && (
           <div className="agp-attns">
             {approvals > 0 && (
-              <div className="agp-attn ac-faceline">
-                <span className="agp-ib agp-ib--warn">
-                  <Icon name="lock" size={16} />
+              <div className="agp-attn ac-mediarow">
+                <span className="ac-mediarow__face">
+                  <span className="agp-ib agp-ib--warn">
+                    <Icon name="lock" size={16} />
+                  </span>
                 </span>
-                <span className="agp-attn__t">
-                  <b className="ac-captop">{t("agentPage.overview.approvals", { count: approvals })}</b>
-                  <span>{decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}</span>
+                <span className="ac-mediarow__head">
+                  <b>{t("agentPage.overview.approvals", { count: approvals })}</b>
                 </span>
-                <span className="agp-attn__tail">
+                <span className="ac-mediarow__end ac-mediarow__end--wrap">
                   <Button asChild size="sm">
                     <Link to="/org/$orgId/approvals" params={{ orgId: org.id }}>
                       {t("agentPage.overview.seeApprovals")}
                     </Link>
                   </Button>
                 </span>
+                <span className="ac-mediarow__body agp-attn__sub">
+                  {decides ? t("agentPage.overview.approvalsYou") : t("agentPage.overview.approvalsWait")}
+                </span>
               </div>
             )}
             {pending.map((p) => (
-              <div key={p.id} className="agp-attn ac-faceline">
-                <span className="agp-ib agp-ib--warn">
-                  <Icon name="document" size={16} />
-                </span>
-                <span className="agp-attn__t">
-                  <b className="ac-captop">{t("agentPage.overview.proposes", g)}</b>
-                  <span>
-                    {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}
-                    {p.canDecide
-                      ? t("approval.waitingYou")
-                      : p.decider.type === "user"
-                        ? t("proposals.waitingFor", { name: p.decider.name })
-                        : t("proposals.waitingAdmin")}
+              <div key={p.id} className="agp-attn ac-mediarow">
+                <span className="ac-mediarow__face">
+                  <span className="agp-ib agp-ib--warn">
+                    <Icon name="document" size={16} />
                   </span>
                 </span>
-                <span className="agp-attn__tail">
+                <span className="ac-mediarow__head">
+                  <b>{t("agentPage.overview.proposes", g)}</b>
+                </span>
+                <span className="ac-mediarow__end ac-mediarow__end--wrap">
                   <Button size="sm" onClick={() => goTo("memory")}>
                     {t("agentPage.overview.review")}
                   </Button>
+                </span>
+                <span className="ac-mediarow__body agp-attn__sub">
+                  {proposalTitle(t, p, org.name, (id) => dir.agentById.get(id)?.name ?? agent.name)} ·{" "}
+                  {p.canDecide
+                    ? t("approval.waitingYou")
+                    : p.decider.type === "user"
+                      ? t("proposals.waitingFor", { name: p.decider.name })
+                      : t("proposals.waitingAdmin")}
                 </span>
               </div>
             ))}

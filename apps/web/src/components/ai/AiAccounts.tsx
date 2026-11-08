@@ -183,10 +183,14 @@ export function AiAccountsSection() {
       {own.length > 0 && (
         <List>
           {own.map((o) => (
-            <div key={o.key} className="ac-list__row ai-accounts__row">
-              <ProviderLogo id={o.kind} size="sm" />
-              <span className="list-col">
-                <span className="ai-accounts__name ac-captop">{ownSignInTitle(t, o)}</span>
+            <div key={o.key} className="ac-list__row ai-accounts__row ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <ProviderLogo id={o.kind} size="sm" />
+              </span>
+              <span className="ac-mediarow__head">
+                <b className="ai-accounts__name">{ownSignInTitle(t, o)}</b>
+              </span>
+              <span className="ac-mediarow__body">
                 <span className="small muted">{t("aiAccounts.page.ownOn", { computer: o.computer })}</span>
                 {o.usage && <PlanMeter usage={o.usage} text={meterText} compact />}
               </span>
@@ -195,7 +199,7 @@ export function AiAccountsSection() {
         </List>
       )}
       {accounts.length > 0 && (
-        <List>
+        <List className="ai-accounts__list">
           {accounts.map((account) => {
             const { logins, usedBy, usage, signedOut, unknown } = account;
             const a = logins.find((l) => l.shared === true) ?? logins[0];
@@ -220,10 +224,14 @@ export function AiAccountsSection() {
                 : t("aiAccounts.page.noAgent"),
             ].filter(Boolean);
             return (
-              <div key={account.key} className="ac-list__row ai-accounts__row">
-                <ProviderLogo id={a.provider ?? a.kind} size="sm" off={allOut} />
-                <span className="list-col">
-                  <span className="ai-accounts__name ac-captop">{accountTitle(a)}</span>
+              <div key={account.key} className="ac-list__row ai-accounts__row ac-mediarow ac-mediarow--row">
+                <span className="ac-mediarow__face">
+                  <ProviderLogo id={a.provider ?? a.kind} size="sm" off={allOut} />
+                </span>
+                <span className="ac-mediarow__head">
+                  <b className="ai-accounts__name">{accountTitle(a)}</b>
+                </span>
+                <span className="ac-mediarow__body">
                   <span className="small muted">{facts.join(" · ")}</span>
                   {signedOut.length > 0 && (
                     <SettingNote icon="alert">
@@ -260,7 +268,7 @@ export function AiAccountsSection() {
                     )
                   )}
                 </span>
-                <div className="ac-acts ac-captail ac-captop">
+                <div className="ac-acts ac-mediarow__end ac-mediarow__end--wrap">
                   {give.length === 1 && give[0] ? (
                     <Button variant="ghost" size="sm" onClick={() => give[0] && void giveTo(a, give[0])}>
                       {t("aiAccounts.page.useFor", agentGrammar(give[0].name))}

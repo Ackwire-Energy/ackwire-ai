@@ -406,10 +406,12 @@ function ConnectedRow({
   ].filter(Boolean);
   const adds = reconnectAddsText(t, item);
   return (
-    <div className="ac-list__row connected-row">
-      <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
-      <span className="list-col connected-row__text">
-        <span className="list-title ac-captop">
+    <div className="ac-list__row connected-row ac-mediarow">
+      <span className="ac-mediarow__face">
+        <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} />
+      </span>
+      <span className="ac-mediarow__head">
+        <span className="list-title">
           <span>{itemName(t, item)}</span>
           {item.needsReconnect ? (
             <Chip icon="alert" tone="waiting">
@@ -429,83 +431,85 @@ function ConnectedRow({
             </Chip>
           )}
         </span>
+      </span>
+      <div className="ac-mediarow__body">
         <span className="small muted">{meta.join(" · ")}</span>
         {adds && !item.needsReconnect && <span className="small muted">{adds}</span>}
-      </span>
-      <span className="connected-row__who small muted">
-        {using.length > 0 && (
-          <AvatarStack>
-            {using.slice(0, 5).map((a) => (
-              <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
-            ))}
-          </AvatarStack>
-        )}
-        {using.length > 0 ? t("connectors.usedBy", { count: using.length, total }) : t("connectors.usedByNone")}
-      </span>
-      {admin && (
-        <div className="connected-row__actions">
-          {(item.needsReconnect || adds) && (
-            <Button
-              size="sm"
-              variant="primary"
-              aria-label={t("connectors.reconnectName", { name: itemName(t, item) })}
-              onClick={onReconnect}
-            >
-              {t("connectors.detail.reconnect")}
-            </Button>
+        <span className="connected-row__who small muted">
+          {using.length > 0 && (
+            <AvatarStack>
+              {using.slice(0, 5).map((a) => (
+                <AgentAvatar key={a.id} agentId={a.id} name={a.name} size="xs" />
+              ))}
+            </AvatarStack>
           )}
-          {item.needsReview && !item.needsReconnect && !adds && (
-            <Button
-              size="sm"
-              variant="primary"
-              aria-label={t("connectors.reviewName", { name: itemName(t, item) })}
-              onClick={onTools}
-            >
-              {t("connectors.review")}
-            </Button>
-          )}
-          <Button size="sm" aria-label={t("connectors.whoName", { name: itemName(t, item) })} onClick={onWho}>
-            {t("connectors.who")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("connectors.toolsName", { name: itemName(t, item) })}
-            onClick={onTools}
-          >
-            {t("connectors.tools")}
-          </Button>
-          <Menu
-            align="end"
-            label={t("connectors.actionsName", { name: itemName(t, item) })}
-            trigger={
+          {using.length > 0 ? t("connectors.usedBy", { count: using.length, total }) : t("connectors.usedByNone")}
+        </span>
+        {admin && (
+          <div className="connected-row__actions">
+            {(item.needsReconnect || adds) && (
               <Button
                 size="sm"
-                variant="ghost"
-                iconOnly
-                icon="more"
-                aria-label={t("connectors.actionsName", { name: itemName(t, item) })}
-              />
-            }
-          >
-            <MenuItem icon="edit" onSelect={onRename}>
-              {t("connectors.rename")}
-            </MenuItem>
-            <MenuItem icon="refresh" onSelect={onReconnect}>
-              {t("connectors.detail.reconnect")}
-            </MenuItem>
-            {item.custom && (
-              <MenuItem icon="plus" onSelect={onAddAccount}>
-                {t("connectors.detail.addAccount")}
-              </MenuItem>
+                variant="primary"
+                aria-label={t("connectors.reconnectName", { name: itemName(t, item) })}
+                onClick={onReconnect}
+              >
+                {t("connectors.detail.reconnect")}
+              </Button>
             )}
-            <MenuSeparator />
-            <MenuItem icon="power" danger onSelect={onDisconnect}>
-              {t("connectors.disconnect")}
-            </MenuItem>
-          </Menu>
-        </div>
-      )}
+            {item.needsReview && !item.needsReconnect && !adds && (
+              <Button
+                size="sm"
+                variant="primary"
+                aria-label={t("connectors.reviewName", { name: itemName(t, item) })}
+                onClick={onTools}
+              >
+                {t("connectors.review")}
+              </Button>
+            )}
+            <Button size="sm" aria-label={t("connectors.whoName", { name: itemName(t, item) })} onClick={onWho}>
+              {t("connectors.who")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("connectors.toolsName", { name: itemName(t, item) })}
+              onClick={onTools}
+            >
+              {t("connectors.tools")}
+            </Button>
+            <Menu
+              align="end"
+              label={t("connectors.actionsName", { name: itemName(t, item) })}
+              trigger={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="more"
+                  aria-label={t("connectors.actionsName", { name: itemName(t, item) })}
+                />
+              }
+            >
+              <MenuItem icon="edit" onSelect={onRename}>
+                {t("connectors.rename")}
+              </MenuItem>
+              <MenuItem icon="refresh" onSelect={onReconnect}>
+                {t("connectors.detail.reconnect")}
+              </MenuItem>
+              {item.custom && (
+                <MenuItem icon="plus" onSelect={onAddAccount}>
+                  {t("connectors.detail.addAccount")}
+                </MenuItem>
+              )}
+              <MenuSeparator />
+              <MenuItem icon="power" danger onSelect={onDisconnect}>
+                {t("connectors.disconnect")}
+              </MenuItem>
+            </Menu>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

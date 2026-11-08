@@ -406,11 +406,15 @@ export function ExistingRows({
           pressed={false}
           disabled={busy}
           onClick={() => void pickKey(k)}
-          className="ai-picker__key ac-iconline"
+          className="ai-picker__key ac-mediarow ac-mediarow--row"
         >
-          <ProviderLogo id={k.provider} size="sm" />
-          <span className="ac-option__text">
+          <span className="ac-mediarow__face">
+            <ProviderLogo id={k.provider} size="sm" />
+          </span>
+          <span className="ac-mediarow__head">
             <span className="ac-option__title">{k.label}</span>
+          </span>
+          <span className="ac-mediarow__body">
             <span className="ac-option__desc">
               {t("newAgent.otherKeyDesc", { provider: providerLabel(k.provider), hint: k.keyHint })}
             </span>
@@ -433,13 +437,17 @@ export function ExistingRows({
         pressed={signIn?.from === a.id}
         disabled={r.act === "locked" || busy || gateDims(gates.gateOf(choice))}
         onClick={pick}
-        className="ai-picker__key ac-iconline"
+        className="ai-picker__key ac-mediarow ac-mediarow--row"
       >
-        {option.leading}
-        <span className="ac-option__text">
+        <span className="ac-mediarow__face">{option.leading}</span>
+        <span className="ac-mediarow__head">
           <span className="ac-option__title">{option.label}</span>
-          {option.description && <span className="ac-option__desc">{option.description}</span>}
         </span>
+        {option.description && (
+          <span className="ac-mediarow__body">
+            <span className="ac-option__desc">{option.description}</span>
+          </span>
+        )}
       </OptionCard>
     );
   });
@@ -532,13 +540,13 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
  */
 function PanelHead({ lead, title, sub, aside }: { lead: ReactNode; title: string; sub: string; aside?: ReactNode }) {
   return (
-    <div className="ai-panel__head ac-faceline">
-      {lead}
-      <span className="ai-panel__title">
-        <b className="ac-captop">{title}</b>
-        <span>{sub}</span>
+    <div className="ai-panel__head ac-mediarow ac-mediarow--row">
+      <span className="ac-mediarow__face">{lead}</span>
+      <span className="ac-mediarow__head">
+        <b className="ai-panel__name">{title}</b>
       </span>
-      {aside}
+      {aside && <span className="ac-mediarow__end ac-mediarow__end--wrap">{aside}</span>}
+      <span className="ac-mediarow__body ai-panel__sub">{sub}</span>
     </div>
   );
 }

@@ -50,6 +50,11 @@
   height: 40px;
   border-radius: 12px;
 }
+/* Leading a MediaRow: the face's size. */
+.ac-mediarow__face > .vlt-tile {
+  width: var(--mediarow-face);
+  height: var(--mediarow-face);
+}
 
 /* The list: one grid for every row (tile | name and line | who may use it | last used | chevron), so the columns line
    up row after row; narrow, who and when go under the name. */
