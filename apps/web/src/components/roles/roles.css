@@ -515,6 +515,10 @@ html:not([data-pointer]) .roles-template:focus-visible {
     flex-direction: column;
     align-items: stretch;
   }
+  /* Under its label, the name's field fills the column. */
+  .roles-look__name {
+    width: auto;
+  }
   .roles-look__row--switch {
     flex-direction: row;
     align-items: center;
