@@ -1139,14 +1139,15 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex: 1;
   min-width: 0;
 }
-/* Canais arquivados: the rows alone, a channel's long name wrapping where it can't break. */
+/* Canais arquivados: the rows alone, each a MediaRow (the kit's `.ac-mediarow`): the channel's mark and name on one line
+   with Restaurar at its end, when it was archived under them. */
 .archived-channels {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.archived-channels .list-col b {
-  overflow-wrap: anywhere;
+.archived-channels__row {
+  padding-block: var(--row-py);
 }
 .member-row__you {
   display: inline-flex;
@@ -3541,10 +3542,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   white-space: normal;
   overflow-wrap: break-word;
 }
-/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
+/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. There an agent's
+   face goes over its name and role: beside them, in that column, it owned a column of three lines. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
+  }
+  .level-matrix__agent {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .level-matrix__agent > :first-child {
+    translate: none;
   }
 }
 .level-matrix__head .connector-icon {
@@ -6023,16 +6032,19 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
   letter-spacing: var(--track-tighter);
 }
 
-/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
+/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. Its words on the
+   baseline of the words around it (the name's, Ver relatório after it), its glyph or face in their line's middle. */
 .msg-reminder {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
   margin-left: 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  vertical-align: middle;
+}
+.msg-reminder > :is(.ac-icon, .ac-brand, .ac-avatar) {
+  align-self: center;
 }
 .msg-reminder--link {
   text-decoration: none;
@@ -7474,10 +7486,12 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
     display: none;
   }
 }
-/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it. The zoom bar comes
-   with the picture (no "100%" while its bytes are on the way). */
-.izoom__status {
-  animation: izoom-wait 0.3s;
+/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it (with reduced
+   motion it shows at once). The zoom bar comes with the picture (no "100%" while its bytes are on the way). */
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__status {
+    animation: izoom-wait 0.3s;
+  }
 }
 @keyframes izoom-wait {
   from,
@@ -7553,7 +7567,11 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 }
 
 /* Settings → Computadores: a MediaRow each, the portrait (drawn at whole pixels, 48 tall) and the name on one line,
-   what it is under them. */
+   what it is under them. A row's button (Usar o computador deste servidor, a tool's Desligar) goes under its words by
+   the list's width, not the window's. */
+.machine-list {
+  container-type: inline-size;
+}
 .machine-row {
   --mediarow-face: 48px;
 }
@@ -8013,6 +8031,31 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   justify-content: flex-end;
   gap: 2px;
   margin-right: 10px;
+}
+/* On a phone a profile's name and state take the row: beside the people, the count and the actions they were squeezed
+   to a letter a line. Those go on the line under them, the actions at its end. */
+@media (max-width: 640px) {
+  .pf-list {
+    display: block;
+  }
+  .pf-list > .machine-page__agent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-bottom: 10px;
+  }
+  .pf-list > .machine-page__agent-row > .machine-page__agent {
+    flex: 1 0 100%;
+  }
+  .pf-list .pf-stack {
+    padding: 0 8px 0 14px;
+  }
+  .pf-list .pf-count {
+    padding-right: 8px;
+  }
+  .pf-list .pf-acts {
+    margin-left: auto;
+  }
 }
 .machine-page__agent {
   flex: 1;

@@ -980,7 +980,9 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     const { socket } = await open(state, `c/${GENERAL_ID}`);
     const pushG = (e: Record<string, unknown>) => push(socket, e, GENERAL_ID);
 
+    // With the @ list open the first Enter picks the name; the next one sends.
     await sendText("oi @ada");
+    await act(async () => fireEvent.keyDown(composer(), { key: "Enter" }));
     await settle(4);
     const first = lastPerson(state);
     expect(bar().textContent).toBe("Ada pensando…");

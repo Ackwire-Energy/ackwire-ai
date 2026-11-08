@@ -232,7 +232,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "Finish installing the GitHub App the phone app started (admins)",
       description:
-        "The phone app opened the install link in the system browser (`returnTo: \"app:connectors\"`); the callback handed `state`, `code` and `installation_id` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired. Refusals as on the web: `github_app.not_visible`, `github_app.other_workspace` (409), `github_app.installed_outside`, `oauth.other_account`.",
+        "The phone app opened the install link in the system browser (`returnTo: \"app:connectors\"`); the callback handed `state`, `code` and `installation_id` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired. Refusals as on the web: `github_app.not_visible`, `github_app.other_workspace` (409), `github_app.installed_outside`, `oauth.other_account`, and `github_app.misconfigured` (500: GitHub refused this server's app, reported as an error).",
       request: {
         params: OrgParams,
         body: body(
@@ -347,7 +347,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "GitHub's redirect after installing (browser navigation)",
       description:
-        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `installed_outside`, `not_allowed` or `failed`. A new binding needs an installation GitHub made after the state was issued (`installed_outside` otherwise, also for `setup_action=update` of one not bound here, and for `setup_action=install` without a state: installed from GitHub's own page). `setup_action=update` without a state (repositories changed on GitHub's own page) lands on the web app with nothing to finish. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
+        "Checks the state and that the person's GitHub account can see the installation, binds it to the organization (its GitHub when it had none), then redirects to the web app with `github_app=installed`, or `github_app_error=` `requested`, `cancelled`, `expired`, `used`, `other_account`, `not_visible`, `other_workspace`, `installed_outside`, `not_allowed`, `misconfigured` (GitHub refused this server's app: its client id or secret is wrong, which is logged as an error) or `failed`. A new binding needs an installation GitHub made after the state was issued (`installed_outside` otherwise, also for `setup_action=update` of one not bound here, and for `setup_action=install` without a state: installed from GitHub's own page). `setup_action=update` without a state (repositories changed on GitHub's own page) lands on the web app with nothing to finish. Started by the phone app: no session needed, it redirects to `agenteschat://connectors/oauth` with `state`, `code` and `installation_id` (or `error`).",
       request: {
         query: z.object({
           state: z.string().optional(),
@@ -392,7 +392,7 @@ export function githubAppRoutes(deps: AppDeps) {
         return c.redirect(`${base}${returnTo}${sep}github_app=installed`, 302);
       } catch (error) {
         const reason = oauthFailure(error);
-        if (reason === "failed") {
+        if (reason === "failed" || reason === "misconfigured") {
           const log = isExpectedError(error) ? deps.log?.warn : deps.log?.error;
           log?.("github app install failed", { error });
         }

@@ -4564,12 +4564,21 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--primary.ac-btn--loading .ac-btn__spinner {
   color: var(--on-action);
 }
-/* Words that take turns (`SwapLabel`): stacked in one cell, the unseen one keeps its width. */
+/*
+ * Words that take turns (`SwapLabel`), each with its icon: stacked in one cell the wider one sizes, the unseen one
+ * keeping its width. The one shown sits in the cell's middle with its icon at the button's gap, so the room the other
+ * keeps splits between both ends instead of opening between the icon and its words.
+ */
 .ac-swap {
   display: inline-grid;
+  gap: inherit;
 }
 .ac-swap > * {
   grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: inherit;
 }
 .ac-swap > [aria-hidden="true"] {
   visibility: hidden;
@@ -4997,7 +5006,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
  * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
  * folded to its icon, say), the box places it.
  */
-:where(.ac-btn > .ac-icon:first-child) {
+:where(.ac-btn > .ac-icon:first-child, .ac-btn > .ac-swap > * > .ac-icon:first-child) {
   margin-inline-start: calc(-1 * var(--lead-air));
   translate: 0 calc(-1 * var(--lead-rise));
 }
@@ -8709,6 +8718,16 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-search__option {
   align-items: center;
 }
+/* A searchable list with people, agents or roles in it is an OptionRow list: every row the faces' room around them (6,
+   10 on touch), every face and mark the list's one size. */
+.ac-tz__list:has(.ac-menu__leading > :is(.ac-avatar, .ac-rolemark)) .ac-tz__option {
+  min-height: var(--option-h);
+  padding-block: calc((var(--option-h) - var(--option-face)) / 2);
+}
+.ac-tz__option > .ac-menu__leading > :is(.ac-avatar, .ac-rolemark) {
+  width: var(--option-face);
+  height: var(--option-face);
+}
 .ac-recur__period {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10780,6 +10799,22 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   height: 20px;
   margin: 0;
   color: var(--ink-muted);
+}
+/* An item with a line under its name (Adicionar workspace, Convidar pessoas): its icon on the name's line, as a menu
+   option's lead is, not in the middle of both lines, and the item's own 12px above it (a menu's two-line rows take
+   8), the room a touch screen needs around it. */
+.ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) {
+  padding-block: 12px;
+}
+.ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-icon:first-child {
+  align-self: flex-start;
+  /* Browsers without the lh unit: the item's 20px line. */
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-icon:first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .ac-mo__item:hover > .ac-icon,
 .ac-mo__item:focus-visible > .ac-icon {

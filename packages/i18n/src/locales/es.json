@@ -3882,7 +3882,8 @@
       "github": {
         "merge_pull_request": "Hacer merge del PR #{{number}} en {{repo}}",
         "pull_request_review_write": "Revisar el PR #{{number}} en {{repo}}",
-        "actions_run_trigger": "Ejecutar {{method}} en {{repo}}"
+        "actions_run_trigger": "Ejecutar {{method}} en {{repo}}",
+        "delete_repository": "Eliminar el repositorio {{repo}}"
       }
     }
   },
@@ -6200,6 +6201,26 @@
     "github_actions_run": {
       "label": "Ejecutar workflows",
       "description": "Iniciar workflows de GitHub Actions (pueden hacer deploy). Siempre pide aprobación."
+    },
+    "github_repo_admin": {
+      "label": "Administrar repositorios",
+      "description": "Crear repositorios y proteger sus ramas con conjuntos de reglas. Eliminar un repositorio y crear un conjunto de reglas siempre piden aprobación."
+    },
+    "github_discussions_read": {
+      "label": "Leer discusiones",
+      "description": "Listar y leer GitHub Discussions y sus comentarios."
+    },
+    "github_discussions_write": {
+      "label": "Escribir en discusiones",
+      "description": "Comentar y responder en GitHub Discussions y marcar respuestas."
+    },
+    "github_security_read": {
+      "label": "Leer alertas de seguridad",
+      "description": "Leer alertas de escaneo de código, de Dependabot y de escaneo de secretos, y avisos de seguridad. Las alertas de secretos muestran el secreto expuesto."
+    },
+    "github_org_read": {
+      "label": "Leer equipos",
+      "description": "Listar los miembros de los equipos de una organización."
     },
     "sentry_issues_read": {
       "label": "Leer errores",
@@ -10616,6 +10637,7 @@
     "notVisible": "Tu cuenta de GitHub no puede ver esa instalación. Instálala con una cuenta que tenga acceso.",
     "otherWorkspace": "Esa cuenta de GitHub ya está vinculada a otro espacio de trabajo. Quita la app de allí antes de instalarla aquí.",
     "installedOutside": "La app se instaló en esa cuenta de GitHub fuera de agentes.chat. Quítala en GitHub e instálala de nuevo desde Conectores › GitHub.",
+    "misconfigured": "La app de GitHub tiene la clave secreta equivocada en el servidor, así que la instalación no puede terminar. Quien administra el servidor tiene que cambiar la clave en la configuración de la app.",
     "connectAccount": "Conectar una cuenta de GitHub",
     "ownerHint": "El dueño de este servidor puede crear la app de GitHub aquí en Conectores.",
     "viaApp": "Mediante la app agentes.chat en {{accounts}}",
@@ -11435,7 +11457,16 @@
       "cycle": "ciclo|ciclos|del ciclo",
       "analytics": "analíticas|analíticas|de las analíticas",
       "revenue": "ingresos|ingresos|de los ingresos",
-      "source": "fuente|fuentes|de la fuente"
+      "source": "fuente|fuentes|de la fuente",
+      "code": "código|códigos|del código",
+      "scanning": "escaneo|escaneos|de escaneo",
+      "secret": "secreto|secretos|del secreto",
+      "security": "seguridad|seguridad|de seguridad",
+      "advisory": "aviso|avisos|del aviso",
+      "discussion": "discusión|discusiones|de la discusión",
+      "dependabot": "Dependabot|Dependabot|de Dependabot",
+      "org": "organización|organizaciones|de la organización",
+      "ruleset": "conjunto de reglas|conjuntos de reglas|del conjunto de reglas"
     }
   },
   "toolReview": {
@@ -11580,7 +11611,7 @@
       "recommended": "Recomendado",
       "appText": "Los agentes aparecen como la app, y eliges los repositorios en GitHub.",
       "account": "Una cuenta de GitHub",
-      "accountText": "Los agentes aparecen como esa cuenta. GitHub Projects necesita una.",
+      "accountText": "Los agentes aparecen como esa cuenta. GitHub Projects de una cuenta personal necesita una.",
       "appNote": "Eliges las cuentas y los repositorios en GitHub y vuelves aquí."
     },
     "githubOrgs": {
@@ -12290,7 +12321,8 @@
       "otherServer": "Esa cuenta está en otra dirección.",
       "gone": "Esa cuenta ya no está conectada.",
       "unfinished": "El inicio de sesión en Composio no terminó. Intenta de nuevo.",
-      "unavailable": "Este servicio no se puede conectar aquí."
+      "unavailable": "Este servicio no se puede conectar aquí.",
+      "misconfigured": "La conexión con {{provider}} está mal configurada en el servidor, así que no puede terminar. Quien administra el servidor tiene que cambiar la clave en la configuración de la app."
     },
     "wiki": {
       "noAccess": "No tienes acceso a esta página.",
@@ -14239,6 +14271,7 @@
         "runningRoutine": "Ejecutó una rutina ahora",
         "proposingTeam": "Propuso un equipo",
         "proposingChange": "Propuso un cambio",
+        "workingOnWorkspace": "Trabajó en el espacio de trabajo",
         "updatingThread": "Actualizó un hilo",
         "addingAgent": "Agregó un agente a un canal",
         "readingConversation": "Leyó la conversación",
@@ -14347,6 +14380,7 @@
       "runningRoutine": "ejecutando una rutina ahora",
       "proposingTeam": "proponiendo un equipo",
       "proposingChange": "proponiendo un cambio",
+      "workingOnWorkspace": "trabajando en el espacio de trabajo",
       "updatingThread": "actualizando un hilo",
       "addingAgent": "agregando un agente a un canal",
       "readingConversation": "leyendo la conversación",

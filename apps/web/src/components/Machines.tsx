@@ -434,7 +434,7 @@ function HostOffRow() {
       </span>
       <span className="ac-mediarow__body small muted">{t("machines.host.offText")}</span>
       {can(org, "configure") && (
-        <span className="ac-mediarow__end">
+        <span className="ac-mediarow__end ac-mediarow__end--wrap">
           <Button
             size="sm"
             loading={turnOn.isPending}
@@ -585,11 +585,11 @@ export function HostComputerCard() {
         {t("machines.host.label")}
       </h2>
       {m ? (
-        <List aria-label={t("machines.host.label")}>
+        <List className="machine-list" aria-label={t("machines.host.label")}>
           <MachineRow machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />
         </List>
       ) : off ? (
-        <List aria-label={t("machines.host.label")}>
+        <List className="machine-list" aria-label={t("machines.host.label")}>
           <HostOffRow />
         </List>
       ) : (
@@ -644,7 +644,7 @@ export function MachinesSection() {
           </EmptyState>
         )}
         {list.length > 0 && (
-          <List aria-label={t("computers.other.title")}>
+          <List className="machine-list" aria-label={t("computers.other.title")}>
             {list.map((m) => (
               <MachineRow key={m.id} machine={m} onRename={() => setRenaming(m)} onRemove={() => setRemoving(m)} />
             ))}
@@ -863,7 +863,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
   return (
     <Card aria-labelledby="sec-machine-tools">
       <CardHeader id="sec-machine-tools" icon="cog" title={t("machines.access.tools")} />
-      <List aria-label={t("machines.access.tools")}>
+      <List className="machine-list" aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
           const on =
             tool === "cursor" || tool === "opencode" || tool === "grok" || tool === "antigravity"
@@ -891,7 +891,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
                 </span>
               </span>
               {warn && <span className="ac-mediarow__body small muted">{t("machines.access.commandsWarn")}</span>}
-              <span className="machine-tool__tail ac-mediarow__end">
+              <span className="machine-tool__tail ac-mediarow__end ac-mediarow__end--wrap">
                 <Chip icon={on ? "check" : "dash"}>{on ? t("machines.access.on") : t("machines.access.off")}</Chip>
                 {on && canReduceAccess(m) && (
                   <Button

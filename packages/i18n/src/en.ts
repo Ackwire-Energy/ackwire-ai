@@ -3877,6 +3877,7 @@ export const en = {
         merge_pull_request: "Merge PR #{{number}} in {{repo}}",
         pull_request_review_write: "Review PR #{{number}} in {{repo}}",
         actions_run_trigger: "Run {{method}} in {{repo}}",
+        delete_repository: "Delete the repository {{repo}}",
       },
     },
   },
@@ -6081,6 +6082,25 @@ export const en = {
       label: "Run workflows",
       description: "Start GitHub Actions workflows (may deploy). Always asks for approval.",
     },
+    github_repo_admin: {
+      label: "Manage repositories",
+      description:
+        "Create repositories and protect their branches with rulesets. Deleting a repository and adding a ruleset always ask for approval.",
+    },
+    github_discussions_read: {
+      label: "Read discussions",
+      description: "List and read GitHub Discussions and their comments.",
+    },
+    github_discussions_write: {
+      label: "Write in discussions",
+      description: "Comment and reply in GitHub Discussions and mark answers.",
+    },
+    github_security_read: {
+      label: "Read security alerts",
+      description:
+        "Read code scanning, Dependabot and secret scanning alerts and security advisories. Secret alerts show the leaked secret.",
+    },
+    github_org_read: { label: "Read teams", description: "List the members of an organization's teams." },
     sentry_issues_read: { label: "Read errors", description: "Search issues and events and read their details." },
     sentry_issues_write: { label: "Triage errors", description: "Resolve, assign or ignore Sentry issues." },
     linear_issues_read: { label: "Read issues", description: "List and read Linear issues and projects." },
@@ -10240,7 +10260,13 @@ export const en = {
     /** The app was installed on GitHub itself, not from agentes.chat (`github_app_error=installed_outside`). */
     installedOutside:
       "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
-    /** GitHub is the app alone: an account too (agents use it where the app isn't installed, and for GitHub Projects). */
+    /**
+     * GitHub refused this server's own GitHub App, whose client secret (or id) is wrong
+     * (`github_app_error=misconfigured`): trying again can't help, only whoever runs the server can fix it.
+     */
+    misconfigured:
+      "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+    /** GitHub is the app alone: an account too (agents use it where the app isn't installed, and for a person's own GitHub Projects). */
     connectAccount: "Connect a GitHub account",
     /** For admins who aren't the server's owner, on a server without the app (never on agentes.chat). */
     ownerHint: "This server's owner can create its GitHub app here in Connectors.",
@@ -10886,6 +10912,15 @@ export const en = {
       analytics: "analytics|analytics",
       revenue: "revenue|revenue",
       source: "source|sources",
+      code: "code|code",
+      scanning: "scanning|scanning",
+      secret: "secret|secrets",
+      security: "security|security",
+      advisory: "advisory|advisories",
+      discussion: "discussion|discussions",
+      dependabot: "Dependabot|Dependabot",
+      org: "organization|organizations",
+      ruleset: "ruleset|rulesets",
     },
   },
   toolReview: {
@@ -10998,7 +11033,7 @@ export const en = {
       recommended: "Recommended",
       appText: "Agents show up as the app, and you pick the repositories on GitHub.",
       account: "A GitHub account",
-      accountText: "Agents show up as that account. GitHub Projects need one.",
+      accountText: "Agents show up as that account. GitHub Projects on a personal account need one.",
       appNote: "You pick the accounts and repositories on GitHub, then come back here.",
     },
     githubOrgs: {
@@ -11640,6 +11675,12 @@ export const en = {
       gone: "That account is no longer connected.",
       unfinished: "The sign-in at Composio didn't finish. Try again.",
       unavailable: "This service can't be connected here.",
+      /**
+       * {{provider}} refused this server's own OAuth app for it, whose client secret (or id) is wrong
+       * (`connector_error=misconfigured`): trying again can't help, only whoever runs the server can fix it.
+       */
+      misconfigured:
+        "The connection to {{provider}} is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings.",
     },
     wiki: {
       noAccess: "You don't have access to this page.",
@@ -13595,6 +13636,7 @@ export const en = {
         runningRoutine: "Ran a routine now",
         proposingTeam: "Proposed a team",
         proposingChange: "Proposed a change",
+        workingOnWorkspace: "Worked on the workspace",
         updatingThread: "Updated a thread",
         addingAgent: "Added an agent to a channel",
         readingConversation: "Read the conversation",
@@ -13703,6 +13745,7 @@ export const en = {
       runningRoutine: "running a routine now",
       proposingTeam: "proposing a team",
       proposingChange: "proposing a change",
+      workingOnWorkspace: "working on the workspace",
       updatingThread: "updating a thread",
       addingAgent: "adding an agent to a channel",
       readingConversation: "reading the conversation",

@@ -92,14 +92,33 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 /**
- * A button's words that take turns ("Copiar link", then "Copiado"): both stay in place, the other one unseen, so the
- * button keeps the wider one's width and doesn't move under the pointer when they change.
+ * A button's words that take turns ("Copiar link", then "Copiado"), each with its icon (in place of the button's own
+ * `icon`): both stay in place, the other one unseen, so the button keeps the wider one's width and doesn't move under
+ * the pointer when they change. The one shown sits in the middle with its icon beside it, the same padding at both ends.
  */
-export function SwapLabel({ label, alt, showAlt }: { label: ReactNode; alt: ReactNode; showAlt: boolean }) {
+export function SwapLabel({
+  label,
+  alt,
+  showAlt,
+  icon,
+  altIcon = icon,
+}: {
+  label: ReactNode;
+  alt: ReactNode;
+  showAlt: boolean;
+  icon?: IconName;
+  altIcon?: IconName;
+}) {
   return (
     <span className="ac-swap">
-      <span aria-hidden={showAlt || undefined}>{label}</span>
-      <span aria-hidden={!showAlt || undefined}>{alt}</span>
+      <span aria-hidden={showAlt || undefined}>
+        {icon && <Icon name={icon} />}
+        {label}
+      </span>
+      <span aria-hidden={!showAlt || undefined}>
+        {altIcon && <Icon name={altIcon} />}
+        {alt}
+      </span>
     </span>
   );
 }

@@ -164,9 +164,16 @@ export function WhoSeesDialog({
         <Locked when={saving}>
           <div className="who-sees__options">
             {KINDS.map((k) => (
-              <OptionCard key={k.kind} pressed={kind === k.kind} onClick={() => setKind(k.kind)}>
-                <Icon name={k.icon} size={16} />
-                <span className="ac-option__text">
+              <OptionCard
+                key={k.kind}
+                className="ac-mediarow ac-mediarow--row"
+                pressed={kind === k.kind}
+                onClick={() => setKind(k.kind)}
+              >
+                <span className="ac-mediarow__face">
+                  <Icon name={k.icon} size={16} />
+                </span>
+                <span className="ac-mediarow__head">
                   <span className="ac-option__title">{t(k.label as "whoSees.everyone")}</span>
                 </span>
               </OptionCard>

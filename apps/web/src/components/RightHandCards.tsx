@@ -681,7 +681,7 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
                   <span className="ac-mediarow__meta">{people.find((p) => p.userId === r.userId)?.email}</span>
                 </span>
                 <span className="ac-mediarow__body">{what(r)}</span>
-                <span className="ac-mediarow__end">
+                <span className="ac-mediarow__end ac-mediarow__end--wrap">
                   {done(r) ? (
                     <span className="proposal-row__status">{t("rightHand.people.done")}</span>
                   ) : (

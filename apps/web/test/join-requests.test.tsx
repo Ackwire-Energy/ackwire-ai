@@ -1023,7 +1023,10 @@ describe("Members › the invitation link", () => {
     const fromPage = await withClipboard(() => click(screen().getByRole("button", { name: "Copiar link de convite" })));
     expect(fromPage).toEqual(["http://localhost:3000/invite/k3J"]);
     const copied = screen().getByRole("button", { name: "Copiado" });
-    expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
+    // The word shown and its own icon (the other word stays unseen, with its own).
+    expect(copied.querySelector(".ac-swap > :not([aria-hidden]) svg path")?.getAttribute("d")).toBe(
+      icons.check[0]?.[1].d,
+    );
     // An active link was there: none was made.
     expect(state.calls.some((c) => c.method === "invites.createLink")).toBe(false);
 

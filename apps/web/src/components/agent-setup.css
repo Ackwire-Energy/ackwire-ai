@@ -161,7 +161,9 @@ html:not([data-pointer]) .setup-row__link:focus-visible {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) 16px;
   gap: 10px;
-  align-items: center;
+  /* Its icon on the first line of words that wrap (`.ac-iconline` places it), the lines in the button's middle. */
+  align-items: start;
+  align-content: center;
   min-height: 40px;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
@@ -171,9 +173,9 @@ html:not([data-pointer]) .setup-row__link:focus-visible {
 .setup-task .ac-icon {
   color: var(--ink-muted);
 }
-/* Its icon on the first line of words that wrap (`.ac-iconline`); the arrow ends the button, in its middle. */
-.setup-task > .ac-icon:first-child {
-  align-self: start;
+/* The arrow ends the button, in the middle of its lines. */
+.setup-task > .ac-icon:last-child {
+  align-self: center;
 }
 .setup-task:hover {
   background: var(--plate);

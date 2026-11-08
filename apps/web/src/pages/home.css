@@ -178,10 +178,10 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 }
 
 /* The right hand's first run while a row is left (ADR 0155 §6): one line back to its checklist. */
+/* A MediaRow (the kit's `.ac-mediarow`): Lodi's face on the first line of words that wrap on a phone, the chevron at
+   that line's end; one line sits in the middle of the row. */
 .home-continue {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  align-content: center;
   min-height: 48px;
   padding: 8px 14px;
   border-radius: var(--radius-md);
@@ -191,11 +191,10 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   font-weight: 600;
   text-decoration: none;
 }
-.home-continue__text {
-  flex: 1;
-  min-width: 0;
+.home-continue > .ac-mediarow__head {
+  font-weight: 600;
 }
-.home-continue > .ac-icon {
+.home-continue > .ac-mediarow__end > .ac-icon {
   color: var(--ink-muted);
 }
 html:not([data-pointer]) .home-continue:focus-visible {

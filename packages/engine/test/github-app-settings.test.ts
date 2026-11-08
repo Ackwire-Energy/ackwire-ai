@@ -157,16 +157,38 @@ describe("GitHub's manifest flow", () => {
       public: true,
       hook_attributes: { url: "https://chat.example.com/api/github-app/webhook", active: true },
     });
-    // Exactly agentes.chat's own app: write on the repository permissions agents use, metadata read.
+    // Exactly agentes.chat's own app, by GitHub's manifest names: write on the repository permissions agents use,
+    // metadata read; an organization's members read and Projects write. Never Codespaces, nor an organization's
+    // administration, secrets, variables, runners or webhooks.
     expect(manifest.default_permissions).toEqual({
       actions: "write",
+      administration: "write",
+      attestations: "write",
       checks: "write",
-      contents: "write",
-      issues: "write",
-      pull_requests: "write",
+      security_events: "write",
       statuses: "write",
+      contents: "write",
+      repository_custom_properties: "write",
+      vulnerability_alerts: "write",
+      dependabot_secrets: "write",
+      deployments: "write",
+      discussions: "write",
+      environments: "write",
+      issues: "write",
+      merge_queues: "write",
+      packages: "write",
+      pages: "write",
+      repository_projects: "write",
+      pull_requests: "write",
+      repository_advisories: "write",
+      secret_scanning_alerts: "write",
+      secrets: "write",
+      actions_variables: "write",
+      repository_hooks: "write",
       workflows: "write",
       metadata: "read",
+      members: "read",
+      organization_projects: "write",
     });
     // GitHub can't deliver to plain http; a long host keeps the name within GitHub's 34 characters.
     expect(githubAppManifest("http://192.168.0.10:3000").hook_attributes.active).toBe(false);

@@ -1414,24 +1414,9 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   font-size: 13px;
   color: var(--ink2);
 }
-.mi-blocked__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
+/* An agent that can't take the mission, a MediaRow (the kit's `.ac-mediarow`): its face and name on one line with
+   Conectar at its end, why under them. */
 .mi-blocked__text {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  flex: 1;
-  min-width: 0;
-}
-.mi-blocked__text b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.mi-blocked__text span {
   color: var(--muted);
 }
 .mi-blocked .mi-lnk {

@@ -26,13 +26,13 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
         return { content: [{ type: "text", text: `Merged PR #${args.pullNumber}` }] };
       },
     );
-    // Not in our catalog: must never reach an agent.
+    // Not in our catalog (a person's stars): must never reach an agent.
     server.registerTool(
-      "delete_repository",
-      { description: "Delete a repository", inputSchema: { repo: z.string() } },
+      "star_repository",
+      { description: "Star a repository", inputSchema: { repo: z.string() } },
       async (args) => {
-        calls.push({ tool: "delete_repository", args });
-        return { content: [{ type: "text", text: "deleted" }] };
+        calls.push({ tool: "star_repository", args });
+        return { content: [{ type: "text", text: "starred" }] };
       },
     );
     server.registerTool(
@@ -56,7 +56,7 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
         },
       );
     }
-    // What agents write on GitHub (ADR 0156): bodies, commit messages, an account-wide read and Projects.
+    // What agents do on GitHub (ADR 0156): bodies, commit messages, account-wide calls, Projects, administration.
     if (options.writes) {
       const repo = { owner: z.string(), repo: z.string() };
       const tools: Record<string, Record<string, z.ZodType>> = {
@@ -73,6 +73,19 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
         push_files: { ...repo, branch: z.string(), files: z.array(z.unknown()), message: z.string() },
         list_issue_types: { owner: z.string() },
         projects_list: { owner: z.string() },
+        label_write: { ...repo, method: z.string(), name: z.string() },
+        discussion_comment_write: {
+          ...repo,
+          method: z.string(),
+          discussionNumber: z.number().optional(),
+          body: z.string().optional(),
+        },
+        list_code_scanning_alerts: repo,
+        list_org_repository_security_advisories: { org: z.string() },
+        get_team_members: { org: z.string(), team_slug: z.string() },
+        create_repository: { name: z.string(), organization: z.string().optional() },
+        delete_repository: repo,
+        create_repository_ruleset: { ...repo, name: z.string(), rules: z.array(z.unknown()) },
       };
       for (const [name, inputSchema] of Object.entries(tools)) {
         server.registerTool(name, { description: name, inputSchema }, async (args) => {

@@ -3637,7 +3637,8 @@
       "github": {
         "merge_pull_request": "合并 {{repo}} 的 PR #{{number}}",
         "pull_request_review_write": "审查 {{repo}} 的 PR #{{number}}",
-        "actions_run_trigger": "在 {{repo}} 中运行 {{method}}"
+        "actions_run_trigger": "在 {{repo}} 中运行 {{method}}",
+        "delete_repository": "删除仓库 {{repo}}"
       }
     }
   },
@@ -5848,6 +5849,26 @@
     "github_actions_run": {
       "label": "运行工作流",
       "description": "启动 GitHub Actions 工作流（可能会部署）。始终需要审批。"
+    },
+    "github_repo_admin": {
+      "label": "管理仓库",
+      "description": "创建仓库，并用规则集保护分支。删除仓库和添加规则集始终需要审批。"
+    },
+    "github_discussions_read": {
+      "label": "读取讨论",
+      "description": "列出并读取 GitHub Discussions 及其评论。"
+    },
+    "github_discussions_write": {
+      "label": "写入讨论",
+      "description": "在 GitHub Discussions 中评论、回复并标记答案。"
+    },
+    "github_security_read": {
+      "label": "读取安全告警",
+      "description": "读取代码扫描、Dependabot 和密钥扫描告警以及安全公告。密钥告警会显示泄露的密钥。"
+    },
+    "github_org_read": {
+      "label": "读取团队",
+      "description": "列出组织中各团队的成员。"
     },
     "sentry_issues_read": {
       "label": "读取错误",
@@ -9923,6 +9944,7 @@
     "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。",
     "otherWorkspace": "这个 GitHub 账号已关联到另一个工作区。请先在那里移除应用，再在这里安装。",
     "installedOutside": "这个 GitHub 账号上的应用是在 agentes.chat 之外安装的。请在 GitHub 上移除它，再从 连接器 › GitHub 重新安装。",
+    "misconfigured": "服务器上的 GitHub 应用密钥不对，所以无法完成安装。运行服务器的人需要在应用的设置中更换密钥。",
     "connectAccount": "连接 GitHub 账号",
     "ownerHint": "这台服务器的所有者可以在这里的连接器中创建 GitHub 应用。",
     "viaApp": "通过 {{accounts}} 上的 agentes.chat 应用",
@@ -10716,7 +10738,16 @@
       "cycle": "周期|周期",
       "analytics": "分析数据|分析数据",
       "revenue": "收入|收入",
-      "source": "来源|来源"
+      "source": "来源|来源",
+      "code": "代码|代码",
+      "scanning": "扫描|扫描",
+      "secret": "密钥|密钥",
+      "security": "安全|安全",
+      "advisory": "公告|公告",
+      "discussion": "讨论|讨论",
+      "dependabot": "Dependabot",
+      "org": "组织|组织",
+      "ruleset": "规则集|规则集"
     }
   },
   "toolReview": {
@@ -10831,7 +10862,7 @@
       "recommended": "推荐",
       "appText": "智能体显示为应用，仓库在 GitHub 上选择。",
       "account": "GitHub 账号",
-      "accountText": "智能体显示为该账号。GitHub Projects 需要账号。",
+      "accountText": "智能体显示为该账号。个人账号的 GitHub Projects 需要账号。",
       "appNote": "在 GitHub 上选择账号和仓库，然后回到这里。"
     },
     "githubOrgs": {
@@ -11509,7 +11540,8 @@
       "otherServer": "那个账号位于另一个地址。",
       "gone": "那个账号已不再连接。",
       "unfinished": "在 Composio 的登录没有完成，请重试。",
-      "unavailable": "这个服务无法在这里连接。"
+      "unavailable": "这个服务无法在这里连接。",
+      "misconfigured": "服务器上与 {{provider}} 的连接配置有误，所以无法完成连接。运行服务器的人需要在应用的设置中更换密钥。"
     },
     "wiki": {
       "noAccess": "你无权访问此页面。",
@@ -13385,6 +13417,7 @@
         "runningRoutine": "立即运行了例行工作",
         "proposingTeam": "提议了一个团队",
         "proposingChange": "提议了一项更改",
+        "workingOnWorkspace": "在工作区中操作了",
         "updatingThread": "更新了一个话题",
         "addingAgent": "把智能体添加到频道",
         "readingConversation": "读了对话",
@@ -13493,6 +13526,7 @@
       "runningRoutine": "立即运行例行工作",
       "proposingTeam": "提议团队",
       "proposingChange": "提议更改",
+      "workingOnWorkspace": "在工作区中操作",
       "updatingThread": "更新话题",
       "addingAgent": "把智能体添加到频道",
       "readingConversation": "阅读对话",

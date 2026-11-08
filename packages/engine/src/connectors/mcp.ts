@@ -439,12 +439,9 @@ export function createConnectorToolSource(
         } catch {
           continue; // an unreachable server hides its tools for this turn
         }
-        const appAlone = connection.authType === GITHUB_APP_AUTH;
         for (const tool of listed) {
           const mapped = def.tools[tool.name];
           if (!mapped || mapped.ours) continue; // not in our catalog, or one we serve: never exposed
-          // GitHub Apps can't reach a person's Projects: through the app alone, they'd only ever fail.
-          if (appAlone && mapped.scope.startsWith("projects.")) continue;
           out.push({
             name: exposedToolName(prefix, tool.name),
             description: cutText(`[${connection.label}] ${tool.description ?? tool.name}`, 1024),

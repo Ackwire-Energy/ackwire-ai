@@ -663,12 +663,17 @@ function AddAccountFlow({
       )}
       <Button
         size="sm"
-        icon={linkCopied ? "check" : "copy"}
         loading={starting && copyingLink}
         disabled={!ready || loading || (starting && !copyingLink)}
         onClick={copyLink}
       >
-        <SwapLabel label={t("agentPage.work.brain.add.copyLink")} alt={t("common.copied")} showAlt={linkCopied} />
+        <SwapLabel
+          icon="copy"
+          altIcon="check"
+          label={t("agentPage.work.brain.add.copyLink")}
+          alt={t("common.copied")}
+          showAlt={linkCopied}
+        />
       </Button>
     </span>
   );
@@ -681,8 +686,8 @@ function AddAccountFlow({
       <b>{label}</b>
       <span className="agp-addacct__code">
         <output aria-label={label}>{code}</output>
-        <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
-          <SwapLabel label={t("common.copy")} alt={t("common.copied")} showAlt={copied} />
+        <Button size="sm" onClick={() => void copy()}>
+          <SwapLabel icon="copy" altIcon="check" label={t("common.copy")} alt={t("common.copied")} showAlt={copied} />
         </Button>
       </span>
       <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>

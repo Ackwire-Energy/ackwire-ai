@@ -4028,7 +4028,8 @@
       "github": {
         "merge_pull_request": "Wykonaj merge PR #{{number}} w {{repo}}",
         "pull_request_review_write": "Przejrzyj PR #{{number}} w {{repo}}",
-        "actions_run_trigger": "Uruchom {{method}} w {{repo}}"
+        "actions_run_trigger": "Uruchom {{method}} w {{repo}}",
+        "delete_repository": "Usuń repozytorium {{repo}}"
       }
     }
   },
@@ -6455,6 +6456,26 @@
     "github_actions_run": {
       "label": "Uruchamianie workflow",
       "description": "Uruchamianie workflow GitHub Actions (mogą wdrażać). Zawsze prosi o zatwierdzenie."
+    },
+    "github_repo_admin": {
+      "label": "Zarządzanie repozytoriami",
+      "description": "Tworzenie repozytoriów i ochrona ich gałęzi zestawami reguł. Usunięcie repozytorium i dodanie zestawu reguł zawsze wymagają zatwierdzenia."
+    },
+    "github_discussions_read": {
+      "label": "Czytanie dyskusji",
+      "description": "Wyświetlanie i czytanie GitHub Discussions oraz ich komentarzy."
+    },
+    "github_discussions_write": {
+      "label": "Pisanie w dyskusjach",
+      "description": "Komentowanie i odpowiadanie w GitHub Discussions oraz oznaczanie odpowiedzi."
+    },
+    "github_security_read": {
+      "label": "Czytanie alertów bezpieczeństwa",
+      "description": "Czytanie alertów skanowania kodu, Dependabota i skanowania sekretów oraz porad dotyczących bezpieczeństwa. Alerty o sekretach pokazują ujawniony sekret."
+    },
+    "github_org_read": {
+      "label": "Czytanie zespołów",
+      "description": "Wyświetlanie członków zespołów organizacji."
     },
     "sentry_issues_read": {
       "label": "Czytanie błędów",
@@ -11093,6 +11114,7 @@
     "notVisible": "Twoje konto GitHub nie widzi tej instalacji. Zainstaluj ją z konta, które ma do niej dostęp.",
     "otherWorkspace": "To konto GitHub jest już połączone z inną przestrzenią roboczą. Usuń tam aplikację, zanim zainstalujesz ją tutaj.",
     "installedOutside": "Aplikacja została zainstalowana na tym koncie GitHub poza agentes.chat. Usuń ją w GitHub i zainstaluj ponownie w Konektory › GitHub.",
+    "misconfigured": "Aplikacja GitHub ma na serwerze zły klucz tajny, więc instalacja nie może się zakończyć. Osoba zarządzająca serwerem musi zmienić klucz w ustawieniach aplikacji.",
     "connectAccount": "Połącz konto GitHub",
     "ownerHint": "Właściciel tego serwera może utworzyć aplikację GitHub tutaj, w Konektorach.",
     "viaApp": "Przez aplikację agentes.chat na kontach {{accounts}}",
@@ -11919,7 +11941,16 @@
       "cycle": "cykl|cykle|cyklu",
       "analytics": "analitykę|analitykę|analityki",
       "revenue": "przychód|przychody|przychodu",
-      "source": "źródło|źródła|źródła"
+      "source": "źródło|źródła|źródła",
+      "code": "kod|kody|kodu",
+      "scanning": "skanowanie|skanowania|skanowania",
+      "secret": "sekret|sekrety|sekretu",
+      "security": "bezpieczeństwo|bezpieczeństwo|bezpieczeństwa",
+      "advisory": "poradę|porady|porady",
+      "discussion": "dyskusję|dyskusje|dyskusji",
+      "dependabot": "Dependabot|Dependabot|Dependabota",
+      "org": "organizację|organizacje|organizacji",
+      "ruleset": "zestaw reguł|zestawy reguł|zestawu reguł"
     }
   },
   "toolReview": {
@@ -12079,7 +12110,7 @@
       "recommended": "Zalecane",
       "appText": "Agenci widnieją jako aplikacja, a repozytoria wybierasz w GitHub.",
       "account": "Konto GitHub",
-      "accountText": "Agenci widnieją jako to konto. GitHub Projects go wymaga.",
+      "accountText": "Agenci widnieją jako to konto. GitHub Projects konta osobistego go wymaga.",
       "appNote": "Wybierasz konta i repozytoria w GitHub, a potem wracasz tutaj."
     },
     "githubOrgs": {
@@ -12805,7 +12836,8 @@
       "otherServer": "To konto jest pod innym adresem.",
       "gone": "To konto nie jest już połączone.",
       "unfinished": "Logowanie w Composio nie zostało dokończone. Spróbuj ponownie.",
-      "unavailable": "Tej usługi nie można tu połączyć."
+      "unavailable": "Tej usługi nie można tu połączyć.",
+      "misconfigured": "Połączenie z {{provider}} jest źle skonfigurowane na serwerze, więc nie może się zakończyć. Osoba zarządzająca serwerem musi zmienić klucz w ustawieniach aplikacji."
     },
     "wiki": {
       "noAccess": "Nie masz dostępu do tej strony.",
@@ -14799,6 +14831,7 @@
         "runningRoutine": "Uruchomiono rutynę teraz",
         "proposingTeam": "Zaproponowano zespół",
         "proposingChange": "Zaproponowano zmianę",
+        "workingOnWorkspace": "Praca w przestrzeni roboczej",
         "updatingThread": "Zaktualizowano wątek",
         "addingAgent": "Dodano agenta do kanału",
         "readingConversation": "Przeczytano rozmowę",
@@ -14907,6 +14940,7 @@
       "runningRoutine": "uruchamianie rutyny teraz",
       "proposingTeam": "proponowanie zespołu",
       "proposingChange": "proponowanie zmiany",
+      "workingOnWorkspace": "praca w przestrzeni roboczej",
       "updatingThread": "aktualizowanie wątku",
       "addingAgent": "dodawanie agenta do kanału",
       "readingConversation": "czytanie rozmowy",

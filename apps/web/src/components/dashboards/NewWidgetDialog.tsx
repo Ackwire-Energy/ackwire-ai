@@ -748,9 +748,11 @@ function NewWidgetBody({
       </div>
       {stale && !editing && (
         <div className="nwc__stale ac-actrow" role="status">
-          <Icon name="info" size={16} />
-          <span className="ac-actrow__text">
-            <b>{t("dashboards.newWidget.stale")}.</b> {t("dashboards.newWidget.staleHint")}
+          <span className="ac-iconline ac-actrow__text">
+            <Icon name="info" size={16} />
+            <span>
+              <b>{t("dashboards.newWidget.stale")}.</b> {t("dashboards.newWidget.staleHint")}
+            </span>
           </span>
           <Button size="sm" icon="refresh" disabled={!canTest} onClick={runTest}>
             {t("dashboards.newWidget.testAgain")}

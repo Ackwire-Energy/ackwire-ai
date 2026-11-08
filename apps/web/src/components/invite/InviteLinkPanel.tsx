@@ -49,12 +49,14 @@ export function InviteLinkPanel() {
               onFocus={(e) => e.currentTarget.select()}
             />
             {/* The link's own screen: copying it is what the screen is for. */}
-            <Button
-              variant="primary"
-              icon={copied === current.id ? "check" : "copy"}
-              onClick={() => copy(current.id, current.url ?? "")}
-            >
-              <SwapLabel label={t("members.copyLink")} alt={t("common.copied")} showAlt={copied === current.id} />
+            <Button variant="primary" onClick={() => copy(current.id, current.url ?? "")}>
+              <SwapLabel
+                icon="copy"
+                altIcon="check"
+                label={t("members.copyLink")}
+                alt={t("common.copied")}
+                showAlt={copied === current.id}
+              />
             </Button>
           </div>
           <p className="invite-link__foot">

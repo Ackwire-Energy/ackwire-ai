@@ -24,31 +24,66 @@ export interface GitHubAppAccess {
 
 /**
  * What an installation token of the app may do for a call, by our scope (ADR 0156), most first: GitHub refuses a set
- * the installation lacks (`workflows` on an older installation) and the next is asked. A scope with none (Projects,
- * which GitHub Apps can't reach on a person's account) never goes through the app.
+ * the installation lacks (`workflows` on an older installation, or a permission it hasn't accepted yet) and the next
+ * is asked. A scope with none never goes through the app.
  */
 const SCOPE_PERMISSIONS: Record<string, AppPermissions[]> = {
   "repo.read": [{ contents: "read" }],
   "git.read": [{ contents: "read" }],
   "repo.write": [{ contents: "write", workflows: "write" }, { contents: "write" }],
   "git.write": [{ contents: "write", workflows: "write" }, { contents: "write" }],
+  "repo.admin": [{ administration: "write" }],
   "pr.read": [{ pull_requests: "read", checks: "read", statuses: "read" }],
   "pr.write": [{ pull_requests: "write", contents: "read" }],
   "pr.merge": [{ contents: "write", pull_requests: "write" }],
-  "issues.read": [{ issues: "read" }],
-  "issues.write": [{ issues: "write" }],
+  // A pull request's number goes through the issues endpoints too (comments, labels, assignees), and GitHub refuses
+  // an app token without `pull_requests` there ("Resource not accessible by integration").
+  "issues.read": [{ issues: "read", pull_requests: "read" }, { issues: "read" }],
+  "issues.write": [{ issues: "write", pull_requests: "write" }, { issues: "write" }],
   "actions.read": [{ actions: "read" }],
   // An installation that hasn't accepted it refuses, and an account's connection runs it.
   "actions.run": [{ actions: "write" }],
+  "discussions.read": [{ discussions: "read" }],
+  "discussions.write": [{ discussions: "write" }],
+  "org.read": [{ members: "read" }],
+  // An organization's Projects (`organizationOnly`); an item's title and fields are its issue's or pull request's.
+  "projects.read": [
+    { organization_projects: "read", issues: "read", pull_requests: "read" },
+    { organization_projects: "read" },
+  ],
+  "projects.write": [
+    { organization_projects: "write", issues: "read", pull_requests: "read" },
+    { organization_projects: "write" },
+  ],
 };
 
-/** Tools that need more than their scope gives: updating a pull request's branch writes to it. */
+/**
+ * Tools that need other permissions than their scope's: updating a pull request's branch writes to it, each kind of
+ * security alert has its own permission, and a ruleset's evaluations (rule suites) are administration's.
+ */
 const TOOL_PERMISSIONS: Record<string, AppPermissions[]> = {
   update_pull_request_branch: [{ pull_requests: "write", contents: "write" }],
+  repository_ruleset_read: [{ administration: "read" }, { metadata: "read" }],
+  list_code_scanning_alerts: [{ security_events: "read" }],
+  get_code_scanning_alert: [{ security_events: "read" }],
+  list_dependabot_alerts: [{ vulnerability_alerts: "read" }],
+  get_dependabot_alert: [{ vulnerability_alerts: "read" }],
+  list_secret_scanning_alerts: [{ secret_scanning_alerts: "read" }],
+  get_secret_scanning_alert: [{ secret_scanning_alerts: "read" }],
+  list_repository_security_advisories: [{ repository_advisories: "read" }],
+  // GitHub lists an organization's advisories only to who may write them.
+  list_org_repository_security_advisories: [{ repository_advisories: "write" }],
 };
 
 export const appPermissionsFor = (tool: string, scope: string): AppPermissions[] | null =>
   TOOL_PERMISSIONS[tool] ?? SCOPE_PERMISSIONS[scope] ?? null;
+
+/**
+ * Calls the app makes only on an organization's installation the call names: GitHub Apps can't reach a person's
+ * Projects, and create repositories only in an organization. Anywhere else they need an account's connection.
+ */
+const organizationOnly = (call: { tool: string; scope: string }) =>
+  call.scope.startsWith("projects.") || call.tool === "create_repository";
 
 /** Why a call can't reach GitHub through the app here, as the agent is told it: the real cause and the way out. */
 export function appMissMessage(target: string, miss: AppTokenMiss | "no_app" | "account_only"): string {
@@ -56,7 +91,7 @@ export function appMissMessage(target: string, miss: AppTokenMiss | "no_app" | "
     case "not_installed":
       return `The agentes.chat GitHub app isn't installed on ${target} for this workspace, so GitHub can't be reached there. Tell the person: an admin adds ${target} to the app in Settings › Connectors › GitHub repositories (Manage on GitHub).`;
     case "refused":
-      return `GitHub didn't let the agentes.chat app do this on ${target}: the app doesn't have that permission. Tell the person: an admin can connect a GitHub account in Settings › Connectors, and agents then do it as that account.`;
+      return `GitHub didn't let the agentes.chat app do this on ${target}: its installation there hasn't granted that permission. Tell the person: an admin accepts the app's new permissions on GitHub (Settings › Connectors › GitHub repositories › Manage on GitHub), or connects a GitHub account in Settings › Connectors, and agents then do it as that account.`;
     case "unreachable":
       return `GitHub didn't answer about ${target}. Nothing was done: try again in a moment.`;
     case "account_only":
@@ -72,10 +107,15 @@ export const noTokenMessage = (connection: Pick<ConnectorConnection, "authType">
     ? appMissMessage(repo, "not_installed")
     : "GitHub is connected without a usable token.";
 
-/** The account a call names without a repository: `owner`, else a search's `org:`, `user:` or `owner:`. */
+/**
+ * The account a call names without a repository: `owner` (an organization's tools say `org` or `organization`), else
+ * a search's `org:`, `user:` or `owner:`.
+ */
 function ownerOfCall(input: Record<string, unknown>): string | null {
-  const owner = typeof input.owner === "string" ? input.owner.trim() : "";
-  if (owner) return owner;
+  for (const key of ["owner", "org", "organization"]) {
+    const named = input[key];
+    if (typeof named === "string" && named.trim()) return named.trim();
+  }
   const query = typeof input.query === "string" ? input.query : typeof input.q === "string" ? input.q : "";
   return /(?:^|\s)(?:org|user|owner):([A-Za-z0-9_.-]{1,100})/i.exec(query)?.[1] ?? null;
 }
@@ -120,12 +160,17 @@ export async function githubCallAuth(
   }
   const owners = new Set((repos ?? []).map((r) => (r.split("/")[0] ?? "").toLowerCase()));
   const owner = repos ? (owners.size === 1 ? [...owners][0] : null) : ownerOfCall(call.input);
+  const accountOnly = async (): Promise<GitHubCallAuth> =>
+    appOnly ? { refused: appMissMessage("", "account_only") } : viaAccount();
+  const orgOnly = organizationOnly(call);
+  if (orgOnly && !owner) return accountOnly();
   const installations = await boundInstallations(ctx.db, ctx.orgId);
   const installation = owner
     ? installations.find((i) => i.accountLogin.toLowerCase() === owner.toLowerCase())
     : appOnly
       ? installations[0]
       : undefined;
+  if (orgOnly && installation && installation.accountType !== "Organization") return accountOnly();
   if (installation) {
     const token = await installationToken(app, github.http, tenant, installation.installationId, permissions);
     if (token) return bearer(token);

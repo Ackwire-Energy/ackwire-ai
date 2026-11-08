@@ -167,6 +167,43 @@ export const githubAppManifestCallbackUri = (publicUrl: string) =>
   `${publicUrl.replace(/\/$/, "")}/api/app/github-app/manifest/callback`;
 
 /**
+ * agentes.chat's own app's permissions (ADR 0156), by GitHub's manifest names (Variables is `actions_variables`).
+ * Never Codespaces (agents have their own computers, and Codespaces bill the organization) nor an organization's
+ * administration, secrets, variables, runners or webhooks. Each call's token asks only what its tool needs
+ * (`github-call.ts`).
+ */
+const APP_PERMISSIONS = {
+  actions: "write",
+  administration: "write",
+  attestations: "write",
+  checks: "write",
+  security_events: "write",
+  statuses: "write",
+  contents: "write",
+  repository_custom_properties: "write",
+  vulnerability_alerts: "write",
+  dependabot_secrets: "write",
+  deployments: "write",
+  discussions: "write",
+  environments: "write",
+  issues: "write",
+  merge_queues: "write",
+  packages: "write",
+  pages: "write",
+  repository_projects: "write",
+  pull_requests: "write",
+  repository_advisories: "write",
+  secret_scanning_alerts: "write",
+  secrets: "write",
+  actions_variables: "write",
+  repository_hooks: "write",
+  workflows: "write",
+  metadata: "read",
+  members: "read",
+  organization_projects: "write",
+} as const;
+
+/**
  * The app a server's owner creates on GitHub: the permissions and addresses agentes.chat's own app is registered with,
  * at this server's `PUBLIC_URL`. A webhook GitHub can't deliver to (no https) is left off: reading the GitHub panel
  * reconciles installations instead.
@@ -184,16 +221,7 @@ export function githubAppManifest(publicUrl: string) {
     setup_on_update: true,
     public: true,
     hook_attributes: { url: `${base}/api/github-app/webhook`, active: base.startsWith("https://") },
-    default_permissions: {
-      actions: "write",
-      checks: "write",
-      contents: "write",
-      issues: "write",
-      pull_requests: "write",
-      statuses: "write",
-      workflows: "write",
-      metadata: "read",
-    },
+    default_permissions: APP_PERMISSIONS,
     default_events: [],
   };
 }

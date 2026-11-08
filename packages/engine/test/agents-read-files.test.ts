@@ -417,7 +417,7 @@ describe("the team's right hand", () => {
 });
 
 describe("its other limits", () => {
-  test("it reads and nothing more: no writing, no copying a file elsewhere, and no card that can't give anything", async () => {
+  test("it reads files and writes none: no copying a file elsewhere, and no card that can't give anything", async () => {
     f = await world();
     const lodi = await lodiOf();
     const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
@@ -427,8 +427,8 @@ describe("its other limits", () => {
     expect(listed).toEqual(
       expect.arrayContaining(["read_artifact", "list_artifacts", "search_wiki", "read_wiki_page"]),
     );
-    for (const name of ["share_artifact", "create_artifact", "create_wiki_page", "request_permission"])
-      expect(listed).not.toContain(name);
+    // The wiki pages its person may edit it writes (ADR 0137 amendment of 2026-11-07); a Drive file never.
+    for (const name of ["share_artifact", "create_artifact", "request_permission"]) expect(listed).not.toContain(name);
     for (const [name, input] of [
       ["create_artifact", { title: "x", kind: "document", markdown: "x" }],
       ["share_artifact", { artifact_id: file.id }],
