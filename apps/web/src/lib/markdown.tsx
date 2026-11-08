@@ -1,5 +1,5 @@
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
-import { splitIdRefs } from "@agenteschat/client/lib/id-refs";
+import { loneIdRef, splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
@@ -27,8 +27,11 @@ export type ChannelRenderer = (name: string, text: string, key: string) => React
 export type WikiLinkRenderer = (title: string, label: string, key: string) => ReactNode;
 /** `![[foto.png]]`: how an embed shows (`block` alone on its line, else inside a sentence). */
 export type EmbedRenderer = (target: string, key: string, block: boolean) => ReactNode;
-/** An internal id in the words (`splitIdRefs`): the pill of what it names, or `text` as written. */
-export type IdRenderer = (id: string, text: string, key: string) => ReactNode;
+/**
+ * An internal id in the words (`splitIdRefs`) or alone in a `code` span (`loneIdRef`): the pill of what it names, or
+ * `text` as written (`shown`, the code span, when it was one).
+ */
+export type IdRenderer = (id: string, text: string, key: string, shown?: ReactNode) => ReactNode;
 
 /**
  * A streaming answer's words, each in its own span (keyed by position, so a
@@ -145,8 +148,11 @@ export function renderInline(
       rest = rest.slice(m.index + tok.length);
       continue;
     }
-    if (m[1]) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
-    else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);
+    if (m[1]) {
+      const code = <code key={k}>{tok.slice(1, -1)}</code>;
+      const id = idRef && !words ? loneIdRef(tok.slice(1, -1)) : null;
+      out.push(id && idRef ? idRef(id, tok.slice(1, -1), k, code) : code);
+    } else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);
     else if (m[3]) out.push(<em key={k}>{inner(tok.slice(1, -1), k)}</em>);
     else if (m[7]) out.push(<del key={k}>{inner(tok.slice(2, -2), k)}</del>);
     else if (m[4]) {

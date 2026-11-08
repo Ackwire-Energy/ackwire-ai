@@ -12,7 +12,7 @@ import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/c
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
-import { splitIdRefs } from "@agenteschat/client/lib/id-refs";
+import { loneIdRef, splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
@@ -640,8 +640,8 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
   | { kind: "link"; text: string; href: string }
-  /** An internal id (`splitIdRefs`): the pill of what it names, or its text as written. */
-  | { kind: "id"; text: string; id: string }
+  /** An internal id (`splitIdRefs`, `code` when alone in a code span): the pill of what it names, or its text as written. */
+  | { kind: "id"; text: string; id: string; code?: true }
   /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
   | { kind: "channel"; text: string; name: string };
 export type Block =
@@ -765,8 +765,10 @@ export function parseInline(text: string): Inline[] {
     let tok = m[0];
     if (m[5]) tok = trimUrl(tok);
     if (at > last) mentions(text.slice(last, at), out, "text");
-    if (m[1]) out.push({ kind: "code", text: tok.slice(1, -1) });
-    else if (m[2]) {
+    if (m[1]) {
+      const id = loneIdRef(tok.slice(1, -1));
+      out.push(id ? { kind: "id", text: tok.slice(1, -1), id, code: true } : { kind: "code", text: tok.slice(1, -1) });
+    } else if (m[2]) {
       // An image shows its words; a link to anything but the web or e-mail is just its words.
       const label = m[3] ?? "";
       const href = m[4] ?? "";

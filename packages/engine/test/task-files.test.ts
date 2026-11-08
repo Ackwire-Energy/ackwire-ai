@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  createAgent,
   createChannel,
   createFileArtifact,
   createIssue,
@@ -12,8 +13,11 @@ import {
   issueFromMessage,
   linkRunActions,
   listIssueActivity,
+  notificationSnippet,
+  openAgentDm,
   openDm,
   postPersonMessage,
+  replyExcerpt,
   type ToolContext,
   undoAgentAction,
 } from "../src";
@@ -154,6 +158,130 @@ describe("a task an agent makes or changes takes the files it's about", () => {
     await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, print.id)).rejects.toThrow();
   });
 
+  test("after Continuar, the task takes the request's print, not the agent's own file on the reply it stopped at", async () => {
+    f = await setup();
+    const print = await upload(f.general.id);
+    const asked = await askWith(f.general.id, "coloca no backlog: um widget", [print.id]);
+    const draft = await createFileArtifact(
+      f.artifactDeps,
+      { type: "agent", agentId: f.agent.id, channelId: f.general.id, runId: asked.runId },
+      f.org.id,
+      { title: "rascunho.png", name: "rascunho.png", bytes: PNG, contentType: "image/png" },
+    );
+    const stopped = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: asked.threadRootId,
+      author: { type: "agent", agentId: f.agent.id, runId: asked.runId, hop: 1 },
+      body: "Parei aqui.",
+      meta: { artifacts: [{ id: draft.id, version: 1, title: "rascunho.png" }] },
+    });
+    const [goesOn] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: asked.threadRootId,
+        triggerMessageId: stopped.id,
+        trigger: "mention",
+        hop: 1,
+        status: "running",
+      })
+      .returning();
+    await call({ ...asked, runId: goesOn?.id ?? "", triggerMessageId: stopped.id }, "create_issue", {
+      title: "Widget",
+    });
+    expect((await task(1)).artifacts.map((a) => a.id)).toEqual([print.id]);
+  });
+
+  test("a task only who asked sees, assigned to someone outside the DM, takes no file of the DM", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const print = await upload(dm.id);
+    const ctx = await askWith(dm.id, "cria uma tarefa só para mim com esse print, para a Bia fazer", [print.id]);
+    const out = await call(ctx, "create_issue", { title: "Para a Bia", visible_to: "requester", assignee: "Bia" });
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain("Not attached");
+    const made = await task(1);
+    expect(made.audience.userIds).toContain(bia.id);
+    expect(made.artifacts).toEqual([]);
+  });
+
+  test("a task made where no person reads is the workspace's: none of that room's files go on it", async () => {
+    f = await setup();
+    const infra = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Infra", handle: "infra", role: "Ops", instructions: "Answer.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const room = await openAgentDm(f.db, f.org.id, f.agent.id, infra.id);
+    const notes = await createFileArtifact(
+      f.artifactDeps,
+      { type: "agent", agentId: f.agent.id, channelId: room.id },
+      f.org.id,
+      { title: "notas.png", name: "notas.png", bytes: PNG, contentType: "image/png" },
+    );
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: room.id,
+      author: { type: "agent", agentId: infra.id, runId: null, hop: 1, stretchId: null },
+      body: "abre uma tarefa com as notas",
+      meta: { artifacts: [{ id: notes.id, version: 1, title: "notas.png" }] },
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: room.id,
+        threadRootId: asked.id,
+        triggerMessageId: asked.id,
+        trigger: "mention",
+        hop: 2,
+        status: "running",
+      })
+      .returning();
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      channelId: room.id,
+      threadRootId: asked.id,
+      triggerMessageId: asked.id,
+    };
+    const out = await call(ctx, "create_issue", { title: "Das notas" });
+    expect(out.content).toContain("Not attached");
+    const made = await task(1);
+    expect(made.audience.mode).toBe("everyone");
+    expect(made.artifacts).toEqual([]);
+  });
+
+  test("an agent's file in the shared Drive stays the workspace's when it goes on a task only who asked sees", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const report = await createFileArtifact(
+      f.artifactDeps,
+      { type: "agent", agentId: f.agent.id, channelId: f.general.id },
+      f.org.id,
+      { title: "relatorio.pdf", name: "relatorio.pdf", bytes: PNG, contentType: "application/pdf" },
+    );
+    await f.db
+      .update(schema.artifacts)
+      .set({ channelId: null, threadId: null })
+      .where(eq(schema.artifacts.id, report.id));
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const ctx = await askWith(dm.id, "cria uma tarefa só para mim com o relatório", []);
+    await call(ctx, "create_issue", { title: "Ler o relatório", visible_to: "requester", files: [report.id] });
+    await call(ctx, "comment_issue", { issue: "#1", text: "De novo.", files: [report.id] });
+    expect((await task(1)).artifacts.map((a) => a.id)).toEqual([report.id]);
+    expect((await getArtifact(f.artifactDeps, person(bia.id), f.org.id, report.id)).channelId).toBeNull();
+  });
+
   test("a file the person who asked can't see doesn't go, and the agent hears why", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "Bia");
@@ -215,6 +343,27 @@ describe("a task an agent makes or changes takes the files it's about", () => {
     });
     const made = await issueFromMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, m.id);
     expect(made.artifacts.map((a) => a.id)).toEqual([print.id]);
+  });
+});
+
+describe("an id an agent wrote, where a text shows with no pill", () => {
+  const ID = "01a1b74b-5b85-74a8-9ffa-f9a6ace806d8";
+  const ORDER = "3f2a8c1e-0b7d-4c55-9a1e-6d2f0c9b8a71";
+
+  test("previews, quotes, the inbox, push and a task made from a message drop it; a bare one and an address stay", async () => {
+    expect(notificationSnippet(`Na referência (print anexado na conversa, artifact ${ID}): uma barra.`)).toBe(
+      "Na referência (print anexado na conversa): uma barra.",
+    );
+    expect(replyExcerpt(`Criei a **tarefa #13** (id=${ID}).`)).toBe("Criei a tarefa #13.");
+    expect(replyExcerpt(`O pedido ${ORDER} é do cliente, veja https://exemplo.com/p?id=${ORDER}`)).toBe(
+      `O pedido ${ORDER} é do cliente, veja https://exemplo.com/p?id=${ORDER}`,
+    );
+    f = await setup();
+    const m = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: `Widget flutuante (artifact ${ID})`,
+    });
+    const made = await issueFromMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, m.id);
+    expect(made.title).toBe("Widget flutuante");
   });
 });
 

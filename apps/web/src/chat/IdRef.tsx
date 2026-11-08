@@ -15,9 +15,10 @@ import { inPlaceClick } from "@/lib/navigate";
 /**
  * An internal id written in a text (`splitIdRefs`), as the pill of what it names for this reader: a file (its icon and
  * name, opening it), a task ("#13 title", opening it), a message (its link's pill). While it loads, a quiet pill, so
- * the id never shows on its way to its name; one that names nothing the reader sees stays as written.
+ * the id never shows on its way to its name; one that names nothing the reader sees stays as written (`shown`: as its
+ * code span, when it was one).
  */
-export function IdRef({ id, text }: { id: string; text: string }) {
+export function IdRef({ id, text, shown }: { id: string; text: string; shown?: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const viewer = useMaybeArtifactViewer();
@@ -31,7 +32,7 @@ export function IdRef({ id, text }: { id: string; text: string }) {
       </span>
     );
   }
-  if (!ref) return <>{text}</>;
+  if (!ref) return shown ?? <>{text}</>;
   if (ref.kind === "message") {
     const m = ref.message;
     return (
@@ -77,4 +78,6 @@ export function IdRef({ id, text }: { id: string; text: string }) {
 }
 
 /** The renderer to pass to `<Markdown idRef>` where people read what agents write: chat, tasks, the wiki. */
-export const renderIdRef: IdRenderer = (id, text, key): ReactNode => <IdRef key={key} id={id} text={text} />;
+export const renderIdRef: IdRenderer = (id, text, key, shown): ReactNode => (
+  <IdRef key={key} id={id} text={text} shown={shown} />
+);

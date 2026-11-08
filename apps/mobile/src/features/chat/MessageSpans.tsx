@@ -83,8 +83,17 @@ export function Spans({
           }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
-          case "id":
-            return live ? <RNText key={key}>{s.text}</RNText> : <IdRefText key={key} id={s.id} text={s.text} />;
+          case "id": {
+            const shown = (
+              <RNText
+                key={key}
+                style={s.code ? [styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }] : undefined}
+              >
+                {s.text}
+              </RNText>
+            );
+            return live ? shown : <IdRefText key={key} id={s.id} shown={shown} />;
+          }
           case "mention": {
             const all = everyone && isEveryoneWord(s.text.slice(1));
             return (

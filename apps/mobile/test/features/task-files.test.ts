@@ -22,10 +22,18 @@ describe("an internal id in a text on the phone", () => {
     ]);
   });
 
-  test("inside a path, in code or in an address it stays as written", () => {
+  test("inside a path, an address or code with more in it, it stays as written", () => {
     expect(parseInline(`exemplo.com/pedidos/${FILE}`)).toEqual([{ kind: "text", text: `exemplo.com/pedidos/${FILE}` }]);
-    expect(parseInline(`\`${FILE}\``)).toEqual([{ kind: "code", text: FILE }]);
+    expect(parseInline(`exemplo.com/p?id=${FILE}`)).toEqual([{ kind: "text", text: `exemplo.com/p?id=${FILE}` }]);
+    expect(parseInline(`\`grep ${FILE} log\``)).toEqual([{ kind: "code", text: `grep ${FILE} log` }]);
     expect(parseInline(`https://exemplo.com/${FILE}`)[0]?.kind).toBe("link");
+  });
+
+  test("alone in a code span, as agents write ids too, it is a pill that falls back to its code", () => {
+    expect(parseInline(`o print \`${FILE}\``)).toEqual([
+      { kind: "text", text: "o print " },
+      { kind: "id", text: FILE, id: FILE, code: true },
+    ]);
   });
 
   test("its pill opens the file or the task, a message's is the message pill, and the id never shows while it loads", () => {
@@ -34,7 +42,7 @@ describe("an internal id in a text on the phone", () => {
     expect(pill).toMatch(/router\.push\(`\/issues\/\$\{ref\.number\}`\)/);
     expect(pill).toContain("<MessageRefText");
     expect(pill).toContain("if (query.isPending) {");
-    expect(pill).toContain("if (!ref) return <RNText>{text}</RNText>;");
+    expect(pill).toContain("if (!ref) return shown;");
     expect(source("MessageSpans.tsx")).toContain('case "id":');
   });
 });

@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, type AgentActionParams, actWithUndo } from "./agent-actions";
 import { issueDiff, issueSnapshot } from "./agent-undo";
 import { currentHandles } from "./agents";
-import { type ArtifactDeps, shareArtifact } from "./artifacts";
+import { type ArtifactDeps, fileRefOf, shareArtifact } from "./artifacts";
 import { UUID } from "./authority";
 import {
   commentIssue,
@@ -219,10 +219,22 @@ async function rightHandTaskRefusal(
 const givenFiles = (input: Record<string, unknown>) =>
   Array.isArray(input.files) ? [...new Set(input.files.map(String))].slice(0, 10) : null;
 
-/** The files on the message the run answers: a task made from it takes them unless the agent says otherwise. */
+/**
+ * The files on the message the run answers: a task made from it takes them unless the agent says otherwise. A run that
+ * goes on from the agent's own reply (Continuar) answers what that reply answered, never the agent's own files.
+ */
 async function requestFiles(ctx: ToolContext) {
-  const message = ctx.triggerMessageId ? await getMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
-  return fileIdsOf(message?.meta).slice(0, 10);
+  let id = ctx.triggerMessageId;
+  for (let hop = 0; id && hop < 5; hop++) {
+    const message = await getMessage(ctx.db, ctx.orgId, id);
+    if (message?.authorAgentId !== ctx.agentId || !message.agentRunId) return fileIdsOf(message?.meta).slice(0, 10);
+    const [stopped] = await ctx.db
+      .select({ trigger: schema.agentRuns.triggerMessageId })
+      .from(schema.agentRuns)
+      .where(and(eq(schema.agentRuns.orgId, ctx.orgId), eq(schema.agentRuns.id, message.agentRunId)));
+    id = stopped?.trigger ?? "";
+  }
+  return [];
 }
 
 type Brought = { brought: string[]; refused: string[] };
@@ -249,7 +261,7 @@ async function bringFiles(
     try {
       if (asIs && !(await asIs(id))) {
         out.refused.push(
-          `${id} isn't where everyone who sees this task reads it, and a task with a chosen audience takes no copy: say they can add the file on the task (Anexos).`,
+          `${id} isn't where everyone who sees this task opens it, and this task takes no copy: say they can add the file on the task (Anexos).`,
         );
         continue;
       }
@@ -262,18 +274,36 @@ async function bringFiles(
 }
 
 /**
- * Whether whoever sees a task for `audience` made in `channelId` reads this file where it lives: the Drive, a public
- * channel, and for less than the workspace that conversation too. True for no such file: `shareArtifact` refuses it.
+ * Whether everyone `readers` names opens this file where it lives, and `shareArtifact` takes it into `channelId` as it
+ * is: one in the Drive or a public channel, or for people who each read it, one already in `channelId`. True for no
+ * such file: `shareArtifact` refuses it.
  */
-async function readsAsIs(deps: ArtifactDeps, orgId: string, id: string, channelId: string, audience: Audience) {
+async function readsAsIs(deps: ArtifactDeps, orgId: string, id: string, readers: Audience, channelId: string) {
   const [file] = UUID.test(id)
     ? await deps.db
-        .select({ channelId: schema.artifacts.channelId })
+        .select({
+          channelId: schema.artifacts.channelId,
+          kind: schema.channels.kind,
+          visibility: schema.channels.visibility,
+        })
         .from(schema.artifacts)
+        .leftJoin(schema.channels, eq(schema.channels.id, schema.artifacts.channelId))
         .where(and(eq(schema.artifacts.orgId, orgId), eq(schema.artifacts.id, id), isNull(schema.artifacts.deletedAt)))
     : [];
-  if (!file?.channelId || (audience.mode !== "everyone" && file.channelId === channelId)) return true;
-  return (await audienceOfConversation(deps.db, file.channelId)).mode === "everyone";
+  if (!file?.channelId || (file.kind === "channel" && file.visibility === "public")) return true;
+  if (readers.mode === "everyone" || file.channelId !== channelId) return false;
+  const read = await Promise.all(readers.userIds.map((userId) => fileRefOf(deps.db, userId, orgId, id)));
+  return read.every(Boolean);
+}
+
+/** A conversation no person reads (a routine's room, the agents' DM): a task made there is the workspace's (`createIssue`). */
+async function nobodyReads(deps: ArtifactDeps, channelId: string) {
+  const [c] = await deps.db
+    .select({ kind: schema.channels.kind, visibility: schema.channels.visibility })
+    .from(schema.channels)
+    .where(eq(schema.channels.id, channelId));
+  if (!c || c.kind === "task" || (c.kind === "channel" && c.visibility === "public")) return false;
+  return (await audienceOfConversation(deps.db, channelId)).mode === "everyone";
 }
 
 /** `bringFiles` into an existing task's own conversation, which whoever sees the task reads. */
@@ -391,13 +421,22 @@ export function createIssueToolSource(deps: ArtifactDeps): ToolSource {
             if (refused) return { content: refused, isError: true };
           }
           const audience = await chosenAudience(ctx, input.visible_to);
-          // Into this conversation, whose readers a task made here has; one whose audience was chosen takes no copy.
+          // Into this conversation, whose readers a task made here has. One whose audience was chosen (a person
+          // assigned sees it too) or made where no person reads (the workspace's) takes only files all its readers
+          // open already, never a copy.
+          const readers: Audience | null = audience
+            ? audience.mode === "people" && assignee?.type === "person"
+              ? { mode: "people", userIds: [...new Set([...audience.userIds, assignee.id])] }
+              : audience
+            : (await nobodyReads(deps, ctx.channelId))
+              ? { mode: "everyone" }
+              : null;
           const files = await bringFiles(
             deps,
             ctx,
             { channelId: ctx.channelId, threadId: replyThreadOf(ctx) },
             givenFiles(input) ?? (await requestFiles(ctx)),
-            audience ? (id) => readsAsIs(deps, ctx.orgId, id, ctx.channelId, audience) : undefined,
+            readers ? (id) => readsAsIs(deps, ctx.orgId, id, readers, ctx.channelId) : undefined,
           );
           const i = await actWithUndo(
             ctx,

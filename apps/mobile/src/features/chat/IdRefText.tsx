@@ -1,5 +1,6 @@
 import { useIdRef } from "@agenteschat/client";
 import { router } from "expo-router";
+import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -10,9 +11,9 @@ import { MessageRefText } from "./MessageRefText";
 /**
  * An internal id written in a text (the web's `IdRef`), as the pill of what it names for this reader: a file (opens it),
  * a task ("#13 title", opens it), a message (its link's pill). While it loads, a quiet pill, so the id never shows on
- * its way to its name; one that names nothing the reader sees stays as written.
+ * its way to its name; one that names nothing the reader sees stays as written (`shown`, a code span's when it was one).
  */
-export function IdRefText({ id, text }: { id: string; text: string }) {
+export function IdRefText({ id, shown }: { id: string; shown: ReactElement }) {
   const { t } = useTranslation();
   const c = useColors();
   const { orgId } = useOrg();
@@ -25,7 +26,7 @@ export function IdRefText({ id, text }: { id: string; text: string }) {
       </RNText>
     );
   }
-  if (!ref) return <RNText>{text}</RNText>;
+  if (!ref) return shown;
   if (ref.kind === "message") {
     const m = ref.message;
     return (

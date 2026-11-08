@@ -69,6 +69,16 @@ describe("an internal id in a text is the pill of what it names", () => {
     expect(text).toContain(`O pedido ${OTHER} é do cliente.`);
   });
 
+  test("alone in a code span too, as agents write ids; one that names nothing stays code", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, {
+      api: createFakeApi(said(withRefs(), `O print \`${FILE}\` e o pedido \`${OTHER}\`.`)),
+    });
+    await settle(8);
+    expect(within(row()).getByRole("link", { name: "Abrir print.png" }).textContent).toBe("print.png");
+    expect(row().textContent).not.toContain(FILE);
+    expect(row().querySelector("code")?.textContent).toBe(OTHER);
+  });
+
   test("while it loads, a quiet pill stands in: the id never shows on its way", async () => {
     const api = createFakeApi(said(withRefs(), `Na referência (artifact ${FILE}).`));
     api.chat.idRef = () => new Promise(() => {});

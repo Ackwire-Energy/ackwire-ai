@@ -5,26 +5,29 @@
  * stays as written: a person's own (an order's, a row's) is theirs to read.
  */
 
-const ID =
-  /(?:\b(?:artifact|artefato|id)[ _]?(?:id)?\s*[:=]?\s*)?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
+import { internalIds } from "./markdown";
 
 /** A piece of text: words, or an id with the words that name its kind (`text`, shown as is when nothing resolves). */
 export type IdRefPart = { text: string; id?: undefined } | { text: string; id: string };
 
 /**
  * A text split around its ids ("ver artifact 0193….” → "ver ", "artifact 0193…" (0193…), "."). One inside an address
- * written without its scheme (`exemplo.com/x/0193…`) stays words.
+ * written without its scheme (`exemplo.com/x/0193…`, `?id=0193…`) stays words.
  */
 export function splitIdRefs(text: string): IdRefPart[] {
   const out: IdRefPart[] = [];
   let last = 0;
-  for (const m of text.matchAll(ID)) {
-    const at = m.index ?? 0;
-    if (text[at - 1] === "/") continue;
-    if (at > last) out.push({ text: text.slice(last, at) });
-    out.push({ text: m[0], id: (m[1] ?? "").toLowerCase() });
-    last = at + m[0].length;
+  for (const m of internalIds(text)) {
+    if (m.at > last) out.push({ text: text.slice(last, m.at) });
+    out.push({ text: m.text, id: m.id });
+    last = m.at + m.text.length;
   }
   if (last < text.length) out.push({ text: text.slice(last) });
   return out;
+}
+
+/** The id a `code` span holds when it holds only one (with its kind's word): agents write ids that way too. */
+export function loneIdRef(code: string): string | null {
+  const [only, ...more] = internalIds(code.trim());
+  return only && more.length === 0 && only.text === code.trim() ? only.id : null;
 }

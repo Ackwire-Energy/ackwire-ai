@@ -799,7 +799,8 @@ export async function createIssue(
     attachmentIds?: string[];
     /**
      * Files the caller checked and placed where whoever sees the task reads them: an agent's, brought by its tool
-     * (`bringFiles` in `issue-tools.ts`), or the message's own turned into the task. Linked and kept like a box's.
+     * (`bringFiles` in `issue-tools.ts`), or the message's own turned into the task. Linked and kept on its "created"
+     * event like a box's, but never moved: one in the shared Drive stays everyone's.
      */
     linkFileIds?: string[];
     /** Who sees it (ADR 0151); left out, where it's made decides. A step always follows its parent. */
@@ -811,7 +812,8 @@ export async function createIssue(
   if (membership && !can(membership, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, 300);
   if (!title) throw new ValidationError("title is required");
-  const files = await withLinked(db, orgId, await ownFiles(db, actor, orgId, input.attachmentIds), input.linkFileIds);
+  const uploaded = await ownFiles(db, actor, orgId, input.attachmentIds);
+  const files = await withLinked(db, orgId, uploaded, input.linkFileIds);
   if (input.priority && !PRIORITIES.includes(input.priority)) throw new ValidationError("invalid priority");
   const criteria = (input.criteria ?? [])
     .map((text) => text.trim().slice(0, 500))
@@ -892,7 +894,7 @@ export async function createIssue(
     db,
     actor,
     row,
-    files.map((f) => f.id),
+    uploaded.map((f) => f.id),
   );
   const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps, orgId, view, "issue.created");
@@ -1396,12 +1398,8 @@ export async function commentIssue(
   if (!body && (options.attachmentIds ?? []).length + (options.linkFileIds ?? []).length === 0)
     throw new ValidationError("Comment is empty");
   const issue = await findVisible(deps.db, actor, orgId, { id: issueId });
-  const files = await withLinked(
-    deps.db,
-    orgId,
-    await ownFiles(deps.db, actor, orgId, options.attachmentIds),
-    options.linkFileIds,
-  );
+  const uploaded = await ownFiles(deps.db, actor, orgId, options.attachmentIds);
+  const files = await withLinked(deps.db, orgId, uploaded, options.linkFileIds);
   const conversation = await ensureTaskConversation(deps.db, issue.id);
   const message = await postInConversation(
     deps,
@@ -1415,7 +1413,7 @@ export async function commentIssue(
     deps.db,
     actor,
     issue,
-    files.map((f) => f.id),
+    uploaded.map((f) => f.id),
   );
   const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
   await deps.db

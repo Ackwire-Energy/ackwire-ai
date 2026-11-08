@@ -283,25 +283,79 @@ export function wikiLinksIn(text: string): string[] {
   return out;
 }
 
+/** An internal id in a text, after the word naming its kind when one does ("artifact 0193…", "id=0193…"). */
+const INTERNAL_ID =
+  /(\b(?:artifact|artefato|id)[ _]?(?:id)?\s*[:=]?\s*)?\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
+
+export interface InternalId {
+  at: number;
+  /** The id with the word naming its kind, as written. */
+  text: string;
+  /** Lower case. */
+  id: string;
+  /** Written as ours, as agents copy it from what they read ("artifact 0193…", "id=0193…"), not a bare one. */
+  marked: boolean;
+}
+
+/**
+ * The internal ids in a text, in order: the apps show what each names in its place (`splitIdRefs`), text with no pill
+ * drops the marked ones (`plainInline`). Never one inside an address (`exemplo.com/x/0193…`, `?id=0193…`).
+ */
+export function internalIds(text: string): InternalId[] {
+  const out: InternalId[] = [];
+  for (const m of text.matchAll(INTERNAL_ID)) {
+    const at = m.index ?? 0;
+    if (/[/?&=#%.+@~-]/.test(text[at - 1] ?? "")) continue;
+    out.push({ at, text: m[0], id: (m[2] ?? "").toLowerCase(), marked: /artifact|artefato|=/i.test(m[1] ?? "") });
+  }
+  return out;
+}
+
+/**
+ * A text without its marked ids, nor the commas and brackets they leave ("(print, artifact 0193…)" → "(print)"). A
+ * bare one stays: it may be the person's own (an order's).
+ */
+function withoutMarkedIds(text: string): string {
+  const marked = internalIds(text).filter((m) => m.marked);
+  if (marked.length === 0) return text;
+  let out = "";
+  let last = 0;
+  for (const m of marked) {
+    out += text.slice(last, m.at);
+    last = m.at + m.text.length;
+  }
+  return `${out}${text.slice(last)}`
+    .replace(/\(\s*[,;:]?\s*\)/g, "")
+    .replace(/\s*[,;:]\s*(?=\))/g, "")
+    .replace(/\(\s*[,;:]\s*/g, "(")
+    .replace(/[ \t]+(?=[,.;:!?)])/g, "")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
 const INLINE_ALL = new RegExp(INLINE.source, "g");
 
-/** A line's words without its inline marks: links and wiki links as their labels, an image as its alt text. */
+/**
+ * A line's words without its inline marks: links and wiki links as their labels, an image as its alt text. Nor an id
+ * of ours an agent wrote, which no person reads (`withoutMarkedIds`).
+ */
 export const plainInline = (text: string): string =>
-  text
-    .replace(/!(?=\[)/g, "")
-    .replace(INLINE_ALL, (tok, code, bold, em, link, _url, wiki, strike) =>
-      code
-        ? tok.slice(1, -1)
-        : bold || strike
-          ? plainInline(tok.slice(2, -2))
-          : em
-            ? plainInline(tok.slice(1, -1))
-            : link
-              ? plainInline(tok.slice(1, tok.indexOf("](")))
-              : wiki
-                ? parseWikiToken(tok).label
-                : tok,
-    );
+  withoutMarkedIds(
+    text
+      .replace(/!(?=\[)/g, "")
+      .replace(INLINE_ALL, (tok, code, bold, em, link, _url, wiki, strike) =>
+        code
+          ? tok.slice(1, -1)
+          : bold || strike
+            ? plainInline(tok.slice(2, -2))
+            : em
+              ? plainInline(tok.slice(1, -1))
+              : link
+                ? plainInline(tok.slice(1, tok.indexOf("](")))
+                : wiki
+                  ? parseWikiToken(tok).label
+                  : tok,
+      ),
+  );
 
 /**
  * A Markdown text's prose as plain lines, the way a person reads it: each line of its paragraphs, list items
