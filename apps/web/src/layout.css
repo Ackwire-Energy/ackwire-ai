@@ -4344,11 +4344,14 @@ html:not([data-pointer]) .settings-tile:focus-visible {
     white-space: nowrap;
   }
 }
+/* On a phone the control goes under the words, as wide as the row. The row wraps to put it there, never turns into a
+   column: there the words' 24-character basis (`.ac-actrow`) would be their height. */
 @media (max-width: 760px) {
   .settings-row {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
+  }
+  .settings-row:not(.settings-row--lead) > .ac-actrow__text + * {
+    flex-basis: 100%;
   }
   .settings-row__control {
     flex: none;
@@ -4662,12 +4665,15 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   height: 112px;
   margin: 0;
 }
+/* The icon on a line of its own over the name: the head wraps, never turns into a column, where the name's 24-character
+   basis (`.ac-actrow`) would be its height. */
 .catalog-svc .ac-dialog__head {
-  flex-direction: column;
-  align-items: flex-start;
   gap: 14px;
   margin-top: -36px;
   padding: 0 var(--dialog-pad) 4px;
+}
+.catalog-svc .ac-dialog__lead {
+  flex-basis: 100%;
 }
 /*
  * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
@@ -13578,10 +13584,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .rh-money .ac-input-affix {
   width: 120px;
 }
+/* The guidance under its label, as wide as the row: a wrap, not a column (`.ac-actrow`). */
 .settings-row.rh-guidance {
-  flex-direction: column;
-  align-items: stretch;
   gap: 10px;
+}
+.rh-guidance > .ac-actrow__text + * {
+  flex-basis: 100%;
 }
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
@@ -13642,9 +13650,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
    one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
-    flex-direction: row;
     flex-wrap: wrap;
-    align-items: center;
     gap: var(--space-2) var(--space-3);
   }
   .settings-row--lead > .settings-row__text {
@@ -13930,9 +13936,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
    keeps the icon and the words on one line, and what ends it goes under them from their edge, where it falls. */
 @container agp-side (max-width: 479px) {
   .agp-card .settings-row:not(.settings-row--lead) {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
+  }
+  .agp-card .settings-row:not(.settings-row--lead) > .ac-actrow__text + * {
+    flex-basis: 100%;
   }
   .agp-card .settings-row__control {
     flex: none;
