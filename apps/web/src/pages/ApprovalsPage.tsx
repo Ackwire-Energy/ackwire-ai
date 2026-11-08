@@ -439,7 +439,7 @@ export function ApprovalsPage() {
                             {...TYPED_VALUES}
                           />
                         </span>
-                        <span className="ap-group__acts ac-acts">
+                        <span className="ap-group__acts">
                           <ApproveAll items={items} />
                         </span>
                       </div>
@@ -1013,10 +1013,10 @@ function RunRow({
             {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
           </ApproveAll>
         </Locked>
-        <Button size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
-          {t("approval.run.show")}
-        </Button>
       </div>
+      <Button size="sm" variant="ghost" className="ap-run__more" aria-expanded={open} onClick={onToggle}>
+        {t("approval.run.show")}
+      </Button>
       {open && <div className="ap-run__items">{children}</div>}
     </section>
   );

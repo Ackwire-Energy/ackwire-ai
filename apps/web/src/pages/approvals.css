@@ -587,9 +587,11 @@ html:not([data-pointer]) .ap-link:focus-visible {
   flex: 1 1 auto;
   min-width: 0;
 }
+/* Two plated buttons: 8 apart, as a dialog's are, and as the run's "Aprovar todos" pair below. */
 .ap-group__acts {
+  display: flex;
   flex-wrap: wrap;
-  row-gap: 8px;
+  gap: var(--space-2);
 }
 .ap-group__head b {
   color: var(--ink);
@@ -733,6 +735,12 @@ html:not([data-pointer]) .ap-li:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+/* "Ver cada um" unfolds the run: on a line of its own under its buttons, its words on their start edge. */
+.ap-run__more {
+  align-self: flex-start;
+  margin-inline: calc(-1 * var(--ghost-plate));
+  padding-inline: var(--ghost-plate);
 }
 .ap-run .ap-run__items {
   margin: 0 -12px;
