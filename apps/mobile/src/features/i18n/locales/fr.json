@@ -171,6 +171,7 @@
     "title": "Discussions",
     "serverError": {
       "offline": "Pas d'Internet sur votre téléphone.",
+      "answered": "{{host}} a répondu, mais tes conversations ne se sont pas chargées. Réessaie dans un instant.",
       "text": "Il est peut-être hors service ou en dehors de votre réseau. Vos discussions s'afficheront d'elles-mêmes dès son retour.",
       "kept": "Affichage de ce qui était déjà dans l'app."
     },

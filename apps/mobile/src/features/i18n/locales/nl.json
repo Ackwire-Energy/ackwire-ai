@@ -165,6 +165,7 @@
     "title": "Gesprekken",
     "serverError": {
       "offline": "Geen internet op je telefoon.",
+      "answered": "{{host}} gaf antwoord, maar je chats zijn niet geladen. Probeer het zo opnieuw.",
       "text": "Misschien is hij offline of buiten je netwerk. Je gesprekken verschijnen vanzelf zodra hij terug is.",
       "kept": "Je ziet wat al in de app stond."
     },
