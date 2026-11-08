@@ -3240,6 +3240,8 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   background: none;
   font: inherit;
   color: inherit;
+  /* A name that wraps (an agent's may be 80 characters) reads from the start, not centred as a button's label. */
+  text-align: start;
   cursor: pointer;
   border-radius: var(--radius-sm);
 }

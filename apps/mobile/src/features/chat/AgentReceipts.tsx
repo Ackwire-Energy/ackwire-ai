@@ -411,8 +411,9 @@ function ReceiptsSheet({
 }
 
 const styles = StyleSheet.create({
-  // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text.
-  line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minHeight: 20 },
+  // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text. Its
+  // buttons go under words that leave them no room: beside a failure's full reason they squeezed it to a word a line.
+  line: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4, minHeight: 20 },
   end: { alignSelf: "flex-end", paddingRight: 16, paddingLeft: 64 },
   start: { alignSelf: "flex-start", paddingRight: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },

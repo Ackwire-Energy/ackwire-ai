@@ -179,7 +179,7 @@ test("an event pill is a part: the body sets its top, and a bubble's tab stands 
   ).toBe("2px");
 });
 
-/** A length the sheet wrote (`32px`, `0`, `calc((20px - var(--control-h-sm))/2)`), in px, with the tokens' values. */
+/** A length the sheet wrote (`32px`, `0`, `calc((var(--msg-line) - 32px)/2)`), in px, at the tokens' values. */
 const px = (value: string | undefined): number => {
   const text = (value ?? "").replace(/var\((--[\w-]+)\)/g, (_m, token: string) => last(":root", token) ?? "").trim();
   const half = /^calc\(\(\s*(-?[\d.]+)px\s*-\s*(-?[\d.]+)px\s*\)\s*\/\s*2\s*\)$/.exec(text);
@@ -190,19 +190,27 @@ const px = (value: string | undefined): number => {
 };
 
 test("a failed reply's reason sits under the name like the text it stands for, its buttons hung on its first line", () => {
-  // Under the name: the 2px a message's text gets, never the gap between parts plus a push to centre the buttons.
+  // Under the name: the 2px a message's text gets, never the gap between parts plus a push to centre the buttons. On
+  // the text's own size and reading line, so its words stand where the text's would at every text size and look.
   const reason = ".ac-msg__error-row > .ac-msg__error";
   expect(px(last(reason, "margin"))).toBe(0);
-  const line = px(last(".ac-msg__error", "line-height"));
-  expect(line).toBe(20);
-  // Each button (the fix, the ×) hangs over the reason's first line by as much as it outgrows it: centred on it, and
-  // the row no taller than its words. On touch the small buttons grow to the default step of the ruler.
+  expect(last(reason, "font-size")).toBe("var(--msg-text)");
+  expect(last(reason, "line-height")).toBe("var(--msg-line)");
+  const line = px(last(reason, "line-height"));
+  expect(line).toBe(24);
+  // The × hangs over the reason's first line by as much as it outgrows it: centred on it, and the row no taller than
+  // its words. On touch the small buttons grow to the default step of the ruler.
   const at = (sheet: string, selector: string) =>
     declarations(sheet, selector)
       .filter(([p]) => p === "margin-block")
       .at(-1)?.[1];
-  const button = at(topLevel(css), ".ac-msg__error-row > .ac-btn");
-  const touch = at(atRule(css, "@media (pointer: coarse)"), ".ac-msg__error-row > .ac-btn");
+  const button = at(topLevel(css), ".ac-msg__error-row > .ac-btn--icon");
+  const touch = at(atRule(css, "@media (pointer: coarse)"), ".ac-msg__error-row > .ac-btn--icon");
+  // Its fix (a key, a model) on a line of its own under the reason: beside it, a long reason went a word per line.
+  const fix = ".ac-msg__error-row > .ac-btn:not(.ac-btn--icon)";
+  const bare = (value: string | undefined) => value?.replace(/\s/g, "");
+  expect(bare(last(fix, "grid-area"))).toBe("2/1/3/-1");
+  expect(bare(last(".ac-msg__error-row", "grid-template-columns"))).toBe("minmax(0,max-content)max-content");
   for (const [margin, height] of [
     [button, px(last(":root", "--control-h-sm"))],
     [touch, px(last(":root", "--control-h-md"))],

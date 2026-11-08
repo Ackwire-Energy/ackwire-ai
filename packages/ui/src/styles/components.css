@@ -1435,25 +1435,36 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 20px;
 }
 /*
- * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
- * middle of a reason that wraps. The buttons (32, 40 on touch) hang over the 20px line by as much as they outgrow it,
- * so the row is as tall as its words and the words sit where a message's text would.
+ * A failed run's reason in its text's place, its × after it, out of the .ac-iconline: on the reason's first line, not
+ * the middle of a reason that wraps. The reason takes the text's size and reading line, so its words stand where a
+ * message's would at every text size and look. The × (32, 40 on touch) hangs over that line by as much as it outgrows
+ * it, so the row is as tall as its words. Its fix (a key, a model) goes on a line of its own under the reason, where
+ * the words start (after the 16px alert and its 6px gap): beside it, it squeezed a long reason to a word per line.
  */
 .ac-msg__error-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) max-content;
+  column-gap: 6px;
+  align-items: start;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
   margin: 0;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
 }
-.ac-msg__error-row > .ac-btn {
-  margin-block: calc((20px - var(--control-h-sm)) / 2);
+.ac-msg__error-row > .ac-btn--icon {
+  margin-block: calc((var(--msg-line) - var(--control-h-sm)) / 2);
+}
+.ac-msg__error-row > .ac-btn:not(.ac-btn--icon) {
+  grid-area: 2 / 1 / 3 / -1;
+  justify-self: start;
+  margin-block-start: var(--space-2);
+  margin-inline-start: calc(16px + 6px);
 }
 @media (pointer: coarse) {
-  .ac-msg__error-row > .ac-btn {
-    margin-block: calc((20px - var(--control-h-md)) / 2);
+  .ac-msg__error-row > .ac-btn--icon {
+    margin-block: calc((var(--msg-line) - var(--control-h-md)) / 2);
   }
 }
 .ac-mention {
@@ -3709,6 +3720,8 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-receipt__words {
   min-width: 0;
   text-wrap: balance;
+  /* A failure's reason can hold an address with nowhere to break. */
+  overflow-wrap: anywhere;
 }
 /* The dot and its action are one piece that wraps whole, the dot 4px from each. The room before the dot is the
    words', so a line the dot starts starts on the column. */
