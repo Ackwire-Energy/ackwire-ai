@@ -225,6 +225,11 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       ]
     : [];
 
+  // One question at a time, as in a conversation: the next open step with its button, and a step just done while it
+  // says so; the count says how far the rest is ("2 de 5"). Complete, the card keeps every row as the record.
+  const focus = next ?? rows.find((r) => !r.done && !r.dim)?.key;
+  const shown = run.state === "complete" ? rows : rows.filter((r) => r.key === focus || r.saying);
+
   return (
     <>
       <SetupCardView
@@ -235,7 +240,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         }
         done={doneHere.length}
         total={steps.length}
-        rows={rows}
+        rows={shown.length > 0 ? shown : rows}
         foot={asks.length > 0 ? <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} /> : null}
       />
       <TeamTemplatesSheet

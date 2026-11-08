@@ -105,6 +105,11 @@ export interface ComposerProps {
   sendEmpty?: boolean;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
   onType?: (text: string) => void;
+  /**
+   * Where the words wait when the person leaves before sending (a conversation, a thread): they are back in the field
+   * when the person returns, until sent or erased. Kept while the app runs.
+   */
+  draftKey?: string;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
   media?: { label: string; onPress: () => void } | null;
   /**
@@ -127,6 +132,9 @@ const SEND = 36;
 /** Space around the send button inside the pill: it sits centered on the first line. */
 const INSET = (FIELD - SEND) / 2;
 /** How long the send button is held to stop the agent and send; the ring around it fills meanwhile. */
+/** Words left in a conversation's field, by `draftKey`, while the app runs. */
+const DRAFTS = new Map<string, string>();
+
 const HOLD_SEND_MS = 600;
 const RING = 44;
 const RING_PATH = (() => {
@@ -165,13 +173,21 @@ export function Composer({
   banner,
   sendEmpty = false,
   onType,
+  draftKey,
   media,
   voice,
 }: ComposerProps) {
   const theme = useTheme();
   const { colors, shadows, reducedMotion } = theme;
   const { t } = useTranslation();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => (draftKey ? (DRAFTS.get(draftKey) ?? "") : ""));
+  // Every change of the words is the draft too; an empty field leaves none behind.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key is the conversation the field belongs to
+  useEffect(() => {
+    if (!draftKey) return;
+    if (text.trim()) DRAFTS.set(draftKey, text);
+    else DRAFTS.delete(draftKey);
+  }, [text]);
   const [caret, setCaret] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [focused, setFocused] = useState(false);

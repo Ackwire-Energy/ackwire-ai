@@ -131,6 +131,7 @@ import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
 import { ConversationSearch } from "../search/ConversationSearch";
 import { hitTarget } from "../search/logic";
+import { takeShareHandoff, useShareHandoff } from "../share/handoff";
 import { AgentFace, Face, OpensAgent } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
@@ -1116,8 +1117,7 @@ function Chat({
     });
     return { id: saved.id, version: saved.version, title: saved.title };
   };
-  const sendWithFiles = async (text: string, how: SendHow) => {
-    const files = pending;
+  const sendWithFiles = async (text: string, how: SendHow, files: PendingFile[] = pending) => {
     setPending((now) => now.map((f): PendingFile => ({ ...f, state: "sending" })));
     const results = await Promise.allSettled(files.map(uploadOne));
     const failed = new Set(files.filter((_, i) => results[i]?.status === "rejected").map((f) => f.id));
@@ -1135,18 +1135,43 @@ function Chat({
     setPending([]);
     toEnd();
   };
+  // What another app shared ("Compartilhar com…" picked this agent): it goes at once, through this conversation's own
+  // sending, so the photos show in the strip while they upload and the agent starts reading as soon as it lands.
+  const shareIn = useShareHandoff(channelId);
+  const shareReady = Boolean(meId) && (Boolean(dm) || Boolean(channel));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sent once per handoff (`at`), when the conversation is known
+  useEffect(() => {
+    if (!shareIn || !shareReady) return;
+    takeShareHandoff(shareIn.at);
+    if (shareIn.files.length > 0) {
+      const files = shareIn.files.map(
+        (f, i): PendingFile => ({ ...f, id: `${shareIn.at}-${i}-${f.uri}`, state: "sending" }),
+      );
+      setPending(files);
+      void sendWithFiles(shareIn.text, "join", files);
+    } else if (shareIn.text) {
+      send(shareIn.text, threadId);
+      toEnd();
+    }
+  }, [shareIn?.at, shareReady]);
   const pickedAsset = (a: ImagePicker.ImagePickerAsset) => ({
     uri: a.uri,
     name: a.fileName ?? (a.type === "video" ? "video.mp4" : "photo.jpg"),
     type: a.mimeType ?? (a.type === "video" ? "video/mp4" : "image/jpeg"),
   });
+  const openPlus = () =>
+    sheet.open(<PlusActions media={mediaTabs.length > 0} onPick={(p) => void onPlus(p)} />);
   const onPlus = async (pick: PlusPick) => {
     // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
-    // iOS took them away with it and the app waited for an answer that never came.
-    const system = pick === "camera" || pick === "photos" || pick === "file";
-    if (system) await new Promise<void>((done) => sheet.close(done));
+    // iOS took them away with it and the app waited for an answer that never came. The GIFs' sheet takes its place
+    // the same way.
+    const after = pick === "camera" || pick === "photos" || pick === "file" || pick === "media";
+    if (after) await new Promise<void>((done) => sheet.close(done));
     else sheet.close();
     switch (pick) {
+      case "media":
+        openMedia();
+        return;
       case "camera": {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) {
@@ -2354,8 +2379,10 @@ function Chat({
                     placeholder={placeholder}
                     onSend={onSend}
                     working={working}
-                    onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
-                    media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
+                    // GIFs and stickers live in the "+", with the photos: the field only sends.
+                    onPlus={openPlus}
+                    media={null}
+                    draftKey={threadId ? `${channelId}:${threadId}` : channelId}
                     inputNativeID={COMPOSER_INPUT_ID}
                     {...(suggestions.length > 0 ? { suggestions } : {})}
                     {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
@@ -2372,7 +2399,7 @@ function Chat({
                             onRemove={removePending}
                             onAdd={
                               pending.length < MAX_PENDING
-                                ? () => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)
+                                ? openPlus
                                 : undefined
                             }
                           />

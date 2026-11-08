@@ -59,6 +59,7 @@ import {
   useReducedMotion,
   useTheme,
 } from "@/ui";
+import { SparkCheck } from "@/ui/SparkCheck";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -428,6 +429,7 @@ export const ASK_ICON: Record<AskKind, IconName> = {
 export function AskCard({
   id,
   kind,
+  kindNote,
   agentId,
   waitsFor,
   lead,
@@ -439,6 +441,8 @@ export function AskCard({
 }: {
   id: string;
   kind: AskKind;
+  /** Said after the kind on the top line ("sai da empresa" for a request that leaves the workspace). */
+  kindNote?: string | undefined;
   agentId: string;
   waitsFor: "you" | (string & {}) | null;
   lead: string;
@@ -510,6 +514,7 @@ export function AskCard({
         {more.content}
       </Animated.View>
     ) : null;
+  const kindWords = askKindWords(t, kind, waitsFor === "you");
   return (
     // A plain view the conversation measures (never flattened away), around the card that fades in.
     <View ref={slot} collapsable={false} style={ownTop}>
@@ -519,7 +524,7 @@ export function AskCard({
           <View style={styles.head}>
             <Icon name={ASK_ICON[kind]} size={13} color={c.muted} />
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
-              {askKindWords(t, kind, waitsFor === "you")}
+              {kindNote ? `${kindWords} · ${kindNote}` : kindWords}
             </Text>
             {waitsFor && waitsFor !== "you" ? (
               <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
@@ -629,10 +634,16 @@ export function AskDone({
   time,
   more,
   actions,
+  celebrate,
 }: {
   done: boolean;
   words: string;
   time?: string;
+  /**
+   * You approved it just now: the check bursts once in the agent's tones (its color), the decision's weight. Never on
+   * an old pill scrolling in.
+   */
+  celebrate?: string | null;
   /** `card`: what opens is a card of its own (the request as it was), drawn without the text's rule beside it. */
   more?: { label: string; content: ReactNode; card?: boolean } | null;
   actions?: ReactNode;
@@ -645,7 +656,7 @@ export function AskDone({
   return (
     <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={[styles.done, ownTop]}>
       <EventPill
-        mark={done ? "check" : "x"}
+        mark={done && celebrate ? <SparkCheck size={14} color={c.ok} tone={celebrate} /> : done ? "check" : "x"}
         markColor={done ? c.ok : c.faint}
         time={time}
         actions={[
@@ -803,7 +814,8 @@ export function AskBar({
           accessibilityLabel={`${plain}. ${t("ask.bar.see")}`}
           style={({ pressed }) => [styles.words, pressed && styles.pressed]}
         >
-          <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+          {/* The name in ink, what it waits for in amber: the one state the app colors, "espera você". */}
+          <Text variant="caption" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={{ color: c.amber }}>
             {parts.map((p, i) =>
               p.bold ? (
                 // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order

@@ -63,7 +63,7 @@ import {
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { genderOf } from "../shared/logic";
+import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -111,6 +111,19 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
   return <ApprovalDone approval={a} />;
 }
 
+/** Approvals whose burst already played: a pill scrolling back into view, or remounted, stays quiet. */
+const celebrated = new Set<string>();
+/** How fresh a decision still bursts: the card turning into the pill, not an old one loading. */
+const CELEBRATE_MS = 10_000;
+
+/** The agent's color when I approved this one just now and it hasn't burst yet; null otherwise. */
+function celebrationFor(a: Approval, meId: string | null, color: string): string | null {
+  if (a.status !== "approved" || !meId || a.decidedByUserId !== meId || !a.decidedAt) return null;
+  if (celebrated.has(a.id) || Date.now() - new Date(a.decidedAt).getTime() > CELEBRATE_MS) return null;
+  celebrated.add(a.id);
+  return color;
+}
+
 /**
  * One decided request, as the conversation's event pill: how it ended and what it did ("Approved by you: Generate
  * image"), when it was decided; its values (so several of one tool are told apart), when it goes out if approved
@@ -122,6 +135,8 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
   const dir = useDirectory();
   const when = useWhen();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
+  // Approved by me a moment ago (the card turning into this pill): the check bursts once in the agent's tones.
+  const [celebrate] = useState(() => celebrationFor(a, meId, agentLook(dir.anyAgent(a.agentId)).color));
   // Approved ahead and still to run: when it goes out, said under its pill, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
@@ -134,6 +149,7 @@ function ApprovalDone({ approval: a }: { approval: Approval }) {
     <AskDone
       done={a.status === "approved"}
       words={`${outcome}: ${markName(approvalHeadline(t, a, i18n.language))}`}
+      celebrate={celebrate}
       time={a.decidedAt ? when.short(a.decidedAt) : undefined}
       actions={
         scheduled && a.canCancel ? (
@@ -554,6 +570,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
     <AskCard
       id={a.id}
       kind="approval"
+      // A request that leaves the workspace (an e-mail, a post, a payment) says so before anything else.
+      kindNote={high ? t("mobile.approval.leaves") : undefined}
       agentId={a.agentId}
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? approvalAskLine(t, a.canDecide)}

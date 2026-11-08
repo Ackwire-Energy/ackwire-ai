@@ -273,22 +273,21 @@ export const ReceiptMark = memo(function ReceiptMark({
         {view.kind === "seen" ? (
           <Face who={{ type: "person", id: view.personId }} size={16} live={false} />
         ) : view.kind === "steer" ? (
+          // Beside the time, a 12 check: two once the agent read it, one while it waits; who read it is in the
+          // words a tap shows, never a face crowding the line.
           view.state === "read" || view.state === "resolved" ? (
-            <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
-          ) : view.state === "now" ? (
-            <Icon name="bolt" size={12} color={tint} />
-          ) : view.state === "delivered" ? (
+            <Icon name="checks" size={12} color={tint} />
+          ) : view.state === "now" || view.state === "delivered" ? (
             <Icon name="check" size={12} color={tint} />
           ) : view.state === "held" ? (
             <Icon name="pause" size={12} color={tint} />
           ) : (
             <InkOrbit size={10} color={tint} />
           )
+        ) : view.mark === "none" && view.agentId ? (
+          <Icon name="checks" size={12} color={tint} />
         ) : (
-          <>
-            {view.agentId ? <AgentFace agentId={view.agentId} size={16} live={false} framed={false} /> : null}
-            <Mark mark={view.mark} color={tint} />
-          </>
+          <Mark mark={view.mark} color={tint} />
         )}
       </Pressable>
     </Animated.View>

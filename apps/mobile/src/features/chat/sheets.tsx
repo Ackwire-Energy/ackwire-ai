@@ -298,15 +298,20 @@ export function MessageActions(props: MessageActionsContext) {
 
 // ── "+" in the composer ──────────────────────────────────────────────────────
 
-export type PlusPick = "camera" | "photos" | "file" | "mission" | "summary" | "remind";
+export type PlusPick = "camera" | "photos" | "file" | "media" | "mission" | "summary" | "remind";
 
-export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
+/**
+ * The "+" of the chat: what goes with a message as tiles (camera, photos, file and, where they can be sent, the
+ * GIFs and stickers, so the field itself only sends), then what to start here, in words.
+ */
+export function PlusActions({ onPick, media = false }: { onPick: (pick: PlusPick) => void; media?: boolean }) {
   const { t } = useTranslation();
   const surface = useSurface();
-  const tiles: { key: PlusPick; icon: "camera" | "image" | "file"; label: string }[] = [
+  const tiles: { key: PlusPick; icon: "camera" | "image" | "file" | "sticker"; label: string }[] = [
     { key: "camera", icon: "camera", label: t("mobile.plus.camera") },
     { key: "photos", icon: "image", label: t("mobile.plus.photos") },
     { key: "file", icon: "file", label: t("mobile.plus.file") },
+    ...(media ? [{ key: "media" as const, icon: "sticker" as const, label: t("mobile.plus.media") }] : []),
   ];
   return (
     <>
@@ -336,7 +341,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "target",
             label: t("mobile.plus.mission"),
             hint: t("mobile.plus.missionHint"),
-            code: "/mission",
             onPress: () => onPick("mission"),
           },
           {
@@ -344,7 +348,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "sparkle",
             label: t("mobile.plus.summary"),
             hint: t("mobile.plus.summaryHint"),
-            code: "/summary",
             onPress: () => onPick("summary"),
           },
           {
@@ -352,7 +355,6 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
             icon: "clock",
             label: t("mobile.plus.remind"),
             hint: t("mobile.plus.remindHint"),
-            code: "/remind",
             onPress: () => onPick("remind"),
           },
         ]}
