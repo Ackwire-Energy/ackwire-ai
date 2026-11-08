@@ -7,9 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, RefreshControl, StyleSheet } from "react-native";
-import { usePush } from "@/providers/push";
-import { GroupedRow, LargeTitleScreen, Text } from "@/ui";
+import { RefreshControl, View } from "react-native";
+import { GroupedRow, LargeTitleScreen, SkeletonList, SwipeRow } from "@/ui";
 import { router } from "@/ui/navigation";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
@@ -20,7 +19,7 @@ import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { RightHandAsk } from "../right-hand/Pin";
-import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
@@ -45,8 +44,6 @@ import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
 /** Rows of the home whose agent moves (a long list stays light). */
 const LIVE_ROWS = 6;
-/** How long Conversas shows, loaded, before our notifications sheet opens over it (past the launch). */
-const PUSH_OFFER_MS = 2500;
 
 /** A section's "Ver todos", pushed: a kind, or one channel category (ADR 0080). */
 export const openKindList = (kind: ListKind | `category-${string}`) => router.push(`/conversations/${kind}`);
@@ -59,9 +56,10 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * collapsible (remembered), five rows and "Ver todos". Under the greeting, the workspace's own computer while it
  * is being prepared, and a notice per computer that went offline with agents waiting for it. Above the sections a
  * Dashboards row pushes the Dashboards list (ADR 0135 §15). An agent's row says it waits on your ok, waits
- * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
- * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
- * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
+ * for its computer, or what it is doing. A row swiped left pins it on top (or takes it off), the long press's menu
+ * has the rest. While the list loads, rows of its own shape stand in (no spinner, nothing moves when it lands).
+ * Search and Threads have their own tabs. Empty, it invites the first agent. Nothing opens over it on its own: the
+ * offer to turn on notifications comes as a line in the right hand's conversation. When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 const OTHER_CHANNELS = "otherChannels";
@@ -76,6 +74,7 @@ export function ChatsScreen() {
 
 function Home() {
   const { t } = useTranslation();
+  const c = useColors();
   const orgId = useOrgId();
   const qc = useQueryClient();
   const focused = useIsFocused();
@@ -136,18 +135,6 @@ function Home() {
   // Agents already in the team fill the home (Agentes) instead of the invitation to create the first one.
   const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
 
-  const { offer, markOffered } = usePush();
-  const approvalWaits = waiting.items.some((i) => i.kind === "approval");
-  const offerPush = focused && !list.loading && !empty && !failed && (offer.home || (offer.approval && approvalWaits));
-  useEffect(() => {
-    if (!offerPush) return;
-    const timer = setTimeout(() => {
-      if (AppState.currentState !== "active") return;
-      markOffered();
-      router.push("/push-ask");
-    }, PUSH_OFFER_MS);
-    return () => clearTimeout(timer);
-  }, [offerPush, markOffered]);
   const strip = <WaitingStrip items={waiting.items} open={waitOpen} onOpenChange={setWaitOpen} />;
 
   const ask = pinned.pin && !failed && !list.loading ? <RightHandAsk row={pinned.pin} onStart={startDm} /> : null;
@@ -187,26 +174,42 @@ function Home() {
       ) : empty ? (
         <FirstAgentEmpty />
       ) : list.loading ? (
-        <Text tone="faint" style={styles.center}>
-          {t("mobile.common.loading")}
-        </Text>
+        <>
+          <CollapsibleSection title={t("mobile.chats.section.agents")} count={0} collapsed={false} onToggle={() => {}}>
+            <SkeletonList rows={4} />
+          </CollapsibleSection>
+          <CollapsibleSection title={t("mobile.chats.section.channels")} count={0} collapsed={false} onToggle={() => {}}>
+            <SkeletonList rows={2} />
+          </CollapsibleSection>
+        </>
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);
-          const row = (r: ConversationRow, i: number, shown: boolean) => (
-            <ConversationRowView
-              key={r.key}
-              row={r}
-              divider={i > 0}
-              live={shown && live++ < LIVE_ROWS}
-              agent={agentStates.get(r.key)}
-              pinned={i < (s.pinned ?? 0)}
-              onHold={menus.openRowMenu}
-              holdLabel={t("sidebarPins.pin")}
-              holdActions={menus.rowActionsOf}
-              {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
-            />
-          );
+          const row = (r: ConversationRow, i: number, shown: boolean) => {
+            const view = (
+              <ConversationRowView
+                key={r.key}
+                row={r}
+                divider={i > 0}
+                live={shown && live++ < LIVE_ROWS}
+                agent={agentStates.get(r.key)}
+                pinned={i < (s.pinned ?? 0)}
+                onHold={menus.openRowMenu}
+                holdLabel={t("sidebarPins.pin")}
+                holdActions={menus.rowActionsOf}
+                {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
+              />
+            );
+            // Swiped left: Fixar no topo (or Desafixar), the menu's first action, on a pane; the row stays opaque
+            // over it (the hairline and the sky never show through).
+            const pin = menus.rowActionsOf(r).find((a) => a.key === "pin");
+            if (!pin) return view;
+            return (
+              <SwipeRow key={r.key} right={{ label: pin.label, icon: "pin", color: c.agent, ink: c.onAgent, onAction: pin.run }}>
+                <View style={{ backgroundColor: c.bg }}>{view}</View>
+              </SwipeRow>
+            );
+          };
           const hold = s.categoryId ? menus.categoryMenu(s.categoryId, s.name ?? "") : undefined;
           return (
             <CollapsibleSection
@@ -251,7 +254,3 @@ function Home() {
     </LargeTitleScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { textAlign: "center", paddingVertical: 40 },
-});

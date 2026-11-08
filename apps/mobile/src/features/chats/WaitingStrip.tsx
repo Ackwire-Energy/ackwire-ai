@@ -1,20 +1,19 @@
 import { useMissionList, useNotifications } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
-import { mixHex } from "@agenteschat/ui/agent/engine";
+import { timeLeft } from "@agenteschat/client/lib/format";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { CHROME_MAX_SCALE, Count, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
+import { CHROME_MAX_SCALE, Fuse, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
 import { router } from "@/ui/navigation";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
-import { useSurface } from "../shared/parts";
+import { fuseRemaining } from "../shared/logic";
 import { useWaitingApprovals } from "../shared/queries";
 import { WaitingCard } from "../shared/WaitingCard";
 import { missionsWaiting, openQuestions } from "./logic";
 import {
-  stackLayers,
   WAITING_ICON,
   type WaitingItem,
   waitingChipKey,
@@ -51,12 +50,12 @@ const openWaitingActivity = () =>
   router.navigate({ pathname: "/activity", params: { filter: "waiting", at: String(Date.now()) } });
 
 /**
- * "Esperando você" on top of Conversas and Threads. Closed: a dark ink strip, full
- * width, like a live activity: the first item's agent (moving), "Theo precisa do seu ok · expira em 46 min" and
- * the count, with two copies of the strip peeking out under it while more wait. Tapped, it springs
- * open into the card: who asks and the kind, the title, the fuse, Revisar, and "e mais N esperando você"
- * (Atividade on Esperando). Tapping the card opens the request, like Revisar; scrolling the list (`open` is the
- * screen's) closes it.
+ * "Esperando você" on top of Conversas. Closed: a dark ink strip, full width, like a live activity: the first
+ * item's agent (moving), its name in bold and "espera seu ok" in amber (the one color of the screen, for what waits
+ * on you), and at its end the fuse burning to the deadline with the time left. No count and no copies stacked
+ * under it: the tab's badge already counts, and the card says "e mais N". Tapped, it springs open into the card:
+ * who asks and the kind, the title, the fuse, Revisar, and "e mais N esperando você" (Atividade on Esperando).
+ * Tapping the card opens the request, like Revisar; scrolling the list (`open` is the screen's) closes it.
  * Nothing waiting: nothing.
  */
 export function WaitingStrip({
@@ -87,11 +86,11 @@ export function WaitingStrip({
       >
         {open ? (
           <Animated.View key="card" {...fade}>
-            <WaitingOpenCard item={first} rest={stack.rest} faces={stack.faces} stacked={stack.stacked} />
+            <WaitingOpenCard item={first} rest={stack.rest} faces={stack.faces} />
           </Animated.View>
         ) : (
           <Animated.View key="pill" {...fade}>
-            <WaitingPill item={first} count={stack.count} stacked={stack.stacked} onPress={() => onOpenChange(true)} />
+            <WaitingPill item={first} count={stack.count} onPress={() => onOpenChange(true)} />
           </Animated.View>
         )}
       </View>
@@ -108,82 +107,56 @@ function useLine(item: WaitingItem) {
   return { name, verb, line: name ? t("mobile.chats.wait.line", { name, verb }) : t("mobile.home.waiting") };
 }
 
-function WaitingPill({
-  item,
-  count,
-  stacked,
-  onPress,
-}: {
-  item: WaitingItem;
-  count: number;
-  stacked: boolean;
-  onPress: () => void;
-}) {
+function WaitingPill({ item, count, onPress }: { item: WaitingItem; count: number; onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const now = useNow();
-  const { line } = useLine(item);
+  const { name, line } = useLine(item);
+  // The strip's short verb ("espera seu ok"), the row's; the long one stays for screen readers.
+  const short = t(`mobile.homeNow.rowWait.${item.kind}`);
+  const left = item.expiresAt ? timeLeft(t, item.expiresAt, new Date(now)) : null;
   const minutes = waitingMinutes(item, now);
   const expires = minutes !== null ? t("mobile.approval.expiresIn", { count: minutes }) : null;
-  const layers = stackLayers(c.ink, c.bg);
   return (
-    <View style={stacked ? styles.stackRoom : undefined}>
-      {stacked
-        ? [...layers]
-            .reverse()
-            .map((l) => (
-              <View
-                key={l.translateY}
-                style={[
-                  styles.layer,
-                  { backgroundColor: l.color, transform: [{ translateY: l.translateY }, { scaleX: l.scaleX }] },
-                ]}
-              />
-            ))
-        : null}
-      <PressScale
-        onPress={onPress}
-        to={0.98}
-        accessibilityRole="button"
-        accessibilityLabel={[line, expires, t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count })]
-          .filter(Boolean)
-          .join(", ")}
-        accessibilityHint={t("mobile.chats.wait.open")}
-        accessibilityState={{ expanded: false }}
-        style={[styles.pill, { backgroundColor: c.ink }]}
-      >
-        <View style={styles.pillRow}>
-          <AgentFace agentId={item.agentId} size={26} />
-          <RNText numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.pillText, { color: c.bg }]}>
+    <PressScale
+      onPress={onPress}
+      to={0.98}
+      accessibilityRole="button"
+      accessibilityLabel={[line, expires, t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count })]
+        .filter(Boolean)
+        .join(", ")}
+      accessibilityHint={t("mobile.chats.wait.open")}
+      accessibilityState={{ expanded: false }}
+      style={[styles.pill, { backgroundColor: c.ink }]}
+    >
+      <View style={styles.pillRow}>
+        <AgentFace agentId={item.agentId} size={26} mode="run" />
+        <RNText numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.pillText, { color: c.bg }]}>
+          {name ? (
+            <>
+              <RNText style={styles.semibold}>{name}</RNText>
+              <RNText style={{ color: c.amber }}>{` ${short}`}</RNText>
+            </>
+          ) : (
             <RNText style={styles.semibold}>{line}</RNText>
-            {expires ? <RNText style={styles.dim}>{` · ${expires}`}</RNText> : null}
-          </RNText>
-          <View style={[styles.n, { backgroundColor: mixOnInk(c.ink, c.bg) }]}>
-            <Count value={count} size={14} max={99} color={c.bg} />
+          )}
+        </RNText>
+        {left && item.createdAt && item.expiresAt ? (
+          <View style={styles.deadline}>
+            <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} style={styles.fuse} />
+            <RNText numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.left, { color: c.amber }]}>
+              {left}
+            </RNText>
           </View>
-        </View>
-      </PressScale>
-    </View>
+        ) : null}
+      </View>
+    </PressScale>
   );
 }
 
-/** The count's chip on the strip: the background at 18% over ink. */
-const mixOnInk = (ink: string, bg: string) => mixHex(ink, bg, 0.18);
-
-function WaitingOpenCard({
-  item,
-  rest,
-  faces,
-  stacked,
-}: {
-  item: WaitingItem;
-  rest: number;
-  faces: string[];
-  stacked: boolean;
-}) {
+function WaitingOpenCard({ item, rest, faces }: { item: WaitingItem; rest: number; faces: string[] }) {
   const { t } = useTranslation();
   const c = useColors();
-  const surface = useSurface();
   const now = useNow();
   const { name, line } = useLine(item);
   const minutes = waitingMinutes(item, now);
@@ -192,13 +165,7 @@ function WaitingOpenCard({
     else openWaitingActivity();
   };
   return (
-    <View style={stacked ? styles.stackRoom : undefined}>
-      {stacked ? (
-        <>
-          <View style={[styles.back, styles.back2, surface, { opacity: 0.7 }]} />
-          <View style={[styles.back, styles.back1, surface, { opacity: 0.9 }]} />
-        </>
-      ) : null}
+    <View>
       <WaitingCard
         agentId={item.agentId}
         name={name || t("mobile.home.waiting")}
@@ -239,42 +206,21 @@ function WaitingOpenCard({
   );
 }
 
-/** Room under the strip or the card for the copies stacked behind. */
-const STACK_ROOM = 14;
-
 const styles = StyleSheet.create({
   // Full width with the list's 16pt sides inside, so the clip leaves room for the shadows.
   box: { overflow: "hidden" },
-  measure: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  stackRoom: { paddingBottom: STACK_ROOM },
-  layer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: STACK_ROOM,
-    borderRadius: 999,
-    boxShadow: "0px 1px 2px 0px rgba(0, 0, 0, 0.08)",
-  },
+  measure: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
   pill: {
     borderRadius: 999,
     boxShadow: "inset 0px 1px 0px 0px rgba(255, 255, 255, 0.08), 0px 4px 12px -6px rgba(0, 0, 0, 0.35)",
   },
-  pillRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingHorizontal: 10 },
+  // 48 tall: the face 11 from the left edge, the words 12 after it, the deadline 14 from the right.
+  pillRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48, paddingLeft: 11, paddingRight: 14 },
   pillText: { flex: 1, minWidth: 0, ...systemText("subhead") },
   semibold: { fontWeight: weights.semibold },
-  dim: { opacity: 0.7 },
-  n: {
-    minWidth: 26,
-    height: 26,
-    paddingHorizontal: 8,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  back: { position: "absolute", height: 30, borderRadius: 20 },
-  back1: { bottom: 6, left: 8, right: 8 },
-  back2: { bottom: 0, left: 16, right: 16 },
+  deadline: { flexDirection: "row", alignItems: "center", gap: 8 },
+  fuse: { width: 36, height: 6 },
+  left: { ...systemText("footnote", weights.semibold), fontVariant: ["tabular-nums"] },
   more: { flexDirection: "row", alignItems: "center", gap: 8 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },

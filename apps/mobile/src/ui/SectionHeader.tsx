@@ -47,7 +47,8 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
 
 const styles = StyleSheet.create({
   // The count and the way on sit on the title's baseline: on its first line when a long title wraps.
-  h: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
+  // At the screen's 16-point margin, 24 above and 8 below: the lists' rhythm in eights.
+  h: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 24, paddingHorizontal: 16, paddingBottom: 8 },
   title: { fontWeight: "600", flexShrink: 1 },
   action: { marginLeft: "auto", flexDirection: "row", alignItems: "baseline", gap: 2, flexShrink: 1, minWidth: 0 },
   actionText: { fontWeight: weights.medium, flexShrink: 1 },

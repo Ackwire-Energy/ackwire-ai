@@ -44,8 +44,9 @@ const SMALL_FACE = 27;
 /** Open: until its height is measured. */
 const OPEN_GUESS = 260;
 const TICK_MS = 250;
-/** Swiped up this far, it's put away. */
+/** Swiped up this far, or flicked up this fast (points per second), it's put away. */
 const PUT_AWAY = -24;
+const FLICK_AWAY = -600;
 /** "Enviado" stays this long before the notice leaves. */
 const SENT_MS = 1400;
 const OPEN_MAX = 3;
@@ -54,6 +55,12 @@ const MUTED = "rgba(255,255,255,0.64)";
 const LINE = "rgba(255,255,255,0.12)";
 
 type Shape = "none" | "pill" | "small" | "open";
+
+/** Pulled past its edge, the island follows less the further it goes (a boundary that resists, not a wall). */
+function rubberband(overshoot: number, dimension: number, constant = 0.55) {
+  "worklet";
+  return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
+}
 
 /**
  * The island on the phone (ADR 0071 §9): what reaches me while the app is open grows out of the camera's island (on
@@ -143,7 +150,9 @@ export function NoticeIsland() {
     }
   }, [shape, size.w, size.h, corner, reducedMotion, motion.pop, w, h, r, fade, content]);
 
-  // Swiped up: what isn't waiting leaves, what is shrinks beside the camera.
+  // Swiped up: what isn't waiting leaves, what is shrinks beside the camera. The island is the finger while it is
+  // down (up freely; pulled down it resists, it lives at the top), and lets go on distance or on a flick, the spring
+  // home seeded with the finger's speed.
   const putAway = useCallback(() => {
     setOpen(false);
     island.putAway();
@@ -155,11 +164,12 @@ export function NoticeIsland() {
         .enabled(!scrolls)
         .activeOffsetY([-8, 8])
         .onChange((e) => {
-          drag.value = Math.min(0, drag.value + e.changeY);
+          const next = drag.value + e.changeY;
+          drag.value = next <= 0 ? next : rubberband(next, PILL_HEIGHT);
         })
-        .onEnd(() => {
-          if (drag.value < PUT_AWAY) scheduleOnRN(putAway);
-          drag.value = withSpring(0, { damping: 18, stiffness: 260 });
+        .onEnd((e) => {
+          if (drag.value < PUT_AWAY || e.velocityY < FLICK_AWAY) scheduleOnRN(putAway);
+          drag.value = withSpring(0, { duration: 400, dampingRatio: 0.8, velocity: e.velocityY });
         }),
     [drag, putAway, scrolls],
   );

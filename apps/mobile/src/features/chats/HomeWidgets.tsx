@@ -9,8 +9,8 @@ import { WidgetPeek } from "../dashboards/WidgetPeek";
 import { useColors, useOrgId } from "../shared/hooks";
 import { CollapsibleSection } from "./HomeSection";
 
-/** A widget's width on the strip: two and a bit show, so it reads as one that scrolls. */
-const STRIP_WIDGET = 156;
+/** A widget's width on the strip: two show whole and the third peeks past the edge, so it reads as one that scrolls. */
+const STRIP_WIDGET = 162;
 
 /**
  * The home's widgets (ADR 0135 §15, §18): a head with what Início shows (My Home, or the board chosen with "Use on
@@ -90,7 +90,8 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
   );
 }
 
-const GAP = 10;
+/** Between the cards: the lists' 12. */
+const GAP = 12;
 
 const styles = StyleSheet.create({
   medium: { fontWeight: "500" },

@@ -1,61 +1,64 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshControl, StyleSheet } from "react-native";
+import { RefreshControl } from "react-native";
 import { STORED } from "@/lib/storage";
-import { LargeTitleScreen, Text } from "@/ui";
+import { Button, LargeTitleScreen, SkeletonList } from "@/ui";
 import { router } from "@/ui/navigation";
-import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { useConversations } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { RetryLine, TeamSkyEmpty } from "../shared/TeamSkyEmpty";
 import { ConversationRowView } from "./ConversationRowView";
 import { CollapsibleSection, useCollapsedSections } from "./HomeSection";
 import { THREAD_SECTIONS, threadRows, threadSections } from "./logic";
-import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
-import { waitingInThreads } from "./waiting";
 
 /** Rows whose agent moves (a long list stays light). */
 const LIVE_ROWS = 8;
 
 /**
- * Threads, the second tab: like the home, under the native large title with
- * Você and "+" in the bar, the "Esperando você" strip with only what waits in missions and threads, then the
- * sections Missões and Threads (collapsible, remembered) in Conversas' rows.
+ * Threads, the second tab, named as its tab is: like the home, under the native large title with Você and "+" in
+ * the bar, the sections Missões and Threads (collapsible, remembered) in Conversas' rows, each with its faint line
+ * ("Missão · #produto") over the name and its state as words (amber for what waits on you, the orbit for who
+ * works); what is closed sits at the end of its section. What waits on you is on Conversas' strip and in Atividade,
+ * not repeated here. Loading: rows of its own shape. Empty: the sky with the team, and the way to the conversations.
  */
 export function ThreadsScreen() {
   const { t } = useTranslation();
   const header = useTabHeader();
   const list = useConversations();
-  const waiting = useWaitingItems();
   const { collapsed, toggle } = useCollapsedSections(STORED.threadsCollapsed, THREAD_SECTIONS);
-  const [waitOpen, setWaitOpen] = useState(false);
   const rows = threadRows(list.rows);
   const sections = threadSections(rows);
-  const threadIds = new Set(rows.flatMap((r) => (r.kind === "thread" || r.kind === "mission" ? [r.threadId] : [])));
-  const items = waitingInThreads(waiting.items, threadIds);
-  const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch()]));
+  const pull = usePullRefresh(() => list.refetch());
   let live = 0;
   return (
     <LargeTitleScreen
       title={t("mobile.threads.title")}
       {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
-      onScrollBeginDrag={waitOpen ? () => setWaitOpen(false) : undefined}
     >
-      <WaitingStrip items={items} open={waitOpen} onOpenChange={setWaitOpen} />
       {list.loading ? (
-        <Text tone="faint" style={styles.center}>
-          {t("mobile.common.loading")}
-        </Text>
+        <>
+          <CollapsibleSection title={t("mobile.threads.section.missions")} count={0} collapsed={false} onToggle={() => {}}>
+            <SkeletonList rows={2} />
+          </CollapsibleSection>
+          <CollapsibleSection title={t("mobile.threads.section.threads")} count={0} collapsed={false} onToggle={() => {}}>
+            <SkeletonList rows={3} />
+          </CollapsibleSection>
+        </>
       ) : list.failed && rows.length === 0 ? (
-        <LoadFailed onRetry={() => void list.refetch()} />
+        <RetryLine onRetry={() => void list.refetch()} />
       ) : rows.length === 0 ? (
-        <FirstUse
-          place="threads"
-          acts
-          label={t("mobile.empty.threads.action")}
-          icon="chat"
-          onPress={() => router.navigate("/")}
+        <TeamSkyEmpty
+          title={t("mobile.empty.threads.title")}
+          text={t("mobile.empty.threads.text")}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mobile.empty.threads.action")}
+              onPress={() => router.navigate("/")}
+            />
+          }
         />
       ) : (
         sections.map((s) => {
@@ -78,7 +81,3 @@ export function ThreadsScreen() {
     </LargeTitleScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { textAlign: "center", paddingVertical: 40 },
-});

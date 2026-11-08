@@ -2,7 +2,7 @@ import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-rou
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { FadeIn, FadeOutUp, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
@@ -35,6 +35,12 @@ export interface LargeTitleScreenProps {
    * stay on the plain (white, in light) background.
    */
   grouped?: boolean;
+  /**
+   * The large title folded away and the bar's own title in its place (a search field under it took the focus, as
+   * the system's search bar rises into the navigation); content that should slide up with it carries a
+   * `LinearTransition` layout.
+   */
+  collapsed?: boolean;
 }
 
 /**
@@ -59,6 +65,7 @@ export function LargeTitleScreen({
   bottomInset = 24,
   onScrollBeginDrag,
   grouped = false,
+  collapsed = false,
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
@@ -75,9 +82,13 @@ export function LargeTitleScreen({
     () => ({
       ...actionOptions,
       title,
-      headerTitle: () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
+      // Folded, the bar's plain title stands (no fade to drive; set, not left out, as options merge); else it fades
+      // in as the large one leaves.
+      headerTitle: collapsed
+        ? title
+        : () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
     }),
-    [actionOptions, title, y],
+    [actionOptions, title, y, collapsed],
   );
   return (
     <View style={[styles.screen, { backgroundColor: grouped ? colors.grouped : colors.bg }]}>
@@ -108,16 +119,23 @@ export function LargeTitleScreen({
                 {backdrop}
               </CoverParallax>
             ) : null}
-            <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
-              <Text variant="display" accessibilityRole="header" numberOfLines={1}>
-                {title}
-              </Text>
-              {subtitle ? (
-                <Text variant="small" tone="muted" style={styles.subtitle}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </Animated.View>
+            {/* The title shows at once when the screen opens; it fades only when it comes back after a search. */}
+            <LayoutAnimationConfig skipEntering>
+              {collapsed ? null : (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOutUp.duration(180)}>
+                  <Animated.View style={[styles.head, below ? styles.headTight : null, titleFade]}>
+                    <Text variant="display" accessibilityRole="header" numberOfLines={1}>
+                      {title}
+                    </Text>
+                    {subtitle ? (
+                      <Text variant="small" tone="muted" style={styles.subtitle}>
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </Animated.View>
+                </Animated.View>
+              )}
+            </LayoutAnimationConfig>
             {below}
           </View>
           {children}
@@ -140,7 +158,8 @@ const BAR_TITLE_TO = 48;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  // At the screen's 16, as the lists and cards under it.
+  head: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 },
   headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });

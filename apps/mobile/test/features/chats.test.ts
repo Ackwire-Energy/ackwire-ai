@@ -30,7 +30,6 @@ import {
   waitingTotal,
 } from "../../src/features/chats/logic";
 import {
-  stackLayers,
   waitingChipKey,
   waitingCount,
   waitingInThreads,
@@ -460,13 +459,6 @@ describe("the Esperando você strip", () => {
     expect(waitingInThreads(items, new Set(["t-q"])).map((i) => i.key)).toEqual(["m:m1", "q:n1"]);
     expect(waitingInThreads(items, new Set(["t-camp", "t-q"])).map((i) => i.key)).toEqual(["a:ap1", "m:m1", "q:n1"]);
   });
-
-  test("the stack's colors are ink mixed with the background, darker in front", () => {
-    const [p1, p2] = stackLayers("#000000", "#ffffff");
-    expect([p1.translateY, p1.scaleX, p2.translateY, p2.scaleX]).toEqual([7, 0.95, 14, 0.89]);
-    expect(p1.color).toBe("#616161");
-    expect(p2.color).toBe("#adadad");
-  });
 });
 
 describe("the Threads tab", () => {
@@ -545,6 +537,12 @@ describe("the Threads tab", () => {
     ]);
     expect(threadSections(rows.filter((r) => r.kind !== "mission")).map((s) => s.key)).toEqual(["threads"]);
     expect(threadSections([])).toEqual([]);
+  });
+
+  test("a finished mission goes after the live ones (the row carries no mark of it)", () => {
+    const missions = threadSections(rows).find((s) => s.key === "missions")?.rows ?? [];
+    expect(missions.at(-1)?.key).toBe("t:done");
+    expect(missions.slice(0, -1).some((r) => r.key === "t:done")).toBe(false);
   });
 
   test("its collapsed sections are remembered on their own keys", () => {

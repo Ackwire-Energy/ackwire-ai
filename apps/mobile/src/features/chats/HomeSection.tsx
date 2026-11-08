@@ -137,8 +137,8 @@ export function SeeAllRow({ label, onPress }: { label: string; onPress: () => vo
 }
 
 const styles = StyleSheet.create({
-  // The kit's `SectionHeader` and the widgets' head on the same screen leave 8 under the title, not 6.
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
+  // The kit's `SectionHeader` box: the screen's 16 at the sides, 24 above and 8 below (the rhythm in eights).
+  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 24, paddingHorizontal: 16, paddingBottom: 8 },
   pressed: { opacity: 0.6 },
   title: { fontWeight: "600", flexShrink: 1 },
   grow: { flex: 1 },
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingVertical: 12,
-    paddingLeft: LIST_INSET + 2,
+    paddingLeft: LIST_INSET,
     paddingRight: 16,
   },
   medium: { fontWeight: "500" },

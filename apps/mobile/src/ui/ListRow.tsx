@@ -8,28 +8,31 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { Icon } from "./Icon";
 import { Text, textLineOf } from "./Text";
 import { useTheme } from "./theme";
 import { weights } from "./type-scale";
 
 /** The avatar column of a full-width list row (52pt: an agent's body, a person's photo, a tile). */
 export const LIST_AVATAR = 52;
+/** The row's side margin: the screen's 16, as every list and card. */
+const SIDE = 16;
 /** The gap between the avatar and the text. */
 const GAP = 12;
 /** The unread dot sits nearer the text than the row's gap. */
 const DOT_GAP = 10;
-/** Where the hairline between rows starts: the text column. */
-export const LIST_INSET = 14 + LIST_AVATAR + GAP;
+/** Where the hairline between rows starts: the text column (16 + 52 + 12 = 80). */
+export const LIST_INSET = SIDE + LIST_AVATAR + GAP;
 
 const IOS = Platform.OS === "ios";
 
 /**
- * A row's second line, readable: 15.5/21 on iOS (Android keeps its
- * 14/20 body medium). For any text that sits in that line (a preview, what an agent is doing).
+ * A row's second line on the app's type ruler: 15/20 on iOS (the subhead), Android its 14/20 body medium. For any
+ * text that sits in that line (a preview, what an agent is doing).
  */
-export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15.5, lineHeight: 21 } : { lineHeight: 20 };
-/** The time on line 1: 14.5 on iOS, tabular figures. */
-export const LIST_TIME: TextStyle = { ...(IOS ? { fontSize: 14.5 } : null), fontVariant: ["tabular-nums"] };
+export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15, lineHeight: 20 } : { lineHeight: 20 };
+/** The time on line 1: the 13-point meta size, tabular figures. */
+export const LIST_TIME: TextStyle = { ...(IOS ? { fontSize: 13, lineHeight: 18 } : null), fontVariant: ["tabular-nums"] };
 
 export interface ListRowProps extends Omit<PressableProps, "style" | "children"> {
   /** The 52pt avatar box's content. */
@@ -56,13 +59,15 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   unread?: boolean;
   /** The row's own background (in a white card on grouped gray: `raised`). Default: clear. */
   background?: string;
+  /** A chevron on the right, centered on the row: the row opens a screen of its own. */
+  chevron?: boolean;
 }
 
 /**
  * One full-width row of a list: no card, the
- * 52pt avatar, the semibold 17 name and the time on line 1, the preview (15.5/21, two lines) with a badge or
- * state on line 2, hairlines inset to the text, about 82pt tall. Unread: bold name, darker time and preview.
- * Conversas, Atividade and Agentes use it.
+ * 52pt avatar, the semibold 17 name and the time (13) on line 1, the preview (15/20, up to two lines) with a badge or
+ * state on line 2, hairlines inset to the text column at 80, 76pt tall with a one-line preview. Unread: bold name,
+ * darker time and preview. Conversas, Atividade and Agentes use it.
  */
 export function ListRow({
   leading,
@@ -77,6 +82,7 @@ export function ListRow({
   dot = false,
   unread = false,
   background,
+  chevron = false,
   ...press
 }: ListRowProps) {
   const { colors: c } = useTheme();
@@ -130,6 +136,7 @@ export function ListRow({
         ) : null}
       </View>
       {dot ? <View style={[styles.dot, { backgroundColor: c.badge }]} /> : null}
+      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
     </Pressable>
   );
 }
@@ -140,16 +147,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: GAP,
     paddingVertical: 12,
-    paddingLeft: 14,
-    paddingRight: 16,
-    minHeight: 82,
+    paddingHorizontal: SIDE,
+    minHeight: 76,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
   dot: { width: 10, height: 10, borderRadius: 5, marginLeft: DOT_GAP - GAP },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
   // The time and the badge stay on their line's first row when the name or the preview wraps.
-  l1: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  l1: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   l2: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   trailing: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },

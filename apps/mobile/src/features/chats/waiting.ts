@@ -1,13 +1,12 @@
 import type { AppNotification, Approval, Mission } from "@agenteschat/client";
-import { mixHex } from "@agenteschat/ui/agent/engine";
 import { type AppHref, chatHref, notificationHref } from "../links/logic";
 import { minutesLeft } from "../shared/logic";
 import { missionWaitingItems } from "./logic";
 
 /**
  * "Esperando você": what waits on you as items in one order (requests, the one
- * closest to expiring first, then missions, then agents' questions), the dark strip that shows the first one
- * with the others stacked behind it, and the card it opens into. Pure: the strip turns this into text.
+ * closest to expiring first, then missions, then agents' questions), the dark strip that shows the first one, and
+ * the card it opens into (which says how many more wait). Pure: the strip turns this into text.
  */
 
 export type WaitingKind = "approval" | "question" | "mission";
@@ -92,8 +91,8 @@ export const waitingInThreads = (items: WaitingItem[], threadIds: ReadonlySet<st
 const MORE_FACES = 3;
 
 /**
- * The strip's shape: the first item, the count, how many more wait besides it ("e mais N"; the copies of the
- * strip stacked behind show only then), and the agents of the next ones (distinct, at most three).
+ * The strip's shape: the first item, the count, how many more wait besides it ("e mais N" on the open card), and
+ * the agents of the next ones (distinct, at most three).
  */
 export function waitingStack(items: WaitingItem[]) {
   const first = items[0] ?? null;
@@ -115,14 +114,3 @@ export const waitingMinutes = (i: Pick<WaitingItem, "expiresAt">, now = Date.now
 export const waitingVerbKey = (kind: WaitingKind) => `mobile.chats.wait.verb.${kind}` as const;
 export const waitingChipKey = (kind: WaitingKind) => `mobile.chats.wait.chip.${kind}` as const;
 export const WAITING_ICON = { approval: "shield", question: "help", mission: "target" } as const;
-
-/**
- * The strip's two copies behind it, like grouped notifications: a little narrower and lower each, in ink
- * mixed with the background (62% and 32% ink).
- */
-export function stackLayers(ink: string, bg: string) {
-  return [
-    { translateY: 7, scaleX: 0.95, color: mixHex(ink, bg, 0.38) },
-    { translateY: 14, scaleX: 0.89, color: mixHex(ink, bg, 0.68) },
-  ] as const;
-}

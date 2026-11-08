@@ -25,8 +25,11 @@ export interface WaitingCardProps {
   expires?: { createdAt?: string | null; expiresAt: string } | null;
   /** Without a deadline, at the top line's right: where and when ("#marketing · 19:58"). */
   where?: string;
-  /** The one action, wide under the request. */
-  action?: { label: string; onPress: () => void } | null;
+  /**
+   * The one action, wide under the request: the screen's one primary on the card that decides something, else
+   * secondary (`variant`), so a page of cards has one primary.
+   */
+  action?: { label: string; onPress: () => void; variant?: "primary" | "secondary" } | null;
   /** The decision taken on the card itself (the chat's `AskButtons`), in place of `action`. */
   decision?: ReactNode;
   onPress?: () => void;
@@ -38,10 +41,10 @@ export interface WaitingCardProps {
 /**
  * One thing waiting on you, as Atividade, Conversas' strip and an agent's profile show it, read as the chat's request
  * card: the card with its cut corner (square bottom left, as the chat's blocks), the asking agent's sky faint across
- * the top (gray when no agent asks), its face with the name and the kind under it (its icon quiet: no "waiting for
- * you" mark, the card itself is the ask) and, at the right, where and when; then the request in words, why in muted,
- * what it goes through on one quiet line, the decision (or its one action) wide under it and, at its end, the fuse to
- * its deadline.
+ * the top (gray when no agent asks), its face with the name (15, regular: the request is the card's one bold) and
+ * the kind under it (its icon quiet: no "waiting for you" mark, the card itself is the ask) and, at the right, where
+ * and when; then the request in words (17 semibold), why in muted, what it goes through on one quiet line, the
+ * decision (or its one action) wide under it and, at its end, the fuse to its deadline.
  */
 export function WaitingCard({
   agentId,
@@ -66,7 +69,9 @@ export function WaitingCard({
     decision ??
     (action ? (
       <AskButtons
-        primary={<Button variant="primary" size="card" wide label={action.label} onPress={action.onPress} />}
+        primary={
+          <Button variant={action.variant ?? "primary"} size="card" wide label={action.label} onPress={action.onPress} />
+        }
       />
     ) : null);
   return (
@@ -91,7 +96,7 @@ export function WaitingCard({
             {agentId ? <AgentFace agentId={agentId} size={FACE} live={false} /> : leading}
             <View style={styles.grow}>
               {name ? (
-                <Text variant="small" tone="ink" numberOfLines={1} style={styles.semibold}>
+                <Text variant="small" tone="ink2" numberOfLines={1}>
                   {name}
                 </Text>
               ) : null}
@@ -152,7 +157,7 @@ const styles = StyleSheet.create({
   clip: { borderRadius: RADIUS, borderBottomLeftRadius: CUT, overflow: "hidden", paddingBottom: 14 },
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 56, opacity: 0.5 },
   body: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
-  hd: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 2 },
+  hd: { flexDirection: "row", alignItems: "center", gap: 12 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
   // The source line as the chat's card draws it: its mark, its details faint on one line.
   source: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", minHeight: 24 },
@@ -165,7 +170,6 @@ const styles = StyleSheet.create({
   // Where and when never take the name's room: at most half the line.
   where: { flexShrink: 1, maxWidth: "50%" },
   footer: { marginTop: 12, marginHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  semibold: { fontWeight: weights.semibold },
   medium: { fontWeight: weights.medium },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
