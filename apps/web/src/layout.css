@@ -4072,7 +4072,12 @@ html:not([data-pointer]) .settings__link:focus-visible {
 .settings__saved > .ac-icon {
   color: var(--ok);
 }
-/* Rows: label and help on the left, the control on the right, hairlines between. */
+/*
+ * Rows: the label (and its ⓘ) at the start, the control at the end, centred on each other, hairlines between. One
+ * compact control's height and the row's room above and below it (48), whatever the row holds: its controls are the
+ * compact step, as every action inside a row. A status line under the label makes it two lines, the control centred
+ * on both.
+ */
 .settings-rows {
   display: flex;
   flex-direction: column;
@@ -13359,8 +13364,8 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   display: grid;
   place-items: center;
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 10px 10px 10px 4px;
   color: var(--muted);
   background: var(--raised);
@@ -13457,19 +13462,19 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
 }
 /* The person's face where the other lines have their icon, as wide as it. */
 .settings-row__face.ac-avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   font-size: 12px;
 }
 /* On a phone the icon, the words and a switch or a chevron stay on one line. Any other control (a choice of several,
-   a select, a field, buttons) goes under the words, from their edge (the 30px icon and the 14px gap), so the rows of
+   a select, a field, buttons) goes under the words, from their edge (the 28px icon and the 12px gap), so the rows of
    one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px 14px;
+    gap: var(--space-2) var(--space-3);
   }
   .settings-row--lead > .settings-row__text {
     flex: 1 1 160px;
@@ -13714,8 +13719,8 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   cursor: pointer;
 }
 .rh-set__face-edit .ac-avatar {
-  width: var(--control-h-md);
-  height: var(--control-h-md);
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
 }
 .rh-set__face-edit:hover .ac-avatar,
 .opens-agent:hover .ac-avatar {
