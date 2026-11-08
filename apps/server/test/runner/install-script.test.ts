@@ -28,8 +28,8 @@ import {
   GOOGLE_APT,
   GOOGLE_CHROME_LINUX,
   installScript,
-  RUNNER_BUN_SHA256,
   REQUIREMENTS,
+  RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
   SYSTEM_BROWSER_DIR,
   shQuote,
@@ -442,7 +442,9 @@ test.skipIf(process.platform === "win32")(
     writeFileSync(path.join(user.fake, "id"), "#!/bin/sh\necho 1001\n", { mode: 0o755 });
     const simple = user.install(installScript("https://agentes.test"), args);
     expect(simple.status).toBe(0);
-    expect(simple.log).toContain(`service install --host --server http://127.0.0.1:3000 --token-file ${token} --no-exec`);
+    expect(simple.log).toContain(
+      `service install --host --server http://127.0.0.1:3000 --token-file ${token} --no-exec`,
+    );
     expect(simple.log).not.toContain(" pair ");
 
     // As root on Linux, each agent its own user: --system.
@@ -1024,6 +1026,11 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
   // Restarting the runner (an update) leaves background tasks running.
   expect(unit).toContain("KillMode=process");
   expect(unit).toContain('Environment="AGENTES_RUNNER_HOME=/home/me/.agentes-runner"');
+  expect(unit).toContain("Description=agentes.chat runner (connected computer)");
+  // The server's own computer as a user unit: the setup's simple mode (ADR 0153 §5).
+  expect(systemdUnit(launch, ["host", "--server", "http://127.0.0.1:3000"])).toContain(
+    "Description=agentes.chat runner (this server's computer)",
+  );
   // The install-time PATH, like the plist: tasks find claude, git, node.
   expect(systemdUnit({ ...launch, path: "/home/me/.local/bin:/usr/bin" })).toContain(
     'Environment="PATH=/home/me/.local/bin:/usr/bin"',
