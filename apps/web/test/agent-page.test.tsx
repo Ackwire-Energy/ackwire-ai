@@ -160,6 +160,37 @@ describe("agent page: what it does", () => {
     expect(document.querySelector(".newag__note")).toBeNull();
   });
 
+  test("someone who can't edit reads the instructions drawn as Markdown, never its marks", async () => {
+    const state = asMember();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions = [
+        "## Papel",
+        "Revisa PRs, **sempre** com teste.",
+        "Responde em português.",
+        "",
+        "- Investiga primeiro",
+        "- Abre PRs pequenos",
+        "",
+        // The worst case a pasted file brings: an unbroken address, another script, an emoji.
+        `Docs: https://example.com/${"a".repeat(240)} · 日本語のメモ 🙂`,
+      ].join("\n");
+    await go("?tab=instructions", state);
+    const how = screen().getByRole("region", { name: "Como a Ada trabalha" });
+    expect(within(how).queryByRole("textbox")).toBeNull();
+    expect(how.textContent).not.toMatch(/##|\*\*|- Investiga/);
+    expect([...how.querySelectorAll("strong")].map((b) => b.textContent)).toContain("sempre");
+    expect([...how.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Investiga primeiro",
+      "Abre PRs pequenos",
+    ]);
+    // Its own lines stay lines, as written.
+    expect(how.querySelector(".md p:not(.md__h)")?.textContent).toBe(
+      "Revisa PRs, sempre com teste.\nResponde em português.",
+    );
+    expect(how.textContent).toContain("日本語のメモ 🙂");
+  });
+
   test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
@@ -476,6 +507,8 @@ describe("agent page: inline editing and the save bar", () => {
   test("changes add up in one bar: count, names, Ver (old → new, Desfazer), Alterado on the card, Descartar", async () => {
     await go("?tab=instructions");
     const box = screen().getByRole("textbox", { name: "Instruções" });
+    // The server's cap: typing stops there, never a refusal after saving.
+    expect(box.getAttribute("maxlength")).toBe("50000");
     await type(box, "Instruções de Ada.\nAbre PRs pequenos.");
     const card = box.closest("section") as HTMLElement;
     expect(card.getAttribute("data-changed")).toBe("true");

@@ -204,7 +204,7 @@ function LearnedRow({ m }: { m: Memory }) {
       ) : (
         <Locked when={act.isPending}>
           <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
-            <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
+            <Textarea rows={3} maxLength={8000} value={draft} onChange={(e) => setDraft(e.target.value)} />
           </Field>
         </Locked>
       )}

@@ -470,10 +470,51 @@ describe("a computer command (its permission check)", () => {
     expect(lines(toolItemsLive(yes.runs.r1?.work ?? []))[0]?.state).toBe("done");
   });
 
-  test("a refusal's reason: a known one in the person's words, else its first sentence", () => {
+  test("a refusal's reason under its line: only a known one, in the person's words, never the text it came with", () => {
     expect(toolWhy(t, { why: "A person said no.", refusal: "person" })).toStartWith("chat.work.refusal.person");
-    expect(toolWhy(t, { why: BECAUSE, refusal: null })).toBe(BECAUSE);
+    expect(toolWhy(t, { why: BECAUSE, refusal: null })).toBeNull();
     expect(toolWhy(t, { why: null })).toBeNull();
+    // A code with no words: still nothing but the line's own phrase ("Recusado: …").
+    const none = ((key: string, o?: { defaultValue?: string }) =>
+      key.endsWith(".new") ? (o?.defaultValue ?? "") : key) as TFunction;
+    expect(toolWhy(none, { why: BECAUSE, refusal: "new" })).toBeNull();
+  });
+
+  test("a failed tool's own error never shows under its line: the gateway's refusals say why in words", () => {
+    const call = (seq: number, id: string, name: string) => ({
+      seq,
+      kind: "tool_call",
+      data: { toolUseId: id, name, input: {} },
+      createdAt: at(seq),
+    });
+    const result = (seq: number, id: string, content: string, data?: Record<string, unknown>) => ({
+      seq,
+      kind: "tool_result",
+      data: { toolUseId: id, isError: true, content, ...(data ? { data } : {}) },
+      createdAt: at(seq),
+    });
+    const work = workFromSteps([
+      call(1, "a", "send_dm"),
+      result(2, "a", "Failed: That person isn't in this conversation"),
+      call(3, "b", "github_merge_pull_request"),
+      result(4, "b", "Not allowed: this agent lacks the scope github:pr.merge", { refusal: "noAccess" }),
+      call(5, "c", "create_routine"),
+      result(6, "c", "This is a routine's background work: …", { code: "tool.not_allowed", refusal: "policy" }),
+    ]);
+    const saved = lines(toolItemsSaved(work));
+    expect(saved.map((l) => [l.state, toolWhy(t, l)])).toEqual([
+      ["fail", null],
+      ["fail", 'chat.work.refusal.noAccess|{"defaultValue":""}'],
+      ["fail", 'chat.work.refusal.policy|{"defaultValue":""}'],
+    ]);
+    // What the tool said stays in its open view.
+    expect(saved[0]?.result).toBe("Failed: That person isn't in this conversation");
+    // Live: the end carries the gateway's word.
+    let s = applyChannelEvent(emptyStreams, start("d", "github_merge_pull_request"));
+    s = applyChannelEvent(s, { ...end("d", true), refusal: "noAccess" } as Ev);
+    expect(lines(toolItemsLive(s.runs.r1?.work ?? [])).map((l) => [l.state, l.refusal])).toEqual([
+      ["fail", "noAccess"],
+    ]);
   });
 
   test("the task's card: each step in words, the same words in a row once, with the last one's time", () => {

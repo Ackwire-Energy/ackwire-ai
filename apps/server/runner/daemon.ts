@@ -32,6 +32,7 @@ import {
 import { redactCommon } from "@agenteschat/adapters/redact";
 import {
   type ActivityEntry,
+  type ActivitySaid,
   CONTROL_PROTOCOL_VERSION,
   type ControlAccessRequest,
   type ControlConfig,
@@ -357,6 +358,10 @@ export interface DaemonOptions {
   /** Tests: how soon a failed self-check runs again (`SELF_CHECK_RETRY_MS`). */
   selfCheckRetryMs?: number;
 }
+
+/** What a task is in its activity words: a shell task's command, or the CLI that works it (the app names it). */
+const taskWhat = (job: Pick<ControlJob, "summary" | "said">): Record<string, string> =>
+  job.said?.executor ? { executor: job.said.executor } : { what: job.summary };
 
 export class RunnerDaemon implements RequestObserver {
   private stored: StoredConfig | null = null;
@@ -828,6 +833,11 @@ export class RunnerDaemon implements RequestObserver {
             ? `paused until ${shortTime(nextPause.until, this.now())}`
             : "paused"
           : "resumed",
+        said: !nextPause.paused
+          ? { key: "resumed" }
+          : nextPause.until
+            ? { key: "pausedUntil", until: nextPause.until }
+            : { key: "paused" },
         result: "ok",
       });
     }
@@ -849,8 +859,8 @@ export class RunnerDaemon implements RequestObserver {
     if (!initial && JSON.stringify(prevAccess) !== JSON.stringify(nextAccess)) {
       this.send({ type: "access.changed", access: nextAccess });
       this.emit({ kind: "access.changed", access: nextAccess });
-      for (const summary of this.describeAccessChange(prevAccess, nextAccess)) {
-        this.record({ kind: "access", summary, result: "ok" });
+      for (const { summary, said } of this.describeAccessChange(prevAccess, nextAccess)) {
+        this.record({ kind: "access", summary, said, result: "ok" });
       }
       this.resolveSatisfied(nextAccess);
       // The browser (or desktop) switch went off: the agents' browsers (or desktops) close now, not when next used.
@@ -934,8 +944,8 @@ export class RunnerDaemon implements RequestObserver {
     this.write(rest);
   }
 
-  private describeAccessChange(a: RunnerAccess, b: RunnerAccess): string[] {
-    const out: string[] = [];
+  private describeAccessChange(a: RunnerAccess, b: RunnerAccess): { summary: string; said: ActivitySaid }[] {
+    const out: { summary: string; said: ActivitySaid }[] = [];
     const label: Record<keyof RunnerTools, string> = {
       claude: "Claude Code",
       codex: "Codex",
@@ -949,16 +959,35 @@ export class RunnerDaemon implements RequestObserver {
       terminal: "the terminal",
     };
     for (const t of TOOL_NAMES)
-      if ((a.tools[t] === true) !== (b.tools[t] === true)) out.push(`${label[t]} turned ${b.tools[t] ? "on" : "off"}`);
-    const names = (ids: string[]) =>
-      ids.map((id) => this.agents.find((x) => x.id === id)?.name ?? id.slice(0, 8)).join(", ") || "no agent";
+      if ((a.tools[t] === true) !== (b.tools[t] === true)) {
+        const on = b.tools[t] === true;
+        out.push({
+          summary: `${label[t]} turned ${on ? "on" : "off"}`,
+          // A product's name stays its name; the app words the rest (`tools.<tool>`).
+          said: { key: on ? "toolOn" : "toolOff", tool: t, name: label[t] },
+        });
+      }
+    // Names only: "no agent" is the app's to say (an empty `agents`).
+    const named = (ids: string[]) =>
+      ids.map((id) => this.agents.find((x) => x.id === id)?.name ?? id.slice(0, 8)).join(", ");
+    const names = (ids: string[]) => named(ids) || "no agent";
     for (const f of b.folders) {
       const old = a.folders.find((x) => x.path === f.path);
-      if (!old) out.push(`allowed ${f.path} for ${names(f.agents)}`);
+      const agents = named(f.agents);
+      if (!old)
+        out.push({
+          summary: `allowed ${f.path} for ${names(f.agents)}`,
+          said: { key: "folderAllowed", path: f.path, agents },
+        });
       else if (JSON.stringify(old.agents) !== JSON.stringify(f.agents))
-        out.push(`${f.path} now for ${names(f.agents)}`);
+        out.push({
+          summary: `${f.path} now for ${names(f.agents)}`,
+          said: { key: "folderAgents", path: f.path, agents },
+        });
     }
-    for (const f of a.folders) if (!b.folders.some((x) => x.path === f.path)) out.push(`removed ${f.path}`);
+    for (const f of a.folders)
+      if (!b.folders.some((x) => x.path === f.path))
+        out.push({ summary: `removed ${f.path}`, said: { key: "folderRemoved", path: f.path } });
     return out;
   }
 
@@ -2114,7 +2143,8 @@ export class RunnerDaemon implements RequestObserver {
               desktop: true,
             }),
           );
-          this.record({ kind: "pair", summary: `connected to ${grant.org.name || url}`, result: "ok" });
+          const org = grant.org.name || url;
+          this.record({ kind: "pair", summary: `connected to ${org}`, said: { key: "connected", org }, result: "ok" });
           const c = this.requirePaired();
           this.emit({
             kind: "pair.done",
@@ -2170,7 +2200,12 @@ export class RunnerDaemon implements RequestObserver {
       previousToken: token,
       ...(access ? { access: { folders: [], tools: access.tools } } : {}),
     });
-    this.record({ kind: "pair", summary: `disconnected${orgName ? ` from ${orgName}` : ""}`, result: "ok" });
+    this.record({
+      kind: "pair",
+      summary: `disconnected${orgName ? ` from ${orgName}` : ""}`,
+      said: orgName ? { key: "disconnectedFrom", org: orgName } : { key: "disconnected" },
+      result: "ok",
+    });
     return { unpaired: true };
   }
 
@@ -2248,7 +2283,13 @@ export class RunnerDaemon implements RequestObserver {
       this.writeAccess(addFolder(this.access(), real, ids));
     } else {
       this.requests.resolve(r.requestId, "denied");
-      this.record({ agent: r.agent, kind: "access", summary: `not now: ${r.path}`, result: "refused" });
+      this.record({
+        agent: r.agent,
+        kind: "access",
+        summary: `not now: ${r.path}`,
+        said: { key: "accessNotNow", path: r.path },
+        result: "refused",
+      });
     }
     this.emit({ kind: "access.resolved", requestId: r.requestId, decision });
     this.flushDecisions();
@@ -2283,7 +2324,13 @@ export class RunnerDaemon implements RequestObserver {
     if (!existing) {
       const { agentHandle: _h, ...request } = stored;
       this.emit({ kind: "access.requested", request });
-      this.record({ agent: { id, name }, kind: "access", summary: `asked for ${abs}`, result: "running" });
+      this.record({
+        agent: { id, name },
+        kind: "access",
+        summary: `asked for ${abs}`,
+        said: { key: "accessAsked", path: abs },
+        result: "running",
+      });
       this.opts.print?.(
         `${name} asks for the folder ${abs}${stored.reason ? ` (${firstLine(stored.reason)})` : ""}. To allow it: agentes-runner folders allow ${shellWord(abs)} --agent ${handle}`,
       );
@@ -2315,7 +2362,13 @@ export class RunnerDaemon implements RequestObserver {
     const gone = this.requests.expire();
     for (const r of gone) {
       this.emit({ kind: "access.resolved", requestId: r.requestId, decision: "expired" });
-      this.record({ agent: r.agent, kind: "access", summary: `request expired: ${r.path}`, result: "refused" });
+      this.record({
+        agent: r.agent,
+        kind: "access",
+        summary: `request expired: ${r.path}`,
+        said: { key: "accessExpired", path: r.path },
+        result: "refused",
+      });
     }
     if (gone.length) this.flushDecisions();
   }
@@ -2371,18 +2424,18 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   /** What a request is, for the app: null for ops that aren't work (status, output, secrets…). */
-  private describe(req: MachineRequest): Pick<ControlJob, "kind" | "summary" | "where" | "command"> | null {
+  private describe(req: MachineRequest): Pick<ControlJob, "kind" | "summary" | "said" | "where" | "command"> | null {
     const p = (v: unknown) => String(v ?? "") || ".";
     switch (req.op) {
       case "read":
-        return { kind: "read", summary: `read ${p(req.path)}` };
+        return { kind: "read", summary: `read ${p(req.path)}`, said: { key: "read", path: p(req.path) } };
       case "write":
       case "pull":
-        return { kind: "write", summary: `wrote ${p(req.path)}` };
+        return { kind: "write", summary: `wrote ${p(req.path)}`, said: { key: "wrote", path: p(req.path) } };
       case "list":
-        return { kind: "list", summary: `looked at ${p(req.path)}` };
+        return { kind: "list", summary: `looked at ${p(req.path)}`, said: { key: "looked", path: p(req.path) } };
       case "push":
-        return { kind: "push", summary: `sent ${p(req.path)}` };
+        return { kind: "push", summary: `sent ${p(req.path)}`, said: { key: "sent", path: p(req.path) } };
       case "exec": {
         const command = String(req.command ?? "");
         return {
@@ -2392,8 +2445,10 @@ export class RunnerDaemon implements RequestObserver {
           ...(typeof req.cwd === "string" && req.cwd.trim() ? { where: path.basename(req.cwd.trim()) } : {}),
         };
       }
-      case "brain.turn":
-        return { kind: "brain", summary: req.kind === "codex" ? "thinking with Codex" : "thinking with Claude Code" };
+      case "brain.turn": {
+        const brain = req.kind === "codex" ? "Codex" : "Claude Code";
+        return { kind: "brain", summary: `thinking with ${brain}`, said: { key: "thinking", brain } };
+      }
       case "git.sync": {
         // Clones are work people see; the quick update before each turn is not.
         const clones = Array.isArray(req.repos) ? req.repos.filter((r) => r?.clone === true) : [];
@@ -2419,6 +2474,7 @@ export class RunnerDaemon implements RequestObserver {
         ...(agent ? { agent } : {}),
         kind: d.kind,
         summary: clean(d.summary),
+        ...(d.said ? { said: d.said } : {}),
         ...(d.where ? { where: d.where } : {}),
         ...(d.command ? { command: clean(d.command).slice(0, 2000) } : {}),
         startedAt,
@@ -2451,6 +2507,8 @@ export class RunnerDaemon implements RequestObserver {
             result === "refused" && !outcome.ok
               ? `${d.summary} (refused: ${firstLine(outcome.error.message, 80)})`
               : d.summary,
+          // Refused: the line's mark says so, in the person's language.
+          ...(d.said ? { said: d.said } : {}),
           ...(d.command ? { command: d.command } : {}),
           ...(d.where ? { where: d.where } : {}),
           result,
@@ -2468,6 +2526,8 @@ export class RunnerDaemon implements RequestObserver {
       kind: "task",
       summary:
         t.executor === "shell" ? firstLine(t.command, 80) : t.executor === "codex" ? "Codex task" : "Claude Code task",
+      // A shell task's line is its command; a CLI's, words the app says.
+      ...(t.executor === "shell" ? {} : { said: { key: "task", executor: t.executor } }),
       where: path.basename(t.cwd),
       ...(t.executor === "shell" ? { command: t.command } : {}),
       startedAt: t.startedAt,
@@ -2490,6 +2550,10 @@ export class RunnerDaemon implements RequestObserver {
           ...(agent ? { agent } : {}),
           kind: "task",
           summary: `${executor === "shell" ? firstLine(String(req.command ?? ""), 80) : executor === "codex" ? "Codex task" : "Claude Code task"} didn't start: ${firstLine(outcome.error.message, 80)}`,
+          said: {
+            key: "taskNotStarted",
+            ...(executor === "shell" ? { what: firstLine(String(req.command ?? ""), 80) } : { executor }),
+          },
           result,
         },
         redact,
@@ -2518,6 +2582,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(job.agent ? { agent: job.agent } : {}),
       kind: "task",
       summary: `started: ${job.summary}`,
+      said: { key: "taskStarted", ...taskWhat(job) },
       ...(job.command ? { command: job.command } : {}),
       ...(job.where ? { where: job.where } : {}),
       result: "running",
@@ -2542,11 +2607,21 @@ export class RunnerDaemon implements RequestObserver {
             : ok
               ? "finished"
               : `failed (exit ${done?.exitCode ?? "?"})`;
+      const said: ActivitySaid = done?.canceled
+        ? { key: "taskCanceled", ...taskWhat(job) }
+        : done?.interrupted
+          ? { key: "taskInterrupted", ...taskWhat(job) }
+          : done?.timedOut
+            ? { key: "taskTimedOut", ...taskWhat(job) }
+            : ok
+              ? { key: "taskFinished", ...taskWhat(job) }
+              : { key: "taskFailed", exit: String(done?.exitCode ?? "?"), ...taskWhat(job) };
       this.record(
         {
           ...(job.agent ? { agent: job.agent } : {}),
           kind: "task",
           summary: `${how}: ${job.summary}`,
+          said,
           ...(job.command ? { command: job.command } : {}),
           ...(job.where ? { where: job.where } : {}),
           result,

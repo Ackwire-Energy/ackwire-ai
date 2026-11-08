@@ -11,6 +11,7 @@ import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
 import { calendarReminders, routineSeer, routineSlots } from "./routines";
 import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
+import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { userVisibleChannels } from "./search";
 import { taskSeenSql } from "./task-access";
@@ -1086,8 +1087,12 @@ export async function proposeCalendarEvent(
       channelId: run.channelId,
       threadId: replyThreadOf(run),
       author: { type: "agent", agentId: run.agentId, runId: run.runId, hop: 1 },
-      body: `Proposta de evento: ${row.title}`,
-      meta: { calendarProposalId: row.id, calendarProposal: proposalView(row) },
+      body: `Event proposal: ${row.title}`,
+      meta: {
+        calendarProposalId: row.id,
+        calendarProposal: proposalView(row),
+        ...bodyCode("calendar_proposal", { title: row.title }),
+      },
     });
     const [linked] = await tx
       .update(calendarProposals)

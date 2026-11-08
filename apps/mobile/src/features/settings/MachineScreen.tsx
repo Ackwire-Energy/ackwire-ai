@@ -30,6 +30,7 @@ import {
   hostDescKey,
   isPaused,
   MACHINE_TOOLS,
+  machineReasonText,
   sharedFolderFacts,
   sharedFolderOf,
   toolOnCommand,
@@ -605,7 +606,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
       ) : null}
       {switchedOn && !ready && m.browser?.reason ? (
         <>
-          <GroupedFooter>{m.browser.reason}</GroupedFooter>
+          <GroupedFooter>{machineReasonText(t, m.browser)}</GroupedFooter>
           {command ? (
             <>
               <Gap />
@@ -685,8 +686,8 @@ function DesktopUseSection({ machine: m }: { machine: Machine }) {
   const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
   // A Mac or Windows has nothing to install for it: said in the app's words, not the runner's English.
   const linux = m.os === "linux";
-  const reason = use.available ? null : linux ? use.reason : t("desktop.use.linuxOnly");
-  const command = linux ? commandInReason(reason) : null;
+  const reason = use.available ? null : linux ? machineReasonText(t, use) : t("desktop.use.linuxOnly");
+  const command = linux && !use.available ? commandInReason(use.reason) : null;
   return (
     <>
       <GroupedHeader>{t("desktop.use.title")}</GroupedHeader>

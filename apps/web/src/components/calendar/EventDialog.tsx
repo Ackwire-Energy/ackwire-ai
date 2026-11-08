@@ -257,7 +257,12 @@ export function EventDialog({
               />
             </Field>
             <Field label={t("calendar.form.description")} id="ev-desc">
-              <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Textarea
+                rows={3}
+                maxLength={10_000}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </Field>
           </DialogBody>
         </Locked>

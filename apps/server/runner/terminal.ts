@@ -191,12 +191,19 @@ export class Terminals {
   /** `hello.terminal`: whether people can open terminals here, and what is missing when they can't. */
   info(): RunnerTerminalInfo {
     const sys = this.system;
-    if (sys.platform === "win32") return { available: false, reason: "Terminals run on Linux and Mac computers only" };
-    if (sys.uid === 0 && !this.opts.agentUsers) return { available: false, reason: NOT_AS_ROOT };
+    if (sys.platform === "win32") {
+      return {
+        available: false,
+        reason: "Terminals run on Linux and Mac computers only",
+        code: "terminal_unsupported",
+      };
+    }
+    if (sys.uid === 0 && !this.opts.agentUsers) return { available: false, reason: NOT_AS_ROOT, code: "not_as_root" };
     if (!sys.pty) {
       return {
         available: false,
         reason: `The terminal needs the runner on Bun 1.3.5 or newer (it runs on ${sys.runtime})`,
+        code: "runner_bun_old",
       };
     }
     return { available: true };

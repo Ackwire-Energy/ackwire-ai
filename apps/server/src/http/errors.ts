@@ -49,6 +49,26 @@ export const errorResponse = (description: string) => ({
   content: { "application/json": { schema: ErrorResponse } },
 });
 
+/**
+ * What the apps say of a validation failure, by its first problem: the field and its kind (`too_long` for text,
+ * `too_many` for a list, `missing` for an empty one of either, else `invalid`), with the limit when there is one. A
+ * number out of its range is `invalid`: "shorten it" or "fill it in" would mislead. The message is the validator's
+ * English, for developers.
+ */
+export function issueParams(
+  issue: { code: string; path: PropertyKey[]; maximum?: unknown; minimum?: unknown; origin?: unknown } | undefined,
+) {
+  if (!issue) return undefined;
+  const field = issue.path.map(String).join(".") || "body";
+  const list = issue.origin === "array" || issue.origin === "set";
+  const sized = list || issue.origin === "string";
+  if (sized && issue.code === "too_big" && typeof issue.maximum === "number") {
+    return { field, issue: list ? "too_many" : "too_long", max: issue.maximum };
+  }
+  if (sized && issue.code === "too_small" && Number(issue.minimum) <= 1) return { field, issue: "missing" };
+  return { field, issue: "invalid" };
+}
+
 /** Turns request validation failures into our error format. */
 export function validationHook<E extends Env>(): Hook<unknown, E, string, unknown> {
   return (result, c) => {
@@ -56,7 +76,7 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
       const message = result.error.issues
         .map((i) => `${i.path.length > 0 ? i.path.join(".") : "body"}: ${i.message}`)
         .join(". ");
-      return apiError(c, 400, "invalid_request", message);
+      return apiError(c, 400, "invalid_request", message, issueParams(result.error.issues[0]));
     }
   };
 }

@@ -508,7 +508,47 @@
       "resultOk": "Funcionó",
       "resultFailed": "Falló",
       "resultRefused": "Rechazado",
-      "resultRunning": "En ejecución"
+      "resultRunning": "En ejecución",
+      "said": {
+        "read": "leyó {{path}}",
+        "wrote": "escribió {{path}}",
+        "looked": "miró {{path}}",
+        "sent": "envió {{path}}",
+        "thinking": "pensando con {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "empezó: {{what}}",
+        "taskFinished": "terminó: {{what}}",
+        "taskCanceled": "cancelada: {{what}}",
+        "taskInterrupted": "interrumpida: {{what}}",
+        "taskTimedOut": "se detuvo en su tiempo límite: {{what}}",
+        "taskFailed": "falló (salida {{exit}}): {{what}}",
+        "taskNotStarted": "no empezó: {{what}}",
+        "executor": {
+          "codex": "tarea de Codex",
+          "claude": "tarea de Claude Code"
+        },
+        "paused": "en pausa",
+        "pausedUntil": "en pausa hasta {{until}}",
+        "resumed": "reanudada",
+        "connected": "conectada a {{org}}",
+        "disconnected": "desconectada",
+        "disconnectedFrom": "desconectada de {{org}}",
+        "accessAsked": "pidió {{path}}",
+        "accessNotNow": "ahora no: {{path}}",
+        "accessExpired": "el pedido venció: {{path}}",
+        "toolOn": "activó {{tool}}",
+        "toolOff": "desactivó {{tool}}",
+        "tools": {
+          "commands": "los comandos",
+          "browser": "el navegador",
+          "desktop": "las pantallas de los agentes",
+          "terminal": "la terminal"
+        },
+        "folderAllowed": "permitió {{path}} para {{agents}}",
+        "folderAgents": "{{path}} ahora para {{agents}}",
+        "folderRemoved": "quitó {{path}}",
+        "noAgent": "ningún agente"
+      }
     },
     "advanced": {
       "title": "Avanzado",

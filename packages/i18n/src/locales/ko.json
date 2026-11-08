@@ -45,6 +45,7 @@
     "today": "오늘",
     "yesterday": "어제",
     "loadFailed": "불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
+    "gone": "이제 여기에 없어요. 삭제되었거나 더 이상 접근할 수 없어요.",
     "notAllowed": "이 작업을 할 권한이 없어요.",
     "tooMany": "시도 횟수가 너무 많아요. 나중에 다시 시도해 주세요.",
     "offline": "오프라인 상태예요. 연결을 확인하고 다시 시도해 주세요.",
@@ -4580,6 +4581,7 @@
         "too_many_tool_calls": "한 번의 실행에서 도구 사용 한도를 넘었어요.",
         "stuck": "막혀서 중지했어요.",
         "brain_interrupted": "AI가 끝내기 전에 멈췄어요.",
+        "brain_unavailable": "컴퓨터의 AI가 응답하지 못했어요. 컴퓨터를 확인하고 다시 요청해 주세요.",
         "empty_reply": "모델이 아무것도 반환하지 않았어요.",
         "model_refused": "모델이 답변을 거부했어요.",
         "agent_archived": "에이전트가 보관됐어요.",
@@ -5922,6 +5924,7 @@
         "done": "끝남",
         "canceled": "하지 않을 작업"
       },
+      "stageFull": "{{stage}}에는 이미 열이 {{max}}개 있어요. 한 단계의 최대치예요. 먼저 그중 하나를 삭제해 주세요.",
       "stageExplain": {
         "todo": "새 작업은 할 일의 첫 열에 들어와요.",
         "in_progress": "에이전트가 시작하면 작업이 진행 중의 첫 열로 가요.",
@@ -11316,6 +11319,7 @@
     },
     "issue": {
       "assigneeOutside": "이 사람은 이 작업을 볼 수 없어요. 먼저 볼 수 있는 사람에 추가하세요.",
+      "stageFull": "한 단계에는 열을 최대 {{max}}개까지 둘 수 있어요. 먼저 그 단계의 열을 하나 삭제해 주세요.",
       "deleteForbidden": "이 작업은 만든 사람이나 관리자만 삭제할 수 있어요.",
       "audienceEmpty": "볼 수 있는 사람을 선택하세요."
     },
@@ -11604,6 +11608,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "이 컴퓨터의 시스템에서는 에이전트 브라우저가 실행되지 않아요.",
+      "browser_download": "에이전트 브라우저를 다운로드하지 못했어요. 이 컴퓨터의 연결을 확인해 주세요. 다음에 사용할 때 다시 시도해요.",
+      "browser_checksum": "에이전트 브라우저 다운로드가 손상되어 사용하지 않았어요. 다음에 사용할 때 다시 시도해요.",
+      "desktop_use_linux": "에이전트 화면의 앱은 에이전트 화면이 있는 Linux 컴퓨터에서 실행돼요.",
+      "desktop_use_own_user": "에이전트 화면의 앱을 쓰려면 이 컴퓨터에서 에이전트마다 자기 사용자로 일해야 해요(시스템 모드). 여기서는 모든 에이전트가 runner의 사용자로 일해요.",
+      "desktop_use_install": "에이전트 화면의 앱에 필요한 것을 이 컴퓨터에 설치해 주세요:",
+      "desktop_unavailable": "이 컴퓨터에서는 에이전트 화면을 실행할 수 없어요.",
+      "desktop_linux": "에이전트 화면은 Linux 컴퓨터에서만 실행돼요.",
+      "desktop_install": "이 컴퓨터에 에이전트 화면을 설치해 주세요:",
+      "not_as_root": "에이전트 화면과 터미널은 절대 root로 실행되지 않아요. runner를 일반 사용자로 실행해 주세요.",
+      "runner_bun_old": "Bun 1.3.5 이상에서 실행되는 runner가 필요해요. 이 컴퓨터의 runner를 업데이트해 주세요.",
+      "terminal_unsupported": "터미널은 Linux와 Mac 컴퓨터에서만 실행돼요."
+    },
     "egress": {
       "draining": "네트워크가 바뀌고 있어요. 컴퓨터의 열린 세션은 {{when}}에 다시 시작돼요.",
       "restart": "네트워크를 적용하려고 컴퓨터 세션을 다시 시작하고 있어요. 새 작업은 끝날 때까지 기다려요.",
@@ -12326,6 +12344,7 @@
       "techAction": "작업",
       "techTool": "도구",
       "techKind": "종류",
+      "techSaid": "받은 응답 내용",
       "techRun": "실행",
       "techId": "기록",
       "openConversation": "대화 열기",
@@ -13050,7 +13069,11 @@
         "shell": "내부에서 다른 명령을 실행해요",
         "inline": "인라인으로 받은 코드를 실행해요",
         "global": "컴퓨터 전체에 설치해요",
-        "rules": "에이전트가 스스로 할 수 있는 범위를 벗어나요"
+        "rules": "에이전트가 스스로 할 수 있는 범위를 벗어나요",
+        "noAccess": "에이전트에게 여기에 대한 접근 권한이 없어요",
+        "policy": "이런 종류의 작업에서는 허용되지 않아요",
+        "credential": "키처럼 보이는 것을 보내요",
+        "repo": "그 저장소는 에이전트 목록에 없어요"
       },
       "gave": "입력",
       "answered": "답함",
@@ -13406,6 +13429,7 @@
       "action_update_skills": "스킬 업데이트",
       "action_approvals": "내 승인을 기다리는 요청",
       "action_open_page": "화면 열기",
+      "calendar_proposal": "일정 제안: {{title}}",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "team_proposal": "팀을 제안했어요: {{names}}",
       "settings_proposal": "{{names}}에 대한 변경을 제안했어요",
@@ -13613,6 +13637,38 @@
     "update_skill_from_source": {
       "label": "링크에서 스킬 업데이트",
       "description": "스킬을 설치한 곳에서 업데이트해요. 스크립트 변경은 사람을 기다려요."
+    },
+    "propose_remove_agents": {
+      "label": "에이전트 보관 또는 삭제 제안",
+      "description": "보관하거나 삭제할 에이전트 목록 카드를 게시해요. 권한 있는 사람이 적용해요."
+    },
+    "offer_answers": {
+      "label": "탭해서 답하는 질문하기",
+      "description": "탭해서 답하는 질문을 게시해요. 탭할 때마다 그 사람의 메시지가 돼요."
+    },
+    "propose_team": {
+      "label": "팀 제안",
+      "description": "여러 에이전트와 그 채널, 루틴, 스킬을 담은 카드를 게시해요. 만드는 건 사람이 해요."
+    },
+    "propose_settings_change": {
+      "label": "동료의 설정 제안",
+      "description": "동료의 새 모델, AI, 예산, 담당자, 공개 범위나 채널을 담은 카드를 게시해요. 적용은 사람이 해요."
+    },
+    "offer_approvals": {
+      "label": "승인 대기 항목 보기",
+      "description": "그 사람의 승인을 기다리는 항목을 카드 하나로 게시해요. 그 자리에서 하나씩 승인하거나 거절해요."
+    },
+    "propose_member_changes": {
+      "label": "사람 변경 제안",
+      "description": "소유자, 역할, 제거를 바꾸는 카드를 게시해요. 권한 있는 사람이 하나씩 적용해요."
+    },
+    "offer_open_page": {
+      "label": "화면 열기 제안",
+      "description": "결제, 역할, 에이전트 페이지처럼 앱의 화면을 여는 버튼이 있는 카드를 게시해요."
+    },
+    "set_team_week": {
+      "label": "팀의 한 주 카드 바꾸기",
+      "description": "그 사람의 다이렉트 메시지에 오는 주간 팀의 한 주 카드를 멈추거나, 다시 시작하거나, 시간을 옮겨요."
     },
     "propose_agent": {
       "label": "에이전트 제안",

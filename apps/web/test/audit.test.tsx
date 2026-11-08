@@ -52,7 +52,8 @@ const AUDIT: AuditRow[] = [
     details: {
       kind: "internal",
       behind: "person",
-      reason: "Ada lacks the scope drive:write",
+      reason: "Not allowed: Ada lacks the scope drive:write",
+      refusal: "noAccess",
       input: { file: "contratos-2025.pdf", apiKey: "***" },
     },
     outcome: "refused",
@@ -101,7 +102,8 @@ describe("Configurações → Auditoria", () => {
       "Walter criou uma rotina",
     ]);
     const first = section().querySelector(".audit-row") as HTMLElement;
-    expect(first.textContent).toContain("Railway: Deploy api · pedido por Walter · #general");
+    // About what in words, as the call's approval card says it, never "Railway: Deploy api".
+    expect(first.textContent).toContain("Fazer um deploy · pedido por Walter · #general");
     expect(first.textContent).toContain("Esperando aprovação");
     expect(section().textContent).toContain("rotina Follow-up");
     expect([...section().querySelectorAll(".audit__day")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
@@ -126,7 +128,12 @@ describe("Configurações → Auditoria", () => {
     await click(refused);
     const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
     expect(panel.classList.contains("thread-panel")).toBe(true);
-    expect(panel.textContent).toContain("Por que foi recusado: Ada lacks the scope drive:write");
+    // Why, in words; what the gateway said is the agent's English, in the technical part only.
+    expect(panel.textContent).toContain("Por que foi recusado: O agente não tem acesso a isso");
+    expect(panel.querySelector(".audit-panel__reason")?.textContent).not.toContain("drive:write");
+    expect(panel.querySelector(".audit-panel__tech")?.textContent).toContain(
+      "O que respondeuNot allowed: Ada lacks the scope drive:write",
+    );
     expect(panel.textContent).toContain("contratos-2025.pdf");
     expect(panel.textContent).toContain("escondido");
     expect(panel.textContent).not.toContain("***");
@@ -135,6 +142,26 @@ describe("Configurações → Auditoria", () => {
     );
     await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
     expect(screen().queryByRole("complementary", { name: "Detalhe da auditoria" })).toBeNull();
+  });
+
+  test("a change's details never list ids, and say each field in words", async () => {
+    const change = row({
+      id: "c1",
+      actor: { type: "person", id: "u-walter", name: "Walter" },
+      action: "connector.connected",
+      target: { type: "connector", id: "conn-1" },
+      details: { label: "GitHub da Acme", connectionId: "conn-1", machineId: "m-9", scopeCount: 3 },
+      runId: null,
+      onBehalfOf: null,
+      outcome: null,
+    });
+    await go(seedState({ audit: [change] }));
+    await click(section().querySelector(".audit-row") as HTMLElement);
+    const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
+    const details = panel.querySelector(".audit-panel__sent")?.textContent ?? "";
+    expect(details).toContain("GitHub da Acme");
+    expect(details).not.toMatch(/conn-1|m-9|connectionId|machineId/);
+    expect(details).toContain("Scope count");
   });
 
   test("the panel hangs from <body>, so it stays put while the list scrolls", async () => {

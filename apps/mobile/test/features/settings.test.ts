@@ -559,3 +559,10 @@ test("Sobre o agentes.chat in Você: on every self-hosted server, old ones too; 
     '...(about ? [{ icon: "info" as const, label: t("settings.section.about"), href: "/me/about" }] : [])',
   );
 });
+
+test("Auditoria's row screen: the call's title in words, and what the tool said only in the technical group", () => {
+  const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "settings", "AuditScreen.tsx"), "utf8");
+  expect(src).toContain("title={auditHint(t, row) ?? auditPhrase(t, row)}");
+  const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
+  expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
+});

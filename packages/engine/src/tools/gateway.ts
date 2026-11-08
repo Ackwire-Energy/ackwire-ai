@@ -320,6 +320,10 @@ const UNCHECKED: TeamCheck = { proceed: true, reason: null };
  * with less access than the tool needs (`request_permission` only offers what it has none of), or a permission it
  * can ask for. Each says who can change it.
  */
+/**
+ * The gateway's own refusals carry `data.refusal`, a word the apps say in the person's language under the call's line
+ * (`chat.work.refusal.<refusal>`, as a refused command's code): the text itself is the agent's, in English.
+ */
 async function refusalOf(
   ctx: ToolContext,
   tool: ToolDefinition,
@@ -981,6 +985,7 @@ export function createToolGateway(deps: {
         outcome: AuditOutcome,
         extra: {
           reason?: string | null;
+          refusal?: string | null;
           approvalId?: string;
           secretRequestId?: string;
           about?: ToolCallSubject | null;
@@ -1024,8 +1029,12 @@ export function createToolGateway(deps: {
           ...(data ? { data } : {}),
           ...(autoApproved ? { autoApproved } : {}),
         });
+        const refusal = typeof output.data?.refusal === "string" ? output.data.refusal : null;
         if (outcome)
-          await audit(outcome, outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content) });
+          await audit(
+            outcome,
+            outcome === "done" ? { about: callSubject(output) } : { reason: shown(output.content), refusal },
+          );
         return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
@@ -1048,7 +1057,10 @@ export function createToolGateway(deps: {
       const builtIn = isBuiltIn(tool);
       const decision = policyFor(authority, tool);
       if (decision.action === "refuse") {
-        return finish({ content: decision.reason, isError: true, data: { code: "tool.not_allowed" } }, "refused");
+        return finish(
+          { content: decision.reason, isError: true, data: { code: "tool.not_allowed", refusal: "policy" } },
+          "refused",
+        );
       }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
@@ -1056,7 +1068,10 @@ export function createToolGateway(deps: {
         const access = accessWithNeeds(granted, tool);
         if (!isAllowed(access.state)) {
           const refusal = await refusalOf(ctx, tool, access, granted);
-          return finish({ content: `Not allowed: ${refusal}`, isError: true }, "refused");
+          return finish(
+            { content: `Not allowed: ${refusal}`, isError: true, data: { refusal: "noAccess" } },
+            "refused",
+          );
         }
       }
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
@@ -1107,7 +1122,10 @@ export function createToolGateway(deps: {
       // computer (a sandbox that can't keep it from being read) can't leave through any tool, on any brain. Any
       // other run uses the agent's own grants, as a person's does.
       if (fedByRoutine(authority) && carriesCredential(call.input)) {
-        return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } }, "refused");
+        return finish(
+          { content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential", refusal: "credential" } },
+          "refused",
+        );
       }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);

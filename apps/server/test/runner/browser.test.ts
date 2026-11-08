@@ -2893,7 +2893,11 @@ test("a download that doesn't match its pinned checksum is never used", async ()
   expect(await errorCode(act)).toBe("browser_unavailable");
   expect(fetched).toContain(`/releases/download/v${AGENT_BROWSER_VERSION}/agent-browser-`);
   expect(existsSync(path.join(home, "bin"))).toBe(false);
-  expect(manager.info()).toMatchObject({ available: false, reason: expect.stringContaining("checksum") });
+  expect(manager.info()).toMatchObject({
+    available: false,
+    reason: expect.stringContaining("checksum"),
+    code: "browser_checksum",
+  });
   // Not tried again right away.
   fetched = "";
   expect(await errorCode(act)).toBe("browser_unavailable");

@@ -78,6 +78,9 @@ export async function listIssueColumns(db: Database, userId: string, orgId: stri
   return (await boardColumns(db, orgId)).map(view);
 }
 
+/** Columns a stage holds at most (the board's add dialog mirrors it: packages/client/src/lib/issues.ts). */
+const STAGE_COLUMNS_MAX = 10;
+
 /** Adds a column to a stage: right after `afterId` when it is in the same stage, else at the stage's end. */
 export async function createIssueColumn(
   deps: ColumnDeps,
@@ -89,7 +92,11 @@ export async function createIssueColumn(
   if (!BOARD_STAGES.includes(input.stage)) throw new ValidationError("invalid stage");
   const name = cleanName(input.name);
   const inStage = (await boardColumns(deps.db, orgId)).filter((c) => c.stage === input.stage);
-  if (inStage.length >= 10) throw new ValidationError("A stage holds at most 10 columns");
+  if (inStage.length >= STAGE_COLUMNS_MAX) {
+    throw new ValidationError(`A stage holds at most ${STAGE_COLUMNS_MAX} columns`, "issue_column.stage_full", {
+      max: STAGE_COLUMNS_MAX,
+    });
+  }
   const at = input.afterId ? inStage.findIndex((c) => c.id === input.afterId) : -1;
   const before = at >= 0 ? inStage[at] : inStage.at(-1);
   const next = at >= 0 ? inStage[at + 1] : undefined;

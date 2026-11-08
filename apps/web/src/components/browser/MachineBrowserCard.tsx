@@ -9,7 +9,13 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { allowsInApp, canReduceAccess, commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
+import {
+  allowsInApp,
+  canReduceAccess,
+  commandInReason,
+  machineReasonText,
+  toolOnCommand,
+} from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -155,7 +161,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {m.browser.reason}
+            {machineReasonText(t, m.browser)}
             {command && <CommandBlock command={command} />}
           </div>
         </div>

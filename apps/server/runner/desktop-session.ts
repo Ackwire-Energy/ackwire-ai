@@ -602,18 +602,24 @@ export class DesktopSessions {
   /** `hello.desktop`: whether this computer can run the agents' desktops, and what to install when it can't. */
   info(): RunnerDesktopInfo {
     if (this.sys.platform !== "linux") {
-      return { available: false, reason: "The agents' desktops run on Linux computers only" };
+      return { available: false, reason: "The agents' desktops run on Linux computers only", code: "desktop_linux" };
     }
-    if (this.sys.uid === 0 && !this.opts.agentUsers) return { available: false, reason: NOT_AS_ROOT };
+    if (this.sys.uid === 0 && !this.opts.agentUsers)
+      return { available: false, reason: NOT_AS_ROOT, code: "not_as_root" };
     if (!this.sys.pty) {
       return {
         available: false,
         reason: `The agents' desktops need the runner on Bun 1.3.5 or newer (it runs on ${this.sys.runtime})`,
+        code: "runner_bun_old",
       };
     }
     const missing = PACKAGES.filter(([command]) => !this.sys.which(command)).map(([, pkg]) => pkg);
     if (missing.length > 0) {
-      return { available: false, reason: `Install the agents' desktops: ${INSTALL} (missing: ${missing.join(", ")})` };
+      return {
+        available: false,
+        reason: `Install the agents' desktops: \`${INSTALL}\` (missing: ${missing.join(", ")})`,
+        code: "desktop_install",
+      };
     }
     return { available: true, ...DESKTOP_SIZE };
   }

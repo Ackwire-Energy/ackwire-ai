@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import { en, ptBR } from "@agenteschat/i18n";
 import {
   accessMatrix,
+  BUILTIN_TOOL_INFO,
+  BUILTIN_TOOLS,
   type ConnectorDeps,
   connectorGrantValidator,
   createApiKeyConnection,
@@ -252,4 +255,17 @@ test("tools carry a label, a description and readOnly", async () => {
   expect(tools.find((t) => t.name === "create_issue")).toMatchObject({ label: "Create issue", readOnly: false });
   const matrix = await accessMatrix(f.db, f.owner.id, f.org.id);
   expect(matrix.tools.find((t) => t.name === "read_artifact")).toMatchObject({ label: "Read file", readOnly: true });
+});
+
+test("every tool the Acesso page lists has its label and description, in English and in Portuguese", () => {
+  const key = (name: string) => name.replace(/[^a-zA-Z0-9]/g, "_");
+  const worded = (strings: { builtinTools: object }, name: string) => {
+    const words = (strings.builtinTools as Record<string, { label?: string; description?: string }>)[key(name)];
+    return Boolean(words?.label && words.description);
+  };
+  // The always-on "ask the person" tools ("" scope) have no row there.
+  const listed = Object.entries(BUILTIN_TOOLS).flatMap(([scope, names]) => (scope ? names : []));
+  expect(listed.filter((name) => !BUILTIN_TOOL_INFO[name]?.description)).toEqual([]);
+  expect(listed.filter((name) => !worded(en, name))).toEqual([]);
+  expect(listed.filter((name) => !worded(ptBR, name))).toEqual([]);
 });

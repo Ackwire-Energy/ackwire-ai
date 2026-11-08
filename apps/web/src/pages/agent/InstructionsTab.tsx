@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { InstructionTips } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { Markdown } from "@/lib/markdown";
 import { CardHead, useAgentEdit } from "./context";
 import { ReadOnlyNote } from "./pieces";
 
@@ -47,6 +48,7 @@ export function InstructionsTab() {
                   ref={area}
                   className="newag__textarea agp-instructions"
                   rows={14}
+                  maxLength={50_000}
                   aria-label={t("agent.instructions")}
                   placeholder={t("newAgent.instructionsPlaceholder")}
                   value={draft.instructions}
@@ -82,7 +84,7 @@ export function InstructionsTab() {
                 )}
               </>
             ) : agent.instructions.trim() ? (
-              <p className="agp-prose">{agent.instructions}</p>
+              <Markdown source={agent.instructions} variant="message" className="agp-prose" />
             ) : (
               <p className="muted">{t("agent.noInstructions", g)}</p>
             )}

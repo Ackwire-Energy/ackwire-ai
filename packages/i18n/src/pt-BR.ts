@@ -55,6 +55,7 @@ export const ptBR = {
     today: "Hoje",
     yesterday: "Ontem",
     loadFailed: "Não foi possível carregar. Confira a conexão e tente de novo.",
+    gone: "Isso não está mais aqui. Foi apagado, ou você não tem mais acesso.",
     notAllowed: "Você não tem permissão para isso.",
     tooMany: "Muitas tentativas. Tente de novo mais tarde.",
     /** A request with no answer at all (`errorText`): the browser offline, or the server out of reach. */
@@ -4882,6 +4883,7 @@ export const ptBR = {
         too_many_tool_calls: "Passou do limite de ferramentas numa execução.",
         stuck: "Parou porque travou.",
         brain_interrupted: "A IA parou antes de terminar.",
+        brain_unavailable: "A IA do computador não conseguiu responder. Confira o computador e peça de novo.",
         empty_reply: "O modelo não respondeu nada.",
         model_refused: "O modelo se recusou a responder.",
         agent_archived: "O agente foi arquivado.",
@@ -6252,6 +6254,7 @@ export const ptBR = {
         done: "Terminado",
         canceled: "Não vai ser feito",
       },
+      stageFull: "{{stage}} já tem {{max}} colunas, o máximo de uma etapa. Exclua uma delas antes.",
       stageExplain: {
         todo: "Tarefas novas entram na primeira coluna de A fazer.",
         in_progress: "Quando um agente começa, a tarefa vai para a primeira coluna de Em andamento.",
@@ -11609,6 +11612,7 @@ export const ptBR = {
     },
     issue: {
       assigneeOutside: "Essa pessoa não vê esta tarefa. Inclua ela em Quem vê primeiro.",
+      stageFull: "Uma etapa tem no máximo {{max}} colunas. Exclua uma das colunas dela antes.",
       deleteForbidden: "Só quem criou esta tarefa ou um administrador pode excluir.",
       audienceEmpty: "Escolha quem vê.",
     },
@@ -11911,6 +11915,24 @@ export const ptBR = {
     },
   },
   machines: {
+    reasons: {
+      browser_unsupported: "O navegador dos agentes não roda no sistema deste computador.",
+      browser_download:
+        "Não deu para baixar o navegador dos agentes. Confira a conexão deste computador, e ele tenta de novo no próximo uso.",
+      browser_checksum:
+        "O download do navegador dos agentes veio com defeito e não foi usado. Ele tenta de novo no próximo uso.",
+      desktop_use_linux: "O uso da área de trabalho roda em computadores Linux com as áreas de trabalho dos agentes.",
+      desktop_use_own_user:
+        "O uso da área de trabalho precisa que cada agente trabalhe como seu próprio usuário neste computador (modo sistema). Aqui todos trabalham como o usuário do runner.",
+      desktop_use_install: "Instale neste computador o que o uso da área de trabalho precisa:",
+      desktop_unavailable: "As áreas de trabalho dos agentes não rodam neste computador.",
+      desktop_linux: "As áreas de trabalho dos agentes rodam só em computadores Linux.",
+      desktop_install: "Instale neste computador as áreas de trabalho dos agentes:",
+      not_as_root:
+        "As áreas de trabalho e os terminais dos agentes nunca rodam como root. Rode o runner como um usuário comum.",
+      runner_bun_old: "Isso precisa do runner no Bun 1.3.5 ou mais novo. Atualize o runner neste computador.",
+      terminal_unsupported: "Os terminais rodam só em computadores Linux e Mac.",
+    },
     egress: {
       draining: "A rede está mudando. As sessões abertas do computador serão reiniciadas às {{when}}.",
       restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",
@@ -12654,6 +12676,7 @@ export const ptBR = {
       techAction: "Ação",
       techTool: "Ferramenta",
       techKind: "Tipo",
+      techSaid: "O que respondeu",
       techRun: "Execução",
       techId: "Registro",
       openConversation: "Abrir conversa",
@@ -13428,6 +13451,10 @@ export const ptBR = {
         inline: "Roda código passado direto no comando",
         global: "Instala para o computador todo",
         rules: "Fora do que agentes podem fazer sozinhos",
+        noAccess: "O agente não tem acesso a isso",
+        policy: "Não é permitido neste tipo de trabalho",
+        credential: "Envia o que parece uma chave",
+        repo: "Esse repositório não está na lista do agente",
       },
       gave: "recebeu",
       answered: "devolveu",
@@ -13815,6 +13842,7 @@ export const ptBR = {
       action_update_skills: "Atualizar skills",
       action_approvals: "Aprovações esperando você",
       action_open_page: "Abrir uma tela",
+      calendar_proposal: "Proposta de evento: {{title}}",
       agent_proposal: "Propôs um novo agente: {{name}}",
       team_proposal: "Propôs um time: {{names}}",
       settings_proposal: "Propôs uma mudança para {{names}}",
@@ -14033,6 +14061,39 @@ export const ptBR = {
     update_skill_from_source: {
       label: "Atualizar skills dos links",
       description: "Atualiza skills de onde foram instaladas. Mudanças em scripts esperam uma pessoa.",
+    },
+    propose_remove_agents: {
+      label: "Propor arquivar ou excluir agentes",
+      description: "Posta um card com os agentes a arquivar ou excluir. Quem pode aplica.",
+    },
+    offer_answers: {
+      label: "Perguntar com respostas para tocar",
+      description: "Posta uma pergunta com respostas que a pessoa toca. Cada toque vira uma mensagem dela.",
+    },
+    propose_team: {
+      label: "Propor um time",
+      description: "Posta um card com vários agentes, seus canais, rotinas e skills. Uma pessoa cria.",
+    },
+    propose_settings_change: {
+      label: "Propor ajustes de um colega",
+      description:
+        "Posta um card com novo modelo, IA, orçamento, dono, público ou canais de um colega. Uma pessoa aplica.",
+    },
+    offer_approvals: {
+      label: "Mostrar o que espera aprovação",
+      description: "Posta um card com as aprovações que esperam a pessoa, que aprova ou recusa cada uma ali.",
+    },
+    propose_member_changes: {
+      label: "Propor mudanças nas pessoas",
+      description: "Posta um card com donos, papéis ou remoções a mudar. Quem pode aplica cada uma.",
+    },
+    offer_open_page: {
+      label: "Oferecer abrir uma tela",
+      description: "Posta um card cujo botão abre uma tela do app, como cobrança, papéis ou a página de um agente.",
+    },
+    set_team_week: {
+      label: "Mudar o card da Semana da equipe",
+      description: "Para, retoma ou muda o dia do card semanal da equipe na DM da pessoa.",
     },
     propose_agent: {
       label: "Propor um agente",

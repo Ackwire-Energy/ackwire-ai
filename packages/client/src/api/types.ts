@@ -4180,7 +4180,7 @@ export interface Machine {
    * ADR 0062 (protocol 21): whether agents can use their own desktops there (only where each agent is its own OS
    * user); `reason`, in the runner's words, says what is missing. Null or absent when its runner doesn't say.
    */
-  desktopUse?: { available: boolean; reason: string | null } | null;
+  desktopUse?: { available: boolean; reason: string | null; code?: string | null } | null;
   /**
    * ADR 0115: its workspace disk (free GB, share in use) and the shared folder's size (GB, measured hourly), as its
    * runner last said; null or absent for people who don't manage it, or when its runner doesn't say.
@@ -4237,8 +4237,10 @@ export interface MachineBrowser {
   available: boolean;
   version: string | null;
   chrome: string | null;
-  /** Why it can't run yet, in the runner's words. */
+  /** Why it can't run yet, in the runner's words (English). */
   reason: string | null;
+  /** That reason as a code the apps word (`machineReasonText`); absent from older servers, null from older runners. */
+  code?: string | null;
 }
 
 /**

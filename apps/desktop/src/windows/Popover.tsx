@@ -11,6 +11,7 @@ import { Button, Icon, Kbd, normalizeAppearance, PixelSpinner, Segmented } from 
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
+import { saidText } from "../control/activity";
 import {
   BROWSER_NOTIFY_PREF,
   browserRowState,
@@ -924,8 +925,9 @@ function BrowserRow({ home, browser }: { home: Home; browser: ControlBrowser }) 
 }
 
 function JobRow({ home, job, now }: { home: Home; job: ControlJob; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const agent = job.agent ? agentOf(home, job.agent) : null;
+  const what = saidText(t, job, (iso) => clock(iso, i18n.language, new Date()));
   const color = normalizeAppearance(agent?.look).color;
   return (
     <div className="dk-job">
@@ -934,7 +936,7 @@ function JobRow({ home, job, now }: { home: Home; job: ControlJob; now: number }
       </span>
       <span className="dk-job__text">
         <b>
-          <span>{agent ? `${agent.name} · ${job.summary}` : job.summary}</span>
+          <span>{agent ? `${agent.name} · ${what}` : what}</span>
         </b>
         <small>
           <PixelSpinner size={14} color={color} />

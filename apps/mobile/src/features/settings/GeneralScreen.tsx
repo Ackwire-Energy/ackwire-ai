@@ -340,6 +340,7 @@ export function GeneralScreen() {
       <TextArea
         ref={contextField}
         value={context}
+        maxLength={20_000}
         onChangeText={changeContext}
         onBlur={flushContext}
         editable={editable}

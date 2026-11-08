@@ -13,7 +13,7 @@ const SCOPE_CHECKS: Record<string, ScopedCheck> = {
   "github:": async (input, ctx) => {
     const r = await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, input);
     if (r.ok) return { ok: true, ...(r.repo ? { data: { repo: r.repo } } : {}) };
-    return { ok: false, message: r.message, data: r.repo ? { deniedRepo: r.repo } : {} };
+    return { ok: false, message: r.message, data: r.repo ? { deniedRepo: r.repo, refusal: "repo" } : {} };
   },
 };
 

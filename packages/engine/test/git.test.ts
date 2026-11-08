@@ -971,9 +971,12 @@ describe("the computer", () => {
     const result = await clone?.execute({ repo: "https://github.com/acme/app.git" }, ctx);
     expect(result).toMatchObject({ isError: true });
     expect(result?.content).toContain("You have no computer");
-    const pr = await tools
-      .find((t) => t.name === "open_pull_request")
-      ?.execute({ repo: "acme/app", branch: "agentes/dev/fix", title: "Fix login" }, ctx);
+    const open = tools.find((t) => t.name === "open_pull_request");
+    // The audit's title, in English like every other call's (the apps word the row by the tool).
+    expect(open?.describe?.({ repo: "acme/app", branch: "agentes/dev/fix", title: "Fix login" })).toEqual({
+      title: "Open a pull request in acme/app: Fix login",
+    });
+    const pr = await open?.execute({ repo: "acme/app", branch: "agentes/dev/fix", title: "Fix login" }, ctx);
     expect(pr?.content).toContain("https://github.com/acme/app/pull/7");
     const post = github.calls.find((c) => c.method === "POST");
     expect(post?.auth).toBe(`Bearer ${GH_TOKEN}`);

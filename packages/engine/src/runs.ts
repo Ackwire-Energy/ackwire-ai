@@ -192,6 +192,9 @@ export function runErrorDetail(error: string | null | undefined): {
     return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };
   if (error.startsWith("canceled_by:"))
     return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
+  // A computer brain's background run cut after its tools ran, or with nothing to think with (`executor.ts`).
+  const brain = /^(brain_interrupted|brain_unavailable): ?/.exec(error);
+  if (brain) return { errorCode: `run.${brain[1]}`, errorParams: { detail: error.slice(brain[0].length) } };
   const standing = standingErrorDetail(error);
   if (standing) return standing;
   // Older rows hold the Portuguese texts these errors used to have, or an earlier wording: still recognized.

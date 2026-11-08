@@ -207,6 +207,11 @@ describe("calendar", () => {
       .from(schema.messages)
       .where(eq(schema.messages.id, proposal?.messageId ?? ""));
     expect(card?.meta.calendarProposalId).toBe(proposal?.id);
+    // Lists, the inbox and the push word it in each reader's language: English only as the fallback.
+    expect(card).toMatchObject({
+      body: "Event proposal: Revisão do PR",
+      meta: { bodyCode: "calendar_proposal", bodyParams: { title: "Revisão do PR" } },
+    });
     expect(card?.threadId).toBeNull(); // asked in the channel: the card is there
 
     const deps = { db: f.db, pubsub: f.pubsub };

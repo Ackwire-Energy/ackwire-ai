@@ -153,11 +153,13 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
         })
       : toolPhrase(t, l);
   const why = toolWhy(t, l);
+  // What the tool answered, its own words when it failed: only in the open view, never under the line.
+  const answered = l.result ?? why ?? l.why;
   const detail = l.code ? (
     <CodePanel code={l.code} output={output} live={l.state === "run"} />
   ) : output.length > 0 ? (
     <OutputView output={output} live={l.state === "run"} />
-  ) : l.input || l.result || why ? (
+  ) : l.input || answered ? (
     <div className="ac-tools__io">
       {l.input && (
         <>
@@ -165,10 +167,10 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
           <span>{l.input}</span>
         </>
       )}
-      {(l.result || why) && (
+      {answered && (
         <>
           <b>{l.state === "fail" ? t("chat.work.error") : t("chat.work.answered")}</b>
-          <span>{l.result ?? why}</span>
+          <span>{answered}</span>
         </>
       )}
     </div>

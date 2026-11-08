@@ -284,6 +284,7 @@ export function NewIssueDialog({
                       ref={textRef}
                       className="issue-new__text"
                       rows={4}
+                      maxLength={50_000}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder={t("issues.form.descriptionPlaceholder")}

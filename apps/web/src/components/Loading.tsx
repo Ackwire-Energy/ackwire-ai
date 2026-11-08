@@ -1,4 +1,4 @@
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, isGone, knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
   EmptyState,
@@ -111,16 +111,22 @@ export function useStepText(active: boolean, steps: string[]) {
   return steps[stepAt(since, now, steps.length)];
 }
 
-/** A friendly line and one action: "Tentar de novo". */
+/** A friendly line and one action: "Tentar de novo", unless what it loads is gone, which no try brings back. */
 export function ErrorState({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const gone = isGone(error);
   // A query's `error` is null when it holds none: nothing to read, so the load just failed.
-  const message = error == null ? t("common.loadFailed") : errorText(t, error);
+  const message =
+    error == null
+      ? t("common.loadFailed")
+      : gone
+        ? (knownErrorText(t, error, i18n.language) ?? t("common.gone"))
+        : errorText(t, error, i18n.language);
   return (
     <EmptyState
       icon="alert"
       actions={
-        onRetry ? (
+        onRetry && !gone ? (
           <Button size="sm" onClick={onRetry}>
             {t("common.retry")}
           </Button>

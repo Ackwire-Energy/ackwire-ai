@@ -620,16 +620,22 @@ export class DesktopManager {
 
   /** `hello.desktopUse`: whether agents can use their desktops here, and what is missing when they can't. */
   info(): RunnerDesktopUseInfo {
-    if (this.sys.platform !== "linux") return { available: false, reason: NEEDS_LINUX };
+    if (this.sys.platform !== "linux") return { available: false, reason: NEEDS_LINUX, code: "desktop_use_linux" };
     const refusal = this.opts.workers ? null : ownUserRefusal(null, this.helperUid, this.opts.uids?.() ?? null);
-    if (refusal) return { available: false, reason: refusal };
+    if (refusal) return { available: false, reason: refusal, code: "desktop_use_own_user" };
     const desktops = this.opts.desktops.info();
     if (!desktops.available) {
-      return { available: false, reason: desktops.reason ?? "The agents' desktops can't run on this computer" };
+      return {
+        available: false,
+        reason: desktops.reason ?? "The agents' desktops can't run on this computer",
+        code: desktops.code ?? "desktop_unavailable",
+      };
     }
     const tools = ["python3", "xdotool", "scrot"].filter((c) => !this.sys.which(c));
     const missing = [...new Set([...tools, ...this.missing])];
-    return missing.length > 0 ? { available: false, reason: installReason(missing) } : { available: true };
+    return missing.length > 0
+      ? { available: false, reason: installReason(missing), code: "desktop_use_install" }
+      : { available: true };
   }
 
   look(agent: AgentScope): Promise<DesktopLookReply> {

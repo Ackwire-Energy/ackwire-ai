@@ -45,6 +45,7 @@
     "today": "Aujourd'hui",
     "yesterday": "Hier",
     "loadFailed": "Impossible de charger ceci. Vérifiez votre connexion et réessayez.",
+    "gone": "Ceci n'est plus là. Il a été supprimé, ou vous n'y avez plus accès.",
     "notAllowed": "Vous n'avez pas l'autorisation pour cela.",
     "tooMany": "Trop de tentatives. Réessayez plus tard.",
     "offline": "Vous êtes hors ligne. Vérifiez votre connexion et réessayez.",
@@ -4953,6 +4954,7 @@
         "too_many_tool_calls": "A dépassé la limite d'outils pour une exécution.",
         "stuck": "Arrêtée car bloquée.",
         "brain_interrupted": "L'IA s'est arrêtée avant de terminer.",
+        "brain_unavailable": "L'IA de son ordinateur n'a pas pu répondre. Vérifiez l'ordinateur et redemandez.",
         "empty_reply": "Le modèle n'a rien renvoyé.",
         "model_refused": "Le modèle a refusé de répondre.",
         "agent_archived": "L'agent a été archivé.",
@@ -6370,6 +6372,7 @@
         "done": "Finie",
         "canceled": "Ne sera pas faite"
       },
+      "stageFull": "{{stage}} a déjà {{max}} colonnes, le maximum pour une étape. Supprimez-en une d'abord.",
       "stageExplain": {
         "todo": "Les nouvelles tâches arrivent dans la première colonne de À faire.",
         "in_progress": "Quand un agent commence, la tâche va dans la première colonne de En cours.",
@@ -12228,6 +12231,7 @@
     },
     "issue": {
       "assigneeOutside": "Cette personne ne voit pas cette tâche. Ajoutez-la d'abord à Qui le voit.",
+      "stageFull": "Une étape contient au plus {{max}} colonnes. Supprimez d'abord une de ses colonnes.",
       "deleteForbidden": "Seule la personne qui a créé cette tâche ou un administrateur peut la supprimer.",
       "audienceEmpty": "Choisissez qui le voit."
     },
@@ -12518,6 +12522,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Le navigateur des agents ne fonctionne pas sur le système de cet ordinateur.",
+      "browser_download": "Impossible de télécharger le navigateur des agents. Vérifiez la connexion de cet ordinateur et il réessaiera à la prochaine utilisation.",
+      "browser_checksum": "Le téléchargement du navigateur des agents est arrivé abîmé, il n'a donc pas été utilisé. Il réessaiera à la prochaine utilisation.",
+      "desktop_use_linux": "Les applications sur les écrans des agents fonctionnent sur les ordinateurs Linux qui ont les écrans des agents.",
+      "desktop_use_own_user": "Les applications sur les écrans demandent que chaque agent travaille avec son propre utilisateur sur cet ordinateur (mode système). Ici tous les agents travaillent avec l'utilisateur du runner.",
+      "desktop_use_install": "Installez sur cet ordinateur ce dont les applications sur les écrans ont besoin :",
+      "desktop_unavailable": "Les écrans des agents ne peuvent pas fonctionner sur cet ordinateur.",
+      "desktop_linux": "Les écrans des agents fonctionnent uniquement sur les ordinateurs Linux.",
+      "desktop_install": "Installez les écrans des agents sur cet ordinateur :",
+      "not_as_root": "Les écrans et les terminaux des agents ne fonctionnent jamais en root. Lancez le runner avec un utilisateur normal.",
+      "runner_bun_old": "Il faut le runner sur Bun 1.3.5 ou plus récent. Mettez à jour le runner sur cet ordinateur.",
+      "terminal_unsupported": "Les terminaux fonctionnent uniquement sur les ordinateurs Linux et Mac."
+    },
     "egress": {
       "draining": "Le réseau change. Les sessions ouvertes de l’ordinateur redémarreront à {{when}}.",
       "restart": "Les sessions de l’ordinateur redémarrent pour appliquer le réseau. Les nouvelles tâches attendent la fin.",
@@ -13270,6 +13288,7 @@
       "techAction": "Action",
       "techTool": "Outil",
       "techKind": "Type",
+      "techSaid": "Ce qu'il a répondu",
       "techRun": "Exécution",
       "techId": "Enregistrement",
       "openConversation": "Ouvrir la conversation",
@@ -14051,7 +14070,11 @@
         "shell": "Elle exécute d'autres commandes à l'intérieur",
         "inline": "Elle exécute du code fourni en ligne",
         "global": "Elle installe pour tout l'ordinateur",
-        "rules": "Hors de ce que les agents peuvent faire seuls"
+        "rules": "Hors de ce que les agents peuvent faire seuls",
+        "noAccess": "L'agent n'a pas accès à ceci",
+        "policy": "Non autorisé dans ce type de travail",
+        "credential": "Envoie ce qui ressemble à une clé",
+        "repo": "Ce dépôt n'est pas dans la liste de l'agent"
       },
       "gave": "donné",
       "answered": "répondu",
@@ -14410,6 +14433,7 @@
       "action_update_skills": "Mettre à jour des compétences",
       "action_approvals": "Approbations qui vous attendent",
       "action_open_page": "Ouvrir un écran",
+      "calendar_proposal": "Proposition d'événement : {{title}}",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "team_proposal": "A proposé une équipe : {{names}}",
       "settings_proposal": "A proposé un changement pour {{names}}",
@@ -14623,6 +14647,38 @@
     "update_skill_from_source": {
       "label": "Mettre à jour les compétences depuis leurs liens",
       "description": "Met à jour les compétences depuis l'endroit où elles ont été installées. Les changements de scripts attendent une personne."
+    },
+    "propose_remove_agents": {
+      "label": "Proposer d'archiver ou de supprimer des agents",
+      "description": "Publie une carte avec les agents à archiver ou à supprimer. Une personne qui le peut l'applique."
+    },
+    "offer_answers": {
+      "label": "Demander avec des réponses à toucher",
+      "description": "Publie une question avec des réponses que la personne touche. Chaque appui est son propre message."
+    },
+    "propose_team": {
+      "label": "Proposer une équipe",
+      "description": "Publie une carte avec plusieurs agents, leurs canaux, routines et compétences. Une personne la crée."
+    },
+    "propose_settings_change": {
+      "label": "Proposer les réglages d'un collègue",
+      "description": "Publie une carte avec le nouveau modèle, l'IA, le budget, le responsable, le public ou les canaux d'un collègue. Une personne l'applique."
+    },
+    "offer_approvals": {
+      "label": "Montrer ce qui attend une approbation",
+      "description": "Publie une carte avec les approbations qui attendent la personne, qui approuve ou refuse chacune sur place."
+    },
+    "propose_member_changes": {
+      "label": "Proposer des changements de personnes",
+      "description": "Publie une carte avec des propriétaires, des rôles ou des retraits à changer. Une personne qui le peut applique chacun."
+    },
+    "offer_open_page": {
+      "label": "Proposer d'ouvrir un écran",
+      "description": "Publie une carte dont le bouton ouvre un écran de l'app, comme la facturation, les rôles ou la page d'un agent."
+    },
+    "set_team_week": {
+      "label": "Modifier la carte Semaine de l’équipe",
+      "description": "Arrête, relance ou déplace la carte hebdomadaire Semaine de l’équipe dans le message direct de la personne."
     },
     "propose_agent": {
       "label": "Proposer un agent",

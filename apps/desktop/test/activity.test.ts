@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { ActivityEntry } from "@agenteschat/adapters/runner-control";
-import { groupByDay, hasMore, homesToFetch, mergePages, startCursor } from "../src/control/activity";
+import i18next from "i18next";
+import { groupByDay, hasMore, homesToFetch, mergePages, saidText, startCursor } from "../src/control/activity";
+import { desktopEn } from "../src/i18n/keys.en";
+import { desktopPtBR } from "../src/i18n/keys.pt-BR";
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 17, 12, 0) - min * 60_000).toISOString();
 const entry = (min: number, summary = `e${min}`): ActivityEntry => ({ at: at(min), kind: "file", summary });
@@ -80,5 +83,61 @@ describe("groupByDay", () => {
       ["yesterday", 1],
       ["date", 1],
     ]);
+  });
+});
+
+describe("each line in the person's words", () => {
+  const lang = (strings: Record<string, unknown>, lng: string) => {
+    const instance = i18next.createInstance();
+    void instance.init({
+      lng,
+      resources: { [lng]: { translation: { desktop: strings } } },
+      initAsync: false,
+      interpolation: { escapeValue: false },
+    });
+    return instance.t;
+  };
+  const pt = lang(desktopPtBR as unknown as Record<string, unknown>, "pt-BR");
+  const en = lang(desktopEn as unknown as Record<string, unknown>, "en");
+  const clock = (iso: string) => iso.slice(11, 16);
+  const line = (summary: string, said?: ActivityEntry["said"]): ActivityEntry => ({
+    at: at(0),
+    kind: "file",
+    summary,
+    ...(said ? { said } : {}),
+  });
+
+  test("what the runner says it was, never its English, with what it names as it came", () => {
+    expect(saidText(pt, line("wrote /home/x/report.md", { key: "wrote", path: "/home/x/report.md" }), clock)).toBe(
+      "escreveu /home/x/report.md",
+    );
+    expect(saidText(pt, line("thinking with Codex", { key: "thinking", brain: "Codex" }), clock)).toBe(
+      "pensando com o Codex",
+    );
+    expect(saidText(pt, line("started: Codex task", { key: "taskStarted", executor: "codex" }), clock)).toBe(
+      "começou: tarefa do Codex",
+    );
+    expect(
+      saidText(pt, line("failed (exit 2): npm test", { key: "taskFailed", exit: "2", what: "npm test" }), clock),
+    ).toBe("falhou (saída 2): npm test");
+    expect(
+      saidText(pt, line("the browser turned on", { key: "toolOn", tool: "browser", name: "the browser" }), clock),
+    ).toBe("ligou o navegador");
+    // A product's name stays its name.
+    expect(saidText(pt, line("Codex turned off", { key: "toolOff", tool: "codex", name: "Codex" }), clock)).toBe(
+      "desligou Codex",
+    );
+    expect(saidText(pt, line("allowed /p for no agent", { key: "folderAllowed", path: "/p", agents: "" }), clock)).toBe(
+      "liberou /p para nenhum agente",
+    );
+    expect(
+      saidText(pt, line("paused until 16:24", { key: "pausedUntil", until: "2026-10-17T16:24:00.000Z" }), clock),
+    ).toBe("pausado até 16:24");
+    expect(saidText(en, line("connected to Acme", { key: "connected", org: "Acme" }), clock)).toBe("connected to Acme");
+  });
+
+  test("a line from an older runner, or with words this app doesn't have, reads as it came", () => {
+    expect(saidText(pt, line("looked at /home/x"), clock)).toBe("looked at /home/x");
+    expect(saidText(pt, line("something new", { key: "somethingNew" }), clock)).toBe("something new");
   });
 });

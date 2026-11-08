@@ -53,6 +53,8 @@ export const en = {
     today: "Today",
     yesterday: "Yesterday",
     loadFailed: "Couldn't load this. Check your connection and try again.",
+    /** What a page loads was deleted, archived or isn't this person's to see: no try brings it back. */
+    gone: "This isn't here anymore. It was deleted, or you no longer have access.",
     notAllowed: "You don't have permission for this.",
     tooMany: "Too many tries. Try again later.",
     offline: "You're offline. Check your connection and try again.",
@@ -4851,6 +4853,8 @@ export const en = {
         too_many_tool_calls: "Went over the tool limit for one run.",
         stuck: "Stopped because it got stuck.",
         brain_interrupted: "The AI stopped before finishing.",
+        /** A computer brain had no AI to think with this time; its own words show only on hover. */
+        brain_unavailable: "The AI on its computer couldn't answer. Check the computer and ask again.",
         empty_reply: "The model returned nothing.",
         model_refused: "The model refused to answer.",
         agent_archived: "The agent was archived.",
@@ -6175,6 +6179,8 @@ export const en = {
         done: "Finished",
         canceled: "Won't be done",
       },
+      /** The stage picked already holds the most columns a stage may have. */
+      stageFull: "{{stage}} already has {{max}} columns, the most a stage holds. Delete one there first.",
       stageExplain: {
         todo: "New tasks land in the first column of To do.",
         in_progress: "When an agent starts, the task goes to the first column of In progress.",
@@ -11494,6 +11500,7 @@ export const en = {
     },
     issue: {
       assigneeOutside: "This person can't see this task. Add them to who sees it first.",
+      stageFull: "A stage holds at most {{max}} columns. Delete one of its columns first.",
       deleteForbidden: "Only who created this task or an administrator can delete it.",
       audienceEmpty: "Choose who sees it.",
     },
@@ -11799,6 +11806,23 @@ export const en = {
     },
   },
   machines: {
+    /** Why a computer can't run the agent browser or desktop use yet, by the runner's code; a command may follow. */
+    reasons: {
+      browser_unsupported: "The agent browser doesn't run on this computer's system.",
+      browser_download:
+        "Couldn't download the agent browser. Check this computer's connection, and it tries again on its next use.",
+      browser_checksum: "The agent browser's download came damaged, so it wasn't used. It tries again on its next use.",
+      desktop_use_linux: "Desktop use runs on Linux computers with the agents' desktops.",
+      desktop_use_own_user:
+        "Desktop use needs each agent to work as its own user on this computer (system mode). Here every agent works as the runner's user.",
+      desktop_use_install: "Install what desktop use needs on this computer:",
+      desktop_unavailable: "The agents' desktops can't run on this computer.",
+      desktop_linux: "The agents' desktops run on Linux computers only.",
+      desktop_install: "Install the agents' desktops on this computer:",
+      not_as_root: "The agents' desktops and terminals never run as root. Run the runner as a normal user.",
+      runner_bun_old: "This needs the runner on Bun 1.3.5 or newer. Update the runner on this computer.",
+      terminal_unsupported: "Terminals run on Linux and Mac computers only.",
+    },
     egress: {
       draining: "Network settings are changing. Open computer sessions will restart at {{when}}.",
       restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
@@ -12545,6 +12569,8 @@ export const en = {
       techAction: "Action",
       techTool: "Tool",
       techKind: "Kind",
+      /** What the tool or the gateway answered a call that didn't go through, as it was written. */
+      techSaid: "What it answered",
       techRun: "Run",
       techId: "Record",
       openConversation: "Open conversation",
@@ -13301,6 +13327,11 @@ export const en = {
         inline: "It runs code given inline",
         global: "It installs for the whole computer",
         rules: "Outside what agents may do on their own",
+        /** Calls the Tool Gateway refused (`data.refusal`): the agent lacks access, the kind of work, a key, a repository. */
+        noAccess: "The agent doesn't have access to this",
+        policy: "Not allowed in this kind of work",
+        credential: "It sends what looks like a key",
+        repo: "That repository isn't on the agent's list",
       },
       gave: "given",
       answered: "answered",
@@ -13693,6 +13724,7 @@ export const en = {
       action_update_skills: "Update skills",
       action_approvals: "Approvals waiting for you",
       action_open_page: "Open a screen",
+      calendar_proposal: "Event proposal: {{title}}",
       agent_proposal: "Proposed a new agent: {{name}}",
       team_proposal: "Proposed a team: {{names}}",
       settings_proposal: "Proposed a change to {{names}}",
@@ -13907,6 +13939,39 @@ export const en = {
     update_skill_from_source: {
       label: "Update skills from their links",
       description: "Updates skills from where they were installed. Changes to scripts wait for a person.",
+    },
+    propose_remove_agents: {
+      label: "Propose archiving or deleting agents",
+      description: "Posts one card listing the agents to archive or delete. A person who may applies it.",
+    },
+    offer_answers: {
+      label: "Ask with answers to tap",
+      description: "Posts a question with answers the person taps. Each tap is their own message.",
+    },
+    propose_team: {
+      label: "Propose a team",
+      description: "Posts one card with several agents, their channels, routines and skills. A person creates it.",
+    },
+    propose_settings_change: {
+      label: "Propose a teammate's settings",
+      description:
+        "Posts a card with a teammate's new model, AI, budget, owner, audience or channels. A person applies it.",
+    },
+    offer_approvals: {
+      label: "Show what waits for approval",
+      description: "Posts one card with the approvals waiting for the person, who approves or refuses each there.",
+    },
+    propose_member_changes: {
+      label: "Propose changes to people",
+      description: "Posts one card with owners, roles or removals to change. A person who may applies each one.",
+    },
+    offer_open_page: {
+      label: "Offer to open a screen",
+      description: "Posts a card whose button opens a screen of the app, such as billing, roles or an agent's page.",
+    },
+    set_team_week: {
+      label: "Change the Team week card",
+      description: "Stops, starts again or moves the weekly Team week card in the person's DM.",
     },
     propose_agent: {
       label: "Propose an agent",

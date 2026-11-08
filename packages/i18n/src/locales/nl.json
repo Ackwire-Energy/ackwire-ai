@@ -45,6 +45,7 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "loadFailed": "Dit kon niet geladen worden. Controleer je verbinding en probeer het opnieuw.",
+    "gone": "Dit is er niet meer. Het is verwijderd, of je hebt er geen toegang meer toe.",
     "notAllowed": "Je hebt hier geen toestemming voor.",
     "tooMany": "Te veel pogingen. Probeer het later opnieuw.",
     "offline": "Je bent offline. Controleer je verbinding en probeer het opnieuw.",
@@ -4801,6 +4802,7 @@
         "too_many_tool_calls": "Over de toollimiet voor één run gegaan.",
         "stuck": "Gestopt omdat hij vastliep.",
         "brain_interrupted": "De AI stopte voordat hij klaar was.",
+        "brain_unavailable": "De AI op zijn computer kon niet antwoorden. Controleer de computer en vraag het opnieuw.",
         "empty_reply": "Het model gaf niets terug.",
         "model_refused": "Het model weigerde te antwoorden.",
         "agent_archived": "De agent is gearchiveerd.",
@@ -6195,6 +6197,7 @@
         "done": "Afgerond",
         "canceled": "Wordt niet gedaan"
       },
+      "stageFull": "{{stage}} heeft al {{max}} kolommen, het maximum voor een fase. Verwijder er daar eerst een.",
       "stageExplain": {
         "todo": "Nieuwe taken komen in de eerste kolom van Te doen.",
         "in_progress": "Als een agent begint, gaat de taak naar de eerste kolom van Bezig.",
@@ -11856,6 +11859,7 @@
     },
     "issue": {
       "assigneeOutside": "Deze persoon ziet deze taak niet. Voeg die eerst toe bij Wie het ziet.",
+      "stageFull": "Een fase heeft hoogstens {{max}} kolommen. Verwijder eerst een van de kolommen.",
       "deleteForbidden": "Alleen wie deze taak heeft gemaakt of een beheerder kan hem verwijderen.",
       "audienceEmpty": "Kies wie het ziet."
     },
@@ -12145,6 +12149,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "De browser van de agents werkt niet op het systeem van deze computer.",
+      "browser_download": "De browser van de agents kon niet worden gedownload. Controleer de verbinding van deze computer, dan probeert hij het bij het volgende gebruik opnieuw.",
+      "browser_checksum": "De download van de browser van de agents kwam beschadigd binnen en is niet gebruikt. Hij probeert het bij het volgende gebruik opnieuw.",
+      "desktop_use_linux": "Apps op de schermen van de agents werken op Linux-computers met de schermen van de agents.",
+      "desktop_use_own_user": "Apps op de schermen hebben voor elke agent een eigen gebruiker op deze computer nodig (systeemmodus). Hier werken alle agents als de gebruiker van de runner.",
+      "desktop_use_install": "Installeer op deze computer wat apps op de schermen nodig hebben:",
+      "desktop_unavailable": "De schermen van de agents kunnen niet op deze computer draaien.",
+      "desktop_linux": "De schermen van de agents draaien alleen op Linux-computers.",
+      "desktop_install": "Installeer op deze computer de schermen van de agents:",
+      "not_as_root": "De schermen en terminals van de agents draaien nooit als root. Start de runner als een gewone gebruiker.",
+      "runner_bun_old": "Hiervoor is de runner op Bun 1.3.5 of nieuwer nodig. Werk de runner op deze computer bij.",
+      "terminal_unsupported": "Terminals werken alleen op Linux- en Mac-computers."
+    },
     "egress": {
       "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
       "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
@@ -12883,6 +12901,7 @@
       "techAction": "Actie",
       "techTool": "Tool",
       "techKind": "Soort",
+      "techSaid": "Wat het antwoordde",
       "techRun": "Run",
       "techId": "Record",
       "openConversation": "Gesprek openen",
@@ -13635,7 +13654,11 @@
         "shell": "Het voert er andere opdrachten in uit",
         "inline": "Het voert meegegeven code direct uit",
         "global": "Het installeert voor de hele computer",
-        "rules": "Buiten wat agents zelf mogen doen"
+        "rules": "Buiten wat agents zelf mogen doen",
+        "noAccess": "De agent heeft hier geen toegang toe",
+        "policy": "Niet toegestaan bij dit soort werk",
+        "credential": "Het verstuurt iets wat op een sleutel lijkt",
+        "repo": "Die repository staat niet op de lijst van de agent"
       },
       "gave": "gegeven",
       "answered": "beantwoord",
@@ -13993,6 +14016,7 @@
       "action_update_skills": "Skills bijwerken",
       "action_approvals": "Goedkeuringen die op jou wachten",
       "action_open_page": "Een scherm openen",
+      "calendar_proposal": "Voorstel voor een afspraak: {{title}}",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "team_proposal": "Stelde een team voor: {{names}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",
@@ -14203,6 +14227,38 @@
     "update_skill_from_source": {
       "label": "Skills bijwerken vanaf hun links",
       "description": "Werkt skills bij vanaf waar ze zijn geïnstalleerd. Wijzigingen in scripts wachten op een persoon."
+    },
+    "propose_remove_agents": {
+      "label": "Archiveren of verwijderen van agents voorstellen",
+      "description": "Plaatst een kaart met de agents om te archiveren of te verwijderen. Iemand die dat mag past hem toe."
+    },
+    "offer_answers": {
+      "label": "Vragen met antwoorden om aan te tikken",
+      "description": "Plaatst een vraag met antwoorden die iemand aantikt. Elke tik is een eigen bericht."
+    },
+    "propose_team": {
+      "label": "Een team voorstellen",
+      "description": "Plaatst een kaart met meerdere agents, hun kanalen, routines en skills. Een mens maakt het aan."
+    },
+    "propose_settings_change": {
+      "label": "Instellingen van een collega voorstellen",
+      "description": "Plaatst een kaart met het nieuwe model, de AI, het budget, de eigenaar, het publiek of de kanalen van een collega. Een mens past hem toe."
+    },
+    "offer_approvals": {
+      "label": "Tonen wat op goedkeuring wacht",
+      "description": "Plaatst een kaart met de goedkeuringen die op iemand wachten, die elk daar goedkeurt of weigert."
+    },
+    "propose_member_changes": {
+      "label": "Wijzigingen bij mensen voorstellen",
+      "description": "Plaatst een kaart met eigenaren, rollen of verwijderingen om te wijzigen. Iemand die dat mag past elk ervan toe."
+    },
+    "offer_open_page": {
+      "label": "Aanbieden een scherm te openen",
+      "description": "Plaatst een kaart met een knop die een scherm van de app opent, zoals facturering, rollen of de pagina van een agent."
+    },
+    "set_team_week": {
+      "label": "De kaart Teamweek wijzigen",
+      "description": "Stopt, hervat of verplaatst de wekelijkse kaart Teamweek in het directe bericht van die persoon."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

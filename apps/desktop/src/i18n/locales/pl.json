@@ -512,7 +512,47 @@
       "resultOk": "Zadziałało",
       "resultFailed": "Nie powiodło się",
       "resultRefused": "Odmówiono",
-      "resultRunning": "W toku"
+      "resultRunning": "W toku",
+      "said": {
+        "read": "odczytał {{path}}",
+        "wrote": "zapisał {{path}}",
+        "looked": "przejrzał {{path}}",
+        "sent": "wysłał {{path}}",
+        "thinking": "myśli z {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "rozpoczęto: {{what}}",
+        "taskFinished": "zakończono: {{what}}",
+        "taskCanceled": "anulowano: {{what}}",
+        "taskInterrupted": "przerwano: {{what}}",
+        "taskTimedOut": "zatrzymano po limicie czasu: {{what}}",
+        "taskFailed": "nie powiodło się (kod {{exit}}): {{what}}",
+        "taskNotStarted": "nie rozpoczęto: {{what}}",
+        "executor": {
+          "codex": "zadanie Codex",
+          "claude": "zadanie Claude Code"
+        },
+        "paused": "wstrzymano",
+        "pausedUntil": "wstrzymano do {{until}}",
+        "resumed": "wznowiono",
+        "connected": "połączono z {{org}}",
+        "disconnected": "rozłączono",
+        "disconnectedFrom": "rozłączono z {{org}}",
+        "accessAsked": "poprosił o {{path}}",
+        "accessNotNow": "nie teraz: {{path}}",
+        "accessExpired": "prośba wygasła: {{path}}",
+        "toolOn": "włączył {{tool}}",
+        "toolOff": "wyłączył {{tool}}",
+        "tools": {
+          "commands": "polecenia",
+          "browser": "przeglądarkę agentów",
+          "desktop": "ekrany agentów",
+          "terminal": "terminal agentów"
+        },
+        "folderAllowed": "zezwolił na {{path}} dla {{agents}}",
+        "folderAgents": "{{path}} teraz dla {{agents}}",
+        "folderRemoved": "usunął {{path}}",
+        "noAgent": "żaden agent"
+      }
     },
     "advanced": {
       "title": "Zaawansowane",

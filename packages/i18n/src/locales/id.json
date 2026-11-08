@@ -45,6 +45,7 @@
     "today": "Hari ini",
     "yesterday": "Kemarin",
     "loadFailed": "Tidak bisa memuat ini. Periksa koneksimu dan coba lagi.",
+    "gone": "Ini sudah tidak ada di sini. Sudah dihapus, atau kamu tidak punya akses lagi.",
     "notAllowed": "Kamu tidak punya izin untuk ini.",
     "tooMany": "Terlalu banyak percobaan. Coba lagi nanti.",
     "offline": "Kamu sedang offline. Periksa koneksimu dan coba lagi.",
@@ -4597,6 +4598,7 @@
         "too_many_tool_calls": "Melewati batas alat untuk satu proses.",
         "stuck": "Berhenti karena macet.",
         "brain_interrupted": "AI berhenti sebelum selesai.",
+        "brain_unavailable": "AI di komputernya tidak bisa menjawab. Periksa komputernya lalu minta lagi.",
         "empty_reply": "Model tidak mengembalikan apa pun.",
         "model_refused": "Model menolak menjawab.",
         "agent_archived": "Agen sudah diarsipkan.",
@@ -5953,6 +5955,7 @@
         "done": "Sudah selesai",
         "canceled": "Tidak akan dikerjakan"
       },
+      "stageFull": "{{stage}} sudah punya {{max}} kolom, batas untuk satu tahap. Hapus salah satunya dulu.",
       "stageExplain": {
         "todo": "Tugas baru masuk ke kolom pertama Akan dikerjakan.",
         "in_progress": "Saat agen mulai, tugas pindah ke kolom pertama Sedang dikerjakan.",
@@ -11376,6 +11379,7 @@
     },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
+      "stageFull": "Satu tahap paling banyak punya {{max}} kolom. Hapus dulu salah satu kolomnya.",
       "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya.",
       "audienceEmpty": "Pilih siapa yang melihat."
     },
@@ -11664,6 +11668,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Browser agen tidak berjalan di sistem komputer ini.",
+      "browser_download": "Browser agen tidak bisa diunduh. Periksa koneksi komputer ini, dan akan dicoba lagi saat dipakai berikutnya.",
+      "browser_checksum": "Unduhan browser agen rusak, jadi tidak dipakai. Akan dicoba lagi saat dipakai berikutnya.",
+      "desktop_use_linux": "Aplikasi di layar agen berjalan di komputer Linux yang punya layar agen.",
+      "desktop_use_own_user": "Aplikasi di layar agen butuh setiap agen bekerja sebagai penggunanya sendiri di komputer ini (mode sistem). Di sini semua agen bekerja sebagai pengguna runner.",
+      "desktop_use_install": "Pasang di komputer ini yang dibutuhkan aplikasi di layar agen:",
+      "desktop_unavailable": "Layar agen tidak bisa berjalan di komputer ini.",
+      "desktop_linux": "Layar agen hanya berjalan di komputer Linux.",
+      "desktop_install": "Pasang layar agen di komputer ini:",
+      "not_as_root": "Layar dan terminal agen tidak pernah berjalan sebagai root. Jalankan runner sebagai pengguna biasa.",
+      "runner_bun_old": "Ini butuh runner di Bun 1.3.5 atau yang lebih baru. Perbarui runner di komputer ini.",
+      "terminal_unsupported": "Terminal hanya berjalan di komputer Linux dan Mac."
+    },
     "egress": {
       "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
       "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
@@ -12388,6 +12406,7 @@
       "techAction": "Tindakan",
       "techTool": "Alat",
       "techKind": "Jenis",
+      "techSaid": "Yang dijawabnya",
       "techRun": "Proses",
       "techId": "Catatan",
       "openConversation": "Buka percakapan",
@@ -13112,7 +13131,11 @@
         "shell": "Menjalankan perintah lain di dalamnya",
         "inline": "Menjalankan kode yang ditulis langsung",
         "global": "Memasang untuk seluruh komputer",
-        "rules": "Di luar yang boleh dilakukan agen sendiri"
+        "rules": "Di luar yang boleh dilakukan agen sendiri",
+        "noAccess": "Agen tidak punya akses ke ini",
+        "policy": "Tidak diizinkan dalam jenis pekerjaan ini",
+        "credential": "Mengirim sesuatu yang tampak seperti kunci",
+        "repo": "Repositori itu tidak ada di daftar agen"
       },
       "gave": "diberikan",
       "answered": "dijawab",
@@ -13468,6 +13491,7 @@
       "action_update_skills": "Perbarui skill",
       "action_approvals": "Persetujuan yang menunggumu",
       "action_open_page": "Buka layar",
+      "calendar_proposal": "Usulan acara: {{title}}",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "team_proposal": "Mengusulkan tim: {{names}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
@@ -13675,6 +13699,38 @@
     "update_skill_from_source": {
       "label": "Perbarui skill dari tautannya",
       "description": "Memperbarui skill dari tempat skill dipasang. Perubahan skrip menunggu seseorang."
+    },
+    "propose_remove_agents": {
+      "label": "Usulkan mengarsipkan atau menghapus agen",
+      "description": "Memposting kartu berisi agen yang akan diarsipkan atau dihapus. Orang yang berwenang menerapkannya."
+    },
+    "offer_answers": {
+      "label": "Bertanya dengan jawaban untuk diketuk",
+      "description": "Memposting pertanyaan dengan jawaban yang diketuk orangnya. Setiap ketukan menjadi pesannya sendiri."
+    },
+    "propose_team": {
+      "label": "Usulkan sebuah tim",
+      "description": "Memposting kartu berisi beberapa agen, kanal, rutinitas, dan skill mereka. Seseorang yang membuatnya."
+    },
+    "propose_settings_change": {
+      "label": "Usulkan pengaturan rekan",
+      "description": "Memposting kartu berisi model, AI, anggaran, penanggung jawab, audiens, atau kanal baru seorang rekan. Seseorang yang menerapkannya."
+    },
+    "offer_approvals": {
+      "label": "Tampilkan yang menunggu persetujuan",
+      "description": "Memposting kartu berisi persetujuan yang menunggu orang itu, yang menyetujui atau menolak masing-masing di sana."
+    },
+    "propose_member_changes": {
+      "label": "Usulkan perubahan orang",
+      "description": "Memposting kartu berisi pemilik, peran, atau penghapusan yang akan diubah. Orang yang berwenang menerapkan masing-masing."
+    },
+    "offer_open_page": {
+      "label": "Tawarkan membuka sebuah layar",
+      "description": "Memposting kartu yang tombolnya membuka layar aplikasi, seperti tagihan, peran, atau halaman agen."
+    },
+    "set_team_week": {
+      "label": "Ubah kartu Minggu tim",
+      "description": "Menghentikan, memulai lagi, atau memindahkan kartu mingguan Minggu tim di pesan langsung orang itu."
     },
     "propose_agent": {
       "label": "Usulkan agen",

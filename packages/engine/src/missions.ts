@@ -1469,16 +1469,19 @@ export async function pauseStuck(
     reason === "repeated_failure"
       ? `"${detail.title ?? "a task"}" failed ${MISSION_STUCK.failures} times in a row`
       : `I was woken ${MISSION_STUCK.idleWakeups} times without the plan moving`;
-  await postMissionMessage(deps, row, `I paused the mission: ${why}. What should I do? Resume it to let me go on.`, {
-    missionStuck: { missionId: row.id, reason, ...detail },
+  const said = {
     bodyCode: reason === "repeated_failure" ? "mission_stuck_failure" : "mission_stuck_idle",
     bodyParams: {
       title: detail.title ?? "",
       count: String(reason === "repeated_failure" ? MISSION_STUCK.failures : MISSION_STUCK.idleWakeups),
     },
+  };
+  await postMissionMessage(deps, row, `I paused the mission: ${why}. What should I do? Resume it to let me go on.`, {
+    missionStuck: { missionId: row.id, reason, ...detail },
+    ...said,
   });
   await publishMissionEvent(deps, row, "paused", { code: "mission.paused_stuck", reason });
-  await notifyMissionEnded(deps, row, "mission_stopped", { type: "agent", id: row.agentId }, why).catch(() => {});
+  await notifyMissionEnded(deps, row, "mission_stopped", { type: "agent", id: row.agentId }, why, said).catch(() => {});
   if (row.ownerId) {
     await publishUserEvent(deps.pubsub, row.orgId, row.ownerId, {
       type: "mission.needs_you",

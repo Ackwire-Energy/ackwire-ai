@@ -215,16 +215,30 @@ describe("only as the agent's own user", () => {
     };
     const make = (o: Partial<DesktopManagerOptions>) =>
       new DesktopManager({ desktops, log: () => {}, system: linux, ...o });
-    expect(make({}).info()).toEqual({ available: false, reason: expect.stringMatching(/system mode/) });
+    // Each reason comes with its code, which the apps say in the person's language.
+    expect(make({}).info()).toEqual({
+      available: false,
+      reason: expect.stringMatching(/system mode/),
+      code: "desktop_use_own_user",
+    });
     expect(make({ uids: () => null }).info().available).toBe(false);
     expect(make({ uids: () => UIDS }).info()).toEqual({ available: true });
-    expect(make({ uids: () => UIDS, system: { ...linux, platform: "darwin" } }).info().reason).toMatch(/Linux/);
+    expect(make({ uids: () => UIDS, system: { ...linux, platform: "darwin" } }).info()).toMatchObject({
+      reason: expect.stringMatching(/Linux/),
+      code: "desktop_use_linux",
+    });
     const noXdotool = { ...linux, which: (c: string) => (c === "xdotool" ? null : `/usr/bin/${c}`) };
     expect(make({ uids: () => UIDS, system: noXdotool }).info().reason).toMatch(
       /`sudo apt install --no-install-recommends python3 python3-gi python3-xlib xdotool scrot at-spi2-core` \(missing: xdotool\)/,
     );
+    expect(make({ uids: () => UIDS, system: noXdotool }).info().code).toBe("desktop_use_install");
     const noDesktops = { ...desktops, info: () => ({ available: false, reason: "Install the agents' desktops: …" }) };
-    expect(make({ uids: () => UIDS, desktops: noDesktops }).info().reason).toBe("Install the agents' desktops: …");
+    expect(make({ uids: () => UIDS, desktops: noDesktops }).info()).toMatchObject({
+      reason: "Install the agents' desktops: …",
+      code: "desktop_unavailable",
+    });
+    const coded = { ...desktops, info: () => ({ available: false, reason: "…", code: "desktop_install" }) };
+    expect(make({ uids: () => UIDS, desktops: coded }).info().code).toBe("desktop_install");
   });
 
   test("an agent that isn't on its own user gets nothing: no desktop started, no helper run", async () => {

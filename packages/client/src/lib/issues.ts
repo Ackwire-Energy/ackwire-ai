@@ -6,6 +6,9 @@ export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"]
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
 export const PRIORITIES: IssuePriority[] = ["low", "normal", "high"];
 
+/** Columns a stage of the board holds at most (mirror of packages/engine/src/issue-columns.ts). */
+export const STAGE_COLUMNS_MAX = 10;
+
 /** A circle that fills as the work goes. */
 export const STATUS_ICON: Record<IssueStatus, "stageTodo" | "stageProgress" | "stageReview" | "stageDone" | "close"> = {
   todo: "stageTodo",

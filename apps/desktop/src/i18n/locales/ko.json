@@ -500,7 +500,47 @@
       "resultOk": "성공",
       "resultFailed": "실패",
       "resultRefused": "거부됨",
-      "resultRunning": "실행 중"
+      "resultRunning": "실행 중",
+      "said": {
+        "read": "{{path}} 읽음",
+        "wrote": "{{path}}에 씀",
+        "looked": "{{path}} 살펴봄",
+        "sent": "{{path}} 보냄",
+        "thinking": "{{brain}}(으)로 생각하는 중",
+        "task": "{{what}}",
+        "taskStarted": "시작함: {{what}}",
+        "taskFinished": "끝남: {{what}}",
+        "taskCanceled": "취소됨: {{what}}",
+        "taskInterrupted": "중단됨: {{what}}",
+        "taskTimedOut": "시간 제한에서 멈춤: {{what}}",
+        "taskFailed": "실패함 (종료 코드 {{exit}}): {{what}}",
+        "taskNotStarted": "시작하지 못함: {{what}}",
+        "executor": {
+          "codex": "Codex 작업",
+          "claude": "Claude Code 작업"
+        },
+        "paused": "일시 정지됨",
+        "pausedUntil": "{{until}}까지 일시 정지",
+        "resumed": "다시 시작됨",
+        "connected": "{{org}}에 연결됨",
+        "disconnected": "연결 끊김",
+        "disconnectedFrom": "{{org}}와 연결 끊김",
+        "accessAsked": "{{path}} 요청함",
+        "accessNotNow": "지금은 안 됨: {{path}}",
+        "accessExpired": "요청 만료: {{path}}",
+        "toolOn": "{{tool}} 켬",
+        "toolOff": "{{tool}} 끔",
+        "tools": {
+          "commands": "명령 실행",
+          "browser": "브라우저 기능",
+          "desktop": "에이전트 화면",
+          "terminal": "터미널 기능"
+        },
+        "folderAllowed": "{{agents}}에게 {{path}} 허용함",
+        "folderAgents": "{{path}} 이제 {{agents}}용",
+        "folderRemoved": "{{path}} 제거함",
+        "noAgent": "에이전트 없음"
+      }
     },
     "advanced": {
       "title": "고급",

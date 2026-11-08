@@ -52,6 +52,19 @@ export const installCommand = (origin: string) =>
 export const allowFolderCommand = (path: string, handle?: string) =>
   `agentes-runner folders allow ${shellQuote(path)}${handle ? ` --agent ${handle}` : ""}`;
 
+/**
+ * Why a computer can't run its agent browser or desktop use yet, in the person's words (`machines.reasons.<code>`);
+ * a runner from before reason codes says it in its own English.
+ */
+export function machineReasonText(
+  t: TFunction,
+  info: { reason: string | null; code?: string | null } | null | undefined,
+): string | null {
+  if (!info?.code) return info?.reason ?? null;
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return tt(`machines.reasons.${info.code}`, { defaultValue: info.reason ?? "" }) || info.reason;
+}
+
 /** The first command in a runner's own words ("…run `agentes-runner browser install --with-deps`"), to copy. */
 export function commandInReason(reason: string | null | undefined): string | null {
   const m = reason ? /`([^`]+)`/.exec(reason) : null;
