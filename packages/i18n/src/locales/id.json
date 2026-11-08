@@ -1297,7 +1297,7 @@
       "calendar": "Rapat dan tenggat",
       "team": "Siapa siapa: orang, agen, dan grupnya",
       "dashboards": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
-      "taskManager": "Apa yang sedang dikerjakan tiap agen, dan hentikan yang perlu"
+      "taskManager": "Apa yang dikerjakan tiap agen sekarang, dan hentikan yang perlu"
     },
     "customizeSidebar": "Sesuaikan sidebar",
     "sidebarMenu": {
@@ -1503,7 +1503,7 @@
     "list": {
       "agents": "Agen",
       "people": "Orang",
-      "search": "Cari menurut nama, peran, atau kanal",
+      "search": "Cari di tim",
       "filterLabel": "Tampilkan agen",
       "filter": {
         "mine": "Milikku",
@@ -7740,6 +7740,7 @@
     "noResults": "Tidak ada yang bernama itu.",
     "channels_other": "{{count}} kanal",
     "people_other": "{{count}} orang atau agen",
+    "kinds_other": "{{count}} jenis",
     "clearAll": "Hapus filter",
     "clearSearch": "Hapus pencarian"
   },
@@ -9725,7 +9726,6 @@
     "searchHint": "Pintasan untuk mencari",
     "who": "Dibuat oleh",
     "everyone": "Semua",
-    "kinds": "Jenis",
     "kindMany": {
       "document": "Dokumen",
       "table": "Tabel",
@@ -9737,7 +9737,6 @@
       "poll": "Polling",
       "choices": "Pilihan"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Tampilan",
     "viewGrid": "Kisi",
     "viewList": "Daftar",
@@ -12839,6 +12838,7 @@
     "about": "Kamu melihat berapa banyak tiap orang memakai dan dengan agen mana. Isi percakapan pribadi tidak pernah muncul di sini.",
     "plansAbout": "Paket sudah dibayar. Nilai ini hanya membandingkan pemakaian antarorang.",
     "sub_other": "{{month}} · {{count}} orang · {{amount}} untuk AI",
+    "subPlans_other": "{{month}} · {{count}} orang · {{amount}}",
     "periodLabel": "Periode",
     "period": {
       "month": "Bulan ini",
@@ -12886,7 +12886,8 @@
     "meter": {
       "of": "dari {{limit}}",
       "noLimit": "· tanpa batas",
-      "estimate": "≈ {{amount}} lewat API"
+      "estimate": "≈ {{amount}} dengan harga API",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Sekarang",
@@ -12925,7 +12926,8 @@
     },
     "limits": {
       "title": "Batas pemakaian per orang",
-      "lead": "Berapa banyak AI yang boleh dipakai tiap orang per bulan, dari semua agen. Yang dihitung adalah permintaannya dan rutinitas yang ia buat.",
+      "lead": "Berapa banyak AI yang boleh dipakai tiap orang per bulan, dari semua agen.",
+      "leadMore": "Yang dihitung adalah permintaannya dan rutinitas yang ia buat.",
       "default": "Bawaan workspace",
       "defaultHint": "Berlaku untuk yang tidak punya batas dari peran atau pengecualian.",
       "byRole": "Per peran",
@@ -12936,7 +12938,8 @@
       "amount": "Batas per bulan",
       "rule": "Batas milik orang itu yang berlaku. Tanpanya, yang tertinggi dari perannya. Tanpa keduanya, bawaan. Pemilik tidak punya batas.",
       "whenTitle": "Saat seseorang mencapai batas",
-      "block": "Agen berhenti memulai pekerjaan baru untuk orang itu",
+      "whenHint": "Hentikan pekerjaan baru: agen berhenti memulai pekerjaan baru untuk orang itu. Hanya beri tahu: pekerjaan tetap jalan dan admin mendapat pemberitahuan.",
+      "blockShort": "Hentikan pekerjaan baru",
       "notify": "Hanya beri tahu admin",
       "warn": "Peringatkan di 80%",
       "warnHint": "Orang itu mendapat pemberitahuan, dan admin mendapat satu lagi di 100%.",
@@ -12975,7 +12978,9 @@
     "usesNow": "sedang memakainya",
     "monthTokens": "{{tokens}} token bulan ini",
     "tokens": "{{tokens}} token",
-    "equivalent": "≈ {{amount}} lewat API",
+    "equivalent": "≈ {{amount}} dengan harga API",
+    "apiPrice": "harga API",
+    "apiPriceHint": "Saat agen memakai paket, tidak ada yang membayar per pemakaian. Nilai ini adalah biaya pemakaian yang sama lewat API.",
     "thisMonth": "Bulan ini",
     "moreAgents_other": "+{{count}} agen",
     "paid": "{{amount}} dibayar",

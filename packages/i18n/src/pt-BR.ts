@@ -1318,7 +1318,7 @@ export const ptBR = {
       calendar: "Reuniões e prazos da equipe",
       team: "Quem é quem: pessoas, agentes e seus grupos",
       dashboards: "Números e gráficos que os agentes mantêm em dia",
-      taskManager: "O que cada agente está fazendo agora, e parar o que precisar",
+      taskManager: "O que cada agente faz agora, e parar o que precisar",
     },
     customizeSidebar: "Personalizar a barra lateral",
     /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
@@ -1543,7 +1543,7 @@ export const ptBR = {
     list: {
       agents: "Agentes",
       people: "Pessoas",
-      search: "Buscar por nome, função ou canal",
+      search: "Buscar no time",
       filterLabel: "Mostrar agentes",
       filter: {
         mine: "Meus",
@@ -8111,6 +8111,8 @@ export const ptBR = {
     channels_other: "{{count}} canais",
     people_one: "{{count}} pessoa ou agente",
     people_other: "{{count}} pessoas ou agentes",
+    kinds_one: "{{count}} tipo",
+    kinds_other: "{{count}} tipos",
     clearAll: "Limpar filtros",
     clearSearch: "Limpar busca",
   },
@@ -10151,7 +10153,6 @@ export const ptBR = {
     searchHint: "Atalho para buscar",
     who: "Quem fez",
     everyone: "Todos",
-    kinds: "Tipos",
     kindMany: {
       document: "Documentos",
       table: "Tabelas",
@@ -10163,7 +10164,6 @@ export const ptBR = {
       poll: "Votações",
       choices: "Escolhas",
     },
-    kindCount: "{{kind}}: {{count}}",
     view: "Visualização",
     viewGrid: "Grade",
     viewList: "Lista",
@@ -13131,6 +13131,8 @@ export const ptBR = {
     plansAbout: "O plano já está pago. Este valor só compara o uso entre pessoas.",
     sub_one: "{{month}} · {{count}} pessoa · {{amount}} de IA",
     sub_other: "{{month}} · {{count}} pessoas · {{amount}} de IA",
+    subPlans_one: "{{month}} · {{count}} pessoa · {{amount}}",
+    subPlans_other: "{{month}} · {{count}} pessoas · {{amount}}",
     periodLabel: "Período",
     period: { month: "Este mês", last7: "Últimos 7 dias", last30: "Últimos 30 dias", lastMonth: "Mês passado" },
     role: "Papel",
@@ -13162,7 +13164,12 @@ export const ptBR = {
       last: "Último uso {{when}}",
       never: "Sem uso",
     },
-    meter: { of: "de {{limit}}", noLimit: "· sem limite", estimate: "≈ {{amount}} pela API" },
+    meter: {
+      of: "de {{limit}}",
+      noLimit: "· sem limite",
+      estimate: "≈ {{amount}} pelo preço da API",
+      approx: "≈ {{amount}}",
+    },
     live: { title: "Agora", routineOf: "Rotina de {{name}}" },
     from: {
       raised: "aumentado este mês",
@@ -13198,7 +13205,8 @@ export const ptBR = {
     },
     limits: {
       title: "Limite de uso por pessoa",
-      lead: "Quanto cada pessoa pode usar de IA por mês, somando todos os agentes. Conta o que ela pede e as rotinas que ela criou.",
+      lead: "Quanto cada pessoa pode usar de IA por mês, somando todos os agentes.",
+      leadMore: "Conta o que ela pede e as rotinas que ela criou.",
       default: "Padrão do workspace",
       defaultHint: "Vale para quem não tem limite pelo papel nem exceção.",
       byRole: "Por papel",
@@ -13209,7 +13217,9 @@ export const ptBR = {
       amount: "Limite por mês",
       rule: "Vale o limite da pessoa. Sem ele, o maior entre os papéis dela. Sem nenhum, o padrão. Donos não têm limite.",
       whenTitle: "Quando alguém chega no limite",
-      block: "Os agentes param de começar trabalho novo para essa pessoa",
+      whenHint:
+        "Parar trabalho novo: os agentes param de começar trabalho novo para essa pessoa. Só avisar: o trabalho segue e os admins recebem um aviso.",
+      blockShort: "Parar trabalho novo",
       notify: "Só avisar os admins",
       warn: "Avisar em 80%",
       warnHint: "A pessoa recebe um aviso, e os admins recebem outro em 100%.",
@@ -13244,7 +13254,10 @@ export const ptBR = {
     usesNow: "usa agora",
     monthTokens: "{{tokens}} tokens este mês",
     tokens: "{{tokens}} tokens",
-    equivalent: "≈ {{amount}} pela API",
+    equivalent: "≈ {{amount}} pelo preço da API",
+    apiPrice: "o preço da API",
+    apiPriceHint:
+      "Quando os agentes usam planos, ninguém paga por uso. Este valor é o que o mesmo uso custaria pela API.",
     thisMonth: "Este mês",
     moreAgents_one: "+{{count}} agente",
     moreAgents_other: "+{{count}} agentes",

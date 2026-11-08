@@ -1554,7 +1554,7 @@
     "list": {
       "agents": "Agenten",
       "people": "Personen",
-      "search": "Nach Name, Rolle oder Kanal suchen",
+      "search": "Im Team suchen",
       "filterLabel": "Agenten anzeigen",
       "filter": {
         "mine": "Meine",
@@ -8024,6 +8024,8 @@
     "channels_other": "{{count}} Kanäle",
     "people_one": "{{count}} Person oder Agent",
     "people_other": "{{count}} Personen oder Agenten",
+    "kinds_one": "{{count}} Typ",
+    "kinds_other": "{{count}} Typen",
     "clearAll": "Filter zurücksetzen",
     "clearSearch": "Suche zurücksetzen"
   },
@@ -10098,7 +10100,6 @@
     "searchHint": "Tastenkürzel für die Suche",
     "who": "Erstellt von",
     "everyone": "Alle",
-    "kinds": "Typen",
     "kindMany": {
       "document": "Dokumente",
       "table": "Tabellen",
@@ -10110,7 +10111,6 @@
       "poll": "Umfragen",
       "choices": "Auswahlen"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Ansicht",
     "viewGrid": "Raster",
     "viewList": "Liste",
@@ -13286,6 +13286,8 @@
     "plansAbout": "Der Plan ist schon bezahlt. Dieser Betrag vergleicht nur die Nutzung zwischen Personen.",
     "sub_one": "{{month}} · {{count}} Person · {{amount}} für KI",
     "sub_other": "{{month}} · {{count}} Personen · {{amount}} für KI",
+    "subPlans_one": "{{month}} · {{count}} Person · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} Personen · {{amount}}",
     "periodLabel": "Zeitraum",
     "period": {
       "month": "Dieser Monat",
@@ -13333,7 +13335,8 @@
     "meter": {
       "of": "von {{limit}}",
       "noLimit": "· ohne Limit",
-      "estimate": "≈ {{amount}} über die API"
+      "estimate": "≈ {{amount}} zu API-Preisen",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Jetzt",
@@ -13373,7 +13376,8 @@
     },
     "limits": {
       "title": "Nutzungslimit pro Person",
-      "lead": "Wie viel KI jede Person pro Monat nutzen darf, über alle Agenten hinweg. Es zählt, was sie anfragt, und die Routinen, die sie erstellt hat.",
+      "lead": "Wie viel KI jede Person pro Monat nutzen darf, über alle Agenten hinweg.",
+      "leadMore": "Es zählt, was sie anfragt, und die Routinen, die sie erstellt hat.",
       "default": "Standard des Workspace",
       "defaultHint": "Gilt für alle ohne Limit aus einer Rolle oder einer Ausnahme.",
       "byRole": "Nach Rolle",
@@ -13384,7 +13388,8 @@
       "amount": "Monatslimit",
       "rule": "Es gilt das eigene Limit der Person. Ohne eines das höchste ihrer Rollen. Ohne jedes der Standard. Inhaber haben kein Limit.",
       "whenTitle": "Wenn jemand das Limit erreicht",
-      "block": "Agenten beginnen keine neue Arbeit mehr für diese Person",
+      "whenHint": "Neue Arbeit stoppen: Agenten beginnen keine neue Arbeit mehr für diese Person. Nur benachrichtigen: Die Arbeit geht weiter und die Admins erhalten einen Hinweis.",
+      "blockShort": "Neue Arbeit stoppen",
       "notify": "Nur die Admins benachrichtigen",
       "warn": "Bei 80 % warnen",
       "warnHint": "Die Person bekommt einen Hinweis, und die Admins bekommen einen weiteren bei 100 %.",
@@ -13423,7 +13428,9 @@
     "usesNow": "nutzt es gerade",
     "monthTokens": "{{tokens}} Tokens diesen Monat",
     "tokens": "{{tokens}} Tokens",
-    "equivalent": "≈ {{amount}} über die API",
+    "equivalent": "≈ {{amount}} zu API-Preisen",
+    "apiPrice": "den API-Preis",
+    "apiPriceHint": "Wenn Agenten Abos nutzen, zahlt niemand nach Nutzung. Dieser Betrag ist das, was dieselbe Nutzung über die API kosten würde.",
     "thisMonth": "Dieser Monat",
     "moreAgents_one": "+{{count}} Agent",
     "moreAgents_other": "+{{count}} Agenten",

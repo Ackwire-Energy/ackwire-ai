@@ -1319,7 +1319,7 @@ export const en = {
       calendar: "Meetings and deadlines",
       team: "Who's who: people, agents and their groups",
       dashboards: "Numbers and charts the agents keep up to date",
-      taskManager: "What each agent is doing now, and stopping what you need",
+      taskManager: "What each agent does now, and stop what you need",
     },
     customizeSidebar: "Customize sidebar",
     /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
@@ -1547,7 +1547,7 @@ export const en = {
     list: {
       agents: "Agents",
       people: "People",
-      search: "Search by name, role or channel",
+      search: "Search the team",
       filterLabel: "Show agents",
       filter: {
         mine: "Mine",
@@ -8017,6 +8017,8 @@ export const en = {
     channels_other: "{{count}} channels",
     people_one: "{{count}} person or agent",
     people_other: "{{count}} people or agents",
+    kinds_one: "{{count}} type",
+    kinds_other: "{{count}} types",
     clearAll: "Clear filters",
     clearSearch: "Clear search",
   },
@@ -10033,7 +10035,6 @@ export const en = {
     searchHint: "Shortcut to search",
     who: "Made by",
     everyone: "Everyone",
-    kinds: "Types",
     kindMany: {
       document: "Documents",
       table: "Tables",
@@ -10045,7 +10046,6 @@ export const en = {
       poll: "Polls",
       choices: "Choices",
     },
-    kindCount: "{{kind}}: {{count}}",
     view: "View",
     viewGrid: "Grid",
     viewList: "List",
@@ -13026,6 +13026,8 @@ export const en = {
     plansAbout: "The plan is already paid for. This amount only compares use between people.",
     sub_one: "{{month}} · {{count}} person · {{amount}} of AI",
     sub_other: "{{month}} · {{count}} people · {{amount}} of AI",
+    subPlans_one: "{{month}} · {{count}} person · {{amount}}",
+    subPlans_other: "{{month}} · {{count}} people · {{amount}}",
     periodLabel: "Period",
     period: { month: "This month", last7: "Last 7 days", last30: "Last 30 days", lastMonth: "Last month" },
     role: "Role",
@@ -13057,7 +13059,12 @@ export const en = {
       last: "Last used {{when}}",
       never: "No use",
     },
-    meter: { of: "of {{limit}}", noLimit: "· no limit", estimate: "≈ {{amount}} through the API" },
+    meter: {
+      of: "of {{limit}}",
+      noLimit: "· no limit",
+      estimate: "≈ {{amount}} at API prices",
+      approx: "≈ {{amount}}",
+    },
     live: { title: "Now", routineOf: "{{name}}'s routine" },
     from: {
       raised: "raised this month",
@@ -13093,7 +13100,8 @@ export const en = {
     },
     limits: {
       title: "Usage limit per person",
-      lead: "How much AI each person may use a month, across every agent. It counts what they ask for and the routines they created.",
+      lead: "How much AI each person may use a month, across every agent.",
+      leadMore: "It counts what they ask for and the routines they created.",
       default: "Workspace default",
       defaultHint: "For anyone without a limit from a role or an exception.",
       byRole: "By role",
@@ -13104,7 +13112,9 @@ export const en = {
       amount: "Monthly limit",
       rule: "The person's own limit applies. Without one, the highest of their roles'. Without any, the default. Owners have no limit.",
       whenTitle: "When someone reaches the limit",
-      block: "Agents stop starting new work for that person",
+      whenHint:
+        "Stop new work: agents stop starting new work for that person. Only tell: the work goes on and the admins get a notice.",
+      blockShort: "Stop new work",
       notify: "Only tell the admins",
       warn: "Warn at 80%",
       warnHint: "The person gets a notice, and the admins get another at 100%.",
@@ -13139,7 +13149,10 @@ export const en = {
     usesNow: "uses it now",
     monthTokens: "{{tokens}} tokens this month",
     tokens: "{{tokens}} tokens",
-    equivalent: "≈ {{amount}} through the API",
+    equivalent: "≈ {{amount}} at API prices",
+    apiPrice: "the API price",
+    apiPriceHint:
+      "When agents use plans, nobody pays by use. This amount is what the same use would cost through the API.",
     /** The column of each agent's tokens in an account's list. */
     thisMonth: "This month",
     /** The row an account's list folds the rest of its agents into: how many (`percent`, their share, sits beside it). */

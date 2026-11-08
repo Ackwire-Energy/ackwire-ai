@@ -1658,7 +1658,7 @@
     "list": {
       "agents": "Agenci",
       "people": "Osoby",
-      "search": "Szukaj po nazwie, roli lub kanale",
+      "search": "Szukaj w zespole",
       "filterLabel": "Pokaż agentów",
       "filter": {
         "mine": "Moi",
@@ -8616,6 +8616,10 @@
     "people_few": "{{count}} osoby lub agenci",
     "people_many": "{{count}} osób lub agentów",
     "people_other": "{{count}} osoby lub agenta",
+    "kinds_one": "{{count}} typ",
+    "kinds_few": "{{count}} typy",
+    "kinds_many": "{{count}} typów",
+    "kinds_other": "{{count}} typu",
     "clearAll": "Wyczyść filtry",
     "clearSearch": "Wyczyść wyszukiwanie"
   },
@@ -10888,7 +10892,6 @@
     "searchHint": "Skrót do wyszukiwania",
     "who": "Autor",
     "everyone": "Wszyscy",
-    "kinds": "Typy",
     "kindMany": {
       "document": "Dokumenty",
       "table": "Tabele",
@@ -10900,7 +10903,6 @@
       "poll": "Ankiety",
       "choices": "Karty wyboru"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Widok",
     "viewGrid": "Siatka",
     "viewList": "Lista",
@@ -14221,6 +14223,10 @@
     "sub_few": "{{month}} · {{count}} osoby · {{amount}} na AI",
     "sub_many": "{{month}} · {{count}} osób · {{amount}} na AI",
     "sub_other": "{{month}} · {{count}} osoby · {{amount}} na AI",
+    "subPlans_one": "{{month}} · {{count}} osoba · {{amount}}",
+    "subPlans_few": "{{month}} · {{count}} osoby · {{amount}}",
+    "subPlans_many": "{{month}} · {{count}} osób · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} osoby · {{amount}}",
     "periodLabel": "Okres",
     "period": {
       "month": "Ten miesiąc",
@@ -14268,7 +14274,8 @@
     "meter": {
       "of": "z {{limit}}",
       "noLimit": "· bez limitu",
-      "estimate": "≈ {{amount}} przez API"
+      "estimate": "≈ {{amount}} po cenach API",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Teraz",
@@ -14310,7 +14317,8 @@
     },
     "limits": {
       "title": "Limit użycia na osobę",
-      "lead": "Ile AI każda osoba może użyć w miesiącu, łącznie ze wszystkimi agentami. Liczy się to, o co prosi, i rutyny, które utworzyła.",
+      "lead": "Ile AI każda osoba może użyć w miesiącu, łącznie ze wszystkimi agentami.",
+      "leadMore": "Liczy się to, o co prosi, i rutyny, które utworzyła.",
       "default": "Domyślny workspace'u",
       "defaultHint": "Dotyczy osób bez limitu z roli ani wyjątku.",
       "byRole": "Według roli",
@@ -14321,7 +14329,8 @@
       "amount": "Limit miesięczny",
       "rule": "Obowiązuje limit osoby. Bez niego najwyższy z jej ról. Bez żadnego domyślny. Właściciele nie mają limitu.",
       "whenTitle": "Gdy ktoś osiągnie limit",
-      "block": "Agenci przestają zaczynać nową pracę dla tej osoby",
+      "whenHint": "Zatrzymać nową pracę: agenci przestają zaczynać nową pracę dla tej osoby. Tylko powiadomić: praca trwa dalej, a admini dostają powiadomienie.",
+      "blockShort": "Zatrzymać nową pracę",
       "notify": "Tylko powiadom adminów",
       "warn": "Ostrzegaj przy 80%",
       "warnHint": "Osoba dostaje powiadomienie, a admini kolejne przy 100%.",
@@ -14360,7 +14369,9 @@
     "usesNow": "używa go teraz",
     "monthTokens": "{{tokens}} tokenów w tym miesiącu",
     "tokens": "{{tokens}} tokenów",
-    "equivalent": "≈ {{amount}} przez API",
+    "equivalent": "≈ {{amount}} po cenach API",
+    "apiPrice": "cenę API",
+    "apiPriceHint": "Gdy agenci korzystają z planów, nikt nie płaci za użycie. Ta kwota to koszt takiego samego użycia przez API.",
     "thisMonth": "Ten miesiąc",
     "moreAgents_one": "+{{count}} inny agent",
     "moreAgents_few": "+{{count}} innych agentów",

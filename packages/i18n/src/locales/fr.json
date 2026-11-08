@@ -1369,7 +1369,7 @@
       "calendar": "Réunions et échéances",
       "team": "Qui est qui : personnes, agents et leurs groupes",
       "dashboards": "Des chiffres et des graphiques que les agents tiennent à jour",
-      "taskManager": "Ce que chaque agent fait en ce moment, et arrêter ce qu'il faut"
+      "taskManager": "Ce que chaque agent fait maintenant, et arrêter ce qu'il faut"
     },
     "customizeSidebar": "Personnaliser la barre latérale",
     "sidebarMenu": {
@@ -1606,7 +1606,7 @@
     "list": {
       "agents": "Agents",
       "people": "Personnes",
-      "search": "Rechercher par nom, rôle ou canal",
+      "search": "Chercher dans l'équipe",
       "filterLabel": "Afficher les agents",
       "filter": {
         "mine": "Les miens",
@@ -8330,6 +8330,9 @@
     "people_one": "{{count}} personne ou agent",
     "people_many": "{{count}} personnes ou agents",
     "people_other": "{{count}} personnes ou agents",
+    "kinds_one": "{{count}} type",
+    "kinds_many": "{{count}} types",
+    "kinds_other": "{{count}} types",
     "clearAll": "Effacer les filtres",
     "clearSearch": "Effacer la recherche"
   },
@@ -10486,7 +10489,6 @@
     "searchHint": "Raccourci de recherche",
     "who": "Créé par",
     "everyone": "Tout le monde",
-    "kinds": "Types de fichier",
     "kindMany": {
       "document": "Documents",
       "table": "Tableaux",
@@ -10498,7 +10500,6 @@
       "poll": "Sondages",
       "choices": "Choix"
     },
-    "kindCount": "{{kind}} : {{count}}",
     "view": "Affichage",
     "viewGrid": "Grille",
     "viewList": "Liste",
@@ -13748,6 +13749,9 @@
     "sub_one": "{{month}} · {{count}} personne · {{amount}} d'IA",
     "sub_many": "{{month}} · {{count}} personnes · {{amount}} d'IA",
     "sub_other": "{{month}} · {{count}} personnes · {{amount}} d'IA",
+    "subPlans_one": "{{month}} · {{count}} personne · {{amount}}",
+    "subPlans_many": "{{month}} · {{count}} personnes · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} personnes · {{amount}}",
     "periodLabel": "Période",
     "period": {
       "month": "Ce mois-ci",
@@ -13795,7 +13799,8 @@
     "meter": {
       "of": "sur {{limit}}",
       "noLimit": "· sans limite",
-      "estimate": "≈ {{amount}} via l'API"
+      "estimate": "≈ {{amount}} au prix de l'API",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Maintenant",
@@ -13836,7 +13841,8 @@
     },
     "limits": {
       "title": "Limite d'utilisation par personne",
-      "lead": "Combien d'IA chaque personne peut utiliser par mois, tous agents confondus. Cela compte ce qu'elle demande et les routines qu'elle a créées.",
+      "lead": "Combien d'IA chaque personne peut utiliser par mois, tous agents confondus.",
+      "leadMore": "Cela compte ce qu'elle demande et les routines qu'elle a créées.",
       "default": "Par défaut du workspace",
       "defaultHint": "S'applique à qui n'a pas de limite par rôle ni d'exception.",
       "byRole": "Par rôle",
@@ -13847,7 +13853,8 @@
       "amount": "Limite par mois",
       "rule": "La limite de la personne s'applique. Sans elle, la plus haute de ses rôles. Sans aucune, celle par défaut. Les propriétaires n'ont pas de limite.",
       "whenTitle": "Quand quelqu'un atteint la limite",
-      "block": "Les agents ne commencent plus de nouveau travail pour cette personne",
+      "whenHint": "Arrêter le nouveau travail : les agents ne commencent plus de nouveau travail pour cette personne. Prévenir seulement : le travail continue et les admins reçoivent un avis.",
+      "blockShort": "Arrêter le nouveau travail",
       "notify": "Prévenir seulement les admins",
       "warn": "Prévenir à 80 %",
       "warnHint": "La personne reçoit un avis, et les admins en reçoivent un autre à 100 %.",
@@ -13886,7 +13893,9 @@
     "usesNow": "l'utilise en ce moment",
     "monthTokens": "{{tokens}} jetons ce mois-ci",
     "tokens": "{{tokens}} jetons",
-    "equivalent": "≈ {{amount}} via l'API",
+    "equivalent": "≈ {{amount}} au prix de l'API",
+    "apiPrice": "le prix de l'API",
+    "apiPriceHint": "Quand les agents utilisent des forfaits, personne ne paie à l'usage. Ce montant est ce que coûterait le même usage via l'API.",
     "thisMonth": "Ce mois-ci",
     "moreAgents_one": "+{{count}} autre agent",
     "moreAgents_many": "+{{count}} autres agents",

@@ -1297,7 +1297,7 @@
       "calendar": "会议和截止日期",
       "team": "谁是谁：成员、智能体及其分组",
       "dashboards": "智能体保持更新的数字和图表",
-      "taskManager": "查看每个智能体正在做什么，并停止需要停止的任务"
+      "taskManager": "每个智能体现在在做什么，并停止需要停止的任务"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
@@ -1503,7 +1503,7 @@
     "list": {
       "agents": "智能体",
       "people": "成员",
-      "search": "按名称、角色或频道搜索",
+      "search": "在团队中搜索",
       "filterLabel": "显示智能体",
       "filter": {
         "mine": "我的",
@@ -7737,6 +7737,7 @@
     "noResults": "没有这个名称的结果。",
     "channels_other": "{{count}} 个频道",
     "people_other": "{{count}} 个成员或智能体",
+    "kinds_other": "{{count}} 种类型",
     "clearAll": "清除筛选",
     "clearSearch": "清除搜索"
   },
@@ -9736,7 +9737,6 @@
     "searchHint": "搜索快捷键",
     "who": "创建者",
     "everyone": "所有人",
-    "kinds": "类型",
     "kindMany": {
       "document": "文档",
       "table": "表格",
@@ -9748,7 +9748,6 @@
       "poll": "投票",
       "choices": "选项"
     },
-    "kindCount": "{{kind}}：{{count}}",
     "view": "视图",
     "viewGrid": "网格",
     "viewList": "列表",
@@ -12846,6 +12845,7 @@
     "about": "你可以看到每个人用了多少、用了哪些智能体。私聊的内容永远不会出现在这里。",
     "plansAbout": "套餐已付费。这个金额只用于比较成员之间的用量。",
     "sub_other": "{{month}} · {{count}} 人 · AI 用量 {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} 人 · {{amount}}",
     "periodLabel": "时间段",
     "period": {
       "month": "本月",
@@ -12893,7 +12893,8 @@
     "meter": {
       "of": "/ {{limit}}",
       "noLimit": "· 无额度",
-      "estimate": "按 API 计 ≈ {{amount}}"
+      "estimate": "按 API 价格约 {{amount}}",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "现在",
@@ -12932,7 +12933,8 @@
     },
     "limits": {
       "title": "每人使用额度",
-      "lead": "每个人每月可使用的 AI 量,合计所有智能体。包括本人提出的请求和本人创建的例行任务。",
+      "lead": "每个人每月可使用的 AI 量，合计所有智能体。",
+      "leadMore": "包括本人提出的请求和本人创建的例行任务。",
       "default": "工作区默认",
       "defaultHint": "适用于没有角色额度或例外的人。",
       "byRole": "按角色",
@@ -12943,7 +12945,8 @@
       "amount": "每月额度",
       "rule": "优先使用本人的额度。没有时取其角色中最高的额度。都没有时使用默认值。所有者没有额度。",
       "whenTitle": "有人达到额度时",
-      "block": "智能体不再为此人开始新工作",
+      "whenHint": "停止新工作：智能体不再为此人开始新工作。只通知：工作继续进行，管理员会收到通知。",
+      "blockShort": "停止新工作",
       "notify": "只通知管理员",
       "warn": "达到 80% 时提醒",
       "warnHint": "本人会收到提醒,管理员会在 100% 时再收到一条。",
@@ -12982,7 +12985,9 @@
     "usesNow": "正在使用",
     "monthTokens": "本月 {{tokens}} 个 token",
     "tokens": "{{tokens}} 个 token",
-    "equivalent": "按 API 计约 {{amount}}",
+    "equivalent": "按 API 价格约 {{amount}}",
+    "apiPrice": "API 价格",
+    "apiPriceHint": "智能体使用套餐时，没有人按用量付费。这个金额是同样的用量通过 API 需要的费用。",
     "thisMonth": "本月",
     "moreAgents_other": "+{{count}} 个智能体",
     "paid": "已支付 {{amount}}",
