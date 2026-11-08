@@ -24,6 +24,8 @@ import {
   Icon,
   type IconName,
   LineIcon,
+  MEDIA_ROW,
+  MediaRow,
   PressScale,
   Segmented,
   Text,
@@ -233,22 +235,21 @@ export function ProposalBanner({ board }: { board: Dashboard }) {
     );
   return (
     <View style={[styles.proposal, surface]}>
-      <View style={styles.proposalTop}>
-        <AgentFace agentId={p.agentId} size={28} live={false} />
-        <View style={styles.grow}>
-          <Text variant="subhead" tone="ink" style={styles.semibold}>
-            {t("dashboards.proposal.title", { name: look.name })}
+      {/* The agent's face and what it asks on one line; who would see it and why under them, whole. */}
+      <MediaRow
+        size="row"
+        face={<AgentFace agentId={p.agentId} size={MEDIA_ROW.row.face} live={false} />}
+        name={t("dashboards.proposal.title", { name: look.name })}
+      >
+        <Text variant="footnote" tone="muted">
+          {toRoles ? t("dashboards.proposal.roles", { roles: names }) : t("dashboards.proposal.workspace")}
+        </Text>
+        {p.why ? (
+          <Text variant="footnote" tone="faint">
+            {p.why}
           </Text>
-          <Text variant="footnote" tone="muted">
-            {toRoles ? t("dashboards.proposal.roles", { roles: names }) : t("dashboards.proposal.workspace")}
-          </Text>
-          {p.why ? (
-            <Text variant="footnote" tone="faint" numberOfLines={3}>
-              {p.why}
-            </Text>
-          ) : null}
-        </View>
-      </View>
+        ) : null}
+      </MediaRow>
       <View style={styles.proposalActions}>
         <Button
           size="sm"
@@ -531,7 +532,6 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  proposalTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   proposalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 8 },
   chips: { gap: 6, paddingHorizontal: 16 },
   // Min heights: with a large text size the label grows past them instead of being clipped.

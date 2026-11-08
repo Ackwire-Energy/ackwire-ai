@@ -40,6 +40,22 @@ describe("MediaRow", () => {
     expect(row).toContain("<View style={[styles.end, { height: side, marginTop: axis.face }]}>{end}</View>");
   });
 
+  test("an agent's ask to show a board: its face and the ask on one line, who would see it and why under them, whole", () => {
+    const parts = src("features/dashboards/parts.tsx");
+    expect(parts).toMatch(
+      /<MediaRow\s+size="row"\s+face=\{<AgentFace agentId=\{p\.agentId\} size=\{MEDIA_ROW\.row\.face\}/,
+    );
+    expect(parts).not.toContain("proposalTop");
+    expect(parts).not.toContain("numberOfLines={3}");
+  });
+
+  test("Definir status' preview: what it is over the row, your face and name on one line, your status under them", () => {
+    const screen = src("features/status/StatusScreen.tsx");
+    expect(screen).toContain("<WithPresence size={MEDIA_ROW.card.face} presence={shown} ring={c.raised}>");
+    expect(screen).toMatch(/name=\{name\}\s*>\s*<Text variant="small" tone="muted">/);
+    expect(screen).toContain("preview: { gap: 8, paddingHorizontal: 16, paddingVertical: 14 },");
+  });
+
   test("screens import it from the design system", () => {
     expect(src("ui/index.ts")).toContain('export { MediaRow, type MediaRowProps } from "./MediaRow";');
   });

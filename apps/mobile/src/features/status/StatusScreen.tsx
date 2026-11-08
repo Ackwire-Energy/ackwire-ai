@@ -16,6 +16,8 @@ import {
   GroupedList,
   GroupedRow,
   Icon,
+  MEDIA_ROW,
+  MediaRow,
   PresenceBadge,
   Text,
   useTheme,
@@ -171,23 +173,24 @@ function StatusEditor() {
       action={{ label: t("common.save"), onPress: save, disabled: !meId || !me }}
     >
       <Gap />
-      {/* How people see you, as you edit. */}
+      {/* How people see you, as you edit: what it is over the row, your face and name on one line, your status under. */}
       <GroupedList>
         <View style={styles.preview}>
-          <WithPresence size={48} presence={shown} ring={c.raised} cell={1.2}>
-            <Face who={meId ? { type: "person", id: meId } : null} size={48} live={false} />
-          </WithPresence>
-          <View style={styles.grow}>
-            <Text variant="caption" tone="faint" numberOfLines={1}>
-              {d.availability === "hidden" ? t("presence.hiddenPreview") : t("presence.howOthersSee")}
-            </Text>
-            <Text variant="body" numberOfLines={1} style={styles.semibold}>
-              {name}
-            </Text>
-            <Text variant="small" tone="muted" numberOfLines={1}>
+          <Text variant="caption" tone="faint">
+            {d.availability === "hidden" ? t("presence.hiddenPreview") : t("presence.howOthersSee")}
+          </Text>
+          <MediaRow
+            face={
+              <WithPresence size={MEDIA_ROW.card.face} presence={shown} ring={c.raised}>
+                <Face who={meId ? { type: "person", id: meId } : null} size={MEDIA_ROW.card.face} live={false} />
+              </WithPresence>
+            }
+            name={name}
+          >
+            <Text variant="small" tone="muted">
               {text ? lineText({ emoji: d.emoji, text }) : t(`presence.${shown}`)}
             </Text>
-          </View>
+          </MediaRow>
         </View>
       </GroupedList>
 
@@ -304,10 +307,8 @@ function StatusEditor() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0 },
-  semibold: { fontWeight: "600" },
   pressed: { opacity: 0.6 },
-  preview: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  preview: { gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
   field: {
     flexDirection: "row",
     alignItems: "center",
