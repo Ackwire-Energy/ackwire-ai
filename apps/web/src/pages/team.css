@@ -114,7 +114,7 @@
   font-weight: 650;
 }
 .team-archived__row {
-  padding: 8px;
+  padding: var(--row-py) 8px;
   border-radius: var(--radius-sm);
 }
 .team-archived__row:hover {

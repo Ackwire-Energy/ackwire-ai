@@ -10801,11 +10801,7 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   color: var(--ink-muted);
 }
 /* An item with a line under its name (Adicionar workspace, Convidar pessoas): its icon on the name's line, as a menu
-   option's lead is, not in the middle of both lines, and the item's own 12px above it (a menu's two-line rows take
-   8), the room a touch screen needs around it. */
-.ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) {
-  padding-block: 12px;
-}
+   option's lead is, not in the middle of both lines. The item keeps its own room, a touch menu's described row (58). */
 .ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-icon:first-child {
   align-self: flex-start;
   /* Browsers without the lh unit: the item's 20px line. */
