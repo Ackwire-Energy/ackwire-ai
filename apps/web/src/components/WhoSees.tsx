@@ -74,10 +74,12 @@ export function WhoSeesButton({
           onClick={onClick}
         >
           <span className="ac-select__value">
-            <span className="ac-select__lead" aria-hidden="true">
-              <Icon name={icon} size={16} />
+            <span>
+              <span className="ac-select__lead" aria-hidden="true">
+                <Icon name={icon} size={16} />
+              </span>
+              <span className="ac-select__text">{label}</span>
             </span>
-            <span className="ac-select__text">{label}</span>
           </span>
           <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
             <path d="m6 8 4 4 4-4" />

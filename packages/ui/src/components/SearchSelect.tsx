@@ -156,7 +156,15 @@ export function SearchSelect<V extends string = string, O extends SelectOption<V
             }}
           >
             <span className="ac-select__value">
-              {renderValue ? renderValue(chosen) : chosen ? <ChosenValue option={chosen} /> : placeholder}
+              {renderValue ? (
+                renderValue(chosen)
+              ) : chosen ? (
+                <span>
+                  <ChosenValue option={chosen} />
+                </span>
+              ) : (
+                placeholder
+              )}
             </span>
             <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
               <path d="m6 8 4 4 4-4" />

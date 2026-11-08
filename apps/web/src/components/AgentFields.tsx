@@ -116,7 +116,13 @@ export function BrainPickSelect({
         list: t("models.list"),
       }}
       renderValue={(o) =>
-        o ? <ChosenValue option={{ ...o, label: o.title }} /> : <span className="newag__sel-value">{fallback}</span>
+        o ? (
+          <span>
+            <ChosenValue option={{ ...o, label: o.title }} />
+          </span>
+        ) : (
+          <span className="newag__sel-value">{fallback}</span>
+        )
       }
     />
   );
@@ -150,7 +156,15 @@ export function ModelSelect({
         noResults: t("models.noResults"),
         list: t("models.list"),
       }}
-      renderValue={(o) => (o ? <ChosenValue option={o} /> : value)}
+      renderValue={(o) =>
+        o ? (
+          <span>
+            <ChosenValue option={o} />
+          </span>
+        ) : (
+          value
+        )
+      }
     />
   );
 }
