@@ -13136,14 +13136,29 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-panel__row > .ac-acts > .ac-btn {
   max-width: 100%;
 }
-/* A long action on a phone takes two lines rather than run past the panel's edge. */
+/* A long action on a phone takes two lines rather than run past the panel's edge, a step's too (under its words, 32px
+   in: "Abrir as configurações do ChatGPT" at 320). */
 @media (max-width: 640px) {
-  .ai-panel__row > .ac-btn {
+  .ai-panel__row > .ac-btn,
+  .agp-addacct__step > .ac-btn {
     max-width: 100%;
     height: auto;
     min-height: var(--control-h-sm);
     padding-block: 6px;
     white-space: normal;
+  }
+  .agp-addacct__step.ac-iconline > .ac-btn {
+    max-width: calc(100% - 32px);
+  }
+  /* Its icon stays on the first line, as an `.ac-iconline` lead does, and one line still makes a 32px button. */
+  @supports (top: 1lh) {
+    :is(.ai-panel__row, .agp-addacct__step) > .ac-btn {
+      align-items: flex-start;
+      padding-block: calc((var(--control-h-sm) - 1lh) / 2);
+    }
+    :is(.ai-panel__row, .agp-addacct__step) > .ac-btn > .ac-icon:first-child {
+      translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+    }
   }
 }
 /* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
