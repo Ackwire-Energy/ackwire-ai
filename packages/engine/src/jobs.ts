@@ -59,6 +59,7 @@ import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
+import type { GitHubAppAccess } from "./git/github-call";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import { announceTaskConversation } from "./issues";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -170,6 +171,8 @@ export interface JobDeps extends RunExecutorDeps {
   vault?: VaultDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
+  /** The server's GitHub App: job `org.delete` uninstalls it from the workspace's GitHub accounts (ADR 0153). */
+  githubApp?: GitHubAppAccess;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
   mail?: MailAdapters | null;
   /** What a deleted workspace leaves in the server's log (job `org.delete`). */
@@ -898,7 +901,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
     [ORG_DELETE_JOB]: async (job, ctx) => {
       await purgeWorkspace(
-        { db: deps.db, pubsub: deps.pubsub, connectors: deps.connectors, mail: deps.mail, log: deps.log },
+        {
+          db: deps.db,
+          pubsub: deps.pubsub,
+          connectors: deps.connectors,
+          githubApp: deps.githubApp,
+          mail: deps.mail,
+          log: deps.log,
+        },
         String(job.payload.orgId),
         { finalAttempt: ctx.finalAttempt },
       );

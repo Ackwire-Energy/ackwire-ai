@@ -705,6 +705,7 @@ export function buildEngine(o: EngineOptions) {
     skills: skillDeps,
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
+    githubApp: githubAppAccess,
     // External Vault sources synced every few minutes (ADR 0144).
     vault,
     mail: adapters.mail,
