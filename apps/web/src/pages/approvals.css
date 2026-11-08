@@ -866,11 +866,19 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
+/* As wide as its buttons: on a narrow bar they wrap, and the line that says what Aprovar sempre covers goes under them at
+   their width (it adds none of its own), never cut by the bar's edge. */
 .ap-bar__acts {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.ap-bar__acts .ap-always {
+  contain: inline-size;
 }
 .ap-bar--refuse {
   display: block;
