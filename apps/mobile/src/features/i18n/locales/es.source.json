@@ -2344,6 +2344,36 @@
   "me.workspacesIn": {
     "value": "You're in"
   },
+  "me.workspacesFoot": {
+    "value": "You stay signed in to each one and get notifications from all of them. Tap a workspace to open it."
+  },
+  "me.workspacesUnreachable": {
+    "value": "No answer right now"
+  },
+  "me.addWorkspace": {
+    "value": "Add workspace"
+  },
+  "me.addWorkspaceCreate": {
+    "value": "Create a new workspace"
+  },
+  "me.addWorkspaceCreateSub": {
+    "value": "On agentes.chat"
+  },
+  "me.addWorkspaceTeam": {
+    "value": "Join your team's server"
+  },
+  "me.addWorkspaceTeamSub": {
+    "value": "By its address or the QR code shown on the computer"
+  },
+  "me.teamServer": {
+    "value": "Team server"
+  },
+  "me.teamServerLead": {
+    "value": "Your team's agentes.chat address, the same one shown in the browser."
+  },
+  "me.teamServerFoot": {
+    "value": "You don't leave any workspace: your team's server joins your list, with your account there."
+  },
   "me.account.title": {
     "value": "Account"
   },

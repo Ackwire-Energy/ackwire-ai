@@ -1,0 +1,113 @@
+import { describe, expect, test } from "bun:test";
+import type { OrgSummary } from "@agenteschat/client";
+import { orderedServers, unreadElsewhere, workspacesOf } from "../src/features/me/workspaces-logic";
+import { newWorkspaceMade } from "../src/lib/new-workspace";
+import { readPushData } from "../src/lib/push-payload";
+import {
+  prefixesFrom,
+  pushPlace,
+  serverAfter,
+  serverListFrom,
+  serverSlug,
+  sessionPrefix,
+  withoutServer,
+  withServer,
+} from "../src/lib/server-choice";
+
+// Workspaces across servers (ADR 0154).
+const cloud = "https://app.agentes.chat";
+const box = "https://agentes.exemplo.com.br";
+const lab = "https://lab.tail1234.ts.net";
+
+describe("a session per server", () => {
+  test("the server used before keeps the old prefix, so whoever was signed in stays", () => {
+    expect(prefixesFrom(null, box, "agenteschat")).toEqual({ [box]: "agenteschat" });
+    const kept = prefixesFrom(JSON.stringify({ [box]: "agenteschat" }), cloud, "agenteschat");
+    expect(sessionPrefix(kept, box, "agenteschat")).toBe("agenteschat");
+    // Any other server: its own, from its address, the same every time, and one storage keys can take.
+    const own = sessionPrefix(kept, cloud, "agenteschat");
+    expect(own).toBe(`agenteschat_${serverSlug(cloud)}`);
+    expect(own).toMatch(/^[A-Za-z0-9._-]+$/);
+    expect(serverSlug(cloud)).not.toBe(serverSlug(box));
+    expect(serverSlug(cloud)).toBe(serverSlug(cloud));
+    // Unreadable or odd values: as on the first launch, or dropped.
+    expect(prefixesFrom("{", box, "agenteschat")).toEqual({ [box]: "agenteschat" });
+    expect(prefixesFrom(JSON.stringify({ [box]: "a b", [cloud]: 3 }), box, "agenteschat")).toEqual({});
+  });
+
+  test("the servers signed in to: in the order added, each once, addresses only", () => {
+    expect(serverListFrom(null)).toEqual([]);
+    expect(serverListFrom(JSON.stringify([box, "not a server", box, 4, cloud]))).toEqual([box, cloud]);
+    expect(serverListFrom("nope")).toEqual([]);
+    expect(withServer([box], cloud)).toEqual([box, cloud]);
+    expect(withServer([box, cloud], box)).toEqual([box, cloud]);
+    expect(withoutServer([box, cloud], box)).toEqual([cloud]);
+    // Signing out of one: the app goes to the next still signed in, or to sign-in with none left.
+    expect(serverAfter([box, cloud], box)).toBe(cloud);
+    expect(serverAfter([box], box)).toBeNull();
+    expect(serverAfter([], box)).toBeNull();
+  });
+});
+
+describe("a push from another server", () => {
+  test("names its server; it opens there, after the app moves, or nowhere for one it left", () => {
+    expect(readPushData({ server: box, orgId: "o1" })).toEqual({ server: box, orgId: "o1" });
+    expect(pushPlace(undefined, cloud, [cloud, box])).toEqual({ kind: "here" });
+    expect(pushPlace(`${cloud}/`, cloud, [cloud, box])).toEqual({ kind: "here" });
+    expect(pushPlace(box, cloud, [cloud, box])).toEqual({ kind: "switch", server: box });
+    expect(pushPlace(lab, cloud, [cloud, box])).toEqual({ kind: "gone" });
+    expect(pushPlace("not a server", cloud, [cloud])).toEqual({ kind: "here" });
+  });
+});
+
+describe("Workspaces", () => {
+  const org = (id: string, name: string): OrgSummary => ({ id, name, role: "member" }) as OrgSummary;
+
+  test("every server signed in to, the current one listed even before its session is known", () => {
+    expect(orderedServers([cloud, box], box)).toEqual([cloud, box]);
+    expect(orderedServers([cloud], box)).toEqual([box, cloud]);
+  });
+
+  test("each server's workspaces with their unread counts, and the total outside the one open", () => {
+    const here = workspacesOf({
+      server: cloud,
+      current: true,
+      orgs: [org("a", "Acme"), org("n", "Estúdio Norte")],
+      unread: [
+        { orgId: "a", unread: 2 },
+        { orgId: "n", unread: 3 },
+      ],
+      failed: false,
+    });
+    expect(here.host).toBe("agentes.chat");
+    expect(here.orgs.map((o) => [o.id, o.unread])).toEqual([
+      ["a", 2],
+      ["n", 3],
+    ]);
+    const there = workspacesOf({ server: box, current: false, orgs: [org("o", "Oficina")], unread: [], failed: false });
+    expect(there.host).toBe("agentes.exemplo.com.br");
+    expect(there.orgs[0]?.unread).toBe(0);
+    const withNews = workspacesOf({
+      server: box,
+      current: false,
+      orgs: [org("o", "Oficina")],
+      unread: [{ orgId: "o", unread: 1 }],
+      failed: false,
+    });
+    // The open workspace's own unread isn't counted: Você says what waits elsewhere.
+    expect(unreadElsewhere([here, withNews], "a")).toBe(4);
+    // A server that didn't answer with nothing known keeps its group, saying so.
+    const down = workspacesOf({ server: lab, current: false, orgs: [], unread: [], failed: true });
+    expect(down.failed).toBe(true);
+    expect(workspacesOf({ server: lab, current: false, orgs: [org("x", "X")], unread: [], failed: true }).failed).toBe(
+      false,
+    );
+  });
+
+  test("a new workspace asked for: over once another workspace is open than when the first run showed", () => {
+    expect(newWorkspaceMade({ server: cloud }, "a")).toBe(false);
+    expect(newWorkspaceMade({ server: cloud, from: "a" }, "a")).toBe(false);
+    expect(newWorkspaceMade({ server: cloud, from: "a" }, "new")).toBe(true);
+    expect(newWorkspaceMade({ server: cloud, from: null }, "new")).toBe(true);
+  });
+});

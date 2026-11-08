@@ -968,6 +968,18 @@ export const featureKeysEn = {
     version: "agentes.chat · version {{version}}",
     workspaces: "Workspaces",
     workspacesIn: "You're in",
+    workspacesFoot:
+      "You stay signed in to each one and get notifications from all of them. Tap a workspace to open it.",
+    /** A server in Workspaces that didn't answer. */
+    workspacesUnreachable: "No answer right now",
+    addWorkspace: "Add workspace",
+    addWorkspaceCreate: "Create a new workspace",
+    addWorkspaceCreateSub: "On agentes.chat",
+    addWorkspaceTeam: "Join your team's server",
+    addWorkspaceTeamSub: "By its address or the QR code shown on the computer",
+    teamServer: "Team server",
+    teamServerLead: "Your team's agentes.chat address, the same one shown in the browser.",
+    teamServerFoot: "You don't leave any workspace: your team's server joins your list, with your account there.",
     account: {
       title: "Account",
       save: "OK",
