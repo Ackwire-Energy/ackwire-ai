@@ -353,7 +353,7 @@ function ChannelCard({
 
 const styles = StyleSheet.create({
   // Under the large title's words (20 in, not the page's 16), tucked to it as Memória's and Wiki's lines are.
-  summary: { paddingHorizontal: 20, marginTop: -4 },
+  summary: { paddingHorizontal: 16, marginTop: -4 },
   page: { paddingHorizontal: PAGE },
   lead: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52 },
   // The thin stem between a face and what hangs from it.

@@ -28,6 +28,7 @@ import {
   useTheme,
 } from "@/ui";
 import { withAlpha } from "@/ui/palette";
+import { useFontScale } from "@/ui/text-scale";
 import { leadBox } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 
@@ -108,7 +109,7 @@ export function ActionList({ items }: { items: ActionItem[] }) {
 /** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
 function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
   const c = useColors();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const line = textLineOf("body", fontScale);
   // A hint that may wrap: the icon and what is on the right stay on the label's line, not the row's middle.
   const tall = Boolean(it.hint) && !it.oneLine;

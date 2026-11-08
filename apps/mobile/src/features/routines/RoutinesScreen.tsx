@@ -2,7 +2,7 @@ import { type Routine, useRoutines } from "@agenteschat/client";
 import { routineStateTime, routineStateWords } from "@agenteschat/client/lib/routine-view";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
@@ -15,6 +15,7 @@ import {
   ListRow,
   SearchField,
   SectionHeader,
+  SkeletonList,
   Text,
   useReducedMotion,
 } from "@/ui";
@@ -122,9 +123,8 @@ function RoutineList() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {routines.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : routines.isError && !routines.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   search: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
-  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 20, paddingVertical: 14 },
+  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 14 },
   pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },
 });

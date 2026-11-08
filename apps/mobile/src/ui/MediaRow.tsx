@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { MEDIA_ROW, type MediaRowSize, mediaRowAxis } from "./media-row";
 import { Text, type TextTone, textLineOf } from "./Text";
+import { useFontScale } from "./text-scale";
 import { weights } from "./type-scale";
 
 export interface MediaRowProps {
@@ -23,7 +24,7 @@ export interface MediaRowProps {
 /** A face, the name and what it is on one line, and the rest under them at full width (the web's MediaRow). */
 export function MediaRow({ face, name, meta, end, children, size = "card", quiet }: MediaRowProps) {
   const { face: side, gap } = MEDIA_ROW[size];
-  const axis = mediaRowAxis(side, textLineOf("subhead", useWindowDimensions().fontScale));
+  const axis = mediaRowAxis(side, textLineOf("subhead", useFontScale()));
   return (
     <View style={styles.row}>
       <View style={[styles.head, { gap }]}>

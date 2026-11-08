@@ -1150,6 +1150,8 @@ export const featureKeysEn = {
     on: "On",
     off: "Off",
     notificationsPhone: "Notifications on this phone",
+    /** Conversa, under "When opening a conversation": what the last-read choice shows. */
+    chatOpenAtHelp: "Where you stopped, a “New” line marks what came after.",
     notificationsOnHint: "They also arrive in the browser and the desktop app, if they're on there.",
     notificationsOffHint: "Turn them on to get notifications here. The kinds below apply to all your devices.",
     notificationsKindsHint: "Activity keeps everything. This applies to this workspace, on all your devices.",
@@ -1478,6 +1480,9 @@ export const featureKeysEn = {
     gone: "This task is no longer here.",
     /** Under the title when nothing runs or waits. */
     quiet: "Nothing in progress",
+    /** In the line under an agent's tasks: how many it finished today. */
+    doneToday_one: "{{count}} done today",
+    doneToday_other: "{{count}} done today",
     /** The group over who asked for the task, on its screen. */
     request: "Request",
     /** The system alert before stopping one task from its screen. */

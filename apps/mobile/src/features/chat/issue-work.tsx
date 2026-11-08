@@ -72,7 +72,7 @@ export function IssueTakenLine({ message, gap }: { message: Message; gap: number
         <Text
           variant="small"
           tone="ink2"
-          style={[styles.link, styles.bold]}
+          style={styles.bold}
           onPress={() => router.push(`/issues/${taken.number}`)}
           accessibilityRole="link"
           suppressHighlighting
@@ -150,5 +150,4 @@ const styles = StyleSheet.create({
   // An event pill at the messages' words, left aligned; the list sets its top.
   line: { paddingRight: 16 },
   // The pill's words' size (its sentence sets it; a nested text keeps the variant's own otherwise).
-  link: { fontSize: 14, lineHeight: 19 },
 });

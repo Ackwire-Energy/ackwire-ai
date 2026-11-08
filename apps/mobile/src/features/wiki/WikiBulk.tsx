@@ -267,7 +267,7 @@ export function WikiAgentsScreen({ ids }: { ids: string[] }) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
-  lead: { paddingHorizontal: 20, paddingBottom: 8 },
+  lead: { paddingHorizontal: 16, paddingBottom: 8 },
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   content: { paddingTop: 8, paddingBottom: 40, gap: 12 },

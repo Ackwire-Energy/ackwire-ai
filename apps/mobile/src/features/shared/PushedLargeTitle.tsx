@@ -97,5 +97,5 @@ const BAR_TITLE_TO = 48;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  head: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 },
 });

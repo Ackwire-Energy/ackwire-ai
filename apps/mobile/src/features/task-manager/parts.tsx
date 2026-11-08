@@ -114,13 +114,12 @@ export function WaitLines({ tasks, now }: { tasks: ManagedTask[]; now: number })
  */
 function WaitLine({ group, now }: { group: TaskWaitGroup; now: number }) {
   const { t, i18n } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
   const failed = useFailed();
   const go = useContinueTasks(orgId);
   return (
-    <View style={[styles.waitLine, { backgroundColor: c.sunken }]}>
-      <Text variant="footnote" tone="ink2">
+    <View style={styles.waitLine}>
+      <Text variant="subhead" tone="muted">
         {taskWaitGroupText(t, i18n.language, group, now)}
       </Text>
       {group.continuable.length > 0 ? (
@@ -318,15 +317,8 @@ const styles = StyleSheet.create({
   stack: { gap: 2, minWidth: 0 },
   // Under the state's words: past its mark's box and the row's gap.
   starts: { marginLeft: MARK + 4 + 6 },
-  waitLine: {
-    gap: 8,
-    alignItems: "flex-start",
-    marginTop: 4,
-    marginBottom: 8,
-    marginHorizontal: 16,
-    padding: 12,
-    borderRadius: 14,
-  },
+  // Said once over the tasks it holds: a line on the 16 margin, never a plate.
+  waitLine: { gap: 8, alignItems: "flex-start", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
   stopCompact: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },

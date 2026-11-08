@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   files: { marginTop: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  none: { paddingHorizontal: 20 },
-  event: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 20, paddingVertical: 6 },
-  comment: { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  none: { paddingHorizontal: 16 },
+  event: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 16, paddingVertical: 6 },
+  comment: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
 });

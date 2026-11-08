@@ -326,7 +326,7 @@ export function DeleteAccountScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   list: { padding: 14, gap: 10 },
   line: { gap: 8 },
   // A line that wraps keeps its icon on the first.

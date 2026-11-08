@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   scroll: { paddingTop: 4 },
-  head: { paddingHorizontal: 20, gap: 4 },
+  head: { paddingHorizontal: 16, gap: 4 },
   progCard: { marginHorizontal: 16, marginTop: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   // Two sizes of text on one line: they share a baseline.

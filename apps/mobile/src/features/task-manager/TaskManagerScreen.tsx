@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client/lib/task-manager";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -33,6 +33,7 @@ import {
   PixelFail,
   PixelStopped,
   SectionHeader,
+  SkeletonList,
   Text,
   useReducedMotion,
   weights,
@@ -144,9 +145,8 @@ function TaskManager() {
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {tasks.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : tasks.isError && !view ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   // Under the large title's words (20 in), as Equipe's line.
-  summary: { paddingHorizontal: 20, marginTop: -4, paddingBottom: 4 },
+  summary: { paddingHorizontal: 16, marginTop: -4, paddingBottom: 4 },
   agent: {
     flexDirection: "row",
     alignItems: "center",
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   agentDivider: { left: 16 },
   taskDivider: { left: TASK_INSET },
   flatDivider: { left: FLAT_INSET },
-  none: { paddingHorizontal: 20, paddingBottom: 12 },
+  none: { paddingHorizontal: 16, paddingBottom: 12 },
   end: { alignItems: "flex-end", gap: 2, maxWidth: 130 },
   computer: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 16 },
   computerDivider: { left: FLAT_INSET },

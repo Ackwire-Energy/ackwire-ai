@@ -438,5 +438,5 @@ const styles = StyleSheet.create({
   outcome: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   time: { fontVariant: ["tabular-nums"] },
   semibold: { fontWeight: "600" },
-  lead: { paddingHorizontal: 20, paddingTop: 12, gap: 8 },
+  lead: { paddingHorizontal: 16, paddingTop: 12, gap: 8 },
 });

@@ -149,6 +149,7 @@ import { AskStore } from "./ask-store";
 import { AskBar, AskProbes, AskStoreProvider, useAskWatch, useAwayAsk } from "./asks";
 import { AttachmentStrip, MAX_PENDING, type PendingFile } from "./AttachmentStrip";
 import { ChannelHello } from "./ChannelHello";
+import { ChannelWelcome } from "./ChannelWelcome";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ChannelPicker } from "./ChannelPicker";
 import { ConversationSwitcher } from "./ConversationSwitcher";
@@ -2285,8 +2286,11 @@ function Chat({
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
                   ) : channel && helloAgent && !dm && !isThread ? (
                     <ChannelHello
+                      channelId={channelId}
                       channel={channel.name}
-                      agent={helloAgent}
+                      topic={channel.topic}
+                      agents={[helloAgent, ...talkable.filter((a) => a.id !== helloAgent.id)]}
+                      members={roster.data ?? []}
                       bottomInset={composerHeight}
                       keyboardLift={lift}
                       onAsk={onSend}
@@ -2310,6 +2314,16 @@ function Chat({
               colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}
               locations={[0, 0.62, 1]}
               style={[styles.topFade, { height: headerHeight + 28 }]}
+            />
+          ) : null}
+          {channel && !dm && !isThread && member && showList ? (
+            // The channel greets you under the bar, as the web's: a newcomer's #general, or the first channel of a day.
+            <ChannelWelcome
+              channelId={channelId}
+              channelName={channel.name}
+              messages={top.data}
+              agentIds={channelAgents}
+              top={headerHeight + 8}
             />
           ) : null}
           {/* Above the composer and its working line, riding the keyboard with them. */}

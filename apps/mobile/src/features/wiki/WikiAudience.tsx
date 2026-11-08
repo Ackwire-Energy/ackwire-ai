@@ -241,5 +241,5 @@ function Form({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { paddingBottom: 40 },
-  lead: { paddingHorizontal: 20, paddingVertical: 12 },
+  lead: { paddingHorizontal: 16, paddingVertical: 12 },
 });

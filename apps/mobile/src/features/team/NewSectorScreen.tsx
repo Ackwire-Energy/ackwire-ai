@@ -3,7 +3,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput } from "react-native";
-import { GroupedField, GroupedList, useToast } from "@/ui";
+import { GroupedField, GroupedList, useFieldText, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Gap, SettingsPage } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
@@ -16,6 +16,7 @@ const NAME_MAX = 80;
 export function NewSectorScreen() {
   const { t } = useTranslation();
   const c = useColors();
+  const words = useFieldText("body");
   const toast = useToast();
   const action = useAgentGroupAction(useOrgId());
   const [name, setName] = useState("");
@@ -51,7 +52,7 @@ export function NewSectorScreen() {
             autoCapitalize="words"
             returnKeyType="done"
             onSubmitEditing={save}
-            style={[styles.input, { color: c.ink }]}
+            style={[styles.input, words, { color: c.ink }]}
           />
         </GroupedField>
       </GroupedList>
@@ -60,5 +61,5 @@ export function NewSectorScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0, fontSize: 17 },
+  input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
 });

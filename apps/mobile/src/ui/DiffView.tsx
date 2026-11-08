@@ -1,5 +1,6 @@
 import type { DiffLine } from "@agenteschat/ui/diff";
 import { Text as RNText, StyleSheet, View } from "react-native";
+import { useSystemText } from "./Text";
 import { fonts, useTheme } from "./theme";
 
 /**
@@ -8,6 +9,8 @@ import { fonts, useTheme } from "./theme";
  */
 export function DiffView({ lines, prose = false }: { lines: DiffLine[]; prose?: boolean }) {
   const { colors } = useTheme();
+  // Words (a proposed change to a text) are the footnote on the scale, grown with the person's text size; code keeps mono.
+  const words = useSystemText("footnote");
   return (
     <View style={[styles.diff, { backgroundColor: colors.sunken, borderColor: colors.line }]}>
       {lines.map((l, i) => (
@@ -15,7 +18,7 @@ export function DiffView({ lines, prose = false }: { lines: DiffLine[]; prose?: 
           // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
           key={i}
           style={[
-            prose ? styles.prose : styles.line,
+            prose ? words : styles.line,
             { color: l.kind === "del" ? colors.faint : colors.ink2 },
             l.kind === "add" && styles.added,
             l.kind === "del" && styles.removed,
@@ -32,7 +35,6 @@ export function DiffView({ lines, prose = false }: { lines: DiffLine[]; prose?: 
 const styles = StyleSheet.create({
   diff: { borderRadius: 14, padding: 12, borderWidth: StyleSheet.hairlineWidth },
   line: { fontFamily: fonts.mono, fontSize: 13, lineHeight: 19 },
-  prose: { fontSize: 13, lineHeight: 19 },
   added: { fontWeight: "600" },
   removed: { textDecorationLine: "line-through" },
 });

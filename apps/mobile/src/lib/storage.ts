@@ -54,6 +54,10 @@ export const STORED = {
   pushOffers: "push-offers",
   /** The wiki pages last opened on this phone, per workspace (JSON: org id → slugs, newest first). */
   wikiRecent: "wiki-recent",
+  /** When each workspace was last opened (JSON: org id → ms), for the channel's greeting of a new day (ADR 0090). */
+  channelVisits: "channel-visits",
+  /** The newcomers who closed their #general welcome (JSON list of "user:org"). */
+  arrivalClosed: "arrival-closed",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */

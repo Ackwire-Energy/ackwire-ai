@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "./Icon";
 import { Text, textLineOf } from "./Text";
+import { useFontScale } from "./text-scale";
 import { useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
@@ -37,7 +38,7 @@ export function Row({
   below,
 }: RowProps) {
   const { colors } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   // A subtitle that wraps or something under it: the leading sits at the top and the meta and chevron on the
   // title's line (centred on the whole row they floated between lines). Short rows keep everything centred.
   const tall = subtitleLines > 1 || Boolean(below);

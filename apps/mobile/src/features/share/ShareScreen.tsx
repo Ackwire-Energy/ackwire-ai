@@ -2,7 +2,7 @@ import { keys, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { type NativeStackNavigationOptions, useNavigation } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import Animated, {
@@ -129,114 +129,127 @@ export function ShareScreen() {
   return (
     <SheetSurface>
       <View style={styles.fill}>
-        <View style={styles.head}>
-          <Pressable
-            onPress={cancel}
-            accessibilityRole="button"
-            hitSlop={10}
-            style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
-          >
-            <Text variant="body" tone="ink2">
-              {t("mobile.common.cancel")}
-            </Text>
-          </Pressable>
-          <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
-            {t("mobile.share.title")}
-          </Text>
-          <View style={styles.side} />
-        </View>
-        {!shared ? (
-          gaveUp ? (
-            <EmptyState size="inline" title={t("mobile.share.nothing")} subtitle={t("mobile.share.nothingHint")} />
-          ) : (
-            <View style={styles.waiting}>
-              <PixelOrbit color="sky" size={16} />
-              <Text variant="subhead" tone="muted">
-                {t("mobile.share.waiting")}
-              </Text>
-            </View>
-          )
-        ) : (
-          <>
-            <ScrollView
-              style={styles.fill}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              showsVerticalScrollIndicator={false}
-              automaticallyAdjustKeyboardInsets
-              contentContainerStyle={styles.content}
+        <ScrollView
+          style={styles.fill}
+          // The bar rides pinned at the top of this scroll view: a form sheet tracks its first scroll view, so nothing
+          // may stand before it (a bar above it is drawn under the list).
+          stickyHeaderIndices={[0]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={styles.scroll}
+        >
+          <SheetBar>
+            <Pressable
+              onPress={cancel}
+              accessibilityRole="button"
+              hitSlop={10}
+              style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
             >
-              <Animated.View style={previewStyle}>
-                <Preview shared={shared} />
-              </Animated.View>
-              <View
-                style={[styles.field, { backgroundColor: colors.raised, boxShadow: `0px 0px 0px 0.5px ${colors.line2}` }]}
-              >
-                <TextInput
-                  value={line}
-                  onChangeText={setLine}
-                  placeholder={t("mobile.share.line")}
-                  placeholderTextColor={colors.faint}
-                  onFocus={() => setTyping(true)}
-                  onBlur={() => setTyping(false)}
-                  returnKeyType="done"
-                  submitBehavior="blurAndSubmit"
-                  multiline={false}
-                  editable={!sending}
-                  style={[styles.input, fieldText("body"), { color: colors.ink }]}
-                />
-              </View>
-              {agents.length > 0 ? (
-                <>
-                  <GroupedHeader>{t("mobile.share.to")}</GroupedHeader>
-                  <GroupedList>
-                    {agents.map((a) => (
-                      <GroupedRow
-                        key={a.id}
-                        leading={<CatchingFace agentId={a.id} catching={sending && a.id === to} />}
-                        label={a.name}
-                        {...(a.role?.trim() ? { sub: a.role.trim() } : {})}
-                        checked={a.id === to}
-                        disabled={sending}
-                        onPress={() => {
-                          haptics.selection();
-                          setTo(a.id);
-                        }}
+              <Text variant="body" tone="ink2">
+                {t("mobile.common.cancel")}
+              </Text>
+            </Pressable>
+            <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
+              {t("mobile.share.title")}
+            </Text>
+            <View style={styles.side} />
+          </SheetBar>
+          <View style={styles.content}>
+            {!shared ? (
+              gaveUp ? (
+                <EmptyState size="inline" title={t("mobile.share.nothing")} subtitle={t("mobile.share.nothingHint")} />
+              ) : (
+                <View style={styles.waiting}>
+                  <PixelOrbit color="sky" size={16} />
+                  <Text variant="subhead" tone="muted">
+                    {t("mobile.share.waiting")}
+                  </Text>
+                </View>
+              )
+            ) : (
+              <>
+                <Animated.View style={previewStyle}>
+                  <Preview shared={shared} />
+                </Animated.View>
+                <View
+                  style={[styles.field, { backgroundColor: colors.raised, boxShadow: `0px 0px 0px 0.5px ${colors.line2}` }]}
+                >
+                  <TextInput
+                    value={line}
+                    onChangeText={setLine}
+                    placeholder={t("mobile.share.line")}
+                    placeholderTextColor={colors.faint}
+                    onFocus={() => setTyping(true)}
+                    onBlur={() => setTyping(false)}
+                    returnKeyType="done"
+                    submitBehavior="blurAndSubmit"
+                    multiline={false}
+                    editable={!sending}
+                    style={[styles.input, fieldText("body"), { color: colors.ink }]}
+                  />
+                </View>
+                {agents.length > 0 ? (
+                  <>
+                    <GroupedHeader>{t("mobile.share.to")}</GroupedHeader>
+                    <GroupedList>
+                      {agents.map((a) => (
+                        <GroupedRow
+                          key={a.id}
+                          leading={<CatchingFace agentId={a.id} catching={sending && a.id === to} />}
+                          label={a.name}
+                          {...(a.role?.trim() ? { sub: a.role.trim() } : {})}
+                          checked={a.id === to}
+                          disabled={sending}
+                          onPress={() => {
+                            haptics.selection();
+                            setTo(a.id);
+                          }}
+                        />
+                      ))}
+                    </GroupedList>
+                  </>
+                ) : !dir.loading ? (
+                  <EmptyState
+                    size="inline"
+                    title={t("mobile.share.noAgents")}
+                    subtitle={t("mobile.share.noAgentsHint")}
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        label={t("mobile.share.createAgent")}
+                        onPress={() => router.replace("/new-agent")}
                       />
-                    ))}
-                  </GroupedList>
-                </>
-              ) : !dir.loading ? (
-                <EmptyState
-                  size="inline"
-                  title={t("mobile.share.noAgents")}
-                  subtitle={t("mobile.share.noAgentsHint")}
-                  action={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      label={t("mobile.share.createAgent")}
-                      onPress={() => router.replace("/new-agent")}
-                    />
-                  }
-                />
-              ) : null}
-            </ScrollView>
-            <View style={[styles.bar, { paddingBottom: 12 + insets.bottom, backgroundColor: colors.grouped }]}>
-              <Button
-                variant="primary"
-                wide
-                label={picked ? t("mobile.share.send", { name: picked.name }) : t("mobile.share.pick")}
-                disabled={!picked || sending}
-                loading={sending}
-                onPress={() => void send()}
-              />
-            </View>
-          </>
-        )}
+                    }
+                  />
+                ) : null}
+              </>
+            )}
+          </View>
+        </ScrollView>
+        {shared ? (
+          <View style={[styles.bar, { paddingBottom: 12 + insets.bottom, backgroundColor: colors.grouped }]}>
+            <Button
+              variant="primary"
+              wide
+              label={picked ? t("mobile.share.send", { name: picked.name }) : t("mobile.share.pick")}
+              disabled={!picked || sending}
+              loading={sending}
+              onPress={() => void send()}
+            />
+          </View>
+        ) : null}
       </View>
     </SheetSurface>
   );
+}
+
+/** The sheet's bar, on the sheet's own color so the list passes under it when pinned. */
+function SheetBar({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return <View style={[styles.head, { backgroundColor: colors.grouped }]}>{children}</View>;
 }
 
 /**
@@ -336,7 +349,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
   waiting: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 32 },
   // 16 from the edges; the preview and the line 12 apart, the list's own header bringing its room above it.
-  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  scroll: { paddingBottom: 24 },
+  content: { paddingHorizontal: 16, paddingTop: 8 },
   // What came, on a white card on the sheet's gray: thumbnails, names and text 8 apart.
   preview: { borderRadius: 20, borderBottomLeftRadius: 6, padding: 12, gap: 8, marginBottom: 12 },
   thumbs: { flexDirection: "row", gap: 8 },

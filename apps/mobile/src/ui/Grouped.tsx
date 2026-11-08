@@ -1,11 +1,12 @@
 import { Children, isValidElement, type ReactNode } from "react";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
+import { useFontScale } from "./text-scale";
 import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
@@ -197,7 +198,7 @@ function Row({
   after,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
   const { colors: c } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
   // A switch answers the finger as it flips, as `Toggle` does.
   const press =

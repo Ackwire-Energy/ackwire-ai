@@ -2,12 +2,22 @@ import { type ArtifactFilters, useArtifacts } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, EmptyState, Filters, IconButton, SearchField, SectionHeader, Text, useReducedMotion } from "@/ui";
+import {
+  Button,
+  EmptyState,
+  Filters,
+  IconButton,
+  SearchField,
+  SectionHeader,
+  SkeletonList,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { FirstUse } from "../shared/FirstUse";
-import { useColors, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
+import { useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { DriveCard } from "./DriveCard";
 import { DRIVE_TYPES, type DriveDaySection, type DriveType, driveSections, gridRows, matchesType } from "./logic";
@@ -24,7 +34,6 @@ const PAGE = 24;
  */
 export function DriveScreen({ highlightId = null }: { highlightId?: string | null }) {
   const { t } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
   const when = useWhen();
   const [q, setQ] = useState("");
@@ -98,9 +107,8 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
         }}
       />
       {list.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : list.isError && !list.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>

@@ -1,10 +1,11 @@
 import { outageKey } from "@agenteschat/client/lib/outages";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { Button, IconButton, LineIcon, Text, textLineOf } from "@/ui";
 import { router } from "@/ui/navigation";
+import { useFontScale } from "@/ui/text-scale";
 import { useColors, useEdition } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { computerIcon, dismissedOutages, type MachineOutage, noticeText } from "./logic";
@@ -68,7 +69,7 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
   const cloud = edition === "cloud";
   const text = noticeText(t, o, cloud);
   // The close's middle where the eye reads the title's first line, as the icon across from it.
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const closeTop = textLineOf("callout", fontScale).middle - CLOSE / 2;
   return (
     <View style={[styles.card, surface]}>

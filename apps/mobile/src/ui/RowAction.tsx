@@ -39,7 +39,7 @@ export function RowAction({
       <View style={styles.face}>
         <RNText
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("footnote", weights.semibold), styles.word, { color: colors.muted }]}
+          style={[systemText("footnote", weights.semibold), { color: colors.muted }]}
         >
           {label}
           {detail ? (
@@ -63,6 +63,5 @@ export const ROW_CARD_INSET = { paddingLeft: 12, paddingRight: 12 - FACE_PAD } a
 const styles = StyleSheet.create({
   row: { height: 32 },
   face: { flexGrow: 1, paddingHorizontal: FACE_PAD, alignItems: "center", justifyContent: "center" },
-  word: { fontSize: 14 },
   detail: { fontVariant: ["tabular-nums"] },
 });

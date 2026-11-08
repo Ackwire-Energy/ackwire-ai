@@ -5,11 +5,11 @@ import {
   type PressableProps,
   StyleSheet,
   type TextStyle,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { Icon } from "./Icon";
 import { Text, textLineOf } from "./Text";
+import { useFontScale } from "./text-scale";
 import { useTheme } from "./theme";
 import { weights } from "./type-scale";
 
@@ -27,12 +27,15 @@ export const LIST_INSET = SIDE + LIST_AVATAR + GAP;
 const IOS = Platform.OS === "ios";
 
 /**
- * A row's second line on the app's type ruler: 15/20 on iOS (the subhead), Android its 14/20 body medium. For any
- * text that sits in that line (a preview, what an agent is doing).
+ * A row's second line on the app's type ruler: the `small` variant (15/20 on iOS, the subhead; Android its 14/20 body
+ * medium) on a 20 line. For any text that sits in that line (a preview, what an agent is doing). It sets no size of
+ * its own, so it grows with the person's text size like the rest of the row.
  */
-export const LIST_PREVIEW: TextStyle = IOS ? { fontSize: 15, lineHeight: 20 } : { lineHeight: 20 };
-/** The time on line 1: the 13-point meta size, tabular figures. */
-export const LIST_TIME: TextStyle = { ...(IOS ? { fontSize: 13, lineHeight: 18 } : null), fontVariant: ["tabular-nums"] };
+export const LIST_PREVIEW: TextStyle = { lineHeight: 20 };
+/** The time on line 1: the meta size (`TIME_VARIANT`), tabular figures. */
+export const LIST_TIME: TextStyle = { fontVariant: ["tabular-nums"] };
+/** The time's variant: the 13-point footnote on iOS, Android's 14 body medium as before. */
+const TIME_VARIANT = IOS ? "footnote" : "small";
 
 export interface ListRowProps extends Omit<PressableProps, "style" | "children"> {
   /** The 52pt avatar box's content. */
@@ -86,7 +89,7 @@ export function ListRow({
   ...press
 }: ListRowProps) {
   const { colors: c } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   // The badge or state stays on the preview's first line: centred on a two-line preview it sat between lines.
   const previewLine = textLineOf("small", fontScale, LIST_PREVIEW).height;
   // The time likewise stays on the title's first line when the title takes two (Activity's sentences).
@@ -113,7 +116,7 @@ export function ListRow({
           )}
           {time ? (
             <View style={[styles.time, { minHeight: titleLine }]}>
-              <Text variant="small" tone={unread ? "ink2" : "faint"} style={[LIST_TIME, unread && styles.unreadTime]}>
+              <Text variant={TIME_VARIANT} tone={unread ? "ink2" : "faint"} style={[LIST_TIME, unread && styles.unreadTime]}>
                 {time}
               </Text>
             </View>

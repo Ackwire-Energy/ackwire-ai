@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   chips: { gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 999 },
   // The operator's empty state, at the headers' text column.
-  hint: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
+  hint: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
   // The section headers run edge to edge (their text at 20); the lists under them keep the 16-point margin.
   res: { paddingTop: 2 },
   list: { paddingHorizontal: 16 },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },

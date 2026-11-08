@@ -6,7 +6,7 @@ import { filePath } from "@agenteschat/client/lib/message-links";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import {
   Button,
@@ -22,6 +22,7 @@ import {
   textLineOf,
   useToast,
 } from "@/ui";
+import { useFontScale } from "@/ui/text-scale";
 import { leadBox } from "@/ui/type-scale";
 import { RoleMark } from "../dashboards/parts";
 import { Face } from "../shared/Face";
@@ -52,7 +53,7 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const toast = useToast();
   const dir = useDirectory();
   const meId = useMeId();

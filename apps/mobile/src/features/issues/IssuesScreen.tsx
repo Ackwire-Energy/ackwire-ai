@@ -4,7 +4,7 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
+  
   Platform,
   RefreshControl,
   ScrollView,
@@ -26,6 +26,7 @@ import {
   SearchField,
   SectionHeader,
   Segmented,
+  SkeletonList,
   Text,
   useReducedMotion,
 } from "@/ui";
@@ -119,9 +120,8 @@ function TaskList({
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {issues.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : issues.isError && !issues.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>

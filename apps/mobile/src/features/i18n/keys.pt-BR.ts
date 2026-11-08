@@ -1136,6 +1136,8 @@ export const featureKeysPtBR = {
     on: "Ligadas",
     off: "Desligadas",
     notificationsPhone: "Notificações no celular",
+    /** Conversa, under "Ao abrir uma conversa": what the last-read choice shows. */
+    chatOpenAtHelp: "Onde você parou, a linha “Novas” marca o que chegou depois.",
     notificationsOnHint: "Também chegam no navegador e no app do computador, se estiverem ligadas lá.",
     notificationsOffHint: "Ligue para receber avisos aqui. Os tipos abaixo valem para todos os seus aparelhos.",
     notificationsKindsHint: "A Atividade guarda tudo. Vale para este workspace, em todos os seus aparelhos.",
@@ -1441,6 +1443,9 @@ export const featureKeysPtBR = {
     gone: "Essa tarefa não está mais aqui.",
     /** Under the title when nothing runs or waits. */
     quiet: "Nada em andamento",
+    /** In the line under an agent's tasks: how many it finished today. */
+    doneToday_one: "{{count}} feita hoje",
+    doneToday_other: "{{count}} feitas hoje",
     /** The group over who asked for the task, on its screen. */
     request: "Pedido",
     /** The system alert before stopping one task from its screen. */

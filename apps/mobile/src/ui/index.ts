@@ -100,9 +100,20 @@ export { SheetSurface } from "./SheetSurface";
 export { SkeletonList, SkeletonRow } from "./Skeleton";
 export { type SwipeAction, SwipeRow } from "./SwipeRow";
 export { searchCancelVisible, searchShowsResults } from "./searchMode";
-export { fieldText, systemText, Text, type TextProps, type TextTone, type TextVariant, textLineOf } from "./Text";
+export {
+  fieldText,
+  systemText,
+  Text,
+  type TextProps,
+  type TextTone,
+  type TextVariant,
+  textLineOf,
+  useFieldText,
+  useSystemText,
+} from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
+export { TextScaleProvider, useFontScale, useTextScale } from "./text-scale";
 export {
   type AppColors,
   boxShadow,

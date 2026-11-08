@@ -14,7 +14,7 @@ import { connectorDescription, connectorName } from "@agenteschat/client/lib/sco
 import { useLocalSearchParams } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -36,6 +36,7 @@ import {
   PressScale,
   SearchField,
   SectionHeader,
+  SkeletonList,
   Text,
   useReducedMotion,
 } from "@/ui";
@@ -190,9 +191,8 @@ function Gallery() {
         />
       </View>
       {catalog.isLoading || connections.isLoading || servers.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={c.muted} />
-        </View>
+        // Loading: the rows' own shape, never a spinner.
+        <SkeletonList rows={4} />
       ) : catalog.isError && !catalog.data ? (
         <View style={styles.center}>
           <Text tone="muted" style={styles.centerText}>

@@ -1,8 +1,9 @@
 import { useArtifact, usePoll, useVote } from "@agenteschat/client";
 import { pollAnswered, pollIsOpen, pollTally, pollToggle } from "@agenteschat/client/lib/blocks";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Icon, Sky, Text, textLineOf, useToast } from "@/ui";
+import { useFontScale } from "@/ui/text-scale";
 import { initialText, leadBox } from "@/ui/type-scale";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -24,7 +25,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const artifact = useArtifact(orgId, id, version);
   const query = usePoll(orgId, id);
   const vote = useVote(orgId, id);
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const a = artifact.data;
   const poll = query.data;
   if (a?.content.kind !== "poll" || !poll) {
