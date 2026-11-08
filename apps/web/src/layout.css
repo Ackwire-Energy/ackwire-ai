@@ -5190,7 +5190,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   font-size: 14.5px;
 }
 .tr-subj__h small,
-.tr-decide__t small {
+.tr-decide__help {
   display: block;
   color: var(--muted);
   font-size: 12.5px;
@@ -5234,15 +5234,11 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .tr-decide:only-child {
   border-radius: 18px;
 }
+/* A MediaRow: the asking mark, how many wait and Aceitar todas on one line (under them in a head under 480px), what to
+   do under them. */
 .tr-decide__h {
-  display: flex;
-  align-items: center;
-  gap: 14px;
   padding: 14px 16px 10px;
-}
-.tr-decide__t {
-  flex: 1;
-  min-width: 0;
+  container-type: inline-size;
 }
 .tr-decide .tr-row__nm {
   white-space: normal;
@@ -5437,14 +5433,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
     gap: 6px;
   }
   .tr-decide__h {
-    flex-wrap: wrap;
     padding: 14px 14px 8px;
-  }
-  .tr-decide__t {
-    flex-basis: calc(100% - 58px);
-  }
-  .tr-decide__h .tr-link {
-    margin-left: 52px;
   }
   .tr-decide .tr-row__ctl {
     gap: 8px;

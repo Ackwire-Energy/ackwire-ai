@@ -468,17 +468,7 @@
   outline: 2px solid var(--agent);
   outline-offset: 2px;
 }
-.team-sector-card__head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.team-sector-card__title {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
+/* A MediaRow: the sector's mark, its name and its menu on one line, who is in it under them. */
 .team-sector-card__title h3 {
   margin: 0;
   font-size: 17px;

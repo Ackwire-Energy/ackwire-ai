@@ -637,11 +637,12 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
+/* A MediaRow: the kind's tile, the title and what to do with it on one line (under them in a list under 480px), who
+   deleted it and when under them, whole. */
+.drive-trash {
+  container-type: inline-size;
+}
 .drive-trash__row {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto auto auto;
-  gap: 14px;
-  align-items: center;
   padding: 10px 12px;
   border-top: 1px solid var(--line);
 }
@@ -649,8 +650,6 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   border-top: 0;
 }
 .drive-trash__icon {
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -658,34 +657,22 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   background: var(--sunken);
   color: var(--muted);
 }
-.drive-trash__text {
-  min-width: 0;
+.drive-trash__title {
+  overflow-wrap: anywhere;
 }
-.drive-trash__text b,
-.drive-trash__text small {
-  display: flex;
+.drive-trash__meta {
+  flex-direction: row;
   align-items: center;
   gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drive-trash__text b {
-  display: block;
-  font-weight: 600;
-}
-.drive-trash__text small {
   font-size: 12.5px;
   color: var(--faint);
 }
-.drive-trash__text small > .ac-avatar {
+.drive-trash__meta > .ac-avatar {
   flex: none;
 }
-/* The words in a box of their own: a flex line clips its loose text without the "…". */
 .drive-trash__by {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -773,11 +760,5 @@ html:not([data-pointer]) button.drive-where:focus-visible {
     bottom: 12px;
     width: auto;
     max-width: none;
-  }
-  .drive-trash__row {
-    grid-template-columns: 40px minmax(0, 1fr) auto auto;
-  }
-  .drive-trash__row .ac-chip {
-    display: none;
   }
 }
