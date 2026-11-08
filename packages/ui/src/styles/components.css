@@ -8716,10 +8716,29 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 
 /*
- * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
- * centre on it), the page's line under it (always there, always one line), the buttons at the end of the title's line,
- * then the page's bar. One shape and one height on every page, so a title and what follows start at the same place
- * wherever you go.
+ * Every page's room, Settings, the wiki and the calendar included: the first line starts `--page-top` under the work
+ * area's top and `--page-x` in from its side. From 761px the title's line centres on the sidebar's workspace row,
+ * whose middle is 38px from the top (the sidebar's 16 above its 44px row).
+ */
+:root {
+  --page-top: calc(38px - var(--control-h-md) / 2);
+  --page-x: 24px;
+}
+@media (max-width: 760px) {
+  :root {
+    --page-top: 20px;
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --page-x: 16px;
+  }
+}
+/*
+ * Every inner page's header (PageHeader): the title, 28px on a line as tall as the page's buttons (so they centre on
+ * it), the page's line under it (always there, always one line), the buttons at the end of the title's line, then the
+ * page's bar. One shape and one height on every page, so a title and what follows start at the same place wherever
+ * you go.
  */
 .ac-pagehead {
   display: flex;
@@ -8749,7 +8768,7 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   min-width: 0;
   font-family: var(--font-display);
   font-size: 28px;
-  line-height: 40px;
+  line-height: var(--control-h-md);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -8768,7 +8787,7 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: var(--control-h-md);
   margin-left: auto;
 }
 .ac-pagehead__bar {
