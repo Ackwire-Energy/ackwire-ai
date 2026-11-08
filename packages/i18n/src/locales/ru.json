@@ -10623,9 +10623,6 @@
     },
     "s3": "Свой бакет",
     "s3Text": "S3, R2, MinIO и другие, совместимые с S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Скоро",
     "current": "Используется",
     "usage": {
       "files": "Файлы: {{size}}",

@@ -9803,9 +9803,6 @@ export const en = {
     },
     s3: "Your own bucket",
     s3Text: "S3, R2, MinIO and others compatible with S3.",
-    gdrive: "Google Drive",
-    onedrive: "OneDrive",
-    soon: "Coming soon",
     current: "In use",
     usage: {
       files: "{{size}}\u00a0of\u00a0files",

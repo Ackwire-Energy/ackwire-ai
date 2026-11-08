@@ -9467,9 +9467,6 @@
     },
     "s3": "独自のバケット",
     "s3Text": "S3、R2、MinIOなど、S3互換のストレージ。",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "近日公開",
     "current": "使用中",
     "usage": {
       "files": "ファイル{{size}}",

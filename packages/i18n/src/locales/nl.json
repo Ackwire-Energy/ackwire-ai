@@ -9956,9 +9956,6 @@
     },
     "s3": "Je eigen bucket",
     "s3Text": "S3, R2, MinIO en andere die compatibel zijn met S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Binnenkort",
     "current": "In gebruik",
     "usage": {
       "files": "{{size}} aan bestanden",

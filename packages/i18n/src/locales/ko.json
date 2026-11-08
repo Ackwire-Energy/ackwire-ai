@@ -9461,9 +9461,6 @@
     },
     "s3": "내 버킷",
     "s3Text": "S3, R2, MinIO 등 S3 호환 저장소.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "곧 지원 예정",
     "current": "사용 중",
     "usage": {
       "files": "파일 {{size}}",

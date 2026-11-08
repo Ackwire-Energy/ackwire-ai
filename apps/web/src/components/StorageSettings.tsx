@@ -176,17 +176,6 @@ export function StorageSection() {
                 }
               />
             ))}
-            {(["gdrive", "onedrive"] as const).map((k) => (
-              <RadioCard
-                key={k}
-                value={k}
-                id={`storage-${k}`}
-                checked={false}
-                disabled
-                title={t(`storage.${k}`)}
-                aside={<Chip icon="waiting">{t("storage.soon")}</Chip>}
-              />
-            ))}
           </RadioGroup>
           {/* Under the options, not in one: each option is a label, which can't hold a button. */}
           {!cloud && reveals && config.platform.folder && (

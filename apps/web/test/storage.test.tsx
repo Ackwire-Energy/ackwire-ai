@@ -68,11 +68,13 @@ describe("Configurações → Armazenamento", () => {
     expect(text(server.closest("label"))).toBe("Este servidorOs arquivos ficam no disco dele.Nenhum arquivo");
     // Our storage is the Cloud's: never said where the server is someone's own.
     expect(s.textContent).not.toMatch(/nosso armazenamento|Armazenamento do agentes/);
-    for (const name of ["Google Drive", "OneDrive"]) {
-      const radio = within(s).getByRole("radio", { name: new RegExp(name) });
-      expect(radio.hasAttribute("disabled")).toBe(true);
-      expect(radio.closest("label")?.textContent).toContain("Em breve");
-    }
+    // No native Google Drive or OneDrive is coming (they connect through Conectores): never promised here.
+    expect(
+      within(s)
+        .getAllByRole("radio")
+        .map((r) => r.getAttribute("value")),
+    ).toEqual(["agentes", "s3"]);
+    expect(s.textContent).not.toMatch(/Google Drive|OneDrive|Em breve/);
     expect(within(s).queryByLabelText("Endpoint")).toBeNull();
 
     const line = async (platform: StoragePlatform) => {

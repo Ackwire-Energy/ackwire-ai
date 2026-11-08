@@ -39,7 +39,10 @@ export const blobs = pgTable(
   (t) => [index().on(t.orgId)],
 );
 
-/** `s3` = the org's own S3-compatible bucket. Planned: `google_drive`, `onedrive` (OAuth into a folder). */
+/**
+ * `s3` = the org's own S3-compatible bucket. `google_drive` and `onedrive` stay in the type unused: no native storage
+ * there is planned, those services connect through Conectores (ADR 0107).
+ */
 export const storageKindEnum = pgEnum("storage_kind", ["s3", "google_drive", "onedrive"]);
 /**
  * `tested`: passed the probe, waiting to be switched on; `failed`: the probe

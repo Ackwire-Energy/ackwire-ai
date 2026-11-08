@@ -10671,9 +10671,6 @@
     },
     "s3": "Twój własny bucket",
     "s3Text": "S3, R2, MinIO i inne zgodne z S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Wkrótce",
     "current": "W użyciu",
     "usage": {
       "files": "{{size}} plików",

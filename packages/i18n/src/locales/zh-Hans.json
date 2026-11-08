@@ -9532,9 +9532,6 @@
     },
     "s3": "你自己的存储桶",
     "s3Text": "S3、R2、MinIO 以及其他兼容 S3 的服务。",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "即将推出",
     "current": "使用中",
     "usage": {
       "files": "{{size}} 文件",

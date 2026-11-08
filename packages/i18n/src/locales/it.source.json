@@ -24138,15 +24138,6 @@
   "storage.s3Text": {
     "value": "S3, R2, MinIO and others compatible with S3."
   },
-  "storage.gdrive": {
-    "value": "Google Drive"
-  },
-  "storage.onedrive": {
-    "value": "OneDrive"
-  },
-  "storage.soon": {
-    "value": "Coming soon"
-  },
   "storage.current": {
     "value": "In use"
   },

@@ -9831,9 +9831,6 @@
     },
     "s3": "Kendi bucket'ınız",
     "s3Text": "S3, R2, MinIO ve S3 uyumlu diğerleri.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Yakında",
     "current": "Kullanımda",
     "usage": {
       "files": "{{size}} dosya",

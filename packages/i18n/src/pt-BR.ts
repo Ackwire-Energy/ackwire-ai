@@ -9915,9 +9915,6 @@ export const ptBR = {
     },
     s3: "Seu próprio bucket",
     s3Text: "S3, R2, MinIO e outros compatíveis com S3.",
-    gdrive: "Google Drive",
-    onedrive: "OneDrive",
-    soon: "Em breve",
     current: "Em uso",
     // What the option in use holds, no-break spaces inside each part: a narrow card breaks the line after its "·".
     usage: {
