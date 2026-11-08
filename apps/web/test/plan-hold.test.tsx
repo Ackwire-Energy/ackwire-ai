@@ -231,7 +231,7 @@ describe("the other places a plan is chosen", () => {
     expect(shownText(body)).toContain(WHY);
     expect(buttonNamed(body, PAY)).not.toBeNull();
     expect(buttonNamed(body, KEY)).toBeNull();
-    expect(shownText(body)).not.toContain("Conecte um plano em Sua IA para usar aqui.");
+    expect(shownText(body)).not.toContain("Conecte um plano em Contas de IA para usar aqui.");
   });
 });
 

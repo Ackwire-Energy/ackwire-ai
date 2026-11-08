@@ -13534,6 +13534,10 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   width: 280px;
   max-width: 100%;
 }
+/* "Sua IA", a MediaRow: its actions drop under its words by its own width. */
+.rh-mine {
+  container-type: inline-size;
+}
 .rh-set__budget,
 .rh-set__acts {
   display: inline-flex;

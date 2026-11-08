@@ -1996,6 +1996,15 @@ export const en = {
       mineHelp: "Your conversation with {{name}} thinks with your plan or one shared with you, and only yours does.",
       connectMine: "Connect my plan",
       useWorkspace: "Use the workspace's",
+      useMine: "Use my plan",
+      /** "Sua IA" as one status line: the AI's name, then what it is for the person (lower case, after a " · "). */
+      mineYours: "your plan",
+      mineOf: "{{owner}}'s plan",
+      mineKey: "workspace key",
+      /** The name when the server's own key answers and the workspace has none of its own. */
+      mineKeyName: "API key",
+      minePlan: "workspace plan",
+      mineNobody: "Nobody answers you here yet",
       /** Without a plan of their own: what their conversation thinks with. */
       fallbackKey: "Without your own plan, it uses the workspace's API key.",
       fallbackKeyOf: "Without your own plan, it uses the workspace's key: {{label}}.",
@@ -2008,7 +2017,7 @@ export const en = {
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
       workspacePlan: "Workspace plan",
       workspacePlanHelp: "A plan in place of the key. It serves other people only when its owner lets it.",
-      noPlans: "Connect a plan under Your AI to use it here.",
+      noPlans: "Connect a plan in AI accounts to use it here.",
       pickPlan: "Choose a plan",
       /** "Atende outras pessoas" on the workspace's plan. */
       sharesOn: "On: people without their own plan talk to {{name}} through this plan.",

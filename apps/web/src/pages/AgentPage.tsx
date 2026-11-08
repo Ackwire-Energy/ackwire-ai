@@ -27,6 +27,7 @@ import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand"
 import {
   Button,
   Card,
+  CardHeader,
   colorKey,
   cx,
   Dialog,
@@ -53,7 +54,7 @@ import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
-import { RightHandMineRow, RightHandSettingsSection } from "@/components/RightHandSettings";
+import { RightHandMineRow, RightHandSettingsSection, useRightHandMineHint } from "@/components/RightHandSettings";
 import { useDirectory } from "@/hooks/useDirectory";
 import {
   AGENT_TABS,
@@ -158,16 +159,24 @@ export function AgentPage(props: AgentPageProps) {
   if (isRightHand(agent)) {
     return (
       <AgentPublicCard agent={agent}>
-        <Card as="section" className="agp-card" aria-label={t("rightHand.settings.mine")}>
-          <div className="settings-rows">
-            <RightHandMineRow agent={agent} />
-          </div>
-        </Card>
+        <RightHandMineCard agent={agent} />
       </AgentPublicCard>
     );
   }
   if (!seesDetails(agent)) return <AgentPublicCard agent={agent} />;
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
+}
+
+/** "Sua IA" on the right hand's page: why it is the viewer's alone behind the title's ⓘ, the status under it. */
+function RightHandMineCard({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const hint = useRightHandMineHint(agent);
+  return (
+    <Card as="section" className="agp-card" aria-labelledby="rh-mine-title">
+      <CardHeader id="rh-mine-title" title={t("rightHand.settings.mine")} hint={hint} />
+      <RightHandMineRow agent={agent} />
+    </Card>
+  );
 }
 
 function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }: AgentPageProps & { agent: Agent }) {
