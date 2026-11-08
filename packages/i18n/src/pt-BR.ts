@@ -10382,6 +10382,12 @@ export const ptBR = {
     /** O app foi instalado no próprio GitHub, não pelo agentes.chat (`github_app_error=installed_outside`). */
     installedOutside:
       "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
+    /**
+     * O GitHub recusou o app do GitHub deste servidor, com a chave secreta (ou o ID) errada
+     * (`github_app_error=misconfigured`): tentar de novo não resolve, só quem cuida do servidor conserta.
+     */
+    misconfigured:
+      "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
     /** O GitHub é só o app: conectar uma conta também (os agentes usam onde o app não está e no GitHub Projects). */
     connectAccount: "Conectar uma conta do GitHub",
     /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no agentes.chat). */
@@ -11779,6 +11785,12 @@ export const ptBR = {
       gone: "Essa conta não está mais conectada.",
       unfinished: "O login na Composio não terminou. Tente de novo.",
       unavailable: "Este serviço não conecta aqui.",
+      /**
+       * O {{provider}} recusou o app de OAuth deste servidor para ele, com a chave secreta (ou o ID) errada
+       * (`connector_error=misconfigured`): tentar de novo não resolve, só quem cuida do servidor conserta.
+       */
+      misconfigured:
+        "A conexão com {{provider}} está mal configurada no servidor, então ela não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
     },
     /** Restricted wiki pages (ADR 0023). */
     wiki: {

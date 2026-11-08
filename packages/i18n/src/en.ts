@@ -10260,6 +10260,12 @@ export const en = {
     /** The app was installed on GitHub itself, not from agentes.chat (`github_app_error=installed_outside`). */
     installedOutside:
       "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
+    /**
+     * GitHub refused this server's own GitHub App, whose client secret (or id) is wrong
+     * (`github_app_error=misconfigured`): trying again can't help, only whoever runs the server can fix it.
+     */
+    misconfigured:
+      "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings.",
     /** GitHub is the app alone: an account too (agents use it where the app isn't installed, and for a person's own GitHub Projects). */
     connectAccount: "Connect a GitHub account",
     /** For admins who aren't the server's owner, on a server without the app (never on agentes.chat). */
@@ -11669,6 +11675,12 @@ export const en = {
       gone: "That account is no longer connected.",
       unfinished: "The sign-in at Composio didn't finish. Try again.",
       unavailable: "This service can't be connected here.",
+      /**
+       * {{provider}} refused this server's own OAuth app for it, whose client secret (or id) is wrong
+       * (`connector_error=misconfigured`): trying again can't help, only whoever runs the server can fix it.
+       */
+      misconfigured:
+        "The connection to {{provider}} is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings.",
     },
     wiki: {
       noAccess: "You don't have access to this page.",

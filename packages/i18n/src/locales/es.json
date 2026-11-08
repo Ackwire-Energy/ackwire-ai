@@ -10636,6 +10636,7 @@
     "notVisible": "Tu cuenta de GitHub no puede ver esa instalación. Instálala con una cuenta que tenga acceso.",
     "otherWorkspace": "Esa cuenta de GitHub ya está vinculada a otro espacio de trabajo. Quita la app de allí antes de instalarla aquí.",
     "installedOutside": "La app se instaló en esa cuenta de GitHub fuera de agentes.chat. Quítala en GitHub e instálala de nuevo desde Conectores › GitHub.",
+    "misconfigured": "La app de GitHub tiene la clave secreta equivocada en el servidor, así que la instalación no puede terminar. Quien administra el servidor tiene que cambiar la clave en la configuración de la app.",
     "connectAccount": "Conectar una cuenta de GitHub",
     "ownerHint": "El dueño de este servidor puede crear la app de GitHub aquí en Conectores.",
     "viaApp": "Mediante la app agentes.chat en {{accounts}}",
@@ -12319,7 +12320,8 @@
       "otherServer": "Esa cuenta está en otra dirección.",
       "gone": "Esa cuenta ya no está conectada.",
       "unfinished": "El inicio de sesión en Composio no terminó. Intenta de nuevo.",
-      "unavailable": "Este servicio no se puede conectar aquí."
+      "unavailable": "Este servicio no se puede conectar aquí.",
+      "misconfigured": "La conexión con {{provider}} está mal configurada en el servidor, así que no puede terminar. Quien administra el servidor tiene que cambiar la clave en la configuración de la app."
     },
     "wiki": {
       "noAccess": "No tienes acceso a esta página.",

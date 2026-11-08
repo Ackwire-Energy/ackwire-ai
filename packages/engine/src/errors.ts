@@ -73,6 +73,22 @@ export class TooManyError extends Error {
   }
 }
 
+/**
+ * This server's own setup is wrong where only whoever runs it can fix it (a provider refused its OAuth app's client id
+ * or secret), so no retry helps. The apps say why by its code, and it is reported like a failure, never logged quietly
+ * as a refusal.
+ */
+export class MisconfiguredError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly params?: ErrorParams,
+  ) {
+    super(message);
+    this.name = "MisconfiguredError";
+  }
+}
+
 /** The agent reached its monthly budget. Checked before every model call. */
 export class BudgetExceededError extends Error {
   constructor(

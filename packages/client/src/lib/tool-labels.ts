@@ -692,8 +692,14 @@ export function toolKey(name: string): { app: string | null; key: string } {
  */
 export const labelIsName = (label: string, name: string) => !label.trim() || toolKey(label).key === toolKey(name).key;
 
-/** How an app writes its own name, by the word a tool's name starts with (`github` → GitHub); null: not one we know. */
-export const appNameOf = (word: string) => APPS[word.toLowerCase().replace(/[^a-z0-9]/g, "")] ?? null;
+/**
+ * How an app writes its own name, by the word a tool's name starts with (`github` → GitHub); null: not one we know.
+ * Own keys only: a word from an address (`?connector=constructor`) names no property of Object's.
+ */
+export const appNameOf = (word: string): string | null => {
+  const key = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return Object.hasOwn(APPS, key) ? (APPS[key] ?? null) : null;
+};
 
 /** The catalog's words for a tool in the language `t` speaks, or null: none there, or a language without a column. */
 export function catalogLabel(t: TFunction, name: string): string | null {

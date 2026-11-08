@@ -10312,6 +10312,7 @@
     "notVisible": "Dein GitHub-Konto kann diese Installation nicht sehen. Installier sie mit einem Konto, das Zugriff darauf hat.",
     "otherWorkspace": "Dieses GitHub-Konto ist schon mit einem anderen Workspace verbunden. Entferne die App dort, bevor du sie hier installierst.",
     "installedOutside": "Die App wurde auf diesem GitHub-Konto außerhalb von agentes.chat installiert. Entferne sie auf GitHub und installier sie noch einmal über Konnektoren › GitHub.",
+    "misconfigured": "Die GitHub-App hat auf dem Server den falschen geheimen Schlüssel, deshalb kann die Installation nicht abgeschlossen werden. Die Person, die den Server betreibt, muss den Schlüssel in den Einstellungen der App ersetzen.",
     "connectAccount": "GitHub-Konto verbinden",
     "ownerHint": "Der Inhaber dieses Servers kann die GitHub-App hier unter Konnektoren erstellen.",
     "viaApp": "Über die agentes.chat-App auf {{accounts}}",
@@ -11953,7 +11954,8 @@
       "otherServer": "Dieses Konto ist unter einer anderen Adresse.",
       "gone": "Dieses Konto ist nicht mehr verbunden.",
       "unfinished": "Die Anmeldung bei Composio wurde nicht abgeschlossen. Versuch es noch einmal.",
-      "unavailable": "Dieser Dienst kann hier nicht verbunden werden."
+      "unavailable": "Dieser Dienst kann hier nicht verbunden werden.",
+      "misconfigured": "Die Verbindung zu {{provider}} ist auf dem Server falsch eingerichtet, deshalb kann sie nicht abgeschlossen werden. Die Person, die den Server betreibt, muss den Schlüssel in den Einstellungen der App ersetzen."
     },
     "wiki": {
       "noAccess": "Du hast keinen Zugriff auf diese Seite.",
