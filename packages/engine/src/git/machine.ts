@@ -19,9 +19,10 @@ import { missionOfRun } from "../mission-context";
 import { standingRefusal } from "../standing";
 import { grantedScopeKeys } from "../tools/scopes";
 import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
-import { appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
+import { appTokenForRepo, botIdentity, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
+import { coAuthorOf } from "./signature";
 
 /**
  * Git on a connected machine through our proxy (ADR 0024 addendum):
@@ -74,6 +75,8 @@ export function machineGitUnavailable(status: MachineStatus | null, orgId: strin
  * The `proxy` and `author` of a `git.sync` for this agent on this machine:
  * a fresh proxy credential (6 h) bound to the machine and the agent. Null
  * when the org has no GitHub connection or the agent has no git access.
+ * With the GitHub App installed for the workspace (ADR 0153), commits are
+ * authored as the app's bot, so GitHub shows them as the app's.
  */
 export async function machineGitSetup(
   deps: MachineGitDeps,
@@ -101,9 +104,14 @@ export async function machineGitSetup(
     exp: Math.floor(now.getTime() / 1000) + GIT_TOKEN_TTL_SECONDS,
     kind: "machine",
   });
+  const github = deps.github;
+  const bot =
+    github && (await boundInstallations(deps.db, orgId)).length > 0 ? await botIdentity(github.app, github.http) : null;
   return {
     proxy: { base: gitProxyBase(deps.git.publicUrl, orgId, connection.id), token },
-    author: { name: `${agent.name} (agentes)`, email: agentCommitEmail(deps.git.publicUrl, agent.handle) },
+    author: bot
+      ? { name: `${agent.name} (agentes.chat)`, email: bot.email }
+      : { name: `${agent.name} (agentes)`, email: agentCommitEmail(deps.git.publicUrl, agent.handle) },
     agent: { id: agent.id, handle: agent.handle, name: agent.name },
   };
 }
@@ -232,7 +240,7 @@ export interface CodeSetup {
   /** "You start in …" for the turn's prompt; absent or "" when it starts in no checkout. */
   start?: string;
   /** What the start was picked from, to pick it again for other words (`codeStart`) without syncing again. */
-  pick?: { present: CodeStartRepo[]; primary?: string };
+  pick?: { present: CodeStartRepo[]; primary?: string; credit?: string };
 }
 
 type CodeStartRepo = { repo: string; dir: string; path?: string };
@@ -260,7 +268,20 @@ export function codeStart(
     pick.present.find((r) => r.repo === named) ??
     pick.present.find((r) => r.repo.toLowerCase() === pick.primary?.toLowerCase()) ??
     pick.present[0];
-  return { cwd: start?.dir ?? "", start: start ? `You start in ${start.path ?? start.dir}.` : "" };
+  const lines = [start ? `You start in ${start.path ?? start.dir}.` : "", pick.credit ?? ""];
+  return { cwd: start?.dir ?? "", start: lines.filter(Boolean).join("\n") };
+}
+
+/**
+ * The turn's commits credit the person behind it (ADR 0153) when they linked GitHub to sign in: the line that says
+ * so, next to where the turn starts.
+ */
+async function creditLine(deps: MachineGitDeps, personId: string | null | undefined) {
+  // ponytail: an instruction the agent follows; a `prepare-commit-msg` hook written by `git.sync` if it forgets.
+  if (!personId) return "";
+  const http = deps.github?.http ?? { fetch, apiUrl: "https://api.github.com" };
+  const trailer = await coAuthorOf({ db: deps.db, http }, personId).catch(() => null);
+  return trailer ? `Commits you make this turn: end each commit message with the line ${trailer}` : "";
 }
 
 /** What a chat turn needs from `prepareAgentCode`. */
@@ -271,6 +292,8 @@ export interface CodeTurn {
   trigger: string;
   messages: ReadonlyArray<{ content: string }>;
   session?: { machineId: string; cwd: string; ownFolder?: boolean } | undefined;
+  /** The person behind the turn: its commits credit them. */
+  personId?: string | null;
 }
 
 /**
@@ -301,6 +324,7 @@ export async function prepareAgentCode(
     if (!status || machineGitUnavailable(status, turn.orgId)) return null;
     const setup = await machineGitSetup(deps, turn.orgId, turn.agentId, session.machineId);
     if (!setup) return null;
+    const credit = await creditLine(deps, turn.personId);
     const list = await agentRepositoryList(deps.db, turn.orgId, turn.agentId);
     const explicit = list.filter((r) => !r.endsWith("/*"));
     const { agent, ...rest } = setup;
@@ -349,11 +373,14 @@ export async function prepareAgentCode(
     const lower = new Set(present.map((r) => r.repo.toLowerCase()));
     const coming = new Set(downloading.map((r) => r.toLowerCase()));
     const notCloned = explicit.filter((r) => !lower.has(r.toLowerCase()) && !coming.has(r.toLowerCase()));
-    if (present.length === 0 && notCloned.length === 0 && downloading.length === 0) return null;
+    if (present.length === 0 && notCloned.length === 0 && downloading.length === 0) {
+      return credit ? { cwd: "", prompt: "", start: credit, pick: { present: [], credit } } : null;
+    }
     const primary = explicit.find((r) => lower.has(r.toLowerCase()));
     const pick = {
       present: present.map((r) => ({ repo: r.repo, dir: r.dir, ...(r.path ? { path: r.path } : {}) })),
       ...(primary ? { primary } : {}),
+      ...(credit ? { credit } : {}),
     };
     const checkouts: CodeCheckout[] = present.map((r) => ({
       repo: r.repo,

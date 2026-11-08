@@ -11,6 +11,7 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   type ConnectorDeps,
   codePrompt,
+  codeStart,
   connectorGrantValidator,
   createApiKeyConnection,
   createGitToolSource,
@@ -637,5 +638,63 @@ describe("prompt text and permissions", () => {
     const presigned = `https://bucket.s3.amazonaws.com/a.pdf?X-Amz-Security-Token=${"FwoGZXIv".repeat(120)}`;
     expect(ask("WebFetch", { url: presigned }).code).toBeUndefined();
     expect(ask("Bash", { command: "curl -s https://docs.example.dev/api?state=open" }).behavior).toBe("allow");
+  });
+});
+
+describe("agents' commits and the GitHub App (ADR 0153)", () => {
+  test("authored as the app's bot where the workspace installed it; each turn credits the person who linked GitHub", async () => {
+    const w = await world();
+    const app = { ...APP, slug: "agentes-machine-test" };
+    const fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/users/agentes-machine-test%5Bbot%5D")) return Response.json({ id: 77 });
+      if (url.endsWith("/user/583231")) return Response.json({ login: "ana-gh" });
+      return new Response("unexpected", { status: 500 });
+    }) as typeof globalThis.fetch;
+    const deps = { ...w.machineDeps, github: { app, http: { apiUrl: API, fetch } } };
+    const setupNow = () => machineGitSetup(deps, f.org.id, f.agent.id, w.paired.machineId);
+    expect((await setupNow())?.author).toEqual({ name: "Dev (agentes)", email: "dev@agents.agentes.test" });
+    await f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 9, accountLogin: "acme", accountType: "Organization" });
+    expect((await setupNow())?.author).toEqual({
+      name: "Dev (agentes.chat)",
+      email: "77+agentes-machine-test[bot]@users.noreply.github.com",
+    });
+
+    const turn = {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      threadRootId: null,
+      trigger: "hi",
+      messages: [],
+      session: { machineId: w.paired.machineId, cwd: "" },
+      personId: f.owner.id,
+    };
+    w.answers.fn = () => [];
+    // No GitHub linked: no credit, and nothing to say.
+    expect(await prepareAgentCode(deps, turn)).toBeNull();
+    await f.db
+      .insert(schema.accounts)
+      .values({ id: crypto.randomUUID(), accountId: "583231", providerId: "github", userId: f.owner.id });
+    const credit =
+      "Commits you make this turn: end each commit message with the line Co-authored-by: ana <583231+ana-gh@users.noreply.github.com>";
+    // Nothing checked out yet: the line comes all the same.
+    expect(await prepareAgentCode(deps, turn)).toEqual({
+      cwd: "",
+      prompt: "",
+      start: credit,
+      pick: { present: [], credit },
+    });
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    w.answers.fn = (req) =>
+      req.repos.map((r) => ({ repo: r.repo, dir: r.dir, path: `${FOLDER}/${r.dir}`, status: "updated" as const }));
+    const code = await prepareAgentCode(deps, turn);
+    expect(code?.start).toBe(`You start in ${FOLDER}/repos/acme/app.\n${credit}`);
+    // Picked again for other words, the credit stays.
+    expect(code?.pick ? codeStart(code.pick, { trigger: "x", messages: [] }).start : "").toBe(code?.start ?? "-");
+    expect(await prepareAgentCode(deps, { ...turn, personId: null })).toMatchObject({
+      start: `You start in ${FOLDER}/repos/acme/app.`,
+    });
   });
 });
