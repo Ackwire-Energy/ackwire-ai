@@ -31,7 +31,12 @@ const OWN_TITLES = new Set([
 ]);
 
 /** GitHub's actions whose server title says what they touch (engine `connectors/catalog.ts`), by their own name. */
-const GITHUB_TITLES = new Set(["merge_pull_request", "pull_request_review_write", "actions_run_trigger"]);
+const GITHUB_TITLES = new Set([
+  "merge_pull_request",
+  "pull_request_review_write",
+  "actions_run_trigger",
+  "delete_repository",
+]);
 
 /** What `request_approval` was asked for (mission tools): `approval.titles.request_approval.*`. */
 const ASKED_ACTIONS = new Set(["merge", "deploy", "rollback"]);

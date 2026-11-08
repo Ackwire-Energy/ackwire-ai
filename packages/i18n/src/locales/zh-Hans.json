@@ -3637,7 +3637,8 @@
       "github": {
         "merge_pull_request": "合并 {{repo}} 的 PR #{{number}}",
         "pull_request_review_write": "审查 {{repo}} 的 PR #{{number}}",
-        "actions_run_trigger": "在 {{repo}} 中运行 {{method}}"
+        "actions_run_trigger": "在 {{repo}} 中运行 {{method}}",
+        "delete_repository": "删除仓库 {{repo}}"
       }
     }
   },
@@ -5848,6 +5849,26 @@
     "github_actions_run": {
       "label": "运行工作流",
       "description": "启动 GitHub Actions 工作流（可能会部署）。始终需要审批。"
+    },
+    "github_repo_admin": {
+      "label": "管理仓库",
+      "description": "创建仓库，并用规则集保护分支。删除仓库和添加规则集始终需要审批。"
+    },
+    "github_discussions_read": {
+      "label": "读取讨论",
+      "description": "列出并读取 GitHub Discussions 及其评论。"
+    },
+    "github_discussions_write": {
+      "label": "写入讨论",
+      "description": "在 GitHub Discussions 中评论、回复并标记答案。"
+    },
+    "github_security_read": {
+      "label": "读取安全告警",
+      "description": "读取代码扫描、Dependabot 和密钥扫描告警以及安全公告。密钥告警会显示泄露的密钥。"
+    },
+    "github_org_read": {
+      "label": "读取团队",
+      "description": "列出组织中各团队的成员。"
     },
     "sentry_issues_read": {
       "label": "读取错误",
@@ -10717,7 +10738,16 @@
       "cycle": "周期|周期",
       "analytics": "分析数据|分析数据",
       "revenue": "收入|收入",
-      "source": "来源|来源"
+      "source": "来源|来源",
+      "code": "代码|代码",
+      "scanning": "扫描|扫描",
+      "secret": "密钥|密钥",
+      "security": "安全|安全",
+      "advisory": "公告|公告",
+      "discussion": "讨论|讨论",
+      "dependabot": "Dependabot",
+      "org": "组织|组织",
+      "ruleset": "规则集|规则集"
     }
   },
   "toolReview": {
@@ -10832,7 +10862,7 @@
       "recommended": "推荐",
       "appText": "智能体显示为应用，仓库在 GitHub 上选择。",
       "account": "GitHub 账号",
-      "accountText": "智能体显示为该账号。GitHub Projects 需要账号。",
+      "accountText": "智能体显示为该账号。个人账号的 GitHub Projects 需要账号。",
       "appNote": "在 GitHub 上选择账号和仓库，然后回到这里。"
     },
     "githubOrgs": {

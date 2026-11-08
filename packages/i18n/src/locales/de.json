@@ -3774,7 +3774,8 @@
       "github": {
         "merge_pull_request": "PR #{{number}} in {{repo}} mergen",
         "pull_request_review_write": "PR #{{number}} in {{repo}} prüfen",
-        "actions_run_trigger": "{{method}} in {{repo}} ausführen"
+        "actions_run_trigger": "{{method}} in {{repo}} ausführen",
+        "delete_repository": "Repository {{repo}} löschen"
       }
     }
   },
@@ -6036,6 +6037,26 @@
     "github_actions_run": {
       "label": "Workflows ausführen",
       "description": "GitHub-Actions-Workflows starten (können deployen). Fragt immer nach Freigabe."
+    },
+    "github_repo_admin": {
+      "label": "Repositorys verwalten",
+      "description": "Repositorys erstellen und ihre Branches mit Regelsätzen schützen. Ein Repository löschen und einen Regelsatz anlegen fragen immer nach Freigabe."
+    },
+    "github_discussions_read": {
+      "label": "Discussions lesen",
+      "description": "GitHub Discussions und ihre Kommentare auflisten und lesen."
+    },
+    "github_discussions_write": {
+      "label": "In Discussions schreiben",
+      "description": "In GitHub Discussions kommentieren und antworten und Kommentare als Antwort markieren."
+    },
+    "github_security_read": {
+      "label": "Sicherheitswarnungen lesen",
+      "description": "Warnungen aus Code-Scanning, Dependabot und Geheimnis-Scanning sowie Sicherheitshinweise lesen. Warnungen zu Geheimnissen zeigen das offengelegte Geheimnis."
+    },
+    "github_org_read": {
+      "label": "Teams lesen",
+      "description": "Die Mitglieder der Teams einer Organisation auflisten."
     },
     "sentry_issues_read": {
       "label": "Fehler lesen",
@@ -11099,7 +11120,16 @@
       "cycle": "Zyklus|Zyklen|des Zyklus",
       "analytics": "Analyse|Analysen|der Analyse",
       "revenue": "Umsatz|Umsätze|des Umsatzes",
-      "source": "Quelle|Quellen|der Quelle"
+      "source": "Quelle|Quellen|der Quelle",
+      "code": "Code|Codes|des Codes",
+      "scanning": "Scan|Scans|des Scans",
+      "secret": "Geheimnis|Geheimnisse|des Geheimnisses",
+      "security": "Sicherheit|Sicherheit|der Sicherheit",
+      "advisory": "Hinweis|Hinweise|des Hinweises",
+      "discussion": "Diskussion|Diskussionen|der Diskussion",
+      "dependabot": "Dependabot|Dependabot|von Dependabot",
+      "org": "Organisation|Organisationen|der Organisation",
+      "ruleset": "Regelsatz|Regelsätze|des Regelsatzes"
     }
   },
   "toolReview": {
@@ -11229,7 +11259,7 @@
       "recommended": "Empfohlen",
       "appText": "Agenten erscheinen als die App, und du wählst die Repositories auf GitHub.",
       "account": "Ein GitHub-Konto",
-      "accountText": "Agenten erscheinen als dieses Konto. GitHub Projects braucht eins.",
+      "accountText": "Agenten erscheinen als dieses Konto. GitHub Projects eines persönlichen Kontos braucht eins.",
       "appNote": "Du wählst die Konten und Repositories auf GitHub und kommst dann hierher zurück."
     },
     "githubOrgs": {

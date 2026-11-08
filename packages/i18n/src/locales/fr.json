@@ -3887,7 +3887,8 @@
       "github": {
         "merge_pull_request": "Faire le merge de la PR #{{number}} dans {{repo}}",
         "pull_request_review_write": "Relire la PR #{{number}} dans {{repo}}",
-        "actions_run_trigger": "Lancer {{method}} dans {{repo}}"
+        "actions_run_trigger": "Lancer {{method}} dans {{repo}}",
+        "delete_repository": "Supprimer le dépôt {{repo}}"
       }
     }
   },
@@ -6252,6 +6253,26 @@
     "github_actions_run": {
       "label": "Lancer des workflows",
       "description": "Lancer des workflows GitHub Actions (peut déployer). Demande toujours une approbation."
+    },
+    "github_repo_admin": {
+      "label": "Gérer les dépôts",
+      "description": "Créer des dépôts et protéger leurs branches avec des ensembles de règles. Supprimer un dépôt et créer un ensemble de règles demandent toujours une approbation."
+    },
+    "github_discussions_read": {
+      "label": "Lire les discussions",
+      "description": "Lister et lire les GitHub Discussions et leurs commentaires."
+    },
+    "github_discussions_write": {
+      "label": "Écrire dans les discussions",
+      "description": "Commenter et répondre dans les GitHub Discussions et marquer des réponses."
+    },
+    "github_security_read": {
+      "label": "Lire les alertes de sécurité",
+      "description": "Lire les alertes d'analyse du code, de Dependabot et d'analyse des secrets, ainsi que les avis de sécurité. Les alertes de secrets montrent le secret exposé."
+    },
+    "github_org_read": {
+      "label": "Lire les équipes",
+      "description": "Lister les membres des équipes d'une organisation."
     },
     "sentry_issues_read": {
       "label": "Lire les erreurs",
@@ -11503,7 +11524,16 @@
       "cycle": "cycle|cycles|du cycle",
       "analytics": "statistiques|statistiques|des statistiques",
       "revenue": "revenus|revenus|des revenus",
-      "source": "source|sources|de la source"
+      "source": "source|sources|de la source",
+      "code": "code|codes|du code",
+      "scanning": "analyse|analyses|de l'analyse",
+      "secret": "secret|secrets|du secret",
+      "security": "sécurité|sécurité|de sécurité",
+      "advisory": "avis|avis|de l'avis",
+      "discussion": "discussion|discussions|de la discussion",
+      "dependabot": "Dependabot|Dependabot|de Dependabot",
+      "org": "organisation|organisations|de l'organisation",
+      "ruleset": "ensemble de règles|ensembles de règles|de l'ensemble de règles"
     }
   },
   "toolReview": {
@@ -11648,7 +11678,7 @@
       "recommended": "Recommandé",
       "appText": "Les agents apparaissent en tant que l'app, et vous choisissez les dépôts sur GitHub.",
       "account": "Un compte GitHub",
-      "accountText": "Les agents apparaissent en tant que ce compte. GitHub Projects en a besoin.",
+      "accountText": "Les agents apparaissent en tant que ce compte. GitHub Projects d'un compte personnel en a besoin.",
       "appNote": "Vous choisissez les comptes et les dépôts sur GitHub, puis vous revenez ici."
     },
     "githubOrgs": {

@@ -990,18 +990,26 @@ There are two ways to set the app up:
     installation** on.
   - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
     installations with GitHub when it opens.
-  - Repository permissions: Actions, Checks, Commit statuses, Contents, Issues, Pull requests and Workflows read and
-    write; Metadata read. Installable by any account.
+  - Repository permissions, read and write: Actions, Administration, Attestations, Checks, Code scanning alerts, Commit
+    statuses, Contents, Custom properties, Dependabot alerts, Dependabot secrets, Deployments, Discussions,
+    Environments, Issues, Merge queues, Packages, Pages, Projects (classic), Pull requests, Repository security
+    advisories, Secret scanning alerts, Secrets, Variables, Webhooks and Workflows; Metadata read. Organization
+    permissions: Members read, Projects read and write. Installable by any account.
 
 Then an admin of each workspace installs it on the repositories its agents may use: connecting GitHub offers
 **The agentes.chat app** first, and **GitHub repositories** in **Settings → Connectors** has **Install the agentes.chat
 app** (on the web and the phone). Each account it's installed on has **Manage on GitHub**, GitHub's page where that
 account's repositories are picked, and **Remove**, which also uninstalls the app from that GitHub account. Without a
 GitHub account connected, the app alone is the workspace's GitHub (**Connect a GitHub account** adds one). GitHub
-Projects need an account. Admins who aren't the server's owner are told the owner can create the app while it's
-missing. Only an installation made from a workspace's install links to it: one installed on GitHub directly, or
-approved there from a member's request, is refused until it is removed on GitHub and installed again from
+Projects on a personal account need an account. Admins who aren't the server's owner are told the owner can create
+the app while it's missing. Only an installation made from a workspace's install links to it: one installed on GitHub
+directly, or approved there from a member's request, is refused until it is removed on GitHub and installed again from
 **Settings → Connectors**.
+
+Each call an agent makes gets a token with only what its tool needs, and deleting a repository or adding a ruleset
+asks a person first. An app created before has fewer permissions: add these on GitHub (the app's settings,
+**Permissions & events**) and each installation's account accepts them there. Until then, what needs them goes
+through the account connection, or tells the agent an admin must accept them.
 
 </details>
 

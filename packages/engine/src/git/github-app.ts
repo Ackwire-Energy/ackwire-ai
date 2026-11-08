@@ -82,6 +82,7 @@ export function boundInstallations(db: Database, orgId: string) {
     .select({
       installationId: githubAppInstallations.installationId,
       accountLogin: githubAppInstallations.accountLogin,
+      accountType: githubAppInstallations.accountType,
     })
     .from(githubAppInstallations)
     .where(and(eq(githubAppInstallations.orgId, orgId), isNull(githubAppInstallations.suspendedAt)))
