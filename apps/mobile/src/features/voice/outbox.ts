@@ -125,21 +125,30 @@ async function upload(item: VoiceSend) {
   return uploadVerdict(res.status);
 }
 
-/** Sends what waits, oldest first, and stops at the first that can't go now. */
+/** Where an item's order matters: its conversation on its server (two conversations never wait on each other). */
+const laneOf = (item: VoiceSend) => `${item.server ?? ""}|${item.orgId}|${item.channelId}|${item.threadId ?? ""}`;
+
+/**
+ * Sends what waits, oldest first. One that can't go now holds back only the ones after it in the same conversation on
+ * the same server, which must keep their order; every other conversation, and every other server, still goes. (A
+ * recording for a server out of reach, such as a team's own one behind a private network, used to hold back every
+ * recording queued after it, on every server: they all sat on "Enviando…".)
+ */
 export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefusal) => void) {
   if (flushing) return;
   flushing = true;
   if (timer) clearTimeout(timer);
   timer = null;
+  const held = new Set<string>();
   try {
     for (const item of [...read()]) {
+      const lane = laneOf(item);
+      if (held.has(lane)) continue;
       const verdict = await upload(item).catch(() => "retry" as const);
       if (verdict === "retry") {
-        timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
-        attempts++;
-        return;
+        held.add(lane);
+        continue;
       }
-      attempts = 0;
       forget(item);
       if (verdict === "done") continue;
       removeBubble(qc, item);
@@ -147,6 +156,12 @@ export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefus
     }
   } finally {
     flushing = false;
+  }
+  if (held.size > 0) {
+    timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
+    attempts++;
+  } else {
+    attempts = 0;
   }
 }
 
