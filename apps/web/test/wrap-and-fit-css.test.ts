@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-const css = await builtCss("src/styles.css", "src/pages/routines.css");
+const css = await builtCss("src/styles.css", "src/pages/routines.css", "src/components/plan-usage.css");
 const top = topLevel(css);
 const last = (sheet: string, selector: string, property: string) =>
   declarations(sheet, selector)
@@ -38,8 +38,17 @@ test("a settings row's control taller than its name's line stays clear of the ha
 });
 
 test("what a row says wraps instead of losing its end to an ellipsis", () => {
-  for (const selector of [".routine-row__when-text b", ".routine-row__when-text small"]) {
+  for (const selector of [".routine-row__when-text b", ".routine-row__when-text small", ".plan-acct__sub"]) {
     expect([selector, last(top, selector, "text-overflow")]).toEqual([selector, undefined]);
     expect([selector, last(top, selector, "white-space")]).toEqual([selector, undefined]);
   }
+});
+
+test("usage on a phone: the figures under the name, as wide as the row, not squeezed into a column beside it", () => {
+  const phone = atRule(css, "@media (max-width: 720px)");
+  expect(last(phone, ".plan-api__row", "grid-template-columns")?.replace(/\s+/g, "")).toBe("28pxminmax(0,1fr)");
+  expect(last(phone, ".plan-api__value", "grid-column")?.replace(/\s+/g, "")).toBe("1/-1");
+  expect(last(phone, ".plan-api__value", "text-align")).toBe("left");
+  expect(last(phone, ".plan-source", "grid-template-columns")?.replace(/\s+/g, "")).toBe("minmax(0,1fr)");
+  expect(last(phone, ".plan-source__n", "align-items")).toBe("flex-start");
 });
