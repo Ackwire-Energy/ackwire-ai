@@ -261,7 +261,7 @@ describe("agent page: its usage (ADR 0063)", () => {
     // It informs: changing the account is "Quem pensa"'s.
     expect(within(now).queryByRole("button")).toBeNull();
     const sources = screen().getByRole("region", { name: "Por conta, este mês" });
-    expect(sources.textContent).toContain("≈ US$\u00a076,00 pela API");
+    expect(sources.textContent).toContain("≈ US$\u00a076,00 pelo preço da API");
     expect(sources.textContent).toContain("US$\u00a00,80 pagos");
   });
 

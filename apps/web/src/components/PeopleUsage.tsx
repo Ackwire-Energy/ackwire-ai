@@ -168,7 +168,7 @@ function placeLine(t: TFunction, place: UsagePlace, agent: string) {
 function UseMeter({ p, plansOnly }: { p: PersonRow; plansOnly: boolean }) {
   const { t, i18n } = useTranslation();
   const amount = formatUsd(i18n.language, p.monthUsd);
-  const shown = plansOnly ? t("peopleUsage.meter.estimate", { amount }) : amount;
+  const shown = plansOnly ? t("peopleUsage.meter.approx", { amount }) : amount;
   return (
     <div className="pu-meter" data-state={p.state}>
       <span className="pu-meter__line">
@@ -247,15 +247,29 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
                 : t("peopleUsage.about")}
             </InfoHint>
           </h3>
-          <span className="muted">
-            {t("peopleUsage.sub", {
-              month,
-              count: data.people.length,
-              amount: data.plansOnly
-                ? t("peopleUsage.meter.estimate", { amount: formatUsd(i18n.language, data.totalUsd) })
-                : formatUsd(i18n.language, data.totalUsd),
-            })}
-          </span>
+          {data.plansOnly ? (
+            // What plans' use would cost through the API: said as that, with why behind the ⓘ.
+            <span className="muted ac-hintline">
+              <span>
+                {t("peopleUsage.subPlans", {
+                  month,
+                  count: data.people.length,
+                  amount: t("peopleUsage.meter.estimate", { amount: formatUsd(i18n.language, data.totalUsd) }),
+                })}
+              </span>
+              <InfoHint name={t("common.about", { label: t("usageViews.apiPrice") })}>
+                {t("usageViews.apiPriceHint")}
+              </InfoHint>
+            </span>
+          ) : (
+            <span className="muted">
+              {t("peopleUsage.sub", {
+                month,
+                count: data.people.length,
+                amount: formatUsd(i18n.language, data.totalUsd),
+              })}
+            </span>
+          )}
         </div>
         <span className="pu-head__acts">
           <Button

@@ -11,6 +11,7 @@ import {
   CardHeader,
   EmptyState,
   Icon,
+  InfoHint,
   Meter,
   PlanMeter,
   ProviderLogo,
@@ -172,7 +173,15 @@ function AccountBlock({ account, money }: { account: PlanAccountUsage; money: bo
         <span className="plan-block__month">
           {t("usageViews.monthTokens", { tokens: formatTokensShort(t, i18n.language, account.monthTokens) })}
           {money && typeof account.equivalentUsd === "number" && (
-            <> · {t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</>
+            <>
+              {" · "}
+              <span className="ac-hintline">
+                <span>{t("usageViews.equivalent", { amount: formatUsd(i18n.language, account.equivalentUsd) })}</span>
+                <InfoHint name={t("common.about", { label: t("usageViews.apiPrice") })}>
+                  {t("usageViews.apiPriceHint")}
+                </InfoHint>
+              </span>
+            </>
           )}
         </span>
       )}
