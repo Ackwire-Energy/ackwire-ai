@@ -1,10 +1,10 @@
 import { type ArtifactDetail, useApi } from "@agenteschat/client";
 import { relativeDay } from "@agenteschat/client/lib/format";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useOrgId, useWhen } from "../shared/hooks";
 import { whenKind } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
