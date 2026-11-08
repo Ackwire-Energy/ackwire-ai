@@ -3897,6 +3897,31 @@ export function useIssueColumnAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "add"; name: string; stage: IssueStatus; afterId?: string | null }
+/**
+ * An agent picked for a task starts on it ("Pedir"). When it can't, the agent stays the task's, as the person picked
+ * it, and the call rejects with why: the caller says it with the task's own words and offers to ask again, so it's
+ * silent here (no second toast).
+ */
+export function useStartAgentOnTask(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async ({ issueId, agentId }: { issueId: string; agentId: string }) => {
+      try {
+        return await api.issues.askAgent(orgId, issueId, agentId);
+      } catch (error) {
+        await api.issues.update(orgId, issueId, { assignee: { type: "agent", id: agentId } }).catch(() => {});
+        throw error;
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
         | { type: "update"; columnId: string; name?: string; index?: number }
         | { type: "delete"; columnId: string; moveTo: string },
     ): Promise<IssueColumn[]> => {

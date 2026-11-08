@@ -244,6 +244,21 @@ test("a computer that can't connect Claude this way is said in the person's lang
   expect(errorText(said, refusal)).toBe("errors.machine.accountMethodUnsupported");
 });
 
+test("an agent that doesn't answer this person says whom it answers, in the person's words", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const only = new ApiError(403, "audience.only", "Ada only replies to Walter and Ana.", {
+    agentName: "Ada",
+    names: ["Walter", "Ana"],
+  });
+  expect(errorText(instance.t, only)).toBe("A Ada só responde a Walter e Ana.");
+  const nobody = new ApiError(403, "audience.nobody", "Theo isn't replying to anyone right now.", {
+    agentName: "Theo",
+    names: [],
+  });
+  expect(errorText(instance.t, nobody)).toBe("O Theo não está respondendo a ninguém agora.");
+});
+
 test("the right hand refused a place: its own line, never ask an admin", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");

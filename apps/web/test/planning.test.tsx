@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { mondayOf } from "@/pages/CalendarPage";
@@ -218,6 +219,41 @@ describe("Issues (board and list)", () => {
     });
     expect(created.criteria.map((c) => c.text)).toEqual(["Botão na agenda", "PDF com o logo da clínica"]);
     expect(created.artifacts).toHaveLength(1);
+  });
+
+  test("Nova tarefa with an agent that can't start: created, why it didn't start, and Pedir de novo starts it", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const ask = api.issues.askAgent;
+    let refusals = 1;
+    api.issues.askAgent = async (orgId, id, agentId) => {
+      if (refusals-- > 0)
+        throw new ApiError(403, "audience.only", "Ada only replies to Walter.", {
+          agentName: "Ada",
+          names: ["Walter"],
+        });
+      return ask(orgId, id, agentId);
+    };
+    await go("issues", api);
+    await click(screen().getByRole("button", { name: "Nova tarefa" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
+    await type(within(dialog).getByLabelText("Título"), "Exportar agenda em PDF");
+    const who = within(dialog).getByRole("button", { name: "Responsável" });
+    who.focus();
+    await key(who, "Enter");
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Ada" }));
+    await settle(3);
+    await click(within(dialog).getByRole("button", { name: "Criar tarefa" }));
+    await settle(8);
+    const toast = () => [...document.querySelectorAll<HTMLElement>(".ac-toast")].at(-1) as HTMLElement;
+    expect(toast().textContent).toContain("Tarefa #133 criada, mas a Ada não começou.");
+    expect(toast().textContent).toContain("A Ada só responde a Walter.");
+    // It stays hers, waiting in A fazer.
+    expect((await api.issues.get(ORG_ID, 133)).assignee).toEqual({ type: "agent", id: ADA_ID });
+    await click(within(toast()).getByRole("button", { name: "Pedir de novo" }));
+    await settle(8);
+    expect(toast().textContent).toContain("Pedido enviado. A Ada trabalha na conversa da tarefa");
+    expect(cardTitles(column("Em andamento"))).toContain("Exportar agenda em PDF");
   });
 
   test("Nova tarefa → formulário completo: the text splits into description and criteria, and comes back", async () => {

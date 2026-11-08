@@ -6044,6 +6044,9 @@ export const en = {
       cancel: "Cancel",
       create: "Create task",
       created: "Task #{{number}} created.",
+      /** The agent picked for it couldn't start: under it, why (`errorText`), and Ask again. */
+      notStarted: "Task #{{number}} created, but {{name}} didn't start.",
+      askAgain: "Ask again",
       intro: "Whoever takes it, a person or an agent, shows on the board with its progress.",
       criteriaFound_one: "{{count}} acceptance criterion",
       criteriaFound_other: "{{count}} acceptance criteria",
@@ -6093,6 +6096,8 @@ export const en = {
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
     asked: "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along.",
+    /** An agent picked on a task couldn't start on it: under it, why, and Ask again. */
+    notStarted: "{{name}} didn't start.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     discussion: "Discussion",

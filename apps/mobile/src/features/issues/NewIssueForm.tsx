@@ -13,6 +13,7 @@ import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useWhoSeesDraft, useWhoSeesLabel, WhoSeesRows } from "../shared/WhoSees";
 import { DUE_CHOICES, type DueChoice, dueDateOf } from "./logic";
+import { useStartAgent } from "./useStartAgent";
 
 type Open = "who" | "priority" | "due" | "sees" | null;
 
@@ -32,6 +33,7 @@ export function NewIssueForm() {
   const meId = useMeId();
   const orgId = useOrgId();
   const action = useIssueAction(orgId);
+  const start = useStartAgent();
   const ai = useAiStatus(orgId);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -66,12 +68,7 @@ export function NewIssueForm() {
         onSuccess: (created) => {
           const issue = created as Issue;
           // An agent picked here starts right away: assigned, its run linked, in progress (as on the web).
-          if (who?.type === "agent")
-            action.mutate(
-              { type: "ask", id: issue.id, agentId: who.id },
-              // Couldn't ask (not in a shared channel…): it stays assigned to the agent.
-              { onError: () => action.mutate({ type: "update", id: issue.id, patch: { assignee: who } }) },
-            );
+          if (who?.type === "agent") start.run(issue, who.id, { created: true });
           successHaptic();
           toast({
             title: t("mobile.issues.form.created", { number: issue.number }),
