@@ -177,6 +177,15 @@ describe("what happens on GitHub wakes the agent it concerns (ADR 0156)", () => 
     await deliver("issue_comment", commentOn(12, "Looks good"), "delivery-1");
     await deliver("issue_comment", commentOn(12, "Looks good"), "delivery-1");
     expect(await githubNotices()).toHaveLength(1);
+    // A worker lost the job after writing, and another runs it again: still one notice.
+    const payload = commentOn(12, "Ship it");
+    await queueGitHubAppEvent(f.db, { event: "issue_comment", delivery: "delivery-2", payload, slug: SLUG });
+    const [job] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `${GITHUB_EVENT_JOB}:delivery-2`));
+    for (const _ of [1, 2]) if (job) await f.handlers[GITHUB_EVENT_JOB]?.(job, { finalAttempt: false });
+    expect(await githubNotices()).toHaveLength(2);
   });
 
   test("a member naming the app on an item no agent worked on goes to the right hand, in their DM", async () => {
@@ -336,6 +345,14 @@ describe("reading what GitHub sent", () => {
       action: "closed",
       item: "issue",
     });
+    // A merge queue merging the agent's PR is a real merge: only the app's own close is an agent's.
+    const queue = base({ id: 3, login: "github-merge-queue[bot]", type: "Bot" });
+    expect(of("pull_request", { ...queue, action: "closed", pull_request: { number: 4, merged: true } })).toMatchObject(
+      {
+        action: "merged",
+        item: "pull_request",
+      },
+    );
     expect(of("issues", { ...base(MEMBER_GH), action: "labeled", issue: { number: 3 } })).toBeNull();
     expect(of("push", { ...base(MEMBER_GH) })).toBeNull();
     expect(of("issue_comment", { ...commentOn(3, "x"), installation: undefined })).toBeNull();

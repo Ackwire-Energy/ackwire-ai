@@ -118,6 +118,8 @@ export interface GitHubAppEvent {
   state: string | null;
   /** It names the app's bot (`@slug`), or asks for its review. */
   mentioned: boolean;
+  /** GitHub's `X-GitHub-Delivery`, set when queued: a job run twice brings it once. */
+  delivery?: string;
 }
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -225,7 +227,7 @@ export async function queueGitHubAppEvent(
   await enqueue(db, {
     orgId: bound.orgId,
     kind: GITHUB_EVENT_JOB,
-    payload: { event },
+    payload: { event: { ...event, ...(delivery ? { delivery } : {}) } },
     ...(delivery ? { dedupeKey: `${GITHUB_EVENT_JOB}:${delivery}` } : {}),
     maxAttempts: 4,
   });
@@ -320,6 +322,22 @@ export async function handleGitHubAppEvent(
     .from(channels)
     .where(and(eq(channels.orgId, orgId), eq(channels.id, target.channelId)));
   if (!agent || agent.archivedAt || !channel || channel.archivedAt) return "ignored";
+  // The job ran before (a worker lost it after writing): its notice is there already.
+  if (e.delivery) {
+    const [seen] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, orgId),
+          eq(messages.channelId, target.channelId),
+          eq(messages.authorAgentId, agent.id),
+          sql`${messages.meta}->'notice'->'refs'->>'delivery' = ${e.delivery}`,
+        ),
+      )
+      .limit(1);
+    if (seen) return "ignored";
+  }
   // Work an agent was handed (the agents' DM) is read by no person: being in the workspace is what counts there.
   const membership = !member
     ? null
@@ -349,6 +367,7 @@ export async function handleGitHubAppEvent(
       url: e.url,
       login: e.sender.login,
       who,
+      ...(e.delivery ? { delivery: e.delivery } : {}),
       ...(e.state ? { state: e.state } : {}),
       ...(task ? { task: `#${task.number} «${cutText(task.title, 200)}»` } : {}),
       ...(behind ? { personId: behind.id } : closing ? {} : { outside: "1" }),
