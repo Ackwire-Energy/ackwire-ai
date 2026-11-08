@@ -10,3 +10,12 @@ export const MEDIA_ROW = {
 } as const;
 
 export type MediaRowSize = "card" | "row";
+
+/**
+ * The face and the name's first line on one axis, however many lines the name wraps to (the web's `--mediarow-axis`),
+ * never the wrapped name's middle: the face's middle where the eye reads that line (`textLineOf`). Whichever is
+ * shorter moves down; what ends the line sits on the face's middle.
+ */
+export function mediaRowAxis(face: number, line: { middle: number }) {
+  return { face: Math.max(0, line.middle - face / 2), words: Math.max(0, face / 2 - line.middle) };
+}

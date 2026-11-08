@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MEDIA_ROW } from "../../src/ui/media-row";
+import { MEDIA_ROW, mediaRowAxis } from "../../src/ui/media-row";
+import { readingMiddle } from "../../src/ui/type-scale";
 
 const src = (path: string) => readFileSync(join(import.meta.dir, "../../src", path), "utf8");
 
@@ -14,14 +15,29 @@ describe("MediaRow", () => {
     const row = src("ui/MediaRow.tsx");
     // One Text holds the name and the meta, so they wrap as words, never as two columns.
     expect(row).toMatch(
-      /<Text variant="subhead" style=\{styles\.words\}>\s*<Text variant="subhead" style=\{styles\.name\}>/,
+      /<Text variant="subhead" style=\{\[styles\.words, \{ paddingTop: axis\.words \}\]\}>\s*<Text variant="subhead" style=\{styles\.name\}>/,
     );
     // The children come after the head's View, not inside it: under the face, not beside it.
     const head = row.indexOf("<View style={[styles.head, { gap }]}>");
-    const close = row.indexOf("</View>", row.indexOf("{end}"));
+    const close = row.indexOf("</View>", row.indexOf("{end}</View> : null}") + "{end}</View>".length);
     expect(head).toBeGreaterThan(0);
     expect(row.indexOf("{children}")).toBeGreaterThan(close);
     expect(row).toContain("row: { gap: MEDIA_ROW.under }");
+  });
+
+  test("a wrapped name keeps its first line on the face's middle, and what ends the line sits there too", () => {
+    // Subhead (15 on 20) is read 11.2 down its line: beside a face of 32 the words come down, the face stays.
+    const subhead = { middle: readingMiddle(15, 20) };
+    expect(mediaRowAxis(32, subhead).face).toBe(0);
+    expect(mediaRowAxis(32, subhead).words).toBeCloseTo(4.8);
+    expect(mediaRowAxis(24, subhead).words).toBeCloseTo(0.8);
+    // At a larger text size the line is read lower than a small face's middle: the face comes down instead.
+    const large = { middle: readingMiddle(19.5, 26) };
+    expect(mediaRowAxis(24, large).face).toBeCloseTo(large.middle - 12);
+    expect(mediaRowAxis(24, large).words).toBe(0);
+    const row = src("ui/MediaRow.tsx");
+    expect(row).toContain('head: { flexDirection: "row", alignItems: "flex-start" }');
+    expect(row).toContain("<View style={[styles.end, { height: side, marginTop: axis.face }]}>{end}</View>");
   });
 
   test("screens import it from the design system", () => {

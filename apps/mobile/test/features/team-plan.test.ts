@@ -35,6 +35,26 @@ test("a conversation draws the team card and the answers to tap under a right ha
   expect(src("chat/live.ts")).toContain('case "team.proposal.updated":');
 });
 
+test("the team card's agents, the first tasks and the map's agents are MediaRows: no face owning a column", () => {
+  const card = src("right-hand/TeamCard.tsx");
+  // The team: face, name and role on one line; what it does, its channel and Ajustar under them.
+  expect(card).toContain(
+    "face={<AgentAvatar agent={fullLook(a.appearance)} size={MEDIA_ROW.card.face} name={a.name} live={false} />}",
+  );
+  expect(card).toMatch(/name=\{a\.name\}\s*meta=\{a\.role\}\s*>\s*<Text variant="small" tone="ink2">\s*\{a\.line\}/);
+  // A first task: the task under the name, Abrir com a tarefa under it.
+  expect(card).toMatch(/name=\{f\.name\}\s*>\s*<Text variant="small" tone="ink2">\s*\{f\.task\}/);
+  // The map: a list row (24), the routines under the name.
+  expect(card).toMatch(/<MediaRow\s+key=\{a\.handle\}\s+size="row"/);
+  expect(card).toContain(
+    "<AgentAvatar agent={fullLook(a.appearance)} size={MEDIA_ROW.row.face} name={a.name} live={false} />",
+  );
+  expect(card.match(/<MediaRow/g)).toHaveLength(3);
+  // No row of a face beside a column of words is left.
+  expect(card).not.toContain("agentHead");
+  expect(card).not.toContain("size={28}");
+});
+
 test("the chips read their answer from the conversation, as on the web", () => {
   const list = [
     { id: "q", createdAt: "2026-11-04T12:00:00.000Z", author: { type: "agent" as const, id: "lodi" }, body: "?" },

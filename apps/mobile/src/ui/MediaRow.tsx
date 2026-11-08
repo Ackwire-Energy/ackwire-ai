@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
-import { MEDIA_ROW, type MediaRowSize } from "./media-row";
-import { Text } from "./Text";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { MEDIA_ROW, type MediaRowSize, mediaRowAxis } from "./media-row";
+import { Text, textLineOf } from "./Text";
 import { weights } from "./type-scale";
 
 export interface MediaRowProps {
@@ -21,11 +21,12 @@ export interface MediaRowProps {
 /** A face, the name and what it is on one line, and the rest under them at full width (the web's MediaRow). */
 export function MediaRow({ face, name, meta, end, children, size = "card" }: MediaRowProps) {
   const { face: side, gap } = MEDIA_ROW[size];
+  const axis = mediaRowAxis(side, textLineOf("subhead", useWindowDimensions().fontScale));
   return (
     <View style={styles.row}>
       <View style={[styles.head, { gap }]}>
-        <View style={{ width: side, height: side }}>{face}</View>
-        <Text variant="subhead" style={styles.words}>
+        <View style={{ width: side, height: side, marginTop: axis.face }}>{face}</View>
+        <Text variant="subhead" style={[styles.words, { paddingTop: axis.words }]}>
           <Text variant="subhead" style={styles.name}>
             {name}
           </Text>
@@ -35,7 +36,7 @@ export function MediaRow({ face, name, meta, end, children, size = "card" }: Med
             </Text>
           ) : null}
         </Text>
-        {end}
+        {end ? <View style={[styles.end, { height: side, marginTop: axis.face }]}>{end}</View> : null}
       </View>
       {children}
     </View>
@@ -44,7 +45,9 @@ export function MediaRow({ face, name, meta, end, children, size = "card" }: Med
 
 const styles = StyleSheet.create({
   row: { gap: MEDIA_ROW.under },
-  head: { flexDirection: "row", alignItems: "center" },
+  head: { flexDirection: "row", alignItems: "flex-start" },
+  // As tall as the face, what ends the line centred on it: a taller control reaches as far above as below.
+  end: { justifyContent: "center" },
   words: { flex: 1, minWidth: 0 },
   name: { fontWeight: weights.semibold },
 });
