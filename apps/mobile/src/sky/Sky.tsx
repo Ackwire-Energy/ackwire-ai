@@ -40,9 +40,19 @@ function hostOf(url: string): string {
  * clouds drifting by, a server of one's own the same sky at dusk with a few stars (`@agenteschat/ui` sky/workspace,
  * drawn by the `workspace` shader). Tones 0..3 are the field's, 6 and 7 what is drawn over it.
  */
-export function WorkspaceSky({ fade = 0.55, style }: { fade?: number; style?: StyleProp<ViewStyle> }) {
+export function WorkspaceSky({
+  fade = 0.55,
+  host,
+  style,
+}: {
+  fade?: number;
+  /** Another server's sky (where a connection leads, a workspace elsewhere: ADR 0154); the current server's by default. */
+  host?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { colors } = useTheme();
-  const hour = skyHourOf(hostOf(useServer()));
+  const current = useServer();
+  const hour = skyHourOf(host ?? hostOf(current));
   const tones = workspaceTones(hour, colors.bg);
   const ink = workspaceInk(hour, colors.bg);
   const deepest = tones[tones.length - 1] ?? colors.bg;

@@ -7,27 +7,29 @@ import { emailTypoFix, isEmail, nameIsPassword, passwordState, webmailOf } from 
 import { useQueryClient } from "@tanstack/react-query";
 import { type ComponentRef, type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AccessibilityInfo, Linking, type TextInput } from "react-native";
+import { AccessibilityInfo, Linking, type TextInput, View } from "react-native";
 import { useNow } from "@/features/shared/hooks";
 import { firstName } from "@/features/shared/logic";
 import { serverUrl } from "@/lib/server";
-import { Button, haptics, Locked, Text } from "@/ui";
+import { Button, haptics, LineIcon, Locked, Text } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
-import { AuthScaffold } from "@/ui/auth/AuthScaffold";
+import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { router } from "@/ui/navigation";
+import { useTheme } from "@/ui/theme";
 import { NameHint, Quiet } from "./AuthFlow";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
 import { rememberInvite } from "./invite";
-import { DidYouMean, ErrorLine, InviteTerms, LeaveButton, OrgLine, useLeaveInvite } from "./invite-parts";
+import { DidYouMean, ErrorLine, InviteTerms, LeaveButton, useLeaveInvite } from "./invite-parts";
 import { type Asked, type AskStep, askAction, askBack, askProgress } from "./invite-steps";
 
 /**
- * Asking through a link, signed out, where email goes out (ADR 0090 §1): the email, the code from it on its own
- * screen, a name, a password and an optional note, one per screen. No account exists until an admin approves; the
- * ask answers the key that signs in then, and the phone keeps it (`onAsked`). An answer with no key (an ask the server
- * keeps no password for) says only where the answer goes.
+ * Asking through a link, signed out, where email goes out (ADR 0090 §1): three screens. The email, with who called
+ * you as the title; the code from it, alone; then you (name, a password and an optional word for whoever approves)
+ * under one button, "Pedir para entrar". No account exists until an admin approves; the ask answers the key that
+ * signs in then, and the phone keeps it (`onAsked`). An answer with no key (an ask the server keeps no password for)
+ * says only where the answer goes.
  */
 export function LinkSteps({
   token,
@@ -39,6 +41,7 @@ export function LinkSteps({
   onAsked: (asked: Asked) => void;
 }) {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const api = useApi();
   const qc = useQueryClient();
   const leave = useLeaveInvite();
@@ -64,10 +67,12 @@ export function LinkSteps({
   const [answered, setAnswered] = useState<AskToJoinResult | null>(null);
   const human = useHumanCheck(askAction(step));
   const codeField = useRef<ComponentRef<typeof TextInput>>(null);
+  const passwordField = useRef<ComponentRef<typeof TextInput>>(null);
+  const noteField = useRef<ComponentRef<typeof TextInput>>(null);
   const typed = email.trim();
   const key = typed.toLowerCase();
   const org = preview.orgName;
-  const sharedBy = preview.invitedBy ? t("mobile.invite.join.sharedBy", { name: firstName(preview.invitedBy) }) : "";
+  const by = preview.invitedBy ? firstName(preview.invitedBy) : null;
   const resendAt = sent?.to === key ? sent.resendAt : 0;
   // A repaint every second while the code's countdown runs; the time itself is read just below.
   useNow(step === "code" && resendAt > Date.now() ? 1000 : 60_000);
@@ -115,7 +120,7 @@ export function LinkSteps({
 
   /** The email's Continue: a code to it, unless it's proven already or one went out a moment ago. */
   const toCode = async () => {
-    if (proof?.email === key) return go("name");
+    if (proof?.email === key) return go("you");
     if (sent?.to === key && Date.now() < sent.resendAt) return go("code");
     if (await sendCode()) {
       setCode("");
@@ -137,7 +142,7 @@ export function LinkSteps({
       haptics.success();
       AccessibilityInfo.announceForAccessibility(t("invite.ask.verified"));
       setProof({ email: key, code: value });
-      go("name");
+      go("you");
     } catch (e) {
       haptics.warning();
       setCode("");
@@ -157,10 +162,11 @@ export function LinkSteps({
     if (digits.length === CODE_LENGTH) void checkCode(digits);
   };
 
-  /** The ask, with a note or without (Pular). */
-  const ask = async (words: string) => {
+  /** The ask, with the word for whoever approves or without. */
+  const ask = async () => {
     if (!proof) return go("email");
     if (asking) return;
+    const words = note.trim();
     setAsking(true);
     setError(null);
     try {
@@ -194,25 +200,17 @@ export function LinkSteps({
     }
   };
 
-  const ready =
-    step === "email"
-      ? isEmail(email) && capped !== key
-      : step === "name"
-        ? name.trim() !== ""
-        : step === "password"
-          ? passwordState(password) === "ok"
-          : step === "note";
+  const nameOk = name.trim() !== "";
+  const passwordOk = passwordState(password) === "ok";
+  const ready = step === "email" ? isEmail(email) && capped !== key : step === "you" ? nameOk && passwordOk : false;
 
   const submit = () => {
     if (!ready || sending || asking) return;
     if (step === "email") void toCode();
-    else if (step === "name") go("password");
-    else if (step === "password" && nameIsPassword(name, password)) {
+    else if (step === "you" && nameIsPassword(name, password)) {
       setPassword("");
-      go("name");
       setError(t("auth.flow.nameIsPassword"));
-    } else if (step === "password") go("note");
-    else if (step === "note") void ask(note.trim());
+    } else if (step === "you") void ask();
   };
 
   if (answered)
@@ -229,32 +227,21 @@ export function LinkSteps({
       </AuthScaffold>
     );
 
-  const first = firstName(name);
   const fix = step === "email" ? emailTypoFix(email) : null;
   const mail = webmailOf(typed);
-  const bubble: Record<AskStep, [string, string]> = {
-    email: [t("invite.ask.hello", { org }), t("invite.ask.emailLead")],
-    code: [t("invite.ask.codeTitle", { email: typed }), t("invite.ask.codeLead")],
-    name: [t("invite.ask.nameTitle"), t("auth.flow.nameLead")],
-    password: [
-      first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
-      t("invite.ask.passwordLead"),
+  const bubble: Record<AskStep, [string, string | undefined]> = {
+    email: [
+      by ? t("mobile.invite.ask.called", { name: by, org }) : t("mobile.invite.ask.calledNoName", { org }),
+      t("mobile.invite.ask.approves", { org }),
     ],
-    note: [t("invite.ask.noteTitle"), t("invite.ask.noteLead")],
+    code: [t("invite.ask.codeTitle", { email: typed }), t("invite.ask.codeLead")],
+    // The subtitle's place holds the confirmed e-mail line, drawn below with its check.
+    you: [t("mobile.invite.ask.youTitle"), undefined],
   };
   const [title, lead] = bubble[step];
-  const expression = wrong ? "cross" : wink ? "wink" : secret ? "closed" : step === "name" ? "happy" : undefined;
+  const expression = wrong ? "cross" : wink ? "wink" : secret ? "closed" : step === "you" ? "happy" : undefined;
   const { n, total } = askProgress(step);
-  const continueButton = (
-    <Button
-      variant="primary"
-      wide
-      label={t("auth.flow.continue")}
-      loading={sending}
-      disabled={!ready || sending}
-      onPress={submit}
-    />
-  );
+  const progress = t("mobile.invite.ask.stepOf", { n, total, name: t(`mobile.invite.ask.step.${step}`) });
 
   const locked = sending || asking;
   let body: ReactNode = null;
@@ -262,7 +249,7 @@ export function LinkSteps({
     case "email":
       body = (
         <>
-          <Locked when={locked} style={{ gap: 10 }}>
+          <Locked when={locked} keepKeyboard style={{ gap: 8 }}>
             <AuthField
               value={email}
               onChangeText={(value) => {
@@ -276,18 +263,26 @@ export function LinkSteps({
               autoCorrect={false}
               autoComplete="email"
               textContentType="emailAddress"
-              returnKeyType="next"
+              // The keyboard's blue key is the action: "continuar", gray until something is typed.
+              returnKeyType="continue"
+              enablesReturnKeyAutomatically
               onSubmitEditing={submit}
               autoFocus
             />
             {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
           </Locked>
-          <OrgLine agent={preview.agents?.[0]} strong={org} text={sharedBy} />
           <ErrorLine error={error ?? (capped === key ? t("errors.code.limit") : null)} />
-          {continueButton}
-          <Locked when={locked}>
+          <Button
+            variant="primary"
+            wide
+            label={t("auth.flow.continue")}
+            loading={sending}
+            disabled={!ready || sending}
+            onPress={submit}
+          />
+          <Locked when={locked} keepKeyboard>
             <Quiet
-              label={t("invite.ask.haveAccountSignIn")}
+              label={t("mobile.invite.ask.haveAccount")}
               onPress={() => {
                 rememberInvite(token, "link");
                 // The address typed here goes along, so the sign-in starts at the password.
@@ -301,7 +296,7 @@ export function LinkSteps({
     case "code":
       body = (
         <>
-          <Locked when={checking}>
+          <Locked when={checking} keepKeyboard>
             <AuthField
               ref={codeField}
               code
@@ -325,7 +320,6 @@ export function LinkSteps({
             <Button
               variant="secondary"
               wide
-              icon="mail"
               label={t("auth.flow.openMail", { app: mail.name })}
               onPress={() => void Linking.openURL(mail.url)}
             />
@@ -335,7 +329,7 @@ export function LinkSteps({
               variant="subhead"
               tone="muted"
               accessibilityLabel={t("invite.ask.resendIn", { count: Math.ceil(left / 1000) })}
-              style={{ textAlign: "center", fontVariant: ["tabular-nums"] }}
+              style={[CENTER, { fontVariant: ["tabular-nums"] }]}
             >
               {formatTimeLeft(left)}
             </Text>
@@ -345,10 +339,20 @@ export function LinkSteps({
         </>
       );
       break;
-    case "name":
+    case "you":
       body = (
         <>
-          <Locked when={locked}>
+          {/* The e-mail is settled: one quiet line with a check, where a subtitle would be. */}
+          <View
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: -16 }}
+            accessibilityLabel={`${t("invite.ask.verified")}: ${typed}`}
+          >
+            <LineIcon name="check" size={16} color={colors.ok} variant="subhead" />
+            <Text variant="subhead" tone="ok" style={{ fontWeight: "600" }}>
+              {t("mobile.invite.ask.emailConfirmed")}
+            </Text>
+          </View>
+          <Locked when={locked} keepKeyboard style={{ gap: 8 }}>
             <AuthField
               value={name}
               onChangeText={setName}
@@ -358,61 +362,48 @@ export function LinkSteps({
               autoCapitalize="words"
               autoComplete="name"
               textContentType="name"
+              // Return moves to the next field; the keyboard stays and the screen doesn't move.
               returnKeyType="next"
-              onSubmitEditing={submit}
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordField.current?.focus()}
               autoFocus
             />
-          </Locked>
-          {error ? <ErrorLine error={error} /> : <NameHint name={name} />}
-          {continueButton}
-        </>
-      );
-      break;
-    case "password":
-      body = (
-        <>
-          <Locked when={locked}>
+            <NameHint name={name} />
             <PasswordField
+              ref={passwordField}
               value={password}
               onChangeText={setPassword}
               fresh
+              autoFocus={false}
+              keepFocus
               onSecretChange={setSecret}
               onShow={() => {
                 setWink(true);
                 setTimeout(() => setWink(false), 900);
               }}
-              onSubmitEditing={submit}
+              onSubmitEditing={() => noteField.current?.focus()}
               label={t("invite.createPassword")}
             />
-          </Locked>
-          {continueButton}
-        </>
-      );
-      break;
-    case "note":
-      body = (
-        <>
-          <Locked when={locked} style={{ gap: 6 }}>
-            <Text variant="subhead" tone="muted">
-              {t("invite.ask.noteField")}
-            </Text>
             <AuthField
+              ref={noteField}
               value={note}
               onChangeText={setNote}
-              placeholder={t("invite.ask.notePlaceholder")}
+              placeholder={t("mobile.invite.ask.notePlaceholder")}
               accessibilityLabel={t("invite.ask.noteField")}
               maxLength={JOIN_NOTE_MAX}
-              multiline
-              textAlignVertical="top"
-              minHeight={96}
-              autoFocus
+              returnKeyType="send"
+              onSubmitEditing={submit}
             />
           </Locked>
           <ErrorLine error={error} />
-          <Button variant="primary" wide label={t("invite.ask.send")} loading={asking} onPress={submit} />
-          <Locked when={locked}>
-            <Quiet label={t("mobile.invite.join.skip")} onPress={() => void ask("")} />
-          </Locked>
+          <Button
+            variant="primary"
+            wide
+            label={t("invite.ask.send")}
+            loading={asking}
+            disabled={!ready || asking}
+            onPress={submit}
+          />
         </>
       );
       break;
@@ -422,13 +413,14 @@ export function LinkSteps({
     <AuthScaffold
       title={title}
       subtitle={lead}
-      progress={t("invite.ask.stepOf", { n, total })}
+      progress={progress}
       stepKey={step}
       onBack={onBack}
+      sky={step === "you" ? "low" : "normal"}
       agentMode={sending || asking || checking ? "run" : "idle"}
       expression={expression}
       overlay={human.view}
-      footer={step === "email" || step === "password" ? <InviteTerms /> : null}
+      footer={step === "email" || step === "you" ? <InviteTerms /> : null}
     >
       {body}
     </AuthScaffold>

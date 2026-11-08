@@ -76,7 +76,11 @@ function AppStack() {
   const setupSheet = useFormSheetOptions([0.7, 1]);
   const requestsSheet = useFormSheetOptions([0.7, 1]);
   const pushSheet = useFormSheetOptions("fitToContents");
+  // The workspaces as a sheet (ADR 0154): tall enough for a few servers, the top detent for many.
+  const workspacesSheet = useFormSheetOptions([0.76, 1]);
   const wikiSheet = useFormSheetOptions([0.55, 1]);
+  // "New" over the tabs as the system's new message: two thirds at rest, the whole screen once the keyboard is up.
+  const newSheet = useFormSheetOptions([0.66, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -102,7 +106,7 @@ function AppStack() {
       <Stack.Screen name="agent-step/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -153,15 +157,21 @@ function AppStack() {
       <Stack.Screen name="join-requests" options={requestsSheet} />
       <Stack.Screen name="switch-computer/[machineId]" options={switchSheet} />
       <Stack.Screen name="computer-setup" options={setupSheet} />
-      <Stack.Screen name="connect-ai" options={formSheet} />
+      {/* Connect an AI: pushed screens, one question each, on the grouped gray (its bar counts the steps). */}
+      <Stack.Screen
+        name="connect-ai"
+        options={{ ...pushed, ...scrollUnder, contentStyle: { backgroundColor: colors.grouped } }}
+      />
       {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
       <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
-      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154). */}
-      <Stack.Screen name="me/add-workspace" options={{ ...pushed, ...scrollUnder }} />
+      {/* The same list as a sheet, from a long press on the workspace's mark in the bar (ADR 0154). */}
+      <Stack.Screen name="workspaces-sheet" options={workspacesSheet} />
+      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154): two choices, a short sheet. */}
+      <Stack.Screen name="me/add-workspace" options={pushSheet} />
       <Stack.Screen name="me/team-server" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/scan" options={{ headerShown: false }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />

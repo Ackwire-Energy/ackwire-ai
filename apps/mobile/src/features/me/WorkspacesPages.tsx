@@ -11,12 +11,13 @@ import { askNewWorkspace } from "@/lib/new-workspace";
 import { openOrgs } from "@/lib/org-choice";
 import { ALLOW_HTTP, serverUrl, signedInServers, useServer, useSignedInServers } from "@/lib/server";
 import { useOrg, useOrgMaybe } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics, Locked, SheetScreen, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { Button } from "@/ui/Button";
 import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 import { OrgAvatar } from "../shared/OrgAvatar";
+import { goBack } from "../shared/parts";
 import { Page } from "./parts";
 import { orderedServers, type ServerWorkspaces, unreadElsewhere, workspacesOf } from "./workspaces-logic";
 
@@ -59,14 +60,40 @@ export function useWorkspacesAcross(): { groups: ServerWorkspaces[]; elsewhere: 
   return { groups, elsewhere: unreadElsewhere(groups, org?.orgId ?? null) };
 }
 
-/** Workspaces: every server's, under a header each; tapping one opens it, on its server, without signing out. */
-export function WorkspacesPage() {
-  const { t, i18n } = useTranslation();
+/**
+ * Opens a workspace from a list of them: the current server's by choosing it; another server's by moving there, the
+ * toast saying where you are now ("Agora em …", on the axis it came from; nothing signs out, ADR 0154). `before`:
+ * closes the list first (a sheet), so the move is seen on the screen under it.
+ */
+export function useOpenWorkspaceRow(before?: () => void) {
+  const { t } = useTranslation();
   const toast = useToast();
   const org = useOrg();
-  const { groups } = useWorkspacesAcross();
+  return (g: ServerWorkspaces, o: { id: string; name: string }) => {
+    const here = g.current && o.id === org.orgId;
+    if (here) return;
+    haptics.light();
+    before?.();
+    if (g.current) {
+      org.setOrgId(o.id);
+      router.dismissTo("/");
+      return;
+    }
+    toast({ title: t("mobile.auth.server.now", { host: o.name }) });
+    void openWorkspace(g.server, o.id);
+  };
+}
+
+/**
+ * The groups of workspaces, one per server (its host as the small header), each workspace with its own mark (logo,
+ * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
+ * answer stays in its place, faded. Shared by the page and the sheet.
+ */
+export function WorkspaceGroups({ groups, onOpen }: { groups: ServerWorkspaces[]; onOpen: ReturnType<typeof useOpenWorkspaceRow> }) {
+  const { t, i18n } = useTranslation();
+  const org = useOrg();
   return (
-    <Page title={t("mobile.me.workspaces")}>
+    <>
       {groups.map((g) => {
         const notes = workspaceNotes(t, i18n.language, g.orgs);
         return (
@@ -81,21 +108,12 @@ export function WorkspacesPage() {
                   return (
                     <GroupedRow
                       key={o.id}
-                      leading={<OrgAvatar logo={o.logo} server={g.server} />}
+                      leading={<OrgAvatar logo={o.logo} name={o.name} server={g.server} />}
                       label={o.name}
                       sub={notes.get(o.id) ?? t(`mobile.me.role.${o.role}`)}
                       checked={here}
                       {...(!here && o.unread > 0 ? { value: String(o.unread) } : {})}
-                      onPress={() => {
-                        if (here) return;
-                        if (g.current) {
-                          org.setOrgId(o.id);
-                          router.dismissTo("/");
-                          return;
-                        }
-                        toast({ title: t("mobile.auth.server.now", { host: o.name }) });
-                        void openWorkspace(g.server, o.id);
-                      }}
+                      onPress={() => onOpen(g, o)}
                     />
                   );
                 })
@@ -104,6 +122,18 @@ export function WorkspacesPage() {
           </View>
         );
       })}
+    </>
+  );
+}
+
+/** Workspaces: every server's, under a header each; tapping one opens it, on its server, without signing out. */
+export function WorkspacesPage() {
+  const { t } = useTranslation();
+  const { groups } = useWorkspacesAcross();
+  const open = useOpenWorkspaceRow();
+  return (
+    <Page title={t("mobile.me.workspaces")}>
+      <WorkspaceGroups groups={groups} onOpen={open} />
       <View style={styles.gap} />
       <GroupedList>
         <GroupedRow
@@ -118,7 +148,10 @@ export function WorkspacesPage() {
   );
 }
 
-/** Adicionar workspace: a new one on agentes.chat, or the team's own server. */
+/**
+ * Adicionar workspace, a short sheet (the system's form sheet, sized to its two rows): a new one on agentes.chat,
+ * or the team's own server; one line under them says nothing is lost.
+ */
 export function AddWorkspacePage() {
   const { t } = useTranslation();
   const create = () => {
@@ -128,7 +161,10 @@ export function AddWorkspacePage() {
     else void openWorkspace(CLOUD_SERVER, null);
   };
   return (
-    <Page title={t("mobile.me.addWorkspace")}>
+    <SheetScreen fit>
+      <Text variant="title2" accessibilityRole="header" style={styles.sheetTitle}>
+        {t("mobile.me.addWorkspace")}
+      </Text>
       <GroupedList>
         <GroupedRow
           icon="plus"
@@ -139,20 +175,24 @@ export function AddWorkspacePage() {
         />
         <GroupedRow
           icon="server"
-          label={t("mobile.me.addWorkspaceTeam")}
-          sub={t("mobile.me.addWorkspaceTeamSub")}
-          subLines={2}
+          label={t("mobile.me.addWorkspaceTeamShort")}
+          sub={t("mobile.me.addWorkspaceTeamSubShort")}
           chevron
-          onPress={() => router.push("/me/team-server")}
+          onPress={() => {
+            goBack();
+            router.push("/me/team-server");
+          }}
         />
       </GroupedList>
-    </Page>
+      <GroupedFooter>{t("mobile.me.addWorkspaceFoot")}</GroupedFooter>
+    </SheetScreen>
   );
 }
 
 /**
- * Servidor da equipe: the fields of "Seu servidor", while signed in. The server is checked first; then the app moves
- * there without leaving any other (ADR 0154): signed in there already, its workspaces; otherwise its sign-in.
+ * Servidor da equipe, while signed in: the question, the address with the URL keyboard open and its return key as the
+ * action, Escanear QR code below it, and one quiet line: nothing signs out (ADR 0154). The server is checked first;
+ * then the app moves there: signed in there already, its workspaces; otherwise its sign-in.
  */
 export function TeamServerPage() {
   const { t } = useTranslation();
@@ -162,6 +202,7 @@ export function TeamServerPage() {
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (busy || !address.trim()) return;
     const server = normalizeServer(address, { allowHttp: ALLOW_HTTP });
     if (!server) return setError(t("mobile.auth.server.invalid"));
     setBusy(true);
@@ -179,22 +220,29 @@ export function TeamServerPage() {
 
   return (
     <Page title={t("mobile.me.teamServer")}>
-      <Text variant="callout" tone="muted" style={styles.lead}>
-        {t("mobile.me.teamServerLead")}
+      <Text variant="subhead" tone="muted" style={styles.lead}>
+        {t("mobile.me.teamServerLeadShort")}
       </Text>
       <View style={styles.form}>
-        <AuthField
-          value={address}
-          onChangeText={setAddress}
-          placeholder={t("mobile.auth.server.placeholder")}
-          keyboardType="url"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="URL"
-          returnKeyType="go"
-          onSubmitEditing={() => void submit()}
-          accessibilityLabel={t("mobile.auth.server.label")}
-        />
+        <Locked when={busy} keepKeyboard>
+          <AuthField
+            value={address}
+            onChangeText={(value) => {
+              setAddress(value);
+              setError(null);
+            }}
+            placeholder={t("mobile.auth.server.placeholder")}
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="URL"
+            returnKeyType="go"
+            enablesReturnKeyAutomatically
+            onSubmitEditing={() => void submit()}
+            accessibilityLabel={t("mobile.auth.server.label")}
+            autoFocus
+          />
+        </Locked>
         {error ? (
           <Text tone="danger" variant="small" style={styles.center}>
             {error}
@@ -216,15 +264,19 @@ export function TeamServerPage() {
           disabled={busy}
           onPress={() => router.push("/me/scan")}
         />
+        <Text variant="footnote" tone="muted" style={[styles.center, styles.quiet]}>
+          {t("mobile.me.addWorkspaceFoot")}
+        </Text>
       </View>
-      <GroupedFooter>{t("mobile.me.teamServerFoot")}</GroupedFooter>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
   gap: { height: 22 },
+  sheetTitle: { paddingHorizontal: 4, paddingBottom: 12 },
   lead: { paddingHorizontal: 4, paddingTop: 4 },
-  form: { gap: 12, paddingTop: 16 },
+  form: { gap: 8, paddingTop: 16 },
   center: { textAlign: "center" },
+  quiet: { paddingTop: 8 },
 });

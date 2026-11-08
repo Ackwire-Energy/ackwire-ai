@@ -15,8 +15,9 @@ import { Text } from "@/ui/Text";
 import { useToast } from "@/ui/Toast";
 
 /**
- * "Seu servidor": the team's own agentes.chat (a self-hosted server, usually on Tailscale), by address or by
- * the QR code the web app shows. The server is checked before anything changes.
+ * "Onde fica o seu agentes.chat?": the team's own server (self-hosted, usually on Tailscale), by address with the
+ * URL keyboard open and its return key as the action, or by the QR code the web app shows. The server is checked
+ * before anything changes.
  */
 export default function Server() {
   const { t } = useTranslation();
@@ -34,6 +35,7 @@ export default function Server() {
   };
 
   const submit = async () => {
+    if (busy || !address.trim()) return;
     const server = normalizeServer(address, { allowHttp: ALLOW_HTTP });
     if (!server) return setError(t("mobile.auth.server.invalid"));
     setBusy(true);
@@ -51,6 +53,7 @@ export default function Server() {
       title={t("mobile.auth.server.title")}
       subtitle={t("mobile.auth.server.subtitle")}
       onBack={() => router.back()}
+      agentMode={busy ? "run" : "idle"}
       footer={
         custom && !busy ? (
           <AuthLink
@@ -60,18 +63,24 @@ export default function Server() {
         ) : null
       }
     >
-      <Locked when={busy}>
+      <Locked when={busy} keepKeyboard>
         <AuthField
           value={address}
-          onChangeText={setAddress}
+          onChangeText={(value) => {
+            setAddress(value);
+            setError(null);
+          }}
           placeholder={t("mobile.auth.server.placeholder")}
           keyboardType="url"
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="URL"
+          // The keyboard's blue key says "ir"; gray until an address is typed.
           returnKeyType="go"
+          enablesReturnKeyAutomatically
           onSubmitEditing={() => void submit()}
           accessibilityLabel={t("mobile.auth.server.label")}
+          autoFocus
         />
       </Locked>
       {error ? (

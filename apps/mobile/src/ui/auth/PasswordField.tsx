@@ -17,11 +17,15 @@ export interface PasswordFieldProps {
   onShow?: () => void;
   onSubmitEditing?: () => void;
   label: string;
+  /** Focused as it appears (default): the one field of its step. Off when it stands among other fields. */
+  autoFocus?: boolean;
+  /** Return hands the keyboard to the next field (`onSubmitEditing` focuses it) instead of closing it. */
+  keepFocus?: boolean;
 }
 
 /** A password with "show" beside it; a new one also gets the 8-pixel meter. */
 export const PasswordField = forwardRef<ComponentRef<typeof TextInput>, PasswordFieldProps>(function PasswordField(
-  { value, onChangeText, fresh, onSecretChange, onShow, onSubmitEditing, label },
+  { value, onChangeText, fresh, onSecretChange, onShow, onSubmitEditing, label, autoFocus = true, keepFocus = false },
   ref,
 ) {
   const { t } = useTranslation();
@@ -41,7 +45,8 @@ export const PasswordField = forwardRef<ComponentRef<typeof TextInput>, Password
           autoComplete={fresh ? "new-password" : "current-password"}
           textContentType={fresh ? "newPassword" : "password"}
           passwordRules={fresh ? "minlength: 8; maxlength: 128;" : undefined}
-          returnKeyType="go"
+          returnKeyType={keepFocus ? "next" : "go"}
+          submitBehavior={keepFocus ? "submit" : undefined}
           onSubmitEditing={onSubmitEditing}
           onFocus={() => {
             setFocus(true);
@@ -52,7 +57,7 @@ export const PasswordField = forwardRef<ComponentRef<typeof TextInput>, Password
             report(false, show);
           }}
           accessibilityLabel={label}
-          autoFocus
+          autoFocus={autoFocus}
           paddingRight={52}
         />
         <View style={{ position: "absolute", right: 4 }}>

@@ -94,8 +94,17 @@ export function spriteBlinks(sprite: (typeof SPRITES)[number], t: number): boole
 /** The sprites' body color (deep navy, white eyes: the sky's agents). */
 export const SPRITE_BODY = "#04203f";
 
-/** The sky's tones, deep to light from the screen's background (the prototype's horizon). */
-export function launchSkyTones(bg: string, dark: boolean): string[] {
+/**
+ * The sky's tones, deep to light from the screen's background. `dusk`: the sky of a team's own server (lilac, as
+ * the workspace's sky at dusk), so the splash that waits on that server says which one fell silent.
+ */
+export function launchSkyTones(bg: string, dark: boolean, dusk = false): string[] {
+  if (dusk) {
+    const [deep, light] = dark ? ["#4a40a8", "#7b6fe0"] : ["#c9c0ff", "#aaa6f5"];
+    return dark
+      ? [bg, mixHex(bg, deep, 0.14), mixHex(bg, deep, 0.3), mixHex(bg, deep, 0.48), mixHex(bg, light, 0.66)]
+      : [bg, mixHex(bg, deep, 0.22), mixHex(bg, deep, 0.48), mixHex(bg, deep, 0.78), deep, light];
+  }
   if (dark)
     return [
       bg,

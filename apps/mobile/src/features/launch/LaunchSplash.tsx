@@ -70,6 +70,8 @@ export interface LaunchSplashProps {
   waiting?: ReactNode;
   /** The agent's eyes closed (nothing is happening; open while it checks again). */
   eyesClosed?: boolean;
+  /** The sky at dusk: the app waits on a team's own server, not the Cloud (its sky says which fell silent). */
+  dusk?: boolean;
 }
 
 /**
@@ -81,7 +83,15 @@ export interface LaunchSplashProps {
  * doesn't answer) the agent goes up and closes its eyes, the sprites keep above the panel that comes in at the
  * bottom, and the splash stays until the app is ready. Reduced motion: the logo still, a short fade.
  */
-export function LaunchSplash({ ready, fontsReady, onShown, onDone, waiting, eyesClosed }: LaunchSplashProps) {
+export function LaunchSplash({
+  ready,
+  fontsReady,
+  onShown,
+  onDone,
+  waiting,
+  eyesClosed,
+  dusk = false,
+}: LaunchSplashProps) {
   const { t } = useTranslation();
   const { colors: c, scheme } = useTheme();
   const reduced = useReducedMotion();
@@ -199,7 +209,7 @@ export function LaunchSplash({ ready, fontsReady, onShown, onDone, waiting, eyes
   const panelStyle = useAnimatedStyle(() => ({ opacity: up.value * (1 - away.value) }));
   const nameStyle = useAnimatedStyle(() => ({ opacity: name.value }));
   const lineStyle = useAnimatedStyle(() => ({ opacity: lineIn.value }));
-  const tones = useMemo(() => launchSkyTones(c.bg, scheme === "dark"), [c.bg, scheme]);
+  const tones = useMemo(() => launchSkyTones(c.bg, scheme === "dark", dusk), [c.bg, scheme, dusk]);
   const lineText = line ? t(`mobile.splash.${line}`) : "";
 
   return (

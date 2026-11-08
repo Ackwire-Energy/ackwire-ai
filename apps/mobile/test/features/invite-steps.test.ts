@@ -27,22 +27,20 @@ const ASKED: Asked = {
 };
 
 describe("asking through a link", () => {
-  test("five questions, one per screen, in the approved order", () => {
-    expect(ASK_STEPS).toEqual(["email", "code", "name", "password", "note"]);
-    expect(ASK_STEPS.map((step) => askProgress(step).n)).toEqual([1, 2, 3, 4, 5]);
-    expect(askProgress("note")).toEqual({ n: 5, total: 5 });
+  test("three screens: the e-mail, its code, then the person, in that order", () => {
+    expect(ASK_STEPS).toEqual(["email", "code", "you"]);
+    expect(ASK_STEPS.map((step) => askProgress(step).n)).toEqual([1, 2, 3]);
+    expect(askProgress("you")).toEqual({ n: 3, total: 3 });
   });
 
   test("Back never lands on a code already typed, and the first step leaves", () => {
     expect(askBack("email")).toBeNull();
     expect(askBack("code")).toBe("email");
-    expect(askBack("name")).toBe("email");
-    expect(askBack("password")).toBe("name");
-    expect(askBack("note")).toBe("password");
+    expect(askBack("you")).toBe("email");
   });
 
   test("only sending the code is bot-checked", () => {
-    expect(ASK_STEPS.map(askAction)).toEqual(["ask-code", "ask-code", null, null, null]);
+    expect(ASK_STEPS.map(askAction)).toEqual(["ask-code", "ask-code", null]);
   });
 });
 
