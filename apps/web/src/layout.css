@@ -859,6 +859,18 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   /* Faces stacked in its rows are cut out of its face, not the page's (the kit's `--stack-ring`). */
   --stack-ring: var(--raised);
 }
+/* It clips its rows at its rounded corners: the first and last rows (or the one thing in a first or last item) take
+   them, so a row's focus ring or plate there is drawn whole, not cut square. */
+.list-card > :first-child,
+.list-card > li:first-child > :only-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.list-card > :last-child,
+.list-card > li:last-child > :only-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
 .page__header {
   display: flex;
   flex-direction: column;

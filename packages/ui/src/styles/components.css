@@ -5528,6 +5528,16 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
 }
+/* The list clips its rows at its rounded corners: its first and last rows take them, so a row's ring there (focus)
+   is drawn whole, not cut square. */
+.ac-list > .ac-list__row:first-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.ac-list > .ac-list__row:last-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
 
 /*
  * A hint (InfoHint): a label and its ⓘ in one `.ac-hintline`, the setting's explanation in a glass bubble. The ⓘ
