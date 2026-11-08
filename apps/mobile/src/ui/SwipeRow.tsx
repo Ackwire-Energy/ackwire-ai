@@ -4,7 +4,13 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
   SwipeDirection,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, { interpolate, type SharedValue, useAnimatedStyle } from "react-native-reanimated";
+import Animated, {
+  interpolate,
+  type SharedValue,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { Text } from "./Text";
@@ -18,8 +24,10 @@ export interface SwipeAction {
   onAction: () => void;
 }
 
-/** The pane's width: the row opens this far, and letting go past half of it does the action. */
+/** The pane's width: the row opens this far, and letting go past half of it leaves it open. */
 const PANE = 92;
+/** Pulled at least this far, the swipe is the action itself (the system's full swipe); short of it, the row waits open. */
+const FULL = 200;
 
 /** One action, or two side by side (Fixar · Silenciar), on a side. */
 type Side = SwipeAction | readonly SwipeAction[] | undefined;
@@ -27,14 +35,16 @@ const actionsOf = (side: Side): readonly SwipeAction[] => (side ? ("label" in si
 
 /**
  * A list row that swipes to an action, as the system's lists do: the row follows the finger (on the UI thread),
- * revealing the action's color under all of it and its pane with the icon and the word, always whole. With one
- * action on a side, letting go past half the pane does it, with a light tap, and the row slides back. With two, the
- * row stays open on both panes (the light tap lands as it catches) and a tap on one does it. A tap on a pane always
- * does it. `left` is revealed by swiping right, `right` by swiping left. The row's content must be opaque (it covers
+ * revealing the action's color under all of it and its pane with the icon and the word, always whole. As the system's
+ * lists: letting go past half the pane leaves the row open on its panes (a light tap as it catches) and a tap on a pane
+ * does it; pulling all the way (`FULL`) with one action on that side is the action itself. A short swipe never acts on
+ * its own (it used to, past 46 points: a look at the pane pinned the row and closed it). `left` is revealed by swiping right, `right` by swiping left. The row's content must be opaque (it covers
  * the panes).
  */
 export function SwipeRow({ left, right, children }: { left?: Side; right?: Side; children: ReactNode }) {
   const ref = useRef<SwipeableMethods>(null);
+  // The farthest the row was pulled in this swipe, read when it settles open.
+  const reach = useSharedValue(0);
   const lefts = actionsOf(left);
   const rights = actionsOf(right);
   const run = (action: SwipeAction | undefined) => {
@@ -47,7 +57,12 @@ export function SwipeRow({ left, right, children }: { left?: Side; right?: Side;
     const [only, ...more] = actions;
     if (!only) return undefined;
     if (more.length === 0)
-      return (progress: SharedValue<number>) => <Pane action={only} progress={progress} onPress={() => run(only)} />;
+      return (progress: SharedValue<number>, drag: SharedValue<number>) => (
+        <>
+          <Reach drag={drag} reach={reach} />
+          <Pane action={only} progress={progress} onPress={() => run(only)} />
+        </>
+      );
     // Two: the outer action's color under the whole row, each pane on its own color, side by side.
     const outer = actions[actions.length - 1] ?? only;
     return (progress: SharedValue<number>) => (
@@ -67,22 +82,39 @@ export function SwipeRow({ left, right, children }: { left?: Side; right?: Side;
     <ReanimatedSwipeable
       ref={ref}
       friction={1}
-      overshootFriction={8}
+      // Past the panes the row still follows, at half the finger's pace, so a full pull is reachable and feels heavy.
+      overshootFriction={2}
       leftThreshold={(PANE * Math.max(1, lefts.length)) / 2}
       rightThreshold={(PANE * Math.max(1, rights.length)) / 2}
       {...(renderLeft ? { renderLeftActions: renderLeft } : {})}
       {...(renderRight ? { renderRightActions: renderRight } : {})}
-      // Opened past the threshold: with one action the swipe was it (the row moved right: the left pane's); with
-      // two the row waits open, and the tap marks the moment it caught.
+      // Settled open: pulled all the way with one action, the swipe was it (the row moved right: the left pane's);
+      // otherwise the row waits open and the tap marks the moment it caught.
       onSwipeableOpen={(direction) => {
         const side = direction === SwipeDirection.RIGHT ? lefts : rights;
-        if (side.length === 1) run(side[0]);
+        const full = reach.value >= FULL;
+        reach.value = 0;
+        if (full && side.length === 1) run(side[0]);
         else haptics.light();
+      }}
+      onSwipeableClose={() => {
+        reach.value = 0;
       }}
     >
       {children}
     </ReanimatedSwipeable>
   );
+}
+
+/** Keeps the farthest the row was pulled (`drag` is its offset, negative when it moves left). */
+function Reach({ drag, reach }: { drag: SharedValue<number>; reach: SharedValue<number> }) {
+  useAnimatedReaction(
+    () => Math.abs(drag.value),
+    (now) => {
+      if (now > reach.value) reach.value = now;
+    },
+  );
+  return null;
 }
 
 /** The action's color under the whole row, only while its side shows. */

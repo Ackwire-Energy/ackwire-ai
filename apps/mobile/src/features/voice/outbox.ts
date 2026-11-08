@@ -36,6 +36,8 @@ let queue: VoiceSend[] | null = null;
 let attempts = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
+/** A flush asked for while one runs (a new recording): run once more when it ends, so nothing waits for the timer. */
+let again = false;
 
 function read(): VoiceSend[] {
   if (queue) return queue;
@@ -129,35 +131,50 @@ async function upload(item: VoiceSend) {
 const laneOf = (item: VoiceSend) => `${item.server ?? ""}|${item.orgId}|${item.channelId}|${item.threadId ?? ""}`;
 
 /**
- * Sends what waits, oldest first. One that can't go now holds back only the ones after it in the same conversation on
- * the same server, which must keep their order; every other conversation, and every other server, still goes. (A
+ * Sends what waits. Each conversation on each server is its own lane, sent oldest first and side by side with the
+ * others: one that can't go now holds back only the ones after it in its lane, which must keep their order. (A
  * recording for a server out of reach, such as a team's own one behind a private network, used to hold back every
- * recording queued after it, on every server: they all sat on "Enviando…".)
+ * recording queued after it on every server, the network's timeout included: they all sat on "Enviando…".)
  */
 export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefusal) => void) {
-  if (flushing) return;
+  if (flushing) {
+    again = true;
+    return;
+  }
   flushing = true;
+  again = false;
   if (timer) clearTimeout(timer);
   timer = null;
-  const held = new Set<string>();
+  const lanes = new Map<string, VoiceSend[]>();
+  for (const item of read()) {
+    const lane = laneOf(item);
+    lanes.set(lane, [...(lanes.get(lane) ?? []), item]);
+  }
+  let held = false;
   try {
-    for (const item of [...read()]) {
-      const lane = laneOf(item);
-      if (held.has(lane)) continue;
-      const verdict = await upload(item).catch(() => "retry" as const);
-      if (verdict === "retry") {
-        held.add(lane);
-        continue;
-      }
-      forget(item);
-      if (verdict === "done") continue;
-      removeBubble(qc, item);
-      onRefused(verdict === "limit" ? "limit" : "refused");
-    }
+    await Promise.all(
+      [...lanes.values()].map(async (items) => {
+        for (const item of items) {
+          const verdict = await upload(item).catch(() => "retry" as const);
+          if (verdict === "retry") {
+            held = true;
+            return;
+          }
+          forget(item);
+          if (verdict === "done") continue;
+          removeBubble(qc, item);
+          onRefused(verdict === "limit" ? "limit" : "refused");
+        }
+      }),
+    );
   } finally {
     flushing = false;
   }
-  if (held.size > 0) {
+  if (again) {
+    void flushVoice(qc, onRefused);
+    return;
+  }
+  if (held) {
     timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
     attempts++;
   } else {
