@@ -204,6 +204,9 @@ test("the settings sidebar's links are the ruler's compact step, the default one
   const top = topLevel(css);
   expect(last(top, ".settings__link", "min-height")).toBe("var(--control-h-sm)");
   expect(last(top, ".settings__link", "border-radius")).toBe("var(--control-r-sm)");
+  // A name that wraps (a long translation) keeps its icon on its first line, the words padded to one line's middle.
+  expect(last(top, ".settings__link", "align-items")).toBe("flex-start");
+  expect(last(top, ".settings__link", "padding")).toBe("calc((var(--control-h-sm) - 22px) / 2) 10px");
   expect(last(top, ".settings__groups", "gap")).toBe("var(--space-4)");
   const touch = atRule(css, "@media (pointer: coarse)");
   expect(last(touch, ".settings__link", "min-height")).toBe("var(--control-h-md)");

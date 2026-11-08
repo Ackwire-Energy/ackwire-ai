@@ -3972,13 +3972,17 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
-/* The compact step of the control ruler, as the sidebar's rows; a finger keeps the default step (below). */
+/*
+ * The compact step of the control ruler, as the sidebar's rows; a finger keeps the default step (below). A name too
+ * long for one line (a long translation) wraps under its first line, and the icon or face stays centred on that line
+ * as on a one-line link: the words start as far down as the link centres one line.
+ */
 .settings__link {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-height: var(--control-h-sm);
-  padding: 0 10px;
+  padding: calc((var(--control-h-sm) - 22px) / 2) 10px;
   border-radius: var(--control-r-sm);
   color: var(--ink2);
   text-decoration: none;
@@ -3986,6 +3990,14 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   transition:
     background-color 0.15s,
     color 0.15s;
+}
+.settings__link > :first-child {
+  flex: none;
+  translate: 0 calc((22px - 100%) / 2);
+}
+/* A face's own small type would set its `lh`: it takes the link's line. */
+.settings__link > .ac-avatar:first-child {
+  line-height: inherit;
 }
 .settings__link > .ac-icon {
   color: var(--ink-muted);
@@ -4009,10 +4021,24 @@ html:not([data-pointer]) .settings__link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+@supports (top: 1lh) {
+  .settings__link {
+    padding-block: calc((var(--control-h-sm) - 1lh) / 2);
+  }
+  .settings__link > :first-child {
+    translate: 0 calc((1lh - 100%) / 2);
+  }
+}
 @media (pointer: coarse) {
   .settings__link {
     min-height: var(--control-h-md);
+    padding-block: calc((var(--control-h-md) - 22px) / 2);
     border-radius: var(--control-r-md);
+  }
+  @supports (top: 1lh) {
+    .settings__link {
+      padding-block: calc((var(--control-h-md) - 1lh) / 2);
+    }
   }
 }
 .settings__body {
