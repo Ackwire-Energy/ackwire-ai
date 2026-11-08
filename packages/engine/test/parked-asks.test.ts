@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
   type Brain,
@@ -10,10 +11,12 @@ import {
   continueRun,
   createAgent,
   createJobHandlers,
+  createPassToolSource,
   createReleaseAsksToolSource,
   drainOutbox,
   getMessage,
   insertMessage,
+  loadReplyPolicy,
   type MachineStatus,
   parkedOnBlock,
   postPersonMessage,
@@ -385,4 +388,71 @@ describe("release_waiting_agent: an agent that handled the ask lets the one wait
     expect((await tool.execute({ agent: "dev", reason: "x" }, ctx)).content).toStartWith('No agent called "dev"');
     expect((await runsOf(f, f.agent.id))[0]?.status).toBe("running");
   });
+});
+
+test("an agent's own question answered meanwhile is withdrawn quietly: it reads who answered, may pass, and posts no 'nobody answered'", async () => {
+  const reply = (req: ModelRequest) => {
+    if (req.outputSchema) return { chunks: ['{"action":"pass","text":""}'] };
+    const last = JSON.stringify(req.messages.at(-1)?.content);
+    if (last.includes("Not needed anymore"))
+      return { chunks: [], toolUses: [{ name: "pass", input: { reason: "já existe" } }] };
+    if (last.includes("Passed")) return { chunks: [] };
+    return {
+      chunks: [],
+      toolUses: [
+        {
+          name: "ask_user",
+          input: { question: "Você já tem a conta de revisão?", why: "Para não criar uma segunda conta." },
+        },
+      ],
+    };
+  };
+  f = await setup({
+    reply,
+    askUser: true,
+    toolSources: [createPassToolSource()],
+    judge: (kind, id, state) => {
+      if (kind !== "request_triage") return undefined;
+      if (id.startsWith("status_"))
+        return { choice: "given", probabilities: { given: 0.95, still_needed: 0.03, not_needed: 0.02 } };
+      const people = state.participants as Record<string, { name: string }>;
+      const key = Object.entries(people).find(([, p]) => p.name === "bia")?.[0] ?? "nobody";
+      return { choice: key, probabilities: { [key]: 0.95 } };
+    },
+  });
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev configura a conta de revisão" });
+  // Brought in by the router, as an agent joining a conversation is: it may stay quiet.
+  await f.db.update(schema.agentRuns).set({ trigger: "router" });
+  await drainOutbox(f.db, f.handlers);
+  const [asking] = await runsOf(f, f.agent.id);
+  expect(asking?.status).toBe("waiting_input");
+  const [question] = await f.db.select().from(schema.agentQuestions);
+  expect(question?.status).toBe("open");
+
+  // Someone else says it is already there: no answer on the card, nor one for the agent.
+  await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "A conta de revisão já existe, criei ontem." });
+  await drainOutbox(f.db, f.handlers, { now: later(2 * 60_000) });
+
+  expect(judgeCalls(f, "request_triage")).toHaveLength(1);
+  const [withdrawn] = await f.db.select().from(schema.agentQuestions);
+  expect(withdrawn?.status).toBe("canceled");
+  const [card] = await f.db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.id, withdrawn?.messageId ?? ""));
+  expect(card?.meta.question).toMatchObject({ withdrawn: true });
+  const read = JSON.stringify(f.provider.calls.filter((c) => !c.request.outputSchema).at(-2)?.request.messages);
+  expect(read).toContain("Not needed anymore: bia already answered it here");
+  expect(read).not.toContain("nobody will answer it");
+  const [ended] = await runsOf(f, f.agent.id);
+  expect(ended?.status).toBe("done");
+  expect(await loadReplyPolicy(f.db, f.org.id, ended?.id ?? "")).toMatchObject({ mayPass: true });
+  // Nothing posted after its card: no "nobody answered my question".
+  const lines = (await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, f.agent.id))).filter(
+    (m) => !m.meta.questionId && !m.meta.notice,
+  );
+  expect(lines).toEqual([]);
 });

@@ -3,8 +3,10 @@ import { and, type Database, type Executor, eq, inArray, rowsOf, schema, sql } f
 import { announceAgentStatus } from "./agent-status";
 import { getAgentCached } from "./agents";
 import { inMission } from "./auto-model";
+import { withdrawHandoff } from "./browser/handoff";
 import {
   askCatchUp,
+  askRequestTriage,
   CATCH_UP_CLOSE_AT,
   type ClosedNote,
   catchUpBar,
@@ -13,6 +15,9 @@ import {
   otherAgentAnswering,
   overruledHere,
   type ReleasedAsks,
+  requestDecision,
+  TRIAGE_MAX_CALLS,
+  TRIAGE_REFRESH_MS,
   type TriageRecord,
   type TriageVerdict,
   triageBrief,
@@ -28,8 +33,12 @@ import { cutText, fromNow, pgSafeJson, stringsOf } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { notifyCatchUpClosed, notifyCatchUpClosedAsker } from "./notification-producers";
+import { openRequestsOf } from "./open-requests";
+import { withdrawQuestion } from "./questions";
 import { releaseInbox } from "./run-inbox";
+import { resumeRunWithResult } from "./run-resume";
 import { type AgentRun, addRunStep, computerWaitOf, replyThreadOf, transitionRun, usageWaitOf } from "./runs";
+import { withdrawSecretRequest } from "./secrets";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 import { lineHeadLooks, usageNoteHandOn, usageWaitClosed, wakeNextInLine } from "./usage-pause";
 
@@ -39,7 +48,9 @@ const { agentRuns, agents, messages, outbox, users } = schema;
  * Asks a waiting run holds (ADR 0136): a run waiting on something a message can't move (its plan's limit, its budget,
  * its computer) keeps what it was asked (its trigger and the messages that joined it) for when it is back. Once one of
  * them is handled meanwhile, it lets it go instead of answering it later: the catch-up check runs early on it
- * (`checkParkedRun`), and another agent that handled it can release it (`release_waiting_agent`).
+ * (`checkParkedRun`), and another agent that handled it can release it (`release_waiting_agent`). What the agent itself
+ * asked people (a question, a secret, help on its screens) gets the same check: a request whose need was met here is
+ * withdrawn quietly.
  */
 
 /** A wait no message can move (`parkedWaitOf`). */
@@ -62,11 +73,13 @@ export const CLOSED_NOTE_CODE = "catch_up_closed";
 /**
  * Something landed where a waiting run would read it (its conversation, or the thread under one of its asks): a person's
  * message or another agent's reply. Each such run gets one check (`checkParkedRun`) a little later, however many
- * messages come meanwhile. Its own words don't count. One statement.
+ * messages come meanwhile. Its own words don't count, but for the card of a request it just made: what it asks may
+ * already be answered here. One statement.
  */
 export async function scheduleParkedChecks(db: Executor, m: Message) {
   if (m.deletedAt || m.meta.notice || m.meta.usageWait || m.meta.talker) return;
   if (m.authorType !== "person" && m.authorType !== "agent") return;
+  const card = m.authorType === "agent" && Boolean(m.meta.questionId || m.meta.secretRequest || m.meta.browserHandoff);
   // One check per run and window, a whole window after the first message in it: the replies it brings come in.
   const now = Date.now();
   const slot = Math.floor(now / EARLY_CHECK_MS);
@@ -77,7 +90,7 @@ export async function scheduleParkedChecks(db: Executor, m: Message) {
     from ${agentRuns} r
     where r.org_id = ${m.orgId}::uuid and r.channel_id = ${m.channelId}::uuid and r.status = 'waiting_input'
       and not r.background and r.work_id is null
-      and r.agent_id is distinct from ${m.authorAgentId}::uuid
+      and ${card ? sql`r.agent_id = ${m.authorAgentId}::uuid` : sql`r.agent_id is distinct from ${m.authorAgentId}::uuid`}
       and ${
         thread
           ? sql`((r.thread_root_id = ${thread}::uuid and r.thread_root_id <> r.trigger_message_id)
@@ -96,8 +109,9 @@ export interface ParkedDeps {
 
 /**
  * The early check of a waiting run (`EARLY_CHECK_JOB`). Parked on its plan, budget or computer: the catch-up check
- * (ADR 0136) reads what it holds now, and an asker whose ask was closed is let go (`releaseAsks`). The catch-up's
- * judge, call budget and bar; in any doubt nothing changes.
+ * (ADR 0136) reads what it holds now, and an asker whose ask was closed is let go (`releaseAsks`). Waiting on a request
+ * of its own: one whose need was met here is withdrawn quietly. The catch-up's judge, call budget and bar; in any doubt
+ * nothing changes.
  */
 export async function checkParkedRun(deps: ParkedDeps, runId: string, jobId?: string) {
   const { db, judge } = deps;
@@ -111,6 +125,7 @@ export async function checkParkedRun(deps: ParkedDeps, runId: string, jobId?: st
   ]);
   if (!trigger || !agent) return;
   if (parkedWaitOf(run)) return checkAsks(deps, judge, run, trigger, agent.name);
+  return checkRequests(deps, judge, run, trigger, agent.name);
 }
 
 /**
@@ -474,6 +489,88 @@ async function tellClosed(
       label,
       ...at,
     }).catch(() => {});
+}
+
+// ── Its own requests ─────────────────────────────────────────────────────────────────────────────────────────────
+
+async function checkRequests(deps: ParkedDeps, judge: Judge, run: AgentRun, trigger: Message, agentName: string) {
+  const { db } = deps;
+  const t = transcriptOf(run);
+  const waiting = new Set(
+    (t.pending?.calls ?? []).flatMap((c) =>
+      c.result ? [] : [c.questionId ?? c.secretRequestId ?? c.waitId ?? ""].filter(Boolean),
+    ),
+  );
+  if (waiting.size === 0) return;
+  const open = (await openRequestsOf(db, run.orgId, run.agentId, run.channelId)).filter(
+    (r) => r.runId === run.id && waiting.has(r.id),
+  );
+  if (open.length === 0) return;
+  const prior = t.requestTriage;
+  if (prior && prior.calls >= TRIAGE_MAX_CALLS) return;
+  const since = Math.min(...open.map((r) => r.createdAt.getTime()));
+  const snapshot = await triageSnapshot(db, run, trigger, agentName, since);
+  if (snapshot.posts.length === 0) return;
+  if (prior && (snapshot.latest <= prior.seenThrough || Date.now() - prior.at < TRIAGE_REFRESH_MS)) return;
+  const bar = await catchUpBar(db, run.orgId).catch(() => CATCH_UP_CLOSE_AT);
+  const requests = open.map((r) => ({ id: r.id, kind: r.kind, what: r.what, at: r.createdAt }));
+  const record = { at: Date.now(), calls: (prior?.calls ?? 0) + 1, seenThrough: snapshot.latest };
+  await db
+    .update(agentRuns)
+    .set({
+      transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{requestTriage}', ${JSON.stringify(record)}::jsonb)`,
+    })
+    .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "waiting_input")));
+  const answers = await askRequestTriage(judge, snapshot, requests, {
+    orgId: run.orgId,
+    agentId: run.agentId,
+    runId: run.id,
+  }).catch(() => null);
+  if (!answers) return;
+  for (const moot of requestDecision(answers, snapshot, requests, bar)) {
+    const request = open.find((r) => r.id === moot.id);
+    if (!request) continue;
+    const given = request.kind === "question" ? "answered it" : "took care of it";
+    const quiet = t.passListed ? "call `pass`" : "end your turn without writing anything";
+    const text = `Not needed anymore: ${moot.who.name} already ${given} here ("${cutText(moot.said, 300)}"). Your request was withdrawn quietly and nobody waits on it. Go on with that; if nothing is left to do or say, ${quiet}.`;
+    await withdrawMoot(deps, run, request, text, `${moot.who.name} already ${given}`).catch(() => false);
+  }
+}
+
+/**
+ * Withdraws a request of the run's whose need was met here: its waiting call reads `text` instead of "nobody will
+ * answer" (`mootRequests`), and the run may stay quiet after it (`requestMoot`). A person answering at the same moment
+ * wins: their answer is what the call reads, and the run owes them one.
+ */
+async function withdrawMoot(
+  deps: ParkedDeps,
+  run: AgentRun,
+  request: { id: string; kind: "browser" | "desktop" | "secret" | "question" },
+  text: string,
+  reason: string,
+) {
+  const marked = await deps.db
+    .update(agentRuns)
+    .set({
+      transcript: sql`jsonb_set(jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{mootRequests}',
+        coalesce(${agentRuns.transcript}->'mootRequests', '{}'::jsonb) || jsonb_build_object(${request.id}::text, ${text}::text)),
+        '{requestMoot}', 'true'::jsonb)`,
+    })
+    .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "waiting_input")))
+    .returning({ id: agentRuns.id });
+  if (marked.length === 0) return false;
+  const d = { db: deps.db, pubsub: deps.pubsub };
+  if (request.kind === "question") return Boolean(await withdrawQuestion(d, run.agentId, request.id));
+  if (request.kind === "secret") return Boolean(await withdrawSecretRequest(d, run.agentId, request.id));
+  // Help on its screens: withdrawn as by the run itself (no "nobody will do it"), then resumed with what met it.
+  if (!(await withdrawHandoff(d, request.id, run.id, reason))) return false;
+  await resumeRunWithResult(deps.db, {
+    runId: run.id,
+    waitId: request.id,
+    result: { content: text },
+    waitingOnly: true,
+  });
+  return true;
 }
 
 // ── Other agents waiting on what a run answers ──────────────────────────────────────────────────────────────────
