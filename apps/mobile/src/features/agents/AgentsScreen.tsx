@@ -16,10 +16,21 @@ import { previewBody } from "@agenteschat/client/lib/message-body";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { Fragment, useMemo } from "react";
+import { useIsFocused } from "expo-router";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  LayoutAnimationConfig,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import type { Gaze } from "@/agent/AgentAvatar";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
@@ -52,6 +63,7 @@ import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
 import { useTasksToday } from "../task-manager/hooks";
 import { TeamEntry } from "../team/TeamEntry";
+import { ARRIVAL_LOOK_MS, clearArrived, useArrived } from "./arrival";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { agoOf, freeSections, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoShort, workTitle } from "./work";
@@ -62,6 +74,8 @@ const LIVE_ROWS = 8;
 const TASKS_POLL_MS = 15_000;
 /** A row's state line changes in place (a run starts, a request lands): it crosses over, never pops. */
 const STATE_IN = FadeIn.duration(160);
+/** Back from a routine: the body comes back into its sky's frame. */
+const FACE_IN = FadeIn.duration(280).easing(Easing.bezier(0.23, 1, 0.32, 1));
 
 /**
  * Agentes: the team in Conversas' rows, who needs you first. The task manager (ADR 0128) is a fixed row under the
@@ -89,6 +103,32 @@ export function AgentsScreen() {
   const agents = dir.agents.filter((a) => listsAgent(org, a));
   const { waiting, working, free } = teamLines(agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
+  // A routine's run works in the background, in no conversation (never "Trabalhando"): the agent is out on it.
+  const onRoutine = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const r of runs.data ?? []) {
+      if (!r.background) continue;
+      const at = r.startedAt ?? r.createdAt;
+      const before = out.get(r.agentId);
+      if (!before || at < before) out.set(r.agentId, at);
+    }
+    return out;
+  }, [runs.data]);
+  // Rows in the order they show, so the others know which way to look at a newcomer.
+  const pins = usePins();
+  const order = useMemo(
+    () => [
+      ...waiting.map((l) => l.agent.id),
+      ...working.map((l) => l.agent.id),
+      ...freeSections(free, groups.data ?? [], pins.pins.agents).flatMap((s) => s.lines.map((l) => l.agent.id)),
+    ],
+    [waiting, working, free, groups.data, pins.pins.agents],
+  );
+  const greeting = useGreeting(order);
+  const gazeOf = (id: string): Gaze | undefined => {
+    if (!greeting || id === greeting) return undefined;
+    return order.indexOf(id) < order.indexOf(greeting) ? "down" : "up";
+  };
   const pull = usePullRefresh(() =>
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch(), groups.refetch()]),
   );
@@ -155,7 +195,14 @@ export function AgentsScreen() {
           <>
             <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />
             {waiting.map((l, i) => (
-              <AgentRow key={l.agent.id} line={l} divider={i > 0} live={i < LIVE_ROWS} />
+              <AgentRow
+                key={l.agent.id}
+                line={l}
+                divider={i > 0}
+                live={i < LIVE_ROWS}
+                gaze={gazeOf(l.agent.id)}
+                routine={onRoutine.get(l.agent.id)}
+              />
             ))}
           </>
         ) : null}
@@ -163,12 +210,26 @@ export function AgentsScreen() {
           <>
             <SectionHeader title={t("mobile.agents.workingSection")} count={working.length} />
             {working.map((l, i) => (
-              <AgentRow key={l.agent.id} line={l} divider={i > 0} live={waiting.length + i < LIVE_ROWS} />
+              <AgentRow
+                key={l.agent.id}
+                line={l}
+                divider={i > 0}
+                live={waiting.length + i < LIVE_ROWS}
+                gaze={gazeOf(l.agent.id)}
+                routine={onRoutine.get(l.agent.id)}
+              />
             ))}
           </>
         ) : null}
         {free.length > 0 && !groups.isPending ? (
-          <FreeSections free={free} groups={groups.data ?? []} before={busy} />
+          <FreeSections
+            free={free}
+            groups={groups.data ?? []}
+            before={busy}
+            greeting={greeting}
+            gazeOf={gazeOf}
+            onRoutine={onRoutine}
+          />
         ) : null}
         {archived.length > 0 ? (
           <>
@@ -256,7 +317,21 @@ function ManagerRow({
  * department, which collapses (remembered on this phone, for every workspace). Mounted once the groups are in, so
  * the team doesn't show whole and then split.
  */
-function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: AgentGroup[]; before: number }) {
+function FreeSections({
+  free,
+  groups,
+  before,
+  greeting,
+  gazeOf,
+  onRoutine,
+}: {
+  free: TeamLine[];
+  groups: AgentGroup[];
+  before: number;
+  greeting: string | null;
+  gazeOf: (id: string) => Gaze | undefined;
+  onRoutine: ReadonlyMap<string, string>;
+}) {
   const { t } = useTranslation();
   const { collapsed, toggle } = useCollapsedSections<string>(STORED.agentGroupsCollapsed, null);
   const pins = usePins();
@@ -267,7 +342,17 @@ function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: Agen
         const first = shown;
         shown += lines.length;
         const rows = lines.map((l, i) => (
-          <AgentRow key={l.agent.id} line={l} divider={i > 0} live={first + i < LIVE_ROWS} pinned={i < pinnedCount} />
+          <AgentRow
+            key={l.agent.id}
+            line={l}
+            divider={i > 0}
+            // The newcomer and the ones looking at it move while it arrives, wherever they sit in the list.
+            live={first + i < LIVE_ROWS || greeting !== null}
+            pinned={i < pinnedCount}
+            arriving={greeting === l.agent.id}
+            gaze={gazeOf(l.agent.id)}
+            routine={onRoutine.get(l.agent.id)}
+          />
         ));
         return group ? (
           <CollapsibleSection
@@ -294,7 +379,7 @@ function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: Agen
 }
 
 /** What a row's second line says, so a change of state crosses over in place (the key) while the row stays. */
-type RowState = "asks" | "works" | "away" | "noAi" | "out" | "free";
+type RowState = "asks" | "works" | "routine" | "away" | "noAi" | "out" | "free";
 
 /**
  * One agent: its living body at 52 (running at work, asleep when it can't work), its name, the time at the right
@@ -307,12 +392,21 @@ function AgentRow({
   divider,
   live,
   pinned = false,
+  arriving = false,
+  gaze,
+  routine,
 }: {
   line: TeamLine;
   divider: boolean;
   live: boolean;
   /** On top of the free ones ("Fixar no topo"): said to screen readers; the order shows it. */
   pinned?: boolean;
+  /** Just created on this phone: its row comes in once, the others looking at it. */
+  arriving?: boolean;
+  /** Where its face looks while a newcomer arrives (up or down at the newcomer's row). */
+  gaze?: Gaze | undefined;
+  /** Since when it is out on a routine (its background run), when it is. */
+  routine?: string | undefined;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -324,23 +418,29 @@ function AgentRow({
   // On a billing hold an AI comes after the plan: no "Sem IA" on a team just made.
   const held = usePlanHold(orgId, org) !== null;
   const shown = usePresenceOf().agent(a.id);
-  const noAi = !held && !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
+  const onRoutineNow = !approval && !w && routine !== undefined;
+  const noAi =
+    !held && !approval && !w && !onRoutineNow && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   // Out of office (its plan or budget ran out, ADR 0084): the server's line says when it is back.
-  const out = !approval && !w && computer === undefined && !noAi && isOutOfOffice(shown?.status?.status);
+  const out =
+    !approval && !w && !onRoutineNow && computer === undefined && !noAi && isOutOfOffice(shown?.status?.status);
   const busy = Boolean(approval || w);
   const state: RowState = approval
     ? "asks"
     : w
       ? "works"
-      : computer !== undefined
-        ? "away"
-        : noAi
-          ? "noAi"
-          : out
-            ? "out"
-            : "free";
+      : onRoutineNow
+        ? "routine"
+        : computer !== undefined
+          ? "away"
+          : noAi
+            ? "noAi"
+            : out
+              ? "out"
+              : "free";
   // One meta per row: how long since it asked or started; a free agent's row needs none.
   const time = l.at && busy ? agoShort(t, agoOf(l.at, now)) : null;
+  const entrance = useArrival(arriving, reduced);
   const role =
     plainRole(a.instructions) ??
     (a.role.trim() ||
@@ -357,7 +457,9 @@ function AgentRow({
         ? t("mobile.agents.workingLabel", { name: a.name })
         : state === "away"
           ? t("mobile.outage.rowWaitingLabel", { name: a.name, computer })
-          : a.name;
+          : state === "routine"
+            ? [a.name, t("mobile.agents.state.routineShort")].join(", ")
+            : a.name;
   const sub = (
     <Animated.View key={state} entering={reduced ? undefined : STATE_IN} style={styles.state}>
       {state === "asks" ? (
@@ -374,6 +476,10 @@ function AgentRow({
             {shown?.line?.text ?? workTitle(t, w)}
           </Text>
         </>
+      ) : state === "routine" && routine ? (
+        <Text variant="small" tone="faint" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
+          {t("mobile.agents.state.routine", { time: agoShort(t, agoOf(routine, now)) })}
+        </Text>
       ) : state === "away" ? (
         <Text variant="small" tone="faint" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           {t("mobile.outage.rowWaiting", { computer })}
@@ -398,33 +504,95 @@ function AgentRow({
     </Animated.View>
   );
   return (
-    <ListRow
-      onPress={() => router.push(`/agent/${a.id}`)}
-      accessibilityRole="button"
-      accessibilityLabel={[
-        said,
-        pinned ? t("sidebarPins.pinned") : null,
-        a.role.trim() || null,
-        time,
-        state === "away" ? null : role,
-      ]
-        .filter(Boolean)
-        .join(", ")}
-      divider={divider}
-      leading={
-        <AgentFace
-          agentId={a.id}
-          size={52}
-          mode={state === "works" ? "run" : state === "away" || state === "noAi" || state === "out" ? "rest" : "idle"}
-          live={live}
-        />
-      }
-      title={a.name}
-      time={time}
-      // An agent with no role and nothing on has no second line, never an empty one.
-      sub={(state === "free" || (state === "out" && !shown?.line)) && !role ? null : sub}
-    />
+    // Only the newcomer's row carries a style; the rest stay plain views.
+    <Animated.View style={arriving ? entrance : undefined}>
+      <ListRow
+        onPress={() => router.push(`/agent/${a.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={[
+          said,
+          pinned ? t("sidebarPins.pinned") : null,
+          a.role.trim() || null,
+          time,
+          state === "away" ? null : role,
+        ]
+          .filter(Boolean)
+          .join(", ")}
+        divider={divider}
+        leading={
+          state === "routine" ? (
+            // Out on its routine: the frame keeps its sky and waits for it.
+            <AgentFace agentId={a.id} size={52} live={false} bodyless />
+          ) : (
+            <Animated.View key="here" entering={reduced ? undefined : FACE_IN}>
+              <AgentFace
+                agentId={a.id}
+                size={52}
+                mode={
+                  state === "works" ? "run" : state === "away" || state === "noAi" || state === "out" ? "rest" : "idle"
+                }
+                live={live}
+                gaze={gaze}
+                {...(arriving ? { expression: "happy" as const } : {})}
+              />
+            </Animated.View>
+          )
+        }
+        title={a.name}
+        time={time}
+        // An agent with no role and nothing on has no second line, never an empty one.
+        sub={(state === "free" || (state === "out" && !shown?.line)) && !role ? null : sub}
+      />
+    </Animated.View>
   );
+}
+
+/**
+ * The agent just created here, while Agentes is on screen: it is greeted once (its row comes in, the others look at it
+ * for `ARRIVAL_LOOK_MS`), then the list is the list again. Null when there is no one to greet.
+ */
+function useGreeting(order: readonly string[]): string | null {
+  const arrived = useArrived();
+  const focused = useIsFocused();
+  const [greeting, setGreeting] = useState<string | null>(null);
+  const listed = arrived !== null && order.includes(arrived);
+  useEffect(() => {
+    if (!focused || !listed || !arrived) return;
+    clearArrived(arrived);
+    setGreeting(arrived);
+  }, [focused, listed, arrived]);
+  useEffect(() => {
+    if (!greeting) return;
+    const done = setTimeout(() => setGreeting(null), ARRIVAL_LOOK_MS);
+    return () => clearTimeout(done);
+  }, [greeting]);
+  return greeting;
+}
+
+/**
+ * A newcomer's row coming in: from a little below and a touch small, on a spring with a small bounce (a rare moment,
+ * the one place this list is allowed one). Reduced motion: it only fades in. Every other row: no style at all.
+ */
+function useArrival(arriving: boolean, reduced: boolean) {
+  const shown = useSharedValue(1);
+  useEffect(() => {
+    if (!arriving) return;
+    shown.set(0);
+    shown.set(
+      reduced
+        ? withTiming(1, { duration: 200 })
+        : withDelay(120, withSpring(1, { duration: 520, dampingRatio: 0.72 })),
+    );
+  }, [arriving, reduced, shown]);
+  return useAnimatedStyle(() => {
+    const v = shown.get();
+    return reduced
+      ? { opacity: v }
+      : {
+          opacity: Math.min(1, v * 1.6),
+          transform: [{ translateY: (1 - v) * 16 }, { scale: 0.96 + 0.04 * v }],
+        };
+  });
 }
 
 const styles = StyleSheet.create({

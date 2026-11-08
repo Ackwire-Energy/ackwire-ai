@@ -8,13 +8,15 @@ export interface PixelOrbitProps {
   color: AgentColorName;
   /** Side in points (default 12). */
   size?: number;
+  /** Held on its first frame (a pull not yet let go): it turns once the work starts. */
+  still?: boolean;
 }
 
 /** The 3×3 pixel orbit (working, loading) in the agent's tones; still with reduced motion. */
-export function PixelOrbit({ color, size = 12 }: PixelOrbitProps) {
+export function PixelOrbit({ color, size = 12, still = false }: PixelOrbitProps) {
   const { colors } = useTheme();
   const reduced = useReducedMotion();
-  const t = useFrameTime(!reduced, 0);
+  const t = useFrameTime(!reduced && !still, 0);
   const head = orbitHead(t * 1000, reduced);
   const cell = size / 3;
   const gap = Math.max(0.5, cell * 0.14);

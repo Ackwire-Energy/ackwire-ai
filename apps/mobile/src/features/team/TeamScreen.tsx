@@ -164,6 +164,14 @@ export function TeamScreen() {
               sub={who || t("team.sectors.nobody")}
               subLines={1}
               time={t("team.agents", { count: s.agents.length })}
+              // A setor opens its page; "Sem setor" (no group) is only a heading for the rest.
+              {...(s.group
+                ? {
+                    chevron: true,
+                    accessibilityRole: "button" as const,
+                    onPress: () => router.push(`/sector/${s.group?.id}`),
+                  }
+                : {})}
             />
           );
         })

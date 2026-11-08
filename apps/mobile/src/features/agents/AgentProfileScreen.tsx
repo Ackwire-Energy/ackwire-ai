@@ -31,11 +31,12 @@ import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { planLine } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import {
   AgentAvatar,
@@ -176,8 +177,14 @@ function Profile({ id }: { id: string }) {
   const details = seesDetails(agent);
   // The team's right hand (ADR 0137): what it is and how it works, its model, Configurar for who manages agents.
   const rightHand = isRightHand(agent);
-  // Which view shows; only for this visit.
-  const [tab, setTab] = useState<ProfileTab>("today");
+  // Which view shows: the one last chosen, on every profile (a person who reads memories keeps reading memories).
+  const [tab, setTabState] = useState<ProfileTab>(() => profileTabOf(readValueSync(STORED.agentProfileTab)));
+  const setTab = (next: ProfileTab) => {
+    setTabState(next);
+    void writeValue(STORED.agentProfileTab, next === "today" ? null : next);
+  };
+  // A hello when its profile opens (a rare, small moment): it smiles once, unless it is at work.
+  const hello = useHello();
   const reduced = useReducedMotion();
   const modelLabel = useModelLabel();
   const detail = useAgentDetail(orgId, id);
@@ -290,27 +297,6 @@ function Profile({ id }: { id: string }) {
     else router.push(`/approval/${href.id}`);
   };
 
-  const fix = (m: Memory) =>
-    sheet.open(
-      <MemoryFix
-        memory={m}
-        agentId={id}
-        agentName={name}
-        g={g}
-        source={m.from ? t("mobile.intentAgents.fix.from", { when: when.short(m.from.at) }) : originText(m)}
-        onSee={
-          m.from
-            ? () => {
-                const from = m.from;
-                sheet.close();
-                if (from) router.push(chatHref(from.channelId, from.threadId));
-              }
-            : undefined
-        }
-        onDone={sheet.close}
-      />,
-    );
-
   const memoryRow = (m: Memory) => {
     const row = (
       <GroupedRow
@@ -318,7 +304,9 @@ function Profile({ id }: { id: string }) {
         label={m.summary ?? memoryLine(t, m)}
         labelLines={2}
         sub={originText(m)}
-        {...(editable ? { chevron: true, onPress: () => fix(m) } : {})}
+        // The same screen Memória opens for it (one place to read, fix or forget a memory).
+        chevron
+        onPress={() => router.push(`/memory/${m.id}`)}
       />
     );
     if (!editable) return <Fragment key={m.id}>{row}</Fragment>;
@@ -697,7 +685,12 @@ function Profile({ id }: { id: string }) {
           {/* Its presence is the badge; a screen reader hears it in words, with why. */}
           <Animated.View style={avatarFade} {...(status ? { accessible: true, accessibilityLabel: status.line } : {})}>
             <WithPresence size={FACE} presence={status?.presence} inset={agentBadgeInset(look, FACE)}>
-              <AgentAvatar agent={look} size={FACE} mode={busy ? "run" : "idle"} />
+              <AgentAvatar
+                agent={look}
+                size={FACE}
+                mode={busy ? "run" : "idle"}
+                {...(hello && !busy ? { expression: "happy" as const } : {})}
+              />
             </WithPresence>
           </Animated.View>
         </View>
@@ -734,7 +727,11 @@ function Profile({ id }: { id: string }) {
                 />
               )}
             </View>
-            {details && !rightHand ? <AgentComputerButton agentId={id} /> : null}
+            {details && !rightHand ? (
+              <View style={styles.grow}>
+                <AgentComputerButton agentId={id} />
+              </View>
+            ) : null}
           </View>
           {agent?.canTalk === false ? (
             <Text variant="small" tone="muted" style={styles.center}>
@@ -1097,6 +1094,22 @@ export function MemoryFix({
 
 const TAB_IN = FadeIn.duration(160);
 
+/** A saved tab, or Hoje. */
+const profileTabOf = (v: string | null): ProfileTab => (v === "access" || v === "memory" ? v : "today");
+
+/** How long the face holds its smile when the profile opens. */
+const HELLO_MS = 900;
+
+/** True for a moment after the profile opens: the face's hello. */
+function useHello() {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const off = setTimeout(() => setOn(false), HELLO_MS);
+    return () => clearTimeout(off);
+  }, []);
+  return on;
+}
+
 /** Height of the sky cover, the bar's area included. */
 const COVER_HEIGHT = 250;
 /** The agent's face, unframed, and the room under it at the cover's foot. */
@@ -1111,10 +1124,11 @@ const styles = StyleSheet.create({
   bar: { position: "absolute", top: 0, left: 0, right: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
   cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: COVER_FOOT },
-  prof: { paddingHorizontal: 24, gap: 4 },
+  // Face, name 28, what it does 15: 8 apart; the buttons 16 under them.
+  prof: { paddingHorizontal: 24, gap: 8 },
   center: { textAlign: "center" },
-  // Chat takes the row; the computer's square sits beside it.
-  acts: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  // Chat and Computador side by side, the same width (one primary); 16 under the words (8 of `prof` and 8 here).
+  acts: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   setup: { paddingHorizontal: 16, marginTop: 22 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
@@ -1123,7 +1137,8 @@ const styles = StyleSheet.create({
   tabs: { paddingHorizontal: 16, paddingTop: 16 },
   page: { paddingHorizontal: 16 },
   block: { marginTop: 16 },
-  orbit: { width: 30, height: 30, alignItems: "center", justifyContent: "center" },
+  // The orbit centered in the row's 36 leading column, where a tile would sit.
+  orbit: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   pixels: { marginBottom: 12 },
   apart: { marginTop: 24 },
   remove: { marginTop: 6, alignSelf: "flex-start" },
@@ -1136,8 +1151,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  // One leading column for a tile or a mark, as `GroupedRow`'s: the text starts at 58 in every row.
-  lead: { width: 32, alignItems: "center", justifyContent: "center" },
+  // One leading column for a tile or a mark, as `GroupedRow`'s (36, a framed face's width): the text starts at 62 in
+  // every row, these included.
+  lead: { width: 36, alignItems: "center", justifyContent: "center" },
   tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   value: { flexShrink: 1, maxWidth: "50%" },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },

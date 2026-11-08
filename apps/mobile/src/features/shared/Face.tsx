@@ -1,9 +1,11 @@
 import { opensDetails } from "@agenteschat/client/lib/audience";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
+import type { Expression } from "@agenteschat/ui/agent/engine";
 import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import type { Gaze } from "@/agent/AgentAvatar";
 import type { AgentLookInput } from "@/agent/looks";
 import { type AgentMode, agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
@@ -88,6 +90,9 @@ export function AgentFace({
   framed,
   presence = false,
   ring,
+  gaze,
+  expression,
+  bodyless,
 }: {
   agentId: string | null | undefined;
   size: number;
@@ -99,14 +104,41 @@ export function AgentFace({
   presence?: boolean;
   /** The surface behind the badge (default the page's color). */
   ring?: string;
+  /** Where it looks for a moment (see `AgentAvatar`). */
+  gaze?: Gaze | undefined;
+  /** A face it holds for a moment (a hello, a cheer). */
+  expression?: Expression | undefined;
+  /** Only its sky in the frame: away on a routine. */
+  bodyless?: boolean | undefined;
 }) {
   const dir = useDirectory();
   const look = agentLook(agentId ? dir.anyAgent(agentId) : undefined);
+  const moment = { gaze, expression, bodyless };
   if (presence && agentId)
     return (
-      <PresentAgentFace agentId={agentId} look={look} size={size} mode={mode} live={live} framed={framed} ring={ring} />
+      <PresentAgentFace
+        agentId={agentId}
+        look={look}
+        size={size}
+        mode={mode}
+        live={live}
+        framed={framed}
+        ring={ring}
+        moment={moment}
+      />
     );
-  return <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />;
+  return (
+    <AgentAvatar
+      agent={look}
+      size={size}
+      mode={mode}
+      live={live}
+      framed={framed}
+      {...(gaze ? { gaze } : {})}
+      {...(expression ? { expression } : {})}
+      {...(bodyless ? { bodyless } : {})}
+    />
+  );
 }
 
 function PresentAgentFace({
@@ -117,6 +149,7 @@ function PresentAgentFace({
   live,
   framed,
   ring,
+  moment,
 }: {
   agentId: string;
   look: AgentLookInput;
@@ -125,12 +158,22 @@ function PresentAgentFace({
   live: boolean;
   framed: boolean | undefined;
   ring: string | undefined;
+  moment: { gaze?: Gaze | undefined; expression?: Expression | undefined; bodyless?: boolean | undefined };
 }) {
   const status = usePresenceOf().agent(agentId)?.status?.status;
   const asleep = mode === "idle" && isOutOfOffice(status);
   return (
     <Badged who={{ type: "agent", id: agentId }} size={size} ring={ring} inset={agentBadgeInset(look, size, framed)}>
-      <AgentAvatar agent={look} size={size} mode={asleep ? "sleep" : mode} live={live} framed={framed} />
+      <AgentAvatar
+        agent={look}
+        size={size}
+        mode={asleep ? "sleep" : mode}
+        live={live}
+        framed={framed}
+        {...(moment.gaze ? { gaze: moment.gaze } : {})}
+        {...(moment.expression ? { expression: moment.expression } : {})}
+        {...(moment.bodyless ? { bodyless: true } : {})}
+      />
     </Badged>
   );
 }

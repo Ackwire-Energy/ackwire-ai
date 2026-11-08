@@ -13,8 +13,7 @@ import { useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, Icon, PressScale, useTheme, useToast } from "@/ui";
-import { BUTTON_SIZES } from "@/ui/Button";
+import { Button, GroupedFooter, GroupedHeader, PressScale, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useDirectory, useNow } from "../shared/hooks";
 import { phoneEntryButton } from "./logic";
@@ -24,20 +23,15 @@ import { useAgentComputer } from "./useAgentComputer";
 /** Opens an agent's computer full screen. */
 export const openComputer = (agentId: string) => router.push(`/computer/${agentId}`);
 
-/** As tall as the profile's Chat beside it (`md`), and as wide: a square on the button ruler. */
-const SIZE = BUTTON_SIZES.md.height;
-
 /**
- * The agent's computer on its profile, beside Chat: a square secondary button that opens it, as the web's
- * entry does. Only for whoever may watch the computer, the wait included; nothing while that loads. A screen reader
- * hears the entry's status line with it. On a request of the agent's for this person it helps (takes control, then
- * opens), and a dot in the waiting color says so, since a request is the one thing here that waits on them. The
- * button never opens a stream.
+ * The agent's computer on its profile, beside Chat: a named secondary button as wide as Chat ("Computador"), so what
+ * it does is read, never guessed from a square. Only for whoever may watch the computer, the wait included; nothing
+ * while that loads; a screen reader hears the entry's status line after the word. On a request of the agent's for
+ * this person it says "Ajudar" and helps (takes control, then opens): the word is the signal, no dot. It never opens a stream.
  */
 export function AgentComputerButton({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { org, orgId } = useOrg();
-  const { colors: c, shadows, scheme } = useTheme();
   const dir = useDirectory();
   const toast = useToast();
   const actions = useBrowserHandoffActions(orgId);
@@ -50,8 +44,6 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
   if (view.forbidden || !view.ready || !f) return null;
   const now = wait.now ?? requestNow;
   const state = entryState(f, now);
-  const name = dir.agentById.get(agentId)?.name ?? "";
-  const g = agentGrammar(name);
   const line = entryLine(t, state, {
     edition: f.edition,
     locale: i18n.language,
@@ -63,10 +55,7 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
     now: new Date(now),
   });
   const helps = phoneEntryButton(state) === "help";
-  const what = helps ? t("agentComputer.help") : t("agentComputer.openOf", g);
-  // The secondary button's lit top edge (`Button`).
-  const edge = scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.9)";
-  // The press gives its own haptic (`PressScale`).
+  // The press gives its own haptic (`Button`).
   const open = () => openComputer(agentId);
   const help = async () => {
     if (state.kind !== "needsYou") return;
@@ -81,19 +70,14 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
     }
   };
   return (
-    <PressScale
+    <Button
+      variant="secondary"
+      wide
+      label={helps ? t("agentComputer.help") : t("agentComputer.button")}
+      // The entry's status line ("Ligado · trabalhando agora"), which the one word can't carry.
+      {...(line ? { hint: line } : {})}
       onPress={helps ? () => void help() : open}
-      sink
-      accessibilityRole="button"
-      accessibilityLabel={[what, line].filter(Boolean).join(", ")}
-      style={[styles.button, { boxShadow: shadows.e1 }]}
-    >
-      <View style={[styles.face, { backgroundColor: c.raised }]}>
-        <View style={[styles.edge, { backgroundColor: edge }]} />
-        <Icon name="laptop" size={BUTTON_SIZES.md.icon} color={c.ink} />
-      </View>
-      {helps ? <View style={[styles.dot, { backgroundColor: c.amber, borderColor: c.grouped }]} /> : null}
-    </PressScale>
+    />
   );
 }
 
@@ -138,14 +122,4 @@ export function AgentComputerPicture({ agentId }: { agentId: string }) {
 
 const styles = StyleSheet.create({
   picture: { width: "100%", aspectRatio: 16 / 10, borderRadius: 14 },
-  button: { width: SIZE, height: SIZE, borderRadius: BUTTON_SIZES.md.radius },
-  face: {
-    flexGrow: 1,
-    borderRadius: BUTTON_SIZES.md.radius,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  edge: { position: "absolute", top: 0, left: 0, right: 0, height: 1 },
-  dot: { position: "absolute", top: -3, right: -3, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
 });

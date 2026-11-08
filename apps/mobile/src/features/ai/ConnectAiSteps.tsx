@@ -746,7 +746,8 @@ function PlanPage(
   if (done) {
     return (
       <View style={styles.done}>
-        <AgentFace agentId={done.agentId} size={64} live={false} />
+        {/* Alive, and glad: the agent can think now (a rare moment). */}
+        <AgentFace agentId={done.agentId} size={64} expression="happy" />
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("aiAccounts.done.savedAgent", { agent: done.agent, label: done.label })}
         </Text>

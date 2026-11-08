@@ -24,6 +24,8 @@ export interface ButtonProps {
   disabled?: boolean;
   /** Working on it: a spinner in the icon's place, and it can't be pressed again meanwhile. */
   loading?: boolean;
+  /** What a screen reader hears after the label: the state the label is too short to say. */
+  hint?: string;
 }
 
 export const BUTTON_SIZES = {
@@ -58,6 +60,7 @@ export function Button({
   wide = false,
   disabled = false,
   loading = false,
+  hint,
 }: ButtonProps) {
   const theme = useTheme();
   const { colors, shadows } = theme;
@@ -73,6 +76,7 @@ export function Button({
       fill={false}
       accessibilityRole="button"
       accessibilityLabel={label}
+      {...(hint ? { accessibilityHint: hint } : {})}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[
         {
