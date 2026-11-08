@@ -664,8 +664,14 @@ function AiAppImport({ orgId }: { orgId: string }) {
             onFocus={(e) => e.currentTarget.select()}
           />
           <div className="imp-other__copy">
-            <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-              <SwapLabel label={t("onboarding.import.aiApp.copy")} alt={t("common.copied")} showAlt={copied === "ok"} />
+            <Button onClick={() => void copy()}>
+              <SwapLabel
+                icon="copy"
+                altIcon="check"
+                label={t("onboarding.import.aiApp.copy")}
+                alt={t("common.copied")}
+                showAlt={copied === "ok"}
+              />
             </Button>
             <span role="status" className="small muted">
               {copied === "ok"
@@ -715,8 +721,14 @@ function OtherApp({ card }: { card: RequestCard }) {
         onFocus={(e) => e.currentTarget.select()}
       />
       <div className="imp-other__copy">
-        <Button icon={copied === "ok" ? "check" : "copy"} onClick={() => void copy()}>
-          <SwapLabel label={t("onboarding.import.request.copy")} alt={t("common.copied")} showAlt={copied === "ok"} />
+        <Button onClick={() => void copy()}>
+          <SwapLabel
+            icon="copy"
+            altIcon="check"
+            label={t("onboarding.import.request.copy")}
+            alt={t("common.copied")}
+            showAlt={copied === "ok"}
+          />
         </Button>
         <span role="status" className="small muted">
           {copied === "ok"
