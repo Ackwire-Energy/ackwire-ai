@@ -32,11 +32,21 @@ describe("MediaRow", () => {
   });
 
   test("a face of 32 in a card's head, 24 in a list row, 12 and 8 from the name", () => {
-    expect(body(".ac-mediarow__face > :is(.ac-avatar, .ac-rolemark)")).toContain("width: 32px;");
-    expect(body(".ac-mediarow--row > .ac-mediarow__face > :is(.ac-avatar, .ac-rolemark)")).toContain("width: 24px;");
+    expect(body(".ac-mediarow")).toContain("--mediarow-face: 32px;");
+    expect(body(".ac-mediarow--row")).toContain("--mediarow-face: 24px;");
+    expect(body(".ac-mediarow > .ac-mediarow__face > :not(svg)")).toContain("width: var(--mediarow-face);");
+    expect(body(".ac-mediarow__face")).toContain("min-width: var(--mediarow-face);");
     expect(body(".ac-mediarow")).toContain("column-gap: var(--space-3);");
     expect(body(".ac-mediarow--row")).toContain("column-gap: var(--space-2);");
     expect(body(".ac-mediarow")).toContain("row-gap: var(--space-2);");
+  });
+
+  test("a wrapped head keeps its first line, and what ends it, on the face's middle", () => {
+    expect(body(".ac-mediarow")).toContain("align-items: start;");
+    expect(body(".ac-mediarow__head")).toContain(
+      "padding-block-start: max(0px, calc((var(--mediarow-face) - 20px) / 2));",
+    );
+    expect(body(".ac-mediarow__end")).toContain("height: var(--mediarow-face);");
   });
 
   test("in a box under 480px, what ends the head drops under the text, at its start", () => {
@@ -45,6 +55,21 @@ describe("MediaRow", () => {
     expect(narrow).toContain("grid-area: auto / 1 / auto / -1;");
     expect(narrow).toContain("order: 1;");
     expect(narrow).toContain("justify-self: start;");
+    expect(narrow).toContain("height: auto;");
+  });
+
+  test("a glyph in a face's place keeps its size and the names in line; nothing under the name's line takes no room", () => {
+    expect(body(".ac-mediarow__face")).toContain("min-width: var(--mediarow-face);");
+    expect(body(".ac-mediarow__face")).toContain("justify-content: center;");
+    expect(body(".ac-mediarow__body:empty")).toContain("display: none;");
+    // A row of actions at the line's end keeps its own gap.
+    expect(body(".ac-mediarow__end.ac-acts")).toContain("column-gap: calc(2 * var(--ghost-plate));");
+  });
+
+  test("it comes last in the kit's sheet, so a row it is mixed with (a list row, an option) takes its grid", () => {
+    const last = css.lastIndexOf(".ac-mediarow {");
+    for (const other of [".ac-list__row {", ".ac-option {", ".ac-faceline {"])
+      expect(css.lastIndexOf(other)).toBeLessThan(last);
   });
 
   test("a task's number reads inline in its title's words, muted, in even figures", () => {

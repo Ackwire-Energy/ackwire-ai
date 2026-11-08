@@ -222,7 +222,7 @@ html[data-pointer] :focus-visible {
  * under it): the first line's capitals start at the picture's top, as a chat name starts at its face. `.ac-captop` goes
  * on the box that holds the first line (block-level, in that line's font size and line height): it rises by the air
  * above its capitals. One line beside a picture centres on it instead (`.ac-iconline`). Three lines or more beside a
- * picture are a MediaRow (below): a face never owns a column while the words beside it are squeezed.
+ * picture are a MediaRow (at the end of this file): a face never owns a column while the words beside it are squeezed.
  */
 .ac-faceline {
   display: flex;
@@ -270,83 +270,6 @@ html[data-pointer] :focus-visible {
 @media (pointer: coarse) {
   .ac-captail:has(> .ac-btn:not(.ac-btn--ghost)) {
     margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
-  }
-}
-
-/*
- * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else
- * (the text, chips, actions) under them at the row's full width, never in a column beside the face. Classes, not a
- * component: the row is whatever its markup is (a button, a link, an `li`, a label).
- *   .ac-mediarow > .ac-mediarow__face, .ac-mediarow__head (<b>name</b> <span .ac-mediarow__meta>role</span>),
- *   .ac-mediarow__end (on the name's line, at its end), .ac-mediarow__body (under, full width).
- * `__end--wrap` drops what ends the head under the body, at its start, when the box holding the rows (with
- * `container-type: inline-size`: a card, a list) is under 480px: a thread or a side panel counts as narrow. A task's
- * number sits inline before its title, in the title's own words (`.ac-mediarow__num`), never in a column.
- */
-.ac-mediarow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: var(--space-3);
-  row-gap: var(--space-2);
-}
-.ac-mediarow--row {
-  column-gap: var(--space-2);
-}
-.ac-mediarow__face {
-  grid-area: 1 / 1;
-  display: flex;
-}
-.ac-mediarow__face > :is(.ac-avatar, .ac-rolemark) {
-  width: 32px;
-  height: 32px;
-}
-.ac-mediarow--row > .ac-mediarow__face > :is(.ac-avatar, .ac-rolemark) {
-  width: 24px;
-  height: 24px;
-}
-.ac-mediarow__head {
-  grid-area: 1 / 2;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 0.4em;
-  font-size: 14px;
-  line-height: 20px;
-  overflow-wrap: anywhere;
-}
-.ac-mediarow__head > b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.ac-mediarow__meta,
-.ac-mediarow__num {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--ink-muted);
-}
-.ac-mediarow__num {
-  font-variant-numeric: tabular-nums;
-}
-.ac-mediarow__end {
-  grid-area: 1 / 3;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.ac-mediarow__body {
-  grid-column: 1 / -1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-@container (max-width: 479px) {
-  .ac-mediarow__end--wrap {
-    grid-area: auto / 1 / auto / -1;
-    order: 1;
-    justify-self: start;
   }
 }
 
@@ -10902,4 +10825,99 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-track__step.is-more .ac-track__node {
   color: var(--muted);
+}
+
+/*
+ * MediaRow: the face (32, or 24 in a list row with `--row`), then the name and the role on its line, everything else
+ * (the text, chips, actions) under them at the row's full width, never in a column beside the face. Classes, not a
+ * component: the row is whatever its markup is (a button, a link, an `li`, a label).
+ *   .ac-mediarow > .ac-mediarow__face, .ac-mediarow__head (<b>name</b> <span .ac-mediarow__meta>role</span>),
+ *   .ac-mediarow__end (on the name's line, at its end), .ac-mediarow__body (under, full width).
+ * `__end--wrap` drops what ends the head under the body, at its start, when the box holding the rows (with
+ * `container-type: inline-size`: a card, a list) is under 480px: a thread or a side panel counts as narrow. A task's
+ * number sits inline before its title, in the title's own words (`.ac-mediarow__num`), never in a column.
+ */
+/* Last in the file: on a row it is mixed with (an `.ac-list__row`, an option) its grid wins at the same weight. The
+   name's first line sits on the face's middle however many lines the head wraps to, and what ends that line on it
+   too (a box as tall as the face, a taller button reaching as far above as below): never the wrapped head's middle. */
+.ac-mediarow {
+  --mediarow-face: 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+}
+.ac-mediarow--row {
+  --mediarow-face: 24px;
+  column-gap: var(--space-2);
+}
+/* As wide and tall as a face at least, so a glyph in a face's place (a check, an icon) keeps the names in line. */
+.ac-mediarow__face {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--mediarow-face);
+  height: var(--mediarow-face);
+}
+/* Whatever leads it (a face, a role's mark, a maker's tile) takes the face's size; a glyph keeps its own. */
+.ac-mediarow > .ac-mediarow__face > :not(svg) {
+  width: var(--mediarow-face);
+  height: var(--mediarow-face);
+}
+.ac-mediarow__head {
+  grid-area: 1 / 2;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4em;
+  padding-block-start: max(0px, calc((var(--mediarow-face) - 20px) / 2));
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.ac-mediarow__head > b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-mediarow__meta,
+.ac-mediarow__num {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+.ac-mediarow__num {
+  font-variant-numeric: tabular-nums;
+}
+.ac-mediarow__end {
+  grid-area: 1 / 3;
+  display: flex;
+  align-items: center;
+  column-gap: var(--space-2);
+  height: var(--mediarow-face);
+}
+/* A row of actions keeps its own gap (`.ac-acts`: its ghosts' words as far apart as two boxes). */
+.ac-mediarow__end.ac-acts {
+  column-gap: calc(2 * var(--ghost-plate));
+}
+.ac-mediarow__body {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* Nothing under the name's line: no row, no gap. */
+.ac-mediarow__body:empty {
+  display: none;
+}
+@container (max-width: 479px) {
+  .ac-mediarow__end--wrap {
+    grid-area: auto / 1 / auto / -1;
+    order: 1;
+    justify-self: start;
+    height: auto;
+  }
 }
