@@ -7,6 +7,7 @@ import {
   composioConnectorsOf,
   connectOverHttp,
   ForbiddenError,
+  MisconfiguredError,
   type RoutineHookConfig,
   type RoutineHookDeps,
   requireAgentDetails,
@@ -211,10 +212,11 @@ export function signInFirst(auth: Auth, publicUrl: string) {
 
 /**
  * Why a provider's return (`?connector_error=`, `?github_app_error=`) failed, as a code the app says
- * (`oauthReturnText`): never the error's own message. `refusals`: codes that go back as they are. "failed" is
- * anything else.
+ * (`oauthReturnText`): never the error's own message. `refusals`: codes that go back as they are. "misconfigured":
+ * the provider refused this server's own OAuth app, which no retry fixes. "failed" is anything else.
  */
 export function oauthFailure(error: unknown, refusals: readonly string[] = []): string {
+  if (error instanceof MisconfiguredError) return "misconfigured";
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code === "string" && refusals.includes(code)) return code;
   if (code === "oauth.link_expired") return "expired";

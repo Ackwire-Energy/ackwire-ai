@@ -10356,6 +10356,7 @@
     "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft.",
     "otherWorkspace": "Dat GitHub-account is al gekoppeld aan een andere werkruimte. Verwijder de app daar voordat je hem hier installeert.",
     "installedOutside": "De app is buiten agentes.chat op dat GitHub-account geïnstalleerd. Verwijder hem op GitHub en installeer hem opnieuw via Connectors › GitHub.",
+    "misconfigured": "De GitHub-app heeft op de server de verkeerde geheime sleutel, dus de installatie kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app.",
     "connectAccount": "Een GitHub-account koppelen",
     "ownerHint": "De eigenaar van deze server kan de GitHub-app hier bij Connectors maken.",
     "viaApp": "Via de agentes.chat-app op {{accounts}}",
@@ -11984,7 +11985,8 @@
       "otherServer": "Dat account staat op een ander adres.",
       "gone": "Dat account is niet meer gekoppeld.",
       "unfinished": "Het inloggen bij Composio is niet afgerond. Probeer het opnieuw.",
-      "unavailable": "Deze dienst kan hier niet gekoppeld worden."
+      "unavailable": "Deze dienst kan hier niet gekoppeld worden.",
+      "misconfigured": "De koppeling met {{provider}} is verkeerd ingesteld op de server, dus die kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app."
     },
     "wiki": {
       "noAccess": "Je hebt geen toegang tot deze pagina.",

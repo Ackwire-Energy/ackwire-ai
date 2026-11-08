@@ -1,5 +1,5 @@
 import { createFcmPushSender } from "@agenteschat/adapters";
-import { requestLocale } from "@agenteschat/engine";
+import { MisconfiguredError, requestLocale } from "@agenteschat/engine";
 import { helpDocsUrl } from "@agenteschat/i18n/help";
 import { appLocale } from "@agenteschat/i18n/locale";
 import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules";
@@ -299,6 +299,8 @@ export function createApp(options: AppOptions) {
       error,
       stack: error.stack,
     });
+    // Reported like any failure, but the apps can say what's wrong and who fixes it.
+    if (error instanceof MisconfiguredError) return apiError(c, 500, error.code, error.message, error.params);
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
   // Ties a request's failure in the log to its report, and to what the client saw (`X-Request-Id`).

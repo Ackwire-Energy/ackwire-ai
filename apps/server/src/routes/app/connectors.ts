@@ -329,7 +329,7 @@ export function connectorRoutes(deps: AppDeps) {
       security,
       summary: "OAuth redirect target (browser navigation)",
       description:
-        "Validates state and PKCE, stores the tokens encrypted, then redirects to the web app with `connected` and `outcome` (`connected`, `reconnected`, `same_account`). It lands back on the page that started it; a Reconectar that signed in to another account comes back with `connector_error=connector.other_account`, one whose account couldn't be checked with `connector.account_unknown` (try again), one for an account disconnected meanwhile with `connector.gone`. Composio's return (ADR 0107) adds `status` and `connected_account_id`, which stands for the code: it must be the account the link made, and `status=failed` comes back as `connector.unfinished`.",
+        "Validates state and PKCE, stores the tokens encrypted, then redirects to the web app with `connected` and `outcome` (`connected`, `reconnected`, `same_account`). It lands back on the page that started it; a Reconectar that signed in to another account comes back with `connector_error=connector.other_account`, one whose account couldn't be checked with `connector.account_unknown` (try again), one for an account disconnected meanwhile with `connector.gone`. When the provider refuses this server's own OAuth app (its client id or secret is wrong, which is logged as an error), it comes back with `connector_error=misconfigured` and `connector`, the connector's id. Composio's return (ADR 0107) adds `status` and `connected_account_id`, which stands for the code: it must be the account the link made, and `status=failed` comes back as `connector.unfinished`.",
       request: {
         query: z.object({
           state: z.string().optional(),
@@ -368,8 +368,12 @@ export function connectorRoutes(deps: AppDeps) {
         return c.redirect(desktopOAuthRedirect({ org, state: q.state, code: q.code }), 302);
       }
       // The web app's: back where it started (its state's page) while the state can still be read, else the start.
-      const fail = (reason: string) =>
-        c.redirect(oauthFailedUrl(base, started?.returnTo ?? "/", "connector_error", reason), 302);
+      // A misconfigured one names which connector's app it is, for the app to say.
+      const fail = (reason: string) => {
+        const url = oauthFailedUrl(base, started?.returnTo ?? "/", "connector_error", reason);
+        const connector = reason === "misconfigured" ? started?.connector : undefined;
+        return c.redirect(connector ? `${url}&connector=${encodeURIComponent(connector)}` : url, 302);
+      };
       // Composio's failed sign-in says so; any other refusal at the provider is a cancel.
       if (q.error) return fail(q.error === "connector.unfinished" ? q.error : "cancelled");
       if (!q.state || !q.code) return fail("failed");
@@ -388,7 +392,7 @@ export function connectorRoutes(deps: AppDeps) {
       } catch (error) {
         // An account's own refusals go back as their code: the app says them in the person's language.
         const reason = oauthFailure(error, ACCOUNT_REFUSALS);
-        if (reason === "failed") {
+        if (reason === "failed" || reason === "misconfigured") {
           const log = isExpectedError(error) ? deps.log?.warn : deps.log?.error;
           log?.("connector oauth failed", { error });
         }
@@ -405,7 +409,7 @@ export function connectorRoutes(deps: AppDeps) {
       security,
       summary: "Finish an OAuth connection the phone app or the desktop app started (admins)",
       description:
-        'The phone app opened the authorize URL in the system browser (`returnTo: "app:connectors"`), or the desktop app\'s window did (`returnTo: "desktop:"` + a path); the callback handed `state` and `code` back to the app, which sends them here with its own session. The state must be this person\'s and this organization\'s, unused and not expired. `returnTo`: the path a desktop authorization lands on.',
+        "The phone app opened the authorize URL in the system browser (`returnTo: \"app:connectors\"`), or the desktop app's window did (`returnTo: \"desktop:\"` + a path); the callback handed `state` and `code` back to the app, which sends them here with its own session. The state must be this person's and this organization's, unused and not expired. `returnTo`: the path a desktop authorization lands on. `connector.misconfigured` (500, with `provider`): the provider refused this server's own OAuth app, reported as an error.",
       request: {
         params: OrgParams,
         body: body(z.object({ state: z.string().min(1).max(200), code: z.string().min(1).max(2000) })),

@@ -9913,6 +9913,7 @@
     "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana.",
     "otherWorkspace": "Akun GitHub itu sudah terhubung ke ruang kerja lain. Hapus aplikasinya di sana sebelum memasangnya di sini.",
     "installedOutside": "Aplikasinya dipasang di akun GitHub itu di luar agentes.chat. Hapus di GitHub, lalu pasang lagi dari Konektor › GitHub.",
+    "misconfigured": "Aplikasi GitHub di server memakai kunci rahasia yang salah, jadi pemasangan tidak bisa selesai. Pengelola server perlu mengganti kunci itu di pengaturan aplikasi.",
     "connectAccount": "Hubungkan akun GitHub",
     "ownerHint": "Pemilik server ini bisa membuat aplikasi GitHub di sini, di Konektor.",
     "viaApp": "Lewat aplikasi agentes.chat di {{accounts}}",
@@ -11503,7 +11504,8 @@
       "otherServer": "Akun itu ada di alamat lain.",
       "gone": "Akun itu sudah tidak terhubung.",
       "unfinished": "Proses masuk di Composio tidak selesai. Coba lagi.",
-      "unavailable": "Layanan ini tidak bisa dihubungkan di sini."
+      "unavailable": "Layanan ini tidak bisa dihubungkan di sini.",
+      "misconfigured": "Koneksi ke {{provider}} di server salah diatur, jadi tidak bisa selesai. Pengelola server perlu mengganti kunci di pengaturan aplikasi."
     },
     "wiki": {
       "noAccess": "Kamu tidak punya akses ke halaman ini.",

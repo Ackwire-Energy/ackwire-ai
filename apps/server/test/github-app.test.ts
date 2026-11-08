@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHmac, generateKeyPairSync } from "node:crypto";
+import { createFakeErrorReporter } from "@agenteschat/adapters";
 import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -240,6 +241,47 @@ test("GitHub's return that didn't install: why as a code where it started, never
   );
   // Repositories changed on GitHub's own page, which comes back on its own: no failure to show.
   expect(await back(owner, "code=c&installation_id=7&setup_action=update")).toBe("http://localhost:3000/");
+});
+
+test("GitHub refusing this server's app (a wrong client secret): `misconfigured`, reported as an error", async () => {
+  // GitHub's answer to a wrong client id or secret: a 200 with its code. `code=bad` is an expired code instead.
+  const github = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) !== "https://github.com/login/oauth/access_token") return http(input, init);
+    return String(init?.body).includes("code=bad")
+      ? Response.json({ error: "bad_verification_code" })
+      : Response.json({
+          error: "incorrect_client_credentials",
+          error_description: "The client_id and/or client_secret passed are incorrect.",
+        });
+  }) as unknown as typeof fetch;
+  const errors = createFakeErrorReporter();
+  t = await createTestServer({ http: github, env, errors });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const start = async (returnTo: string) => {
+    const res = await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: { returnTo } });
+    return new URL(((await res.json()) as { installUrl: string }).installUrl).searchParams.get("state") ?? "";
+  };
+  const back = async (code: string) => {
+    const query = `state=${await start("/conectores")}&code=${code}&installation_id=7&setup_action=install`;
+    return (await owner(`/api/app/github-app/callback?${query}`)).headers.get("location");
+  };
+  const logged = () => errors.reports.map((r) => r.tags.log);
+
+  expect(await back("c")).toBe("http://localhost:3000/conectores?github_app_error=misconfigured");
+  expect(logged()).toEqual(["github app install failed"]);
+  expect(String(errors.reports[0]?.error)).toContain("incorrect_client_credentials");
+  // A code GitHub refused can work on another try: `failed`, and only a warning.
+  expect(await back("bad")).toBe("http://localhost:3000/conectores?github_app_error=failed");
+  expect(logged()).toEqual(["github app install failed"]);
+  // The phone's finish says it by its code, reported too.
+  const phone = await owner(`/api/app/organizations/${orgId}/github-app/complete`, {
+    json: { state: await start("app:connectors"), code: "c", installationId: 7 },
+  });
+  expect(phone.status).toBe(500);
+  expect(((await phone.json()) as { error: { code: string } }).error.code).toBe("github_app.misconfigured");
+  expect(logged()).toEqual(["github app install failed", "unhandled error"]);
 });
 
 test("an installation bound to another workspace comes back as other_workspace", async () => {

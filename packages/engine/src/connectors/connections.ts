@@ -5,7 +5,7 @@ import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamable
 import { type AuditEntry, recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, MisconfiguredError, NotFoundError, ValidationError } from "../errors";
 import { forgetInstallationTokens } from "../git/github-app";
 import type { ResolveHost } from "../net-guard";
 import { requirePermission } from "../organizations";
@@ -665,11 +665,19 @@ interface TokenResponse {
   error_description?: string;
 }
 
+/**
+ * A token endpoint's `error` that refuses the client itself (its id or secret), never the person's sign-in: OAuth's
+ * `invalid_client` (RFC 6749 §5.2) and GitHub's `incorrect_client_credentials`.
+ */
+export const clientRefused = (error: unknown) => error === "invalid_client" || error === "incorrect_client_credentials";
+
+/** `ownApp`: the connector, when the client is this server's own OAuth app for it (`oauthApps`). */
 async function tokenRequest(
   deps: ConnectorDeps,
   url: string,
   form: Record<string, string | undefined>,
   headers: Record<string, string> = {},
+  ownApp?: ConnectorDefinition,
 ): Promise<TokenResponse> {
   const http = deps.http ?? fetch;
   const res = await http(url, {
@@ -684,6 +692,13 @@ async function tokenRequest(
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || body.error || !body.access_token) {
     const said = `The provider refused the authorization: ${body.error_description ?? body.error ?? res.status}`;
+    if (ownApp && clientRefused(body.error)) {
+      throw new MisconfiguredError(
+        `${ownApp.label} refused this server's OAuth app for the ${ownApp.id} connector (a wrong client id or secret): ${body.error_description ?? body.error}`,
+        "connector.misconfigured",
+        { provider: ownApp.label },
+      );
+    }
     // Its own answer (some say `error` with a 200): a 5xx or a 429 is the provider busy, not the sign-in gone.
     throw res.status < 500 && res.status !== 429 ? new TokenRefused(said) : new ValidationError(said);
   }
@@ -719,19 +734,20 @@ export async function noteRefusedSignIn(db: Database, connection: ConnectorConne
 }
 
 /**
- * What a state stands for, without using it up: who started it, in which organization, and where it lands.
- * Null when it is unknown, used or expired. The callback reads it to know whether the phone app started
+ * What a state stands for, without using it up: who started it, in which organization, for which connector, and where
+ * it lands. Null when it is unknown, used or expired. The callback reads it to know whether the phone app started
  * the authorization (the app then finishes it with its own session).
  */
 export async function peekOAuthState(
   deps: Pick<ConnectorDeps, "db" | "now">,
   state: string,
-): Promise<{ orgId: string; userId: string; returnTo: string } | null> {
+): Promise<{ orgId: string; userId: string; connector: string; returnTo: string } | null> {
   const at = deps.now?.() ?? new Date();
   const [row] = await deps.db
     .select({
       orgId: oauthStates.orgId,
       userId: oauthStates.userId,
+      connector: oauthStates.connector,
       returnTo: oauthStates.returnTo,
       usedAt: oauthStates.usedAt,
       expiresAt: oauthStates.expiresAt,
@@ -739,7 +755,7 @@ export async function peekOAuthState(
     .from(oauthStates)
     .where(eq(oauthStates.stateHash, sha256(state)));
   if (!row || row.usedAt || row.expiresAt <= at) return null;
-  return { orgId: row.orgId, userId: row.userId, returnTo: row.returnTo };
+  return { orgId: row.orgId, userId: row.userId, connector: row.connector, returnTo: row.returnTo };
 }
 
 /**
@@ -776,14 +792,20 @@ export async function completeOAuth(
   const app = deps.oauthApps?.[row.connector];
   if (!def.oauth || !app) throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
   const verifier = await stateVerifier(deps, row);
-  const token = await tokenRequest(deps, def.oauth.tokenUrl, {
-    grant_type: "authorization_code",
-    code: input.code,
-    redirect_uri: oauthRedirectUri(deps.publicUrl),
-    client_id: app.clientId,
-    client_secret: app.clientSecret,
-    code_verifier: verifier,
-  });
+  const token = await tokenRequest(
+    deps,
+    def.oauth.tokenUrl,
+    {
+      grant_type: "authorization_code",
+      code: input.code,
+      redirect_uri: oauthRedirectUri(deps.publicUrl),
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
+      code_verifier: verifier,
+    },
+    {},
+    def,
+  );
   const stored = await storeConnection(deps, {
     orgId: row.orgId,
     actorId: user.id,
