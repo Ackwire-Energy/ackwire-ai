@@ -2604,8 +2604,10 @@ function RoutineDialog({
                     ]}
                   />
                 </Field>
-                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
-                {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
+                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} agentId={agentId} />}
+                {kind === "connector" && (
+                  <ConnectorTriggerFields value={connector} onChange={setConnector} agentId={agentId} />
+                )}
                 {kind === "webhook" &&
                   (routine?.trigger.type === "webhook" ? (
                     <WebhookPanel routine={routine} runs={routine.recentRuns} />

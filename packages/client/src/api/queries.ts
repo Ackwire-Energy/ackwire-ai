@@ -2128,9 +2128,9 @@ export function useDisconnect(orgId: string) {
   });
 }
 
-export const useAgentScopes = (orgId: string, agentId: string) => {
+export const useAgentScopes = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
+  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId), enabled });
 };
 
 // ── Mailboxes (ADR 0038) ────────────────────────────────────────────────────

@@ -27424,6 +27424,21 @@
   "mail.routine.noMailbox": {
     "value": "Connect a mailbox in Connectors first."
   },
+  "mail.routine.readsNone": {
+    "value": "{{name}} can't read any mailbox yet."
+  },
+  "mail.routine.cantRead": {
+    "value": "{{name}} can't read this mailbox."
+  },
+  "mail.routine.connectorReadsNone": {
+    "value": "{{name}} can't read {{connector}} yet."
+  },
+  "mail.routine.connectorCantRead": {
+    "value": "{{name}} can't read {{connector}}."
+  },
+  "mail.routine.giveAccess": {
+    "value": "Give access"
+  },
   "mail.routine.openConnectors": {
     "value": "Open Connectors"
   },

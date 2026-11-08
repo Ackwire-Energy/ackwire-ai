@@ -1,4 +1,4 @@
-import type { Routine, RoutineHookOutcome } from "../api/types";
+import type { AgentMailbox, Routine, RoutineHookOutcome, ScopeGrant } from "../api/types";
 import { clockHour } from "./format";
 
 /** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Reminder" label. */
@@ -265,3 +265,27 @@ export function zoneDisplayName(timeZone: string, locale?: string): string | und
   const name = namesFor(locale)[timeZone];
   return name ? name.charAt(0).toLocaleUpperCase() + name.slice(1) : undefined;
 }
+
+/**
+ * What a routine's mailbox or connection picker offers for its agent (the server refuses one the agent can't read):
+ * the ones it reads, and the one already picked when it doesn't, so the picker never shows empty. `cantRead`: the agent
+ * can't read the picked one, or any. `reads` undefined: not known yet, every one shows.
+ */
+export function triggerChoices<T extends { id: string }>(
+  items: T[],
+  reads: ((id: string) => boolean) | undefined,
+  picked: string,
+): { options: T[]; cantRead: boolean } {
+  if (!reads) return { options: items, cantRead: false };
+  const current = items.find((i) => i.id === picked && !reads(i.id));
+  const readable = items.filter((i) => reads(i.id));
+  return { options: current ? [current, ...readable] : readable, cantRead: Boolean(current) || readable.length === 0 };
+}
+
+/** Whether the agent reads a mailbox, from its levels (`GET …/agents/{id}/mail`). */
+export const mailboxReader = (levels: AgentMailbox[]) => (accountId: string) =>
+  levels.some((m) => m.accountId === accountId && m.level !== "none");
+
+/** Whether the agent reads a connection's tools, from its grants (a custom connection's `custom:<id>:read`). */
+export const connectionReader = (grants: ScopeGrant[]) => (connectionId: string) =>
+  grants.some((g) => g.connectionId === connectionId && g.scope === `custom:${connectionId}:read`);
