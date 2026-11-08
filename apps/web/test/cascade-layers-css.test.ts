@@ -71,7 +71,18 @@ test("what applies at every width keeps a layer's rules and drops its media bloc
 test("a card that also stands in a message sets its own margins only outside one: inside, the kit's rhythm does", async () => {
   // The kit's `.ac-msg .ac-msg__body > *` sets the room around a message's parts, but any page rule beats a layered
   // one: a card's own vertical margins are scoped out of a message body, or they would add to the rhythm.
-  const CARDS = [".rq", ".brw-ac", ".mi-card", ".ag-rcs", ".iw-card", ".thread-context", ".cq-turn__say", ".tp-chips"];
+  const CARDS = [
+    ".rq",
+    ".brw-ac",
+    ".mi-card",
+    ".ag-rcs",
+    ".iw-card",
+    ".iw-chips",
+    ".setup-cl",
+    ".thread-context",
+    ".cq-turn__say",
+    ".tp-chips",
+  ];
   const VERTICAL = /^margin(-top|-bottom|-block(-start|-end)?)?$/;
   const loose: string[] = [];
   for (const file of new Bun.Glob("src/**/*.css").scanSync(WEB)) {

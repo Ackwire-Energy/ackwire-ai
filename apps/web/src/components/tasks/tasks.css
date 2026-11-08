@@ -435,11 +435,10 @@
 .tm-taskcard__row > .ac-btn {
   margin-top: -4px;
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .tm-taskcard__label {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  min-width: 0;
   line-height: 1.35;
 }
 .tm-taskcard__title {

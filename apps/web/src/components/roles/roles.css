@@ -252,6 +252,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
 }
 .roles-computer .roles-key__text {
   flex: 1 1 220px;
+  min-width: 0;
 }
 .roles-area__items {
   margin: 10px 0 -4px 32px;
@@ -263,9 +264,8 @@ html:not([data-pointer]) .roles-back:focus-visible {
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .roles-key__text {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;

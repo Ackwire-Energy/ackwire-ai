@@ -289,9 +289,8 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
   place-items: center;
   color: var(--ink2);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .imp-row__text {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;

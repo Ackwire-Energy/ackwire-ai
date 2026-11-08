@@ -11,9 +11,8 @@
   font-size: 13px;
   color: var(--ink-muted);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .noai-banner__text {
-  flex: 1;
-  min-width: 0;
   gap: 10px;
 }
 .noai-banner__text > .ac-icon {

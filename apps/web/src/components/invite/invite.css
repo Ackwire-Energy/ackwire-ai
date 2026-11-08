@@ -479,9 +479,8 @@ html:not([data-pointer]) .invite-each:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .invite-waiting__text {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   font-size: 14px;
