@@ -1,10 +1,10 @@
 import { isTailnet, type ServerProblem } from "@agenteschat/client/lib/server";
-import { router } from "expo-router";
 import { signOutOf } from "@/features/account";
 import { signInOneTime } from "@/lib/auth";
 import { orgValueName, serverUrl, setServer, signedInServers } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 import { writeValue } from "@/lib/storage";
+import { router } from "@/ui/navigation";
 
 /** Why a server can't be used, in the person's words (each takes `{ host }`). */
 export const PROBLEM_TEXT: Record<ServerProblem, string> = {

@@ -29,11 +29,11 @@ import {
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
 import { answerAfter, firstTasks, teamStatus } from "@agenteschat/client/lib/team-plan";
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import type { IconName } from "@/ui";
+import { router } from "@/ui/navigation";
 import { SetupAsks, SetupCardView, useDoneSay } from "../agents/setup/SetupCard";
 import { openSetupStep } from "../agents/setup/SetupStepScreen";
 import { openConnectAi } from "../ai/NoAiCard";
