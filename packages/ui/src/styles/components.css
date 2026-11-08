@@ -9140,6 +9140,15 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-filter__option[aria-selected="true"] .ac-filter__label {
   font-weight: 600;
 }
+/* A filter with people or agents in it is an OptionRow list: every row the faces' room around them (6, 10 on touch). */
+.ac-filter__list:has(.ac-filter__option > .ac-avatar) .ac-filter__option {
+  min-height: var(--option-h);
+  padding-block: calc((var(--option-h) - var(--option-face)) / 2);
+}
+.ac-filter__option > .ac-avatar {
+  width: var(--option-face);
+  height: var(--option-face);
+}
 .ac-filter__label {
   overflow: hidden;
   text-overflow: ellipsis;
