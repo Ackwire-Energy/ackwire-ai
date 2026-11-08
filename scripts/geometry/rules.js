@@ -1451,7 +1451,13 @@
       for (const head of document.querySelectorAll(
         ".ac-grouphead,h2,h3,h4,[role=heading],[class*='head'],[class*='title']",
       )) {
-        if (!seen(head) || head.matches(".ac-pagehead,.ac-dialog__head") || head.closest("svg,.md,[class*='card']"))
+        // Not a list's heading: a page's or a dialog's head, a disclosure (its own button), a menu's heading (on its
+        // items' words by design), or words in a card or in rendered text.
+        if (
+          !seen(head) ||
+          head.matches(".ac-pagehead,.ac-dialog__head,button,a") ||
+          head.closest("svg,.md,[class*='card'],.ac-menu,.ac-popover,[role=menu],[role=listbox]")
+        )
           continue;
         const list = nextOf(head);
         if (!list || !isList(list)) continue;
@@ -1471,6 +1477,8 @@
         if (host && host !== document.body && host.contains(list)) {
           const inner = host.getBoundingClientRect().left + parseFloat(style(host).borderLeftWidth);
           if (Math.abs(edge - inner) <= 1) continue;
+          // A card's own head, its first line (a service's mark and name over its steps): the card's 12, not a list's.
+          if (flow(host)[0]?.contains(head)) continue;
         }
         const h = head.getBoundingClientRect();
         const base = { rule: "groupedge", node: head, el: sig(head), box: sig(list) };
@@ -1486,8 +1494,8 @@
     },
     /**
      * Menu rows are their kind's height, within 0.5px: a line 32, a name over its description 50, a list with faces 36
-     * (40, 58 and 44 on touch). They stand 2 apart, the first `--menu-pad` under the menu's top. Headings, separators
-     * and the reactions' row keep their own.
+     * (40, 58 and 44 on touch), a wrapped name or description by its extra lines. They stand 2 apart, the first
+     * `--menu-pad` under the menu's top. Headings, separators and the reactions' row keep their own.
      */
     menuitem(out) {
       const touch = matchMedia("(pointer: coarse)").matches;
@@ -1507,9 +1515,19 @@
         // The workspace menu (MenuOverlay) fills the screen in 15px type: its rows are the touch ones everywhere.
         const roomy = touch || menu.matches(".ac-mo__group");
         const own = [...menu.querySelectorAll(OWN)].filter((x) => style(x).display !== "none");
+        // A name or a description that wraps (a long one, a narrow window) adds its lines: words wrap, never cut.
+        const grown = (box) => {
+          if (!box || !seen(box)) return 0;
+          const lh = parseFloat(style(box).lineHeight);
+          return lh > 0 ? Math.max(0, Math.round(box.getBoundingClientRect().height / lh) - 1) * lh : 0;
+        };
         for (const [i, el] of items.entries()) {
           const desc = [...el.querySelectorAll(".ac-menu__desc")].some(seen);
-          const want = faces ? (roomy ? 44 : 36) : desc ? (roomy ? 58 : 50) : roomy ? 40 : 32;
+          const extra = desc
+            ? grown(el.querySelector(".ac-menu__label > :first-child:not(.ac-menu__desc)")) +
+              grown(el.querySelector(".ac-menu__desc"))
+            : 0;
+          const want = (faces ? (roomy ? 44 : 36) : desc ? (roomy ? 58 : 50) : roomy ? 40 : 32) + extra;
           const r = el.getBoundingClientRect();
           const base = { rule: "menuitem", node: el, el: sig(el), box: sig(menu) };
           if (Math.abs(r.height - want) > 0.5) out.push({ ...base, side: "height", px: +r.height.toFixed(1), want });
@@ -1602,6 +1620,11 @@
               continue;
             }
             if (n.nodeType !== 1 || !seen(n) || ["absolute", "fixed"].includes(style(n).position)) continue;
+            // An ⓘ in a line of words counts by its glyph: its 24px target has no plate to see.
+            if (n.matches(".ac-hint")) {
+              walk(n);
+              continue;
+            }
             // A plate or a control as tall as the row (its whole row a button) holds the row's content: look inside.
             const full = n.getBoundingClientRect().height >= b.height - 1;
             if ((n.matches(`${HOLDS},${FACE},svg`) || hasSurface(style(n))) && !full) {
