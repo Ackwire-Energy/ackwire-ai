@@ -24778,13 +24778,19 @@
     "value": "GitHub repositories"
   },
   "githubApp.text": {
-    "value": "Install the GitHub app on the accounts and repositories agents may use for code and pull requests. Only {{org}} uses what you install from here."
+    "value": "Where the agentes.chat app is installed, agents open pull requests, issues, comments and commits as the app, with the agent's name and who asked. Only {{org}} uses what you install from here."
   },
   "githubApp.install": {
-    "value": "Install the GitHub app"
+    "value": "Install the agentes.chat app"
+  },
+  "githubApp.installMore": {
+    "value": "Install on another account"
   },
   "githubApp.none": {
     "value": "No GitHub account yet."
+  },
+  "githubApp.usingAccount": {
+    "value": "Today agents show up on GitHub as {{account}}. Install the app so they show up as the agentes.chat app."
   },
   "githubApp.allRepos": {
     "value": "All repositories"
@@ -24795,23 +24801,125 @@
   "githubApp.suspended": {
     "value": "Suspended on GitHub"
   },
+  "githubApp.manage": {
+    "value": "Manage on GitHub"
+  },
+  "githubApp.manageName": {
+    "value": "Manage {{account}} on GitHub"
+  },
   "githubApp.remove": {
     "value": "Remove"
   },
   "githubApp.removeName": {
     "value": "Remove {{account}}"
   },
+  "githubApp.removeTitle": {
+    "value": "Remove the app from {{account}}?"
+  },
+  "githubApp.removeText": {
+    "value": "The agentes.chat app is uninstalled from {{account}} on GitHub, and agents stop using that account's repositories through it."
+  },
+  "githubApp.removeLast": {
+    "value": "It's the last one, so agents lose GitHub until someone installs the app or connects an account."
+  },
   "githubApp.removed": {
-    "value": "{{account}} removed. It stays installed on GitHub. Uninstall it there if you want."
+    "value": "App removed from {{account}} and uninstalled on GitHub."
+  },
+  "githubApp.notUninstalled": {
+    "value": "App removed here, but GitHub didn't confirm the uninstall from {{account}}. Uninstall it there."
+  },
+  "githubApp.openPage": {
+    "value": "Open"
   },
   "githubApp.installed": {
-    "value": "GitHub app installed."
+    "value": "agentes.chat app installed."
   },
   "githubApp.requested": {
-    "value": "We asked the GitHub account's owner to install the app. It shows up here once they do."
+    "value": "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace."
   },
   "githubApp.notVisible": {
     "value": "Your GitHub account can't see that installation. Install it with an account that has access to it."
+  },
+  "githubApp.otherWorkspace": {
+    "value": "That GitHub account is already linked to another workspace. Remove the app there before installing it here."
+  },
+  "githubApp.installedOutside": {
+    "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
+  },
+  "githubApp.connectAccount": {
+    "value": "Connect a GitHub account"
+  },
+  "githubApp.ownerHint": {
+    "value": "This server's owner can create its GitHub app here in Connectors."
+  },
+  "githubApp.viaApp": {
+    "value": "Through the agentes.chat app on {{accounts}}"
+  },
+  "githubApp.disconnectApp": {
+    "value": "The agentes.chat app is also uninstalled from {{accounts}} on GitHub."
+  },
+  "githubApp.disconnectKeepsApp": {
+    "value": "Agents stay on GitHub through the agentes.chat app on {{accounts}}."
+  },
+  "githubApp.keptApp": {
+    "value": "GitHub account disconnected. Agents stay on GitHub through the agentes.chat app."
+  },
+  "githubApp.signature.forPerson": {
+    "value": "{{agent}}, agent for {{person}} on agentes.chat"
+  },
+  "githubApp.signature.alone": {
+    "value": "{{agent}}, an agent on agentes.chat"
+  },
+  "githubApp.manifestPage.title": {
+    "value": "Creating the GitHub app"
+  },
+  "githubApp.manifestPage.continue": {
+    "value": "Continue on GitHub"
+  },
+  "githubApp.server.title": {
+    "value": "This server's GitHub app"
+  },
+  "githubApp.server.lead": {
+    "value": "With it, agents show up on GitHub as the app, not as someone's account."
+  },
+  "githubApp.server.without": {
+    "value": "GitHub creates the app under your account with everything filled in, then comes back here. To keep it under an organization, transfer it on GitHub afterwards."
+  },
+  "githubApp.server.create": {
+    "value": "Create the app on GitHub"
+  },
+  "githubApp.server.state.off": {
+    "value": "Off"
+  },
+  "githubApp.server.state.on": {
+    "value": "On"
+  },
+  "githubApp.server.state.invalid": {
+    "value": "Invalid"
+  },
+  "githubApp.server.line.env": {
+    "value": "Set in this server's settings (GITHUB_APP_ID)."
+  },
+  "githubApp.server.line.invalid": {
+    "value": "This server can't open the saved app. Remove it and create it again."
+  },
+  "githubApp.server.open": {
+    "value": "Open on GitHub"
+  },
+  "githubApp.server.remove": {
+    "value": "Remove the app"
+  },
+  "githubApp.server.removeTitle": {
+    "value": "Remove this server's GitHub app?"
+  },
+  "githubApp.server.removeText": {
+    "value": "Every workspace here stops reaching GitHub through it at once. The app stays on GitHub, where you can delete it."
+  },
+  "githubApp.server.created": {
+    "value": "GitHub app created. Workspaces here can install it now."
+  },
+  "githubApp.server.removed": {
+    "value": "GitHub app removed from this server."
   },
   "oauthReturn.cancelled": {
     "value": "The connection was cancelled. Nothing changed."
@@ -26841,6 +26949,27 @@
   },
   "connectFlow.continueInComposio": {
     "value": "Continue on Composio"
+  },
+  "connectFlow.github.how": {
+    "value": "How agents reach GitHub"
+  },
+  "connectFlow.github.app": {
+    "value": "The agentes.chat app"
+  },
+  "connectFlow.github.recommended": {
+    "value": "Recommended"
+  },
+  "connectFlow.github.appText": {
+    "value": "Agents show up as the app, and you pick the repositories on GitHub."
+  },
+  "connectFlow.github.account": {
+    "value": "A GitHub account"
+  },
+  "connectFlow.github.accountText": {
+    "value": "Agents show up as that account. GitHub Projects need one."
+  },
+  "connectFlow.github.appNote": {
+    "value": "You pick the accounts and repositories on GitHub, then come back here."
   },
   "connectFlow.githubOrgs.title": {
     "value": "Organizations it reaches"

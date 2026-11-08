@@ -487,6 +487,9 @@ const KNOWN = {
   "oauth.link_used": "oauthReturn.used",
   "oauth.other_account": "oauthReturn.otherAccount",
   "github_app.not_visible": "githubApp.notVisible",
+  "github_app.other_workspace": "githubApp.otherWorkspace",
+  "github_app.installed_outside": "githubApp.installedOutside",
+  github_app_env: "githubApp.server.line.env",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
@@ -802,6 +805,10 @@ const OAUTH_RETURNS = {
   forbidden: "common.notAllowed",
   not_visible: "githubApp.notVisible",
   "github_app.not_visible": "githubApp.notVisible",
+  other_workspace: "githubApp.otherWorkspace",
+  "github_app.other_workspace": "githubApp.otherWorkspace",
+  installed_outside: "githubApp.installedOutside",
+  "github_app.installed_outside": "githubApp.installedOutside",
   requested: "githubApp.requested",
 } as const;
 

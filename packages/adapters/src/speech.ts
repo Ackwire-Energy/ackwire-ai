@@ -6,7 +6,10 @@
 export interface SpeechFileInput {
   audio: Uint8Array;
   contentType: string;
-  /** Language the person speaks (`pt`, `en`). Null: the provider detects it. */
+  /**
+   * The app's language (`pt`, `en`), not always the one spoken: only an engine that takes it as a hint gets it
+   * (Soniox). The others detect the spoken language from the audio, and would take this as an order (Whisper does).
+   */
   language: string | null;
   /** Names that must come out right: agents, people, channels. */
   terms: string[];
@@ -45,13 +48,13 @@ export class SpeechError extends Error {
 
 export type SpeechFetch = typeof fetch;
 
-export const SPEECH_PROVIDERS = ["assemblyai", "elevenlabs", "soniox", "groq", "openai", "local"] as const;
+export const SPEECH_PROVIDERS = ["assemblyai", "elevenlabs", "soniox", "groq", "openai", "local", "deepinfra"] as const;
 export type SpeechProviderId = (typeof SPEECH_PROVIDERS)[number];
 
 export interface SpeechCredentials {
   /** Optional only for `local`, whose server may take none. */
   apiKey?: string;
-  /** `local`: the address of a server speaking the OpenAI format, such as `http://whisper:8000/v1`. */
+  /** `local`: the address of a server speaking the OpenAI format, like the speech profile's `http://speech:8000/v1`. */
   baseUrl?: string;
   /** `local`: the model that server loads. */
   model?: string;
@@ -154,7 +157,6 @@ function assemblyAi(apiKey: string, options: SpeechOptions): SpeechEngine {
         body: JSON.stringify({
           audio_url: audioUrl,
           speech_models: ["universal-3-5-pro", "universal-2"],
-          ...(input.language ? { language_code: input.language } : {}),
           ...(terms.length > 0 ? { keyterms_prompt: terms } : {}),
         }),
       });
@@ -188,7 +190,6 @@ function elevenLabs(apiKey: string, options: SpeechOptions): SpeechEngine {
       form.set("model_id", "scribe_v2");
       form.set("file", fileOf(input));
       form.set("tag_audio_events", "false");
-      if (input.language) form.set("language_code", input.language);
       for (const term of cleanTerms(input.terms, MAX_TERMS, 5)) form.append("keyterms", term);
       const res = await http("https://api.elevenlabs.io/v1/speech-to-text", {
         method: "POST",
@@ -254,7 +255,7 @@ function soniox(apiKey: string, options: SpeechOptions): SpeechEngine {
   };
 }
 
-/** The OpenAI format: OpenAI itself, Groq, and a server of one's own (Speaches, a local Whisper or Parakeet). */
+/** The OpenAI format: OpenAI itself, Groq, DeepInfra, and a server of one's own (Speaches, a local Whisper or Parakeet). */
 function openAiFormat(
   config: {
     id: SpeechProviderId;
@@ -286,7 +287,6 @@ function openAiFormat(
       form.set("model", config.model);
       form.set("file", fileOf(input));
       form.set("response_format", "json");
-      if (input.language) form.set("language", input.language);
       const terms = cleanTerms(input.terms, MAX_PROMPT_TERMS, 6);
       if (terms.length > 0) form.set("prompt", terms.join(", "));
       // Twice the recording on top of half a minute: a server that takes longer is stuck, and the next engine tries.
@@ -361,6 +361,20 @@ export function createSpeechEngine(
         model: "whisper-large-v3-turbo",
         nanoUsdPerHour: 0.04 * USD,
         minBilledSeconds: 10,
+      },
+      options,
+    );
+  }
+  if (provider === "deepinfra") {
+    return openAiFormat(
+      {
+        id: "deepinfra",
+        label: "DeepInfra",
+        baseUrl: "https://api.deepinfra.com/v1/openai",
+        apiKey,
+        model: "openai/whisper-large-v3-turbo",
+        nanoUsdPerHour: 0.012 * USD,
+        minBilledSeconds: 0,
       },
       options,
     );

@@ -671,7 +671,8 @@ internet instead, and need it public:
 
 - Routines started by a GitHub or Sentry webhook (the address the routine shows, `/api/webhooks/…`).
 - Routines started by a webhook of their own (the address on the routine's page, `/api/hooks/…`).
-- A GitHub App's events (`/api/github-app/webhook`, with `GITHUB_APP_*`).
+- A GitHub App's events (`/api/github-app/webhook`). Optional: without them, the GitHub panel in
+  **Settings → Connectors** checks the installations with GitHub when it opens.
 - Composio's events (`/api/webhooks/composio`, with `COMPOSIO_API_KEY`): new mail for routines, and connector
   accounts that expired.
 - AI apps that call from their own servers (Apps de IA, below): claude.ai, the Claude apps and ChatGPT reach
@@ -711,7 +712,7 @@ ones a self-hosted instance usually touches:
 | `POSTGRES_PASSWORD` | required | Database password. Read by the compose file only. |
 | `AGENTES_IMAGE` | `ghcr.io/agentes-chat/agentes:latest` | The image to run. A version tag or a digest holds a version. |
 | `BIND_ADDRESS`, `HOST_PORT` | `127.0.0.1`, `3000` | Where the compose file publishes the app. |
-| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore). |
+| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore), `speech` (Voice messages). |
 | `DOMAIN` | | The public domain Caddy gets a certificate for. |
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
 | `TS_HOSTNAME` | `agentes` | The server's name in your tailnet: `https://<TS_HOSTNAME>.<tailnet>.ts.net`. After changing it, run the setup again to update `PUBLIC_URL`. |
@@ -779,7 +780,9 @@ links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
 
-**Voice messages.** People hold the microphone and send audio; agents read its words, and the audio's words stay hidden until someone opens them on that message. The microphone shows only with a speech engine. As the server's owner, pick a provider and paste its key in **Settings**, or set it in the environment: `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`, `SONIOX_API_KEY`, `GROQ_API_KEY` or `OPENAI_SPEECH_API_KEY`, with `SPEECH_ENGINES` for the order they are tried. With any of these, the audio goes to that provider to become text. `LOCAL_SPEECH_URL` points at a server of your own that speaks the OpenAI format (Speaches, a local Whisper or Parakeet), and the audio stays with you: `LOCAL_SPEECH_API_KEY` if it asks for a key, and `LOCAL_SPEECH_WARM=on` if it loads its model on demand and can start when someone presses the microphone (`POST <LOCAL_SPEECH_URL>/warm`). Every request to it names the workspace in `X-Agentes-Org`, and one that takes more than half a minute plus twice the recording goes to the next engine. A self-hosted server has no limit on minutes.
+**Voice messages.** People hold the microphone and send audio; agents read its words, and the audio's words stay hidden until someone opens them on that message. The microphone shows only with a speech engine. As the server's owner, pick a provider and paste its key in **Settings**, or set it in the environment: `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`, `SONIOX_API_KEY`, `GROQ_API_KEY`, `OPENAI_SPEECH_API_KEY` or `DEEPINFRA_API_KEY`, with `SPEECH_ENGINES` for the order they are tried. With any of these, the audio goes to that provider to become text. DeepInfra is the cheapest of them, with the same Whisper as Groq. `LOCAL_SPEECH_URL` points at a server of your own that speaks the OpenAI format (Speaches, a local Whisper or Parakeet), and the audio stays with you: `LOCAL_SPEECH_API_KEY` if it asks for a key, and `LOCAL_SPEECH_WARM=on` if it loads its model on demand and can start when someone presses the microphone (`POST <LOCAL_SPEECH_URL>/warm`). Every request to it names the workspace in `X-Agentes-Org`, and one that takes more than half a minute plus twice the recording goes to the next engine. A self-hosted server has no limit on minutes. Engines hear the language in the audio: the app's language goes only to Soniox, as a hint.
+
+**Voice messages on this machine.** The `speech` profile runs NVIDIA's Parakeet on this server, as agentes.chat's Cloud does: add `speech` to `COMPOSE_PROFILES` and set `LOCAL_SPEECH_URL=http://speech:8000/v1`, then `docker compose up -d`. The first pull is about 1 GB, its models included; once it has started, it needs no internet, and its network reaches only the app. Parakeet knows 25 European languages and picks the one spoken, once a language guess gives them together at least `SPEECH_LANGUAGE_MIN` (0.7); another language, an unsure guess, a recording it hears no words in, or one that arrives when every worker is taken, goes to the next engine at once, so give it one: `SPEECH_ENGINES=local,deepinfra` with `DEEPINFRA_API_KEY`, for example. Without one, a recording in another language goes out as audio with no words, and a busy server's wait for the job's retries; `SPEECH_LANGUAGE_MIN=0` then gives Parakeet every recording, unsure ones included. By default it takes up to 4 CPUs and 4 GB of memory (`SPEECH_CPUS`, `SPEECH_MEMORY`; Docker refuses more CPUs than the machine has, so set `SPEECH_CPUS=2` on a 2-CPU server), runs 2 recordings at once on 2 threads each (`SPEECH_WORKERS`, `SPEECH_THREADS`) and lets 4 more wait up to 3 seconds each (`SPEECH_QUEUE`, `SPEECH_WAIT_SECONDS`); a short note takes a few seconds. `LOCAL_SPEECH_API_KEY`, when set, is the key both sides use. The service runs `ghcr.io/agentes-chat/speech`, published with each release under the app's tags, and `AGENTES_SPEECH_IMAGE` holds a version; from a checkout, `docker build -t agentes-speech:local deploy/speech` builds it (downloading the models from Hugging Face), with `AGENTES_SPEECH_IMAGE=agentes-speech:local`.
 
 Recordings are kept with your files, outside the Drive, for `VOICE_RETENTION_DAYS` (90 by default; 0 keeps them forever). A daily sweep then deletes the audio; the message and its words stay for agents and search, and the player says the recording is gone.
 
@@ -965,6 +968,44 @@ without an OAuth app) or the GitHub App.
 </details>
 
 <details>
+<summary><b>GitHub as an app</b></summary>
+
+Connected with a person's GitHub account, agents open pull requests and comment as that person. With the
+GitHub App, they do it as the app: pull requests, issues, comments and commits come from the app's bot, each
+body ends with one line naming the agent and the person it works for, and commits credit that person
+(`Co-authored-by`) when they signed in with GitHub. Where the app isn't installed, the account connection is
+used, as before.
+
+There are two ways to set the app up:
+
+- **From Settings.** The server's owner opens **Settings → Connectors** and, on the card **This server's GitHub
+  app**, chooses **Create the app on GitHub**. GitHub creates the app under their GitHub account with everything
+  filled in, and sends them back; the app's keys are kept sealed in the database (they open only with this
+  `AGENTES_SECRET`). To own it under a GitHub organization, transfer it on GitHub afterwards. Only the server's
+  owner sees the card. The phone app's **Create in the browser** opens it on the web.
+- **With environment variables** (they win when set): register a GitHub App by hand and set `GITHUB_APP_ID`,
+  `GITHUB_APP_PRIVATE_KEY` (the PEM, raw or base64), `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`,
+  `GITHUB_APP_CLIENT_SECRET` and, with a webhook, `GITHUB_APP_WEBHOOK_SECRET`. Register it with:
+  - Callback URL `{PUBLIC_URL}/api/app/github-app/callback`, with **Request user authorization (OAuth) during
+    installation** on.
+  - Webhook URL `{PUBLIC_URL}/api/github-app/webhook`, optional: without it, the GitHub panel checks the
+    installations with GitHub when it opens.
+  - Repository permissions: Actions, Checks, Commit statuses, Contents, Issues, Pull requests and Workflows read and
+    write; Metadata read. Installable by any account.
+
+Then an admin of each workspace installs it on the repositories its agents may use: connecting GitHub offers
+**The agentes.chat app** first, and **GitHub repositories** in **Settings → Connectors** has **Install the agentes.chat
+app** (on the web and the phone). Each account it's installed on has **Manage on GitHub**, GitHub's page where that
+account's repositories are picked, and **Remove**, which also uninstalls the app from that GitHub account. Without a
+GitHub account connected, the app alone is the workspace's GitHub (**Connect a GitHub account** adds one). GitHub
+Projects need an account. Admins who aren't the server's owner are told the owner can create the app while it's
+missing. Only an installation made from a workspace's install links to it: one installed on GitHub directly, or
+approved there from a member's request, is refused until it is removed on GitHub and installed again from
+**Settings → Connectors**.
+
+</details>
+
+<details>
 <summary><b>Agent computers</b></summary>
 
 Agents run commands and code, drive a browser, and can think with Claude Code or Codex on a
@@ -979,7 +1020,7 @@ curl -fsSL https://chat.example.com/api/machines/install.sh | sh
 
 The computer must reach `PUBLIC_URL`: it downloads the runner from there, sends files back through
 it, and clones and pushes the agents' GitHub repositories through it.
-With a GitHub App set up (`GITHUB_APP_*`) and installed for a repository, agents' computers fetch
+With the GitHub App set up (GitHub as an app, above) and installed for a repository, agents' computers fetch
 that repository straight from github.com (a one-hour, read-only token for that repository alone)
 and still push through your server, so the computer must reach github.com too; without the App,
 clones go through your server. A computer runs at most two clones at once, and a clone goes on when

@@ -1,6 +1,6 @@
 import { checkGiphyKey, type GiphyKeyCheck, type KeyWrapper } from "@agenteschat/adapters";
 import { type Database, type Executor, eq, schema } from "@agenteschat/db";
-import { type AuditEntry, recordAudit } from "./audit";
+import { type AuditEntry, auditEveryOrg } from "./audit";
 import { openSecret, sealSecret } from "./crypto";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -46,27 +46,13 @@ const REREAD_MS = 60_000;
 // GIPHY is asked.
 const KEY_SHAPE = /^[\x21-\x7E]+$/;
 
-/** Every workspace's GIFs come through the key, so each workspace's log says who changed it. */
-async function auditEveryOrg(tx: Executor, actor: AuditEntry["actor"], action: string, hint: string) {
-  const orgs = await tx.select({ id: schema.organizations.id }).from(schema.organizations);
-  for (const org of orgs) {
-    await recordAudit(tx, {
-      orgId: org.id,
-      actor,
-      action,
-      target: { type: "instance_secret", id: NAME },
-      details: { hint },
-    });
-  }
-}
-
 /** Deletes the saved key, with a `gif.key_removed` row in each organization. Processes drop it at their next read. */
 export async function deleteGifKey(tx: Executor, actor: AuditEntry["actor"]) {
   const [gone] = await tx
     .delete(instanceSecrets)
     .where(eq(instanceSecrets.name, NAME))
     .returning({ hint: instanceSecrets.keyHint });
-  if (gone) await auditEveryOrg(tx, actor, "gif.key_removed", gone.hint);
+  if (gone) await auditEveryOrg(tx, NAME, actor, "gif.key_removed", { hint: gone.hint });
 }
 
 const envError = () =>
@@ -159,7 +145,7 @@ export function createGifKey(deps: {
           .insert(instanceSecrets)
           .values({ name: NAME, ...values })
           .onConflictDoUpdate({ target: instanceSecrets.name, set: values });
-        await auditEveryOrg(tx, { type: "person", id: userId }, "gif.key_saved", values.keyHint);
+        await auditEveryOrg(tx, NAME, { type: "person", id: userId }, "gif.key_saved", { hint: values.keyHint });
       });
       changed({ key, hint: values.keyHint, at: values.updatedAt.getTime() });
       return snapshot();

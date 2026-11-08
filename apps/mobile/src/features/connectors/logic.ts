@@ -35,9 +35,13 @@ export function connectionOf(def: ConnectorDef, items: ConnectedItem[]): Connect
 
 /**
  * What an admin does with a connected account on its screen: rename it and sign it in again; an MCP server also
- * takes another account (a catalog connector has one).
+ * takes another account (a catalog connector has one). GitHub through the agentes.chat app alone has no sign-in to
+ * renew: its accounts are the app's installations.
  */
-export function accountActions(item: Pick<ConnectedItem, "custom">): ("rename" | "reconnect" | "add")[] {
+export function accountActions(
+  item: Pick<ConnectedItem, "custom" | "viaGithubApp">,
+): ("rename" | "reconnect" | "add")[] {
+  if (item.viaGithubApp) return ["rename"];
   return item.custom ? ["rename", "reconnect", "add"] : ["rename", "reconnect"];
 }
 
@@ -138,8 +142,16 @@ export function stateOf(authorizeUrl: string): string | null {
   }
 }
 
-/** What the browser brought back to the app (`agenteschat://connectors/oauth?state=…&code=…` or `?error=…`). */
-export type AuthAnswer = { kind: "code"; state: string; code: string } | { kind: "error"; error: string };
+/** Where the browser brings the answer back (APP_OAUTH_REDIRECT on the server). */
+export const APP_RETURN_URL = "agenteschat://connectors/oauth";
+
+/**
+ * What the browser brought back to the app (`agenteschat://connectors/oauth?state=…&code=…` or `?error=…`); the
+ * agentes.chat GitHub app's install adds the installation (`installation_id`), finished with `…/github-app/complete`.
+ */
+export type AuthAnswer =
+  | { kind: "code"; state: string; code: string; installationId?: number }
+  | { kind: "error"; error: string };
 
 export function authAnswerOf(url: string): AuthAnswer | null {
   let parsed: URL;
@@ -152,7 +164,15 @@ export function authAnswerOf(url: string): AuthAnswer | null {
   if (error) return { kind: "error", error };
   const state = parsed.searchParams.get("state");
   const code = parsed.searchParams.get("code");
-  return state && code ? { kind: "code", state, code } : null;
+  const installationId = installationIdOf(parsed.searchParams.get("installation_id"));
+  if (!state || !code) return null;
+  return installationId ? { kind: "code", state, code, installationId } : { kind: "code", state, code };
+}
+
+/** The agentes.chat GitHub app's installation an answer carries (`installation_id`), when it is one. */
+export function installationIdOf(value: string | null | undefined): number | undefined {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 }
 
 /**

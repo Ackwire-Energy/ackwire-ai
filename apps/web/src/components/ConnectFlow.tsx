@@ -7,7 +7,9 @@ import {
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
+  useGitHubApp,
   useGithubAccess,
+  useInstallGitHubApp,
   useRenameConnection,
   useStartOAuth,
 } from "@agenteschat/client";
@@ -51,6 +53,7 @@ import {
   Icon,
   Input,
   Locked,
+  OptionList,
   Segmented,
   Skeleton,
 } from "@agenteschat/ui";
@@ -81,9 +84,16 @@ export type FlowState =
   /**
    * Step 1: a catalog entry, or `null` for any MCP server by address. `add`: another account of `item`'s server
    * (an MCP server takes several); `reconnect`: a new sign-in for `item`, whose name, tools and agents stay. `url`: the
-   * address already typed in (an agent's card).
+   * address already typed in (an agent's card). `account`: GitHub's sign-in alone, without the agentes.chat app first.
    */
-  | { step: 0; def: ConnectorDef | null; mode?: "add" | "reconnect"; item?: ConnectedItem; url?: string }
+  | {
+      step: 0;
+      def: ConnectorDef | null;
+      mode?: "add" | "reconnect";
+      item?: ConnectedItem;
+      url?: string;
+      account?: boolean;
+    }
   /** `naming`: a new account the provider didn't name ("Stripe 2"): its name comes first, above its tools. */
   | { step: 1 | 2; item: ConnectedItem; naming?: boolean };
 
@@ -162,6 +172,7 @@ export function ConnectFlow({
           mode={flow.mode}
           item={flow.item}
           initialUrl={flow.url}
+          accountOnly={flow.account === true}
           onConnected={(item, naming) => onChange({ step: 1, item, naming })}
           onClose={onClose}
         />
@@ -190,7 +201,8 @@ export function ConnectFlow({
 /**
  * Step 1: OAuth ("Continuar no Linear"), or an API key. A service through Composio signs in on Composio's page
  * ("Continuar na Composio"): no key field of ours. A new account goes on to its tools; a new sign-in for an account,
- * or the same account again, ends here with a toast saying which.
+ * or the same account again, ends here with a toast saying which. GitHub, where the server has the agentes.chat app
+ * (ADR 0156), offers the app first (installed on GitHub's page, which comes back to Conectores) and an account second.
  */
 function ConnectStep({
   def,
@@ -198,6 +210,7 @@ function ConnectStep({
   mode,
   item,
   initialUrl,
+  accountOnly,
   onConnected,
   onClose,
 }: {
@@ -206,6 +219,7 @@ function ConnectStep({
   mode?: "add" | "reconnect";
   item?: ConnectedItem;
   initialUrl?: string;
+  accountOnly?: boolean;
   /** `naming`: another account of a server the provider didn't name ("Stripe 2"). */
   onConnected: (item: ConnectedItem, naming: boolean) => void;
   onClose: () => void;
@@ -219,6 +233,9 @@ function ConnectStep({
   const { connect } = useCustomServerAction(org.id);
   const withKey = useConnectWithKey(org.id);
   const oauth = useStartOAuth(org.id);
+  const githubApp = useGitHubApp(org.id);
+  const installApp = useInstallGitHubApp(org.id);
+  const [how, setHow] = useState<"app" | "account">("app");
   const [url, setUrl] = useState(initialUrl ?? "");
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -242,7 +259,10 @@ function ConnectStep({
       : (catalog.data?.connectors.find((c) => c.kind === "remote_mcp" && sameServer(c.serverUrl, fixed)) ?? null);
   const canKey = !viaComposio && (listed === null || listed.auth.includes("api_key") || needsKey !== null);
   const serverUrl = fixed ?? (def?.kind === "remote_mcp" ? def.serverUrl : url.trim());
-  const busy = connect.isPending || withKey.isPending || oauth.isPending;
+  const appOffered =
+    def?.id === "github" && !viaComposio && !mode && !accountOnly && githubApp.data?.installable === true;
+  const viaApp = appOffered && how === "app";
+  const busy = connect.isPending || withKey.isPending || oauth.isPending || installApp.isPending;
   // As the server does: a server by address takes another account, a catalog connector a new sign-in.
   const accounts = (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl));
   const again = byAddress
@@ -278,7 +298,7 @@ function ConnectStep({
   const name = (def ? def.label : fixed ? (accounts[0]?.label ?? item?.label) : label.trim()) || undefined;
   const back = returnTo ? oauthReturnPath(returnTo) : returnPath(org.id);
 
-  const githubOrgs = mode === "reconnect" && def?.id === "github" && !viaComposio;
+  const githubOrgs = mode === "reconnect" && def?.id === "github" && !viaComposio && !item?.viaGithubApp;
   const access = useGithubAccess(org.id, githubOrgs);
   const startOAuth = () => {
     setTouched("oauth");
@@ -290,6 +310,7 @@ function ConnectStep({
       oauth.mutate({ connector: def.id, returnTo: back }, { onSuccess: (to) => navigateAway(to) });
     }
   };
+  const startApp = () => installApp.mutate(back, { onSuccess: (to) => navigateAway(to) });
   const submitKey = () => {
     setTouched("key");
     if ((askUrl && !isHttpsUrl(url)) || apiKey.trim().length < 8) return;
@@ -347,6 +368,8 @@ function ConnectStep({
             <p className="muted cflow__text">
               {connectorDescription(t, def)} {composioConnectText(t, def)}
             </p>
+          ) : def && appOffered ? (
+            <p className="muted cflow__text">{connectorDescription(t, def)}</p>
           ) : def ? (
             <p className="muted cflow__text">
               {connectorDescription(t, def)} {canOAuth && t("connectFlow.oauthHelp", { name: connectorBrand(def) })}
@@ -381,7 +404,27 @@ function ConnectStep({
             </Field>
           )}
           {githubOrgs && <GithubOrgs />}
-          {canOAuth && canKey && (
+          {appOffered && (
+            <OptionList
+              aria-label={t("connectFlow.github.how")}
+              value={how}
+              onValueChange={setHow}
+              options={[
+                {
+                  value: "app",
+                  title: t("connectFlow.github.app"),
+                  tag: t("connectFlow.github.recommended"),
+                  description: t("connectFlow.github.appText"),
+                },
+                {
+                  value: "account",
+                  title: t("connectFlow.github.account"),
+                  description: t("connectFlow.github.accountText"),
+                },
+              ]}
+            />
+          )}
+          {!viaApp && canOAuth && canKey && (
             <details
               className="cflow__more"
               open={keyOpen}
@@ -391,7 +434,7 @@ function ConnectStep({
               {keyForm}
             </details>
           )}
-          {!canOAuth && canKey && keyForm}
+          {!viaApp && !canOAuth && canKey && keyForm}
         </DialogBody>
       </Locked>
       <DialogFooter
@@ -399,15 +442,21 @@ function ConnectStep({
         note={
           connect.isPending
             ? steps
-            : replacing
-              ? t(unchecked ? "connectFlow.replaceUnchecked" : "connectFlow.replace")
-              : again
-                ? t(unchecked ? "connectFlow.newAccountUnchecked" : "connectFlow.newAccount")
-                : t("connectFlow.allCanUse")
+            : viaApp
+              ? t("connectFlow.github.appNote")
+              : replacing
+                ? t(unchecked ? "connectFlow.replaceUnchecked" : "connectFlow.replace")
+                : again
+                  ? t(unchecked ? "connectFlow.newAccountUnchecked" : "connectFlow.newAccount")
+                  : t("connectFlow.allCanUse")
         }
       >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        {canKey && (keyOpen || !canOAuth) ? (
+        {viaApp ? (
+          <Button variant="primary" disabled={busy} loading={installApp.isPending} onClick={startApp}>
+            {t("githubApp.install")}
+          </Button>
+        ) : canKey && (keyOpen || !canOAuth) ? (
           <Button
             variant="primary"
             disabled={busy}

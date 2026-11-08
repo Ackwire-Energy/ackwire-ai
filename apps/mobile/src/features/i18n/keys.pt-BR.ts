@@ -1609,6 +1609,13 @@ export const featureKeysPtBR = {
     usedBy_one: "{{names}} usa",
     usedBy_other: "{{names}} usam",
     fromAgent: "Conectar um serviço",
+    /** O GitHub com o app agentes.chat (ADR 0156): o app primeiro, uma conta como o outro jeito. */
+    githubApp: {
+      useApp: "Usar o app agentes.chat",
+      useAccount: "Usar uma conta do GitHub",
+      /** O dono do servidor cria o app na web (o fluxo de manifesto do GitHub precisa da sessão do navegador). */
+      createInBrowser: "Criar no navegador",
+    },
     review: {
       stepAbout: "O que dá para fazer",
       saving: "Salvando…",

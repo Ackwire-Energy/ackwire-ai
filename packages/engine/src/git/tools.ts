@@ -22,8 +22,10 @@ import {
   validBranch,
 } from "./branches";
 import type { GitHubAppConfig } from "./github-app";
+import { noTokenMessage } from "./github-call";
 import { cloneOnMachine } from "./machine";
 import { parseRepo } from "./repos";
+import { signatureLine, signedBody } from "./signature";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -106,7 +108,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
       /** GitHub's answers on these branches, or why they couldn't be read. */
       const factsOf = async (c: ToolContext, repo: { owner: string; repo: string }, branches: string[]) => {
         const token = await tokenFor(c, repo, "read");
-        if (!token) return "GitHub is connected without a usable token.";
+        if (!token) return noTokenMessage(connection, `${repo.owner}/${repo.repo}`);
         return (
           (await branchFacts(github, token, repo, branches)) ??
           `GitHub didn't answer about ${repo.owner}/${repo.repo}'s branches. Nothing was asked: try again in a moment.`
@@ -287,15 +289,15 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             additionalProperties: false,
           },
           describe: (input) => ({ title: `Abrir PR em ${str(input.repo)}: ${str(input.title)}` }),
-          async execute(input) {
+          async execute(input, c) {
             try {
               const repo = parseRepo(str(input.repo));
               if (!repo) return { content: "repo must be owner/name", isError: true };
-              const token = await githubToken(deps, github, { db: ctx.db, orgId: ctx.orgId }, connection, repo, {
+              const token = await githubToken(deps, github, { db: c.db, orgId: c.orgId }, connection, repo, {
                 pull_requests: "write",
                 contents: "read",
               });
-              if (!token) return { content: "GitHub is connected without a usable token.", isError: true };
+              if (!token) return { content: noTokenMessage(connection, `${repo.owner}/${repo.repo}`), isError: true };
               const headers = { ...githubHeaders(token), "content-type": "application/json" };
               let base = str(input.base);
               if (!base) {
@@ -311,7 +313,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                   title: str(input.title),
                   head: str(input.branch),
                   base,
-                  body: str(input.body),
+                  body: signedBody(str(input.body), await signatureLine(c.db, c)),
                   draft: input.draft === true,
                 }),
               });
@@ -365,7 +367,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               const repo = parseRepo(str(input.repo));
               if (!repo) return { content: "repo must be owner/name", isError: true };
               const token = await tokenFor(c, repo, "write");
-              if (!token) return { content: "GitHub is connected without a usable token.", isError: true };
+              if (!token) return { content: noTokenMessage(connection, `${repo.owner}/${repo.repo}`), isError: true };
               const deleted: string[] = [];
               const missed: string[] = [];
               // One at a time: parallel ref updates in one repository may conflict on GitHub.

@@ -24,7 +24,7 @@ describe("deploy/deploy.sh", () => {
     GIT_COMMITTER_NAME: "test",
     GIT_COMMITTER_EMAIL: "test@example.com",
   };
-  const commits = { first: "", second: "" };
+  const commits = { first: "", second: "", third: "" };
   let runs = 0;
 
   function git(cwd: string, ...args: string[]): string {
@@ -44,14 +44,20 @@ describe("deploy/deploy.sh", () => {
     git(dir, "init", "--quiet", "--bare", "--initial-branch=main", origin);
     const work = join(dir, "work");
     git(dir, "clone", "--quiet", origin, work);
-    mkdirSync(join(work, "deploy"));
+    mkdirSync(join(work, "deploy/speech"), { recursive: true });
     copyFileSync(join(root, "deploy/deploy.sh"), join(work, "deploy/deploy.sh"));
+    writeFileSync(join(work, "deploy/speech/Dockerfile"), "FROM scratch\n");
     writeFileSync(join(work, ".gitignore"), ".env\n");
     commits.first = commit(work, "first");
     commits.second = commit(work, "second");
+    // A later version whose compose file has a service the versions before it don't have.
+    writeFileSync(join(work, "services"), "postgres\nagentes\nnewcomer\nspeech\n");
+    commits.third = commit(work, "third");
     git(work, "push", "--quiet", "origin", "HEAD:main");
 
-    // `compose config` answers as for an .env with AGENTES_IMAGE=agentes:current and no backup profile.
+    // `compose config` answers as for an .env with AGENTES_IMAGE=agentes:current and no backup profile, or with the
+    // services in the checkout's `services`, else the state's. Files in the state make the speech image's build, the
+    // speech service's start or the app's health check fail.
     stub(
       bin,
       "docker",
@@ -63,9 +69,13 @@ id_of() { awk -v tag="$1" '$1 == tag { id = $2 } END { if (id == "") exit 1; pri
 tag() { { grep -v "^$1 " "$state/tags" || true; echo "$1 $2"; } >"$state/tags.new" && mv "$state/tags.new" "$state/tags"; }
 case "$*" in
 "compose config --images") printf 'pgvector/pgvector:0.8.7-pg18\\nagentes:current\\n' ;;
-"compose config --services") printf 'postgres\\nagentes\\n' ;;
+"compose config --services") cat services 2>/dev/null || cat "$state/services" 2>/dev/null || printf 'postgres\\nagentes\\n' ;;
+"image inspect --format {{index"*) cat "$state/speech-label" 2>/dev/null ;;
 "image inspect --format "*) id_of "$5" ;;
 "build "*" -") cat >"$state/dockerfile" && tag agentes:next sha256:versioned ;;
+"build "*" deploy/speech") [[ ! -f $state/speech-fails ]] && echo "\${4#*=}" >"$state/speech-label" ;;
+"compose up --detach speech") [[ ! -f $state/speech-down ]] ;;
+"compose up --detach --wait "*) [[ ! -f $state/unhealthy ]] ;;
 "build "*) tag agentes:next sha256:new ;;
 "tag "*) tag "$3" "$(id_of "$2" || echo "$2")" ;;
 "compose exec -T postgres psql "*)
@@ -182,6 +192,63 @@ esac
     expect(refused.code).toBe(2);
     expect(refused.out).toContain("not a version");
     expect(refused.calls).toEqual([]);
+  });
+
+  test("the speech service never holds the app: built only when deploy/speech changed, started once the app is live, its failures only said", () => {
+    const env =
+      "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\nAGENTES_SPEECH_IMAGE=agentes-speech:current\n";
+    const withSpeech = (...trouble: string[]) => {
+      const at = server(commits.first, env);
+      writeFileSync(join(at.state, "services"), "postgres\nagentes\nspeech\n");
+      for (const file of trouble) writeFileSync(join(at.state, file), "");
+      return at;
+    };
+    const index = (calls: string[], start: string) => calls.findIndex((call) => call.startsWith(start));
+
+    const at = withSpeech();
+    const first = at.deploy([commits.second]);
+    expect({ code: first.code, out: first.out }).toMatchObject({ code: 0 });
+    const tree = git(join(dir, `server-${runs}`), "rev-parse", "HEAD:deploy/speech");
+    const build = `docker build --quiet --label agentes.speech=${tree} --tag agentes-speech:current deploy/speech`;
+    // The app's wait names its services, never speech, and the speech image builds only after the app is live.
+    expect(first.calls).toContain("docker compose up --detach --wait --wait-timeout 150 postgres agentes");
+    expect(index(first.calls, build)).toBeGreaterThan(index(first.calls, "docker compose up --detach --wait"));
+    expect(index(first.calls, "docker compose up --detach speech")).toBeGreaterThan(index(first.calls, build));
+    expect(first.out).toContain("building the speech image");
+    // The next deploy of the same folder finds its label and builds nothing.
+    const again = at.deploy([commits.second]);
+    expect(again.calls.filter((call) => call.endsWith(" deploy/speech"))).toHaveLength(1);
+
+    for (const [trouble, said] of [
+      ["speech-fails", "the speech image didn't build"],
+      ["speech-down", "the speech service didn't start"],
+    ]) {
+      const run = withSpeech(trouble).deploy([commits.second]);
+      expect({ code: run.code }).toEqual({ code: 0 });
+      expect(run.out).toContain(said);
+      expect(run.out).toContain("is live");
+    }
+
+    // An app that doesn't get healthy goes back without speech, which is neither built nor started.
+    const failed = withSpeech("unhealthy").deploy([commits.second]);
+    expect(failed.code).toBe(1);
+    expect(failed.calls.filter((call) => call.startsWith("docker compose up --detach --wait"))).toEqual([
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes",
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes",
+    ]);
+    expect(failed.calls.filter((call) => call.includes("speech"))).toEqual([]);
+  });
+
+  test("a rollback brings up the previous version's own services, never ones only the new compose file has", () => {
+    const at = server(commits.second, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
+    writeFileSync(join(at.state, "unhealthy"), "");
+    const run = at.deploy([commits.third]);
+    expect(run.code).toBe(1);
+    expect(at.head()).toBe(commits.second);
+    expect(run.calls.filter((call) => call.startsWith("docker compose up --detach --wait"))).toEqual([
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes newcomer",
+      "docker compose up --detach --wait --wait-timeout 150 postgres agentes",
+    ]);
   });
 
   test("a dump in progress holds every table: the migration waits for it to end, and one that outlasts the wait stops the deploy", () => {

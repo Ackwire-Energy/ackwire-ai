@@ -51,7 +51,7 @@ export interface GifKey {
 }
 
 /** Who can turn voice into text on this server (ADR 0100). */
-export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local";
+export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local" | "deepinfra";
 
 /**
  * The installation's speech engine, for its pinned owner on a server that isn't agentes.chat's own (`GET
@@ -1938,7 +1938,31 @@ export interface GitHubAppInstallation {
   /** `all` or `selected` repositories. */
   repositorySelection: string;
   suspended: boolean;
+  /** GitHub's page where that account's admins choose its repositories. Absent from an older server. */
+  manageUrl?: string;
   createdAt: string;
+}
+
+/** The server's own GitHub App (ADR 0156), for its pinned owner: from env (read-only here), made from Settings, or none. */
+export interface GitHubAppSetup {
+  source: "env" | "settings" | null;
+  slug: string | null;
+  /** The app's page on GitHub. */
+  htmlUrl: string | null;
+  /** `invalid`: a saved app this server can't open (another `AGENTES_SECRET`). */
+  state: "off" | "ok" | "invalid";
+  /** No app yet: the manifest flow makes one. */
+  canCreate: boolean;
+}
+
+/** `GET …/github-app`: whether the app can be installed here, the organization's installations, the server's app. */
+export interface GitHubAppInfo {
+  installable: boolean;
+  installations: GitHubAppInstallation[];
+  /** The server's pinned owner only; null for everyone else and on agentes.chat. */
+  setup?: GitHubAppSetup | null;
+  /** The server has no app and its owner can make one in Settings (never on agentes.chat). */
+  ownerCreates?: boolean;
 }
 
 /** A repository the organization's GitHub reaches. */

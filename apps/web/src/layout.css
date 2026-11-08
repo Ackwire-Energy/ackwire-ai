@@ -4871,6 +4871,30 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   }
 }
 
+/*
+ * Settings → Conectores → Repositórios do GitHub: the title and its ⓘ, the install button on its right (under it on a
+ * phone), then the accounts, the list 8 under its heading (24 under the card's list above it). An account's actions
+ * sit on its row's right while the name and its state fit beside them, else under them.
+ */
+.gh-app {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+.gh-app__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+/* On a 320 phone Gerenciar no GitHub and Remover don't fit one line: Remover goes under, never past the list's edge. */
+.gh-app .ac-list__row > .ac-acts {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
+
 /* The connect flow: one dialog, three steps (conectar → o que faz → quem usa). */
 .cflow__title {
   display: flex;

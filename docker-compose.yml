@@ -71,9 +71,47 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks: [default, speech]
     restart: unless-stopped
     # Above the 20 s that runs in progress get to finish on SIGTERM (RUN_DRAIN_MS, apps/server/src/start.ts).
     stop_grace_period: 40s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  speech:
+    # Voice messages' words on this machine (ADR 0100, deploy/speech): Parakeet for the 25 European languages it
+    # knows, the language heard in the audio. Another language, or every worker taken, goes to the next engine in
+    # SPEECH_ENGINES at once. On with speech in COMPOSE_PROFILES and LOCAL_SPEECH_URL=http://speech:8000/v1:
+    # SELF_HOSTING.md, Voice messages. The models are in the image and its network reaches only the app, so the audio
+    # never leaves this machine. Nothing waits for it: while it starts, or if it is down, the next engine answers.
+    image: "${AGENTES_SPEECH_IMAGE:-ghcr.io/agentes-chat/speech:latest}"
+    profiles: ["speech"]
+    environment:
+      SPEECH_API_KEY: "${LOCAL_SPEECH_API_KEY:-}"
+      SPEECH_WORKERS: "${SPEECH_WORKERS:-2}"
+      SPEECH_THREADS: "${SPEECH_THREADS:-2}"
+      SPEECH_QUEUE: "${SPEECH_QUEUE:-4}"
+      SPEECH_WAIT_SECONDS: "${SPEECH_WAIT_SECONDS:-3}"
+      SPEECH_LANGUAGE_MIN: "${SPEECH_LANGUAGE_MIN:-0.7}"
+    networks: [speech]
+    # What it may take from the machine the app and Postgres share. Over the memory, it restarts rather than swaps.
+    cpus: "${SPEECH_CPUS:-4}"
+    mem_limit: "${SPEECH_MEMORY:-4g}"
+    memswap_limit: "${SPEECH_MEMORY:-4g}"
+    restart: unless-stopped
+    healthcheck:
+      # 200 once the models are loaded.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     init: true
     security_opt:
       - no-new-privileges:true
@@ -346,6 +384,11 @@ configs:
       </script>
       </body>
       </html>
+
+networks:
+  # The speech service's: the app reaches it there, and it reaches nothing else, the internet included.
+  speech:
+    internal: true
 
 volumes:
   pgdata:

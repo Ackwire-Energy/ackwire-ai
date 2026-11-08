@@ -1513,6 +1513,11 @@
     "disconnected": "{{name}} 연결을 해제했어요.",
     "usedBy_other": "{{names}}이(가) 사용 중",
     "fromAgent": "서비스 연결",
+    "githubApp": {
+      "useApp": "agentes.chat 앱 사용",
+      "useAccount": "GitHub 계정 사용",
+      "createInBrowser": "브라우저에서 만들기"
+    },
     "review": {
       "stepAbout": "할 수 있는 일",
       "saving": "저장하는 중…",

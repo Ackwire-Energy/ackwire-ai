@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { generateKeyPairSync } from "node:crypto";
 import { join } from "node:path";
 import {
   type ComposioClient,
@@ -887,6 +888,56 @@ describe("the purge", () => {
     expect(warned).toEqual([
       { message: "workspace deletion went on with grants not revoked", orgId: f.org.id, ids: [box.id] },
     ]);
+  });
+
+  test("the GitHub App is uninstalled from the workspace's GitHub accounts; one GitHub refuses waits for a retry", async () => {
+    f = await setup();
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const app = { appId: "123", privateKey: privateKey.export({ type: "pkcs1", format: "pem" }).toString() };
+    let down = true;
+    const deleted: string[] = [];
+    const http = {
+      apiUrl: "https://api.github.test",
+      fetch: (async (url: string, init: RequestInit = {}) => {
+        if (init.method !== "DELETE") return new Response("unexpected", { status: 500 });
+        if (url.endsWith("/32") && down) return new Response("down", { status: 502 });
+        deleted.push(url);
+        return new Response(null, { status: url.endsWith("/33") ? 404 : 204 });
+      }) as unknown as typeof fetch,
+    };
+    const rows = await f.db
+      .insert(schema.githubAppInstallations)
+      .values(
+        [31, 32, 33].map((installationId) => ({
+          orgId: f.org.id,
+          installationId,
+          accountLogin: `acct${installationId}`,
+          accountType: "Organization",
+        })),
+      )
+      .returning();
+    const handlers = createJobHandlers({ ...f.jobDeps, githubApp: { app: () => app, http } });
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    const due = () =>
+      f.db.update(schema.outbox).set({ nextAttemptAt: new Date() }).where(eq(schema.outbox.kind, ORG_DELETE_JOB));
+
+    await due();
+    await drainOutbox(f.db, handlers, { maxBatches: 1 });
+    expect(await orgRow()).not.toBeNull();
+    const refused = rows.find((r) => r.installationId === 32)?.id;
+    expect(await jobs(ORG_DELETE_JOB)).toMatchObject([
+      { status: "pending", lastError: `Grants not revoked yet: ${refused}` },
+    ]);
+    // Uninstalled (or already gone) ones aren't asked again.
+    const left = await f.db.select().from(schema.githubAppInstallations);
+    expect(left.map((r) => r.installationId)).toEqual([32]);
+
+    down = false;
+    await due();
+    await drainOutbox(f.db, handlers, { maxBatches: 1 });
+    expect(await orgRow()).toBeNull();
+    expect([...deleted].sort()).toEqual([31, 32, 33].map((id) => `https://api.github.test/app/installations/${id}`));
   });
   test("a mailbox another workspace still uses keeps the grant they share; one nobody else uses loses it", async () => {
     f = await setup();

@@ -471,7 +471,7 @@ export const envVars = {
   SPEECH_ENGINES: {
     schema: z.string().optional(),
     description:
-      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
+      "Speech engines for voice messages, in the order they are tried (ADR 0100): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai, local and deepinfra. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
     section: "Chat",
     example: "assemblyai,groq",
   },
@@ -505,12 +505,18 @@ export const envVars = {
     section: "Chat",
     secret: true,
   },
+  DEEPINFRA_API_KEY: {
+    schema: z.string().optional(),
+    description: "DeepInfra key for voice messages, optional (ADR 0100). The audio goes to DeepInfra to become text.",
+    section: "Chat",
+    secret: true,
+  },
   LOCAL_SPEECH_URL: {
     schema: z.url().optional(),
     description:
-      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): Speaches, a local Whisper or Parakeet. The audio stays with you.",
+      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0100): the compose file's `speech` profile (Parakeet, at `http://speech:8000/v1`), Speaches or a local Whisper. The audio stays with you.",
     section: "Chat",
-    example: "http://whisper:8000/v1",
+    example: "http://speech:8000/v1",
   },
   LOCAL_SPEECH_MODEL: {
     schema: z.string().optional(),
@@ -570,7 +576,7 @@ export const envVars = {
   GITHUB_APP_ID: {
     schema: z.string().optional(),
     description:
-      "Id of a GitHub App for agents' git and pull requests. With `GITHUB_APP_PRIVATE_KEY`, the git proxy uses short installation tokens scoped to one repository (1 hour) where the organization installed the app from agentes.chat, and the org's GitHub connection elsewhere.",
+      "Id of the GitHub App agents act as on GitHub (ADR 0156). With `GITHUB_APP_PRIVATE_KEY`, every GitHub call an agent makes (tools, git pushes and fetches) goes with a short installation token for that repository where the workspace installed the app from agentes.chat, so pull requests, issues, comments and commits come from the app's bot; the workspace's own GitHub connection elsewhere. Repository permissions: contents, pull requests, issues and workflows read and write; checks, commit statuses and actions read; metadata read. Without these variables, the server's owner can create the app from Settings › Connectors (GitHub's manifest flow); set here, they win.",
     section: "Connectors",
   },
   GITHUB_APP_PRIVATE_KEY: {
@@ -593,13 +599,13 @@ export const envVars = {
   GITHUB_APP_SLUG: {
     schema: z.string().optional(),
     description:
-      "URL name of that GitHub App (`github.com/apps/{slug}`). Organizations install it from the app; only installations made that way are used.",
+      "URL name of that GitHub App (`github.com/apps/{slug}`). Workspaces install it from the app; only installations made that way are used.",
     section: "Connectors",
   },
   GITHUB_APP_CLIENT_ID: {
     schema: z.string().optional(),
     description:
-      "Client id of that GitHub App (user authorization during installation must be on). Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
+      "Client id of that GitHub App, with Request user authorization (OAuth) during installation on. Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
     section: "Connectors",
   },
   GITHUB_APP_CLIENT_SECRET: {
@@ -611,7 +617,7 @@ export const envVars = {
   GITHUB_APP_WEBHOOK_SECRET: {
     schema: z.string().optional(),
     description:
-      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes).",
+      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes). Optional: without the webhook, reading the GitHub panel checks the installations with GitHub.",
     section: "Connectors",
     secret: true,
   },

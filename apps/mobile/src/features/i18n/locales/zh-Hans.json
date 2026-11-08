@@ -1513,6 +1513,11 @@
     "disconnected": "{{name}} 已断开连接。",
     "usedBy_other": "{{names}} 在使用",
     "fromAgent": "连接服务",
+    "githubApp": {
+      "useApp": "使用 agentes.chat 应用",
+      "useAccount": "使用 GitHub 账号",
+      "createInBrowser": "在浏览器中创建"
+    },
     "review": {
       "stepAbout": "它能做什么",
       "saving": "正在保存…",

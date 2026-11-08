@@ -238,7 +238,9 @@ async function dropClip(deps: VoiceDeps, clip: Clip, reason: "silent" | "refused
 /** The words of a recording, from the first engine that answers; null when none could. */
 async function wordsOf(deps: VoiceDeps, clip: Clip, audio: Uint8Array) {
   const terms = await namesFor(deps.db, clip.orgId);
+  // The last failure that a retry may get past: one engine busy is worth a retry even when the others refused.
   let last: unknown = null;
+  let refused = false;
   for (const engine of deps.engines()) {
     try {
       const { text } = await engine.file({
@@ -251,10 +253,11 @@ async function wordsOf(deps: VoiceDeps, clip: Clip, audio: Uint8Array) {
       });
       return { engine, text: text.trim() };
     } catch (error) {
-      last = error;
+      if (error instanceof SpeechError && error.reason === "refused") refused = true;
+      else last = error;
     }
   }
-  if (last instanceof SpeechError && last.reason === "refused") return null;
+  if (refused && !last) return null;
   throw last ?? new Error("no speech engine on this server");
 }
 

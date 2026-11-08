@@ -161,6 +161,60 @@ describe("connections", () => {
   });
 });
 
+describe("GitHub and the GitHub App's installations (ADR 0156)", () => {
+  test("disconnecting an account while installations remain keeps GitHub through the app; disconnecting that ends both", async () => {
+    f = await setup();
+    const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    await setAgentScopes(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      [{ connectionId: c.id, scope: "github:pr.read" }],
+      connectorGrantValidator,
+    );
+    await f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 1, accountLogin: "acme", accountType: "Organization" });
+    const row = async () =>
+      (await f.db.select().from(schema.connectorConnections).where(eq(schema.connectorConnections.id, c.id)))[0];
+    const scopes = () => f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, c.id));
+
+    await revokeConnection(f.db, f.owner.id, f.org.id, c.id);
+    expect(await row()).toMatchObject({
+      revokedAt: null,
+      authType: "github_app",
+      accountLabel: "acme",
+      secretCiphertext: null,
+      wrappedDataKey: null,
+    });
+    expect((await scopes()).map((s) => s.scope)).toEqual(["github:pr.read"]);
+    expect(await connectionHeaders(depsOf(f), (await row()) as NonNullable<Awaited<ReturnType<typeof row>>>)).toEqual(
+      {},
+    );
+
+    await revokeConnection(f.db, f.owner.id, f.org.id, c.id);
+    expect((await row())?.revokedAt).not.toBeNull();
+    expect(await scopes()).toEqual([]);
+    expect(await f.db.select().from(schema.githubAppInstallations)).toEqual([]);
+  });
+
+  test("without installations, disconnecting GitHub revokes it as before", async () => {
+    f = await setup();
+    const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    await revokeConnection(f.db, f.owner.id, f.org.id, c.id);
+    const [row] = await f.db.select().from(schema.connectorConnections).where(eq(schema.connectorConnections.id, c.id));
+    expect(row).toMatchObject({ authType: "api_key" });
+    expect(row?.revokedAt).not.toBeNull();
+  });
+});
+
 describe("MCP tools through the Tool Gateway", () => {
   test("only catalog tools the agent was granted are exposed; calls go over MCP with the org's key", async () => {
     f = await setup();

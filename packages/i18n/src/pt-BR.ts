@@ -10209,19 +10209,82 @@ export const ptBR = {
   },
   githubApp: {
     title: "Repositórios do GitHub",
-    text: "Instale o app do GitHub nas contas e repositórios que os agentes podem usar para código e pull requests. Só a {{org}} usa o que você instalar daqui.",
-    install: "Instalar o app do GitHub",
+    text: "Onde o app agentes.chat está instalado, os agentes abrem pull requests, issues, comentários e commits como o app, com o nome do agente e de quem pediu. Só a {{org}} usa o que você instalar daqui.",
+    install: "Instalar o app agentes.chat",
+    installMore: "Instalar em outra conta",
     none: "Nenhuma conta do GitHub ainda.",
+    /** Nada instalado ainda, e os agentes usam a conta do GitHub do workspace: como eles aparecem hoje. */
+    usingAccount:
+      "Hoje os agentes aparecem no GitHub como {{account}}. Instale o app para eles aparecerem como o app agentes.chat.",
     allRepos: "Todos os repositórios",
     someRepos: "Repositórios escolhidos",
     suspended: "Suspenso no GitHub",
+    /** Abre a página da instalação no GitHub, onde os admins daquela conta escolhem os repositórios. */
+    manage: "Gerenciar no GitHub",
+    manageName: "Gerenciar {{account}} no GitHub",
     remove: "Remover",
     removeName: "Remover {{account}}",
-    removed: "{{account}} removido. Continua instalado no GitHub. Desinstale lá se quiser.",
-    installed: "App do GitHub instalado.",
-    /** Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`). */
-    requested: "Pedimos ao dono da conta do GitHub para instalar o app. Ele aparece aqui quando a pessoa instalar.",
+    removeTitle: "Remover o app de {{account}}?",
+    removeText:
+      "O app agentes.chat é desinstalado de {{account}} no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
+    /** Depois de removeText quando é a última conta do app e nenhuma conta do GitHub está conectada. */
+    removeLast: "É a última, então os agentes ficam sem GitHub até alguém instalar o app ou conectar uma conta.",
+    removed: "App removido de {{account}} e desinstalado no GitHub.",
+    /** O GitHub não confirmou a desinstalação: o botão do aviso (openPage) abre a página da instalação lá. */
+    notUninstalled: "App removido daqui, mas o GitHub não confirmou a desinstalação de {{account}}. Desinstale lá.",
+    /** O botão desse aviso, curto para deixar espaço às palavras ao lado dele no celular. */
+    openPage: "Abrir",
+    installed: "App agentes.chat instalado.",
+    /**
+     * Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`).
+     * Approving it on GitHub never links it here: the owner installs it from agentes.chat.
+     */
+    requested:
+      "Só o dono da conta do GitHub pode instalar o app. Peça para essa pessoa instalar em Conectores › GitHub neste workspace.",
     notVisible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
+    otherWorkspace: "Essa conta do GitHub já está ligada a outro workspace. Remova o app de lá antes de instalar aqui.",
+    /** O app foi instalado no próprio GitHub, não pelo agentes.chat (`github_app_error=installed_outside`). */
+    installedOutside:
+      "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
+    /** O GitHub é só o app: conectar uma conta também (os agentes usam onde o app não está e no GitHub Projects). */
+    connectAccount: "Conectar uma conta do GitHub",
+    /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no agentes.chat). */
+    ownerHint: "O dono deste servidor pode criar o app do GitHub aqui em Conectores.",
+    /** A linha de um GitHub conectado só pelo app: as contas onde ele está instalado. */
+    viaApp: "Pelo app agentes.chat em {{accounts}}",
+    disconnectApp: "O app agentes.chat também é desinstalado de {{accounts}} no GitHub.",
+    disconnectKeepsApp: "Os agentes continuam no GitHub pelo app agentes.chat em {{accounts}}.",
+    keptApp: "Conta do GitHub desconectada. Os agentes continuam no GitHub pelo app agentes.chat.",
+    /** A linha no fim do que um agente escreve no GitHub (pull requests, issues, comentários). */
+    signature: {
+      forPerson: "{{agent}}, agente de {{person}} no agentes.chat",
+      alone: "{{agent}}, agente no agentes.chat",
+    },
+    /** A página do servidor que leva o dono ao GitHub para criar o app (ela segue sozinha). */
+    manifestPage: {
+      title: "Criando o app do GitHub",
+      continue: "Continuar no GitHub",
+    },
+    /** Configurações › Conectores para o dono do servidor (nunca no agentes.chat): o app que os workspaces daqui instalam. */
+    server: {
+      title: "App do GitHub deste servidor",
+      lead: "Com ele, os agentes aparecem no GitHub como o app, não como a conta de alguém.",
+      without:
+        "O GitHub cria o app na sua conta com tudo preenchido e volta para cá. Para ele ficar numa organização, transfira depois no GitHub.",
+      create: "Criar o app no GitHub",
+      state: { off: "Desligado", on: "Ligado", invalid: "Inválido" },
+      line: {
+        env: "Definido nas configurações deste servidor (GITHUB_APP_ID).",
+        invalid: "Este servidor não consegue abrir o app salvo. Remova e crie de novo.",
+      },
+      open: "Abrir no GitHub",
+      remove: "Remover o app",
+      removeTitle: "Remover o app do GitHub deste servidor?",
+      removeText:
+        "Todos os workspaces daqui deixam de alcançar o GitHub por ele na hora. O app continua no GitHub, onde você pode excluir.",
+      created: "App do GitHub criado. Os workspaces daqui já podem instalar.",
+      removed: "App do GitHub removido deste servidor.",
+    },
   },
   /** Back from a provider's sign-in that didn't connect (`?connector_error=`, `?github_app_error=`). */
   oauthReturn: {
@@ -10920,6 +10983,16 @@ export const ptBR = {
     namePlaceholder: "Ex.: Suporte",
     continueIn: "Continuar no {{name}}",
     continueInComposio: "Continuar na Composio",
+    /** Conectar o GitHub onde o servidor tem o app agentes.chat: o app primeiro, uma conta depois. */
+    github: {
+      how: "Como os agentes entram no GitHub",
+      app: "O app agentes.chat",
+      recommended: "Recomendado",
+      appText: "Os agentes aparecem como o app, e você escolhe os repositórios no GitHub.",
+      account: "Uma conta do GitHub",
+      accountText: "Os agentes aparecem como essa conta. O GitHub Projects precisa de uma.",
+      appNote: "Você escolhe as contas e os repositórios no GitHub e volta para cá.",
+    },
     /** Em Reconectar GitHub: o login dele só pergunta pelas organizações na primeira vez. */
     githubOrgs: {
       title: "Organizações que ele alcança",

@@ -9725,18 +9725,64 @@
   },
   "githubApp": {
     "title": "GitHub 저장소",
-    "text": "에이전트가 코드와 풀 리퀘스트에 사용할 수 있는 계정과 저장소에 GitHub 앱을 설치하세요. 여기서 설치한 것은 {{org}}만 사용해요.",
-    "install": "GitHub 앱 설치",
+    "text": "agentes.chat 앱이 설치된 곳에서는 에이전트가 앱으로 풀 리퀘스트, 이슈, 댓글, 커밋을 올리고, 에이전트 이름과 요청한 사람이 함께 표시돼요. 여기서 설치한 것은 {{org}}만 사용해요.",
+    "install": "agentes.chat 앱 설치",
+    "installMore": "다른 계정에 설치",
     "none": "아직 GitHub 계정이 없어요.",
+    "usingAccount": "지금은 에이전트가 GitHub에서 {{account}}(으)로 표시돼요. 앱을 설치하면 agentes.chat 앱으로 표시돼요.",
     "allRepos": "모든 저장소",
     "someRepos": "선택한 저장소",
     "suspended": "GitHub에서 정지됨",
+    "manage": "GitHub에서 관리",
+    "manageName": "GitHub에서 {{account}} 관리",
     "remove": "제거",
     "removeName": "{{account}} 제거",
-    "removed": "{{account}}을(를) 제거했어요. GitHub에는 설치된 채로 남아 있어요. 원하면 GitHub에서 제거하세요.",
-    "installed": "GitHub 앱을 설치했어요.",
-    "requested": "GitHub 계정 소유자에게 앱 설치를 요청했어요. 설치하면 여기에 표시돼요.",
-    "notVisible": "내 GitHub 계정으로는 그 설치를 볼 수 없어요. 접근 권한이 있는 계정으로 설치하세요."
+    "removeTitle": "{{account}}에서 앱을 제거할까요?",
+    "removeText": "GitHub의 {{account}}에서 agentes.chat 앱이 제거되고, 에이전트는 더 이상 앱을 통해 그 계정의 저장소를 사용하지 않아요.",
+    "removeLast": "마지막 계정이라, 누군가 앱을 설치하거나 계정을 연결할 때까지 에이전트가 GitHub를 쓸 수 없어요.",
+    "removed": "{{account}}에서 앱을 제거하고 GitHub에서도 제거했어요.",
+    "notUninstalled": "여기서는 앱을 제거했지만 GitHub가 {{account}}에서의 제거를 확인하지 않았어요. GitHub에서 제거하세요.",
+    "openPage": "열기",
+    "installed": "agentes.chat 앱을 설치했어요.",
+    "requested": "GitHub 계정 소유자만 앱을 설치할 수 있어요. 이 워크스페이스의 커넥터 › GitHub에서 설치해 달라고 요청하세요.",
+    "notVisible": "내 GitHub 계정으로는 그 설치를 볼 수 없어요. 접근 권한이 있는 계정으로 설치하세요.",
+    "otherWorkspace": "이 GitHub 계정은 이미 다른 워크스페이스에 연결돼 있어요. 거기서 앱을 제거한 뒤 여기서 설치하세요.",
+    "installedOutside": "그 GitHub 계정의 앱은 agentes.chat 밖에서 설치됐어요. GitHub에서 제거한 뒤 커넥터 › GitHub에서 다시 설치하세요.",
+    "connectAccount": "GitHub 계정 연결",
+    "ownerHint": "이 서버의 소유자가 여기 커넥터에서 GitHub 앱을 만들 수 있어요.",
+    "viaApp": "{{accounts}}의 agentes.chat 앱으로 연결",
+    "disconnectApp": "GitHub의 {{accounts}}에서도 agentes.chat 앱이 제거돼요.",
+    "disconnectKeepsApp": "에이전트는 {{accounts}}의 agentes.chat 앱으로 GitHub를 계속 사용해요.",
+    "keptApp": "GitHub 계정 연결을 해제했어요. 에이전트는 agentes.chat 앱으로 GitHub를 계속 사용해요.",
+    "signature": {
+      "forPerson": "{{agent}}, agentes.chat에서 {{person}}의 에이전트",
+      "alone": "{{agent}}, agentes.chat의 에이전트"
+    },
+    "manifestPage": {
+      "title": "GitHub 앱을 만드는 중",
+      "continue": "GitHub에서 계속"
+    },
+    "server": {
+      "title": "이 서버의 GitHub 앱",
+      "lead": "이 앱이 있으면 에이전트가 GitHub에서 누군가의 계정이 아니라 앱으로 표시돼요.",
+      "without": "GitHub가 모든 항목을 채운 앱을 내 계정에 만들고 여기로 돌아와요. 조직 소유로 두려면 나중에 GitHub에서 이전하세요.",
+      "create": "GitHub에서 앱 만들기",
+      "state": {
+        "off": "꺼짐",
+        "on": "켜짐",
+        "invalid": "잘못됨"
+      },
+      "line": {
+        "env": "이 서버의 설정에서 지정됨(GITHUB_APP_ID).",
+        "invalid": "이 서버가 저장된 앱을 열 수 없어요. 제거하고 다시 만드세요."
+      },
+      "open": "GitHub에서 열기",
+      "remove": "앱 제거",
+      "removeTitle": "이 서버의 GitHub 앱을 제거할까요?",
+      "removeText": "여기 있는 모든 워크스페이스가 바로 이 앱으로 GitHub에 접근할 수 없게 돼요. 앱은 GitHub에 남아 있고 거기서 삭제할 수 있어요.",
+      "created": "GitHub 앱을 만들었어요. 이제 여기 워크스페이스에서 설치할 수 있어요.",
+      "removed": "이 서버에서 GitHub 앱을 제거했어요."
+    }
   },
   "oauthReturn": {
     "cancelled": "연결이 취소됐어요. 바뀐 것은 없어요.",
@@ -10606,6 +10652,15 @@
     "namePlaceholder": "예: 고객 지원",
     "continueIn": "{{name}}에서 계속",
     "continueInComposio": "Composio에서 계속",
+    "github": {
+      "how": "에이전트가 GitHub에 접근하는 방법",
+      "app": "agentes.chat 앱",
+      "recommended": "추천",
+      "appText": "에이전트가 앱으로 표시되고, 저장소는 GitHub에서 골라요.",
+      "account": "GitHub 계정",
+      "accountText": "에이전트가 그 계정으로 표시돼요. GitHub Projects에는 계정이 필요해요.",
+      "appNote": "GitHub에서 계정과 저장소를 고른 뒤 여기로 돌아와요."
+    },
     "githubOrgs": {
       "title": "연결된 조직",
       "none": "아직 조직이 없어요.",

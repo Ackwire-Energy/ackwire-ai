@@ -10082,18 +10082,80 @@ export const en = {
   },
   githubApp: {
     title: "GitHub repositories",
-    text: "Install the GitHub app on the accounts and repositories agents may use for code and pull requests. Only {{org}} uses what you install from here.",
-    install: "Install the GitHub app",
+    text: "Where the agentes.chat app is installed, agents open pull requests, issues, comments and commits as the app, with the agent's name and who asked. Only {{org}} uses what you install from here.",
+    install: "Install the agentes.chat app",
+    installMore: "Install on another account",
     none: "No GitHub account yet.",
+    /** Nothing installed yet, and agents use the workspace's GitHub account: who they show up as today. */
+    usingAccount:
+      "Today agents show up on GitHub as {{account}}. Install the app so they show up as the agentes.chat app.",
     allRepos: "All repositories",
     someRepos: "Selected repositories",
     suspended: "Suspended on GitHub",
+    /** Opens GitHub's page of the installation, where that account's admins choose its repositories. */
+    manage: "Manage on GitHub",
+    manageName: "Manage {{account}} on GitHub",
     remove: "Remove",
     removeName: "Remove {{account}}",
-    removed: "{{account}} removed. It stays installed on GitHub. Uninstall it there if you want.",
-    installed: "GitHub app installed.",
-    requested: "We asked the GitHub account's owner to install the app. It shows up here once they do.",
+    removeTitle: "Remove the app from {{account}}?",
+    removeText:
+      "The agentes.chat app is uninstalled from {{account}} on GitHub, and agents stop using that account's repositories through it.",
+    /** After removeText when it's the app's last account and no GitHub account is connected. */
+    removeLast: "It's the last one, so agents lose GitHub until someone installs the app or connects an account.",
+    removed: "App removed from {{account}} and uninstalled on GitHub.",
+    /** GitHub didn't confirm the uninstall: the toast's button (openPage) opens the installation's page there. */
+    notUninstalled: "App removed here, but GitHub didn't confirm the uninstall from {{account}}. Uninstall it there.",
+    /** That toast's button, short enough to leave its words room beside it on a phone. */
+    openPage: "Open",
+    installed: "agentes.chat app installed.",
+    /** An installation approved on GitHub never links here: the account's owner installs it from agentes.chat. */
+    requested:
+      "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace.",
     notVisible: "Your GitHub account can't see that installation. Install it with an account that has access to it.",
+    otherWorkspace:
+      "That GitHub account is already linked to another workspace. Remove the app there before installing it here.",
+    /** The app was installed on GitHub itself, not from agentes.chat (`github_app_error=installed_outside`). */
+    installedOutside:
+      "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
+    /** GitHub is the app alone: an account too (agents use it where the app isn't installed, and for GitHub Projects). */
+    connectAccount: "Connect a GitHub account",
+    /** For admins who aren't the server's owner, on a server without the app (never on agentes.chat). */
+    ownerHint: "This server's owner can create its GitHub app here in Connectors.",
+    /** A connected row of GitHub through the app alone: the accounts it is installed on. */
+    viaApp: "Through the agentes.chat app on {{accounts}}",
+    disconnectApp: "The agentes.chat app is also uninstalled from {{accounts}} on GitHub.",
+    disconnectKeepsApp: "Agents stay on GitHub through the agentes.chat app on {{accounts}}.",
+    keptApp: "GitHub account disconnected. Agents stay on GitHub through the agentes.chat app.",
+    /** The line under what an agent writes on GitHub (pull requests, issues, comments), in the workspace's language. */
+    signature: {
+      forPerson: "{{agent}}, agent for {{person}} on agentes.chat",
+      alone: "{{agent}}, an agent on agentes.chat",
+    },
+    /** The server's page that sends its owner to GitHub to create the app (it goes on by itself). */
+    manifestPage: {
+      title: "Creating the GitHub app",
+      continue: "Continue on GitHub",
+    },
+    /** Settings › Connectors for the server's owner (never on agentes.chat): the app every workspace here installs. */
+    server: {
+      title: "This server's GitHub app",
+      lead: "With it, agents show up on GitHub as the app, not as someone's account.",
+      without:
+        "GitHub creates the app under your account with everything filled in, then comes back here. To keep it under an organization, transfer it on GitHub afterwards.",
+      create: "Create the app on GitHub",
+      state: { off: "Off", on: "On", invalid: "Invalid" },
+      line: {
+        env: "Set in this server's settings (GITHUB_APP_ID).",
+        invalid: "This server can't open the saved app. Remove it and create it again.",
+      },
+      open: "Open on GitHub",
+      remove: "Remove the app",
+      removeTitle: "Remove this server's GitHub app?",
+      removeText:
+        "Every workspace here stops reaching GitHub through it at once. The app stays on GitHub, where you can delete it.",
+      created: "GitHub app created. Workspaces here can install it now.",
+      removed: "GitHub app removed from this server.",
+    },
   },
   oauthReturn: {
     cancelled: "The connection was cancelled. Nothing changed.",
@@ -10799,6 +10861,16 @@ export const en = {
     continueIn: "Continue on {{name}}",
     continueInComposio: "Continue on Composio",
     /** On Reconnect GitHub: its sign-in asks about organizations only the first time. */
+    /** Connecting GitHub where the server has the agentes.chat app: the app first, an account second. */
+    github: {
+      how: "How agents reach GitHub",
+      app: "The agentes.chat app",
+      recommended: "Recommended",
+      appText: "Agents show up as the app, and you pick the repositories on GitHub.",
+      account: "A GitHub account",
+      accountText: "Agents show up as that account. GitHub Projects need one.",
+      appNote: "You pick the accounts and repositories on GitHub, then come back here.",
+    },
     githubOrgs: {
       title: "Organizations it reaches",
       none: "No organization yet.",
