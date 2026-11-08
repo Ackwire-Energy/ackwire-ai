@@ -54,7 +54,7 @@ export function Entering({ org }: { org: string | null }) {
       <WorkspaceSky fadeTop={0.55} fade={2} style={styles.sky} />
       <View style={styles.center}>
         {org ? (
-          <OrgAvatar logo={state?.org?.logo} name={org} size={72} />
+          <OrgAvatar logo={state?.org?.logo} size={72} />
         ) : (
           <AgentAvatar agent={{ color: "sky", eyes: "round", id: "agentes" }} size={88} expression="happy" />
         )}

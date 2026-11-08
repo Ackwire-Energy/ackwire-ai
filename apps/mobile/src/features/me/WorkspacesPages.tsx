@@ -114,7 +114,7 @@ export function WorkspaceGroups({ groups, onOpen }: { groups: ServerWorkspaces[]
                   return (
                     <GroupedRow
                       key={o.id}
-                      leading={<OrgAvatar logo={o.logo} name={o.name} server={g.server} />}
+                      leading={<OrgAvatar logo={o.logo} server={g.server} />}
                       label={o.name}
                       sub={notes.get(o.id) ?? t(`mobile.me.role.${o.role}`)}
                       checked={here}
