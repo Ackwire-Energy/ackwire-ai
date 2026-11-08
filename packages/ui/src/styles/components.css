@@ -10848,8 +10848,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
  * number sits inline before its title, in the title's own words (`.ac-mediarow__num`), never in a column.
  */
 /* Last in the file: on a row it is mixed with (an `.ac-list__row`, an option) its grid wins at the same weight. The
-   name's first line sits on the face's middle however many lines the head wraps to, and what ends that line on it
-   too (a box as tall as the face, a taller button reaching as far above as below): never the wrapped head's middle. */
+   name's first line sits on the line's axis however many lines the head wraps to, and what ends that line on it too
+   (a box as tall as the axis, anything taller reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
   --mediarow-face: 32px;
   /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
