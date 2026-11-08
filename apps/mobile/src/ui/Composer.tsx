@@ -1,3 +1,4 @@
+import { Canvas, Group, Path, Skia, vec } from "@shopify/react-native-skia";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -10,22 +11,27 @@ import {
   type TextStyle,
   View,
 } from "react-native";
+import { GestureDetector, useExclusiveGestures, useLongPressGesture, useTapGesture } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
+  Easing,
   FadeIn,
-  FadeInDown,
   FadeOut,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
+  withTiming,
   ZoomIn,
   ZoomOut,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { PixelStop } from "@/agent/PixelMarks";
+import { readValueSync, STORED, writeValueSync } from "@/lib/storage";
 import { Glass } from "./Glass";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { PressScale } from "./PressScale";
-import { Segmented } from "./Segmented";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -47,8 +53,8 @@ export interface ComposerMentionState {
 }
 
 /**
- * How a message goes while an agent works: "join" reaches it at its next pause, "now"
- * makes it stop what it is doing and read the message at once. Without an agent at work it is "join".
+ * How a message goes while an agent works: "join" reaches it at its next pause (a tap on send), "now"
+ * makes it stop what it is doing and read the message at once (the send button held). Without an agent at work it is "join".
  */
 export type SendHow = "join" | "now";
 
@@ -100,10 +106,17 @@ export interface ComposerProps {
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
   media?: { label: string; onPress: () => void } | null;
   /**
-   * Voice messages (null where they are off): `mic` in the empty field; while recording, `overlay` covers the field
-   * and `leading` takes the "+"'s place. The text field stays underneath, so the composer never changes height.
+   * Voice messages (null where they are off): `mic` in the empty field; while recording, `overlay` covers the field,
+   * `leading` takes the "+"'s place and `above` sits over the field (the slide-to-cancel hint, the recording line).
+   * The text field stays underneath, so the composer never changes height.
    */
-  voice?: { mic: ReactNode; overlay: ReactNode | null; leading: ReactNode | null; active: boolean } | null;
+  voice?: {
+    mic: ReactNode | null;
+    overlay: ReactNode | null;
+    leading: ReactNode | null;
+    above: ReactNode | null;
+    active: boolean;
+  } | null;
 }
 
 /** The pill's height, the "+" and the send button's. */
@@ -111,6 +124,15 @@ const FIELD = 48;
 const SEND = 36;
 /** Space around the send button inside the pill: it sits centered on the first line. */
 const INSET = (FIELD - SEND) / 2;
+/** How long the send button is held to stop the agent and send; the ring around it fills meanwhile. */
+const HOLD_SEND_MS = 600;
+const RING = 44;
+const RING_PATH = (() => {
+  const path = Skia.Path.Make();
+  path.addCircle(RING / 2, RING / 2, RING / 2 - 2);
+  return path;
+})();
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 /**
  * The center of the app: a round glass "+" for attachments and actions,
@@ -120,9 +142,9 @@ const INSET = (FIELD - SEND) / 2;
  * have their button at the empty field's end: they go as a message of their own, never with words.
  *
  * While an agent works: the empty field's button is "Parar" (a rounded square), one
- * tap and it stops, no question asked (what it did stays and can continue); with text, two buttons above
- * the field choose "Juntar ao que está fazendo" (the default) or "Parar e mandar". A light tap on send, a
- * firm one on stop.
+ * tap and it stops, no question asked (what it did stays and can continue); with text, a tap on send joins
+ * what it is doing and holding the button (a ring of ink fills around it) stops it and sends. A light tap on
+ * send, a firm one on stop. A line under the field says so until the person has held it once.
  */
 export function Composer({
   placeholder,
@@ -149,7 +171,7 @@ export function Composer({
   const [caret, setCaret] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [focused, setFocused] = useState(false);
-  const [how, setHow] = useState<SendHow>("join");
+  const [taught, setTaught] = useState(() => readValueSync(STORED.stopSendTaught) === "1");
   const input = useRef<TextInputInstance | null>(null);
   const prefillAt = prefill?.at;
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per request (its time), whatever the text
@@ -168,11 +190,6 @@ export function Composer({
   const button = has || stopMode;
   const mediaButton = media && !has ? media : null;
   const mic = voice && !has ? voice.mic : null;
-  // The choice is per message: back to "join" when the agent is done.
-  const isWorking = Boolean(working);
-  useEffect(() => {
-    if (!isWorking) setHow("join");
-  }, [isWorking]);
 
   const put = (next: string, at = next.length) => {
     setText(next);
@@ -180,24 +197,31 @@ export function Composer({
     setSelection({ start: at, end: at });
   };
 
-  const send = () => {
+  const send = (how: SendHow) => {
     const value = text.trim();
     if (!value) return;
-    haptics.light();
     onSend(value, working ? how : "join");
     put("", 0);
-    setHow("join");
   };
 
   const press = () => {
     if (has) {
-      send();
+      haptics.light();
+      send("join");
       return;
     }
     if (!working?.stop) return;
     haptics.firm();
     working.stop.onStop();
   };
+  // The button held while an agent works here: it stops and reads this at once. The haptic is the hold's own.
+  const holdSend = () => {
+    send("now");
+    if (taught) return;
+    setTaught(true);
+    writeValueSync(STORED.stopSendTaught, "1");
+  };
+  const hold = working && has ? { hint: t("mobile.composer.holdToStop"), onHold: holdSend } : null;
 
   const pick = (handle: string) => {
     if (!token || !insertMention) return;
@@ -209,7 +233,7 @@ export function Composer({
   return (
     <View>
       {token && mention ? mention({ query: token.query, sigil: token.sigil, pick }) : null}
-      {suggestions && suggestions.length > 0 && !token && !has ? (
+      {suggestions && suggestions.length > 0 && !token && !has && !voice?.active ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -239,24 +263,8 @@ export function Composer({
           ))}
         </ScrollView>
       ) : null}
-      {working && has && !token ? (
-        <Animated.View
-          entering={reducedMotion ? undefined : FadeInDown.duration(200)}
-          exiting={reducedMotion ? undefined : FadeOut.duration(120)}
-          style={styles.choice}
-          accessibilityLabel={t("mobile.composer.choice")}
-        >
-          <Segmented
-            items={[
-              { key: "join", label: t("mobile.composer.join"), icon: "join" },
-              { key: "now", label: t("mobile.composer.now"), icon: "bolt" },
-            ]}
-            value={how}
-            onChange={(k) => setHow(k === "now" ? "now" : "join")}
-          />
-        </Animated.View>
-      ) : null}
       {banner}
+      {voice?.above ?? null}
       <View style={styles.row}>
         {voice?.leading ??
           (onPlus ? (
@@ -348,12 +356,29 @@ export function Composer({
               stop={stopMode}
               label={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
               onPress={press}
+              hold={hold}
             />
           ) : null}
           {voice?.overlay ?? null}
           {mic ? <View style={styles.micBox}>{mic}</View> : null}
         </View>
       </View>
+      {hold && !taught && !token ? (
+        <Animated.View
+          entering={reducedMotion ? undefined : FadeIn.duration(140)}
+          exiting={reducedMotion ? undefined : FadeOut.duration(100)}
+          style={styles.holdHint}
+          pointerEvents="none"
+        >
+          <RNText
+            numberOfLines={1}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={[systemText("footnote"), { color: colors.faint }]}
+          >
+            {hold.hint}
+          </RNText>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -362,10 +387,68 @@ export function Composer({
  * The field's round button: the send arrow, or the stop square. It pops in (ZoomIn) on the glyph it shows, its value
  * born with it: iOS draws a glyph still turning inside that pop blurry. On a button already there the two swap in
  * place, one turning away as the other turns in.
+ *
+ * With `hold` (an agent at work and text to send), a tap sends and holding fills a ring of ink around the button,
+ * linear, for as long as the hold takes; let go early and it empties fast. The ring closed, a firm haptic lands with
+ * it and the message goes "now". Both run on the UI thread; React hears of the tap and the hold only.
  */
-function SendButton({ stop, label, onPress }: { stop: boolean; label: string; onPress: () => void }) {
-  const { colors, reducedMotion } = useTheme();
+function SendButton({
+  stop,
+  label,
+  onPress,
+  hold = null,
+}: {
+  stop: boolean;
+  label: string;
+  onPress: () => void;
+  hold?: { hint: string; onHold: () => void } | null;
+}) {
+  const { colors, reducedMotion, motion } = useTheme();
   const mode = useSharedValue(stop ? 1 : 0);
+  const ring = useSharedValue(0);
+  const pressed = useSharedValue(0);
+  const held = useSharedValue(false);
+  const trackOpacity = useDerivedValue(() => (ring.value > 0.001 ? 1 : 0));
+  const holdRef = useRef(hold);
+  holdRef.current = hold;
+  const holdNow = () => {
+    haptics.firm();
+    holdRef.current?.onHold();
+  };
+  const longPress = useLongPressGesture({
+    enabled: Boolean(hold),
+    minDurationMs: HOLD_SEND_MS,
+    maxDist: 24,
+    onBegin: () => {
+      "worklet";
+      held.value = false;
+      pressed.value = reducedMotion ? 1 : withSpring(1, motion.press);
+      ring.value = withTiming(1, { duration: HOLD_SEND_MS, easing: Easing.linear });
+    },
+    onActivate: () => {
+      "worklet";
+      held.value = true;
+      ring.value = withTiming(0, { duration: 200, easing: EASE_OUT });
+      scheduleOnRN(holdNow);
+    },
+    onFinalize: () => {
+      "worklet";
+      pressed.value = reducedMotion ? 0 : withSpring(0, motion.press);
+      if (held.value) return;
+      cancelAnimation(ring);
+      ring.value = withTiming(0, { duration: 150, easing: EASE_OUT });
+    },
+  });
+  const tap = useTapGesture({
+    enabled: Boolean(hold),
+    maxDuration: HOLD_SEND_MS - 20,
+    onDeactivate: () => {
+      "worklet";
+      scheduleOnRN(onPress);
+    },
+  });
+  const gesture = useExclusiveGestures(longPress, tap);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 - 0.1 * pressed.value }] }));
   useEffect(() => {
     const to = stop ? 1 : 0;
     // Both springs give their mass: with Reanimated 4's default of 4 they overshoot by half and take seconds to settle.
@@ -379,28 +462,63 @@ function SendButton({ stop, label, onPress }: { stop: boolean; label: string; on
     opacity: mode.value,
     transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
   }));
+  const glyphs = (
+    <>
+      <Animated.View style={[styles.glyph, sendGlyph]}>
+        <Icon name="send" size={18} color={colors.bg} />
+      </Animated.View>
+      <Animated.View style={[styles.glyph, stopGlyph]}>
+        <PixelStop size={13} color={colors.bg} moving={stop} />
+      </Animated.View>
+    </>
+  );
   return (
     <Animated.View
       entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320).mass(1)}
       exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
       style={styles.sendBox}
     >
-      <PressScale
-        to={0.9}
-        haptic={false}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        hitSlop={6}
-        style={[styles.send, { backgroundColor: colors.ink }]}
-      >
-        <Animated.View style={[styles.glyph, sendGlyph]}>
-          <Icon name="send" size={18} color={colors.bg} />
-        </Animated.View>
-        <Animated.View style={[styles.glyph, stopGlyph]}>
-          <PixelStop size={13} color={colors.bg} moving={stop} />
-        </Animated.View>
-      </PressScale>
+      {hold ? (
+        <>
+          <Canvas style={styles.ring} pointerEvents="none">
+            <Group origin={vec(RING / 2, RING / 2)} transform={[{ rotate: -Math.PI / 2 }]}>
+              <Path path={RING_PATH} style="stroke" strokeWidth={2} color={colors.line2} opacity={trackOpacity} />
+              <Path
+                path={RING_PATH}
+                style="stroke"
+                strokeWidth={2.5}
+                strokeCap="round"
+                color={colors.ink}
+                start={0}
+                end={ring}
+              />
+            </Group>
+          </Canvas>
+          <GestureDetector gesture={gesture}>
+            <Animated.View
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityHint={hold.hint}
+              style={[styles.send, { backgroundColor: colors.ink }, pressStyle]}
+            >
+              {glyphs}
+            </Animated.View>
+          </GestureDetector>
+        </>
+      ) : (
+        <PressScale
+          to={0.9}
+          haptic={false}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          hitSlop={6}
+          style={[styles.send, { backgroundColor: colors.ink }]}
+        >
+          {glyphs}
+        </PressScale>
+      )}
     </Animated.View>
   );
 }
@@ -468,8 +586,10 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
   },
   face: { height: SEND, justifyContent: "center" },
-  choice: { paddingHorizontal: 4, paddingBottom: 8 },
+  holdHint: { paddingTop: 8, minHeight: 20, alignItems: "center" },
   sendBox: { width: SEND, height: SEND },
+  // Around the button, 4 past it on every side.
+  ring: { position: "absolute", left: (SEND - RING) / 2, top: (SEND - RING) / 2, width: RING, height: RING },
   // Above the overlay: the finger that holds it stays on the same button while the field changes.
   micBox: { width: SEND, height: SEND, zIndex: 2 },
   send: { width: SEND, height: SEND, borderRadius: SEND / 2 },

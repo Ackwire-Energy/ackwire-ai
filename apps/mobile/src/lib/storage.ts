@@ -74,8 +74,12 @@ export const STORED = {
   conversationSearchRecent: "conversation-search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
+  /** The "Double tap = 👍" line under a message was shown once, or the person double tapped already ("1"). */
+  doubleTapTaught: "double-tap-taught",
   /** `<user id>.<org id>` entries (JSON list): the right hand's DM was opened there, so its "Novo" is gone. */
   rightHandSeen: "right-hand-seen",
+  /** The person held the send button to stop an agent and send once: the composer's hint is over ("1"). */
+  stopSendTaught: "stop-send-taught",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {
