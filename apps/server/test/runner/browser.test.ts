@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import {
@@ -79,6 +88,7 @@ const ops = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
 interface Logged {
   args: string[];
   stdin: string;
+  cwd: string;
 }
 
 /**
@@ -2096,6 +2106,29 @@ function fakeDesktop(startMs = 0): NonNullable<BrowserManagerOptions["desktops"]
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const headless = (c?: FakeChrome) => !!c?.args.includes("--headless=new");
+
+test.if(posix)(
+  "an agent whose folder moved (its handle changed) gets a session there, not one in the old folder",
+  async () => {
+    const t = setup();
+    const old = await t.folder();
+    expect(
+      await t.manager.act(dev, old, { op: "browser.act", command: "open", args: ["https://a/"], timeoutSeconds: 30 }),
+    ).toMatchObject({ success: true });
+    // The handle changed: its folder is renamed, and the next request names the new one.
+    const moved = path.join(path.dirname(old), "renamed-agent");
+    renameSync(old, moved);
+    expect(
+      await t.manager.act(dev, moved, { op: "browser.act", command: "open", args: ["https://b/"], timeoutSeconds: 30 }),
+    ).toMatchObject({ success: true });
+    const last = t
+      .logged()
+      .filter((l) => l.args.includes("https://b/"))
+      .at(-1);
+    expect(last?.cwd).toBe(moved);
+    expect(t.chromes.at(-1)?.args).toContain(`--user-data-dir=${path.join(moved, ".agentes", "browser")}`);
+  },
+);
 
 test.if(posix)("Ubuntu's snap Chromium on a desktop: a copy of its Xauthority it can read, the agent's alone", () => {
   const home = tempDir("xauth-");

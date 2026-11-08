@@ -2413,7 +2413,16 @@ export class BrowserManager {
     if (this.closed) throw new RunnerError("browser_unavailable", "The runner is stopping");
     const agentId = String(agent.id ?? "");
     const existing = this.sessions.get(agentId);
-    if (existing) {
+    if (existing && existing.folder !== folder) {
+      // Its folder moved (its handle changed): commands would run in a folder that's gone, so this session closes and
+      // one opens in the new folder, its profile moved along with it.
+      this.opts.log(`the browser of ${agent.handle} moves to its renamed folder`);
+      this.sessions.delete(agentId);
+      // Run from the folder that exists now: the old one is gone.
+      existing.folder = folder;
+      await this.run(existing, ["close"], { timeoutMs: QUICK_TIMEOUT_MS }).catch(() => undefined);
+      await this.stopChrome(existing);
+    } else if (existing) {
       existing.lastUsed = this.now();
       return existing;
     }
