@@ -34,15 +34,15 @@ describe("worst cases", () => {
             count="1.284"
             aside={<a href="#historico">Ver histórico</a>}
           />
-          <ul className="ac-list">
-            <li className="ac-list__row">Relatório de campanha: Black Friday 2026, segunda rodada de testes A/B</li>
-          </ul>
+          <div className="ac-list">
+            <div className="ac-list__row">Relatório de campanha: Black Friday 2026, segunda rodada de testes A/B</div>
+          </div>
         </section>
         <section>
           <GroupHeading title="今日の承認待ち" count={1} />
-          <ul className="ac-list">
-            <li className="ac-list__row">週次サマリー</li>
-          </ul>
+          <div className="ac-list">
+            <div className="ac-list__row">週次サマリー</div>
+          </div>
         </section>
       </div>,
     );

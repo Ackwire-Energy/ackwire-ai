@@ -99,7 +99,10 @@ describe("one menu rhythm", () => {
     expect(body(".ac-tz__list")).toContain("gap: 2px;");
     expect(body(".ac-tz__list > div")).toContain("gap: 2px;");
     expect(body(".ac-filter__list")).toContain("gap: 2px;");
-    expect(body('.ac-menu--select [role="group"]')).toContain("gap: 2px;");
+    expect(body(':is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions)')).toContain(
+      "gap: 2px;",
+    );
+    expect(body(".ac-mo__group")).toContain("--menu-pad: var(--space-2);");
     // The full-screen menu's 15px rows are the touch ones under any pointer: 20px of line and 10 above and below.
     expect(body(".ac-mo__item")).toContain("padding: 10px 14px;");
     expect(body(".ac-suggest__item")).not.toContain("min-height");

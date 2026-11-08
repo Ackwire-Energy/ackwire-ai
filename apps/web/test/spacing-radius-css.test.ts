@@ -65,8 +65,9 @@ test("a rounded thing near a rounded box's edge has the box's radius less the ro
   }
   for (const inner of [".ac-tz__searchrow", ".ac-tz__list", ".ac-filter__list"])
     expect(last(top, inner, "padding")).toBe("var(--menu-pad)");
-  // The phone-style menu overlay: 8px of room inside a section's corner.
-  expect(last(top, ".ac-mo__group", "padding")).toBe("var(--space-2)");
+  // The phone-style menu overlay: 8px of room inside a section's corner, said as its menu's room.
+  expect(last(top, ".ac-mo__group", "--menu-pad")).toBe("var(--space-2)");
+  expect(last(top, ".ac-mo__group", "padding")).toBe("var(--menu-pad)");
   expect(last(top, ".ac-mo__item", "border-radius")).toBe("calc(var(--radius-section) - var(--space-2))");
   // Popovers with their own room set it as the menu's, so their corner follows.
   const layout = topLevel(await read(join(SRC, "layout.css")));

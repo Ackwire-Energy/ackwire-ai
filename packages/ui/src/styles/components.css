@@ -2099,8 +2099,8 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   gap: 2px;
   padding-block: var(--menu-pad);
 }
-/* A group of options under its heading keeps the list's rhythm. */
-.ac-menu--select [role="group"] {
+/* A group of options or items under its heading keeps the list's rhythm (a select's, a dropdown's radio group). */
+:is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions) {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -10601,10 +10601,11 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   color: var(--ink-muted);
 }
 .ac-mo__group {
+  --menu-pad: var(--space-2);
   position: relative;
   max-height: none;
   overflow: visible;
-  padding: var(--space-2);
+  padding: var(--menu-pad);
   border-radius: var(--radius-section);
   box-shadow: var(--e2), var(--top);
 }
