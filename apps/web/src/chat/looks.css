@@ -343,6 +343,19 @@
   }
 }
 
+/* A DM whose sides say who spoke shows no faces: its quiet rows start where its rows' words do, at their own padding. */
+.channel__messages[data-faces="false"] {
+  --thread-indent: 16px;
+}
+@media (max-width: 760px) {
+  .channel__messages[data-faces="false"] {
+    --thread-indent: 12px;
+  }
+}
+.channel__messages[data-look="bubbles"][data-faces="false"] {
+  --thread-indent: 8px;
+}
+
 /* ── Compacta: the time, a small face, the name and the text on one line. ── */
 .channel__messages[data-look="compact"] {
   /* Quiet rows (an event pill, a thread's line) on the text's column, past the clock and the small face. */

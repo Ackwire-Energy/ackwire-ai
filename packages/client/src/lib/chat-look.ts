@@ -51,6 +51,12 @@ export function chatLookOf(prefs: ChatPrefs | undefined, dm: boolean): { style: 
 /** Whether my own rows stand apart on the right. In the others, a row of mine is a row like anyone's. */
 export const mineOnRight = (style: ChatStyle) => style === "comfortable" || style === "bubbles";
 
+/**
+ * Whether the other side's rows show their face. A DM whose look keeps mine on the right says who spoke by the side:
+ * its header already names the one person or agent there, so no face. Channels, threads and the other looks keep it.
+ */
+export const facesShown = (style: ChatStyle, dm: boolean) => !(dm && mineOnRight(style));
+
 /** Where a conversation opens the first time it is shown with `unread` messages waiting. */
 export const opensAtLastRead = (prefs: ChatPrefs | undefined, unread: number) => prefs?.openAt === "read" && unread > 0;
 

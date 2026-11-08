@@ -61,6 +61,8 @@ export interface MessageLook {
    * (a card alone) keeps it, ahead of its time, as anywhere else: a time alone beside a face reads as a broken line.
    */
   names: boolean;
+  /** False where the sides say who spoke (a DM with mine on the right): the other side's rows show no face. */
+  faces?: boolean;
 }
 export const MessageLookContext = createContext<MessageLook | null>(null);
 
@@ -297,6 +299,7 @@ export function Message({
       data-own={own && !mine ? "true" : undefined}
       data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
       data-names={inBubble && look?.names === false ? "false" : undefined}
+      data-faces={look?.faces === false && !mine ? "false" : undefined}
       data-run={mine || drawn === "bubbles" ? run : undefined}
       data-menu-open={menuOpen ? "true" : undefined}
       onClick={(e) => {
@@ -314,7 +317,7 @@ export function Message({
           {time}
         </span>
       )}
-      {mine ? null : grouped ? (
+      {mine || look?.faces === false ? null : grouped ? (
         // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
         <span className="ac-msg__gutter" aria-hidden="true">
           <span className="ac-msg__gutter-time">

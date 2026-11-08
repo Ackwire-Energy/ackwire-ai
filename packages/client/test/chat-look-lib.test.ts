@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { chatLookOf, firstUnreadId, mineOnRight, opensAtLastRead } from "../src/lib/chat-look";
+import { chatLookOf, facesShown, firstUnreadId, mineOnRight, opensAtLastRead } from "../src/lib/chat-look";
 
 const said = (id: string, author: { type: "person" | "agent"; id: string }, createdAt: string) => ({
   id,
@@ -25,6 +25,12 @@ test("my rows stand apart only in the styles that keep the right side", () => {
     true,
     false,
   ]);
+});
+
+test("a DM drops the other side's face where my rows keep the right side; channels and the other looks keep it", () => {
+  const styles = ["comfortable", "left", "bubbles", "compact"] as const;
+  expect(styles.map((s) => facesShown(s, true))).toEqual([false, true, false, true]);
+  expect(styles.map((s) => facesShown(s, false))).toEqual([true, true, true, true]);
 });
 
 test("it opens at the last read message only when asked and with something unread", () => {

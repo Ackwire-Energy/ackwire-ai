@@ -5,6 +5,7 @@ import {
   type ChatStyle,
   type ChatTone,
   chatLookOf,
+  facesShown,
 } from "@agenteschat/client/lib/chat-look";
 import {
   type AgentColor,
@@ -72,10 +73,20 @@ function SampleRows({ lines, children }: { lines: Line[]; children?: (line: Line
   });
 }
 
-function Mini({ className, look, children }: { className?: string; look: ChatStyle; children: ReactNode }) {
+function Mini({
+  className,
+  look,
+  faces = true,
+  children,
+}: {
+  className?: string;
+  look: ChatStyle;
+  faces?: boolean;
+  children: ReactNode;
+}) {
   return (
     <span className={cx("chat-look__mini", className)} aria-hidden="true" inert>
-      <span className="channel__messages" data-look={look}>
+      <span className="channel__messages" data-look={look} data-faces={faces ? undefined : "false"}>
         {children}
       </span>
     </span>
@@ -124,7 +135,7 @@ export function ChatLookSettings() {
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
   const mine = agentGradient(dm ? SAMPLE_AGENT.color : "sky")[1];
-  const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm });
+  const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm, faces: facesShown(s, dm) });
   const talk: Line[] = [
     { who: "me", text: t("settings.account.chat.sample.ask"), time: "14:30" },
     { who: "agent", text: t("settings.account.chat.sample.answer"), time: "14:31" },
@@ -176,7 +187,7 @@ export function ChatLookSettings() {
             {CHAT_STYLES.map((s) => (
               <Choice key={s} id={`chat-look-${s}`} value={s} checked={s === style} title={names[s]}>
                 <MessageLookContext.Provider value={lookOf(s)}>
-                  <Mini look={s}>
+                  <Mini look={s} faces={facesShown(s, dm)}>
                     <SampleRows lines={talk} />
                   </Mini>
                 </MessageLookContext.Provider>
@@ -225,7 +236,7 @@ export function ChatLookSettings() {
                 checked={openAt === "read"}
                 title={t("settings.account.chat.openRead")}
               >
-                <Mini className="chat-look__mini--read" look={style}>
+                <Mini className="chat-look__mini--read" look={style} faces={facesShown(style, dm)}>
                   <SampleRows lines={before.slice(1)} />
                   <div className="channel__unread">{t("channel.unreadDivider")}</div>
                   <SampleRows lines={fresh} />
@@ -240,7 +251,7 @@ export function ChatLookSettings() {
                 checked={openAt === "latest"}
                 title={t("settings.account.chat.openLatest")}
               >
-                <Mini className="chat-look__mini--end" look={style}>
+                <Mini className="chat-look__mini--end" look={style} faces={facesShown(style, dm)}>
                   <SampleRows lines={fresh} />
                 </Mini>
                 <span className="chat-look__composer" aria-hidden="true">

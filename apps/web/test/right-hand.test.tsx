@@ -155,12 +155,14 @@ describe("the right hand elsewhere", () => {
     expect(wrapper?.parentElement?.classList.contains("ac-msg__text")).toBe(true);
   });
 
-  test("its greeting's name opens the profile card, as any message's; its face is the same trigger for the mouse", async () => {
+  test("its greeting's name opens the profile card, as any message's; in its DM no face, the sides say who spoke", async () => {
     await go(withRightHand(seedState()), `dm/agent/${LODI_ID}`);
     const greeting = [...document.querySelectorAll(".ac-msg")].find((m) =>
       m.textContent?.includes("Oi, eu sou o Lodi"),
     );
-    expect(greeting?.querySelector(".ac-msg__avatar .profile-trigger")).toBeTruthy();
+    expect(greeting?.querySelector(".ac-msg__avatar")).toBeNull();
+    expect(greeting?.getAttribute("data-faces")).toBe("false");
+    expect(document.querySelector(".channel__messages")?.getAttribute("data-faces")).toBe("false");
     const name = greeting?.querySelector(".profile-trigger--name") as HTMLElement;
     expect(name.getAttribute("aria-label")).toBe("Perfil de Lodi");
     await click(name);
