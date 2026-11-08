@@ -40,9 +40,11 @@ export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audien
         ? t("drive.audience.workspace")
         : aud.kind === "channel"
           ? t(aud.private ? "drive.audience.privateChannel" : "drive.audience.publicChannel", { name: aud.name })
-          : aud.with
-            ? t("drive.audience.dm", { name: authorName(aud.with) })
-            : t("drive.audience.dmGone");
+          : aud.between
+            ? t("drive.audience.dmBetween", { names: joinNames(aud.between.map(authorName), t) })
+            : aud.with
+              ? t("drive.audience.dm", { name: authorName(aud.with) })
+              : t("drive.audience.dmGone");
   const also =
     priv && sharing?.mode === "people"
       ? [
@@ -57,10 +59,7 @@ export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audien
   return (
     <p className="drive-audience ac-iconline" data-private={priv || undefined}>
       <Icon name={priv ? "lock" : "audienceEveryone"} size={16} />
-      <span>
-        {text}
-        {also.length > 0 && ` ${t("share.also", { who })}`}
-      </span>
+      <span>{also.length > 0 ? t("share.also", { text, who }) : text}</span>
     </p>
   );
 }
@@ -251,9 +250,11 @@ export function DriveDetails({
             title={
               aud.kind === "channel"
                 ? `#${aud.name}`
-                : aud.kind === "dm" && aud.with
-                  ? t("drive.dmWith", { name: authorName(aud.with) })
-                  : t("drive.dm")
+                : aud.kind === "dm" && aud.between
+                  ? t("drive.dmBetween", { names: joinNames(aud.between.map(authorName), t) })
+                  : aud.kind === "dm" && aud.with
+                    ? t("drive.dmWith", { name: authorName(aud.with) })
+                    : t("drive.dm")
             }
             text={a.threadId ? t("drive.inThread") : aud.kind === "dm" ? t("drive.inDm") : t("drive.sharedIn")}
             onOpen={

@@ -4,8 +4,10 @@ import {
   addChannelMember,
   createArtifact,
   createChannel,
+  createIssue,
   createRole,
   deleteArtifact,
+  ensureTaskConversation,
   ForbiddenError,
   fileReach,
   getArtifact,
@@ -15,6 +17,7 @@ import {
   NotFoundError,
   openDm,
   searchForUser,
+  searchVisible,
   setFileSharing,
   setMemberRoles,
   type ValidationError,
@@ -189,6 +192,41 @@ describe("a file's sharing (ADR 0153)", () => {
     // The owner, an administrator it's shared with, may restore it from the trash.
     expect((await listDeletedArtifacts(f.db, f.owner.id, f.org.id)).map((a) => a.id)).toContain(file.id);
   });
+
+  test("someone it was shared with is told whose conversation it is, never 'you and …', and gets no way into it", async () => {
+    const { bia, caio, file } = await world();
+    await setFileSharing(f.artifactDeps, bia.id, f.org.id, file.id, { mode: "people", userIds: [caio.id] });
+    const [theirs] = await withPersonFacts(f.db, caio.id, f.org.id, [
+      await getArtifact(f.artifactDeps, person(caio.id), f.org.id, file.id),
+    ]);
+    expect(theirs?.audience).toEqual({
+      kind: "dm",
+      with: null,
+      between: [
+        { type: "person", id: bia.id },
+        { type: "agent", id: f.agent.id },
+      ],
+    });
+    const [mine] = await withPersonFacts(f.db, bia.id, f.org.id, [file]);
+    expect(mine?.audience).toEqual({ kind: "dm", with: { type: "agent", id: f.agent.id } });
+    // A private channel's file: its name, and no way into it.
+    const fin = await createChannel(f.db, bia.id, f.org.id, { name: "fin", visibility: "private" });
+    const plan = await createArtifact(f.artifactDeps, person(bia.id), f.org.id, doc("Plano", fin.id));
+    await setFileSharing(f.artifactDeps, bia.id, f.org.id, plan.id, { mode: "everyone" });
+    const [outside] = await withPersonFacts(f.db, caio.id, f.org.id, [plan]);
+    expect(outside?.audience).toEqual({ kind: "channel", name: "fin", private: true, outside: true });
+    const [inside] = await withPersonFacts(f.db, bia.id, f.org.id, [plan]);
+    expect(inside?.audience).toEqual({ kind: "channel", name: "fin", private: true });
+  });
+
+  test("a version a link names that isn't a number is a version not found, not a failure", async () => {
+    const { bia, file } = await world();
+    const wrong = await getArtifact(f.artifactDeps, person(bia.id), f.org.id, file.id, Number("abc")).catch(
+      (e: unknown) => e,
+    );
+    expect(wrong).toBeInstanceOf(NotFoundError);
+    expect((wrong as NotFoundError).code).toBe("artifact.version_not_found");
+  });
 });
 
 describe("agents and a shared file: the wiki's rule", () => {
@@ -217,6 +255,52 @@ describe("agents and a shared file: the wiki's rule", () => {
     await setFileSharing(f.artifactDeps, bia.id, f.org.id, file.id, { mode: "everyone" });
     expect(await listedFor(inGeneral, caio.id)).toBe(true);
     expect((await getArtifact(f.artifactDeps, inGeneral, f.org.id, file.id)).id).toBe(file.id);
+  });
+
+  test("a task's conversation is read by whoever sees the task, though nobody is its member", async () => {
+    const { bia, file } = await world();
+    await setFileSharing(f.artifactDeps, bia.id, f.org.id, file.id, { mode: "people", userIds: [f.owner.id] });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const listedIn = async (channelId: string) =>
+      (
+        await listArtifacts(f.db, { type: "agent", agentId: f.agent.id, channelId }, f.org.id, {
+          requesterUserId: f.owner.id,
+        })
+      ).some((a) => a.id === file.id);
+    // The whole workspace sees this task, so what the run says there reaches Caio and Duda too.
+    const open = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Fechar o mês",
+      audience: { mode: "everyone" },
+    });
+    expect(await listedIn((await ensureTaskConversation(f.db, open.id)).channelId)).toBe(false);
+    // Only the owner (an administrator) sees this one, and he sees the file.
+    const mine = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Revisar o contrato",
+      audience: { mode: "people", userIds: [f.owner.id] },
+    });
+    expect(await listedIn((await ensureTaskConversation(f.db, mine.id)).channelId)).toBe(true);
+  });
+
+  test("shared with people, the agents of its own conversation still find it in search", async () => {
+    const { bia, caio, dm, file } = await world();
+    const deps = { db: f.db, search: f.search, gateway: f.gateway };
+    await setFileSharing(f.artifactDeps, bia.id, f.org.id, file.id, { mode: "people", userIds: [caio.id] });
+    await indexSource(deps, { orgId: f.org.id, kind: "file", sourceId: file.id });
+    const hits = await searchVisible(deps, {
+      orgId: f.org.id,
+      text: "Relatório",
+      visibleChannelIds: [dm.id],
+      kinds: ["file"],
+    });
+    expect(hits.map((h) => h.sourceId)).toContain(file.id);
+    // Elsewhere, nothing: the list's people find it by its id (`visibleFileScopes`), no channel does.
+    const elsewhere = await searchVisible(deps, {
+      orgId: f.org.id,
+      text: "Relatório",
+      visibleChannelIds: [f.general.id],
+      kinds: ["file"],
+    });
+    expect(elsewhere.map((h) => h.sourceId)).not.toContain(file.id);
   });
 
   test("fileReach says who it was shared with", async () => {

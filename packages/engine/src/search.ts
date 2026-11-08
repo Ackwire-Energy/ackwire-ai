@@ -33,7 +33,7 @@ import { isQuietNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
-import { adminChannelSql, fileSeenSql, taskSeenSql } from "./task-access";
+import { adminChannelSql, fileSeenSql, fileSharedSql, taskSeenSql } from "./task-access";
 import { visibleWikiPageIds } from "./wiki-links";
 
 const { messages, channelMembers, channels, contextItems, organizationMembers, routines } = schema;
@@ -320,8 +320,8 @@ async function issueSearchScopes(db: Database, orgId: string, userId: string) {
 }
 
 /**
- * The files shared with people (ADR 0153) a person sees, as the ids their search documents carry: their own. Only
- * files' documents are searched with them (`visibleFileScopes`).
+ * The files a list shares with this person (ADR 0153), by id: their documents carry their conversation, which they may
+ * not read, so they're found by their own id (`visibleFileScopes`).
  */
 async function fileSearchScopes(db: Database, orgId: string, userId: string) {
   const rows = await db
@@ -332,7 +332,7 @@ async function fileSearchScopes(db: Database, orgId: string, userId: string) {
         eq(schema.artifacts.orgId, orgId),
         eq(schema.artifacts.share, "people"),
         isNull(schema.artifacts.deletedAt),
-        fileSeenSql(sql`${userId}::text`),
+        fileSharedSql(sql`${userId}::text`),
       ),
     );
   return rows.map((r) => r.id);

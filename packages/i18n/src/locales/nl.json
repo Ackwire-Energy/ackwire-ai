@@ -9902,6 +9902,7 @@
     "onlyDriveText": "Nog niet gedeeld in een kanaal.",
     "dm": "Direct bericht",
     "dmWith": "Direct bericht met {{name}}",
+    "dmBetween": "Direct bericht tussen {{names}}",
     "inDm": "Verstuurd in een direct bericht",
     "inThread": "In een thread van het gesprek",
     "audience": {
@@ -9909,7 +9910,8 @@
       "publicChannel": "Iedereen in de werkruimte kan het zien: het staat in het openbare kanaal #{{name}}",
       "privateChannel": "Alleen leden van #{{name}} en beheerders kunnen het zien",
       "dm": "Alleen jij en {{name}} kunnen het zien: het komt uit een direct bericht",
-      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht"
+      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht",
+      "dmBetween": "Alleen {{names}} kunnen het zien: het komt uit een direct bericht"
     },
     "private": "Privé",
     "privateHint": "Alleen de mensen in het gesprek zien deze bestanden. In een kanaal ook beheerders.",
@@ -15738,6 +15740,7 @@
     "everyone": "De hele werkruimte",
     "whereDm": "Het directe bericht met {{name}}",
     "whereDmGone": "Een direct bericht",
+    "whereDmBetween": "Het directe bericht tussen {{names}}",
     "whereChannel": "Leden van #{{name}}",
     "add": "Persoon of rol toevoegen",
     "addSearch": "Mensen en rollen zoeken",
@@ -15763,7 +15766,7 @@
     "undo": "Ongedaan maken",
     "fileRef": "Bestand {{title}}",
     "fileRefNone": "Bestand zonder toegang",
-    "also": "Ook gedeeld met {{who}}.",
+    "also": "{{text}}. Ook gedeeld met {{who}}.",
     "someOnlyHere": "Sommige van deze links gaan alleen open voor wie in het gesprek van het bestand zit."
   },
   "linkErrors": {
@@ -15803,6 +15806,7 @@
       "signIn": "Inloggen",
       "open": "agentes.chat openen",
       "latest": "Nieuwste versie openen",
+      "file": "Bestand openen",
       "retry": "Opnieuw proberen"
     },
     "errorId": "Foutcode: {{id}}"

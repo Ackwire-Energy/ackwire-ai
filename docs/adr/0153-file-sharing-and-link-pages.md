@@ -47,13 +47,18 @@ Each change is an audit row, `artifact.sharing_changed`, with the mode and the i
 
 **Every path for people** goes through it: `personCanRead` (opening, versions, downloads, exports, restoring),
 `listArtifacts` (`fileSharedSql`), the trash list, and search. A file shared with everyone is indexed for the whole
-workspace; one shared with people carries its own id as its scope, which `searchForUser` passes for who sees it
-(`visibleFileScopes`), and a file hit is checked against the file, since its document follows a change a moment later.
-An adapter that ignores the field keeps those files out, the safe side.
+workspace; one shared with people keeps its conversation as its document's scope, so its conversation and the agents
+there keep finding it, and the people a list names find it by its own id (`visibleFileScopes`, matched on the
+document's `sourceId`), which `searchForUser` passes; a file hit is checked against the file, since its document
+follows a change a moment later. An adapter that ignores the field keeps it to its conversation, the safe side.
+Someone it was shared with sees where it lives without being told it's theirs: a DM's audience names its sides
+(`between`, never "you and …") and a channel's says `outside`, and neither offers a way into the conversation.
 
 **Agents** follow the wiki's rule for what sharing adds (ADR 0023 addendum, `runSharedSql`): a run reaches a shared
 file only when the person behind it and everyone who reads its conversation see it, since what it says reaches them
-all, and with nobody behind it only a file shared with the whole workspace. Their own reach and what they read for a
+all, and with nobody behind it only a file shared with the whole workspace. Who reads the conversation is
+`channelReaderSql` (plus everyone for a public channel), not its members: no person is a member of a task's
+conversation, which whoever sees the task reads. Their own reach and what they read for a
 person where the file lives stay as they were. An agent's search for a person doesn't get the people-shared scopes.
 `fileReach` tells an agent who a file was shared with, and `share_artifact` attaches a workspace-shared file as is.
 
@@ -89,13 +94,15 @@ else the browser's. The JSON's code says the cause, and each cause has one way o
   it may have been deleted or be shared only in a conversation the reader isn't in, ask whoever sent it to share it
   from Compartilhar, and open agentes.chat; any other route: the link isn't available, ask for a new one;
 - a version or a format the file doesn't have (`artifact.version_not_found`, `artifact.format_unavailable`, read
-  only after the file's check): say so, and open the latest version in the app;
+  only after the file's check; a version that isn't a whole number is one it doesn't have): say so, and open the
+  file in the app (its latest version);
 - too many tries (429), and a failure of ours (5xx, with the request's id as the error's code): try again;
 - anything else: the link didn't open, ask for a new one.
 
 The page runs no script and loads nothing (its own policy). Programs keep the JSON: the apps' fetches, the phone,
-agents and scripts never send a navigation, and a download from the app (an empty destination) doesn't either.
-Self-host and Cloud alike.
+agents and scripts never send a navigation, and a download from the app (an empty destination) doesn't either. Two
+answers carry a code of their own now, `artifact.version_not_found` (was `not_found`) and `artifact.format_unavailable`
+(was `invalid_request`), with the same status and message. Self-host and Cloud alike.
 
 ## What stays as it is
 

@@ -9749,6 +9749,8 @@ export const en = {
     onlyDriveText: "Not shared in a channel yet.",
     dm: "Direct message",
     dmWith: "Direct message with {{name}}",
+    /** A file of a DM the person isn't in, shared with them (ADR 0153): the DM's two sides. */
+    dmBetween: "Direct message between {{names}}",
     inDm: "Sent in a direct message",
     inThread: "In a thread of the conversation",
     audience: {
@@ -9757,6 +9759,8 @@ export const en = {
       privateChannel: "Only members of #{{name}} and administrators can see it",
       dm: "Only you and {{name}} can see it: it came from a direct message",
       dmGone: "Only the people in that conversation can see it: it came from a direct message",
+      /** For someone who isn't in the DM and got the file through Compartilhar (ADR 0153). */
+      dmBetween: "Only {{names}} can see it: it came from a direct message",
     },
     private: "Private",
     privateHint: "Only the people in the conversation see these files. In a channel, administrators do too.",
@@ -15370,6 +15374,8 @@ export const en = {
     everyone: "Everyone in the workspace",
     whereDm: "The DM with {{name}}",
     whereDmGone: "A DM",
+    /** For someone who isn't in the DM and got the file through Compartilhar. */
+    whereDmBetween: "The DM between {{names}}",
     whereChannel: "Members of #{{name}}",
     add: "Add a person or a role",
     addSearch: "Search people and roles",
@@ -15396,7 +15402,8 @@ export const en = {
     undo: "Undo",
     fileRef: "File {{title}}",
     fileRefNone: "File without access",
-    also: "Also shared with {{who}}.",
+    /** Who sees the file (`text`, no full stop) and who Compartilhar added. */
+    also: "{{text}}. Also shared with {{who}}.",
     /** Copiar links of several files, some only their conversation opens: the toast, with Compartilhar. */
     someOnlyHere: "Some of these links open only for who's in the file's conversation.",
   },
@@ -15441,6 +15448,7 @@ export const en = {
       signIn: "Sign in",
       open: "Open agentes.chat",
       latest: "Open the latest version",
+      file: "Open the file",
       retry: "Try again",
     },
     errorId: "Error code: {{id}}",

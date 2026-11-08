@@ -9470,6 +9470,7 @@
     "onlyDriveText": "Belum dibagikan di kanal.",
     "dm": "Pesan langsung",
     "dmWith": "Pesan langsung dengan {{name}}",
+    "dmBetween": "Pesan langsung antara {{names}}",
     "inDm": "Dikirim lewat pesan langsung",
     "inThread": "Di utas percakapan",
     "audience": {
@@ -9477,7 +9478,8 @@
       "publicChannel": "Semua orang di ruang kerja bisa melihatnya: file ini ada di kanal publik #{{name}}",
       "privateChannel": "Hanya anggota #{{name}} dan admin yang bisa melihatnya",
       "dm": "Hanya kamu dan {{name}} yang bisa melihatnya: file ini berasal dari pesan langsung",
-      "dmGone": "Hanya orang di percakapan itu yang bisa melihatnya: file ini berasal dari pesan langsung"
+      "dmGone": "Hanya orang di percakapan itu yang bisa melihatnya: file ini berasal dari pesan langsung",
+      "dmBetween": "Hanya {{names}} yang bisa melihatnya: file ini berasal dari pesan langsung"
     },
     "private": "Privat",
     "privateHint": "Hanya orang di percakapan yang bisa melihat file ini. Di channel, admin juga bisa.",
@@ -15126,6 +15128,7 @@
     "everyone": "Seluruh ruang kerja",
     "whereDm": "Pesan langsung dengan {{name}}",
     "whereDmGone": "Sebuah pesan langsung",
+    "whereDmBetween": "Pesan langsung antara {{names}}",
     "whereChannel": "Anggota #{{name}}",
     "add": "Tambahkan orang atau peran",
     "addSearch": "Cari orang dan peran",
@@ -15151,7 +15154,7 @@
     "undo": "Urungkan",
     "fileRef": "File {{title}}",
     "fileRefNone": "File tanpa akses",
-    "also": "Juga dibagikan dengan {{who}}.",
+    "also": "{{text}}. Juga dibagikan dengan {{who}}.",
     "someOnlyHere": "Beberapa tautan ini hanya bisa dibuka oleh yang ada di percakapan file."
   },
   "linkErrors": {
@@ -15191,6 +15194,7 @@
       "signIn": "Masuk",
       "open": "Buka agentes.chat",
       "latest": "Buka versi terbaru",
+      "file": "Buka file",
       "retry": "Coba lagi"
     },
     "errorId": "Kode kesalahan: {{id}}"

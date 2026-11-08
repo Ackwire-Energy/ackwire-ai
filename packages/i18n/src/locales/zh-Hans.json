@@ -9481,6 +9481,7 @@
     "onlyDriveText": "尚未在频道中分享。",
     "dm": "私信",
     "dmWith": "与 {{name}} 的私信",
+    "dmBetween": "{{names}} 之间的私信",
     "inDm": "在私信中发送",
     "inThread": "在对话的话题中",
     "audience": {
@@ -9488,7 +9489,8 @@
       "publicChannel": "工作区中的所有人都能看到：它在公开频道 #{{name}} 中",
       "privateChannel": "只有 #{{name}} 的成员和管理员能看到",
       "dm": "只有你和 {{name}} 能看到：它来自私信",
-      "dmGone": "只有那段对话中的成员能看到：它来自私信"
+      "dmGone": "只有那段对话中的成员能看到：它来自私信",
+      "dmBetween": "只有 {{names}} 能看到：它来自私信"
     },
     "private": "私密",
     "privateHint": "只有对话中的成员能看到这些文件。在频道中，管理员也能看到。",
@@ -15199,6 +15201,7 @@
     "everyone": "整个工作区",
     "whereDm": "与 {{name}} 的私信",
     "whereDmGone": "一条私信",
+    "whereDmBetween": "{{names}} 之间的私信",
     "whereChannel": "#{{name}} 的成员",
     "add": "添加人或角色",
     "addSearch": "搜索人和角色",
@@ -15224,7 +15227,7 @@
     "undo": "撤销",
     "fileRef": "文件 {{title}}",
     "fileRefNone": "无权访问的文件",
-    "also": "也已与 {{who}} 共享。",
+    "also": "{{text}}。也已与 {{who}} 共享。",
     "someOnlyHere": "其中一些链接只有文件所在对话里的人能打开。"
   },
   "linkErrors": {
@@ -15264,6 +15267,7 @@
       "signIn": "登录",
       "open": "打开 agentes.chat",
       "latest": "打开最新版本",
+      "file": "打开文件",
       "retry": "重试"
     },
     "errorId": "错误代码：{{id}}"

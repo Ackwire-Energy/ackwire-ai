@@ -40,7 +40,15 @@ import { maySql } from "./permissions";
 import { routineCreatorOf } from "./requester";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 import { accountInUse } from "./standing";
-import { AUDIENCE_MAX, adminChannelSql, artifactCol, fileSeenSql, fileSharedSql, taskReaderSql } from "./task-access";
+import {
+  AUDIENCE_MAX,
+  adminChannelSql,
+  artifactCol,
+  channelReaderSql,
+  fileSeenSql,
+  fileSharedSql,
+  taskReaderSql,
+} from "./task-access";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
@@ -573,9 +581,10 @@ function runSharedSql(personId: string | null, channelId: string) {
   return and(
     sql`${artifactCol("share")} <> 'conversation'`,
     personId ? fileSharedSql(sql`${personId}::text`) : sql`${artifactCol("share")} = 'everyone'`,
-    // Aliases of their own: `fileSeenSql` nests `channelReaderSql`, whose `rm` and `rc` would take these rows' place.
-    sql`not exists (select 1 from ${channelMembers} runm where runm.channel_id = ${channelId}::uuid
-      and runm.user_id is not null and not ${fileSeenSql(sql`runm.user_id`)})`,
+    // Who reads it by `channelReaderSql`, not its members alone: no person is a member of a task's conversation,
+    // which whoever sees the task reads. Aliases of their own: `fileSeenSql` nests `channelReaderSql` too.
+    sql`not exists (select 1 from organization_members runr where runr.org_id = ${artifactCol("org_id")}
+      and ${channelReaderSql(sql`${channelId}::uuid`, sql`runr.user_id`)} and not ${fileSeenSql(sql`runr.user_id`)})`,
     sql`not exists (select 1 from ${channels} runc join organization_members runo on runo.org_id = runc.org_id
       where runc.id = ${channelId}::uuid and runc.kind = 'channel' and runc.visibility = 'public'
         and not ${fileSeenSql(sql`runo.user_id`)})`,
@@ -1389,10 +1398,14 @@ export function filesOfRun(db: Executor, orgId: string, runId: string, channelId
 }
 
 async function versionRow(db: Database, a: ArtifactRow, version?: number) {
-  const [v] = await db
-    .select()
-    .from(artifactVersions)
-    .where(and(eq(artifactVersions.artifactId, a.id), eq(artifactVersions.version, version ?? a.currentVersion)));
+  const wanted = version ?? a.currentVersion;
+  // A link's `?version=abc` names no version: Postgres would fail on it, a failure of ours to whoever opened it.
+  const [v] = Number.isSafeInteger(wanted)
+    ? await db
+        .select()
+        .from(artifactVersions)
+        .where(and(eq(artifactVersions.artifactId, a.id), eq(artifactVersions.version, wanted)))
+    : [];
   if (!v) throw new NotFoundError("Version not found", "artifact.version_not_found", { latest: a.currentVersion });
   return v;
 }
@@ -1879,9 +1892,13 @@ const canDeleteArtifact = async (db: Database, userId: string, orgId: string, a:
  */
 export type ArtifactAudience =
   | { kind: "workspace" }
-  | { kind: "channel"; name: string; private: boolean }
-  /** `gone`: the other side is an archived agent or a person who left, so the DM can't be opened any more. */
-  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
+  /** `outside`: the viewer doesn't read it there, the file was shared with them (ADR 0153): no way into it. */
+  | { kind: "channel"; name: string; private: boolean; outside?: true }
+  /**
+   * `gone`: the other side is an archived agent or a person who left, so the DM can't be opened any more. `between`:
+   * the viewer isn't one of its sides (it was shared with them, ADR 0153), so no `with` and no way into it: its sides.
+   */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true; between?: ArtifactAuthor[] };
 
 /** What the app adds for the person viewing: may they delete it, who can see it, may they change who sees it. */
 export interface PersonArtifactFacts {
@@ -1957,9 +1974,23 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
   const live = new Set([...liveAgents, ...livePeople].map((r) => r.id));
   const closed = new Set(chans.filter((c) => c.kind !== "channel" || c.visibility !== "public").map((c) => c.id));
   const readsThere = closed.size ? new Set(await personReadableChannels(db, userId, orgId)) : closed;
+  // Shared with them from a conversation they don't read (ADR 0153): what's said is never "you and …", and there's no
+  // way into it.
+  const outside = (id: string) => closed.has(id) && !readsThere.has(id);
   const audience = new Map<string, ArtifactAudience>(
     chans.map((c): [string, ArtifactAudience] => {
-      if (c.kind !== "dm") return [c.id, { kind: "channel", name: c.name, private: c.visibility !== "public" }];
+      if (c.kind !== "dm") {
+        const channel = { kind: "channel", name: c.name, private: c.visibility !== "public" } as const;
+        return [c.id, outside(c.id) ? { ...channel, outside: true } : channel];
+      }
+      if (outside(c.id)) {
+        const sides = dmMembers.filter((m) => m.channelId === c.id);
+        const between: ArtifactAuthor[] = [
+          ...sides.flatMap((m) => (m.userId && !m.agentId ? [{ type: "person" as const, id: m.userId }] : [])),
+          ...sides.flatMap((m) => (m.agentId ? [{ type: "agent" as const, id: m.agentId }] : [])),
+        ];
+        return [c.id, { kind: "dm", with: null, between }];
+      }
       const other = dmMembers.find((m) => m.channelId === c.id && m.userId !== userId);
       const who: ArtifactAuthor | null = other?.agentId
         ? { type: "agent", id: other.agentId }
@@ -2431,8 +2462,9 @@ export async function artifactFile(
 }
 
 /**
- * Search: title and excerpt, visible like the channel it came from; shared with the workspace, the whole org; shared
- * with people, its own id, which `searchForUser` passes for who sees it (`visibleFileScopes`) and nobody else does.
+ * Search: title and excerpt, visible like the channel it came from (shared with people too: its conversation and its
+ * agents keep finding it); shared with the workspace, the whole org. Who it's shared with finds it by its own id
+ * (`visibleFileScopes`), which only `searchForUser` passes.
  */
 registerDocumentBuilder("file", async (db, orgId, id) => {
   const [a] = await db
@@ -2444,7 +2476,7 @@ registerDocumentBuilder("file", async (db, orgId, id) => {
     orgId,
     kind: "file",
     sourceId: a.id,
-    channelIds: a.share === "everyone" || !a.channelId ? [] : a.share === "people" ? [a.id] : [a.channelId],
+    channelIds: a.share === "everyone" || !a.channelId ? [] : [a.channelId],
     title: a.title,
     body: a.excerpt,
     createdAt: a.createdAt,

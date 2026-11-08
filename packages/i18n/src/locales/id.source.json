@@ -24000,6 +24000,9 @@
   "drive.dmWith": {
     "value": "Direct message with {{name}}"
   },
+  "drive.dmBetween": {
+    "value": "Direct message between {{names}}"
+  },
   "drive.inDm": {
     "value": "Sent in a direct message"
   },
@@ -24020,6 +24023,9 @@
   },
   "drive.audience.dmGone": {
     "value": "Only the people in that conversation can see it: it came from a direct message"
+  },
+  "drive.audience.dmBetween": {
+    "value": "Only {{names}} can see it: it came from a direct message"
   },
   "drive.private": {
     "value": "Private"
@@ -37660,6 +37666,9 @@
   "share.whereDmGone": {
     "value": "A DM"
   },
+  "share.whereDmBetween": {
+    "value": "The DM between {{names}}"
+  },
   "share.whereChannel": {
     "value": "Members of #{{name}}"
   },
@@ -37736,7 +37745,7 @@
     "value": "File without access"
   },
   "share.also": {
-    "value": "Also shared with {{who}}."
+    "value": "{{text}}. Also shared with {{who}}."
   },
   "share.someOnlyHere": {
     "value": "Some of these links open only for who's in the file's conversation."
@@ -37797,6 +37806,9 @@
   },
   "linkErrors.action.latest": {
     "value": "Open the latest version"
+  },
+  "linkErrors.action.file": {
+    "value": "Open the file"
   },
   "linkErrors.action.retry": {
     "value": "Try again"

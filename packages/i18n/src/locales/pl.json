@@ -10611,6 +10611,7 @@
     "onlyDriveText": "Jeszcze nie udostępniono na kanale.",
     "dm": "Wiadomość bezpośrednia",
     "dmWith": "Wiadomość bezpośrednia z: {{name}}",
+    "dmBetween": "Wiadomość bezpośrednia między: {{names}}",
     "inDm": "Wysłano w wiadomości bezpośredniej",
     "inThread": "W wątku rozmowy",
     "audience": {
@@ -10618,7 +10619,8 @@
       "publicChannel": "Widzą go wszyscy w przestrzeni roboczej: jest na publicznym kanale #{{name}}",
       "privateChannel": "Widzą go tylko członkowie #{{name}} i administratorzy",
       "dm": "Widzisz go tylko ty i {{name}}: pochodzi z wiadomości bezpośredniej",
-      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej"
+      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej",
+      "dmBetween": "Widzą go tylko {{names}}: pochodzi z wiadomości bezpośredniej"
     },
     "private": "Prywatne",
     "privateHint": "Te pliki widzą tylko osoby z rozmowy. W kanale także administratorzy.",
@@ -16643,6 +16645,7 @@
     "everyone": "Cała przestrzeń robocza",
     "whereDm": "Wiadomość bezpośrednia z: {{name}}",
     "whereDmGone": "Wiadomość bezpośrednia",
+    "whereDmBetween": "Wiadomość bezpośrednia między: {{names}}",
     "whereChannel": "Członkowie #{{name}}",
     "add": "Dodaj osobę lub rolę",
     "addSearch": "Szukaj osób i ról",
@@ -16668,7 +16671,7 @@
     "undo": "Cofnij",
     "fileRef": "Plik {{title}}",
     "fileRefNone": "Plik bez dostępu",
-    "also": "Udostępniono też: {{who}}.",
+    "also": "{{text}}. Udostępniono też: {{who}}.",
     "someOnlyHere": "Niektóre z tych linków otworzą tylko osoby z rozmowy, w której jest plik."
   },
   "linkErrors": {
@@ -16708,6 +16711,7 @@
       "signIn": "Zaloguj się",
       "open": "Otwórz agentes.chat",
       "latest": "Otwórz najnowszą wersję",
+      "file": "Otwórz plik",
       "retry": "Spróbuj ponownie"
     },
     "errorId": "Kod błędu: {{id}}"

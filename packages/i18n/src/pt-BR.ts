@@ -9860,6 +9860,8 @@ export const ptBR = {
     onlyDriveText: "Ainda não foi compartilhado num canal.",
     dm: "Mensagem direta",
     dmWith: "Mensagem direta com {{name}}",
+    /** Um arquivo de uma DM em que a pessoa não está, compartilhado com ela (ADR 0153): os dois lados da DM. */
+    dmBetween: "Mensagem direta entre {{names}}",
     inDm: "Enviado numa mensagem direta",
     inThread: "Numa thread da conversa",
     audience: {
@@ -9868,6 +9870,8 @@ export const ptBR = {
       privateChannel: "Só os membros de #{{name}} e os administradores podem ver",
       dm: "Só você e {{name}} podem ver: veio de uma mensagem direta",
       dmGone: "Só quem estava na conversa pode ver: veio de uma mensagem direta",
+      /** Para quem não está na DM e recebeu o arquivo por Compartilhar (ADR 0153). */
+      dmBetween: "Só {{names}} podem ver: veio de uma mensagem direta",
     },
     private: "Privado",
     privateHint: "Só quem está na conversa vê estes arquivos. Num canal, os administradores também.",
@@ -15582,6 +15586,8 @@ export const ptBR = {
     everyone: "Todos no workspace",
     whereDm: "A DM com {{name}}",
     whereDmGone: "Uma DM",
+    /** Para quem não está na DM e recebeu o arquivo por Compartilhar. */
+    whereDmBetween: "A DM entre {{names}}",
     whereChannel: "Membros de #{{name}}",
     add: "Adicionar pessoa ou papel",
     addSearch: "Buscar pessoas e papéis",
@@ -15608,7 +15614,8 @@ export const ptBR = {
     undo: "Desfazer",
     fileRef: "Arquivo {{title}}",
     fileRefNone: "Arquivo sem acesso",
-    also: "Também compartilhado com {{who}}.",
+    /** Quem vê o arquivo (`text`, sem ponto final) e quem o Compartilhar acrescentou. */
+    also: "{{text}}. Também compartilhado com {{who}}.",
     /** Copiar links de vários arquivos, alguns abertos só na própria conversa: o aviso, com Compartilhar. */
     someOnlyHere: "Alguns desses links só abrem para quem está na conversa do arquivo.",
   },
@@ -15653,6 +15660,7 @@ export const ptBR = {
       signIn: "Entrar",
       open: "Abrir o agentes.chat",
       latest: "Abrir a versão mais recente",
+      file: "Abrir o arquivo",
       retry: "Tentar de novo",
     },
     errorId: "Código do erro: {{id}}",

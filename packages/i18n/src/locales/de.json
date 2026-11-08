@@ -9837,6 +9837,7 @@
     "onlyDriveText": "Noch in keinem Kanal geteilt.",
     "dm": "Direktnachricht",
     "dmWith": "Direktnachricht mit {{name}}",
+    "dmBetween": "Direktnachricht zwischen {{names}}",
     "inDm": "In einer Direktnachricht gesendet",
     "inThread": "In einem Thread der Unterhaltung",
     "audience": {
@@ -9844,7 +9845,8 @@
       "publicChannel": "Alle im Workspace können es sehen: Es ist im öffentlichen Kanal #{{name}}",
       "privateChannel": "Nur Mitglieder von #{{name}} und Administratoren können es sehen",
       "dm": "Nur du und {{name}} könnt es sehen: Es stammt aus einer Direktnachricht",
-      "dmGone": "Nur die Personen in dieser Unterhaltung können es sehen: Es stammt aus einer Direktnachricht"
+      "dmGone": "Nur die Personen in dieser Unterhaltung können es sehen: Es stammt aus einer Direktnachricht",
+      "dmBetween": "Nur {{names}} können es sehen: Es stammt aus einer Direktnachricht"
     },
     "private": "Privat",
     "privateHint": "Nur die Personen in der Unterhaltung sehen diese Dateien. In einem Kanal auch Administratoren.",
@@ -15563,6 +15565,7 @@
     "everyone": "Der ganze Workspace",
     "whereDm": "Die Direktnachricht mit {{name}}",
     "whereDmGone": "Eine Direktnachricht",
+    "whereDmBetween": "Die Direktnachricht zwischen {{names}}",
     "whereChannel": "Mitglieder von #{{name}}",
     "add": "Person oder Rolle hinzufügen",
     "addSearch": "Personen und Rollen suchen",
@@ -15588,7 +15591,7 @@
     "undo": "Rückgängig",
     "fileRef": "Datei {{title}}",
     "fileRefNone": "Datei ohne Zugriff",
-    "also": "Auch geteilt mit {{who}}.",
+    "also": "{{text}}. Auch geteilt mit {{who}}.",
     "someOnlyHere": "Einige dieser Links öffnen sich nur für Personen in der Unterhaltung der Datei."
   },
   "linkErrors": {
@@ -15628,6 +15631,7 @@
       "signIn": "Anmelden",
       "open": "agentes.chat öffnen",
       "latest": "Neueste Version öffnen",
+      "file": "Datei öffnen",
       "retry": "Noch einmal versuchen"
     },
     "errorId": "Fehlercode: {{id}}"

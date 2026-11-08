@@ -2,6 +2,7 @@ import { requestLocale } from "@agenteschat/engine";
 import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
+import { filePath } from "@agenteschat/tokens/message-links";
 import { bodyPath, bodySvg, eyeShapes } from "@agenteschat/ui/agent/engine";
 import type { Context, MiddlewareHandler } from "hono";
 import { signInPage } from "../routes/app/context";
@@ -112,7 +113,7 @@ const ACTION_KEY: Record<PageCause, string> = {
   file: "open",
   link: "open",
   version: "latest",
-  format: "latest",
+  format: "file",
   busy: "retry",
   server: "retry",
   other: "open",
@@ -146,7 +147,7 @@ ${id}<div class="actions"><a class="btn btn--primary" href="${escapeHtml(action)
 /** The app's address of a file (the Drive with it open), from a file route's path: `/api/app/organizations/<org>/artifacts/<id>/…`. */
 function fileAppLink(base: string, path: string): string | null {
   const m = /^\/api\/app\/organizations\/([0-9a-f-]{36})\/artifacts\/([0-9a-f-]{36})(?:\/|$)/i.exec(path);
-  return m ? `${base}/org/${m[1]}/drive?artifact=${m[2]}` : null;
+  return m?.[1] && m[2] ? `${base}${filePath(m[1], m[2])}` : null;
 }
 
 /**

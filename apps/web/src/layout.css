@@ -3396,14 +3396,19 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   font-weight: 600;
 }
-/* A file's link (FileRef): the #channel pill led by the file's icon; a long name wraps like the words around it. */
+/* A file's link (FileRef): the #channel pill, its name wrapping like the words around it, led by the file's 14px icon in
+   its padding as LinkPill's logo is (below), so the icon never ends a line alone. At 0.3em its middle sits on the
+   capitals' middle within a pixel, measured both as the chat's button and as the link it is outside a viewer. */
 .file-ref {
+  position: relative;
+  padding-left: 20px;
   white-space: normal;
   overflow-wrap: break-word;
 }
 .file-ref > .ac-icon {
-  margin-right: 3px;
-  vertical-align: -2px;
+  position: absolute;
+  top: 0.3em;
+  left: 3px;
 }
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a

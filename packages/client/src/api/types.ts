@@ -3166,10 +3166,16 @@ export interface ArtifactSharing {
 
 export type ArtifactAudience =
   | { kind: "workspace" }
-  /** A public channel's files: anyone in the workspace may open them. */
-  | { kind: "channel"; name: string; private: boolean }
-  /** `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open). */
-  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
+  /**
+   * A public channel's files: anyone in the workspace may open them. `outside`: I don't read the channel, the file was
+   * shared with me (ADR 0153), so there's no way into it.
+   */
+  | { kind: "channel"; name: string; private: boolean; outside?: true }
+  /**
+   * `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open).
+   * `between`: I'm not in it, the file was shared with me (ADR 0153): its sides, no `with`, no way into it.
+   */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true; between?: ArtifactAuthor[] };
 
 /** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
 export interface TrashedArtifact extends Artifact {

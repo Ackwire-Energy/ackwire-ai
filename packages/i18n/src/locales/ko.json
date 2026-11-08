@@ -9410,6 +9410,7 @@
     "onlyDriveText": "아직 채널에 공유하지 않았어요.",
     "dm": "다이렉트 메시지",
     "dmWith": "{{name}}와(과)의 다이렉트 메시지",
+    "dmBetween": "{{names}} 사이의 다이렉트 메시지",
     "inDm": "다이렉트 메시지로 보냄",
     "inThread": "대화의 스레드에 있음",
     "audience": {
@@ -9417,7 +9418,8 @@
       "publicChannel": "공개 채널 #{{name}}에 있어서 워크스페이스의 모든 사람이 볼 수 있어요",
       "privateChannel": "#{{name}} 멤버와 관리자만 볼 수 있어요",
       "dm": "다이렉트 메시지에서 온 파일이라 나와 {{name}}만 볼 수 있어요",
-      "dmGone": "다이렉트 메시지에서 온 파일이라 그 대화에 있는 사람만 볼 수 있어요"
+      "dmGone": "다이렉트 메시지에서 온 파일이라 그 대화에 있는 사람만 볼 수 있어요",
+      "dmBetween": "다이렉트 메시지에서 온 파일이라 {{names}}만 볼 수 있어요"
     },
     "private": "비공개",
     "privateHint": "대화에 있는 사람만 이 파일을 볼 수 있어요. 채널에서는 관리자도 볼 수 있어요.",
@@ -15016,6 +15018,7 @@
     "everyone": "워크스페이스 전체",
     "whereDm": "{{name}}와(과)의 다이렉트 메시지",
     "whereDmGone": "다이렉트 메시지",
+    "whereDmBetween": "{{names}} 사이의 다이렉트 메시지",
     "whereChannel": "#{{name}} 멤버",
     "add": "사람 또는 역할 추가",
     "addSearch": "사람과 역할 검색",
@@ -15041,7 +15044,7 @@
     "undo": "실행 취소",
     "fileRef": "파일 {{title}}",
     "fileRefNone": "접근할 수 없는 파일",
-    "also": "{{who}}와(과)도 공유했어요.",
+    "also": "{{text}}. {{who}}와(과)도 공유했어요.",
     "someOnlyHere": "이 링크 중 일부는 파일이 있는 대화의 사람만 열 수 있어요."
   },
   "linkErrors": {
@@ -15081,6 +15084,7 @@
       "signIn": "로그인",
       "open": "agentes.chat 열기",
       "latest": "최신 버전 열기",
+      "file": "파일 열기",
       "retry": "다시 시도"
     },
     "errorId": "오류 코드: {{id}}"

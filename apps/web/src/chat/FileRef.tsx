@@ -29,7 +29,7 @@ export function FileRef({ link }: { link: FileLink }) {
   }
   if (!a) {
     return (
-      <span className="message-ref message-ref--none file-ref">
+      <span className="message-ref message-ref--none">
         <Icon name="lock" size={14} />
         {t("share.fileRefNone")}
       </span>

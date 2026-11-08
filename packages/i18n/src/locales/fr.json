@@ -10220,6 +10220,7 @@
     "onlyDriveText": "Pas encore partagé dans un canal.",
     "dm": "Message direct",
     "dmWith": "Message direct avec {{name}}",
+    "dmBetween": "Message direct entre {{names}}",
     "inDm": "Envoyé dans un message direct",
     "inThread": "Dans un fil de la conversation",
     "audience": {
@@ -10227,7 +10228,8 @@
       "publicChannel": "Tout le monde dans l'espace de travail peut le voir : il se trouve dans le canal public #{{name}}",
       "privateChannel": "Seuls les membres de #{{name}} et les administrateurs peuvent le voir",
       "dm": "Seuls vous et {{name}} pouvez le voir : il provient d'un message direct",
-      "dmGone": "Seules les personnes de cette conversation peuvent le voir : il provient d'un message direct"
+      "dmGone": "Seules les personnes de cette conversation peuvent le voir : il provient d'un message direct",
+      "dmBetween": "Seuls {{names}} peuvent le voir : il provient d'un message direct"
     },
     "private": "Privé",
     "privateHint": "Seules les personnes de la conversation voient ces fichiers. Dans un canal, les administrateurs aussi.",
@@ -16181,6 +16183,7 @@
     "everyone": "Tout l'espace de travail",
     "whereDm": "Le message direct avec {{name}}",
     "whereDmGone": "Un message direct",
+    "whereDmBetween": "Le message direct entre {{names}}",
     "whereChannel": "Membres de #{{name}}",
     "add": "Ajouter une personne ou un rôle",
     "addSearch": "Rechercher des personnes et des rôles",
@@ -16206,7 +16209,7 @@
     "undo": "Annuler",
     "fileRef": "Fichier {{title}}",
     "fileRefNone": "Fichier sans accès",
-    "also": "Partagé aussi avec {{who}}.",
+    "also": "{{text}}. Partagé aussi avec {{who}}.",
     "someOnlyHere": "Certains de ces liens ne s'ouvrent que pour les personnes de la conversation du fichier."
   },
   "linkErrors": {
@@ -16246,6 +16249,7 @@
       "signIn": "Se connecter",
       "open": "Ouvrir agentes.chat",
       "latest": "Ouvrir la version la plus récente",
+      "file": "Ouvrir le fichier",
       "retry": "Réessayer"
     },
     "errorId": "Code de l'erreur : {{id}}"

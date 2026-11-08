@@ -122,12 +122,22 @@ const multipart = <T extends z.ZodType>(schema: T) => ({
 const Audience = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("workspace") }),
-    z.object({ kind: z.literal("channel"), name: z.string(), private: z.boolean() }),
+    z.object({
+      kind: z.literal("channel"),
+      name: z.string(),
+      private: z.boolean(),
+      outside: z.literal(true).optional().openapi({
+        description: "I don't read the channel: the file was shared with me (ADR 0153), so it can't be opened.",
+      }),
+    }),
     z.object({
       kind: z.literal("dm"),
       with: Author.nullable().openapi({ description: "The other participant." }),
       gone: z.literal(true).optional().openapi({
         description: "The other side is an archived agent or a person who left: the DM can't be opened.",
+      }),
+      between: z.array(Author).optional().openapi({
+        description: "I'm not in the DM, the file was shared with me (ADR 0153): its sides, and no `with`.",
       }),
     }),
   ])

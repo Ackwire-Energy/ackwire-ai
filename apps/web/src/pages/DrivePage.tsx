@@ -17,6 +17,7 @@ import {
   rangeOf,
   sortArtifacts,
 } from "@agenteschat/client/lib/drive";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -151,9 +152,11 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     a.audience.kind === "channel"
       ? `#${a.audience.name}`
       : a.audience.kind === "dm"
-        ? a.audience.with
-          ? t("drive.dmWith", { name: authorName(a.audience.with) })
-          : t("drive.dm")
+        ? a.audience.between
+          ? t("drive.dmBetween", { names: joinNames(a.audience.between.map(authorName), t) })
+          : a.audience.with
+            ? t("drive.dmWith", { name: authorName(a.audience.with) })
+            : t("drive.dm")
         : t("artifacts.noChannel");
 
   /** The client-side filters (who made it, several channels or authors). */

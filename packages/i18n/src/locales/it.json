@@ -10234,6 +10234,7 @@
     "onlyDriveText": "Non ancora condiviso in un canale.",
     "dm": "Messaggio diretto",
     "dmWith": "Messaggio diretto con {{name}}",
+    "dmBetween": "Messaggio diretto tra {{names}}",
     "inDm": "Inviato in un messaggio diretto",
     "inThread": "In un thread della conversazione",
     "audience": {
@@ -10241,7 +10242,8 @@
       "publicChannel": "Tutti nello spazio di lavoro possono vederlo: è nel canale pubblico #{{name}}",
       "privateChannel": "Solo i membri di #{{name}} e gli amministratori possono vederlo",
       "dm": "Solo tu e {{name}} potete vederlo: viene da un messaggio diretto",
-      "dmGone": "Solo le persone di quella conversazione possono vederlo: viene da un messaggio diretto"
+      "dmGone": "Solo le persone di quella conversazione possono vederlo: viene da un messaggio diretto",
+      "dmBetween": "Solo {{names}} possono vederlo: viene da un messaggio diretto"
     },
     "private": "Privato",
     "privateHint": "Solo le persone della conversazione vedono questi file. In un canale, anche gli amministratori.",
@@ -16185,6 +16187,7 @@
     "everyone": "Tutto lo spazio di lavoro",
     "whereDm": "Il messaggio diretto con {{name}}",
     "whereDmGone": "Un messaggio diretto",
+    "whereDmBetween": "Il messaggio diretto tra {{names}}",
     "whereChannel": "Membri di #{{name}}",
     "add": "Aggiungi una persona o un ruolo",
     "addSearch": "Cerca persone e ruoli",
@@ -16210,7 +16213,7 @@
     "undo": "Annulla",
     "fileRef": "File {{title}}",
     "fileRefNone": "File senza accesso",
-    "also": "Condiviso anche con {{who}}.",
+    "also": "{{text}}. Condiviso anche con {{who}}.",
     "someOnlyHere": "Alcuni di questi link si aprono solo per chi è nella conversazione del file."
   },
   "linkErrors": {
@@ -16250,6 +16253,7 @@
       "signIn": "Accedi",
       "open": "Apri agentes.chat",
       "latest": "Apri la versione più recente",
+      "file": "Apri il file",
       "retry": "Riprova"
     },
     "errorId": "Codice dell'errore: {{id}}"

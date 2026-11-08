@@ -7,6 +7,7 @@ import {
   toggledSharing,
 } from "@agenteschat/client/lib/drive";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import {
   Avatar,
@@ -158,9 +159,11 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
   const aud = file.audience;
   const where =
     aud.kind === "dm"
-      ? aud.with
-        ? t("share.whereDm", { name: authorName(aud.with) })
-        : t("share.whereDmGone")
+      ? aud.between
+        ? t("share.whereDmBetween", { names: joinNames(aud.between.map(authorName), t) })
+        : aud.with
+          ? t("share.whereDm", { name: authorName(aud.with) })
+          : t("share.whereDmGone")
       : aud.kind === "channel"
         ? t("share.whereChannel", { name: aud.name })
         : t("share.everyone");

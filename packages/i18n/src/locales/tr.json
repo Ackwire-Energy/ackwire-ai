@@ -9777,6 +9777,7 @@
     "onlyDriveText": "Henüz bir kanalda paylaşılmadı.",
     "dm": "Doğrudan mesaj",
     "dmWith": "{{name}} ile doğrudan mesaj",
+    "dmBetween": "{{names}} arasındaki doğrudan mesaj",
     "inDm": "Doğrudan mesajla gönderildi",
     "inThread": "Konuşmanın bir ileti dizisinde",
     "audience": {
@@ -9784,7 +9785,8 @@
       "publicChannel": "Çalışma alanındaki herkes görebilir: herkese açık #{{name}} kanalında",
       "privateChannel": "Yalnızca #{{name}} üyeleri ve yöneticiler görebilir",
       "dm": "Yalnızca siz ve {{name}} görebilirsiniz: bir doğrudan mesajdan geldi",
-      "dmGone": "Yalnızca o konuşmadaki kişiler görebilir: bir doğrudan mesajdan geldi"
+      "dmGone": "Yalnızca o konuşmadaki kişiler görebilir: bir doğrudan mesajdan geldi",
+      "dmBetween": "Yalnızca {{names}} görebilir: bir doğrudan mesajdan geldi"
     },
     "private": "Özel",
     "privateHint": "Bu dosyaları yalnızca konuşmadaki kişiler görür. Bir kanalda yöneticiler de görür.",
@@ -15493,6 +15495,7 @@
     "everyone": "Tüm çalışma alanı",
     "whereDm": "{{name}} ile doğrudan mesaj",
     "whereDmGone": "Bir doğrudan mesaj",
+    "whereDmBetween": "{{names}} arasındaki doğrudan mesaj",
     "whereChannel": "#{{name}} üyeleri",
     "add": "Kişi veya rol ekle",
     "addSearch": "Kişi ve rol ara",
@@ -15518,7 +15521,7 @@
     "undo": "Geri al",
     "fileRef": "Dosya {{title}}",
     "fileRefNone": "Erişim olmayan dosya",
-    "also": "{{who}} ile de paylaşıldı.",
+    "also": "{{text}}. {{who}} ile de paylaşıldı.",
     "someOnlyHere": "Bu bağlantılardan bazılarını yalnızca dosyanın sohbetindekiler açabilir."
   },
   "linkErrors": {
@@ -15558,6 +15561,7 @@
       "signIn": "Giriş yap",
       "open": "agentes.chat'i aç",
       "latest": "En yeni sürümü aç",
+      "file": "Dosyayı aç",
       "retry": "Yeniden dene"
     },
     "errorId": "Hata kodu: {{id}}"

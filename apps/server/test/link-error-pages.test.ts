@@ -136,7 +136,15 @@ describe("a link opened in a browser that the API refuses: our page, same status
     });
     const format = await open(bia, `${base}/artifacts/${report.id}/file?format=patch`);
     expect(format.status).toBe(400);
-    expect(pageOf(await format.text()).title).toBe("Este arquivo não sai nesse formato");
+    expect(pageOf(await format.text())).toEqual({
+      title: "Este arquivo não sai nesse formato",
+      text: "O link pede um formato em que este arquivo não pode ser salvo.",
+      action: [`http://localhost:3000/org/${orgId}/drive?artifact=${report.id}`, "Abrir o arquivo"],
+    });
+    // A link cut or garbled where its version is: that version doesn't exist, never a failure of ours.
+    const garbled = await open(bia, `${base}/artifacts/${report.id}/file?version=2%26for&format=pdf`);
+    expect(garbled.status).toBe(404);
+    expect(pageOf(await garbled.text()).title).toBe("Esta versão do arquivo não existe");
   });
 
   test("programs keep the JSON exactly: the apps' fetches, the phone, scripts and a download started in the app", async () => {

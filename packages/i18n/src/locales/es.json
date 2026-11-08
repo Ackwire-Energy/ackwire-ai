@@ -10152,6 +10152,7 @@
     "onlyDriveText": "Todavía no se compartió en un canal.",
     "dm": "Mensaje directo",
     "dmWith": "Mensaje directo con {{name}}",
+    "dmBetween": "Mensaje directo entre {{names}}",
     "inDm": "Enviado en un mensaje directo",
     "inThread": "En un hilo de la conversación",
     "audience": {
@@ -10159,7 +10160,8 @@
       "publicChannel": "Todos en el espacio de trabajo pueden verlo: está en el canal público #{{name}}",
       "privateChannel": "Solo los miembros de #{{name}} y los administradores pueden verlo",
       "dm": "Solo tú y {{name}} pueden verlo: vino de un mensaje directo",
-      "dmGone": "Solo las personas de esa conversación pueden verlo: vino de un mensaje directo"
+      "dmGone": "Solo las personas de esa conversación pueden verlo: vino de un mensaje directo",
+      "dmBetween": "Solo {{names}} pueden verlo: vino de un mensaje directo"
     },
     "private": "Privado",
     "privateHint": "Solo las personas de la conversación ven estos archivos. En un canal, también los administradores.",
@@ -16041,6 +16043,7 @@
     "everyone": "Todo el espacio de trabajo",
     "whereDm": "El mensaje directo con {{name}}",
     "whereDmGone": "Un mensaje directo",
+    "whereDmBetween": "El mensaje directo entre {{names}}",
     "whereChannel": "Miembros de #{{name}}",
     "add": "Añadir una persona o un rol",
     "addSearch": "Buscar personas y roles",
@@ -16066,7 +16069,7 @@
     "undo": "Deshacer",
     "fileRef": "Archivo {{title}}",
     "fileRefNone": "Archivo sin acceso",
-    "also": "También compartido con {{who}}.",
+    "also": "{{text}}. También compartido con {{who}}.",
     "someOnlyHere": "Algunos de estos enlaces solo se abren para quien está en la conversación del archivo."
   },
   "linkErrors": {
@@ -16106,6 +16109,7 @@
       "signIn": "Iniciar sesión",
       "open": "Abrir agentes.chat",
       "latest": "Abrir la versión más reciente",
+      "file": "Abrir el archivo",
       "retry": "Intentar de nuevo"
     },
     "errorId": "Código del error: {{id}}"

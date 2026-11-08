@@ -7,7 +7,7 @@ import type { ApiClient, Artifact } from "@agenteschat/client";
 import { onlyItsConversation, toggledSharing } from "@agenteschat/client/lib/drive";
 import { filePath, parseFileLink } from "@agenteschat/client/lib/message-links";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 const copied: string[] = [];
@@ -185,6 +185,70 @@ describe("Compartilhar (ADR 0153)", () => {
     await settle(3);
     expect(shareDialog("Relatório de visitas")).toBeTruthy();
     expect(report.id).toBeTruthy();
+  });
+
+  test("shared with me from a DM I'm not in: whose DM it is, no way into it, and the sharing isn't mine to change", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const report = await api.artifacts.create(ORG_ID, {
+      title: "Relatório de visitas",
+      channelId: GENERAL_ID,
+      content: { kind: "document", markdown: "# Visitas" },
+    });
+    // As the server answers someone João's DM with Atlas was shared with (ADR 0153).
+    const outsider = <T extends Artifact>(a: T): T =>
+      a.id === report.id
+        ? {
+            ...a,
+            channelId: "dm-joao-atlas",
+            audience: {
+              kind: "dm",
+              with: null,
+              between: [
+                { type: "person", id: "u-joao" },
+                { type: "agent", id: ATLAS_ID },
+              ],
+            },
+            sharing: { mode: "people", userIds: ["u-walter"], roleIds: [] },
+            canShare: false,
+          }
+        : a;
+    const list = api.artifacts.list;
+    api.artifacts.list = async (...args) => (await list(...args)).map(outsider);
+    const get = api.artifacts.get;
+    api.artifacts.get = async (...args) => outsider(await get(...args));
+    await renderApp(`/org/${ORG_ID}/drive`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Relatório de visitas" }));
+    await settle(4);
+    const panel = screen().getByRole("dialog", { name: "Relatório de visitas" });
+    expect(panel.querySelector(".drive-audience")?.textContent).toBe(
+      "Só João e Atlas podem ver: veio de uma mensagem direta. Também compartilhado com Walter.",
+    );
+    expect(panel.textContent).toContain("Mensagem direta entre João e Atlas");
+    await pick(panel, /^Mais ações: /, "Compartilhar");
+    const dialog = shareDialog("Relatório de visitas");
+    expect([...dialog.querySelectorAll(".share__name")].map((n) => n.textContent)).toEqual([
+      "A DM entre João e Atlas",
+      "Walter (você)",
+    ]);
+    expect(dialog.textContent).toContain("Só quem está na conversa muda quem vê.");
+    const options = [...dialog.querySelectorAll("button.ac-option")];
+    expect(options.length).toBe(3);
+    expect(options.every((b) => b.hasAttribute("disabled"))).toBe(true);
+    await click(within(dialog).getByRole("button", { name: "Concluir" }));
+    await settle(2);
+    // Its "…" has no way into a DM I'm not in (neither mine with Atlas nor mine with João).
+    const more = within(panel).getByRole("button", { name: /^Mais ações: / });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    const menu = screen().getByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: "Compartilhar" })).toBeTruthy();
+    expect(within(menu).queryByRole("menuitem", { name: "Abrir a conversa" })).toBeNull();
   });
 });
 

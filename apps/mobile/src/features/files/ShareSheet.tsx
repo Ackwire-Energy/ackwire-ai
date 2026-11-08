@@ -1,6 +1,7 @@
 import { type ArtifactSharing, useArtifact, useRoles, useSetArtifactSharing } from "@agenteschat/client";
 import { CONVERSATION_ONLY, isPrivateArtifact, toggledSharing } from "@agenteschat/client/lib/drive";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { filePath } from "@agenteschat/client/lib/message-links";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import { useState } from "react";
@@ -107,9 +108,11 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
   const aud = a.audience;
   const where =
     aud.kind === "dm"
-      ? aud.with
-        ? t("share.whereDm", { name: dir.nameOf(aud.with) })
-        : t("share.whereDmGone")
+      ? aud.between
+        ? t("share.whereDmBetween", { names: joinNames(aud.between.map(dir.nameOf), t) })
+        : aud.with
+          ? t("share.whereDm", { name: dir.nameOf(aud.with) })
+          : t("share.whereDmGone")
       : aud.kind === "channel"
         ? t("share.whereChannel", { name: aud.name })
         : t("share.everyone");
