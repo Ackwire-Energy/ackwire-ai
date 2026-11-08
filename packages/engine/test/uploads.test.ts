@@ -597,7 +597,7 @@ describe("upload_file", () => {
     expect(out).toMatchObject({
       isError: true,
       content:
-        "Failed: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
+        "Failed: The computer Build box needs an update to receive files over 5 MB. Its owner updates the agentes app there, or runs `agentes-runner update`.",
     });
     expect(await pulls()).toEqual([]);
   });

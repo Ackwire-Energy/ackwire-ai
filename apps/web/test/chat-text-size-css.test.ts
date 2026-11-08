@@ -87,7 +87,8 @@ test("the name, its time and the clocks beside the words follow the step too", (
   expect(last(".ac-msg__clock", "top")).toContain("var(--msg-line)");
   expect(last('.ac-msg[data-look="compact"] .ac-msg__avatar', "top")).toContain("var(--msg-line)");
   expect(last('.ac-msg[data-look="compact"]', "min-height")).toBe("var(--msg-line)");
-  expect(css.replace(/\s+/g, "")).toContain("top:calc(7px+var(--msg-line)/2-var(--cap-mid)-15px)");
+  // Half of the kit's 28px icon button under that middle.
+  expect(css.replace(/\s+/g, "")).toContain("top:calc(7px+var(--msg-line)/2-var(--cap-mid)-14px)");
 });
 
 test("code in a message takes the step as its words do, the default keeping its 12.5px on a 20px line", () => {

@@ -389,8 +389,14 @@ function InviteActions() {
   return (
     <>
       {!held && (
-        <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
-          <SwapLabel label={t("members.copyInviteLink")} alt={t("common.copied")} showAlt={copied !== null} />
+        <Button loading={make.isPending} onClick={() => void copyLink()}>
+          <SwapLabel
+            icon="link"
+            altIcon="check"
+            label={t("members.copyInviteLink")}
+            alt={t("common.copied")}
+            showAlt={copied !== null}
+          />
         </Button>
       )}
       {invite && (
@@ -601,11 +607,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
               aria-label={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
               onFocus={(e) => e.currentTarget.select()}
             />
-            <Button
-              icon={copied ? "check" : "copy"}
-              onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}
-            >
-              <SwapLabel label={t("common.copy")} alt={t("common.copied")} showAlt={copied} />
+            <Button onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}>
+              <SwapLabel
+                icon="copy"
+                altIcon="check"
+                label={t("common.copy")}
+                alt={t("common.copied")}
+                showAlt={copied}
+              />
             </Button>
           </div>
         </DialogBody>
@@ -779,12 +788,17 @@ function SentInvitations() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        icon={copied === inv.id ? "check" : "copy"}
                         onClick={() =>
                           copy(inv.id, inv.url ?? "", t(`members.invitations.${words.copied}`, { email: inv.email }))
                         }
                       >
-                        <SwapLabel label={t("members.copyLink")} alt={t("common.copied")} showAlt={copied === inv.id} />
+                        <SwapLabel
+                          icon="copy"
+                          altIcon="check"
+                          label={t("members.copyLink")}
+                          alt={t("common.copied")}
+                          showAlt={copied === inv.id}
+                        />
                       </Button>
                     )}
                     <Button

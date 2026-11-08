@@ -4540,12 +4540,21 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--primary.ac-btn--loading .ac-btn__spinner {
   color: var(--on-action);
 }
-/* Words that take turns (`SwapLabel`): stacked in one cell, the unseen one keeps its width. */
+/*
+ * Words that take turns (`SwapLabel`), each with its icon: stacked in one cell the wider one sizes, the unseen one
+ * keeping its width. The one shown sits in the cell's middle with its icon at the button's gap, so the room the other
+ * keeps splits between both ends instead of opening between the icon and its words.
+ */
 .ac-swap {
   display: inline-grid;
+  gap: inherit;
 }
 .ac-swap > * {
   grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: inherit;
 }
 .ac-swap > [aria-hidden="true"] {
   visibility: hidden;
@@ -4973,7 +4982,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
  * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
  * folded to its icon, say), the box places it.
  */
-:where(.ac-btn > .ac-icon:first-child) {
+:where(.ac-btn > .ac-icon:first-child, .ac-btn > .ac-swap > * > .ac-icon:first-child) {
   margin-inline-start: calc(-1 * var(--lead-air));
   translate: 0 calc(-1 * var(--lead-rise));
 }

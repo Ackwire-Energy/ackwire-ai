@@ -7470,10 +7470,12 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
     display: none;
   }
 }
-/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it. The zoom bar comes
-   with the picture (no "100%" while its bytes are on the way). */
-.izoom__status {
-  animation: izoom-wait 0.3s;
+/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it (with reduced
+   motion it shows at once). The zoom bar comes with the picture (no "100%" while its bytes are on the way). */
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__status {
+    animation: izoom-wait 0.3s;
+  }
 }
 @keyframes izoom-wait {
   from,
