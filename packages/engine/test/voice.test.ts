@@ -148,6 +148,38 @@ describe("sending", () => {
     expect((await messageOf(clipId))?.body).toBe("oi");
   });
 
+  test("a slow engine gets the next one beside it after its time alone, and the first words win", async () => {
+    f = await setup();
+    let late: (value: { text: string }) => void = () => {};
+    const slow: SpeechEngine = {
+      ...engine(),
+      id: "local" as SpeechProviderId,
+      file: () => new Promise((resolve) => (late = resolve)),
+    };
+    const fast = { ...engine("oi, tudo certo"), id: "deepinfra" as SpeechProviderId };
+    const deps = voiceDeps([slow, fast], { hedgeAfterMs: () => 10 });
+    const { clipId } = await accept(deps);
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await messageOf(clipId))?.body).toBe("oi, tudo certo");
+    expect((await clipOf(clipId)).engine).toBe("deepinfra");
+    // The slow one's answer arriving afterwards changes nothing.
+    late({ text: "tarde demais" });
+    await Bun.sleep(5);
+    expect((await messageOf(clipId))?.body).toBe("oi, tudo certo");
+  });
+
+  test("an engine that answers in time never wakes the next one", async () => {
+    f = await setup();
+    const first = engine("rápido");
+    const second = engine("nunca");
+    const deps = voiceDeps([first, second], { hedgeAfterMs: () => 50 });
+    const { clipId } = await accept(deps);
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    await Bun.sleep(80);
+    expect((await messageOf(clipId))?.body).toBe("rápido");
+    expect(second.sent).toHaveLength(0);
+  });
+
   test("a server of one's own that says the language isn't for it hands over at once, with no retry", async () => {
     f = await setup();
     // The speech service answers 422 for a language Parakeet doesn't know, which the adapter reads as refused.

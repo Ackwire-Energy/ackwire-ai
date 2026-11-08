@@ -61,7 +61,12 @@ export interface VoiceDeps {
   /** Days a recording is kept (`VOICE_RETENTION_DAYS`); 0: forever. */
   retentionDays: number;
   judge?: Judge | null;
+  /** Tests: how long an engine works alone (`hedgeAfterMs`). */
+  hedgeAfterMs?: (durationMs: number) => number;
 }
+
+/** How long an engine has a recording to itself before the next one starts beside it: 19 s for 88 s of audio. */
+export const hedgeAfterMs = (durationMs: number) => 8_000 + durationMs / 8;
 
 function cleanPeaks(peaks: unknown): number[] {
   if (!Array.isArray(peaks)) return [];
@@ -235,30 +240,66 @@ async function dropClip(deps: VoiceDeps, clip: Clip, reason: "silent" | "refused
   await place.delete(clip.blobKey).catch(() => undefined);
 }
 
-/** The words of a recording, from the first engine that answers; null when none could. */
-async function wordsOf(deps: VoiceDeps, clip: Clip, audio: Uint8Array) {
+/**
+ * The words of a recording, from the first engine that answers; null when none could. A failing engine hands over at
+ * once, and one still working after `hedgeAfterMs` gets the next one beside it: the first words win. The other's
+ * answer is dropped (a hosted engine still bills that call).
+ */
+async function wordsOf(
+  deps: VoiceDeps,
+  clip: Clip,
+  audio: Uint8Array,
+): Promise<{ engine: SpeechEngine; text: string } | null> {
   const terms = await namesFor(deps.db, clip.orgId);
-  // The last failure that a retry may get past: one engine busy is worth a retry even when the others refused.
-  let last: unknown = null;
-  let refused = false;
-  for (const engine of deps.engines()) {
-    try {
-      const { text } = await engine.file({
-        audio,
-        contentType: clip.contentType,
-        language: clip.language,
-        terms,
-        orgId: clip.orgId,
-        durationMs: clip.durationMs,
-      });
-      return { engine, text: text.trim() };
-    } catch (error) {
-      if (error instanceof SpeechError && error.reason === "refused") refused = true;
-      else last = error;
-    }
-  }
-  if (refused && !last) return null;
-  throw last ?? new Error("no speech engine on this server");
+  const input = {
+    audio,
+    contentType: clip.contentType,
+    language: clip.language,
+    terms,
+    orgId: clip.orgId,
+    durationMs: clip.durationMs,
+  };
+  const engines = deps.engines();
+  const alone = (deps.hedgeAfterMs ?? hedgeAfterMs)(clip.durationMs);
+  return new Promise((resolve, reject) => {
+    // The last failure that a retry may get past: one engine busy is worth a retry even when the others refused.
+    let last: unknown = null;
+    let refused = false;
+    let next = 0;
+    let working = 0;
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      clearTimeout(timer);
+      if (done) return;
+      const engine = engines[next++];
+      if (!engine) {
+        if (working > 0) return;
+        done = true;
+        if (refused && !last) resolve(null);
+        else reject(last ?? new Error("no speech engine on this server"));
+        return;
+      }
+      working++;
+      engine.file(input).then(
+        ({ text }) => {
+          working--;
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve({ engine, text: text.trim() });
+        },
+        (error: unknown) => {
+          working--;
+          if (error instanceof SpeechError && error.reason === "refused") refused = true;
+          else last = error;
+          start();
+        },
+      );
+      if (next < engines.length) timer = setTimeout(start, alone);
+    };
+    start();
+  });
 }
 
 const costOf = (engine: SpeechEngine, durationMs: number) =>
