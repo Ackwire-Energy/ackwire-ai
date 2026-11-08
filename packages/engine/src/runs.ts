@@ -134,10 +134,17 @@ const PROVIDER_CAUSES: ReadonlySet<string> = new Set([
 const CAUSE_STATUS: Readonly<Record<string, number>> = { quota: 429, billing: 402, provider_transient: 503 };
 /** "API Error: 529 {…}": a provider's answer, as Claude Code words it. */
 const API_ERROR = /\bAPI Error:? (\d{3})\b/;
-/** The runner's words when the CLI ended without its answer: how it ended, then what it said on its way out. */
-const ENDED = /^\S.*? ended without an answer \(((?:exit|signal) [^)]*)\)(?::\s*([\s\S]*))?$/;
-/** The CLI's result said it failed, and nothing more (`error_during_execution`). */
-const BARE_RESULT = /^\S.*? ended with \w+$/;
+/**
+ * The runner's words when the CLI ended without its answer, how it ended then what it said on its way out: Claude
+ * Code's (`ended without an answer (exit 1): …`) and the other CLIs' (`Codex exited with code 1: …`).
+ */
+const ENDED =
+  /^\S.*? (?:ended without an answer \(((?:exit|signal) [^)]*)\)|exited with code (\S+?))(?::\s*([\s\S]*))?$/;
+/**
+ * The CLI's turn ended failed and it said nothing more: Claude Code's result (`error_during_execution`, `an error`),
+ * another CLI that left with exit 0 short of its answer (`ended without finishing the turn`).
+ */
+const BARE_RESULT = /^\S.*? ended (?:with (?:\w+|an error)|without finishing the turn)$/;
 
 /** A CLI's own failed turn (`claude_failed`, `codex_failed`…), as against its computer's or its plan's. */
 export const isCliFailure = (code: string) => Object.hasOwn(CLI_CODES, code);
@@ -171,10 +178,13 @@ export function cliFailureOf(
     return { provider };
   }
   const brain = BRAIN_NAMES[kind];
-  if (BARE_RESULT.test(failure.message)) return { brain, words: "" };
-  const ended = ENDED.exec(failure.message);
-  if (!ended) return { brain, words: cliErrorWords(failure.message) };
-  return { brain, words: cliErrorWords(ended[2] ?? ""), ended: ended[1] ?? "" };
+  const said = failure.message;
+  // The runner's own sentence about its CLI, never one the CLI said itself ("MCP server exited with code 1").
+  const runner = said.startsWith(`${brain} `) || said.startsWith(`The ${brain} `);
+  if (runner && BARE_RESULT.test(said)) return { brain, words: "" };
+  const ended = runner ? ENDED.exec(said) : null;
+  if (!ended) return { brain, words: cliErrorWords(said) };
+  return { brain, words: cliErrorWords(ended[3] ?? ""), ended: ended[1] ?? `exit ${ended[2]}` };
 }
 
 /**

@@ -270,7 +270,7 @@ export function cliErrorWords(text: string): string {
   const safe = scrubSignIns(redactCredentials(said.replace(/file:\/\//g, "")), "••••").text;
   const short = safe
     .replace(ABSOLUTE_PATH, (path) => path.split(/[\\/]/).filter(Boolean).at(-1) ?? "")
-    .replace(/^(?:Uncaught )?Error:\s*/, "")
+    .replace(/^(?:Uncaught )?error:\s*/i, "")
     .replace(/\s+/g, " ")
     .trim();
   return cutText(short, 200);

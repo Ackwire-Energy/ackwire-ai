@@ -175,9 +175,28 @@ test("a CLI's failure says who failed it: the provider as a key's failure reads,
   expect(
     runErrorDetail(cliFailureText(cli("Overloaded", { cause: "provider_transient" }), {}, "gave_up")),
   ).toMatchObject({ errorCode: "run.provider_down", errorParams: { provider: "Claude" } });
-  // Another CLI's, and what isn't a CLI's.
-  expect(cliFailureText(cli("Cursor exited with code 2: error: unknown model", undefined, "cursor_failed"))).toBe(
-    "cli_failed: Cursor: Cursor exited with code 2: error: unknown model",
+  // The other CLIs read as Claude Code does: what they said on their way out, else how they ended, else that they
+  // stopped. Never the runner's own sentence about them.
+  const other = (message: string, code: string) => cliFailureText(cli(message, undefined, code));
+  expect(other("Cursor exited with code 2: error: unknown model", "cursor_failed")).toBe(
+    "cli_failed: Cursor: unknown model",
+  );
+  expect(other("The Antigravity CLI exited with code 1: Error: quota project not set", "antigravity_failed")).toBe(
+    "cli_failed: Antigravity CLI: quota project not set",
+  );
+  expect(other("Codex exited with code 137", "codex_failed")).toBe("cli_closed: Codex: exit 137");
+  expect(runErrorDetail(other("Grok Build exited with code ?", "grok_failed"))).toEqual({
+    errorCode: "run.cli_closed",
+    errorParams: { brain: "Grok Build" },
+  });
+  expect(other("OpenCode ended without finishing the turn", "opencode_failed")).toBe("cli_failed: OpenCode");
+  expect(other("Claude Code ended with an error", "claude_failed")).toBe("cli_failed: Claude Code");
+  // A Codex turn that failed in its own words, even ones that sound like the runner's.
+  expect(other("stream disconnected before completion: idle timeout", "codex_failed")).toBe(
+    "cli_failed: Codex: stream disconnected before completion: idle timeout",
+  );
+  expect(other("MCP server agentes exited with code 1", "codex_failed")).toBe(
+    "cli_failed: Codex: MCP server agentes exited with code 1",
   );
   expect(cliFailureText(cli("boom", undefined, "runner_error"))).toBeNull();
 });
@@ -197,4 +216,12 @@ test("what a CLI said is safe to show anyone: no secrets, no sign-ins, no folder
   );
   expect(cliErrorWords(`Error: ${"x".repeat(500)}`)).toHaveLength(200);
   expect(cliErrorWords("first line\nsecond line")).toBe("second line");
+  // Sign-ins in an address, a token pasted in a command, a signed one, a folder in quotes or in a file:// address.
+  const more = cliErrorWords(
+    "error: GET https://ana:hunter2-FAKE@git.example.com/x?access_token=FAKEFAKEFAKEFAKE1234 with ghp_FAKEFAKEFAKEFAKEFAKEFAKE12 " +
+      "and eyJFAKEFAKEFAKE.FAKEFAKEFAKEFAKE.FAKEFAKE failed reading '/home/ana/acme/.claude.json' and file:///Users/ana/acme/x.md",
+  );
+  for (const leak of ["hunter2", "FAKEFAKEFAKEFAKE1234", "ghp_", "eyJFAKE", "/home", "Users", "acme"])
+    expect(more).not.toContain(leak);
+  expect(more).toContain(".claude.json");
 });
