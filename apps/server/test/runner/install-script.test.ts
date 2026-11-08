@@ -14,7 +14,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, CHROME_NEEDED } from "@agenteschat/adapters/machine-protocol";
+import {
+  AGENT_BROWSER_SHA256,
+  AGENT_BROWSER_VERSION,
+  agentBrowserUrl,
+  CHROME_NEEDED,
+  CHROMIUM_LINUX,
+  CHROMIUM_NEEDED,
+} from "@agenteschat/adapters/machine-protocol";
 import { lastLine } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
@@ -450,9 +457,15 @@ function rootLinux() {
   );
   writeFileSync(path.join(pc.fake, "chown"), "#!/bin/sh\n", { mode: 0o755 });
   symlinkSync(Bun.which("dirname") as string, path.join(pc.fake, "dirname"));
+  for (const tool of ["ls", "head", "cat", "printf"]) {
+    const real = Bun.which(tool);
+    if (real && !existsSync(path.join(pc.sys, tool))) symlinkSync(real, path.join(pc.sys, tool));
+  }
   const at = (dir: string) => path.join(pc.home, "system", dir);
   const script = installScript("https://agentes.test")
     .replace(RUNNER_BUN_SHA256["linux-aarch64"], createHash("sha256").update(FAKE_ZIP).digest("hex"))
+    // The fake computer is an arm64 one: its agent-browser is what fakeComputer's curl serves for any other download.
+    .replace(AGENT_BROWSER_SHA256["linux-arm64"], createHash("sha256").update("#!/usr/bin/env node\n").digest("hex"))
     .replaceAll(shQuote(SYSTEM_BROWSER_DIR), shQuote(at("opt/browser")))
     .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
     .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
@@ -461,7 +474,9 @@ function rootLinux() {
     .replace(/^CHROME_KEYRING=.*$/m, `CHROME_KEYRING=${shQuote(at("keyrings/google-chrome.gpg"))}`)
     .replace(/^CHROME_SOURCES=.*$/m, `CHROME_SOURCES=${shQuote(at("apt/sources.list.d/google-chrome.sources"))}`)
     .replace(/^CHROME_UPDATES=.*$/m, `CHROME_UPDATES=${shQuote(at("systemd/agentes-chrome-update"))}`)
-    .replace(/^CHROME_DESKTOP=.*$/m, `CHROME_DESKTOP=${shQuote(at("applications/google-chrome.desktop"))}`);
+    .replace(/^CHROME_DESKTOP=.*$/m, `CHROME_DESKTOP=${shQuote(at("applications/google-chrome.desktop"))}`)
+    .replace(/^CHROMIUM_EXE=.*$/m, `CHROMIUM_EXE=${shQuote(at("chromium/chromium"))}`)
+    .replace(/^CHROMIUM_DESKTOP=.*$/m, `CHROMIUM_DESKTOP=${shQuote(at("applications/chromium.desktop"))}`);
   return { ...pc, at, script };
 }
 
@@ -491,6 +506,9 @@ test.skipIf(process.platform === "win32")(
       opt: "755",
       "opt/bin": "755",
       "opt/bin/bun": "755",
+      // Its agent-browser (arm64 here), for every agent's user to run.
+      "opt/browser": "755",
+      [`opt/browser/agent-browser-${AGENT_BROWSER_VERSION}`]: "755",
       "opt/agentes-runner.mjs": "644",
       "bin/agentes-runner": "755",
       var: "700",
@@ -567,10 +585,6 @@ esac
 exit 0
 `,
   );
-  for (const tool of ["ls", "head", "cat", "printf"]) {
-    const real = Bun.which(tool);
-    if (real && !existsSync(path.join(pc.sys, tool))) symlinkSync(real, path.join(pc.sys, tool));
-  }
   const script = pc.script.replace(AGENT_BROWSER_SHA256["linux-x64"], sha256(FAKE_AB));
   const browser = (p = "") => pc.at(path.join("opt/browser", p));
   const run = (text = script, more: string[] = ["--no-start"]) => pc.install(text, ["--system", "--no-pair", ...more]);
@@ -734,6 +748,123 @@ test.skipIf(process.platform === "win32")(
     expect(r.out).toContain("failed: each agent installs what's missing at its browser's first use");
     expect(readdirSync(pc.browser())).toEqual([]);
     expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
+  },
+  30_000,
+);
+
+/**
+ * Root on arm64 Linux (Debian), where Google makes no Chrome: its apt's `install chromium` puts a Chromium
+ * (142.0.7444.59) where Debian's package does, unless `aptFails`; the computer's default browser is Firefox.
+ */
+function rootArm(opts: { aptFails?: boolean } = {}) {
+  const pc = rootLinux();
+  const fake = (name: string, text: string) => writeFileSync(path.join(pc.fake, name), text, { mode: 0o755 });
+  mkdirSync(pc.at("opt/bin"), { recursive: true });
+  writeFileSync(pc.at("opt/bin/bun"), fakeBun(RUNNER_BUN_VERSION, true), { mode: 0o755 });
+  const chromium = pc.at("chromium/chromium");
+  fake(
+    "apt-get",
+    `#!/bin/sh
+echo "apt-get $*" >> "$LOG"
+case " $* " in *" chromium "*)
+  ${opts.aptFails ? "exit 100" : ""}
+  mkdir -p '${path.dirname(chromium)}'
+  printf '#!/bin/sh\\necho "Chromium 142.0.7444.59 built on Debian GNU/Linux 13 (trixie)"\\n' > '${chromium}' && chmod 755 '${chromium}' ;;
+esac
+`,
+  );
+  fake(
+    "systemctl",
+    '#!/bin/sh\necho "systemctl $*" >> "$LOG"\necho "systemd 257 (257.9)"\necho "+PAM +BPF_FRAMEWORK"\n',
+  );
+  fake(
+    "update-alternatives",
+    `#!/bin/sh
+case "$1" in
+  --query) [ "$2" = x-www-browser ] && printf 'Name: x-www-browser\\nStatus: auto\\nValue: /usr/bin/firefox\\n' ;;
+  *) echo "update-alternatives $*" >> "$LOG" ;;
+esac
+exit 0
+`,
+  );
+  const run = (more: string[] = ["--no-start"]) => pc.install(pc.script, ["--system", "--no-pair", ...more]);
+  return { ...pc, run, chromium };
+}
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system on arm64: its agent-browser, and Debian's Chromium (no Google Chrome there), updated the same way",
+  () => {
+    const pc = rootArm();
+    const r = pc.run(["--desktop", "--no-start"]);
+    expect(r.status).toBe(0);
+    // agent-browser's arm64 build, checked against its own SHA-256.
+    expect(r.log).toContain(`curl ${agentBrowserUrl("linux-arm64")}\n`);
+    expect(readdirSync(pc.at("opt/browser"))).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+    // Chromium from the computer's own apt: nothing of Google's repository.
+    expect(r.log).toContain("apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends chromium\n");
+    expect(r.log).not.toContain(GOOGLE_APT.key);
+    expect(r.log).not.toContain("google-chrome-stable");
+    expect(existsSync(pc.at("apt/sources.list.d/google-chrome.sources"))).toBe(false);
+    // Upgraded every 6 hours by the same timer, Chromium alone.
+    expect(read(pc.at("systemd/agentes-chrome-update.service"))).toContain(
+      "install -y --only-upgrade --no-install-recommends chromium'\n",
+    );
+    expect(read(pc.at("systemd/agentes-chrome-update.service"))).toContain(
+      "Description=Chromium's updates for the agents' browsers\n",
+    );
+    expect(r.log).toContain("systemctl enable --now agentes-chrome-update.timer\n");
+    expect(r.log).toContain("update-alternatives --set x-www-browser /usr/bin/firefox\n");
+    expect(read(pc.at("applications/chromium.desktop"))).toContain("NoDisplay=true\n");
+    expect(existsSync(pc.at("applications/google-chrome.desktop"))).toBe(false);
+    expect(r.out).toContain("Chromium 142.0.7444.59, upgraded every 6 hours");
+
+    // Again, with Chromium there: nothing installed again.
+    const again = pc.run();
+    expect(again.status).toBe(0);
+    expect(again.log.split("install -y --no-install-recommends chromium").length).toBe(2);
+    expect(again.out).toContain("Chromium 142.0.7444.59, updated by this computer's own updates");
+
+    // apt failing only says so, and the install goes on.
+    const failing = rootArm({ aptFails: true });
+    const r2 = failing.run();
+    expect(r2.status).toBe(0);
+    expect(r2.out).toContain("Installing Chromium failed: run this installer again.");
+    expect(existsSync(failing.at("opt/agentes-runner.mjs"))).toBe(true);
+
+    // No apt: the person installs Chromium, told how.
+    const noApt = rootArm();
+    rmSync(path.join(noApt.fake, "apt-get"));
+    const r3 = noApt.run();
+    expect(r3.status).toBe(0);
+    expect(r3.out).toContain(CHROMIUM_NEEDED);
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "as a person on arm64 Linux: without Chromium told how to install it, with Debian's or Ubuntu's snap not",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
+    const mine = CHROMIUM_LINUX.map((exe) => path.join(pc.home, "none", exe));
+    let script = installScript("https://x.test").replace(
+      `CHROME_EXE='${GOOGLE_CHROME_LINUX}'`,
+      `CHROME_EXE='${pc.home}/none/chrome'`,
+    );
+    CHROMIUM_LINUX.forEach((exe, i) => {
+      script = script.replace(` ${shQuote(exe)}`, ` ${shQuote(mine[i] as string)}`);
+    });
+    const r = pc.install(script);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(CHROMIUM_NEEDED);
+    expect(r.out).not.toContain(CHROME_NEEDED);
+    for (const exe of mine) {
+      mkdirSync(path.dirname(exe), { recursive: true });
+      writeFileSync(exe, "#!/bin/sh\n", { mode: 0o755 });
+      const again = pc.install(script);
+      expect(again.status).toBe(0);
+      expect(again.out).not.toContain(CHROMIUM_NEEDED);
+      rmSync(exe);
+    }
   },
   30_000,
 );

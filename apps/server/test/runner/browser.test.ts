@@ -9,6 +9,7 @@ import {
   BROWSER_PROTOCOL,
   browserSetupOf,
   CHROME_FAILURES,
+  CHROMIUM_LINUX,
   chromeFailureKind,
   decodeBrowserFrame,
   MACHINE_PROTOCOL_VERSION,
@@ -17,6 +18,7 @@ import {
   parseServerFrame,
   type RunnerAccess,
   type RunnerFrame,
+  usesChromium,
 } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
@@ -34,8 +36,10 @@ import {
   captureTime,
   chromeCandidates,
   chromeLaunchArgs,
+  chromeName,
   chromeUserAgent,
   chromeVersion,
+  confinedChrome,
   crashPage,
   DRAG_GAP_MAX_MS,
   DRAG_LAG_MAX_MS,
@@ -268,7 +272,22 @@ test("only the computer's Google Chrome is driven, at its standard path on each 
     path.join("/Applications", app),
     path.join(home, "Applications", app),
   ]);
-  expect(chromeCandidates(home, "linux")).toEqual(["/opt/google/chrome/chrome"]);
+  expect(chromeCandidates(home, "linux", {}, "x64")).toEqual(["/opt/google/chrome/chrome"]);
+  // Linux on ARM, where Google makes no Chrome: Debian's Chromium, then Ubuntu's snap (ADR 0153).
+  expect(chromeCandidates(home, "linux", {}, "arm64")).toEqual([
+    "/opt/google/chrome/chrome",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+  ]);
+  expect(usesChromium("linux", "arm64")).toBe(true);
+  expect(usesChromium("linux", "x64")).toBe(false);
+  expect(usesChromium("darwin", "arm64")).toBe(false);
+  expect(chromeName("/opt/google/chrome/chrome")).toBe("Google Chrome");
+  for (const exe of CHROMIUM_LINUX) expect(chromeName(exe)).toBe("Chromium");
+  // Only the snap reads no hidden folder at the top of the home, so its start pages move.
+  expect(confinedChrome("/snap/bin/chromium")).toBe(true);
+  expect(confinedChrome("/usr/bin/chromium")).toBe(false);
+  expect(confinedChrome(null)).toBe(false);
   expect(
     chromeCandidates(home, "win32", {
       ProgramFiles: "C:\\Program Files",
@@ -1989,7 +2008,9 @@ test.if(posix)(
       () => null,
       (e: unknown) => e as { code?: string; message?: string },
     );
-    expect(err).toMatchObject({ code: "browser_unavailable", message: CHROME_FAILURES.missing });
+    // On Linux on ARM the agent is told to install Chromium instead (ADR 0153), read as missing all the same.
+    const missing = usesChromium() ? CHROME_FAILURES.missingChromium : CHROME_FAILURES.missing;
+    expect(err).toMatchObject({ code: "browser_unavailable", message: missing });
     expect(chromeFailureKind(err?.message ?? "")).toBe("missing");
     // No Chrome for Testing fallback: agent-browser is never asked to install one, and no Chrome started.
     expect(t.logged().some((l) => l.args.includes("install"))).toBe(false);
@@ -2074,6 +2095,26 @@ function fakeDesktop(startMs = 0): NonNullable<BrowserManagerOptions["desktops"]
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const headless = (c?: FakeChrome) => !!c?.args.includes("--headless=new");
+
+test.if(posix)(
+  "Ubuntu's snap Chromium: the start page goes in the agent's own folder, which the snap can read (ADR 0153)",
+  async () => {
+    const snap = setup({ chrome: () => "/snap/bin/chromium" });
+    const folder = await snap.folder();
+    await snap.manager.warm(dev, folder, false);
+    const page = new URL(snap.chromes[0]?.args.at(-1) ?? "");
+    expect(page.protocol).toBe("file:");
+    expect(decodeURIComponent(page.pathname)).toBe(path.join(folder, ".agentes", "start", "agentes-start.html"));
+    expect(existsSync(path.join(folder, ".agentes", "start", "agentes-start.html"))).toBe(true);
+    // Any other browser keeps it under the runner's home, out of the agent's folder.
+    const other = setup();
+    const otherFolder = await other.folder();
+    await other.manager.warm(dev, otherFolder, false);
+    const kept = decodeURIComponent(new URL(other.chromes[0]?.args.at(-1) ?? "").pathname);
+    expect(kept.startsWith(path.join(other.home, "start"))).toBe(true);
+    expect(existsSync(path.join(otherFolder, ".agentes", "start"))).toBe(false);
+  },
+);
 
 test.if(posix)(
   "warm: the agent's Chrome starts ahead, once, on a blank page, without agent-browser or a stream",

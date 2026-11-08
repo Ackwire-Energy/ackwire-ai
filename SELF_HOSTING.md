@@ -1035,6 +1035,10 @@ Without root nothing installs Chrome for you: `agentes-runner update` and the in
 where to get it, and when a computer's runner connects without a Chrome, whoever connected it gets a
 notification once (with the browser switched on there).
 
+Google makes no Chrome for Linux on ARM, so there (an arm64 server or VM) the agents' browser is the
+computer's Chromium: Debian's (`sudo apt install chromium`) or Ubuntu's snap (`sudo snap install chromium`).
+`--system` installs Debian's with the same update timer, and agent-browser's arm64 build.
+
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
 hand (to sign in, say); and people can open a terminal there, a shell as the agent. Both need the
@@ -1533,7 +1537,8 @@ that computer: its `Desktops` and `Terminal` lines say what is missing (the runn
 newer, the packages, or the switch), as in Agent computers above.
 
 **An agent says "Google Chrome isn't installed on this computer".** Install Google Chrome there
-(google.com/chrome); on a computer installed with `--system`, run that same install command again.
+(google.com/chrome), or Chromium on Linux on ARM (as the message says); on a computer installed with
+`--system`, run that same install command again.
 The next request works, no restart needed. "Google Chrome didn't start" names the system libraries it
 lacks when that is why, and the runner's log keeps what Chrome printed. Each of these is also sent to
 your error reports when `SENTRY_DSN` is set.

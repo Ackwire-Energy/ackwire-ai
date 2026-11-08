@@ -12,7 +12,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   type AgentScope,
-  CHROME_NEEDED,
+  browserNeeded,
   MACHINE_PROTOCOL_VERSION,
   type RunnerTools,
 } from "@agenteschat/adapters/machine-protocol";
@@ -716,8 +716,9 @@ async function update(): Promise<number> {
   }
   writeFileSync(`${script}.new`, text, { mode: 0o755 });
   renameSync(`${script}.new`, script);
-  // Runners from ADR 0133 on drive the computer's own Google Chrome, which this user can't install.
-  const chrome = findChrome() ? undefined : CHROME_NEEDED;
+  // Runners from ADR 0133 on drive the computer's own Google Chrome (Chromium on Linux on ARM, ADR 0153), which this
+  // user can't install.
+  const chrome = findChrome() ? undefined : browserNeeded();
   if (!serviceStatus()) {
     return printed(
       term,
