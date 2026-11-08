@@ -5,7 +5,7 @@ setupDom();
 
 import type { Agent, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -662,6 +662,18 @@ describe("an agent's card to install or update a skill", () => {
     expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
       { url: link, list: true },
     ]);
+  });
+
+  test("done for everyone once the library has it, a member who doesn't manage agents too", async () => {
+    const state = seedState();
+    meWithRole(state, []);
+    const link = "https://github.com/acme/skills/tree/main/pr-review";
+    state.messages.push(offer("c-have", "install_skill", { url: link, why: "Revisa PRs." }));
+    await open(state);
+    const row = cardRow("Instalada");
+    expect(row.querySelector(".rq-done")).not.toBeNull();
+    expect(row.textContent).toContain(`Instalada: ${link}`);
+    expect(within(row).queryByRole("button", { name: "Instalar" })).toBeNull();
   });
 
   test("an update waiting on its scripts: Revisar opens the skill, where it is applied", async () => {

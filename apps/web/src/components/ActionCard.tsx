@@ -243,7 +243,7 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const may = can(org, "manage_agents");
-  const skills = useSkills(org.id, may);
+  const skills = useSkills(org.id);
   const [open, setOpen] = useState(false);
   const title = t("actionCard.install_skill.title");
   if (installSkillDone(card, skills.data ?? [])) {

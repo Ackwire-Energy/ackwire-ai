@@ -331,3 +331,12 @@ describe("the secret card on the phone", () => {
     expect(asks).toContain('{waitsFor && waitsFor !== "you" ? (');
   });
 });
+
+describe("an agent's offer card is done for everyone once it's done", () => {
+  test("the skill library is read whatever the viewer may do: only the button asks for managing agents", () => {
+    const offer = readFileSync(join(import.meta.dir, "../../src/features/ai/OfferCard.tsx"), "utf8");
+    const install = offer.slice(offer.indexOf("function InstallSkill("), offer.indexOf("\nfunction UpdateSkills("));
+    expect(install).toContain("useSkills(orgId)");
+    expect(install).toContain('action={may ? t("actionCard.install_skill.open") : null}');
+  });
+});
