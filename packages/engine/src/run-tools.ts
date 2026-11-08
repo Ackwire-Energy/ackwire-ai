@@ -395,6 +395,10 @@ const endFields = (end: ChipEnd) => ({
   ...(end.autoApproved ? { autoApproved: end.autoApproved } : {}),
 });
 
+/** The Tool Gateway's own refusal of a call (`data.refusal`), for the apps' words under its line. */
+const gatewayRefusal = (output: ToolOutput): Pick<ChipEnd, "refusal"> =>
+  output.isError && typeof output.data?.refusal === "string" ? { refusal: output.data.refusal.slice(0, 40) } : {};
+
 /**
  * A permission check's end as the chat shows it: refused (the policy's own reason, and its code for the apps'
  * words), waiting on a person (its request, which the person's answer names), or allowed. Only a `deny` carries
@@ -509,6 +513,7 @@ export async function invokeWithChip(
             : {
                 failed: outcome.output.isError === true,
                 slip: outcome.output.isError === true && codeOf(outcome.output.content) === "tool.invalid_input",
+                ...gatewayRefusal(outcome.output),
                 autoApproved: outcome.autoApproved,
               },
       );

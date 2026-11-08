@@ -12998,6 +12998,11 @@ export const en = {
         inline: "It runs code given inline",
         global: "It installs for the whole computer",
         rules: "Outside what agents may do on their own",
+        /** Calls the Tool Gateway refused (`data.refusal`): the agent lacks access, the kind of work, a key, a repository. */
+        noAccess: "The agent doesn't have access to this",
+        policy: "Not allowed in this kind of work",
+        credential: "It sends what looks like a key",
+        repo: "That repository isn't on the agent's list",
       },
       gave: "given",
       answered: "answered",

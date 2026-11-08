@@ -30,11 +30,11 @@ export interface WorkItem extends Activity {
   output?: LiveOutput[];
   /** Grey words after its phrase (`toolHint`): the built-in's label or the connector tool's own name. */
   hint?: string | null;
-  /** Why it failed: the first line of the tool's error. */
+  /** Why it failed: the first line of the tool's error, in its own words (its open view shows it). */
   why?: string | null;
   /** It failed because its arguments were refused: the tool never ran. */
   slip?: boolean;
-  /** A refused command: the refusal's code, which `toolWhy` says in the person's words. */
+  /** A refused command or a call the Tool Gateway refused: the refusal's code, which `toolWhy` says in words. */
   refusal?: string | null;
   /** No result: it never ran (it waited on a person, or the run stopped first). */
   held?: boolean;
@@ -213,6 +213,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
     const failed = result?.data.isError === true || check?.refused === true;
     const why = !failed ? null : check?.refused ? check.why : firstLine(content);
+    const refusal = check?.code ?? (failed ? gatewayRefusal(result?.data.data) : null);
     const held = !result || Boolean(check?.request);
     const autoApproved = autoApprovedOf(result?.data.autoApproved);
     const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
@@ -246,7 +247,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       count: 1,
       hint: toolHint(name, a, detail),
       why,
-      ...(check?.code ? { refusal: check.code } : {}),
+      ...(refusal ? { refusal } : {}),
       ...(held ? { held: true } : {}),
       ...(autoApproved ? { autoApproved } : {}),
       // A permission check opens on the whole command it checked (recorded masked), not on its JSON.
@@ -413,11 +414,20 @@ const plainWhy = (text: string) => {
 };
 
 /**
- * Why a line failed, for people: a refused command's reason in their words (`chat.work.refusal.<code>`), else
- * the first sentence of what the tool said.
+ * Why a line failed, under it, for people: a refusal's reason in their words (`chat.work.refusal.<code>`), else
+ * nothing. What the tool said is its own text (often English, a connector's JSON): the line's open view shows it.
  */
-export const toolWhy = (t: TFunction, l: { why?: string | null; refusal?: string | null }) =>
-  l.refusal ? t(`chat.work.refusal.${l.refusal}`, { defaultValue: l.why ?? "" }) || null : (l.why ?? null);
+export function toolWhy(t: TFunction, l: { why?: string | null; refusal?: string | null }): string | null {
+  if (!l.refusal) return null;
+  const say = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return say(`chat.work.refusal.${l.refusal}`, { defaultValue: "" }) || null;
+}
+
+/** The Tool Gateway's own refusal of a call (`tool_result` step `data.refusal`): a word `toolWhy` says. */
+const gatewayRefusal = (data: unknown) => {
+  const refusal = (data as { refusal?: unknown } | null | undefined)?.refusal;
+  return typeof refusal === "string" && refusal ? refusal : null;
+};
 
 /** A permission check's answer (`permission_prompt`): refused and why, or waiting on a person (its request). */
 function checkAnswer(content: string) {
