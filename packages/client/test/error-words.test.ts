@@ -305,6 +305,11 @@ const PLAIN_LINE = new Set([
   "account.invalid_kind",
   "account.invalid_label",
   "account.invalid_plan",
+  // A workspace change's card offers Apply, Dismiss and Send on only to whom may (`mayApplyCard`).
+  "action_card.not_allowed",
+  "action_card.not_requester",
+  "action_card.unknown",
+  "action_card.yours",
   // Every "Responde a" picker and drag offers only what `mayReportTo` allows, the server's own rules.
   "agent.reports_to",
   "agent_proposal.yours",
