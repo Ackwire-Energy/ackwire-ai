@@ -286,7 +286,8 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible {
   color: var(--ink2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 260px;
+  /* Twelve and a half lines and the padding: a longer text scrolls from the middle of a line, never by a sliver. */
+  max-height: calc(12.5 * 1.55em + 20px);
   overflow-y: auto;
 }
 
