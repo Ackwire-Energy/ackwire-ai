@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { CHROME_MAX_SCALE, Fuse, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
+import { CHROME_MAX_SCALE, Fuse, Glass, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
 import { router } from "@/ui/navigation";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
@@ -127,33 +127,34 @@ function WaitingPill({ item, count, onPress }: { item: WaitingItem; count: numbe
         .join(", ")}
       accessibilityHint={t("mobile.chats.wait.open")}
       accessibilityState={{ expanded: false }}
-      style={[styles.pill, { backgroundColor: c.ink }]}
+      style={styles.pill}
     >
-      <View style={styles.pillRow}>
-        <AgentFace agentId={item.agentId} size={26} mode="run" />
-        <RNText numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.pillText, { color: c.bg }]}>
-          {name ? (
-            <>
-              <RNText style={styles.semibold}>{name}</RNText>
-              <RNText style={{ color: c.amber }}>{` ${short}`}</RNText>
-            </>
-          ) : (
-            <RNText style={styles.semibold}>{line}</RNText>
-          )}
-        </RNText>
-        {left && item.createdAt && item.expiresAt ? (
-          <View style={styles.deadline}>
-            <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} style={styles.fuse} />
-            <RNText
-              numberOfLines={1}
-              maxFontSizeMultiplier={CHROME_MAX_SCALE}
-              style={[styles.left, { color: c.amber }]}
-            >
-              {left}
-            </RNText>
-          </View>
-        ) : null}
-      </View>
+      {/* The same glass line that goes with you over the tabs ("Ada espera seu ok"): one look for what waits on you,
+          wherever it shows. */}
+      <Glass intensity={60} style={styles.glass}>
+        <View style={styles.pillRow}>
+          <AgentFace agentId={item.agentId} size={24} mode="idle" />
+          <RNText
+            numberOfLines={1}
+            maxFontSizeMultiplier={CHROME_MAX_SCALE}
+            style={[styles.pillText, styles.semibold, { color: c.amber }]}
+          >
+            {name ? `${name} ${short}` : line}
+          </RNText>
+          {left && item.createdAt && item.expiresAt ? (
+            <View style={styles.deadline}>
+              <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} style={styles.fuse} />
+              <RNText
+                numberOfLines={1}
+                maxFontSizeMultiplier={CHROME_MAX_SCALE}
+                style={[styles.left, { color: c.amber }]}
+              >
+                {left}
+              </RNText>
+            </View>
+          ) : null}
+        </View>
+      </Glass>
     </PressScale>
   );
 }
@@ -222,12 +223,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
   },
-  pill: {
-    borderRadius: 999,
-    boxShadow: "inset 0px 1px 0px 0px rgba(255, 255, 255, 0.08), 0px 4px 12px -6px rgba(0, 0, 0, 0.35)",
-  },
-  // 48 tall: the face 11 from the left edge, the words 12 after it, the deadline 14 from the right.
-  pillRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48, paddingLeft: 11, paddingRight: 14 },
+  pill: { borderRadius: 999 },
+  glass: { borderRadius: 999, overflow: "hidden" },
+  // 48 tall, as the line over the tabs: the face 16 from the left edge, the words 8 after it, the deadline 16 from
+  // the right.
+  pillRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingLeft: 16, paddingRight: 16 },
   pillText: { flex: 1, minWidth: 0, ...systemText("subhead") },
   semibold: { fontWeight: weights.semibold },
   deadline: { flexDirection: "row", alignItems: "center", gap: 8 },
