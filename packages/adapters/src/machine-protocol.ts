@@ -995,8 +995,10 @@ export interface RunnerBrowserInfo {
   version?: string;
   /** The Chrome it uses, with its version when known ("Google Chrome 156.0.8078.79"). */
   chrome?: string;
-  /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
+  /** Why it isn't available, for people ("Chrome's libraries are missing: run …"), in English. */
   reason?: string;
+  /** The same as a code the apps word in the person's language (`machines.reasons.<code>`); absent from older runners. */
+  code?: string;
   /**
    * The computer has no Google Chrome at its standard path: the server tells the person once (or reports it, on a
    * computer of the Cloud's). Absent from runners before ADR 0133, which fetched Chrome for Testing themselves.
@@ -1007,8 +1009,10 @@ export interface RunnerBrowserInfo {
 /** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
 export interface RunnerDesktopInfo {
   available: boolean;
-  /** Why it isn't available, for people (what to install). */
+  /** Why it isn't available, for people (what to install), in English. */
   reason?: string;
+  /** The same as a code the apps word (`machines.reasons.<code>`); absent from older runners. */
+  code?: string;
   /** The desktops' size in pixels (both or neither). */
   width?: number;
   height?: number;
@@ -1018,6 +1022,8 @@ export interface RunnerDesktopInfo {
 export interface RunnerTerminalInfo {
   available: boolean;
   reason?: string;
+  /** `reason` as a code the apps word (`machines.reasons.<code>`); absent from older runners. */
+  code?: string;
 }
 
 /** `hello.desktopUse` (protocol 21): whether agents can use their desktops here; `reason` says what is missing. */
@@ -3436,11 +3442,13 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
   const version = cut(v.version, 40);
   const chrome = cut(v.chrome, 120);
   const reason = cut(v.reason, BROWSER_LIMITS.message);
+  const code = reasonCode(v.code);
   return {
     available: v.available === true,
     ...(version !== undefined ? { version } : {}),
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
+    ...(code !== undefined ? { code } : {}),
     ...(v.chromeMissing === true ? { chromeMissing: true as const } : {}),
   };
 }
@@ -3462,8 +3470,16 @@ const smallJson = (raw: string, max: number): unknown => {
 /** `hello.terminal` (protocol 18), `hello.desktopUse` (21) and the part `hello.desktop` shares with them, cut. */
 export function parseAvailability(v: Record<string, unknown>): RunnerTerminalInfo {
   const reason = cut(v.reason, BROWSER_LIMITS.message);
-  return { available: v.available === true, ...(reason !== undefined ? { reason } : {}) };
+  const code = reasonCode(v.code);
+  return {
+    available: v.available === true,
+    ...(reason !== undefined ? { reason } : {}),
+    ...(code !== undefined ? { code } : {}),
+  };
 }
+
+/** A reason's code (`browser_download`): a short word, else none. */
+const reasonCode = (v: unknown) => (typeof v === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(v) ? v : undefined);
 
 const between = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;

@@ -11501,6 +11501,23 @@ export const en = {
     },
   },
   machines: {
+    /** Why a computer can't run the agent browser or desktop use yet, by the runner's code; a command may follow. */
+    reasons: {
+      browser_unsupported: "The agent browser doesn't run on this computer's system.",
+      browser_download:
+        "Couldn't download the agent browser. Check this computer's connection, and it tries again on its next use.",
+      browser_checksum: "The agent browser's download came damaged, so it wasn't used. It tries again on its next use.",
+      desktop_use_linux: "Desktop use runs on Linux computers with the agents' desktops.",
+      desktop_use_own_user:
+        "Desktop use needs each agent to work as its own user on this computer (system mode). Here every agent works as the runner's user.",
+      desktop_use_install: "Install what desktop use needs on this computer:",
+      desktop_unavailable: "The agents' desktops can't run on this computer.",
+      desktop_linux: "The agents' desktops run on Linux computers only.",
+      desktop_install: "Install the agents' desktops on this computer:",
+      not_as_root: "The agents' desktops and terminals never run as root. Run the runner as a normal user.",
+      runner_bun_old: "This needs the runner on Bun 1.3.5 or newer. Update the runner on this computer.",
+      terminal_unsupported: "Terminals run on Linux and Mac computers only.",
+    },
     egress: {
       draining: "Network settings are changing. Open computer sessions will restart at {{when}}.",
       restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",

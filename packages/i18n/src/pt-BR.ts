@@ -11599,6 +11599,24 @@ export const ptBR = {
     },
   },
   machines: {
+    reasons: {
+      browser_unsupported: "O navegador dos agentes não roda no sistema deste computador.",
+      browser_download:
+        "Não deu para baixar o navegador dos agentes. Confira a conexão deste computador, e ele tenta de novo no próximo uso.",
+      browser_checksum:
+        "O download do navegador dos agentes veio com defeito e não foi usado. Ele tenta de novo no próximo uso.",
+      desktop_use_linux: "O uso da área de trabalho roda em computadores Linux com as áreas de trabalho dos agentes.",
+      desktop_use_own_user:
+        "O uso da área de trabalho precisa que cada agente trabalhe como seu próprio usuário neste computador (modo sistema). Aqui todos trabalham como o usuário do runner.",
+      desktop_use_install: "Instale neste computador o que o uso da área de trabalho precisa:",
+      desktop_unavailable: "As áreas de trabalho dos agentes não rodam neste computador.",
+      desktop_linux: "As áreas de trabalho dos agentes rodam só em computadores Linux.",
+      desktop_install: "Instale neste computador as áreas de trabalho dos agentes:",
+      not_as_root:
+        "As áreas de trabalho e os terminais dos agentes nunca rodam como root. Rode o runner como um usuário comum.",
+      runner_bun_old: "Isso precisa do runner no Bun 1.3.5 ou mais novo. Atualize o runner neste computador.",
+      terminal_unsupported: "Os terminais rodam só em computadores Linux e Mac.",
+    },
     egress: {
       draining: "A rede está mudando. As sessões abertas do computador serão reiniciadas às {{when}}.",
       restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",

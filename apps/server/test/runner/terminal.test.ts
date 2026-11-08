@@ -117,7 +117,10 @@ test("info: Linux and Mac computers, with the runner on Bun 1.3.5 or newer", () 
   expect(ask({ platform: "linux", pty: false, runtime: "Node 22.12.0" }).reason).toBe(
     "The terminal needs the runner on Bun 1.3.5 or newer (it runs on Node 22.12.0)",
   );
-  expect(ask({ platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 0 }).reason).toContain("never run as root");
+  expect(ask({ platform: "linux", pty: true, runtime: "Bun 1.4.4", uid: 0 })).toMatchObject({
+    reason: expect.stringContaining("never run as root"),
+    code: "not_as_root",
+  });
 });
 
 test("a runner running as root opens a shell only through a launcher that runs it as the agent", async () => {
