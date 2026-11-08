@@ -378,7 +378,7 @@ function InviteActions() {
     if (url) copy("link", url);
   };
   return (
-    <div className="row members-acts">
+    <>
       {!held && (
         <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
           {copied ? t("common.copied") : t("members.copyInviteLink")}
@@ -389,7 +389,7 @@ function InviteActions() {
           {t("members.inviteTitle")}
         </Button>
       )}
-    </div>
+    </>
   );
 }
 

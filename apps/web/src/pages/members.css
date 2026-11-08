@@ -2,10 +2,6 @@
  * Configurações › Membros e convites (ADR 0068, 0085, 0090). Tokens only, so light and dark follow the theme.
  */
 
-/* The page's own actions, beside its title; under it on a narrow screen. */
-.members-acts {
-  flex: none;
-}
 /* "Esperando você" and how many. */
 .members-head {
   display: flex;

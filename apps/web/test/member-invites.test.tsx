@@ -85,6 +85,13 @@ describe("the invite dialog", () => {
   const option = (name: RegExp) => within(dialog()).getByRole("button", { name });
   const box = (name: string) => within(dialog()).getByRole("checkbox", { name });
 
+  test("the page's buttons are the page head's own, so on a phone they fill its row and wrap inside the margins", async () => {
+    await members();
+    const actions = document.querySelector(".ac-pagehead__actions") as HTMLElement;
+    for (const name of ["Copiar link de convite", "Convidar pessoas"])
+      expect(within(actions).getByRole("button", { name }).parentElement?.className).toBe(actions.className);
+  });
+
   test("a step at a time, the host asking each: Quem, Papel, Onde começam, Recado; Voltar keeps what was chosen", async () => {
     await members();
     const invite = await openInvite();
