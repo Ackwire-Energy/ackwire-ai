@@ -245,10 +245,6 @@ describe("own message styles", () => {
     const narrow = css.split("@media (hover: none), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
     expect(narrow).toContain(".ac-msg--own > .ac-msg__body > .ac-msg__actions");
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
-    // Keyboard focus in my row opens its time's details (the head that has them is hidden).
-    expect(css).toMatch(
-      /html:not\(\[data-pointer\]\) \.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
-    );
   });
 
   test("the bubble's colors come from the theme's tokens, and wide rows take the row", async () => {

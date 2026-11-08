@@ -8,6 +8,9 @@ export const onScreenKeyboard = () =>
 /** A pointer that can rest over something without pressing it: a mouse or a pen, never a finger. */
 export const hoverPointer = (pointerType: string) => pointerType === "mouse" || pointerType === "pen";
 
+/** A screen whose main pointer can't rest over anything (a phone, a tablet): a tap stands in for hover. */
+export const hoverless = () => typeof window.matchMedia === "function" && window.matchMedia("(hover: none)").matches;
+
 /** Keys that can move the focus besides Tab: between radios, tabs or a menu's items. In a field they move the caret. */
 const MOVES = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
 

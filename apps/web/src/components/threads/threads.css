@@ -955,20 +955,6 @@ html:not([data-pointer]) .thread-line:focus-visible {
       display: none;
     }
   }
-  /* A message's time details (the full date and what the reply cost) are one line wider than the panel: anchored to
-     the row and wrapping, as on a phone (the kit's 640px rule), instead of cut off at the panel's edge. */
-  @container thread-dock (max-width: 640px) {
-    .ac-msg__time--details,
-    .ac-msg__gutter-time {
-      position: static;
-    }
-    :is(.ac-msg__time--details, .ac-msg__gutter-time) .ac-msg__tip {
-      left: 12px;
-      width: max-content;
-      max-width: calc(100% - 24px);
-      white-space: normal;
-    }
-  }
 }
 /* The agent's page and a task's steps scroll inside, so their tabs and save bar stick to the panel. */
 .thread-panel__page {

@@ -67,7 +67,6 @@ describe("focus rings", () => {
             )
           )
             continue;
-          if (/\.ac-msg__note:focus \.ac-msg__note-tip/.test(selector)) continue;
           if (!selector.startsWith(KEYS_ONLY)) ungated.push(`${path}: ${selector}`);
         }
       }

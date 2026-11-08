@@ -4,6 +4,32 @@
  */
 export const EDGE_ROOM = 12;
 
+/** How far a tip (`Tip`) stands from the element it is about. */
+export const TIP_GAP = 6;
+
+/**
+ * Where a tip goes in the window (`Tip`): `TIP_GAP` over its element, under it when the window has no room over it, its
+ * start, middle or end on the element's, moved along only as far as it takes to stay `EDGE_ROOM` inside the window.
+ */
+export function placeTip(
+  anchor: { left: number; top: number; right: number; bottom: number },
+  tip: { width: number; height: number },
+  align: "start" | "center" | "end",
+  windowWidth: number,
+) {
+  const x =
+    align === "start"
+      ? anchor.left
+      : align === "end"
+        ? anchor.right - tip.width
+        : (anchor.left + anchor.right - tip.width) / 2;
+  const over = anchor.top - TIP_GAP - tip.height;
+  return {
+    left: Math.max(EDGE_ROOM, Math.min(x, windowWidth - EDGE_ROOM - tip.width)),
+    top: over >= EDGE_ROOM ? over : anchor.bottom + TIP_GAP,
+  };
+}
+
 /**
  * How far a popover moves over its trigger to show whole: a card taller than the room on its side (its height clamped to
  * that room, and still overflowing) gains what it lacks over `base`, the room it had before moving, up to the whole

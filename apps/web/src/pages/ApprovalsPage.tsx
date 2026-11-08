@@ -62,6 +62,7 @@ import {
   Segmented,
   StepTrack,
   type StepTrackStep,
+  Tip,
   Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
@@ -585,10 +586,19 @@ export function ConnectorMark({ approval }: { approval: Approval }) {
   const via = useApprovalVia(approval);
   const label = via.account ? `${via.name} · ${via.account}` : via.name;
   return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so a keyboard reaches the name in its tooltip
-    <span className="ap-conn-mark" role="img" aria-label={label} data-tip={label} tabIndex={0}>
+    // Focusable so a keyboard reaches the name in its tip.
+    <Tip
+      className="ap-conn-mark"
+      role="img"
+      aria-label={label}
+      tabIndex={0}
+      tip={label}
+      look="ap-conn-mark__tip"
+      align="center"
+      delay={0}
+    >
       <ViaGlyph via={via} />
-    </span>
+    </Tip>
   );
 }
 

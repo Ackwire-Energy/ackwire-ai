@@ -5,8 +5,20 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Dialog, DialogBody, Field, monthGrid, normalizeTime, Select, Token, timeOptions } from "../src";
-import { EDGE_ROOM, pullToFit } from "../src/floating";
+import {
+  Dialog,
+  DialogBody,
+  Field,
+  Message,
+  MessageText,
+  monthGrid,
+  normalizeTime,
+  Select,
+  Token,
+  timeOptions,
+} from "../src";
+import { TIP_OPEN_MS } from "../src/components/Tip";
+import { EDGE_ROOM, placeTip, pullToFit, TIP_GAP } from "../src/floating";
 
 const body = () => within(document.body);
 const key = async (el: Element, k: string) => {
@@ -99,6 +111,105 @@ describe("floating layers", () => {
     // A menu at its own 280px cap scrolls where it is.
     expect(pullToFit({ ...card, client: 280, height: 280 })).toBe(0);
     expect(pullToFit({ ...card, room: Number.NaN })).toBe(0);
+  });
+
+  test("a message's time details open on the floating layer: in <body>, over the row's bar, never cut by a pane", async () => {
+    // The longest they get: a full date, a custom provider's model id, a million tokens.
+    const meta =
+      "quarta-feira, 30 de setembro de 2026 às 23:59 · accounts/fireworks/models/qwen3-coder-480b-a35b-instruct · 1.048.576 tokens";
+    const { container, unmount } = render(
+      // A side pane's column: narrower than the details, and it clips.
+      <div style={{ width: 360, overflow: "hidden" }}>
+        <Message author="Ada" time="23:59" meta={meta} agent>
+          <MessageText>Rodei a suíte inteira de novo.</MessageText>
+          <div className="ac-msg__actions" role="toolbar" aria-label="Ações" />
+        </Message>
+      </div>,
+    );
+    const time = container.querySelector(".ac-msg__time--details") as HTMLElement;
+    // Closed, the time is still described by its details.
+    expect(document.getElementById(time.getAttribute("aria-describedby") ?? "")?.textContent).toBe(meta);
+    expect(document.querySelector(".ac-tip")).toBeNull();
+    await act(async () => fireEvent.pointerEnter(time, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, TIP_OPEN_MS + 10)));
+    const tip = document.querySelector<HTMLElement>(".ac-tip.ac-msg__tip");
+    expect(tip?.textContent).toBe(meta);
+    expect(tip?.parentElement).toBe(document.body);
+    expect(container.contains(tip)).toBe(false);
+    const rule = (await css("components.css")).split(".ac-tip {")[1]?.split("}")[0] ?? "";
+    expect(rule).toContain("position: fixed");
+    expect(rule).toContain("z-index: var(--z-floating)");
+    // As wide as the window allows, and a word longer than that (a mailbox in a connector's tip) breaks inside it.
+    expect(rule).toContain(`max-width: calc(100vw - ${2 * EDGE_ROOM}px)`);
+    expect(rule).toContain("overflow-wrap: anywhere");
+    await act(async () => fireEvent.pointerLeave(time, { pointerType: "mouse" }));
+    expect(document.querySelector(".ac-tip")).toBeNull();
+    unmount();
+  });
+
+  test("the keys' focus in my row opens its time's details, its head being hidden", async () => {
+    const { unmount } = render(
+      <Message own author="João" time="23:40" meta="sábado, 7 de novembro de 2026 às 23:40">
+        <MessageText>Fizemos um ajuste na conexão.</MessageText>
+        <div className="ac-msg__actions">
+          <button type="button">Reagir</button>
+        </div>
+      </Message>,
+    );
+    const react = body().getByRole("button", { name: "Reagir" });
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      react.focus();
+    });
+    expect(document.querySelector(".ac-tip")?.textContent).toBe("sábado, 7 de novembro de 2026 às 23:40");
+    await act(async () => react.blur());
+    expect(document.querySelector(".ac-tip")).toBeNull();
+    unmount();
+  });
+
+  test("on a touch screen a tap shows the time's details, which stay as the finger leaves, until the focus goes", async () => {
+    const was = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query === "(hover: none)" })) as typeof window.matchMedia;
+    try {
+      const { container, unmount } = render(
+        <Message author="Ada" time="23:59" meta="quarta-feira, 30 de setembro de 2026 às 23:59" agent>
+          <MessageText>Pronto.</MessageText>
+        </Message>,
+      );
+      const time = container.querySelector(".ac-msg__time--details") as HTMLElement;
+      // A finger: no hover, and not the keys.
+      await act(async () => {
+        fireEvent.pointerDown(document.body, { pointerType: "touch" });
+        fireEvent.pointerEnter(time, { pointerType: "touch" });
+        time.focus();
+        fireEvent.pointerLeave(time, { pointerType: "touch" });
+      });
+      expect(document.querySelector(".ac-tip")?.textContent).toBe("quarta-feira, 30 de setembro de 2026 às 23:59");
+      await act(async () => time.blur());
+      expect(document.querySelector(".ac-tip")).toBeNull();
+      unmount();
+    } finally {
+      window.matchMedia = was;
+    }
+  });
+
+  test("a tip stands over its element, under it with no room over it, and moves along only to stay inside the window", () => {
+    const time = { left: 894, top: 520, right: 925, bottom: 536 };
+    // Wider than the room right of the time: moved left, `EDGE_ROOM` inside the window.
+    expect(placeTip(time, { width: 394, height: 26 }, "start", 1280)).toEqual({
+      left: 1280 - EDGE_ROOM - 394,
+      top: 520 - TIP_GAP - 26,
+    });
+    expect(placeTip(time, { width: 200, height: 26 }, "start", 1280).left).toBe(894);
+    // At the window's top: under it.
+    expect(placeTip({ ...time, top: 20, bottom: 36 }, { width: 200, height: 26 }, "start", 1280).top).toBe(
+      36 + TIP_GAP,
+    );
+    // A bubble's time ends it: the tip's end on the time's, moved right when a short bubble on the left has no room.
+    expect(placeTip(time, { width: 300, height: 26 }, "end", 1280).left).toBe(925 - 300);
+    expect(placeTip({ ...time, left: 40, right: 70 }, { width: 300, height: 26 }, "end", 390).left).toBe(EDGE_ROOM);
+    // A note's reason: centered on it.
+    expect(placeTip({ ...time, left: 100, right: 160 }, { width: 100, height: 20 }, "center", 1280).left).toBe(80);
   });
 });
 
