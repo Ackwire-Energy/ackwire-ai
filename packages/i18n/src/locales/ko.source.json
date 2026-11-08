@@ -25140,6 +25140,9 @@
   "githubApp.installedOutside": {
     "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
   },
+  "githubApp.misconfigured": {
+    "value": "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings."
+  },
   "githubApp.connectAccount": {
     "value": "Connect a GitHub account"
   },
@@ -28917,6 +28920,9 @@
   },
   "errors.connector.unavailable": {
     "value": "This service can't be connected here."
+  },
+  "errors.connector.misconfigured": {
+    "value": "The connection to {{provider}} is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings."
   },
   "errors.wiki.noAccess": {
     "value": "You don't have access to this page."

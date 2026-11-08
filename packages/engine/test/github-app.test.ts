@@ -15,9 +15,11 @@ import {
   handleGitHubAppWebhook,
   installationToken,
   listGitHubAppInstallations,
+  MisconfiguredError,
   reconcileGitHubAppInstallations,
   removeGitHubAppInstallation,
   startGitHubAppInstall,
+  ValidationError,
   validGitHubAppSignature,
 } from "../src";
 import { addMember, addUser, SECRET } from "./fixtures";
@@ -306,6 +308,36 @@ describe("GitHub App installations are bound to one organization", () => {
     await expect(startGitHubAppInstall({ ...w.deps, app: null }, w.ana.id, w.orgA.id)).rejects.toThrow(
       "not configured",
     );
+  });
+
+  test("GitHub refusing this server's client id or secret: misconfigured; a code it refused stays a refusal", async () => {
+    const w = await world();
+    const wrongSecret = (async (input: string | URL | Request, init?: RequestInit) =>
+      String(input) === `${WEB}/login/oauth/access_token`
+        ? Response.json({
+            error: "incorrect_client_credentials",
+            error_description: "The client_id and/or client_secret passed are incorrect.",
+          })
+        : w.fake.fetch(input, init)) as typeof fetch;
+    const deps = { ...w.deps, http: { fetch: wrongSecret, apiUrl: API, webUrl: WEB } };
+    const { state } = await startGitHubAppInstall(deps, w.ana.id, w.orgA.id);
+    const failed = await completeGitHubAppInstall(deps, w.ana, { state, code: `code-${w.ana.id}`, installationId: 1 })
+      .then(() => null)
+      .catch((e: unknown) => e);
+    expect(failed).toBeInstanceOf(MisconfiguredError);
+    expect(failed).toMatchObject({ code: "github_app.misconfigured" });
+    // An expired code: GitHub's own refusal of it, which another install gets past.
+    const again = await startGitHubAppInstall(w.deps, w.ana.id, w.orgA.id);
+    const refused = await completeGitHubAppInstall(w.deps, w.ana, {
+      state: again.state,
+      code: "old",
+      installationId: 1,
+    })
+      .then(() => null)
+      .catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(ValidationError);
+    expect(refused).not.toBeInstanceOf(MisconfiguredError);
+    expect(await listGitHubAppInstallations(w.db, w.ana.id, w.orgA.id)).toEqual([]);
   });
 });
 

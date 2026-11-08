@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   type ConnectorDeps,
+  clientRefused,
   completeOAuth,
   connectionHeaders,
   connectionView,
@@ -17,6 +18,7 @@ import {
   fillTitle,
   listApprovals,
   listMessages,
+  MisconfiguredError,
   postPersonMessage,
   revokeConnection,
   setAgentScopes,
@@ -493,6 +495,37 @@ describe("OAuth (state + PKCE)", () => {
       "invalid_grant",
     );
     await expect(startOAuth(deps, f.owner.id, f.org.id, "linear")).rejects.toThrow("not configured");
+  });
+
+  test("this server's OAuth app refused (a wrong client id or secret): misconfigured, naming the provider", async () => {
+    f = await setup();
+    // The token endpoint refusing the client itself, never the person's code.
+    expect(["invalid_client", "incorrect_client_credentials"].map(clientRefused)).toEqual([true, true]);
+    // A code expired or used, a cancel, another callback address, no code at all: another try can work.
+    const others = ["invalid_grant", "bad_verification_code", "access_denied", "redirect_uri_mismatch", undefined];
+    expect(others.map(clientRefused)).toEqual([false, false, false, false, false]);
+    // GitHub says it with a 200 and its own code; other servers with OAuth's invalid_client.
+    const answers = [
+      () =>
+        Response.json({
+          error: "incorrect_client_credentials",
+          error_description: "The client_id and/or client_secret passed are incorrect.",
+        }),
+      () => Response.json({ error: "invalid_client" }, { status: 401 }),
+    ];
+    for (const answer of answers) {
+      const deps = depsOf(f, { http: (async () => answer()) as unknown as typeof fetch });
+      const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+      const failed = await completeOAuth(deps, { id: f.owner.id }, { state, code: "c" }).catch((e: unknown) => e);
+      expect(failed).toBeInstanceOf(MisconfiguredError);
+      expect(failed).toMatchObject({ code: "connector.misconfigured", params: { provider: "GitHub" } });
+    }
+    // The person's code refused stays what it was: a refusal, which another try can get past.
+    const expired = (async () => Response.json({ error: "invalid_grant" }, { status: 400 })) as unknown as typeof fetch;
+    const deps = depsOf(f, { http: expired });
+    const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+    const refused = await completeOAuth(deps, { id: f.owner.id }, { state, code: "c" }).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(TokenRefused);
   });
 
   test("tokens about to expire are refreshed before a call", async () => {

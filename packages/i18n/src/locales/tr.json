@@ -10231,6 +10231,7 @@
     "notVisible": "GitHub hesabınız o kurulumu göremiyor. Ona erişimi olan bir hesapla yükleyin.",
     "otherWorkspace": "Bu GitHub hesabı zaten başka bir çalışma alanına bağlı. Buraya yüklemeden önce uygulamayı oradan kaldırın.",
     "installedOutside": "Uygulama bu GitHub hesabına agentes.chat dışında yüklendi. GitHub'da kaldırın ve Bağlayıcılar › GitHub bölümünden yeniden yükleyin.",
+    "misconfigured": "Sunucudaki GitHub uygulamasının gizli anahtarı yanlış, bu yüzden yükleme tamamlanamıyor. Sunucuyu yöneten kişinin anahtarı uygulamanın ayarlarında değiştirmesi gerekiyor.",
     "connectAccount": "GitHub hesabı bağla",
     "ownerHint": "Bu sunucunun sahibi GitHub uygulamasını burada, Bağlayıcılar bölümünde oluşturabilir.",
     "viaApp": "{{accounts}} üzerindeki agentes.chat uygulamasıyla",
@@ -11859,7 +11860,8 @@
       "otherServer": "O hesap başka bir adreste.",
       "gone": "O hesap artık bağlı değil.",
       "unfinished": "Composio'da giriş tamamlanmadı. Tekrar deneyin.",
-      "unavailable": "Bu hizmet burada bağlanamaz."
+      "unavailable": "Bu hizmet burada bağlanamaz.",
+      "misconfigured": "Sunucuda {{provider}} bağlantısı yanlış ayarlanmış, bu yüzden tamamlanamıyor. Sunucuyu yöneten kişinin anahtarı uygulamanın ayarlarında değiştirmesi gerekiyor."
     },
     "wiki": {
       "noAccess": "Bu sayfaya erişiminiz yok.",

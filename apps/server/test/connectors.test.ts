@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { createFakeComposioClient, createFakeMailConnector } from "@agenteschat/adapters";
+import { createFakeComposioClient, createFakeErrorReporter, createFakeMailConnector } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { type McpConnect, mcpPreset } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -258,6 +258,41 @@ test("a connector's return that didn't connect lands where it started, with why 
   expect(await back(owner, `state=${await start()}&code=abc`)).toBe(`${landing}failed`);
   // A state nobody can read any more lands on the start.
   expect(await back(owner, "state=forged&code=abc")).toBe("http://localhost:3000/?connector_error=expired");
+});
+
+test("the provider refusing this server's OAuth app: `misconfigured` with the connector, reported as an error", async () => {
+  const errors = createFakeErrorReporter();
+  t = await createTestServer({
+    http: (async () => Response.json({ error: "invalid_client" }, { status: 401 })) as unknown as typeof fetch,
+    env: { CONNECTOR_GITHUB_CLIENT_ID: "gh-id", CONNECTOR_GITHUB_CLIENT_SECRET: "not-the-real-secret" },
+    errors,
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const start = async (returnTo: string) => {
+    const res = await owner(`/api/app/organizations/${orgId}/connectors/github/oauth/start`, { json: { returnTo } });
+    return new URL(((await res.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get("state") ?? "";
+  };
+  const logged = () => errors.reports.map((r) => r.tags.log);
+
+  const page = `/org/${orgId}/settings/connectors`;
+  const back = await owner(`/api/app/connectors/oauth/callback?state=${await start(page)}&code=abc`);
+  expect(back.headers.get("location")).toBe(
+    `http://localhost:3000${page}?connector_error=misconfigured&connector=github`,
+  );
+  expect(logged()).toEqual(["connector oauth failed"]);
+  expect(String(errors.reports[0]?.error)).toContain("invalid_client");
+  // The phone's (or the desktop window's) finish: its code and the provider's name, reported too.
+  const phone = await owner(`/api/app/organizations/${orgId}/connectors/oauth/complete`, {
+    json: { state: await start("app:connectors"), code: "abc" },
+  });
+  expect(phone.status).toBe(500);
+  expect(((await phone.json()) as { error: unknown }).error).toMatchObject({
+    code: "connector.misconfigured",
+    params: { provider: "GitHub" },
+  });
+  expect(logged()).toEqual(["connector oauth failed", "unhandled error"]);
 });
 
 type Listed = {

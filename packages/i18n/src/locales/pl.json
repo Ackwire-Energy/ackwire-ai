@@ -11091,6 +11091,7 @@
     "notVisible": "Twoje konto GitHub nie widzi tej instalacji. Zainstaluj ją z konta, które ma do niej dostęp.",
     "otherWorkspace": "To konto GitHub jest już połączone z inną przestrzenią roboczą. Usuń tam aplikację, zanim zainstalujesz ją tutaj.",
     "installedOutside": "Aplikacja została zainstalowana na tym koncie GitHub poza agentes.chat. Usuń ją w GitHub i zainstaluj ponownie w Konektory › GitHub.",
+    "misconfigured": "Aplikacja GitHub ma na serwerze zły klucz tajny, więc instalacja nie może się zakończyć. Osoba zarządzająca serwerem musi zmienić klucz w ustawieniach aplikacji.",
     "connectAccount": "Połącz konto GitHub",
     "ownerHint": "Właściciel tego serwera może utworzyć aplikację GitHub tutaj, w Konektorach.",
     "viaApp": "Przez aplikację agentes.chat na kontach {{accounts}}",
@@ -12803,7 +12804,8 @@
       "otherServer": "To konto jest pod innym adresem.",
       "gone": "To konto nie jest już połączone.",
       "unfinished": "Logowanie w Composio nie zostało dokończone. Spróbuj ponownie.",
-      "unavailable": "Tej usługi nie można tu połączyć."
+      "unavailable": "Tej usługi nie można tu połączyć.",
+      "misconfigured": "Połączenie z {{provider}} jest źle skonfigurowane na serwerze, więc nie może się zakończyć. Osoba zarządzająca serwerem musi zmienić klucz w ustawieniach aplikacji."
     },
     "wiki": {
       "noAccess": "Nie masz dostępu do tej strony.",

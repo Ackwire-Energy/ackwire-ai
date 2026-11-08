@@ -169,6 +169,7 @@ const KNOWN = {
   "connector.gone": "errors.connector.gone",
   "connector.unfinished": "errors.connector.unfinished",
   "connector.unavailable": "errors.connector.unavailable",
+  "connector.misconfigured": "errors.connector.misconfigured",
   // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
   "org.create_unpaid": "standing.createInactive",
   "credentials.plan_hold": "connectAi.key.closed",
@@ -503,6 +504,7 @@ const KNOWN = {
   "github_app.not_visible": "githubApp.notVisible",
   "github_app.other_workspace": "githubApp.otherWorkspace",
   "github_app.installed_outside": "githubApp.installedOutside",
+  "github_app.misconfigured": "githubApp.misconfigured",
   github_app_env: "githubApp.server.line.env",
 } as const;
 
@@ -853,14 +855,18 @@ const OAUTH_RETURNS = {
   "github_app.other_workspace": "githubApp.otherWorkspace",
   installed_outside: "githubApp.installedOutside",
   "github_app.installed_outside": "githubApp.installedOutside",
+  "github_app.misconfigured": "githubApp.misconfigured",
   requested: "githubApp.requested",
 } as const;
 
-/** A provider's return that didn't connect, by its code, in the person's words (any other code: it failed). */
-export const oauthReturnText = (t: TFunction, code: string): string => {
+/**
+ * A provider's return that didn't connect, by its code, in the person's words (any other code: it failed). `params`:
+ * what the code names (`connector.misconfigured`, its `provider`).
+ */
+export const oauthReturnText = (t: TFunction, code: string, params?: Record<string, unknown>): string => {
   if (Object.hasOwn(OAUTH_RETURNS, code)) return t(OAUTH_RETURNS[code as keyof typeof OAUTH_RETURNS]);
   // A connector account's own refusal comes as its full code (`connector.other_account`).
-  if (code.startsWith("connector.") && Object.hasOwn(KNOWN, code)) return t(KNOWN[code as keyof typeof KNOWN]);
+  if (code.startsWith("connector.") && Object.hasOwn(KNOWN, code)) return t(KNOWN[code as keyof typeof KNOWN], params);
   return t("oauthReturn.failed");
 };
 

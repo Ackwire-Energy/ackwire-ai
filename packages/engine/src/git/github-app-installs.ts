@@ -2,10 +2,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { type AuditEntry, recordAudit } from "../audit";
-import { OAUTH_STATE_TTL_MS, type OAuthApps, syncGitHubAppConnection } from "../connectors/connections";
+import { clientRefused, OAUTH_STATE_TTL_MS, type OAuthApps, syncGitHubAppConnection } from "../connectors/connections";
 import { desktopReturnPath, isDesktopReturn, oauthReturnTo } from "../connectors/oauth-return";
 import { randomToken, sealSecret, sha256 } from "../crypto";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, MisconfiguredError, NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
 import {
   forgetInstallationTokens,
@@ -194,6 +194,12 @@ export async function completeGitHubAppInstall(
     }).toString(),
   });
   const token = (await res.json().catch(() => ({}))) as { access_token?: string; error?: string };
+  if (clientRefused(token.error)) {
+    throw new MisconfiguredError(
+      `GitHub refused this server's GitHub App (a wrong client id or secret): ${token.error}`,
+      "github_app.misconfigured",
+    );
+  }
   if (!res.ok || !token.access_token) {
     throw new ValidationError(`GitHub refused the authorization: ${token.error ?? res.status}`);
   }
