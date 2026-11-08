@@ -12,14 +12,18 @@ test("a settings row's control centres on its words, never pinned to the first l
   // Nothing lifts or tops what ends a row: the label and its control share the row's middle, a status line included.
   const pinned: string[] = [];
   for (const rule of rules(css))
-    for (const s of rule.selectors.filter((s) => s.includes(".settings-row") && /settings-row__(end|control|chevron)/.test(s)))
+    for (const s of rule.selectors.filter(
+      (s) => s.includes(".settings-row") && /settings-row__(end|control|chevron)/.test(s),
+    ))
       for (const [p, v] of rule.declarations)
         if ((p === "translate" && v !== "none") || (p === "align-self" && v === "flex-start"))
           pinned.push(`${s} {${p}: ${v}}`);
   expect(pinned).toEqual([]);
   const row = last(top, ".settings-row", "align-items");
   expect(row).toBe("center");
-  expect(last(top, ".settings-row", "min-height")?.replace(/\s+/g, "")).toBe("calc(var(--control-h-sm)+2*var(--row-py))");
+  expect(last(top, ".settings-row", "min-height")?.replace(/\s+/g, "")).toBe(
+    "calc(var(--control-h-sm)+2*var(--row-py))",
+  );
   // On a phone every control but a switch goes under the words, from their edge, and sits where it falls.
   const phone = atRule(css, "@media (max-width: 760px)");
   const under = ".settings-row--lead>.settings-row__end:not(:has(>.ac-switch))";
