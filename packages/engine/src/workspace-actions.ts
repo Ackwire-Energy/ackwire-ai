@@ -23,6 +23,7 @@ import {
 } from "./channels";
 import { findMember } from "./chat-tools";
 import { ownWords } from "./context/learn";
+import { cardPlace, NO_PERSON_READS } from "./consultations";
 import { continueRun } from "./continue-run";
 import { queueInvitationEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -63,7 +64,6 @@ import {
   updateRole,
 } from "./roles";
 import { bodyCode } from "./run-tools";
-import { replyThreadOf } from "./runs";
 import { rankTools } from "./tools/directory";
 import { canonicalJson, type JsonSchema, validateJson } from "./tools/json-schema";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
@@ -1686,6 +1686,8 @@ export function workspaceActionTool(deps: { pubsub?: PubSub; server?: ServerLink
         }
         const full = await deps.cardsLeft(ctx);
         if (full) return full;
+        const at = await cardPlace(ctx);
+        if (!at) return { content: NO_PERSON_READS, isError: true };
         const card: WorkspaceActionCard = {
           kind: "workspace_action",
           forUserId: person,
@@ -1702,7 +1704,7 @@ export function workspaceActionTool(deps: { pubsub?: PubSub; server?: ServerLink
           decidedByUserId: null,
           decidedAt: null,
         };
-        const message = await postActionCard(deps, ctx, card);
+        const message = await postActionCard(deps, ctx, at, card);
         return {
           content: `Posted a card to ${a.id} (${describe(resolved.words)}). ${
             may
@@ -1724,11 +1726,15 @@ const describe = (words: Record<string, string>) =>
     .map(([k, v]) => `${k}: ${v}`)
     .join(", ");
 
-async function postActionCard(deps: { pubsub?: PubSub } & CardTools, ctx: ToolContext, card: WorkspaceActionCard) {
+async function postActionCard(
+  deps: { pubsub?: PubSub } & CardTools,
+  ctx: ToolContext,
+  at: { channelId: string; threadId: string | null },
+  card: WorkspaceActionCard,
+) {
   const message = await insertMessage(ctx.db, {
     orgId: ctx.orgId,
-    channelId: ctx.channelId,
-    threadId: replyThreadOf(ctx),
+    ...at,
     author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await deps.hopOf(ctx) },
     body: `Proposed ${card.params.action} (${describe(card.params.words)})${card.params.why ? `: ${card.params.why}` : ""}`,
     meta: { ...bodyCode(WORKSPACE_ACTION_CARD), actionCard: card },
