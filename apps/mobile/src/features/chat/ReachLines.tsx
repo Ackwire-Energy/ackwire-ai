@@ -18,13 +18,14 @@ import {
   unavailableNotice,
   widenQuestion,
 } from "@agenteschat/client/lib/audience";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { ACT_ROW, Button, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
+import { Button, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -98,29 +99,35 @@ function Row({
       />
     );
   return (
-    <View style={[styles.one, ACT_ROW.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
-      <View style={styles.tx}>
+    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+      <View style={styles.head}>
         <LineIcon name={handed ? "chat" : "info"} size={15} color={colors.muted} variant="small" />
-      </View>
-      <View style={[ACT_ROW.text, styles.tx]}>
-        <Text variant="small" tone="ink2" numberOfLines={3}>
-          {runs.map((r, i) =>
-            r.bold ? (
-              <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
-                {r.text}
-              </Text>
-            ) : (
-              r.text
-            ),
-          )}
-        </Text>
-        {detail ? (
-          <Text variant="caption" tone="faint" numberOfLines={1} style={styles.detail}>
-            {detail}
+        <View style={styles.words}>
+          <Text variant="small" tone="ink2">
+            {runs.map((r, i) =>
+              r.bold ? (
+                <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
+                  {r.text}
+                </Text>
+              ) : (
+                r.text
+              ),
+            )}
           </Text>
-        ) : null}
+          {detail ? (
+            <Text variant="caption" tone="faint" numberOfLines={1} style={styles.detail}>
+              {detail}
+            </Text>
+          ) : null}
+        </View>
       </View>
-      {!handed && agent && e.userId ? <AllowTalkAction agent={agent} userId={e.userId} /> : null}
+      {/* The action under the words, on their column: a long one ("Deixar Heitor Lima falar com ela") beside them
+          squeezed the words into three cut lines. */}
+      {!handed && agent && e.userId ? (
+        <View style={styles.act}>
+          <AllowTalkAction agent={agent} userId={e.userId} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -149,7 +156,11 @@ export function AllowTalkAction({ agent, userId }: { agent: Agent; userId: strin
       onPress={() => {
         if (save.busy || save.done) return;
         tapHaptic();
-        save.widen(audience, ask(audience), () => toast({ title: t("reach.allowed", { person, name: g.name }) }));
+        // A failure says why (it used to do nothing at all, and the person was left guessing).
+        save
+          .saveAsync(audience, ask(audience))
+          .then((saved) => saved && toast({ title: t("reach.allowed", { person, name: g.name }) }))
+          .catch((error: unknown) => toast({ title: errorText(t, error), icon: "x" }));
       }}
     />
   );
@@ -178,7 +189,10 @@ export function LetMeTalkButton({ agent }: { agent: Agent }) {
       disabled={save.busy || save.done}
       onPress={() => {
         tapHaptic();
-        save.widen(audience, ask(audience), () => toast({ title: t("reach.allowedMe", g) }));
+        save
+          .saveAsync(audience, ask(audience))
+          .then((saved) => saved && toast({ title: t("reach.allowedMe", g) }))
+          .catch((error: unknown) => toast({ title: errorText(t, error), icon: "x" }));
       }}
     />
   );
@@ -282,14 +296,10 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   lockedText: { textAlign: "center" },
   bold: { fontWeight: "600" },
-  // As the team checks' line (TeamChecks): the icon, the first line and the action (32, in a 50 row) share one middle,
-  // also when the words take three lines.
+  // The icon on the words' first line, the words across the card; the action under them on their column.
   one: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    minHeight: 50,
-    paddingVertical: (50 - 32) / 2,
+    gap: 4,
+    paddingVertical: 12,
     ...ROW_CARD_INSET,
     borderWidth: StyleSheet.hairlineWidth,
     borderTopLeftRadius: 14,
@@ -297,7 +307,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     borderBottomLeftRadius: 6,
   },
-  // The "small" line (20) on the action's middle.
-  tx: { paddingTop: (32 - 20) / 2 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  words: { flex: 1, minWidth: 0 },
+  // The text column: the icon's 15 and the 8 after it.
+  act: { paddingLeft: 15 + 8, alignItems: "flex-start" },
   detail: { marginTop: 2 },
 });
