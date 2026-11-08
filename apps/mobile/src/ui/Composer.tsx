@@ -113,14 +113,16 @@ export interface ComposerProps {
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
   media?: { label: string; onPress: () => void } | null;
   /**
-   * Voice messages (null where they are off): `mic` in the empty field; while recording, `overlay` covers the field,
-   * `leading` takes the "+"'s place and `above` sits over the field (the slide-to-cancel hint, the recording line).
-   * The text field stays underneath, so the composer never changes height.
+   * Voice messages (null where they are off): `mic` in the empty field; while the mic is held, `overlay` covers the
+   * field. Hands free or paused, `bar` takes the field's place in the field's own capsule (same height, radius, ring
+   * and inset), and `leading` is drawn in the "+"'s own plate; `above` sits over the row (the slide-to-cancel hint,
+   * the recording line). The text field stays mounted underneath, so the composer never changes height.
    */
   voice?: {
     mic: ReactNode | null;
     overlay: ReactNode | null;
-    leading: ReactNode | null;
+    bar: ReactNode | null;
+    leading: { icon: IconName; label: string; onPress: () => void } | null;
     above: ReactNode | null;
     active: boolean;
   } | null;
@@ -131,6 +133,8 @@ const FIELD = 48;
 const SEND = 36;
 /** Space around the send button inside the pill: it sits centered on the first line. */
 const INSET = (FIELD - SEND) / 2;
+/** The field's ring and its soft shadow; a voice take's bar wears the same. */
+const FIELD_SHADOW = (line: string) => `0px 0px 0px 0.5px ${line}, 0px 6px 18px -10px rgba(0, 0, 0, 0.25)`;
 /** How long the send button is held to stop the agent and send; the ring around it fills meanwhile. */
 /** Words left in a conversation's field, by `draftKey`, while the app runs. */
 const DRAFTS = new Map<string, string>();
@@ -286,30 +290,51 @@ export function Composer({
       {banner}
       {voice?.above ?? null}
       <View style={styles.row}>
-        {voice?.leading ??
-          (onPlus ? (
-            <PressScale
-              to={0.9}
-              onPress={onPlus}
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.a11y.attach")}
-              style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
-            >
-              <Glass style={styles.plusGlass} intensity={50}>
-                <View style={styles.center}>
-                  <Icon name="plus" size={24} color={colors.ink2} />
-                </View>
-              </Glass>
-            </PressScale>
-          ) : null)}
+        {/* The "+" plate; while a take is held hands free or paused, the same plate holds its trash. */}
+        {voice?.leading ? (
+          <PressScale
+            to={0.9}
+            onPress={voice.leading.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={voice.leading.label}
+            style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
+          >
+            <Glass style={styles.plusGlass} intensity={50}>
+              <View style={styles.center}>
+                <Icon name={voice.leading.icon} size={22} color={colors.danger} />
+              </View>
+            </Glass>
+          </PressScale>
+        ) : onPlus ? (
+          <PressScale
+            to={0.9}
+            onPress={onPlus}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.a11y.attach")}
+            style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
+          >
+            <Glass style={styles.plusGlass} intensity={50}>
+              <View style={styles.center}>
+                <Icon name="plus" size={24} color={colors.ink2} />
+              </View>
+            </Glass>
+          </PressScale>
+        ) : null}
+        {voice?.bar ? (
+          <View style={[styles.bar, { backgroundColor: colors.raised, boxShadow: FIELD_SHADOW(colors.line2) }]}>
+            {voice.bar}
+          </View>
+        ) : null}
         <View
           style={[
             styles.field,
             {
               backgroundColor: colors.raised,
-              boxShadow: `0px 0px 0px 0.5px ${colors.line2}, 0px 6px 18px -10px rgba(0, 0, 0, 0.25)`,
+              boxShadow: FIELD_SHADOW(colors.line2),
               paddingRight: button || mediaButton || mic ? INSET : 14,
             },
+            // Kept mounted under a take's bar (the words and the keyboard's focus survive it), never drawn.
+            voice?.bar ? styles.hidden : null,
           ]}
         >
           {face && !text ? (
@@ -605,6 +630,17 @@ const styles = StyleSheet.create({
     paddingVertical: INSET,
     paddingLeft: 14,
   },
+  // A take's bar: the field's capsule at its one-line height, its 36 controls INSET from every edge.
+  bar: {
+    flex: 1,
+    minWidth: 0,
+    height: FIELD,
+    borderRadius: FIELD / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: INSET,
+  },
+  hidden: { display: "none" },
   face: { height: SEND, justifyContent: "center" },
   holdHint: { paddingTop: 8, minHeight: 20, alignItems: "center" },
   sendBox: { width: SEND, height: SEND },

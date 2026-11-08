@@ -75,7 +75,7 @@ export function PixelWave({
   off: string;
   onWidth?: (width: number) => void;
   height: number;
-  /** A square at `progress`, to grab and drag. */
+  /** A square at `progress`, to grab and drag; hidden while `progress` is still at the start. */
   handle?: boolean;
   /** The field's color: the left end of a growing recording fades into it. */
   fade?: string;
@@ -89,6 +89,8 @@ export function PixelWave({
   };
   const clip = useDerivedValue(() => rect(0, 0, width * progress.value, height));
   const handleX = useDerivedValue(() => Math.min(width - HANDLE, Math.max(0, width * progress.value - HANDLE / 2)));
+  // At the very start nothing is played yet: no handle until playing or a scrub moves it.
+  const handleOpacity = useDerivedValue(() => (progress.value > 0.002 ? 1 : 0));
   return (
     <Canvas onLayout={layout} style={[styles.canvas, { height }, style]}>
       <Path path={inner} color={off} />
@@ -102,7 +104,16 @@ export function PixelWave({
           <LinearGradient start={vec(0, 0)} end={vec(width * FADE, 0)} colors={[fade, transparent(fade)]} />
         </Rect>
       ) : null}
-      {handle ? <Rect x={handleX} y={height / 2 - HANDLE / 2} width={HANDLE} height={HANDLE} color={tones[0]} /> : null}
+      {handle ? (
+        <Rect
+          x={handleX}
+          y={height / 2 - HANDLE / 2}
+          width={HANDLE}
+          height={HANDLE}
+          color={tones[0]}
+          opacity={handleOpacity}
+        />
+      ) : null}
     </Canvas>
   );
 }

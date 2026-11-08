@@ -13,7 +13,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { Button, Glass, haptics, Icon, PressScale, Text, useTheme, useToast } from "@/ui";
+import { Glass, haptics, Icon, PressScale, Text, useTheme, useToast } from "@/ui";
 import { withOpacity } from "../chat/turn";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -22,10 +22,23 @@ import { CANCEL_X, HOLD_MS, LOCK_Y, secondsLeft, slideIntent } from "./logic";
 import { LIVE_WAVE, useVoiceTake, type VoiceTarget } from "./useVoiceTake";
 import { PixelWave } from "./VoiceBars";
 
+/*
+ * The ruler of a take in the composer (the field's own numbers, `Composer`):
+ *   capsule   48 tall, radius 24, the field's ring and shadow; the "+" plate (48, glass) on its left, 8 apart.
+ *   inset     6 on every side: each 36 control sits 6 from the top, the bottom and the end it is near.
+ *   controls  36 round, one size: the in-field secondary (pause, play: no fill, the glyph alone, as the field's own
+ *             sticker button) and the primary (send: the ink circle with the arrow, the field's own send).
+ *   text      the clock starts 14 from the capsule's left edge (6 inset + 8), where the field's words start.
+ *   gaps      12 on each side of the wave; 8 between a time and a control, and between two controls.
+ *   times     15/20 (subhead), muted, tabular figures; "0:04" until listened to, then "0:02 / 0:04".
+ *   hands free  [trash plate] 8 [ 6 | 8 clock | 12 | wave | 12 | pause 36 | 8 | send 36 | 6 ]
+ *   paused      [trash plate] 8 [ 6 | play 36 | 12 | wave | 12 | time | 8 | send 36 | 6 ]
+ * Holding the mic keeps the field (the gesture lives on its mic) with the live wave drawn over it.
+ */
 const MIC = 36;
 /** The microphone under the finger grows to 44 (the ruler's next size up), in ink. */
 const HELD = 44 / MIC;
-/** The "+" the trash takes the place of. */
+/** The "+" plate the trash takes the place of. */
 const LEAD = 48;
 /** How far past the cancel and lock lines the finger still moves the button, less and less. */
 const OVERSHOOT = 80;
@@ -38,8 +51,10 @@ export interface ComposerVoice {
   mic: React.ReactNode | null;
   /** Over the field while recording: the composer keeps its size under it. */
   overlay: React.ReactNode | null;
-  /** In the "+" button's place. */
-  leading: React.ReactNode | null;
+  /** Hands free or paused: the field's place, in the field's own capsule (see the ruler above). */
+  bar: React.ReactNode | null;
+  /** In the "+" plate: the trash, hands free or paused. */
+  leading: { icon: "trash"; label: string; onPress: () => void } | null;
   /** Above the field: the slide-to-cancel hint, or the recording line once hands free. */
   above: React.ReactNode | null;
   active: boolean;
@@ -206,21 +221,7 @@ export function useVoiceComposer(
   const left = secondsLeft(take.seconds * 1000);
   const clock = left !== null && !paused ? t("voice.left", { seconds: left }) : voiceClock(take.seconds * 1000);
 
-  const mic = locked ? (
-    <PressScale
-      to={0.9}
-      haptic={false}
-      onPress={() => void take.send()}
-      accessibilityRole="button"
-      accessibilityLabel={t("voice.send")}
-      hitSlop={6}
-      style={[styles.button, { backgroundColor: c.ink }]}
-    >
-      <View style={styles.center}>
-        <Icon name="send" size={18} color={c.bg} />
-      </View>
-    </PressScale>
-  ) : paused ? null : (
+  const mic = locked || paused ? null : (
     <GestureDetector gesture={press}>
       <Animated.View
         accessible
@@ -241,101 +242,108 @@ export function useVoiceComposer(
       edge={take.edge}
       progress={take.progress}
       tones={tones}
-      off={c.line2}
+      off={withOpacity(c.faint, 0.45)}
       onWidth={take.setWidth}
       height={LIVE_WAVE}
       handle={handle}
       {...(handle ? {} : { fade: c.raised })}
     />
   );
-
-  const overlay =
-    phase === "idle" ? null : (
-      <View style={[styles.overlay, paused ? styles.overlayPaused : styles.overlayLive, { backgroundColor: c.raised }]}>
-        {holding ? (
-          <Animated.View style={[styles.lock, lockStyle]} pointerEvents="none">
-            <Glass style={styles.capsule} intensity={50}>
-              <Icon name="lock" size={14} color={c.muted} />
-              <Text variant="footnote" tone="muted" numberOfLines={1}>
-                {t("mobile.voice.slideUpToLock")}
-              </Text>
-            </Glass>
-          </Animated.View>
-        ) : null}
-        {holding && agent ? (
-          <View style={styles.face} pointerEvents="none">
-            <Face who={{ type: "agent", id: agent.id }} size={22} framed={false} mode="run" />
-          </View>
-        ) : null}
-        {paused ? (
-          <PressScale
-            to={0.92}
-            onPress={() => void take.listen()}
-            accessibilityRole="button"
-            accessibilityLabel={take.listening ? t("voice.stop") : t("voice.listen")}
-            hitSlop={8}
-            style={[styles.play, { backgroundColor: c.ink }]}
-          >
-            <View style={styles.center}>
-              <Icon name={take.listening ? "pause" : "play"} size={16} color={c.bg} />
-            </View>
-          </PressScale>
-        ) : (
-          <Text variant="body" numberOfLines={1} style={[styles.time, left !== null && { color: c.danger }]}>
-            {clock}
-          </Text>
-        )}
-        <GestureDetector gesture={scrub}>
-          <View
-            style={styles.wave}
-            onLayout={(e) => {
-              scrubWidth.value = e.nativeEvent.layout.width;
-            }}
-          >
-            {wave(paused)}
-          </View>
-        </GestureDetector>
-        {paused ? (
-          <>
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.ofTotal}>
-              {`${voiceClock(take.seconds * 1000)} / ${voiceClock(take.total * 1000)}`}
-            </Text>
-            <Button variant="primary" size="sm" label={t("mobile.voice.send")} onPress={() => void take.send()} />
-          </>
-        ) : locked ? (
-          <Button variant="secondary" size="sm" label={t("voice.pause")} onPress={() => void take.pause()} />
-        ) : null}
+  // The wave and the scrub on it, one piece for the held field and the bar.
+  const waveBox = (
+    <GestureDetector gesture={scrub}>
+      <View
+        style={styles.wave}
+        onLayout={(e) => {
+          scrubWidth.value = e.nativeEvent.layout.width;
+        }}
+      >
+        {wave(paused)}
       </View>
-    );
-
-  const leading = locked ? (
+    </GestureDetector>
+  );
+  // One 36 control: the in-field secondary (glyph alone) or the primary (the ink circle), as the field's own buttons.
+  const control = (icon: "pause" | "play" | "send", label: string, onPress: () => void, primary = false) => (
     <PressScale
       to={0.9}
-      onPress={() => void take.cancel(true)}
+      haptic={!primary}
+      onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={t("voice.delete")}
-      style={[styles.trash, { backgroundColor: withOpacity(c.danger, 0.12) }]}
+      accessibilityLabel={label}
+      hitSlop={6}
+      style={[styles.button, primary && { backgroundColor: c.ink }]}
     >
       <View style={styles.center}>
-        <Icon name="trash" size={20} color={c.danger} />
+        <Icon name={icon} size={primary ? 18 : 20} color={primary ? c.bg : icon === "play" ? c.ink2 : c.muted} />
       </View>
     </PressScale>
-  ) : paused ? (
-    <PressScale
-      to={0.96}
-      onPress={() => void take.cancel(true)}
-      accessibilityRole="button"
-      accessibilityLabel={t("voice.delete")}
-      hitSlop={{ top: 0, bottom: 0, left: 12, right: 4 }}
-      style={styles.discard}
-    >
-      <View style={styles.center}>
-        <Text variant="subhead" tone="danger" numberOfLines={1} style={styles.discardText}>
-          {t("mobile.voice.discard")}
-        </Text>
-      </View>
-    </PressScale>
+  );
+  const send = control("send", t("voice.send"), () => void take.send(), true);
+  // Paused and not listened to yet, the whole length alone; once played or scrubbed, where it is of the whole.
+  const started = take.listening || take.seconds !== take.total;
+  const pausedTime = started
+    ? `${voiceClock(take.seconds * 1000)} / ${voiceClock(take.total * 1000)}`
+    : voiceClock(take.total * 1000);
+
+  // Held: the field keeps its mic (the gesture lives there) and the live take is drawn over it.
+  const overlay = holding ? (
+    <View style={[styles.overlay, styles.overlayLive, { backgroundColor: c.raised }]}>
+      <Animated.View style={[styles.lock, lockStyle]} pointerEvents="none">
+        <Glass style={styles.capsule} intensity={50}>
+          <Icon name="lock" size={14} color={c.muted} />
+          <Text variant="footnote" tone="muted" numberOfLines={1}>
+            {t("mobile.voice.slideUpToLock")}
+          </Text>
+        </Glass>
+      </Animated.View>
+      {agent ? (
+        <View style={styles.face} pointerEvents="none">
+          <Face who={{ type: "agent", id: agent.id }} size={22} framed={false} mode="run" />
+        </View>
+      ) : null}
+      <Text variant="subhead" tone="muted" numberOfLines={1} style={[styles.time, left !== null && { color: c.danger }]}>
+        {clock}
+      </Text>
+      {waveBox}
+    </View>
   ) : null;
+
+  // Hands free or paused: the bar in the field's capsule, on the ruler above.
+  const bar = locked ? (
+    <>
+      <Text
+        variant="subhead"
+        tone="muted"
+        numberOfLines={1}
+        style={[styles.time, styles.timeLead, left !== null && { color: c.danger }]}
+      >
+        {clock}
+      </Text>
+      <View style={styles.gapWide} />
+      {waveBox}
+      <View style={styles.gapWide} />
+      {control("pause", t("voice.pause"), () => void take.pause())}
+      <View style={styles.gap} />
+      {send}
+    </>
+  ) : paused ? (
+    <>
+      {control(take.listening ? "pause" : "play", take.listening ? t("voice.stop") : t("voice.listen"), () =>
+        void take.listen(),
+      )}
+      <View style={styles.gapWide} />
+      {waveBox}
+      <View style={styles.gapWide} />
+      <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.time}>
+        {pausedTime}
+      </Text>
+      <View style={styles.gap} />
+      {send}
+    </>
+  ) : null;
+
+  const leading =
+    locked || paused ? { icon: "trash" as const, label: t("voice.delete"), onPress: () => void take.cancel(true) } : null;
 
   const above = holding ? (
     <Animated.View style={[styles.hint, hintStyle]} pointerEvents="none">
@@ -366,7 +374,7 @@ export function useVoiceComposer(
     </View>
   ) : null;
 
-  return { mic, overlay, leading, above, active: phase !== "idle" };
+  return { mic, overlay, bar, leading, above, active: phase !== "idle" };
 }
 
 const styles = StyleSheet.create({
@@ -374,22 +382,20 @@ const styles = StyleSheet.create({
   button: { width: MIC, height: MIC, borderRadius: MIC / 2 },
   overlay: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 24,
+    borderRadius: LEAD / 2,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
-  // Leaves the button slot (the microphone or send) its place at the end.
-  overlayLive: { paddingLeft: 12, paddingRight: 6 + MIC + 8 },
-  overlayPaused: { paddingLeft: 6, paddingRight: 6 },
+  // Held: the text starts where the field's words do (14); the mic's slot (6 + 36) and a 12 gap stay free at the end.
+  overlayLive: { paddingLeft: 14, paddingRight: 6 + MIC + 12 },
   face: { width: 22, height: 22 },
-  play: { width: MIC, height: MIC, borderRadius: MIC / 2 },
-  time: { minWidth: 40, fontVariant: ["tabular-nums"] },
-  ofTotal: { fontVariant: ["tabular-nums"] },
-  wave: { flex: 1, minWidth: 0, height: LIVE_WAVE, flexDirection: "row" },
-  trash: { width: LEAD, height: LEAD, borderRadius: LEAD / 2 },
-  discard: { height: LEAD, paddingHorizontal: 4, justifyContent: "center" },
-  discardText: { fontWeight: "600" },
+  time: { flexShrink: 0, fontVariant: ["tabular-nums"] },
+  // In the bar, the clock starts 14 from the capsule's edge, as the field's words: its 6 inset and 8 more.
+  timeLead: { marginLeft: 8 },
+  gap: { width: 8 },
+  gapWide: { width: 12 },
+  wave: { flex: 1, minWidth: 0, height: LIVE_WAVE, flexDirection: "row", alignItems: "center" },
   // Above the field's right end, over the microphone.
   lock: { position: "absolute", right: 0, bottom: LEAD + 16 },
   capsule: {
@@ -402,8 +408,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   capsuleInk: { flexShrink: 0 },
-  // Starts where the field's text starts: the "+" (48), the gap (8) and the field's own inset.
-  hint: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 20, paddingLeft: LEAD + 8 + 10, paddingBottom: 8 },
+  // Starts where the field's text starts: the "+" (48), the gap (8) and the field's own inset (14).
+  hint: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 20, paddingLeft: LEAD + 8 + 14, paddingBottom: 8 },
   chev: { transform: [{ rotate: "90deg" }] },
   line: { flexDirection: "row", alignItems: "center", gap: 8, paddingBottom: 8 },
   lineGlass: {
