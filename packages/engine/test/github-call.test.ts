@@ -3,10 +3,12 @@ import { generateKeyPairSync } from "node:crypto";
 import { schema } from "@agenteschat/db";
 import {
   appPermissionsFor,
+  CONNECTOR_CATALOG,
   type ConnectorDeps,
   createApiKeyConnection,
   createConnectorToolSource,
   type GitHubAppConfig,
+  githubAppManifest,
   SIGNATURE_MARK,
   syncGitHubAppConnection,
   type ToolContext,
@@ -25,15 +27,20 @@ const APP: GitHubAppConfig = {
 };
 const API = "https://api.github.test";
 
-/** GitHub's REST API for the app: `acme/*` is installation 1's; the person's GitHub account is 583231. */
-function fakeRest() {
+/**
+ * GitHub's REST API for the app: `acme/*` is installation 1's; the person's GitHub account is 583231. `refuse`: a
+ * permission installation 1 hasn't accepted (GitHub answers 422 to any set that asks it).
+ */
+function fakeRest(refuse?: string) {
   const minted: { body: Record<string, unknown> }[] = [];
   const fake = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     if (/\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 1 });
     if (url.includes("/repos/")) return new Response("not found", { status: 404 });
     if (url.endsWith("/app/installations/1/access_tokens")) {
-      minted.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+      const body = JSON.parse(String(init?.body)) as { permissions?: Record<string, string> };
+      if (refuse && body.permissions && refuse in body.permissions) return new Response("refused", { status: 422 });
+      minted.push({ body });
       return Response.json(
         { token: `ghs_app_${minted.length}`, expires_at: new Date(Date.now() + 3600_000).toISOString() },
         { status: 201 },
@@ -45,10 +52,10 @@ function fakeRest() {
   return { fetch: fake, minted };
 }
 
-async function world(options: { account?: boolean } = {}) {
+async function world(options: { account?: boolean; refuse?: string } = {}) {
   f = await setup();
   const mcp = fakeGithubMcp({ writes: true });
-  const rest = fakeRest();
+  const rest = fakeRest(options.refuse);
   const deps: ConnectorDeps = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://chat.example.com" };
   if (options.account) {
     await createApiKeyConnection(deps, f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_secret_123456" });
@@ -87,7 +94,7 @@ async function world(options: { account?: boolean } = {}) {
 }
 
 describe("GitHub's tools act as the app where it is installed (ADR 0156)", () => {
-  test("what the app's token may do, by the tool's scope: most first, never Projects", () => {
+  test("what the app's token may do, by the tool's scope: most first", () => {
     expect(appPermissionsFor("push_files", "repo.write")).toEqual([
       { contents: "write", workflows: "write" },
       { contents: "write" },
@@ -102,7 +109,67 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
       { pull_requests: "write", contents: "write" },
     ]);
     expect(appPermissionsFor("actions_run_trigger", "actions.run")).toEqual([{ actions: "write" }]);
-    expect(appPermissionsFor("projects_list", "projects.read")).toBeNull();
+    // An organization's Projects; an item's title and fields are its issue's or pull request's.
+    expect(appPermissionsFor("projects_list", "projects.read")).toEqual([
+      { organization_projects: "read", issues: "read", pull_requests: "read" },
+      { organization_projects: "read" },
+    ]);
+    expect(appPermissionsFor("projects_write", "projects.write")).toEqual([
+      { organization_projects: "write", issues: "read", pull_requests: "read" },
+      { organization_projects: "write" },
+    ]);
+    // A pull request's number goes through the issues endpoints too (comments, labels, assignees).
+    expect(appPermissionsFor("add_issue_comment", "issues.write")).toEqual([
+      { issues: "write", pull_requests: "write" },
+      { issues: "write" },
+    ]);
+    expect(appPermissionsFor("issue_read", "issues.read")).toEqual([
+      { issues: "read", pull_requests: "read" },
+      { issues: "read" },
+    ]);
+  });
+
+  test("the widened scopes ask only what their tools need: each kind of security alert its own permission", () => {
+    expect(appPermissionsFor("create_repository", "repo.admin")).toEqual([{ administration: "write" }]);
+    expect(appPermissionsFor("delete_repository", "repo.admin")).toEqual([{ administration: "write" }]);
+    expect(appPermissionsFor("create_repository_ruleset", "repo.admin")).toEqual([{ administration: "write" }]);
+    expect(appPermissionsFor("repository_ruleset_read", "repo.read")).toEqual([
+      { administration: "read" },
+      { metadata: "read" },
+    ]);
+    expect(appPermissionsFor("list_discussions", "discussions.read")).toEqual([{ discussions: "read" }]);
+    expect(appPermissionsFor("discussion_comment_write", "discussions.write")).toEqual([{ discussions: "write" }]);
+    expect(appPermissionsFor("label_write", "issues.write")).toEqual([
+      { issues: "write", pull_requests: "write" },
+      { issues: "write" },
+    ]);
+    expect(appPermissionsFor("get_team_members", "org.read")).toEqual([{ members: "read" }]);
+    expect(appPermissionsFor("get_code_scanning_alert", "security.read")).toEqual([{ security_events: "read" }]);
+    expect(appPermissionsFor("list_dependabot_alerts", "security.read")).toEqual([{ vulnerability_alerts: "read" }]);
+    expect(appPermissionsFor("get_secret_scanning_alert", "security.read")).toEqual([
+      { secret_scanning_alerts: "read" },
+    ]);
+    expect(appPermissionsFor("list_repository_security_advisories", "security.read")).toEqual([
+      { repository_advisories: "read" },
+    ]);
+    expect(appPermissionsFor("list_org_repository_security_advisories", "security.read")).toEqual([
+      { repository_advisories: "write" },
+    ]);
+  });
+
+  test("every GitHub tool can go as the app, asking only permissions the app's manifest has", () => {
+    const granted: Record<string, string> = githubAppManifest("https://chat.example.com").default_permissions;
+    const beyond: string[] = [];
+    for (const [name, tool] of Object.entries(CONNECTOR_CATALOG.github?.tools ?? {})) {
+      if (tool.ours) continue;
+      const sets = appPermissionsFor(name, tool.scope);
+      if (!sets) beyond.push(`${name}: no permissions`);
+      for (const [permission, level] of (sets ?? []).flatMap((set) => Object.entries(set))) {
+        const has = granted[permission];
+        if (!has || (level === "write" && has !== "write")) beyond.push(`${name}: ${permission} ${level}`);
+      }
+    }
+    expect(beyond).toEqual([]);
   });
 
   test("a covered repository goes with its app token; anywhere else with the account, as before", async () => {
@@ -114,7 +181,10 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
       body: "Done",
     });
     expect(covered.auth).toBe("Bearer ghs_app_1");
-    expect(w.rest.minted.at(-1)?.body).toEqual({ repositories: ["api"], permissions: { issues: "write" } });
+    expect(w.rest.minted.at(-1)?.body).toEqual({
+      repositories: ["api"],
+      permissions: { issues: "write", pull_requests: "write" },
+    });
     const elsewhere = await w.call("github_add_issue_comment", {
       owner: "other",
       repo: "x",
@@ -127,11 +197,11 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
     expect((await w.call("github_list_issue_types", { owner: "someone" })).auth).toBe("Bearer ghp_secret_123456");
   });
 
-  test("through the app alone: listed with the installation's token, Projects hidden, uncovered repositories refused", async () => {
+  test("through the app alone: listed with the installation's token, uncovered repositories refused", async () => {
     const w = await world();
     const listed = (await w.source.tools(w.ctx)).map((t) => t.name);
     expect(listed).toContain("github_add_issue_comment");
-    expect(listed).not.toContain("github_projects_list");
+    expect(listed).toContain("github_projects_list");
     expect(w.mcp.sessions[0]?.headers.authorization).toBe("Bearer ghs_app_1");
     expect(w.rest.minted[0]?.body).toEqual({ permissions: { metadata: "read" } });
 
@@ -147,6 +217,66 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
     expect(
       (await w.call("github_add_issue_comment", { owner: "acme", repo: "app", issue_number: 1, body: "Hi" })).auth,
     ).toStartWith("Bearer ghs_app_");
+  });
+});
+
+describe("what only an organization's installation reaches (ADR 0156, addendum)", () => {
+  const personal = () =>
+    f.db.insert(schema.githubAppInstallations).values({
+      orgId: f.org.id,
+      installationId: 2,
+      accountLogin: "ana-gh",
+      accountType: "User",
+      createdByUserId: f.owner.id,
+    });
+
+  test("Projects and new repositories go as the app on an organization; a person's need an account", async () => {
+    const w = await world();
+    await personal();
+    const projects = await w.call("github_projects_list", { owner: "acme" });
+    expect(projects.auth).toStartWith("Bearer ghs_app_");
+    expect(w.rest.minted.at(-1)?.body).toEqual({
+      permissions: { organization_projects: "read", issues: "read", pull_requests: "read" },
+    });
+    const theirs = await w.call("github_projects_list", { owner: "ana-gh" });
+    expect(theirs.out.content).toContain("This needs a GitHub account");
+    expect(theirs.auth).toBeUndefined();
+    expect((await w.call("github_create_repository", { name: "site" })).out.content).toContain(
+      "This needs a GitHub account",
+    );
+    const created = await w.call("github_create_repository", { name: "site", organization: "acme" });
+    expect(created.auth).toStartWith("Bearer ghs_app_");
+    expect(w.rest.minted.at(-1)?.body).toEqual({ permissions: { administration: "write" } });
+  });
+
+  test("with an account too, a person's Projects go as the account", async () => {
+    const w = await world({ account: true });
+    await personal();
+    expect((await w.call("github_projects_list", { owner: "ana-gh" })).auth).toBe("Bearer ghp_secret_123456");
+    expect((await w.call("github_create_repository", { name: "site" })).auth).toBe("Bearer ghp_secret_123456");
+  });
+
+  test("an organization's tools name it as org: that installation's token, with the tool's permission", async () => {
+    const w = await world();
+    expect((await w.call("github_get_team_members", { org: "acme", team_slug: "core" })).auth).toStartWith(
+      "Bearer ghs_app_",
+    );
+    expect(w.rest.minted.at(-1)?.body).toEqual({ permissions: { members: "read" } });
+    await w.call("github_list_org_repository_security_advisories", { org: "acme" });
+    expect(w.rest.minted.at(-1)?.body).toEqual({ permissions: { repository_advisories: "write" } });
+    await w.call("github_list_code_scanning_alerts", { owner: "acme", repo: "api" });
+    expect(w.rest.minted.at(-1)?.body).toEqual({ repositories: ["api"], permissions: { security_events: "read" } });
+  });
+
+  test("an installation that hasn't accepted a new permission: the account does it, or the agent says who accepts", async () => {
+    const alone = await world({ refuse: "discussions" });
+    const input = { owner: "acme", repo: "app", method: "add", discussionNumber: 3, body: "Thanks" };
+    const refused = await alone.call("github_discussion_comment_write", input);
+    expect(refused.out.content).toContain("accepts the app's new permissions on GitHub");
+    expect(refused.auth).toBeUndefined();
+    await f.close();
+    const withAccount = await world({ account: true, refuse: "discussions" });
+    expect((await withAccount.call("github_discussion_comment_write", input)).auth).toBe("Bearer ghp_secret_123456");
   });
 });
 

@@ -1,4 +1,4 @@
-import { useCompleteOAuth } from "@agenteschat/client";
+import { ApiError, useCompleteOAuth } from "@agenteschat/client";
 import { errorCode, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { safeRedirect } from "@agenteschat/client/lib/guards";
 import { useNavigate } from "@tanstack/react-router";
@@ -37,9 +37,10 @@ export function DesktopConnectorPage({
     started.current = true;
     // Replacing this page: the code it carried leaves the history.
     const go = (href: string) => void navigate({ href, replace: true });
-    // `reason`: why, as the callbacks say it (oauthReturnText), or the API's code when finishing here failed.
-    const fail = (reason: string) => {
-      toast.show(oauthReturnText(t, reason), "error");
+    // `reason`: why, as the callbacks say it (oauthReturnText), or the API's code (and what it names) when finishing
+    // here failed.
+    const fail = (reason: string, params?: Record<string, unknown>) => {
+      toast.show(oauthReturnText(t, reason, params), "error");
       go(org ? `/org/${encodeURIComponent(org)}/settings/connectors` : "/");
     };
     if (state === DESKTOP_MAIL_STATE) {
@@ -63,7 +64,8 @@ export function DesktopConnectorPage({
           const back = `connected=${encodeURIComponent(done.connector)}&outcome=${done.outcome}`;
           go(`${to}${to.includes("?") ? "&" : "?"}${back}`);
         },
-        onError: (failed) => fail(errorCode(failed) ?? "failed"),
+        onError: (failed) =>
+          fail(errorCode(failed) ?? "failed", failed instanceof ApiError ? failed.params : undefined),
       },
     );
   }, [org, state, code, error, complete, navigate, toast, t]);

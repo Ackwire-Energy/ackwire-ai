@@ -211,7 +211,7 @@ describe("Conectar GitHub: the agentes.chat app first", () => {
     );
     expect(app?.getAttribute("aria-checked")).toBe("true");
     expect(account?.textContent).toBe(
-      "Uma conta do GitHubOs agentes aparecem como essa conta. O GitHub Projects precisa de uma.",
+      "Uma conta do GitHubOs agentes aparecem como essa conta. O GitHub Projects de uma conta pessoal precisa de uma.",
     );
     expect(flow.textContent).toContain("Você escolhe as contas e os repositórios no GitHub e volta para cá.");
     // The account's key is the account's other way in: not offered for the app.

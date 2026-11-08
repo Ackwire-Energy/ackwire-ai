@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   type ConnectorDeps,
+  clientRefused,
   completeOAuth,
   connectionHeaders,
   connectionView,
@@ -17,6 +18,7 @@ import {
   fillTitle,
   listApprovals,
   listMessages,
+  MisconfiguredError,
   postPersonMessage,
   revokeConnection,
   setAgentScopes,
@@ -251,10 +253,11 @@ describe("MCP tools through the Tool Gateway", () => {
     expect(new Set(all.map((t) => t.service))).toEqual(new Set(["github"]));
     expect(mcp.sessions[0]).toEqual({
       serverUrl: "https://api.githubcopilot.com/mcp/",
-      // Projects and Actions too, besides the server's default toolsets.
+      // Actions, Projects, discussions, labels, security alerts and rulesets too, besides the server's default toolsets.
       headers: {
         authorization: "Bearer ghp_secret_123456",
-        "X-MCP-Toolsets": "context,repos,issues,pull_requests,users,actions,projects",
+        "X-MCP-Toolsets":
+          "context,repos,issues,pull_requests,users,actions,projects,discussions,labels,code_security,dependabot,secret_protection,security_advisories,governance",
       },
     });
 
@@ -312,9 +315,9 @@ describe("MCP tools through the Tool Gateway", () => {
       output: { content: wrapExternal("github_issue_read", "boom"), isError: true },
     });
     expect(
-      await gateway.invoke(rctx, { toolUseId: "t3", name: "github_delete_repository", input: { repo: "app" } }),
+      await gateway.invoke(rctx, { toolUseId: "t3", name: "github_star_repository", input: { repo: "app" } }),
     ).toMatchObject({
-      output: { content: "Unknown tool github_delete_repository", isError: true },
+      output: { content: "Unknown tool github_star_repository", isError: true },
     });
     expect(mcp.calls.map((c) => c.tool)).toEqual(["pull_request_read"]);
     const used = await f.db.select().from(schema.connectorUsageDays).orderBy(schema.connectorUsageDays.tool);
@@ -327,6 +330,70 @@ describe("MCP tools through the Tool Gateway", () => {
     await revokeConnection(f.db, f.owner.id, f.org.id, c.id);
     expect(await gateway.list(ctx)).toEqual([]);
     expect(await f.db.select().from(schema.agentScopes)).toEqual([]);
+  });
+
+  test("deleting a repository and adding a ruleset ask a person; creating one, labels and discussions don't", async () => {
+    f = await setup();
+    const mcp = fakeGithubMcp({ writes: true });
+    await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_secret_123456" });
+    const source = createConnectorToolSource({ ...depsOf(f), connect: mcp.connect });
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "x",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: msg.id,
+        triggerMessageId: msg.id,
+        trigger: "mention",
+        hop: 1,
+      })
+      .returning();
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      channelId: f.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+    };
+    const sensitive = Object.fromEntries((await source.tools(ctx)).map((t) => [t.name, t.sensitive]));
+    expect(sensitive).toMatchObject({
+      github_delete_repository: true,
+      github_create_repository_ruleset: true,
+      github_create_repository: false,
+      github_label_write: false,
+      github_discussion_comment_write: false,
+      github_list_code_scanning_alerts: false,
+    });
+
+    const gateway = createToolGateway({ sources: [source] });
+    const why = "The person asked to clean up the old repositories: this is the one they named.";
+    const call = (name: string, input: Record<string, unknown>) =>
+      gateway.invoke(ctx, { toolUseId: crypto.randomUUID(), name, input });
+    const deletion = await call("github_delete_repository", { owner: "acme", repo: "old", why });
+    expect(deletion).toMatchObject({ type: "approval", approval: { title: "Delete acme/old" } });
+    const ruleset = await call("github_create_repository_ruleset", {
+      owner: "acme",
+      repo: "app",
+      name: "main",
+      rules: [{ type: "deletion" }],
+      why,
+    });
+    expect(ruleset).toMatchObject({ type: "approval", approval: { title: "Create ruleset main" } });
+    expect(await call("github_create_repository", { name: "new", organization: "acme" })).toMatchObject({
+      type: "result",
+    });
+    expect(
+      await call("github_label_write", { owner: "acme", repo: "app", method: "delete", name: "stale" }),
+    ).toMatchObject({
+      type: "result",
+    });
+    expect(mcp.calls.map((x) => x.tool)).toEqual(["create_repository", "label_write"]);
   });
 
   test("end to end: mention → MCP read → merge approval → approve → merged over MCP with exactly the approved params", async () => {
@@ -493,6 +560,37 @@ describe("OAuth (state + PKCE)", () => {
       "invalid_grant",
     );
     await expect(startOAuth(deps, f.owner.id, f.org.id, "linear")).rejects.toThrow("not configured");
+  });
+
+  test("this server's OAuth app refused (a wrong client id or secret): misconfigured, naming the provider", async () => {
+    f = await setup();
+    // The token endpoint refusing the client itself, never the person's code.
+    expect(["invalid_client", "incorrect_client_credentials"].map(clientRefused)).toEqual([true, true]);
+    // A code expired or used, a cancel, another callback address, no code at all: another try can work.
+    const others = ["invalid_grant", "bad_verification_code", "access_denied", "redirect_uri_mismatch", undefined];
+    expect(others.map(clientRefused)).toEqual([false, false, false, false, false]);
+    // GitHub says it with a 200 and its own code; other servers with OAuth's invalid_client.
+    const answers = [
+      () =>
+        Response.json({
+          error: "incorrect_client_credentials",
+          error_description: "The client_id and/or client_secret passed are incorrect.",
+        }),
+      () => Response.json({ error: "invalid_client" }, { status: 401 }),
+    ];
+    for (const answer of answers) {
+      const deps = depsOf(f, { http: (async () => answer()) as unknown as typeof fetch });
+      const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+      const failed = await completeOAuth(deps, { id: f.owner.id }, { state, code: "c" }).catch((e: unknown) => e);
+      expect(failed).toBeInstanceOf(MisconfiguredError);
+      expect(failed).toMatchObject({ code: "connector.misconfigured", params: { provider: "GitHub" } });
+    }
+    // The person's code refused stays what it was: a refusal, which another try can get past.
+    const expired = (async () => Response.json({ error: "invalid_grant" }, { status: 400 })) as unknown as typeof fetch;
+    const deps = depsOf(f, { http: expired });
+    const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+    const refused = await completeOAuth(deps, { id: f.owner.id }, { state, code: "c" }).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(TokenRefused);
   });
 
   test("tokens about to expire are refreshed before a call", async () => {

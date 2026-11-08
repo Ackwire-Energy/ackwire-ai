@@ -3867,6 +3867,7 @@ export const ptBR = {
         merge_pull_request: "Fazer merge do PR #{{number}} em {{repo}}",
         pull_request_review_write: "Revisar o PR #{{number}} em {{repo}}",
         actions_run_trigger: "Rodar {{method}} em {{repo}}",
+        delete_repository: "Apagar o repositório {{repo}}",
       },
     },
   },
@@ -6151,6 +6152,25 @@ export const ptBR = {
       label: "Rodar workflows",
       description: "Iniciar workflows do GitHub Actions (pode fazer deploy). Sempre pede aprovação.",
     },
+    github_repo_admin: {
+      label: "Gerenciar repositórios",
+      description:
+        "Criar repositórios e proteger as branches com conjuntos de regras. Apagar um repositório e criar um conjunto de regras sempre pedem aprovação.",
+    },
+    github_discussions_read: {
+      label: "Ler discussões",
+      description: "Listar e ler as GitHub Discussions e os comentários.",
+    },
+    github_discussions_write: {
+      label: "Escrever em discussões",
+      description: "Comentar e responder nas GitHub Discussions e marcar respostas.",
+    },
+    github_security_read: {
+      label: "Ler alertas de segurança",
+      description:
+        "Ler alertas do código, do Dependabot e de segredos expostos, e avisos de segurança. Os alertas de segredos mostram o segredo exposto.",
+    },
+    github_org_read: { label: "Ler equipes", description: "Listar os membros das equipes de uma organização." },
     sentry_issues_read: { label: "Ler erros", description: "Buscar issues e eventos e ler os detalhes." },
     sentry_issues_write: { label: "Triar erros", description: "Resolver, atribuir ou ignorar issues do Sentry." },
     linear_issues_read: { label: "Ler issues", description: "Listar e ler issues e projetos do Linear." },
@@ -10362,6 +10382,12 @@ export const ptBR = {
     /** O app foi instalado no próprio GitHub, não pelo agentes.chat (`github_app_error=installed_outside`). */
     installedOutside:
       "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
+    /**
+     * O GitHub recusou o app do GitHub deste servidor, com a chave secreta (ou o ID) errada
+     * (`github_app_error=misconfigured`): tentar de novo não resolve, só quem cuida do servidor conserta.
+     */
+    misconfigured:
+      "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
     /** O GitHub é só o app: conectar uma conta também (os agentes usam onde o app não está e no GitHub Projects). */
     connectAccount: "Conectar uma conta do GitHub",
     /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no agentes.chat). */
@@ -10997,6 +11023,15 @@ export const ptBR = {
       analytics: "análise|análises|da análise",
       revenue: "receita|receitas|da receita",
       source: "origem|origens|da origem",
+      code: "código|códigos|do código",
+      scanning: "varredura|varreduras|da varredura",
+      secret: "segredo|segredos|do segredo",
+      security: "segurança|segurança|de segurança",
+      advisory: "aviso|avisos|do aviso",
+      discussion: "discussão|discussões|da discussão",
+      dependabot: "Dependabot|Dependabot|do Dependabot",
+      org: "organização|organizações|da organização",
+      ruleset: "conjunto de regras|conjuntos de regras|do conjunto de regras",
     },
   },
   toolReview: {
@@ -11108,7 +11143,7 @@ export const ptBR = {
       recommended: "Recomendado",
       appText: "Os agentes aparecem como o app, e você escolhe os repositórios no GitHub.",
       account: "Uma conta do GitHub",
-      accountText: "Os agentes aparecem como essa conta. O GitHub Projects precisa de uma.",
+      accountText: "Os agentes aparecem como essa conta. O GitHub Projects de uma conta pessoal precisa de uma.",
       appNote: "Você escolhe as contas e os repositórios no GitHub e volta para cá.",
     },
     /** Em Reconectar GitHub: o login dele só pergunta pelas organizações na primeira vez. */
@@ -11750,6 +11785,12 @@ export const ptBR = {
       gone: "Essa conta não está mais conectada.",
       unfinished: "O login na Composio não terminou. Tente de novo.",
       unavailable: "Este serviço não conecta aqui.",
+      /**
+       * O {{provider}} recusou o app de OAuth deste servidor para ele, com a chave secreta (ou o ID) errada
+       * (`connector_error=misconfigured`): tentar de novo não resolve, só quem cuida do servidor conserta.
+       */
+      misconfigured:
+        "A conexão com {{provider}} está mal configurada no servidor, então ela não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
     },
     /** Restricted wiki pages (ADR 0023). */
     wiki: {

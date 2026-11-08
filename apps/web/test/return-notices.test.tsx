@@ -84,6 +84,33 @@ describe("back from a provider's sign-in that didn't connect", () => {
     ]);
   });
 
+  test("this server's own app refused at the provider: what's wrong and who fixes it, the connector by its name", () => {
+    expect(open(`${CONNECTORS}?github_app_error=misconfigured&tab=apps`)).toEqual({
+      shown: [
+        [
+          "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+          "error",
+        ],
+      ],
+      left: `${CONNECTORS}?tab=apps`,
+    });
+    expect(open(`${CONNECTORS}?connector_error=misconfigured&connector=linear&tab=apps`, "en")).toEqual({
+      shown: [
+        [
+          "The connection to Linear is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+          "error",
+        ],
+      ],
+      left: `${CONNECTORS}?tab=apps`,
+    });
+    // A connector the app has no name for (an address made by hand): only that it failed, never the address's words.
+    for (const connector of ["constructor", "evil-corp", ""]) {
+      expect(open(`${CONNECTORS}?connector_error=misconfigured&connector=${connector}`, "en").shown).toEqual([
+        ["Couldn't connect. Try again in a moment.", "error"],
+      ]);
+    }
+  });
+
   test("the GitHub account's owner was asked to install: news, not an error, with where the owner installs it", () => {
     expect(open(`${CONNECTORS}?github_app_error=requested`)).toEqual({
       shown: [
@@ -143,5 +170,20 @@ describe("back from a provider's sign-in that didn't connect", () => {
     );
     expect(document.body.textContent).not.toContain("invalid or expired");
     expect(router.state.location.pathname).toBe(CONNECTORS);
+  });
+
+  test("in the desktop app's window: this server's OAuth app refused, said by its code with the provider it names", async () => {
+    const api = createFakeApi(seedState());
+    api.connectors.completeOAuth = async () => {
+      throw new ApiError(500, "connector.misconfigured", "GitHub refused this server's OAuth app", {
+        provider: "GitHub",
+      });
+    };
+    await renderApp(`/desktop/connector?org=${ORG_ID}&state=s1&code=c1`, { api });
+    await settle(8);
+    expect(document.querySelector(".ac-toast")?.textContent).toContain(
+      "A conexão com GitHub está mal configurada no servidor, então ela não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+    );
+    expect(document.body.textContent).not.toContain("refused this server");
   });
 });

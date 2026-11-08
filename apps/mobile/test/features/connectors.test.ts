@@ -1,8 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Connection, ConnectorDef, CustomServer, GitHubAppInfo, GitHubAppInstallation } from "@agenteschat/client";
+import {
+  ApiError,
+  type Connection,
+  type ConnectorDef,
+  type CustomServer,
+  type GitHubAppInfo,
+  type GitHubAppInstallation,
+} from "@agenteschat/client";
 import { connectedItems, isMcpItem, itemName } from "@agenteschat/client/lib/connected";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   appAccountsText,
   githubAppPanel,
@@ -478,6 +486,29 @@ describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", 
     expect(back).toContain("installationIdOf(params.installation_id)");
     // The server's own app is made in the browser, on Conectores of the web.
     expect(app).toContain("/settings/connectors`)");
+  });
+
+  test("a provider refusing this server's own app: the finish says what's wrong and who fixes it", async () => {
+    // What the server answers the app's finish (`…/github-app/complete`, `…/connectors/oauth/complete`), which the
+    // sheet and the link route say with knownErrorText.
+    const app = new ApiError(500, "github_app.misconfigured", "GitHub refused this server's GitHub App");
+    const sentry = new ApiError(500, "connector.misconfigured", "Sentry refused this server's OAuth app", {
+      provider: "Sentry",
+    });
+    for (const lng of ["pt-BR", "en"] as const) {
+      const tr = await translator(lng);
+      expect([knownErrorText(tr, app), knownErrorText(tr, sentry)]).toEqual(
+        lng === "pt-BR"
+          ? [
+              "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+              "A conexão com Sentry está mal configurada no servidor, então ela não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+            ]
+          : [
+              "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+              "The connection to Sentry is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+            ],
+      );
+    }
   });
 });
 

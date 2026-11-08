@@ -4,7 +4,15 @@ import { join } from "node:path";
 import { en as enStrings, ptBR, resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import { ApiError, createFileRequester, createRequester, invitationQuery, NetworkError } from "../src/index";
-import { authErrorText, errorText, hasWordsFor, noAnswer, sendWaits, signInRefusalText } from "../src/lib/errors";
+import {
+  authErrorText,
+  errorText,
+  hasWordsFor,
+  noAnswer,
+  oauthReturnText,
+  sendWaits,
+  signInRefusalText,
+} from "../src/lib/errors";
 
 const failure = new TypeError("Failed to fetch");
 const unreachable = async () => {
@@ -293,6 +301,32 @@ test("the right hand refused a place: its own line, never ask an admin", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");
   expect(errorText(t, refused)).toBe("errors.rightHand.permanent");
+});
+
+test("a provider refused this server's own OAuth app: what's wrong and who fixes it, never 'try again'", () => {
+  const said = (lng: string) => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+    const t = instance.t;
+    const app = new ApiError(500, "github_app.misconfigured", "GitHub refused this server's GitHub App");
+    const linear = { provider: "Linear" };
+    const connector = new ApiError(500, "connector.misconfigured", "Linear refused this server's OAuth app", linear);
+    // The phone says what finishing answered; the desktop window, by its code and what it names.
+    const texts = [errorText(t, app), errorText(t, connector)];
+    expect([
+      oauthReturnText(t, "github_app.misconfigured"),
+      oauthReturnText(t, "connector.misconfigured", linear),
+    ]).toEqual(texts);
+    return texts;
+  };
+  expect(said("pt-BR")).toEqual([
+    "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+    "A conexão com Linear está mal configurada no servidor, então ela não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
+  ]);
+  expect(said("en")).toEqual([
+    "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+    "The connection to Linear is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings.",
+  ]);
 });
 
 /**

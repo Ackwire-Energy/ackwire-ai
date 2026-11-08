@@ -3647,7 +3647,8 @@
       "github": {
         "merge_pull_request": "Merge PR #{{number}} di {{repo}}",
         "pull_request_review_write": "Tinjau PR #{{number}} di {{repo}}",
-        "actions_run_trigger": "Jalankan {{method}} di {{repo}}"
+        "actions_run_trigger": "Jalankan {{method}} di {{repo}}",
+        "delete_repository": "Hapus repositori {{repo}}"
       }
     }
   },
@@ -5836,6 +5837,26 @@
     "github_actions_run": {
       "label": "Jalankan workflow",
       "description": "Mulai workflow GitHub Actions (bisa melakukan deploy). Selalu minta persetujuan."
+    },
+    "github_repo_admin": {
+      "label": "Kelola repositori",
+      "description": "Buat repositori dan lindungi branch-nya dengan ruleset. Menghapus repositori dan menambahkan ruleset selalu minta persetujuan."
+    },
+    "github_discussions_read": {
+      "label": "Baca diskusi",
+      "description": "Lihat daftar dan baca GitHub Discussions beserta komentarnya."
+    },
+    "github_discussions_write": {
+      "label": "Tulis di diskusi",
+      "description": "Beri komentar dan balasan di GitHub Discussions dan tandai jawaban."
+    },
+    "github_security_read": {
+      "label": "Baca peringatan keamanan",
+      "description": "Baca peringatan pemindaian kode, Dependabot, dan pemindaian rahasia, serta advisori keamanan. Peringatan rahasia menampilkan rahasia yang bocor."
+    },
+    "github_org_read": {
+      "label": "Baca tim",
+      "description": "Lihat daftar anggota tim di sebuah organisasi."
     },
     "sentry_issues_read": {
       "label": "Baca error",
@@ -9913,6 +9934,7 @@
     "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana.",
     "otherWorkspace": "Akun GitHub itu sudah terhubung ke ruang kerja lain. Hapus aplikasinya di sana sebelum memasangnya di sini.",
     "installedOutside": "Aplikasinya dipasang di akun GitHub itu di luar agentes.chat. Hapus di GitHub, lalu pasang lagi dari Konektor › GitHub.",
+    "misconfigured": "Aplikasi GitHub di server memakai kunci rahasia yang salah, jadi pemasangan tidak bisa selesai. Pengelola server perlu mengganti kunci itu di pengaturan aplikasi.",
     "connectAccount": "Hubungkan akun GitHub",
     "ownerHint": "Pemilik server ini bisa membuat aplikasi GitHub di sini, di Konektor.",
     "viaApp": "Lewat aplikasi agentes.chat di {{accounts}}",
@@ -10710,7 +10732,16 @@
       "cycle": "siklus|siklus|siklus",
       "analytics": "analitik|analitik|analitik",
       "revenue": "pendapatan|pendapatan|pendapatan",
-      "source": "sumber|sumber|sumber"
+      "source": "sumber|sumber|sumber",
+      "code": "kode|kode|kode",
+      "scanning": "pemindaian|pemindaian|pemindaian",
+      "secret": "rahasia|rahasia|rahasia",
+      "security": "keamanan|keamanan|keamanan",
+      "advisory": "advisori|advisori|advisori",
+      "discussion": "diskusi|diskusi|diskusi",
+      "dependabot": "Dependabot|Dependabot|Dependabot",
+      "org": "organisasi|organisasi|organisasi",
+      "ruleset": "ruleset|ruleset|ruleset"
     }
   },
   "toolReview": {
@@ -10825,7 +10856,7 @@
       "recommended": "Disarankan",
       "appText": "Agen muncul sebagai aplikasi, dan kamu memilih repositorinya di GitHub.",
       "account": "Akun GitHub",
-      "accountText": "Agen muncul sebagai akun itu. GitHub Projects butuh akun.",
+      "accountText": "Agen muncul sebagai akun itu. GitHub Projects di akun pribadi butuh akun.",
       "appNote": "Kamu memilih akun dan repositori di GitHub, lalu kembali ke sini."
     },
     "githubOrgs": {
@@ -11503,7 +11534,8 @@
       "otherServer": "Akun itu ada di alamat lain.",
       "gone": "Akun itu sudah tidak terhubung.",
       "unfinished": "Proses masuk di Composio tidak selesai. Coba lagi.",
-      "unavailable": "Layanan ini tidak bisa dihubungkan di sini."
+      "unavailable": "Layanan ini tidak bisa dihubungkan di sini.",
+      "misconfigured": "Koneksi ke {{provider}} di server salah diatur, jadi tidak bisa selesai. Pengelola server perlu mengganti kunci di pengaturan aplikasi."
     },
     "wiki": {
       "noAccess": "Kamu tidak punya akses ke halaman ini.",

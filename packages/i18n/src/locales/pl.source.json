@@ -9234,6 +9234,9 @@
   "approval.titles.github.actions_run_trigger": {
     "value": "Run {{method}} in {{repo}}"
   },
+  "approval.titles.github.delete_repository": {
+    "value": "Delete the repository {{repo}}"
+  },
   "home.greeting.morning": {
     "value": "Good morning, {{name}}"
   },
@@ -14650,6 +14653,36 @@
   },
   "scopes.github_actions_run.description": {
     "value": "Start GitHub Actions workflows (may deploy). Always asks for approval."
+  },
+  "scopes.github_repo_admin.label": {
+    "value": "Manage repositories"
+  },
+  "scopes.github_repo_admin.description": {
+    "value": "Create repositories and protect their branches with rulesets. Deleting a repository and adding a ruleset always ask for approval."
+  },
+  "scopes.github_discussions_read.label": {
+    "value": "Read discussions"
+  },
+  "scopes.github_discussions_read.description": {
+    "value": "List and read GitHub Discussions and their comments."
+  },
+  "scopes.github_discussions_write.label": {
+    "value": "Write in discussions"
+  },
+  "scopes.github_discussions_write.description": {
+    "value": "Comment and reply in GitHub Discussions and mark answers."
+  },
+  "scopes.github_security_read.label": {
+    "value": "Read security alerts"
+  },
+  "scopes.github_security_read.description": {
+    "value": "Read code scanning, Dependabot and secret scanning alerts and security advisories. Secret alerts show the leaked secret."
+  },
+  "scopes.github_org_read.label": {
+    "value": "Read teams"
+  },
+  "scopes.github_org_read.description": {
+    "value": "List the members of an organization's teams."
   },
   "scopes.sentry_issues_read.label": {
     "value": "Read errors"
@@ -25140,6 +25173,9 @@
   "githubApp.installedOutside": {
     "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
   },
+  "githubApp.misconfigured": {
+    "value": "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings."
+  },
   "githubApp.connectAccount": {
     "value": "Connect a GitHub account"
   },
@@ -26944,6 +26980,33 @@
   "toolNames.noun.source": {
     "value": "source|sources"
   },
+  "toolNames.noun.code": {
+    "value": "code|code"
+  },
+  "toolNames.noun.scanning": {
+    "value": "scanning|scanning"
+  },
+  "toolNames.noun.secret": {
+    "value": "secret|secrets"
+  },
+  "toolNames.noun.security": {
+    "value": "security|security"
+  },
+  "toolNames.noun.advisory": {
+    "value": "advisory|advisories"
+  },
+  "toolNames.noun.discussion": {
+    "value": "discussion|discussions"
+  },
+  "toolNames.noun.dependabot": {
+    "value": "Dependabot|Dependabot"
+  },
+  "toolNames.noun.org": {
+    "value": "organization|organizations"
+  },
+  "toolNames.noun.ruleset": {
+    "value": "ruleset|rulesets"
+  },
   "toolReview.title": {
     "value": "Review what the agent can do on its own"
   },
@@ -27266,7 +27329,7 @@
     "value": "A GitHub account"
   },
   "connectFlow.github.accountText": {
-    "value": "Agents show up as that account. GitHub Projects need one."
+    "value": "Agents show up as that account. GitHub Projects on a personal account need one."
   },
   "connectFlow.github.appNote": {
     "value": "You pick the accounts and repositories on GitHub, then come back here."
@@ -28917,6 +28980,9 @@
   },
   "errors.connector.unavailable": {
     "value": "This service can't be connected here."
+  },
+  "errors.connector.misconfigured": {
+    "value": "The connection to {{provider}} is set up wrong on the server, so it can't finish. Whoever runs the server needs to replace the key in the app's settings."
   },
   "errors.wiki.noAccess": {
     "value": "You don't have access to this page."

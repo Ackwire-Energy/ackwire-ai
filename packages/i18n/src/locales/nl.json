@@ -3775,7 +3775,8 @@
       "github": {
         "merge_pull_request": "PR #{{number}} in {{repo}} mergen",
         "pull_request_review_write": "PR #{{number}} in {{repo}} beoordelen",
-        "actions_run_trigger": "{{method}} in {{repo}} uitvoeren"
+        "actions_run_trigger": "{{method}} in {{repo}} uitvoeren",
+        "delete_repository": "Repository {{repo}} verwijderen"
       }
     }
   },
@@ -6077,6 +6078,26 @@
     "github_actions_run": {
       "label": "Workflows uitvoeren",
       "description": "GitHub Actions-workflows starten (kan deployen). Vraagt altijd om goedkeuring."
+    },
+    "github_repo_admin": {
+      "label": "Repositories beheren",
+      "description": "Repositories maken en hun branches beschermen met rulesets. Een repository verwijderen en een ruleset toevoegen vragen altijd om goedkeuring."
+    },
+    "github_discussions_read": {
+      "label": "Discussies lezen",
+      "description": "GitHub Discussions en hun reacties weergeven en lezen."
+    },
+    "github_discussions_write": {
+      "label": "In discussies schrijven",
+      "description": "Reageren en antwoorden in GitHub Discussions en antwoorden markeren."
+    },
+    "github_security_read": {
+      "label": "Beveiligingswaarschuwingen lezen",
+      "description": "Waarschuwingen van codescanning, Dependabot en geheimenscanning en beveiligingsadviezen lezen. Waarschuwingen over geheimen tonen het gelekte geheim."
+    },
+    "github_org_read": {
+      "label": "Teams lezen",
+      "description": "De leden van de teams van een organisatie weergeven."
     },
     "sentry_issues_read": {
       "label": "Fouten lezen",
@@ -10356,6 +10377,7 @@
     "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft.",
     "otherWorkspace": "Dat GitHub-account is al gekoppeld aan een andere werkruimte. Verwijder de app daar voordat je hem hier installeert.",
     "installedOutside": "De app is buiten agentes.chat op dat GitHub-account geïnstalleerd. Verwijder hem op GitHub en installeer hem opnieuw via Connectors › GitHub.",
+    "misconfigured": "De GitHub-app heeft op de server de verkeerde geheime sleutel, dus de installatie kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app.",
     "connectAccount": "Een GitHub-account koppelen",
     "ownerHint": "De eigenaar van deze server kan de GitHub-app hier bij Connectors maken.",
     "viaApp": "Via de agentes.chat-app op {{accounts}}",
@@ -11160,7 +11182,16 @@
       "cycle": "cyclus|cycli",
       "analytics": "analytics|analytics",
       "revenue": "omzet|omzet",
-      "source": "bron|bronnen"
+      "source": "bron|bronnen",
+      "code": "code|codes",
+      "scanning": "scan|scans",
+      "secret": "geheim|geheimen",
+      "security": "beveiliging|beveiliging",
+      "advisory": "advies|adviezen",
+      "discussion": "discussie|discussies",
+      "dependabot": "Dependabot",
+      "org": "organisatie|organisaties",
+      "ruleset": "regelset|regelsets"
     }
   },
   "toolReview": {
@@ -11290,7 +11321,7 @@
       "recommended": "Aanbevolen",
       "appText": "Agents verschijnen als de app, en je kiest de repository's op GitHub.",
       "account": "Een GitHub-account",
-      "accountText": "Agents verschijnen als dat account. GitHub Projects heeft er een nodig.",
+      "accountText": "Agents verschijnen als dat account. GitHub Projects van een persoonlijk account heeft er een nodig.",
       "appNote": "Je kiest de accounts en repository's op GitHub en komt dan hier terug."
     },
     "githubOrgs": {
@@ -11984,7 +12015,8 @@
       "otherServer": "Dat account staat op een ander adres.",
       "gone": "Dat account is niet meer gekoppeld.",
       "unfinished": "Het inloggen bij Composio is niet afgerond. Probeer het opnieuw.",
-      "unavailable": "Deze dienst kan hier niet gekoppeld worden."
+      "unavailable": "Deze dienst kan hier niet gekoppeld worden.",
+      "misconfigured": "De koppeling met {{provider}} is verkeerd ingesteld op de server, dus die kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app."
     },
     "wiki": {
       "noAccess": "Je hebt geen toegang tot deze pagina.",

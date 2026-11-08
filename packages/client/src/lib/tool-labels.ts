@@ -9,7 +9,10 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   // GitHub and GitLab: repositories, code, branches
   git_clone: ["Clone repository", "Clonar repositório"],
   create_repository: ["Create repository", "Criar repositório"],
+  delete_repository: ["Delete repository", "Apagar repositório"],
   fork_repository: ["Fork repository", "Fazer fork de um repositório"],
+  repository_ruleset_read: ["Read rulesets", "Ler conjuntos de regras"],
+  create_repository_ruleset: ["Create ruleset", "Criar conjunto de regras"],
   search_repositories: ["Search repositories", "Buscar repositórios"],
   get_file_contents: ["Read file", "Ler arquivo"],
   create_or_update_file: ["Create or change a file", "Criar ou alterar um arquivo"],
@@ -32,8 +35,19 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   search_users: ["Search people", "Buscar pessoas"],
   list_notifications: ["List notifications", "Listar notificações"],
   list_code_scanning_alerts: ["List code alerts", "Listar alertas do código"],
+  get_code_scanning_alert: ["See code alert", "Ver alerta do código"],
   list_secret_scanning_alerts: ["List leaked secret alerts", "Listar alertas de segredos expostos"],
+  get_secret_scanning_alert: ["See leaked secret alert", "Ver alerta de segredo exposto"],
   list_dependabot_alerts: ["List dependency alerts", "Listar alertas de dependências"],
+  get_dependabot_alert: ["See dependency alert", "Ver alerta de dependência"],
+  list_repository_security_advisories: [
+    "List the security advisories of a repository",
+    "Listar os avisos de segurança de um repositório",
+  ],
+  list_org_repository_security_advisories: [
+    "List the security advisories of an organization",
+    "Listar os avisos de segurança de uma organização",
+  ],
 
   // Pull requests and merge requests
   open_pull_request: ["Open pull request", "Abrir PR"],
@@ -87,8 +101,15 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   delete_comment: ["Delete comment", "Apagar comentário"],
   get_label: ["See label", "Ver etiqueta"],
   list_labels: ["List labels", "Listar etiquetas"],
+  list_label: ["List labels", "Listar etiquetas"],
   list_issue_labels: ["List labels", "Listar etiquetas"],
   create_label: ["Create label", "Criar etiqueta"],
+  label_write: ["Create or change a label", "Criar ou alterar uma etiqueta"],
+  list_discussions: ["List discussions", "Listar discussões"],
+  get_discussion: ["See discussion", "Ver discussão"],
+  get_discussion_comments: ["Read the comments of a discussion", "Ler os comentários de uma discussão"],
+  list_discussion_categories: ["List discussion categories", "Listar categorias de discussão"],
+  discussion_comment_write: ["Comment on a discussion", "Comentar numa discussão"],
   list_milestones: ["List milestones", "Listar marcos"],
   list_cycles: ["List cycles", "Listar ciclos"],
   list_projects: ["List projects", "Listar projetos"],
@@ -101,6 +122,7 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   find_projects: ["Find projects", "Encontrar projetos"],
   list_teams: ["List teams", "Listar equipes"],
   get_teams: ["List teams", "Listar equipes"],
+  get_team_members: ["List team members", "Listar membros da equipe"],
   find_teams: ["Find teams", "Encontrar equipes"],
   create_team: ["Create team", "Criar equipe"],
   find_organizations: ["Find organizations", "Encontrar organizações"],
@@ -670,8 +692,14 @@ export function toolKey(name: string): { app: string | null; key: string } {
  */
 export const labelIsName = (label: string, name: string) => !label.trim() || toolKey(label).key === toolKey(name).key;
 
-/** How an app writes its own name, by the word a tool's name starts with (`github` → GitHub); null: not one we know. */
-export const appNameOf = (word: string) => APPS[word.toLowerCase().replace(/[^a-z0-9]/g, "")] ?? null;
+/**
+ * How an app writes its own name, by the word a tool's name starts with (`github` → GitHub); null: not one we know.
+ * Own keys only: a word from an address (`?connector=constructor`) names no property of Object's.
+ */
+export const appNameOf = (word: string): string | null => {
+  const key = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return Object.hasOwn(APPS, key) ? (APPS[key] ?? null) : null;
+};
 
 /** The catalog's words for a tool in the language `t` speaks, or null: none there, or a language without a column. */
 export function catalogLabel(t: TFunction, name: string): string | null {
