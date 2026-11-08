@@ -23,6 +23,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { MessageText } from "../chat/MessageText";
 import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -269,9 +270,14 @@ export function AgentEditScreen({ id }: { id: string }) {
                     scrollEnabled={false}
                     style={styles.bare}
                   />
+                ) : agent.instructions.trim() ? (
+                  // Read as the chat reads Markdown: an imported agent's "## Papel" and "**sempre**" never show as marks.
+                  <View style={styles.field}>
+                    <MessageText body={agent.instructions} />
+                  </View>
                 ) : (
                   <Text variant="body" tone="ink2" selectable style={styles.field}>
-                    {agent.instructions || t("agentPage.none")}
+                    {t("agentPage.none")}
                   </Text>
                 )}
               </GroupedList>

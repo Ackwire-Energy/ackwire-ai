@@ -10208,6 +10208,7 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .agp-instructions.ac-input {
   min-height: 300px;
