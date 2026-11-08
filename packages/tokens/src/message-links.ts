@@ -48,7 +48,7 @@ export function parseMessageLink(href: string, origins: readonly string[] = []):
   return null;
 }
 
-/** A file's address in the app (ADR 0153): the Drive with the file open, at a version when given. */
+/** A file's address in the app (ADR 0157): the Drive with the file open, at a version when given. */
 export function filePath(orgId: string, artifactId: string, version?: number | null): string {
   return `/org/${orgId}/drive?artifact=${artifactId}${version ? `&v=${version}` : ""}`;
 }

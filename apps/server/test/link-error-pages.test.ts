@@ -64,7 +64,7 @@ async function world() {
 const open = (b: Browser, path: string, headers: Record<string, string> = {}) =>
   b(path, { origin: null, headers: { ...OPENED, ...headers } });
 
-describe("a link opened in a browser that the API refuses: our page, same status (ADR 0153)", () => {
+describe("a link opened in a browser that the API refuses: our page, same status (ADR 0157)", () => {
   test("a file only a DM sees: the page with its cause and one way out, never the JSON", async () => {
     const { owner, base, report } = await world();
     const res = await open(owner, `${base}/artifacts/${report.id}/file?version=1&format=pdf`);

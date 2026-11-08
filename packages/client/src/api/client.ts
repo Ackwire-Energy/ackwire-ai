@@ -1524,7 +1524,7 @@ export interface ApiClient {
       id: string,
       input: { content: ArtifactContent; note?: string | null; baseVersion: number; title?: string },
     ): Promise<ArtifactDetail>;
-    /** Who sees it on top of its conversation (ADR 0153); 403 `artifact.sharing_forbidden` for who got it shared. */
+    /** Who sees it on top of its conversation (ADR 0157); 403 `artifact.sharing_forbidden` for who got it shared. */
     setSharing(
       orgId: string,
       id: string,

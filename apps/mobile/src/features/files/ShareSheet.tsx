@@ -44,7 +44,7 @@ const SAVED = {
 } as const satisfies Record<Mode, string>;
 
 /**
- * Compartilhar on the phone (ADR 0153), the web's share dialog as a sheet: the file's name, who sees it (changed in
+ * Compartilhar on the phone (ADR 0157), the web's share dialog as a sheet: the file's name, who sees it (changed in
  * place), who has access, and Copiar link, an address of the app. While only a private conversation sees the file,
  * it says people outside won't open the link, with the way to choose them right there.
  */

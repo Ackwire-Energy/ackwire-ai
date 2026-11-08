@@ -320,7 +320,7 @@ async function issueSearchScopes(db: Database, orgId: string, userId: string) {
 }
 
 /**
- * The files a list shares with this person (ADR 0153), by id: their documents carry their conversation, which they may
+ * The files a list shares with this person (ADR 0157), by id: their documents carry their conversation, which they may
  * not read, so they're found by their own id (`visibleFileScopes`).
  */
 async function fileSearchScopes(db: Database, orgId: string, userId: string) {

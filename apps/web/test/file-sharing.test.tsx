@@ -74,7 +74,7 @@ const pressed = (dialog: HTMLElement) =>
     .filter((b) => b.getAttribute("aria-pressed") === "true")
     .map((b) => b.querySelector(".ac-option__title")?.textContent);
 
-describe("Compartilhar (ADR 0153)", () => {
+describe("Compartilhar (ADR 0157)", () => {
   test("a DM's file: only the conversation, said plainly beside Copiar link, which copies the app's address", async () => {
     const { report } = await drive();
     await fromDetails("Relatório de visitas", "Compartilhar");
@@ -195,7 +195,7 @@ describe("Compartilhar (ADR 0153)", () => {
       channelId: GENERAL_ID,
       content: { kind: "document", markdown: "# Visitas" },
     });
-    // As the server answers someone João's DM with Atlas was shared with (ADR 0153).
+    // As the server answers someone João's DM with Atlas was shared with (ADR 0157).
     const outsider = <T extends Artifact>(a: T): T =>
       a.id === report.id
         ? {

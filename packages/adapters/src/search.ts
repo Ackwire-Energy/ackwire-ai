@@ -28,7 +28,7 @@ export interface SearchQuery {
   visibleChannelIds: string[];
   /** Scopes the reader sees on tasks' documents only: a DM's id here reaches its tasks, never its messages. */
   visibleIssueScopes?: string[];
-  /** Files' documents the reader sees by their own id (`sourceId`), past their channels: shared with them (ADR 0153). */
+  /** Files' documents the reader sees by their own id (`sourceId`), past their channels: shared with them (ADR 0157). */
   visibleFileScopes?: string[];
   kinds?: SearchKind[];
   limit?: number;

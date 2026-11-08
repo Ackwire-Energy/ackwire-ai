@@ -62,7 +62,7 @@ async function world() {
   return { bia, caio, duda, dm, file, reads };
 }
 
-describe("a file's sharing (ADR 0153)", () => {
+describe("a file's sharing (ADR 0157)", () => {
   test("conversation, the default: only the DM, administrators included out", async () => {
     const { bia, caio, file, reads } = await world();
     expect(file.sharing).toEqual({ mode: "conversation", userIds: [], roleIds: [] });

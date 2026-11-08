@@ -66,18 +66,18 @@ export function groupArtifacts(list: Artifact[], group: DriveGroup, now = new Da
 /** The Drive's section of files only a DM's two sides or a private channel's members can see. */
 export const PRIVATE_SECTION = "private";
 
-/** Not open to the whole workspace: from a DM or a private channel (ADR 0111), unless shared with everyone (ADR 0153). */
+/** Not open to the whole workspace: from a DM or a private channel (ADR 0111), unless shared with everyone (ADR 0157). */
 export const isPrivateArtifact = (a: Pick<Artifact, "audience"> & Partial<Pick<Artifact, "sharing">>) =>
   (a.audience.kind === "dm" || (a.audience.kind === "channel" && a.audience.private)) && a.sharing?.mode !== "everyone";
 
 /**
- * Only the private conversation it lives in sees it (ADR 0153): a link to it opens for nobody else, so copying one
+ * Only the private conversation it lives in sees it (ADR 0157): a link to it opens for nobody else, so copying one
  * goes through the share dialog, which says so.
  */
 export const onlyItsConversation = (a: Pick<Artifact, "audience" | "sharing">) =>
   isPrivateArtifact(a) && (a.sharing?.mode ?? "conversation") === "conversation";
 
-/** A file's own conversation alone: what a file is shared with by default (ADR 0153). */
+/** A file's own conversation alone: what a file is shared with by default (ADR 0157). */
 export const CONVERSATION_ONLY: ArtifactSharing = { mode: "conversation", userIds: [], roleIds: [] };
 
 /** The sharing with one person or role added, or taken out if there; a list left empty is the conversation alone. */
@@ -105,7 +105,7 @@ export function driveSections(list: Artifact[], group: DriveGroup, now = new Dat
 
 /**
  * Where "Abrir na conversa" goes: its thread, else its DM (by the other side) or channel. Null for a file
- * of no conversation, one shared with me from a conversation I don't read (ADR 0153), or a DM whose other side is
+ * of no conversation, one shared with me from a conversation I don't read (ADR 0157), or a DM whose other side is
  * gone (missing, an archived agent, a person who left).
  */
 export function artifactPlace(a: Pick<Artifact, "channelId" | "threadId" | "audience">): OpenTarget | null {

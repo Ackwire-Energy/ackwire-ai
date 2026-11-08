@@ -11,7 +11,7 @@ import { successHaptic } from "../shared/parts";
 import { openInDrive, saveToPhotos, shareFile } from "./source";
 
 /**
- * Compartilhar (who sees it and its link, ADR 0153), Enviar (the system's share sheet with the file), Salvar
+ * Compartilhar (who sees it and its link, ADR 0157), Enviar (the system's share sheet with the file), Salvar
  * em Fotos and Ver no Drive for one file, with their toasts; one at a time.
  */
 export function useFileActions(detail: ArtifactDetail | undefined) {

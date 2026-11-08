@@ -176,7 +176,7 @@ export const artifactKindEnum = pgEnum("artifact_kind", [
 /**
  * Files people and agents make (Drive): documents, tables, diffs, HTML
  * pages, diagrams, and binary files as is (`file`, ADR 0025). Visibility comes from the channel of origin (null =
- * the whole organization), widened by `share` (ADR 0153). Content lives in the blob store, one object per
+ * the whole organization), widened by `share` (ADR 0157). Content lives in the blob store, one object per
  * version (`artifact_versions`).
  */
 export const artifacts = pgTable(
@@ -199,7 +199,7 @@ export const artifacts = pgTable(
     /** Text for search (first part of the latest version). */
     excerpt: text().notNull().default(""),
     /**
-     * Who sees it past its conversation (ADR 0153): `conversation` adds nobody, `people` adds `shareUserIds`, whoever
+     * Who sees it past its conversation (ADR 0157): `conversation` adds nobody, `people` adds `shareUserIds`, whoever
      * holds one of `shareRoleIds` and administrators, `everyone` the whole workspace.
      */
     share: text().$type<"conversation" | "people" | "everyone">().notNull().default("conversation"),

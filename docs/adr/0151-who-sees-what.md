@@ -61,7 +61,7 @@ Search: a limited task's document carries its own id as its scope (`channelIds: 
 
 ### 8. What stays as it is
 
-- **Drive files.** A file's audience is its conversation (`artifacts.channel_id`), read in `personCanRead`, the list queries, `agentReaches`, sharing and search. A list of people there is a second path through all of them, not the same small change. Administrators reach channel files through §5. A limited task keeps its author's files (§2); someone else's linked file keeps its own audience. ADR 0153 adds that second path: a file's sharing, on top of its conversation.
+- **Drive files.** A file's audience is its conversation (`artifacts.channel_id`), read in `personCanRead`, the list queries, `agentReaches`, sharing and search. A list of people there is a second path through all of them, not the same small change. Administrators reach channel files through §5. A limited task keeps its author's files (§2); someone else's linked file keeps its own audience. ADR 0157 adds that second path: a file's sharing, on top of its conversation.
 - **Painéis.** They already offer workspace, only me and roles (ADR 0135 §8). A `private` board is its owner's alone, administrators included, and what an admin sees they also edit and delete, so opening it is a decision of its own.
 - **Rotinas.** Their audience is who may see the run's conversation and its creator; they already follow `requireChannelAccess`.
 - **Missões.** They live in a channel, so they follow §5, in their list too.

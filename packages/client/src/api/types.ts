@@ -3148,14 +3148,14 @@ export interface Artifact {
   inDrive?: boolean;
   /** Who can see it, from the conversation it came from (ADR 0111). */
   audience: ArtifactAudience;
-  /** Who sees it on top of that conversation (ADR 0153); absent from an older server. */
+  /** Who sees it on top of that conversation (ADR 0157); absent from an older server. */
   sharing?: ArtifactSharing;
   /** I may change `sharing`: it lives in a conversation not everyone reads, and I read it there. */
   canShare?: boolean;
 }
 
 /**
- * Who sees a file past where it lives (ADR 0153): nobody more (`conversation`), the people and roles listed and
+ * Who sees a file past where it lives (ADR 0157): nobody more (`conversation`), the people and roles listed and
  * administrators (`people`), or the whole workspace (`everyone`).
  */
 export interface ArtifactSharing {
@@ -3168,12 +3168,12 @@ export type ArtifactAudience =
   | { kind: "workspace" }
   /**
    * A public channel's files: anyone in the workspace may open them. `outside`: I don't read the channel, the file was
-   * shared with me (ADR 0153), so there's no way into it.
+   * shared with me (ADR 0157), so there's no way into it.
    */
   | { kind: "channel"; name: string; private: boolean; outside?: true }
   /**
    * `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open).
-   * `between`: I'm not in it, the file was shared with me (ADR 0153): its sides, no `with`, no way into it.
+   * `between`: I'm not in it, the file was shared with me (ADR 0157): its sides, no `with`, no way into it.
    */
   | { kind: "dm"; with: ArtifactAuthor | null; gone?: true; between?: ArtifactAuthor[] };
 

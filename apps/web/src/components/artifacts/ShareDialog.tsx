@@ -49,7 +49,7 @@ const SAVED = {
 } as const satisfies Record<Mode, string>;
 
 /**
- * Compartilhar, for any file (ADR 0153), and Copiar link: a link copies at once when everyone it may reach opens it;
+ * Compartilhar, for any file (ADR 0157), and Copiar link: a link copies at once when everyone it may reach opens it;
  * one only a private conversation sees opens the dialog, which says so beside its own Copiar link.
  */
 export function useFileShare() {

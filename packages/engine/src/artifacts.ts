@@ -148,12 +148,12 @@ export interface ArtifactView {
   untrusted: boolean;
   /** False for a block or a poll, which live in their conversation until someone keeps a block (ADR 0113). */
   inDrive: boolean;
-  /** Who sees it past its conversation (ADR 0153). */
+  /** Who sees it past its conversation (ADR 0157). */
   sharing: FileSharing;
 }
 
 /**
- * Who sees a file on top of where it lives (ADR 0153): its conversation alone (`conversation`, the default), also the
+ * Who sees a file on top of where it lives (ADR 0157): its conversation alone (`conversation`, the default), also the
  * people and roles chosen and administrators (`people`), or the whole workspace (`everyone`).
  */
 export interface FileSharing {
@@ -600,7 +600,7 @@ const sharingOf = (a: Pick<ArtifactRow, "share" | "shareUserIds" | "shareRoleIds
   roleIds: a.share === "people" ? a.shareRoleIds : [],
 });
 
-/** Whether a person reads a file: where it lives (`readsWhereItLives`), or through its sharing (ADR 0153). */
+/** Whether a person reads a file: where it lives (`readsWhereItLives`), or through its sharing (ADR 0157). */
 async function personCanRead(db: Database, userId: string, orgId: string, a: Readable) {
   if (!a.channelId || a.share === "everyone" || (a.share === "people" && a.shareUserIds?.includes(userId))) return true;
   if (await readsWhereItLives(db, userId, orgId, a.channelId)) return true;
@@ -1516,7 +1516,7 @@ export async function listArtifactVersions(
 
 /**
  * Everything the actor can see, newest update first: org-wide files, files
- * of channels they belong to, and of public channels (people), and what a file's sharing adds (ADR 0153): for a
+ * of channels they belong to, and of public channels (people), and what a file's sharing adds (ADR 0157): for a
  * person who it shows the file to, for an agent the wiki's rule (`runSharedSql`).
  */
 export async function listArtifacts(
@@ -1541,7 +1541,7 @@ export async function listArtifacts(
   let visible: string[];
   let dm: AgentsDmReads | null = null;
   let ownRoom: SQL | undefined;
-  // What a file's sharing adds (ADR 0153).
+  // What a file's sharing adds (ADR 0157).
   let widened: SQL;
   if (actor.type === "agent") {
     widened = runSharedSql(filters.requesterUserId ?? null, actor.channelId);
@@ -1892,11 +1892,11 @@ const canDeleteArtifact = async (db: Database, userId: string, orgId: string, a:
  */
 export type ArtifactAudience =
   | { kind: "workspace" }
-  /** `outside`: the viewer doesn't read it there, the file was shared with them (ADR 0153): no way into it. */
+  /** `outside`: the viewer doesn't read it there, the file was shared with them (ADR 0157): no way into it. */
   | { kind: "channel"; name: string; private: boolean; outside?: true }
   /**
    * `gone`: the other side is an archived agent or a person who left, so the DM can't be opened any more. `between`:
-   * the viewer isn't one of its sides (it was shared with them, ADR 0153), so no `with` and no way into it: its sides.
+   * the viewer isn't one of its sides (it was shared with them, ADR 0157), so no `with` and no way into it: its sides.
    */
   | { kind: "dm"; with: ArtifactAuthor | null; gone?: true; between?: ArtifactAuthor[] };
 
@@ -1974,7 +1974,7 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
   const live = new Set([...liveAgents, ...livePeople].map((r) => r.id));
   const closed = new Set(chans.filter((c) => c.kind !== "channel" || c.visibility !== "public").map((c) => c.id));
   const readsThere = closed.size ? new Set(await personReadableChannels(db, userId, orgId)) : closed;
-  // Shared with them from a conversation they don't read (ADR 0153): what's said is never "you and …", and there's no
+  // Shared with them from a conversation they don't read (ADR 0157): what's said is never "you and …", and there's no
   // way into it.
   const outside = (id: string) => closed.has(id) && !readsThere.has(id);
   const audience = new Map<string, ArtifactAudience>(
@@ -2060,7 +2060,7 @@ async function cleanSharing(db: Database, orgId: string, input: Partial<FileShar
 }
 
 /**
- * "Compartilhar" (ADR 0153): who sees a file on top of the conversation it lives in. Whoever reads it there may change
+ * "Compartilhar" (ADR 0157): who sees a file on top of the conversation it lives in. Whoever reads it there may change
  * it (a DM's participants, a channel's members and administrators, whoever sees a task for its conversation); someone
  * it was shared with may not. A file the whole workspace sees already (the shared Drive, a public channel) has nothing
  * to widen. Audited, and its conversation hears of it.

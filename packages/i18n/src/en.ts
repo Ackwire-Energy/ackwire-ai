@@ -9749,7 +9749,7 @@ export const en = {
     onlyDriveText: "Not shared in a channel yet.",
     dm: "Direct message",
     dmWith: "Direct message with {{name}}",
-    /** A file of a DM the person isn't in, shared with them (ADR 0153): the DM's two sides. */
+    /** A file of a DM the person isn't in, shared with them (ADR 0157): the DM's two sides. */
     dmBetween: "Direct message between {{names}}",
     inDm: "Sent in a direct message",
     inThread: "In a thread of the conversation",
@@ -9759,7 +9759,7 @@ export const en = {
       privateChannel: "Only members of #{{name}} and administrators can see it",
       dm: "Only you and {{name}} can see it: it came from a direct message",
       dmGone: "Only the people in that conversation can see it: it came from a direct message",
-      /** For someone who isn't in the DM and got the file through Compartilhar (ADR 0153). */
+      /** For someone who isn't in the DM and got the file through Compartilhar (ADR 0157). */
       dmBetween: "Only {{names}} can see it: it came from a direct message",
     },
     private: "Private",
@@ -15365,7 +15365,7 @@ export const en = {
     limited: "limited access",
     rolesToo: "The roles already on this page keep seeing it.",
   },
-  /** Compartilhar (ADR 0153): who sees a file on top of the conversation it lives in, and its link. */
+  /** Compartilhar (ADR 0157): who sees a file on top of the conversation it lives in, and its link. */
   share: {
     button: "Share",
     title: "Share {{name}}",
@@ -15408,7 +15408,7 @@ export const en = {
     someOnlyHere: "Some of these links open only for who's in the file's conversation.",
   },
   /**
-   * A link a person opens in a browser that the server refuses (ADR 0153): each cause's title and words, the button
+   * A link a person opens in a browser that the server refuses (ADR 0157): each cause's title and words, the button
    * that gets them out, and the error's code on a failure of ours.
    */
   linkErrors: {

@@ -22,7 +22,7 @@ import { DrivePreview } from "./DrivePreview";
 
 /**
  * Who can see a file, in plain words ("Só você e o Theo podem ver: veio de uma mensagem direta"), with who its
- * sharing adds (ADR 0153).
+ * sharing adds (ADR 0157).
  */
 export function AudienceLine({ artifact: a }: { artifact: Pick<Artifact, "audience" | "sharing"> }) {
   const { t } = useTranslation();

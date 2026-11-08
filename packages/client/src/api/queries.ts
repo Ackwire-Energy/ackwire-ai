@@ -3714,7 +3714,7 @@ export function useSaveArtifact(orgId: string, id: string) {
   });
 }
 
-/** "Compartilhar" (ADR 0153): who sees a file on top of its conversation. The dialog says a failure itself. */
+/** "Compartilhar" (ADR 0157): who sees a file on top of its conversation. The dialog says a failure itself. */
 export function useSetArtifactSharing(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

@@ -48,7 +48,7 @@
   gap: var(--space-2);
 }
 
-/* Compartilhar (ADR 0153): who sees the file, who has access, and its link at the foot. */
+/* Compartilhar (ADR 0157): who sees the file, who has access, and its link at the foot. */
 .share .ac-dialog__body {
   display: flex;
   flex-direction: column;

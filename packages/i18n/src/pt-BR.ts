@@ -9860,7 +9860,7 @@ export const ptBR = {
     onlyDriveText: "Ainda não foi compartilhado num canal.",
     dm: "Mensagem direta",
     dmWith: "Mensagem direta com {{name}}",
-    /** Um arquivo de uma DM em que a pessoa não está, compartilhado com ela (ADR 0153): os dois lados da DM. */
+    /** Um arquivo de uma DM em que a pessoa não está, compartilhado com ela (ADR 0157): os dois lados da DM. */
     dmBetween: "Mensagem direta entre {{names}}",
     inDm: "Enviado numa mensagem direta",
     inThread: "Numa thread da conversa",
@@ -9870,7 +9870,7 @@ export const ptBR = {
       privateChannel: "Só os membros de #{{name}} e os administradores podem ver",
       dm: "Só você e {{name}} podem ver: veio de uma mensagem direta",
       dmGone: "Só quem estava na conversa pode ver: veio de uma mensagem direta",
-      /** Para quem não está na DM e recebeu o arquivo por Compartilhar (ADR 0153). */
+      /** Para quem não está na DM e recebeu o arquivo por Compartilhar (ADR 0157). */
       dmBetween: "Só {{names}} podem ver: veio de uma mensagem direta",
     },
     private: "Privado",
@@ -15577,7 +15577,7 @@ export const ptBR = {
     limited: "acesso limitado",
     rolesToo: "Os papéis que já estão nesta página continuam vendo.",
   },
-  /** Compartilhar (ADR 0153): quem vê um arquivo além da conversa em que ele está, e o link dele. */
+  /** Compartilhar (ADR 0157): quem vê um arquivo além da conversa em que ele está, e o link dele. */
   share: {
     button: "Compartilhar",
     title: "Compartilhar {{name}}",
@@ -15620,7 +15620,7 @@ export const ptBR = {
     someOnlyHere: "Alguns desses links só abrem para quem está na conversa do arquivo.",
   },
   /**
-   * Um link aberto no navegador que o servidor recusa (ADR 0153): o título e o texto de cada causa, o botão que leva
+   * Um link aberto no navegador que o servidor recusa (ADR 0157): o título e o texto de cada causa, o botão que leva
    * a pessoa adiante e o código do erro quando a falha é nossa.
    */
   linkErrors: {

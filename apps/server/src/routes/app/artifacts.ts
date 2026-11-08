@@ -127,7 +127,7 @@ const Audience = z
       name: z.string(),
       private: z.boolean(),
       outside: z.literal(true).optional().openapi({
-        description: "I don't read the channel: the file was shared with me (ADR 0153), so it can't be opened.",
+        description: "I don't read the channel: the file was shared with me (ADR 0157), so it can't be opened.",
       }),
     }),
     z.object({
@@ -137,7 +137,7 @@ const Audience = z
         description: "The other side is an archived agent or a person who left: the DM can't be opened.",
       }),
       between: z.array(Author).optional().openapi({
-        description: "I'm not in the DM, the file was shared with me (ADR 0153): its sides, and no `with`.",
+        description: "I'm not in the DM, the file was shared with me (ADR 0157): its sides, and no `with`.",
       }),
     }),
   ])
@@ -151,7 +151,7 @@ const Sharing = z
   })
   .openapi("ArtifactSharing", {
     description:
-      "Who sees it on top of its conversation (ADR 0153): nobody more, the people and roles listed (and administrators), or the whole workspace.",
+      "Who sees it on top of its conversation (ADR 0157): nobody more, the people and roles listed (and administrators), or the whole workspace.",
   });
 
 const Artifact = z

@@ -129,7 +129,7 @@ export async function admitTaskAgents(
 export const artifactCol = (name: string) => sql.raw(`"artifacts"."${name}"`);
 
 /**
- * Whether a file's sharing (ADR 0153) shows it to `userId` past its conversation, as a condition over `artifacts`: the
+ * Whether a file's sharing (ADR 0157) shows it to `userId` past its conversation, as a condition over `artifacts`: the
  * whole workspace, or a list that names them, holds a role of theirs, or them as an administrator. The workspace
  * membership is the caller's check. `userId` may be a column.
  */
