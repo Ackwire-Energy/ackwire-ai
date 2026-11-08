@@ -115,6 +115,8 @@ export interface ControlJob {
   kind: "exec" | "read" | "write" | "list" | "push" | "task" | "brain";
   /** Short, human, English-free when possible: the app shows it as is, e.g. a command or a file name. */
   summary: string;
+  /** The same as words the app says in the person's language (as `ActivityEntry.said`): absent, `summary` is shown. */
+  said?: ActivitySaid;
   /** Folder name it works in (last part of the cwd), when known. */
   where?: string;
   /** The command line (redacted), for `exec` and shell tasks. */
@@ -129,14 +131,22 @@ export interface ActivityEntry {
   at: string;
   agent?: { id: string; name: string };
   kind: "file" | "command" | "task" | "brain" | "access" | "pause" | "pair" | "update";
-  /** What happened, short (`read src/app.ts`, `bun test`, `paused until 16:24`). */
+  /** What happened, short (`read src/app.ts`, `bun test`, `paused until 16:24`), in English. */
   summary: string;
+  /**
+   * The same as words the desktop app says in the person's language (`desktop.prefs.activity.said.<key>`), with
+   * their values (a path, a command, a workspace's name). Absent from older runners: the app shows `summary`.
+   */
+  said?: ActivitySaid;
   /** The command line with secrets redacted. */
   command?: string;
   /** Folder name it happened in. */
   where?: string;
   result?: "ok" | "failed" | "refused" | "running";
 }
+
+/** An activity line's words and their values, all text. */
+export type ActivitySaid = { key: string } & Record<string, string>;
 
 /** A folder an agent asked for, waiting for the person (protocol 10). */
 export interface ControlAccessRequest {

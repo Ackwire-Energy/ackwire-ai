@@ -11,6 +11,7 @@ import {
   hasMore,
   homesToFetch,
   mergePages,
+  saidText,
   startCursor,
 } from "../../control/activity";
 import { orgName, pairedHomes } from "../../control/store";
@@ -176,6 +177,7 @@ function EntryRow({ entry, showOrg }: { entry: HomeEntry; showOrg: boolean }) {
   const store = useStore();
   const home = store.home(entry.homeId);
   const agent = entry.agent ? agentOf(home, entry.agent) : null;
+  const said = saidText(t, entry, (iso) => clock(iso, i18n.language, new Date()));
   return (
     <div className="dk-ev">
       <span className="dk-ev__tm">{clock(entry.at, i18n.language, new Date(entry.at))}</span>
@@ -184,10 +186,10 @@ function EntryRow({ entry, showOrg }: { entry: HomeEntry; showOrg: boolean }) {
       </span>
       <span className="dk-ev__tx">
         {agent && <b>{agent.name} </b>}
-        {entry.summary}
+        {said}
         {entry.where && <span className="dk-faint"> · {entry.where}</span>}
         {showOrg && home && <small>{orgName(home)}</small>}
-        {entry.command && entry.command !== entry.summary && (
+        {entry.command && entry.command !== entry.summary && entry.command !== said && (
           <small>
             <code className="dk-code-inline">{entry.command}</code>
           </small>

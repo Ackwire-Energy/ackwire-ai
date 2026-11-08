@@ -1,4 +1,4 @@
-import type { ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
+import type { ActivitySaid, ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
 import { browserRowState, browsersOf } from "./browser";
 import type { Home } from "./store";
 
@@ -14,6 +14,8 @@ export interface NotchWork {
   homeId: string;
   agent?: { id: string; name: string };
   summary: string;
+  /** What it is, in words the app says (`saidText`); absent: `summary` as it came. */
+  said?: ActivitySaid;
   where?: string;
   command?: string;
   startedAt?: string;
@@ -45,6 +47,7 @@ const jobWork = (h: NotchHome, j: ControlJob): NotchWork => ({
   homeId: h.homeId,
   ...(j.agent ? { agent: j.agent } : {}),
   summary: j.summary,
+  ...(j.said ? { said: j.said } : {}),
   ...(j.where ? { where: j.where } : {}),
   ...(j.command ? { command: j.command } : {}),
   startedAt: j.startedAt,

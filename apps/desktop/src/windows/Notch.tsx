@@ -9,6 +9,7 @@ import { Button, Icon, normalizeAppearance, PixelSpinner } from "@agenteschat/ui
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
+import { saidText } from "../control/activity";
 import { siteLink } from "../control/browser";
 import {
   finishedOf,
@@ -24,7 +25,7 @@ import { agentOf } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
-import { elapsedClock } from "../ui/time";
+import { clock, elapsedClock } from "../ui/time";
 
 /** Each wing beside the notch. */
 const WING = 74;
@@ -320,29 +321,31 @@ function HelpLine({ home, help, row }: { home: Home | undefined; help: NotchHelp
 }
 
 function DoneLine({ home, done, row }: { home: Home | undefined; done: Done; row?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const agent = agentOf(home, done.work.agent ?? { id: "", name: t("desktop.notch.someAgent") });
+  const what = saidText(t, done.work, (iso) => clock(iso, i18n.language, new Date()));
   return (
     <div className={row ? "dk-notch__row" : "dk-notch__line"}>
       <AgentFace agent={agent} size="sm" expression="happy" />
       <span className="dk-notch__text">
         <b>{t("desktop.notch.done", { agent: agent.name })}</b>
-        <small>{[done.work.summary, elapsedClock(done.ms)].filter(Boolean).join(" · ")}</small>
+        <small>{[what, elapsedClock(done.ms)].filter(Boolean).join(" · ")}</small>
       </span>
     </div>
   );
 }
 
 function WorkRow({ home, work, now }: { home: Home | undefined; work: NotchWork; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const agent = work.agent ? agentOf(home, work.agent) : null;
+  const what = saidText(t, work, (iso) => clock(iso, i18n.language, new Date()));
   const color = normalizeAppearance(agent?.look).color;
   const started = work.startedAt ? Date.parse(work.startedAt) : Number.NaN;
   const title = work.browser
     ? t("desktop.notch.inBrowser", { agent: agent?.name || t("desktop.notch.someAgent") })
     : agent
-      ? `${agent.name} · ${work.summary}`
-      : work.summary;
+      ? `${agent.name} · ${what}`
+      : what;
   return (
     <div className="dk-notch__row">
       {agent ? <AgentFace agent={agent} size="sm" state="writing" /> : <BrandFace size="sm" />}
