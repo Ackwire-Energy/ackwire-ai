@@ -4048,6 +4048,7 @@ html:not([data-pointer]) .settings__link:focus-visible {
 .settings__section {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
 }
 /* "Salvo": shows for a moment after each automatic save. */
 .settings__saved {
