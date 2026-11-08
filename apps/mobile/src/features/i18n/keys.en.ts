@@ -137,6 +137,8 @@ export const featureKeysEn = {
     refuseTitle: "Decline the request",
     /** The system alert from the card's "Decline": the reason is optional. */
     refuseAsk: "Decline the request?",
+    /** On a high-risk request's top line, after its kind: it acts outside the workspace. */
+    leaves: "goes outside the company",
     refuseWhyF: "{{name}} learns from the reason. Optional.",
     refuseWhyM: "{{name}} learns from the reason. Optional.",
     /** The request's sheet: its title, its groups and the switch for next time. */
@@ -249,6 +251,10 @@ export const featureKeysEn = {
     nobodyWorking: "No agent working right now",
     /** The greeting's line when one agent works: its name. */
     workingOne: "{{name}} is working",
+    /** A conversation's row swiped left: the pane beside Pin, short so the word fits the pane. */
+    swipe: { mute: "Mute", unmute: "Unmute" },
+    /** Conversas' one line back to the right hand's first-run checklist (ADR 0155 §6). */
+    firstRunLine: "{{name}} is setting up the team · {{done}} of {{total}}",
     first: {
       title: "Start with your first agent",
       subtitle: "Give it a name and say what it does. It shows up here, as a chat.",
@@ -296,6 +302,30 @@ export const featureKeysEn = {
     },
   },
   /** Recording a voice message in the composer (the shared `voice.*` strings hold the rest). */
+  /** The line over the tab bar that goes with you while an agent does long work or waits on you. */
+  along: {
+    agent: "An agent",
+    waits: "{{name}} is waiting for your ok",
+    on: "{{name}} · {{what}}",
+    working: "{{name}} is working",
+    more: "+{{count}}",
+  },
+  /** "Compartilhar com…": what another app shared (the system's share sheet), sent to one agent. */
+  share: {
+    title: "Share",
+    to: "To",
+    line: "Add a line, if you like",
+    send: "Send to {{name}}",
+    pick: "Pick an agent",
+    more: "+{{count}}",
+    firstTen: "The first {{count}} go in this message.",
+    waiting: "Receiving…",
+    nothing: "Nothing to share",
+    nothingHint: "Open what you want to send and tap Share.",
+    noAgents: "No agents yet",
+    noAgentsHint: "Create one and it shows here, ready to receive.",
+    createAgent: "Create agent",
+  },
   voice: {
     /** Above the field while the finger holds the microphone: slide left to throw the recording away. */
     slideToCancel: "slide to cancel",
@@ -460,6 +490,60 @@ export const featureKeysEn = {
       noIntro: "Ask for what you need, in plain words.",
       firstTitle: "To start",
       sendHint: "Tap to send",
+      /** An agent's first message in a new conversation, drawn by the app: the greeting, then the three starts. */
+      hello: "Hi, {{person}}! I'm {{name}}.",
+      helloNoName: "Hi! I'm {{name}}.",
+      helloRole: "{{role}} on the team.",
+      helloAsk: "Where do we start?",
+      now: "now",
+      /** The starts' short words on their buttons; a tap sends the whole request (`first.*`). */
+      start: {
+        support: {
+          how: "What's urgent for you",
+          task: "Reply about the deadline",
+          routine: "Urgent things, every morning",
+        },
+        ops: {
+          how: "How you spot an outage",
+          task: "Check that all is up",
+          routine: "The night, every morning",
+        },
+        qa: {
+          how: "What you test first",
+          task: "Test cases for sign-in",
+          routine: "What broke, every week",
+        },
+        dev: {
+          how: "What you do in our code",
+          task: "Review the latest pull request",
+          routine: "What changed, every Friday",
+        },
+        research: {
+          how: "What you research best",
+          task: "Compare three competitors",
+          routine: "The market, every Monday",
+        },
+        writing: {
+          how: "What you write best",
+          task: "Improve a text of mine",
+          routine: "Your week in writing",
+        },
+        product: {
+          how: "How you set priorities",
+          task: "What's late in the tasks",
+          routine: "The plan, every Monday",
+        },
+        sales: {
+          how: "How you find good leads",
+          task: "An email about the product",
+          routine: "New leads, every Monday",
+        },
+        general: {
+          how: "What you can do for me",
+          task: "Show me an example",
+          routine: "Your week, every Monday",
+        },
+      },
       first: {
         support: {
           how: "How do you decide what's urgent?",
@@ -514,6 +598,8 @@ export const featureKeysEn = {
     camera: "Camera",
     photos: "Photos",
     file: "File",
+    /** The fourth tile: the GIFs and stickers, out of the field so it only sends. */
+    media: "GIFs",
     noCamera: "No camera access. Allow it in the phone's Settings.",
     mission: "Start a mission",
     missionHint: "Long work, with a plan, from start to finish",
@@ -742,6 +828,10 @@ export const featureKeysEn = {
       noAi: "No AI connected",
       connect: "Connect",
       archived: "Archived",
+      /** Out on a routine (a background run), and for how long: its frame shows only its sky meanwhile. */
+      routine: "On a routine · {{time}}",
+      /** For screen readers, after the agent's name. */
+      routineShort: "on a routine",
     },
     /** Under the toast that says the agent joined: what it thinks with. */
     thinksWith: "Thinks with {{label}}",
@@ -771,6 +861,9 @@ export const featureKeysEn = {
     identityQuestion: "Who is the agent?",
     identityLead: "Its name, how to call it in the chat, and its face.",
     handleMention: "Mention @{{handle}} to call it.",
+    /** Under the name while it is typed: the @ follows the name until the person changes it. */
+    handleFromName: "In the chat: @{{handle}}. It comes from the name; you can change it.",
+    handleFromNameEmpty: "Its @ in the chat comes from the name.",
     reviewLead: "Tap a line to change it.",
     planHint: "Or connect your AI plan: {{name}} then thinks with it, without spending the key.",
     partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
@@ -1100,6 +1193,8 @@ export const featureKeysEn = {
     addWorkspaceTeamSubShort: "Address or the computer's QR code",
     addWorkspaceFoot: "You don't leave any workspace.",
     teamServerLeadShort: "What your team opens in the browser.",
+    /** The team server's screen: the question is the title, in two lines on the sign-in's ruler. */
+    teamServerQuestion: "What's your team's address?",
     account: {
       title: "Account",
       save: "OK",
@@ -1324,6 +1419,15 @@ export const featureKeysEn = {
   },
   wiki: {
     map: "Page map",
+    /** The wiki's links as a sky: the home's header, a page's section over its neighbours. */
+    graph: "Connections",
+    /** Under a page's title in the graph: how many links touch it. */
+    links_one: "{{count}} link",
+    links_other: "{{count}} links",
+    /** A page's section: the pages it links to. */
+    linksOut: "Links to",
+    /** The wiki home: the pages last opened on this phone. */
+    continue: "Keep reading",
     /** The wiki bar's "…": who sees it, the map, choosing pages, the trash. */
     more: "More options",
     mapAgent: "Agent that read pages this week",
@@ -1356,6 +1460,17 @@ export const featureKeysEn = {
     loadFailed: "Couldn't load the routines.",
     anyAgent: "All agents",
     create: "Create",
+    /** The form's "when" as rows, each value picked from the system's list. */
+    when: {
+      /** Repetição's value for a rule only the written phrase says (every 2 weeks, several times a day…). */
+      custom: "Your own way",
+      /** The last choice under Repetição: the phrase field opens for anything the rows don't hold. */
+      write: "Write it your way…",
+      day: "Day",
+      /** A month's day in the Dia list ("Day 5"). */
+      monthDay: "Day {{day}}",
+      lastDay: "Last day",
+    },
   },
   // The task manager (ADR 0128; the rest of its words are shared, `taskManager.*`).
   taskManager: {
@@ -1885,6 +2000,9 @@ export const featureKeysEn = {
     logoHelp: "Optional.",
     logoPick: "Choose",
     zone: "Time zone: {{zone}}",
+    /** After the zone, in the first run: opens the list of zones. */
+    zoneChange: "Change",
+    zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
     anotherLead: "On agentes.chat. You stay in {{org}}; you can switch any time.",

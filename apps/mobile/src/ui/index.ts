@@ -86,6 +86,7 @@ export { OPTION_ROW } from "./option-row";
 export { PresenceBadge, type PresenceBadgeProps, WithPresence } from "./PresenceBadge";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
+export { PULL_TINT, PullOrbit } from "./PullOrbit";
 export { type BadgePresence, badgeCell } from "./presence-badge";
 export { Row, type RowProps } from "./Row";
 export { ROW_CARD_INSET, RowAction } from "./RowAction";

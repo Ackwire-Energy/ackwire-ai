@@ -36,7 +36,8 @@ test("the right hand is its own row, its DM's unread kept, never one of Agentes'
 test("Conversas asks the right hand from its own field under the greeting, never one of Agentes' rows", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   const chats = src("chats/ChatsScreen.tsx");
-  expect(chats).toContain("<RightHandAsk row={pinned.pin} onStart={startDm} />");
+  // Its face wakes as Conversas arrives after the splash (once per launch).
+  expect(chats).toContain("<RightHandAsk row={pinned.pin} onStart={startDm} faceMode={wake.mode} faceStyle={wake.style} />");
   expect(chats).toContain("after={ask}");
   expect(chats).not.toContain("kept: lead");
   expect(src("right-hand/Pin.tsx")).toContain('t("mobile.chat.messageTo", { name: row.with.name })');
@@ -107,7 +108,8 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
   expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
-  expect(src("chats/FirstRunLine.tsx")).toContain('t("home.firstRun"');
+  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 2 of 5").
+  expect(src("chats/FirstRunLine.tsx")).toContain('t("mobile.chats.firstRunLine"');
   // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected.
   const card = src("right-hand/FirstRun.tsx");
   expect(card).toContain('{ org: org?.name ?? "", agents: team.length, label, apps: appNames, members: run.members }');

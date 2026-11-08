@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
-import { rememberAgentLooks, useTheme } from "@/ui";
+import { haptics, rememberAgentLooks, useTheme } from "@/ui";
 import { agentLook, daysAgo, type PacedClock, pacedClock, whenKind } from "./logic";
 
 /** The current organization's id. */
@@ -171,6 +171,9 @@ export function usePullRefresh(refetch: () => Promise<unknown>): { refreshing: b
     latest.current = refetch;
   });
   const onRefresh = useCallback(() => {
+    // One light tap on the frame the pull catches (the spinner locks in), as the system's own lists do: the release
+    // is felt as well as seen.
+    haptics.light();
     setRefreshing(true);
     void Promise.resolve()
       .then(() => latest.current())

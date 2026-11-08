@@ -3,6 +3,7 @@ import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { NoticeIsland } from "@/features/island/NoticeIsland";
+import { ShareInbox } from "@/features/share/ShareInbox";
 import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { useAppIconBadge } from "@/features/shared/queries";
 import { ScreenError } from "@/features/shared/ScreenError";
@@ -46,6 +47,8 @@ export default function AppLayout() {
       <AppStack />
       {/* What reaches me while the app is open, out of the camera's island (ADR 0071 §9). */}
       <NoticeIsland />
+      {/* What other apps share through the system's share sheet opens "Compartilhar com…". */}
+      <ShareInbox />
     </>
   );
 }
@@ -82,6 +85,7 @@ function AppStack() {
   const wikiSheet = useFormSheetOptions([0.55, 1]);
   // "New" over the tabs as the system's new message: two thirds at rest, the whole screen once the keyboard is up.
   const newSheet = useFormSheetOptions([0.66, 1]);
+  const shareSheet = useFormSheetOptions([0.72, 1]);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" />
@@ -92,6 +96,7 @@ function AppStack() {
       <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="sector-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="sector/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-categories" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="channel-category-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -108,6 +113,7 @@ function AppStack() {
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new" options={newSheet} />
+      <Stack.Screen name="share-to" options={shareSheet} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -118,6 +124,7 @@ function AppStack() {
       <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-map" options={pushed} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="who-sees" options={{ ...pushed, ...scrollUnder }} />
@@ -173,7 +180,8 @@ function AppStack() {
       <Stack.Screen name="workspaces-sheet" options={workspacesSheet} />
       {/* Another workspace, on agentes.chat or the team's own server (ADR 0154): two choices, a short sheet. */}
       <Stack.Screen name="me/add-workspace" options={pushSheet} />
-      <Stack.Screen name="me/team-server" options={{ ...pushed, ...scrollUnder }} />
+      {/* On the sign-in's ruler: its own sky and back circle, no bar. */}
+      <Stack.Screen name="me/team-server" options={{ headerShown: false }} />
       <Stack.Screen name="me/scan" options={{ headerShown: false }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="invite-people" options={{ ...pushed, ...scrollUnder }} />

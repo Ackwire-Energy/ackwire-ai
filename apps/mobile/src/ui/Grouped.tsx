@@ -107,6 +107,11 @@ export function GroupedFooter({ children }: { children: ReactNode }) {
 
 export interface GroupedRowProps {
   label: string;
+  /**
+   * The label in parts, the ones that matched what was typed in semibold (Novo's filter); the same words as `label`,
+   * which still names the row for VoiceOver.
+   */
+  labelParts?: readonly { text: string; mark?: boolean }[];
   /** Lines the label may take (default 1): a setting's long name beside its switch. */
   labelLines?: number;
   /** A small line under the label. */
@@ -168,6 +173,7 @@ function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string;
 
 function Row({
   label,
+  labelParts,
   labelLines = 1,
   sub,
   subLines = 1,
@@ -241,7 +247,18 @@ function Row({
       {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
         <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
-          {label}
+          {labelParts
+            ? labelParts.map((part, i) =>
+                part.mark ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                  <Text key={i} variant="body" style={[{ color: tone }, styles.marked]}>
+                    {part.text}
+                  </Text>
+                ) : (
+                  part.text
+                ),
+              )
+            : label}
         </Text>
         {sub ? (
           <Text variant="footnote" tone="faint" numberOfLines={subLines}>
@@ -395,6 +412,7 @@ function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { h
 }
 
 const styles = StyleSheet.create({
+  marked: { fontWeight: "600" },
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
   header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },

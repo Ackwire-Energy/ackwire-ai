@@ -44,6 +44,11 @@ export const mobilePtBR = {
       checking: "Conferindo…",
       scan: "Escanear QR code",
       backTo: "Voltar para {{host}}",
+      /** A linha quieta do login termina em "Mudar", que oferece o servidor ou o idioma na lista do sistema. */
+      footChange: "Mudar",
+      footChoose: "Servidor e idioma",
+      footServer: "Outro servidor",
+      footLanguage: "Idioma",
       now: "Agora em {{host}}",
       invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
       unreachable: "Não conseguimos falar com {{host}}. Confira o endereço e a internet, e tente de novo.",
@@ -57,6 +62,8 @@ export const mobilePtBR = {
         line: "{{host}} não respondeu.",
         text: "Ele pode estar fora do ar ou fora da sua rede. O app abre sozinho quando ele voltar.",
         tryNow: "Tentar agora",
+        /** Ao lado de Sair no splash de espera: corrigir o endereço sem sair da conta. */
+        switchServer: "Trocar de servidor",
         /** Beside the wick burning down to the next automatic try. */
         retryIn_one: "tenta de novo em {{count}} s",
         retryIn_other: "tenta de novo em {{count}} s",

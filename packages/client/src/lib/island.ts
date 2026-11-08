@@ -11,7 +11,7 @@ import { channelOf, isSnoozed } from "./notifications";
  */
 
 /** How long a notice stays before it leaves (or, waiting on me, shrinks). */
-export const ISLAND_LIFE_MS = 6500;
+export const ISLAND_LIFE_MS = 6000;
 /** At most this many at once: past it, the oldest one that isn't waiting leaves first (the inbox keeps it). */
 export const ISLAND_MAX = 6;
 

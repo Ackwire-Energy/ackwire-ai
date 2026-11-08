@@ -1,6 +1,9 @@
 import { NativeTabs } from "expo-router/native-tabs";
 import { useTranslation } from "react-i18next";
-import { useUnreadConversations, useUnreadThreads, useWaitingCount } from "@/features/shared/queries";
+import { Platform } from "react-native";
+import { useNow } from "@/features/shared/hooks";
+import { useActiveWork, useUnreadConversations, useUnreadThreads, useWaitingCount } from "@/features/shared/queries";
+import { WorkAlongLine, workAlong } from "@/features/work-along/WorkAlong";
 import { TAB_BADGE, tabBadge } from "@/lib/nav";
 import { haptics, useTheme } from "@/ui";
 import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
@@ -28,6 +31,8 @@ export default function TabsLayout() {
   const unreadThreads = useUnreadThreads();
   const waiting = useWaitingCount();
   const counts: Record<string, number> = { "(chats)": unread, threads: unreadThreads, activity: waiting };
+  // Long work and what waits on you go with you across the tabs (iOS 26: the bar's accessory, the system's glass).
+  const along = workAlong(useActiveWork(), useNow(15_000));
   return (
     <NativeTabs
       tintColor={colors.ink}
@@ -40,9 +45,16 @@ export default function TabsLayout() {
       indicatorColor={colors.sunken}
       rippleColor={colors.plate}
       labelVisibilityMode="labeled"
+      // iOS 26: reading down a list, the bar folds to the current tab and comes back on the way up (the system's own).
+      minimizeBehavior="onScrollDown"
       // The system tab bars give no haptic on a tab change; ours did.
       screenListeners={{ tabPress: () => haptics.selection() }}
     >
+      {along && Platform.OS === "ios" ? (
+        <NativeTabs.BottomAccessory>
+          <WorkAlongLine lead={along.lead} others={along.others} />
+        </NativeTabs.BottomAccessory>
+      ) : null}
       {TABS.map((tab) => {
         const label = t(tab.label);
         const count = counts[tab.name] ?? 0;

@@ -1,3 +1,4 @@
+import { markTerms } from "@agenteschat/client/lib/search-filters";
 import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { type NativeStackNavigationOptions, useIsFocused, useNavigation } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -172,6 +173,7 @@ export function NewScreen() {
                         key={a.id}
                         leading={<AgentFace agentId={a.id} size={FACE} mode={working ? "run" : "idle"} live={false} />}
                         label={a.name}
+                        {...(typed ? { labelParts: markTerms(a.name, [typed]) } : {})}
                         {...(a.role?.trim() ? { sub: a.role.trim() } : {})}
                         {...(working
                           ? {
@@ -196,8 +198,10 @@ export function NewScreen() {
                       key={p.userId}
                       leading={<Face who={{ type: "person", id: p.userId }} size={FACE} />}
                       label={p.name}
+                      {...(typed ? { labelParts: markTerms(p.name, [typed]) } : {})}
                       chevron
-                      onPress={() => void openDm({ userId: p.userId }, { replace: true })}
+                      // As an agent's: the conversation opens ready to type.
+                      onPress={() => void openDm({ userId: p.userId }, { compose: true, replace: true })}
                     />
                   ))}
                   {invite ? (

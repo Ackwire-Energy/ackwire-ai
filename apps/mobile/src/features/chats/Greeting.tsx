@@ -12,6 +12,7 @@ import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook, firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { FIRST_AGENT_EXAMPLES } from "./examples";
+import { Arrive } from "./HomeEntrance";
 import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
 /** The look of an agent still to be born (the new-agent sheet and the empty state). */
@@ -57,6 +58,7 @@ export function Greeting({
   finished,
   onFinishedPress,
   after,
+  arrive = { armed: false, play: false },
 }: {
   working: readonly string[];
   /** The newest thing an agent finished (null: nothing new). */
@@ -65,6 +67,8 @@ export function Greeting({
   onFinishedPress?: (f: FinishedItem) => void;
   /** Under it, on the sky: the way to ask the right hand (`RightHandAsk`). */
   after?: ReactNode;
+  /** Conversas' arrival after the splash (`useHomeEntrance`): the greeting's words rise first, `after` on its own. */
+  arrive?: { armed: boolean; play: boolean };
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -95,43 +99,45 @@ export function Greeting({
   );
   return (
     <View style={styles.mini}>
-      <Text variant="body" tone="ink2" numberOfLines={1}>
-        {greeting}
-      </Text>
-      {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
-      {line.kind === "idle" ? null : (
-        <View style={styles.line}>
-          {line.kind === "finished" ? (
-            <Pressable
-              onPress={() => openFinished(line.finished)}
-              accessibilityRole="button"
-              accessibilityLabel={`${finishedName} ${finishedText}`}
-              hitSlop={13}
-              style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
-            >
-              <AgentFace agentId={line.finished.agentId} size={FACE} framed />
-              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-                {finishedName ? (
-                  <Text variant="footnote" tone="ink2" style={styles.bold}>
-                    {`${finishedName} `}
-                  </Text>
-                ) : null}
-                {finishedText}
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={openAgents}
-              accessibilityRole="button"
-              accessibilityLabel={workingText}
-              hitSlop={13}
-              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
-            >
-              {workingPart}
-            </Pressable>
-          )}
-        </View>
-      )}
+      <Arrive {...arrive} rise={12} duration={520}>
+        <Text variant="body" tone="ink2" numberOfLines={1}>
+          {greeting}
+        </Text>
+        {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
+        {line.kind === "idle" ? null : (
+          <View style={styles.line}>
+            {line.kind === "finished" ? (
+              <Pressable
+                onPress={() => openFinished(line.finished)}
+                accessibilityRole="button"
+                accessibilityLabel={`${finishedName} ${finishedText}`}
+                hitSlop={13}
+                style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+              >
+                <AgentFace agentId={line.finished.agentId} size={FACE} framed />
+                <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                  {finishedName ? (
+                    <Text variant="footnote" tone="ink2" style={styles.bold}>
+                      {`${finishedName} `}
+                    </Text>
+                  ) : null}
+                  {finishedText}
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={openAgents}
+                accessibilityRole="button"
+                accessibilityLabel={workingText}
+                hitSlop={13}
+                style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
+              >
+                {workingPart}
+              </Pressable>
+            )}
+          </View>
+        )}
+      </Arrive>
       {after ? <View style={styles.after}>{after}</View> : null}
     </View>
   );

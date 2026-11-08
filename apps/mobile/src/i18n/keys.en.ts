@@ -39,6 +39,11 @@ export const mobileEn = {
       checking: "Checking…",
       scan: "Scan QR code",
       backTo: "Back to {{host}}",
+      /** The sign-in's quiet line ends in "Change", which offers the server or the language in the system's list. */
+      footChange: "Change",
+      footChoose: "Server and language",
+      footServer: "Another server",
+      footLanguage: "Language",
       now: "Now on {{host}}",
       invalid: "Check the address, something like agentes.yourteam.ts.net.",
       unreachable: "We can't reach {{host}}. Check the address and your connection, and try again.",
@@ -52,6 +57,8 @@ export const mobileEn = {
         line: "{{host}} didn't answer.",
         text: "It may be down or outside your network. The app opens on its own once it's back.",
         tryNow: "Try now",
+        /** Beside Sign out on the waiting splash: fix the address without leaving the account. */
+        switchServer: "Change server",
         /** Beside the wick burning down to the next automatic try. */
         retryIn_one: "tries again in {{count}} s",
         retryIn_other: "tries again in {{count}} s",

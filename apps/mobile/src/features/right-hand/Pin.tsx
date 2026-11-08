@@ -1,6 +1,8 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
+import type { AgentMode } from "@/agent/poses";
 import { Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import type { ConversationRow } from "../chats/logic";
@@ -15,7 +17,19 @@ import { useSurface } from "../shared/parts";
  * you haven't read it, its last line takes the invitation's place, in the text's own color ("Atlas: deixei o
  * resumo na sua conversa"). It is not one of Agentes' rows.
  */
-export function RightHandAsk({ row, onStart }: { row: ConversationRow; onStart: (agentId: string) => void }) {
+export function RightHandAsk({
+  row,
+  onStart,
+  faceMode = "idle",
+  faceStyle,
+}: {
+  row: ConversationRow;
+  onStart: (agentId: string) => void;
+  /** The face's mode: asleep under the splash, it wakes as Conversas arrives (`useWake`). */
+  faceMode?: AgentMode;
+  /** The face's own motion (the hop as it wakes). */
+  faceStyle?: StyleProp<ViewStyle>;
+}) {
   const { t } = useTranslation();
   const surface = useSurface();
   if (row.kind !== "dm") return null;
@@ -38,7 +52,9 @@ export function RightHandAsk({ row, onStart }: { row: ConversationRow; onStart: 
       accessibilityHint={theirs ? invite : undefined}
       style={({ pressed }) => [styles.field, surface, pressed && styles.pressed]}
     >
-      <AgentFace agentId={row.with.id} size={FACE} />
+      <Animated.View style={faceStyle}>
+        <AgentFace agentId={row.with.id} size={FACE} mode={faceMode} />
+      </Animated.View>
       <Text variant="body" tone={theirs ? "ink" : "faint"} numberOfLines={1} style={styles.grow}>
         {words}
       </Text>

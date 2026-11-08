@@ -26,6 +26,11 @@ export interface LargeTitleScreenProps {
   backdrop?: ReactNode;
   children?: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
+  /**
+   * Drawn in the gap a pull-down opens above the content, where the system's wheel would be (pass the refresh
+   * control a clear tint on iOS): the pixel orbit (`PullOrbit`).
+   */
+  pullMark?: ReactNode;
   /** Room under the content (default 24; the system already keeps content clear of the tab bar). */
   bottomInset?: number;
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
@@ -62,6 +67,7 @@ export function LargeTitleScreen({
   backdrop,
   children,
   refreshControl,
+  pullMark,
   bottomInset = 24,
   onScrollBeginDrag,
   grouped = false,
@@ -139,6 +145,12 @@ export function LargeTitleScreen({
             {below}
           </View>
           {children}
+          {pullMark ? (
+            // On iOS the content starts under the bar's inset: the gap opens above that.
+            <View pointerEvents="none" style={[styles.pullMark, { top: -PULL_MARK - (IOS ? headerHeight : 0) }]}>
+              {pullMark}
+            </View>
+          ) : null}
         </Animated.ScrollView>
       </LivePause>
       <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} tone={grouped ? colors.grouped : colors.bg} />
@@ -156,10 +168,15 @@ const TITLE_GONE = 40;
 const BAR_TITLE_FROM = 28;
 const BAR_TITLE_TO = 48;
 
+/** The pull-down's gap, where the orbit sits (the system's wheel takes about as much). */
+const PULL_MARK = 56;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   // At the screen's 16, as the lists and cards under it.
   head: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 },
+  // Above the content's top edge: only a pull-down brings it into view (the system's wheel sits there too).
+  pullMark: { position: "absolute", left: 0, right: 0, height: PULL_MARK, alignItems: "center", justifyContent: "center" },
   headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });

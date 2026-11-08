@@ -33,6 +33,8 @@ import {
   LIST_INSET,
   ListRow,
   PersonAvatar,
+  PULL_TINT,
+  PullOrbit,
   SectionHeader,
   SkeletonList,
   SwipeRow,
@@ -118,7 +120,8 @@ export function ActivityScreen() {
     <LargeTitleScreen
       title={t("mobile.activity.title")}
       {...header}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={PULL_TINT} />}
+      pullMark={<PullOrbit refreshing={pull.refreshing} />}
     >
       <Filters
         items={[

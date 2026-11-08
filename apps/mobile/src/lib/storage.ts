@@ -52,12 +52,16 @@ export const STORED = {
   pushOff: "push-off",
   /** How many times our notifications sheet opened by itself (@agenteschat/client/lib/push-offer). */
   pushOffers: "push-offers",
+  /** The wiki pages last opened on this phone, per workspace (JSON: org id → slugs, newest first). */
+  wikiRecent: "wiki-recent",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
   threadsCollapsed: "threads-collapsed",
   /** Agentes' groups the person collapsed, in every workspace (JSON list of group ids). */
   agentGroupsCollapsed: "agent-groups-collapsed",
+  /** The agent profile's tab last chosen (Hoje, Acesso, Memória): every profile opens on it (features/agents). */
+  agentProfileTab: "agent-profile-tab",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
   /** The request this phone made through a link, with the key that signs in once approved (features/auth/invite.ts). */

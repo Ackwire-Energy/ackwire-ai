@@ -47,6 +47,8 @@ export type ConversationRow =
       unread: number;
       /** Unread mentions of me: the row's number, as on the web (even while muted). */
       mentions: number;
+      /** I muted it (it never looks unread): the swipe offers to turn it back on. Only set when true. */
+      muted?: boolean;
     }
   | {
       kind: "dm";
@@ -196,6 +198,7 @@ export function buildConversations(input: {
       at: last?.createdAt ?? null,
       unread: looksUnread(c) ? Math.max(0, c.unreadCount ?? 0) : 0,
       mentions: Math.max(0, c.mentionCount ?? 0),
+      ...(c.muted ? { muted: true } : {}),
     });
   }
   return rows.sort((a, b) => {

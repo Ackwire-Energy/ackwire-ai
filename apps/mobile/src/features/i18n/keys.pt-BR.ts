@@ -141,6 +141,8 @@ export const featureKeysPtBR = {
     tapNoteAhead: "Aprovar agora vale para {{when}}.",
     refuseTitle: "Recusar o pedido",
     refuseAsk: "Recusar o pedido?",
+    /** On a high-risk request's top line, after its kind: it acts outside the workspace. */
+    leaves: "sai da empresa",
     refuseWhyF: "A {{name}} aprende com o motivo. Opcional.",
     refuseWhyM: "O {{name}} aprende com o motivo. Opcional.",
     sheet: {
@@ -254,6 +256,10 @@ export const featureKeysPtBR = {
     nobodyWorking: "Nenhum agente trabalhando agora",
     /** The greeting's line when one agent works: its name. */
     workingOne: "{{name}} está trabalhando",
+    /** A conversation's row swiped left: the pane beside Pin, short so the word fits the pane. */
+    swipe: { mute: "Silenciar", unmute: "Reativar" },
+    /** Conversas' one line back to the right hand's first-run checklist (ADR 0155 §6). */
+    firstRunLine: "{{name}} está montando o time · {{done}} de {{total}}",
     first: {
       title: "Comece pelo seu primeiro agente",
       subtitle: "Dê um nome e diga o que ele faz. Ele aparece aqui, como uma conversa.",
@@ -299,6 +305,30 @@ export const featureKeysPtBR = {
     agent: {
       question: "O que esse agente vai fazer?",
     },
+  },
+  /** The line over the tab bar that goes with you while an agent does long work or waits on you. */
+  along: {
+    agent: "Um agente",
+    waits: "{{name}} espera seu ok",
+    on: "{{name}} · {{what}}",
+    working: "{{name}} está trabalhando",
+    more: "+{{count}}",
+  },
+  /** "Compartilhar com…": what another app shared (the system's share sheet), sent to one agent. */
+  share: {
+    title: "Compartilhar",
+    to: "Para quem",
+    line: "Escreva algo, se quiser",
+    send: "Enviar para {{name}}",
+    pick: "Escolha um agente",
+    more: "+{{count}}",
+    firstTen: "Vão os {{count}} primeiros nesta mensagem.",
+    waiting: "Recebendo…",
+    nothing: "Nada para compartilhar",
+    nothingHint: "Abra o que quer mandar e toque em Compartilhar.",
+    noAgents: "Nenhum agente ainda",
+    noAgentsHint: "Crie um e ele aparece aqui, pronto para receber.",
+    createAgent: "Criar agente",
   },
   voice: {
     slideToCancel: "deslize para cancelar",
@@ -450,6 +480,60 @@ export const featureKeysPtBR = {
       noIntro: "Peça o que precisar, em palavras simples.",
       firstTitle: "Para começar",
       sendHint: "Toque para enviar",
+      /** An agent's first message in a new conversation, drawn by the app: the greeting, then the three starts. */
+      hello: "Oi, {{person}}! Eu sou {{name}}.",
+      helloNoName: "Oi! Eu sou {{name}}.",
+      helloRole: "{{role}} na equipe.",
+      helloAsk: "Por onde começamos?",
+      now: "agora",
+      /** The starts' short words on their buttons; a tap sends the whole request (`first.*`). */
+      start: {
+        support: {
+          how: "O que é urgente para você",
+          task: "Responder sobre o prazo",
+          routine: "Urgências, toda manhã",
+        },
+        ops: {
+          how: "Como você vê uma queda",
+          task: "Ver se está tudo no ar",
+          routine: "A noite, toda manhã",
+        },
+        qa: {
+          how: "O que você testa primeiro",
+          task: "Casos de teste do login",
+          routine: "O que quebrou na semana",
+        },
+        dev: {
+          how: "O que você faz no código",
+          task: "Revisar o último pull request",
+          routine: "O que mudou, toda sexta",
+        },
+        research: {
+          how: "A pesquisa que você faz melhor",
+          task: "Comparar três concorrentes",
+          routine: "O mercado, toda segunda",
+        },
+        writing: {
+          how: "O texto que você faz melhor",
+          task: "Melhorar um texto meu",
+          routine: "Sua semana por escrito",
+        },
+        product: {
+          how: "Como você prioriza",
+          task: "O que está atrasado",
+          routine: "O plano, toda segunda",
+        },
+        sales: {
+          how: "Como você acha bons leads",
+          task: "Um e-mail sobre o produto",
+          routine: "Leads novos, toda segunda",
+        },
+        general: {
+          how: "O que você faz por mim",
+          task: "Um exemplo do que você faz",
+          routine: "Sua semana, toda segunda",
+        },
+      },
       first: {
         support: {
           how: "Como você decide o que é urgente?",
@@ -504,6 +588,8 @@ export const featureKeysPtBR = {
     camera: "Câmera",
     photos: "Fotos",
     file: "Arquivo",
+    /** The fourth tile: the GIFs and stickers, out of the field so it only sends. */
+    media: "GIFs",
     noCamera: "Sem acesso à câmera. Libere nos Ajustes do celular.",
     mission: "Começar uma missão",
     missionHint: "Um trabalho longo, com plano, do começo ao fim",
@@ -728,6 +814,8 @@ export const featureKeysPtBR = {
     /** A row's state, as text in the state's color (amber only for what waits on the person). */
     state: {
       waitsYou: "espera seu ok",
+      routine: "Na rotina · {{time}}",
+      routineShort: "na rotina",
       noAi: "Sem IA ligada",
       connect: "Conectar",
       archived: "Arquivado",
@@ -759,6 +847,8 @@ export const featureKeysPtBR = {
     identityQuestion: "Quem é o agente?",
     identityLead: "Nome, como chamar no chat e o rosto.",
     handleMention: "Mencione @{{handle}} para chamar.",
+    handleFromName: "No chat: @{{handle}}. Vem do nome, dá para mudar.",
+    handleFromNameEmpty: "O @ no chat vem do nome.",
     reviewLead: "Toque numa linha para mudar.",
     planHint: "Ou conecte o seu plano de IA: o {{name}} passa a pensar por ele, sem gastar a chave.",
     planHint_female: "Ou conecte o seu plano de IA: a {{name}} passa a pensar por ele, sem gastar a chave.",
@@ -1082,6 +1172,8 @@ export const featureKeysPtBR = {
     addWorkspaceTeamSubShort: "Endereço ou QR code do computador",
     addWorkspaceFoot: "Você não sai de nenhum workspace.",
     teamServerLeadShort: "O que o time abre no navegador.",
+    /** A tela do servidor da equipe: a pergunta é o título, em duas linhas, na régua do login. */
+    teamServerQuestion: "Qual é o endereço da sua equipe?",
     account: {
       title: "Conta",
       save: "OK",
@@ -1299,6 +1391,11 @@ export const featureKeysPtBR = {
   },
   wiki: {
     map: "Mapa das páginas",
+    graph: "Conexões",
+    links_one: "{{count}} conexão",
+    links_other: "{{count}} conexões",
+    linksOut: "Liga para",
+    continue: "Continuar lendo",
     more: "Mais opções",
     mapAgent: "Agente que leu páginas nesta semana",
     usedBy: "Agentes que usam",
@@ -1330,6 +1427,13 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar as rotinas.",
     anyAgent: "Todos os agentes",
     create: "Criar",
+    when: {
+      custom: "Do seu jeito",
+      write: "Escrever do meu jeito…",
+      day: "Dia",
+      monthDay: "Dia {{day}}",
+      lastDay: "Último dia",
+    },
   },
   // The task manager (ADR 0128; the rest of its words are shared, `taskManager.*`).
   taskManager: {
@@ -1855,6 +1959,9 @@ export const featureKeysPtBR = {
     logoHelp: "Opcional.",
     logoPick: "Escolher",
     zone: "Fuso: {{zone}}",
+    /** Depois do fuso, no primeiro uso: abre a lista de fusos. */
+    zoneChange: "Trocar",
+    zoneTitle: "Fuso horário",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "Como se chama o workspace novo?",
     anotherLead: "No agentes.chat. Você continua na {{org}}; dá para trocar a qualquer hora.",
