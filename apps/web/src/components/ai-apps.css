@@ -164,12 +164,16 @@ html:not([data-pointer]) .apps-client:focus-visible {
   flex-direction: column;
   gap: 20px;
 }
+/* The app's mark on a line of its own, what it asks under it at the column's width: a mark never owns a column beside
+   a title that wraps. */
 .consent__app {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
 .consent__app > .list-col {
+  align-self: stretch;
   min-width: 0;
   gap: 4px;
 }

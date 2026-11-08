@@ -177,62 +177,22 @@ html:not([data-pointer]) .db-card:focus-visible {
 }
 
 /* An agent's request to publish the board (ADR 0135 §11): a line in its tone above the grid. */
+/* A MediaRow: the agent's face and what it asks on one line, its two buttons at that line's end (under the words in a
+   banner under 480px), for whom and why under them. */
 .db-proposal {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--surface-raised);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wg-s) 30%, transparent);
+  container-type: inline-size;
 }
 .db-proposal__text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  gap: 0;
   font-size: 13.5px;
   color: var(--ink2);
 }
-.db-proposal__text b {
-  font-size: 14px;
-  color: var(--ink);
-}
 .db-proposal__why {
   color: var(--muted);
-}
-.db-proposal__acts {
-  display: flex;
-  flex: none;
-  gap: 8px;
-}
-/* With its buttons: the face and the buttons on the title's line, not the middle of the title, the audience and the
-   why under it. The words keep the room a small button takes (32, 40 on touch), as a toast's do, so the title's line
-   runs through the buttons' middle. */
-.db-proposal:has(> .db-proposal__acts) {
-  --db-line-pad: calc((var(--control-h-sm) - 22px) / 2);
-  align-items: flex-start;
-}
-@media (pointer: coarse) {
-  .db-proposal:has(> .db-proposal__acts) {
-    --db-line-pad: calc((var(--control-h-md) - 22px) / 2);
-  }
-}
-.db-proposal:has(> .db-proposal__acts) > .db-proposal__text {
-  margin-top: var(--db-line-pad);
-}
-/* The 24px face's middle on the 22px line's. */
-.db-proposal:has(> .db-proposal__acts) > :first-child {
-  margin-top: calc(var(--db-line-pad) - 1px);
-}
-@media (max-width: 760px) {
-  .db-proposal {
-    flex-wrap: wrap;
-  }
-  .db-proposal__acts {
-    width: 100%;
-    justify-content: flex-end;
-  }
 }
 
 /* ── Dialogs: shared fields ─────────────────────────────────────────────── */

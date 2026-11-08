@@ -115,23 +115,18 @@
 .ac-dialog__body.status-dialog {
   gap: 18px;
 }
+/* What it says above, then the face, the name and the status as a MediaRow. */
 .status-preview {
   --presence-ring: var(--card-well, var(--sunken));
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 14px;
   border-radius: 14px 14px 14px 4px;
   background: var(--card-well, var(--sunken));
   box-shadow: var(--card-well-shadow, none);
 }
-.status-preview__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
 .status-preview__caption {
-  margin-bottom: 2px;
   font-size: 12px;
   color: var(--faint);
 }

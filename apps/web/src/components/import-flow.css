@@ -183,20 +183,14 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
 }
 
 /* ── The plan ───────────────────────────────────────────────────────────── */
-.imp-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.imp-head .imp-mark {
+/* A MediaRow: the mark and the title on one line (Trocar at its end), what it holds under them. */
+.ac-mediarow__face > .imp-mark {
+  width: var(--mediarow-face);
+  height: var(--mediarow-face);
   margin: 0;
 }
 .imp-mark--done {
   color: var(--ink);
-}
-.imp-head__text {
-  flex: 1;
-  min-width: 0;
 }
 .imp-head__title {
   margin: 0;
@@ -209,7 +203,7 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
   outline: none;
 }
 .imp-head__sub {
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -392,27 +386,16 @@ label.imp-row__text {
 }
 
 /* ── Report ─────────────────────────────────────────────────────────────── */
+/* Each a MediaRow: the kind's tile and how many came, their links under them. */
 .imp-made li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  font-size: 13.5px;
 }
 .imp-made__icon {
-  flex: none;
-  width: 28px;
-  height: 28px;
   display: grid;
   place-items: center;
   border-radius: 9px;
   background: var(--sunken);
   color: var(--ink2);
-}
-.imp-made__text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  font-size: 13.5px;
 }
 .imp-made__links {
   display: flex;
@@ -467,7 +450,5 @@ html:not([data-pointer]) .imp-link:focus-visible {
 
 /* ── "Do seu app de IA": the most reliable way, on top of the sources ───── */
 .imp-aiapp {
-  justify-content: flex-start;
-  gap: 12px;
   text-align: left;
 }

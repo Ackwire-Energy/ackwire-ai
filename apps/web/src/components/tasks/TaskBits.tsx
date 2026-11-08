@@ -489,12 +489,16 @@ export function StopAllConfirm({
       align="end"
       className="tm-confirm"
     >
-      <div className="tm-confirm__head ac-iconline">
-        <AgentAvatar agentId={agentId} name={name} size="sm" />
-        <div className="tm-confirm__text">
-          <b>{title}</b>
-          <p>{helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.body", { name })}</p>
-        </div>
+      <div className="tm-confirm__head ac-mediarow ac-mediarow--row">
+        <span className="ac-mediarow__face">
+          <AgentAvatar agentId={agentId} name={name} size="sm" />
+        </span>
+        <span className="ac-mediarow__head">
+          <b className="tm-confirm__title">{title}</b>
+        </span>
+        <p className="ac-mediarow__body tm-confirm__text">
+          {helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.body", { name })}
+        </p>
       </div>
       <ReasonInput
         value={reason}

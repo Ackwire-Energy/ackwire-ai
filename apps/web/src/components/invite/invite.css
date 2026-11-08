@@ -102,7 +102,6 @@
 .invite-host__face {
   display: flex;
   flex: none;
-  margin-top: 2px;
 }
 .invite-host .auth__bubble {
   padding: 14px 18px;
@@ -113,15 +112,6 @@
 }
 .invite-host .auth__lead {
   line-height: 20px;
-}
-/* The answers start where the bubble does: the host's 36px and the 14px beside it. */
-.invite-answer {
-  padding-left: 50px;
-}
-@media (max-width: 560px) {
-  .invite-answer {
-    padding-left: 0;
-  }
 }
 /* Back (or Cancelar) on the left, what goes on on the right. */
 .invite-foot__gap {

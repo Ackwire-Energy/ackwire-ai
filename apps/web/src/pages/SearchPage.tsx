@@ -193,17 +193,25 @@ function HitRow({
   ]
     .filter(Boolean)
     .join(" · ");
-  // A message's face leads the row (an .ac-iconline lead, on the first line); other hits start with their text.
-  const face = hit.kind === "message" && !!hit.author;
-  const body = (
-    <span className={face ? "search-hit ac-iconline" : "search-hit"}>
-      {face && hit.author && <ActorAvatar actor={hit.author} name={hit.author.name} size="sm" />}
-      <span className="list-col">
-        <span className="small muted">{meta}</span>
-        <span>{hitText(t, hit)}</span>
+  // A message is a MediaRow: its face and who, where and when on one line, the words under them; other hits start
+  // with their text.
+  const body =
+    hit.kind === "message" && hit.author ? (
+      <span className="search-hit ac-mediarow ac-mediarow--row">
+        <span className="ac-mediarow__face">
+          <ActorAvatar actor={hit.author} name={hit.author.name} size="sm" />
+        </span>
+        <span className="ac-mediarow__head small muted">{meta}</span>
+        <span className="ac-mediarow__body">{hitText(t, hit)}</span>
       </span>
-    </span>
-  );
+    ) : (
+      <span className="search-hit">
+        <span className="list-col">
+          <span className="small muted">{meta}</span>
+          <span>{hitText(t, hit)}</span>
+        </span>
+      </span>
+    );
   const link = hitLink(orgId, hit, channelId, dm);
   if (!link) return <div className="ac-list__row">{body}</div>;
   return (

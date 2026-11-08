@@ -444,24 +444,32 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
         const name = p.target.type === "org_context" ? org.name : agentName(p.agentId);
         const status = rowStatus(t, p);
         return (
-          <li key={p.id} className="proposal-row">
-            {p.target.type === "org_context" ? (
-              <Icon name="layers" size={20} />
-            ) : (
-              <AgentAvatar agentId={p.agentId} size="sm" name={name} />
-            )}
-            <span className="proposal-row__what">
-              <span className="proposal-row__name">{name}</span>
-              {!isText(p) && <SettingChange p={p} />}
+          <li key={p.id} className="proposal-row ac-mediarow ac-mediarow--row">
+            <span className="ac-mediarow__face">
+              {p.target.type === "org_context" ? (
+                <Icon name="layers" size={20} />
+              ) : (
+                <AgentAvatar agentId={p.agentId} size="sm" name={name} />
+              )}
             </span>
-            {status && <span className="proposal-row__status">{status}</span>}
-            {isOpen(p) && (
-              <Switch
-                checked={p.canDecide && !off.has(p.id)}
-                disabled={!p.canDecide || decide.isPending}
-                onCheckedChange={(on) => toggle(p.id, on)}
-                aria-label={t("proposals.include", { name })}
-              />
+            <span className="ac-mediarow__head">
+              <b className="proposal-row__name">{name}</b>
+            </span>
+            <span className="ac-mediarow__end">
+              {status && <span className="proposal-row__status">{status}</span>}
+              {isOpen(p) && (
+                <Switch
+                  checked={p.canDecide && !off.has(p.id)}
+                  disabled={!p.canDecide || decide.isPending}
+                  onCheckedChange={(on) => toggle(p.id, on)}
+                  aria-label={t("proposals.include", { name })}
+                />
+              )}
+            </span>
+            {!isText(p) && (
+              <span className="ac-mediarow__body">
+                <SettingChange p={p} />
+              </span>
             )}
           </li>
         );

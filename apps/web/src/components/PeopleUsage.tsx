@@ -557,16 +557,21 @@ function RecentList({ data }: { data: PersonUsage }) {
                 t("peopleUsage.drawer.runs", { count: r.runs }),
               ];
         return (
-          <li key={`${r.kind}-${r.agentId}-${"startedAt" in r ? r.startedAt : r.lastAt}`} className="pu-recent__row">
-            <AgentAvatar agentId={r.agentId} name={agent} size="sm" />
-            <span className="pu-recent__text">
+          <li
+            key={`${r.kind}-${r.agentId}-${"startedAt" in r ? r.startedAt : r.lastAt}`}
+            className="pu-recent__row ac-mediarow ac-mediarow--row"
+          >
+            <span className="ac-mediarow__face">
+              <AgentAvatar agentId={r.agentId} name={agent} size="sm" />
+            </span>
+            <span className="ac-mediarow__head">
               <span className="pu-recent__title">
-                {r.kind !== "work" && <Icon name="lock" size={14} />}
+                {r.kind !== "work" && <Icon name="lock" size={14} inline />}
                 {title}
               </span>
-              <span className="muted">{line}</span>
             </span>
-            <span className="pu-recent__amount tabular">{amount(r.amount)}</span>
+            <span className="ac-mediarow__end pu-recent__amount tabular">{amount(r.amount)}</span>
+            <span className="ac-mediarow__body muted">{line}</span>
           </li>
         );
       })}

@@ -342,10 +342,8 @@ html:not([data-pointer]) .thread-title__button:focus-visible {
 :where(:not(.ac-msg__body)) > .thread-context {
   margin-block: 6px 10px;
 }
+/* A MediaRow: the tile, what it is and the chevron on one line, how it came under them. */
 .thread-context__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   width: 100%;
   padding: 10px 12px;
   border: 0;
@@ -364,9 +362,6 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
 .thread-context__icon {
-  width: 30px;
-  height: 30px;
-  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -374,27 +369,19 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   background: var(--sunken);
   color: var(--ink2);
 }
-.thread-context__title {
-  flex: 1;
-  min-width: 0;
-}
-.thread-context__title b {
-  display: block;
-  font-size: 14px;
+.thread-context__head .thread-context__title {
   font-weight: 650;
   letter-spacing: -0.01em;
 }
-.thread-context__title small {
-  display: flex;
+.thread-context__sub {
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  margin-top: 1px;
   font-size: 12.5px;
   color: var(--faint);
 }
 .thread-context__chev {
-  flex: none;
   color: var(--faint);
   transition: transform 0.25s var(--out);
 }
@@ -405,7 +392,7 @@ html:not([data-pointer]) .thread-context__head:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
-  padding: 0 12px 10px 52px;
+  padding: 0 12px 10px;
   font-size: 12.5px;
 }
 .thread-context__link {

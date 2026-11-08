@@ -256,21 +256,29 @@ function RemovalCard({
               const name = nameOf(p);
               const status = rowStatus(t, p);
               return (
-                <li key={p.id} className="proposal-row">
-                  <AgentAvatar agentId={p.agentId} size="sm" name={name} />
-                  <span className="proposal-row__what">
-                    <span className="proposal-row__name">{name}</span>
-                    {agent && <span>{[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}</span>}
+                <li key={p.id} className="proposal-row ac-mediarow ac-mediarow--row">
+                  <span className="ac-mediarow__face">
+                    <AgentAvatar agentId={p.agentId} size="sm" name={name} />
                   </span>
-                  {status && <span className="proposal-row__status">{status}</span>}
-                  {isOpen(p) && p.canDecide && (
-                    <Switch
-                      checked={!off.has(p.id)}
-                      disabled={decide.isPending}
-                      onCheckedChange={(on) => toggle(p.id, on)}
-                      aria-label={t("proposals.include", { name })}
-                    />
-                  )}
+                  <span className="ac-mediarow__head">
+                    <b className="proposal-row__name">{name}</b>
+                    {agent && (
+                      <span className="ac-mediarow__meta">
+                        {[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </span>
+                  <span className="ac-mediarow__end">
+                    {status && <span className="proposal-row__status">{status}</span>}
+                    {isOpen(p) && p.canDecide && (
+                      <Switch
+                        checked={!off.has(p.id)}
+                        disabled={decide.isPending}
+                        onCheckedChange={(on) => toggle(p.id, on)}
+                        aria-label={t("proposals.include", { name })}
+                      />
+                    )}
+                  </span>
                 </li>
               );
             })}
@@ -630,33 +638,36 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
         body={
           <ul className="proposal-rows">
             {card.rows.map((r) => (
-              <li key={`${r.userId}:${what(r)}`} className="proposal-row">
-                <PersonAvatar id={r.userId} name={r.name} size="sm" />
-                <span className="proposal-row__what">
-                  {/* Their email too: a display name alone can be anyone's (the card may follow what someone else wrote). */}
-                  <span className="proposal-row__name">
-                    {r.name} <span className="muted">{people.find((p) => p.userId === r.userId)?.email}</span>
-                  </span>
-                  <span>{what(r)}</span>
+              <li key={`${r.userId}:${what(r)}`} className="proposal-row ac-mediarow ac-mediarow--row">
+                <span className="ac-mediarow__face">
+                  <PersonAvatar id={r.userId} name={r.name} size="sm" />
                 </span>
-                {done(r) ? (
-                  <span className="proposal-row__status">{t("rightHand.people.done")}</span>
-                ) : (
-                  members.isSuccess &&
-                  may(r) && (
-                    <Button
-                      size="sm"
-                      variant={"remove" in r ? "danger" : "primary"}
-                      loading={
-                        (change.isPending && change.variables?.userId === r.userId) ||
-                        (setRoles.isPending && setRoles.variables?.userId === r.userId)
-                      }
-                      onClick={() => apply(r)}
-                    >
-                      {"remove" in r ? t("members.remove.item") : t("rightHand.card.apply")}
-                    </Button>
-                  )
-                )}
+                {/* Their email too: a display name alone can be anyone's (the card may follow what someone else wrote). */}
+                <span className="ac-mediarow__head">
+                  <b className="proposal-row__name">{r.name}</b>
+                  <span className="ac-mediarow__meta">{people.find((p) => p.userId === r.userId)?.email}</span>
+                </span>
+                <span className="ac-mediarow__body">{what(r)}</span>
+                <span className="ac-mediarow__end">
+                  {done(r) ? (
+                    <span className="proposal-row__status">{t("rightHand.people.done")}</span>
+                  ) : (
+                    members.isSuccess &&
+                    may(r) && (
+                      <Button
+                        size="sm"
+                        variant={"remove" in r ? "danger" : "primary"}
+                        loading={
+                          (change.isPending && change.variables?.userId === r.userId) ||
+                          (setRoles.isPending && setRoles.variables?.userId === r.userId)
+                        }
+                        onClick={() => apply(r)}
+                      >
+                        {"remove" in r ? t("members.remove.item") : t("rightHand.card.apply")}
+                      </Button>
+                    )
+                  )}
+                </span>
               </li>
             ))}
           </ul>

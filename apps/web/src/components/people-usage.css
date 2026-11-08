@@ -364,28 +364,14 @@ th.pu-num .pu-sort {
   align-items: center;
   gap: 10px;
 }
-.pu-recent__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.pu-recent__text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  line-height: 20px;
-}
-.pu-recent__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.pu-recent__text .muted {
+/* A MediaRow: the agent's face, what it did and its amount on one line, where under them. */
+.pu-recent__row > .ac-mediarow__body {
   font-size: 13.5px;
 }
+.pu-recent__title .ac-icon--inline {
+  margin-right: 6px;
+}
 .pu-recent__amount {
-  margin-left: auto;
   white-space: nowrap;
 }
 /* One short line, as the other links led by an icon (.mail-howto__link). */

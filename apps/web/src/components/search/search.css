@@ -104,6 +104,10 @@
 }
 /* With a face, also an .ac-iconline: the face on the first line's capitals (who and when), the text under it. */
 .search-hit {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.search-hit:not(.ac-mediarow) {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
