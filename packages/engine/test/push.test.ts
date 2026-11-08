@@ -34,6 +34,7 @@ import {
   PUSH_RECEIPTS_DELAY_MS,
   postPersonMessage,
   pushLocale,
+  pushQuote,
   pushStrings,
   pushTicketsOf,
   registerPushDevice,
@@ -200,6 +201,17 @@ describe("push text", () => {
     expect(
       renderPush("pt-BR", { kind: "dashboard_proposal", waiting: true, actorName: "Theo", title: "Black Friday" }),
     ).toEqual({ title: "Theo quer publicar um painel", body: "“Black Friday” · Toque para decidir." });
+  });
+
+  test("a push quotes only what someone wrote: never a body the server wrote, nor a cut reply's English note", () => {
+    expect(pushQuote({ text: "Te mandei o contrato" })).toBe("Te mandei o contrato");
+    expect(pushQuote({ text: "Event proposal: Reunião", meta: { bodyCode: "calendar_proposal" } })).toBeNull();
+    const note = "_Claude Code stopped before finishing (lost). Already done, not repeated: run_code._";
+    expect(pushQuote({ text: note, meta: { brainInterrupted: { text: "", tools: ["run_code"] } } })).toBeNull();
+    expect(
+      pushQuote({ text: `Fiz metade\n\n${note}`, meta: { brainInterrupted: { text: "Fiz metade", tools: [] } } }),
+    ).toBe("Fiz metade");
+    expect(pushQuote({ text: "_Interrupted by a server restart._", meta: { interrupted: { text: "" } } })).toBeNull();
   });
 
   test("high risk follows the approval card's rule", () => {

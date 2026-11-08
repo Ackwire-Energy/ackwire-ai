@@ -326,6 +326,16 @@ async function isLooking(presence: PushDeps["presence"], orgId: string, userId: 
 }
 
 /**
+ * What a push quotes of the latest message: never a body the server wrote (English: only the apps word it, by its code,
+ * so the push says to open it), and of a reply a restart or its computer cut, only what the agent itself wrote.
+ */
+export function pushQuote(latest: Pick<NotificationLatest, "text" | "meta">): string | null {
+  if (latest.meta?.bodyCode) return null;
+  const cut = latest.meta?.brainInterrupted ?? latest.meta?.interrupted;
+  return cut ? cut.text || null : (latest.text ?? null);
+}
+
+/**
  * Sends the push of one notification to every device of its person, unless
  * it was read, done or snoozed meanwhile: phones through `push` (one call),
  * browsers whose session is still on through `webPush` (one per subscription).
@@ -398,8 +408,7 @@ export async function deliverPush(
     actorType: actor?.type ?? null,
     label: source.label,
     title: latest.title,
-    // A body the server wrote is English: only the apps word it (`previewBody`), so the push says to open it.
-    text: latest.meta?.bodyCode ? null : latest.text,
+    text: pushQuote(latest),
     media: await sentMediaOf(db, row.orgId, row.kind, source, latest),
     suggestedBy: latest.suggestedBy ?? null,
     highRisk,
