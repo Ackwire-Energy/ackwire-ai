@@ -495,7 +495,47 @@
       "resultOk": "Geklappt",
       "resultFailed": "Fehlgeschlagen",
       "resultRefused": "Abgelehnt",
-      "resultRunning": "Läuft"
+      "resultRunning": "Läuft",
+      "said": {
+        "read": "las {{path}}",
+        "wrote": "schrieb {{path}}",
+        "looked": "sah sich {{path}} an",
+        "sent": "sendete {{path}}",
+        "thinking": "denkt mit {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "gestartet: {{what}}",
+        "taskFinished": "fertig: {{what}}",
+        "taskCanceled": "abgebrochen: {{what}}",
+        "taskInterrupted": "unterbrochen: {{what}}",
+        "taskTimedOut": "am Zeitlimit gestoppt: {{what}}",
+        "taskFailed": "fehlgeschlagen (Exit {{exit}}): {{what}}",
+        "taskNotStarted": "nicht gestartet: {{what}}",
+        "executor": {
+          "codex": "Aufgabe von Codex",
+          "claude": "Aufgabe von Claude Code"
+        },
+        "paused": "pausiert",
+        "pausedUntil": "pausiert bis {{until}}",
+        "resumed": "fortgesetzt",
+        "connected": "verbunden mit {{org}}",
+        "disconnected": "getrennt",
+        "disconnectedFrom": "getrennt von {{org}}",
+        "accessAsked": "bat um {{path}}",
+        "accessNotNow": "jetzt nicht: {{path}}",
+        "accessExpired": "Anfrage abgelaufen: {{path}}",
+        "toolOn": "schaltete {{tool}} ein",
+        "toolOff": "schaltete {{tool}} aus",
+        "tools": {
+          "commands": "die Befehle",
+          "browser": "den Browser",
+          "desktop": "die Bildschirme der Agenten",
+          "terminal": "das Terminal"
+        },
+        "folderAllowed": "erlaubte {{path}} für {{agents}}",
+        "folderAgents": "{{path}} jetzt für {{agents}}",
+        "folderRemoved": "entfernte {{path}}",
+        "noAgent": "kein Agent"
+      }
     },
     "advanced": {
       "title": "Erweitert",

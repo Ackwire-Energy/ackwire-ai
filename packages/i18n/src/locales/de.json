@@ -44,6 +44,7 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "loadFailed": "Das konnte nicht geladen werden. Prüf deine Verbindung und versuch es noch einmal.",
+    "gone": "Das gibt es hier nicht mehr. Es wurde gelöscht, oder du hast keinen Zugriff mehr.",
     "notAllowed": "Dafür hast du keine Berechtigung.",
     "tooMany": "Zu viele Versuche. Versuch es später noch einmal.",
     "offline": "Du bist offline. Prüf deine Verbindung und versuch es noch einmal.",
@@ -4780,6 +4781,7 @@
         "too_many_tool_calls": "Das Tool-Limit für eine Ausführung wurde überschritten.",
         "stuck": "Gestoppt, weil er feststeckte.",
         "brain_interrupted": "Die KI hat aufgehört, bevor sie fertig war.",
+        "brain_unavailable": "Die KI auf seinem Computer konnte nicht antworten. Prüfe den Computer und frag noch einmal.",
         "empty_reply": "Das Modell hat nichts zurückgegeben.",
         "model_refused": "Das Modell hat die Antwort verweigert.",
         "agent_archived": "Der Agent wurde archiviert.",
@@ -5936,6 +5938,7 @@
         "done": "Fertig",
         "canceled": "Wird nicht gemacht"
       },
+      "stageFull": "{{stage}} hat schon {{max}} Spalten, mehr hat eine Phase nicht. Lösch dort zuerst eine.",
       "stageExplain": {
         "todo": "Neue Aufgaben landen in der ersten Spalte von Zu erledigen.",
         "in_progress": "Wenn ein Agent beginnt, wandert die Aufgabe in die erste Spalte von In Arbeit.",
@@ -11521,6 +11524,7 @@
     },
     "issue": {
       "assigneeOutside": "Diese Person sieht diese Aufgabe nicht. Füge sie zuerst bei Wer es sieht hinzu.",
+      "stageFull": "Eine Phase hat höchstens {{max}} Spalten. Lösch zuerst eine ihrer Spalten.",
       "deleteForbidden": "Nur wer diese Aufgabe erstellt hat oder ein Administrator kann sie löschen.",
       "audienceEmpty": "Wähle, wer es sieht."
     },
@@ -11810,6 +11814,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Der Browser der Agenten läuft nicht auf dem System dieses Computers.",
+      "browser_download": "Der Browser der Agenten konnte nicht heruntergeladen werden. Prüfe die Verbindung dieses Computers, beim nächsten Mal versucht er es erneut.",
+      "browser_checksum": "Der Download des Browsers der Agenten kam beschädigt an und wurde nicht verwendet. Beim nächsten Mal versucht er es erneut.",
+      "desktop_use_linux": "Apps auf den Bildschirmen der Agenten laufen auf Linux-Computern mit den Bildschirmen der Agenten.",
+      "desktop_use_own_user": "Apps auf den Bildschirmen brauchen für jeden Agenten einen eigenen Benutzer auf diesem Computer (Systemmodus). Hier arbeiten alle Agenten als Benutzer des Runners.",
+      "desktop_use_install": "Installiere auf diesem Computer, was Apps auf den Bildschirmen brauchen:",
+      "desktop_unavailable": "Die Bildschirme der Agenten laufen auf diesem Computer nicht.",
+      "desktop_linux": "Die Bildschirme der Agenten laufen nur auf Linux-Computern.",
+      "desktop_install": "Installiere auf diesem Computer die Bildschirme der Agenten:",
+      "not_as_root": "Bildschirme und Terminals der Agenten laufen nie als root. Starte den Runner als normaler Benutzer.",
+      "runner_bun_old": "Dafür braucht der Runner Bun 1.3.5 oder neuer. Aktualisiere den Runner auf diesem Computer.",
+      "terminal_unsupported": "Terminals laufen nur auf Linux- und Mac-Computern."
+    },
     "egress": {
       "draining": "Das Netzwerk ändert sich. Offene Sitzungen des Computers starten um {{when}} neu.",
       "restart": "Die Sitzungen des Computers starten neu, um das Netzwerk zu übernehmen. Neue Arbeit wartet, bis das fertig ist.",
@@ -12548,6 +12566,7 @@
       "techAction": "Aktion",
       "techTool": "Tool",
       "techKind": "Art",
+      "techSaid": "Was es geantwortet hat",
       "techRun": "Ausführung",
       "techId": "Eintrag",
       "openConversation": "Unterhaltung öffnen",
@@ -13295,7 +13314,11 @@
         "shell": "Es führt darin andere Befehle aus",
         "inline": "Es führt direkt übergebenen Code aus",
         "global": "Es installiert für den ganzen Computer",
-        "rules": "Außerhalb dessen, was Agenten selbstständig tun dürfen"
+        "rules": "Außerhalb dessen, was Agenten selbstständig tun dürfen",
+        "noAccess": "Der Agent hat keinen Zugriff darauf",
+        "policy": "Bei dieser Art Arbeit nicht erlaubt",
+        "credential": "Es sendet etwas, das wie ein Schlüssel aussieht",
+        "repo": "Dieses Repository steht nicht auf der Liste des Agenten"
       },
       "gave": "übergeben",
       "answered": "beantwortet",
@@ -13572,6 +13595,7 @@
       "machine_task_done": "„{{title}}“ ist auf {{computer}} fertig.",
       "machine_task_failed": "„{{title}}“ ist auf {{computer}} fehlgeschlagen.",
       "machine_task_canceled": "„{{title}}“ wurde auf {{computer}} gestoppt.",
+      "calendar_proposal": "Terminvorschlag: {{title}}",
       "machine_task_interrupted": "„{{title}}“ wurde auf {{computer}} unterbrochen.",
       "machine_task_doneNoComputer": "„{{title}}“ ist fertig.",
       "machine_task_failedNoComputer": "„{{title}}“ ist fehlgeschlagen.",
@@ -13860,6 +13884,38 @@
     "update_skill_from_source": {
       "label": "Skills über ihre Links aktualisieren",
       "description": "Aktualisiert Skills von dort, wo sie installiert wurden. Änderungen an Skripten warten auf eine Person."
+    },
+    "propose_remove_agents": {
+      "label": "Archivieren oder Löschen von Agenten vorschlagen",
+      "description": "Postet eine Karte mit den Agenten zum Archivieren oder Löschen. Eine berechtigte Person wendet sie an."
+    },
+    "offer_answers": {
+      "label": "Mit Antworten zum Antippen fragen",
+      "description": "Postet eine Frage mit Antworten, die die Person antippt. Jedes Antippen ist ihre eigene Nachricht."
+    },
+    "propose_team": {
+      "label": "Ein Team vorschlagen",
+      "description": "Postet eine Karte mit mehreren Agenten, ihren Kanälen, Routinen und Skills. Eine Person erstellt es."
+    },
+    "propose_settings_change": {
+      "label": "Einstellungen eines Teammitglieds vorschlagen",
+      "description": "Postet eine Karte mit neuem Modell, KI, Budget, Verantwortlichem, Publikum oder Kanälen eines Teammitglieds. Eine Person wendet sie an."
+    },
+    "offer_approvals": {
+      "label": "Zeigen, was auf Freigabe wartet",
+      "description": "Postet eine Karte mit den Freigaben, die auf die Person warten. Sie gibt jede dort frei oder lehnt sie ab."
+    },
+    "propose_member_changes": {
+      "label": "Änderungen an Personen vorschlagen",
+      "description": "Postet eine Karte mit Inhabern, Rollen oder Entfernungen. Eine berechtigte Person wendet jede an."
+    },
+    "offer_open_page": {
+      "label": "Anbieten, einen Bildschirm zu öffnen",
+      "description": "Postet eine Karte, deren Taste einen Bildschirm der App öffnet, etwa Abrechnung, Rollen oder die Seite eines Agenten."
+    },
+    "set_team_week": {
+      "label": "Die Karte Teamwoche ändern",
+      "description": "Stoppt, startet wieder oder verschiebt die wöchentliche Karte Teamwoche in der Direktnachricht der Person."
     },
     "propose_agent": {
       "label": "Agenten vorschlagen",

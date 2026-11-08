@@ -44,6 +44,7 @@
     "today": "今天",
     "yesterday": "昨天",
     "loadFailed": "无法加载，请检查网络连接后重试。",
+    "gone": "这项内容已不在这里。它已被删除，或你已无权访问。",
     "notAllowed": "你没有权限执行此操作。",
     "tooMany": "尝试次数过多，请稍后再试。",
     "offline": "你已离线，请检查网络连接后重试。",
@@ -4636,6 +4637,7 @@
         "too_many_tool_calls": "单次运行超出了工具调用上限。",
         "stuck": "因卡住而停止。",
         "brain_interrupted": "AI 在完成前停止了。",
+        "brain_unavailable": "其电脑上的 AI 无法回答。请检查电脑后再试一次。",
         "empty_reply": "模型没有返回任何内容。",
         "model_refused": "模型拒绝回答。",
         "agent_archived": "该智能体已归档。",
@@ -5754,6 +5756,7 @@
         "done": "已完成",
         "canceled": "不会再做"
       },
+      "stageFull": "{{stage}} 已有 {{max}} 列，这是一个阶段的上限。请先在其中删除一列。",
       "stageExplain": {
         "todo": "新任务会进入“待办”的第一列。",
         "in_progress": "智能体开始工作后，任务会移到“进行中”的第一列。",
@@ -11116,6 +11119,7 @@
     },
     "issue": {
       "assigneeOutside": "这个人看不到这个任务。请先把他加入“谁能看到”。",
+      "stageFull": "一个阶段最多 {{max}} 列。请先删除其中一列。",
       "deleteForbidden": "只有这项任务的创建者或管理员可以删除它。",
       "audienceEmpty": "请选择谁能看到。"
     },
@@ -11404,6 +11408,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "智能体浏览器无法在这台电脑的系统上运行。",
+      "browser_download": "无法下载智能体浏览器。请检查这台电脑的网络连接，下次使用时会再试一次。",
+      "browser_checksum": "智能体浏览器的下载文件已损坏，因此没有使用。下次使用时会再试一次。",
+      "desktop_use_linux": "智能体屏幕上的应用可在带有智能体屏幕的 Linux 电脑上运行。",
+      "desktop_use_own_user": "智能体屏幕上的应用需要每个智能体在这台电脑上以自己的用户身份工作（系统模式）。这里所有智能体都以 runner 的用户身份工作。",
+      "desktop_use_install": "请在这台电脑上安装智能体屏幕上的应用所需的组件：",
+      "desktop_unavailable": "智能体屏幕无法在这台电脑上运行。",
+      "desktop_linux": "智能体屏幕只能在 Linux 电脑上运行。",
+      "desktop_install": "请在这台电脑上安装智能体屏幕：",
+      "not_as_root": "智能体的屏幕和终端从不以 root 身份运行。请用普通用户运行 runner。",
+      "runner_bun_old": "这需要 runner 运行在 Bun 1.3.5 或更新版本上。请更新这台电脑上的 runner。",
+      "terminal_unsupported": "终端只能在 Linux 和 Mac 电脑上运行。"
+    },
     "egress": {
       "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
       "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
@@ -12128,6 +12146,7 @@
       "techAction": "操作",
       "techTool": "工具",
       "techKind": "类型",
+      "techSaid": "返回的内容",
       "techRun": "运行",
       "techId": "记录",
       "openConversation": "打开对话",
@@ -12857,7 +12876,11 @@
         "shell": "会在内部运行其他命令",
         "inline": "会运行内联代码",
         "global": "会为整台电脑安装",
-        "rules": "超出了智能体可自行执行的范围"
+        "rules": "超出了智能体可自行执行的范围",
+        "noAccess": "智能体无权访问此内容",
+        "policy": "此类工作中不允许",
+        "credential": "会发送看起来像密钥的内容",
+        "repo": "该仓库不在智能体的列表中"
       },
       "gave": "已提供",
       "answered": "已回答",
@@ -13134,6 +13157,7 @@
       "machine_task_done": "“{{title}}”已在 {{computer}} 上完成。",
       "machine_task_failed": "“{{title}}”在 {{computer}} 上失败了。",
       "machine_task_canceled": "“{{title}}”已在 {{computer}} 上停止。",
+      "calendar_proposal": "活动提议：{{title}}",
       "machine_task_interrupted": "“{{title}}”在 {{computer}} 上被中断了。",
       "machine_task_doneNoComputer": "“{{title}}”已完成。",
       "machine_task_failedNoComputer": "“{{title}}”失败了。",
@@ -13419,6 +13443,38 @@
     "update_skill_from_source": {
       "label": "从链接更新技能",
       "description": "从安装来源更新技能。脚本的改动要等人处理。"
+    },
+    "propose_remove_agents": {
+      "label": "提议归档或删除智能体",
+      "description": "发布一张列出要归档或删除的智能体的卡片，由有权限的人应用。"
+    },
+    "offer_answers": {
+      "label": "提出可点选答案的问题",
+      "description": "发布一个带有可点选答案的问题，每次点选都是对方自己的一条消息。"
+    },
+    "propose_team": {
+      "label": "提议一个团队",
+      "description": "发布一张包含多个智能体及其频道、例行工作和技能的卡片，由成员创建。"
+    },
+    "propose_settings_change": {
+      "label": "提议同事的设置",
+      "description": "发布一张卡片，包含同事的新模型、AI、预算、负责人、可见范围或频道，由成员应用。"
+    },
+    "offer_approvals": {
+      "label": "显示等待审批的事项",
+      "description": "发布一张卡片，列出等待此人审批的事项，此人可在卡片上逐一批准或拒绝。"
+    },
+    "propose_member_changes": {
+      "label": "提议人员变更",
+      "description": "发布一张卡片，列出要变更的所有者、角色或移除，由有权限的人逐项应用。"
+    },
+    "offer_open_page": {
+      "label": "提议打开一个页面",
+      "description": "发布一张卡片，点击按钮即可打开应用中的页面，例如账单、角色或某个智能体的页面。"
+    },
+    "set_team_week": {
+      "label": "更改团队周报卡片",
+      "description": "停止、重新开始或改期此人私信中每周的团队周报卡片。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

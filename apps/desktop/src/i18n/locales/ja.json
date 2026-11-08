@@ -492,7 +492,47 @@
       "resultOk": "成功",
       "resultFailed": "失敗",
       "resultRefused": "拒否",
-      "resultRunning": "実行中"
+      "resultRunning": "実行中",
+      "said": {
+        "read": "{{path}}を読みました",
+        "wrote": "{{path}}に書き込みました",
+        "looked": "{{path}}を見ました",
+        "sent": "{{path}}を送りました",
+        "thinking": "{{brain}}で考え中",
+        "task": "{{what}}",
+        "taskStarted": "開始: {{what}}",
+        "taskFinished": "完了: {{what}}",
+        "taskCanceled": "キャンセル: {{what}}",
+        "taskInterrupted": "中断: {{what}}",
+        "taskTimedOut": "制限時間で停止: {{what}}",
+        "taskFailed": "失敗 (終了コード {{exit}}): {{what}}",
+        "taskNotStarted": "開始できませんでした: {{what}}",
+        "executor": {
+          "codex": "Codexのタスク",
+          "claude": "Claude Codeのタスク"
+        },
+        "paused": "一時停止中",
+        "pausedUntil": "{{until}}まで一時停止",
+        "resumed": "再開しました",
+        "connected": "{{org}}に接続しました",
+        "disconnected": "接続を解除しました",
+        "disconnectedFrom": "{{org}}との接続を解除しました",
+        "accessAsked": "{{path}}を求めました",
+        "accessNotNow": "今はなし: {{path}}",
+        "accessExpired": "依頼の期限切れ: {{path}}",
+        "toolOn": "{{tool}}をオンにしました",
+        "toolOff": "{{tool}}をオフにしました",
+        "tools": {
+          "commands": "コマンド",
+          "browser": "ブラウザ",
+          "desktop": "エージェントの画面",
+          "terminal": "ターミナル"
+        },
+        "folderAllowed": "{{path}}を{{agents}}に許可しました",
+        "folderAgents": "{{path}}は今後{{agents}}用",
+        "folderRemoved": "{{path}}を削除しました",
+        "noAgent": "エージェントなし"
+      }
     },
     "advanced": {
       "title": "詳細設定",

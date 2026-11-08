@@ -44,6 +44,7 @@
     "today": "Oggi",
     "yesterday": "Ieri",
     "loadFailed": "Impossibile caricare. Controlla la connessione e riprova.",
+    "gone": "Questo non c'è più. È stato eliminato, oppure non hai più accesso.",
     "notAllowed": "Non hai i permessi per farlo.",
     "tooMany": "Troppi tentativi. Riprova più tardi.",
     "offline": "Sei offline. Controlla la connessione e riprova.",
@@ -4967,6 +4968,7 @@
         "too_many_tool_calls": "Ha superato il limite di strumenti per un'esecuzione.",
         "stuck": "Interrotta perché si era bloccata.",
         "brain_interrupted": "L'IA si è fermata prima di finire.",
+        "brain_unavailable": "L'IA del suo computer non è riuscita a rispondere. Controlla il computer e chiedi di nuovo.",
         "empty_reply": "Il modello non ha restituito nulla.",
         "model_refused": "Il modello si è rifiutato di rispondere.",
         "agent_archived": "L'agente è stato archiviato.",
@@ -6154,6 +6156,7 @@
         "done": "Finita",
         "canceled": "Non verrà fatta"
       },
+      "stageFull": "{{stage}} ha già {{max}} colonne, il massimo per una fase. Eliminane una prima.",
       "stageExplain": {
         "todo": "Le nuove attività arrivano nella prima colonna di Da fare.",
         "in_progress": "Quando un agente inizia, l'attività va nella prima colonna di In corso.",
@@ -11959,6 +11962,7 @@
     },
     "issue": {
       "assigneeOutside": "Questa persona non vede questa attività. Aggiungila prima a Chi lo vede.",
+      "stageFull": "Una fase ha al massimo {{max}} colonne. Elimina prima una delle sue colonne.",
       "deleteForbidden": "Solo chi ha creato questa attività o un amministratore può eliminarla.",
       "audienceEmpty": "Scegli chi lo vede."
     },
@@ -12249,6 +12253,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Il browser degli agenti non funziona sul sistema di questo computer.",
+      "browser_download": "Non è stato possibile scaricare il browser degli agenti. Controlla la connessione di questo computer e riproverà al prossimo uso.",
+      "browser_checksum": "Il download del browser degli agenti è arrivato danneggiato, quindi non è stato usato. Riproverà al prossimo uso.",
+      "desktop_use_linux": "Le app sugli schermi degli agenti funzionano sui computer Linux con gli schermi degli agenti.",
+      "desktop_use_own_user": "Le app sugli schermi richiedono che ogni agente lavori con un proprio utente su questo computer (modalità sistema). Qui tutti gli agenti lavorano con l'utente del runner.",
+      "desktop_use_install": "Installa su questo computer ciò che serve alle app sugli schermi:",
+      "desktop_unavailable": "Gli schermi degli agenti non possono funzionare su questo computer.",
+      "desktop_linux": "Gli schermi degli agenti funzionano solo sui computer Linux.",
+      "desktop_install": "Installa su questo computer gli schermi degli agenti:",
+      "not_as_root": "Gli schermi e i terminali degli agenti non funzionano mai come root. Avvia il runner con un utente normale.",
+      "runner_bun_old": "Serve il runner su Bun 1.3.5 o più recente. Aggiorna il runner su questo computer.",
+      "terminal_unsupported": "I terminali funzionano solo sui computer Linux e Mac."
+    },
     "egress": {
       "draining": "La rete sta cambiando. Le sessioni aperte del computer si riavvieranno alle {{when}}.",
       "restart": "Le sessioni del computer si stanno riavviando per applicare la rete. Il nuovo lavoro aspetta che finisca.",
@@ -13001,6 +13019,7 @@
       "techAction": "Azione",
       "techTool": "Strumento",
       "techKind": "Tipo",
+      "techSaid": "Cosa ha risposto",
       "techRun": "Esecuzione",
       "techId": "Registro",
       "openConversation": "Apri conversazione",
@@ -13776,7 +13795,11 @@
         "shell": "Esegue altri comandi al suo interno",
         "inline": "Esegue codice scritto direttamente nel comando",
         "global": "Installa per tutto il computer",
-        "rules": "Fuori da ciò che gli agenti possono fare da soli"
+        "rules": "Fuori da ciò che gli agenti possono fare da soli",
+        "noAccess": "L'agente non ha accesso a questo",
+        "policy": "Non consentito in questo tipo di lavoro",
+        "credential": "Invia qualcosa che sembra una chiave",
+        "repo": "Questo repository non è nell'elenco dell'agente"
       },
       "gave": "dato",
       "answered": "risposto",
@@ -14055,6 +14078,7 @@
       "machine_task_done": "“{{title}}” è terminato su {{computer}}.",
       "machine_task_failed": "“{{title}}” non è riuscito su {{computer}}.",
       "machine_task_canceled": "“{{title}}” è stato fermato su {{computer}}.",
+      "calendar_proposal": "Proposta di evento: {{title}}",
       "machine_task_interrupted": "“{{title}}” è stato interrotto su {{computer}}.",
       "machine_task_doneNoComputer": "“{{title}}” è terminato.",
       "machine_task_failedNoComputer": "“{{title}}” non è riuscito.",
@@ -14346,6 +14370,38 @@
     "update_skill_from_source": {
       "label": "Aggiorna le skill dai loro link",
       "description": "Aggiorna le skill da dove sono state installate. Le modifiche agli script aspettano una persona."
+    },
+    "propose_remove_agents": {
+      "label": "Proponi di archiviare o eliminare agenti",
+      "description": "Pubblica una scheda con gli agenti da archiviare o eliminare. La applica chi ne ha il permesso."
+    },
+    "offer_answers": {
+      "label": "Chiedi con risposte da toccare",
+      "description": "Pubblica una domanda con risposte che la persona tocca. Ogni tocco è un suo messaggio."
+    },
+    "propose_team": {
+      "label": "Proponi un team",
+      "description": "Pubblica una scheda con più agenti, i loro canali, routine e skill. Lo crea una persona."
+    },
+    "propose_settings_change": {
+      "label": "Proponi le impostazioni di un collega",
+      "description": "Pubblica una scheda con il nuovo modello, l'IA, il budget, il responsabile, il pubblico o i canali di un collega. La applica una persona."
+    },
+    "offer_approvals": {
+      "label": "Mostra cosa attende approvazione",
+      "description": "Pubblica una scheda con le approvazioni che attendono la persona, che approva o rifiuta ciascuna lì."
+    },
+    "propose_member_changes": {
+      "label": "Proponi modifiche alle persone",
+      "description": "Pubblica una scheda con proprietari, ruoli o rimozioni da cambiare. Chi ne ha il permesso applica ciascuna."
+    },
+    "offer_open_page": {
+      "label": "Proponi di aprire una schermata",
+      "description": "Pubblica una scheda il cui pulsante apre una schermata dell'app, come fatturazione, ruoli o la pagina di un agente."
+    },
+    "set_team_week": {
+      "label": "Cambia la scheda Settimana del team",
+      "description": "Ferma, riavvia o sposta la scheda settimanale Settimana del team nel messaggio diretto della persona."
     },
     "propose_agent": {
       "label": "Proponi un agente",

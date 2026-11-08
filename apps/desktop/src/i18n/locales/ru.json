@@ -501,7 +501,47 @@
       "resultOk": "Выполнено",
       "resultFailed": "Ошибка",
       "resultRefused": "Отклонено",
-      "resultRunning": "Выполняется"
+      "resultRunning": "Выполняется",
+      "said": {
+        "read": "прочитал {{path}}",
+        "wrote": "записал {{path}}",
+        "looked": "просмотрел {{path}}",
+        "sent": "отправил {{path}}",
+        "thinking": "думает с {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "начата: {{what}}",
+        "taskFinished": "завершена: {{what}}",
+        "taskCanceled": "отменена: {{what}}",
+        "taskInterrupted": "прервана: {{what}}",
+        "taskTimedOut": "остановлена по лимиту времени: {{what}}",
+        "taskFailed": "не удалась (код {{exit}}): {{what}}",
+        "taskNotStarted": "не началась: {{what}}",
+        "executor": {
+          "codex": "задача Codex",
+          "claude": "задача Claude Code"
+        },
+        "paused": "на паузе",
+        "pausedUntil": "на паузе до {{until}}",
+        "resumed": "возобновлено",
+        "connected": "подключено к {{org}}",
+        "disconnected": "отключено",
+        "disconnectedFrom": "отключено от {{org}}",
+        "accessAsked": "запросил {{path}}",
+        "accessNotNow": "не сейчас: {{path}}",
+        "accessExpired": "запрос истёк: {{path}}",
+        "toolOn": "включил {{tool}}",
+        "toolOff": "выключил {{tool}}",
+        "tools": {
+          "commands": "команды",
+          "browser": "браузер агентов",
+          "desktop": "экраны агентов",
+          "terminal": "терминал агентов"
+        },
+        "folderAllowed": "разрешил {{path}} для {{agents}}",
+        "folderAgents": "{{path}} теперь для {{agents}}",
+        "folderRemoved": "удалил {{path}}",
+        "noAgent": "ни одного агента"
+      }
     },
     "advanced": {
       "title": "Дополнительно",

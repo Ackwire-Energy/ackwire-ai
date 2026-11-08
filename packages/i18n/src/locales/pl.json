@@ -44,6 +44,7 @@
     "today": "Dzisiaj",
     "yesterday": "Wczoraj",
     "loadFailed": "Nie udało się tego wczytać. Sprawdź połączenie i spróbuj ponownie.",
+    "gone": "Tego już tu nie ma. Zostało usunięte albo nie masz już dostępu.",
     "notAllowed": "Nie masz do tego uprawnień.",
     "tooMany": "Zbyt wiele prób. Spróbuj później.",
     "offline": "Jesteś offline. Sprawdź połączenie i spróbuj ponownie.",
@@ -5143,6 +5144,7 @@
         "too_many_tool_calls": "Przekroczono limit narzędzi w jednym uruchomieniu.",
         "stuck": "Zatrzymano, bo się zawiesiło.",
         "brain_interrupted": "AI przerwało przed zakończeniem.",
+        "brain_unavailable": "AI na jego komputerze nie mogło odpowiedzieć. Sprawdź komputer i poproś jeszcze raz.",
         "empty_reply": "Model nic nie zwrócił.",
         "model_refused": "Model odmówił odpowiedzi.",
         "agent_archived": "Agent został zarchiwizowany.",
@@ -6341,6 +6343,7 @@
         "done": "Zakończone",
         "canceled": "Nie będzie robione"
       },
+      "stageFull": "{{stage}} ma już {{max}} kolumn, tyle mieści jeden etap. Najpierw usuń tam jedną z nich.",
       "stageExplain": {
         "todo": "Nowe zadania trafiają do pierwszej kolumny etapu Do zrobienia.",
         "in_progress": "Gdy agent zaczyna, zadanie trafia do pierwszej kolumny etapu W toku.",
@@ -12381,6 +12384,7 @@
     },
     "issue": {
       "assigneeOutside": "Ta osoba nie widzi tego zadania. Najpierw dodaj ją do Kto to widzi.",
+      "stageFull": "Etap mieści najwyżej {{max}} kolumn. Najpierw usuń jedną z jego kolumn.",
       "deleteForbidden": "Tylko osoba, która utworzyła to zadanie, lub administrator może je usunąć.",
       "audienceEmpty": "Wybierz, kto to widzi."
     },
@@ -12672,6 +12676,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Przeglądarka agentów nie działa w systemie tego komputera.",
+      "browser_download": "Nie udało się pobrać przeglądarki agentów. Sprawdź połączenie tego komputera, a przy następnym użyciu spróbuje ponownie.",
+      "browser_checksum": "Pobrana przeglądarka agentów była uszkodzona, więc nie została użyta. Przy następnym użyciu spróbuje ponownie.",
+      "desktop_use_linux": "Aplikacje na ekranach agentów działają na komputerach z Linuksem, które mają ekrany agentów.",
+      "desktop_use_own_user": "Aplikacje na ekranach wymagają, by każdy agent pracował na tym komputerze jako własny użytkownik (tryb systemowy). Tutaj wszyscy agenci pracują jako użytkownik runnera.",
+      "desktop_use_install": "Zainstaluj na tym komputerze to, czego potrzebują aplikacje na ekranach:",
+      "desktop_unavailable": "Ekrany agentów nie mogą działać na tym komputerze.",
+      "desktop_linux": "Ekrany agentów działają tylko na komputerach z Linuksem.",
+      "desktop_install": "Zainstaluj na tym komputerze ekrany agentów:",
+      "not_as_root": "Ekrany i terminale agentów nigdy nie działają jako root. Uruchom runnera jako zwykły użytkownik.",
+      "runner_bun_old": "To wymaga runnera na Bun 1.3.5 lub nowszym. Zaktualizuj runnera na tym komputerze.",
+      "terminal_unsupported": "Terminale działają tylko na komputerach z Linuksem i Makach."
+    },
     "egress": {
       "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
       "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
@@ -13439,6 +13457,7 @@
       "techAction": "Akcja",
       "techTool": "Narzędzie",
       "techKind": "Rodzaj",
+      "techSaid": "Co odpowiedziało",
       "techRun": "Uruchomienie",
       "techId": "Wpis",
       "openConversation": "Otwórz rozmowę",
@@ -14237,7 +14256,11 @@
         "shell": "Uruchamia w sobie inne polecenia",
         "inline": "Uruchamia kod podany w linii",
         "global": "Instaluje dla całego komputera",
-        "rules": "Poza tym, co agenci mogą robić samodzielnie"
+        "rules": "Poza tym, co agenci mogą robić samodzielnie",
+        "noAccess": "Agent nie ma do tego dostępu",
+        "policy": "Niedozwolone przy takiej pracy",
+        "credential": "Wysyła coś, co wygląda na klucz",
+        "repo": "Tego repozytorium nie ma na liście agenta"
       },
       "gave": "wejście",
       "answered": "wynik",
@@ -14517,6 +14540,7 @@
       "machine_task_done": "„{{title}}” zakończone na komputerze {{computer}}.",
       "machine_task_failed": "„{{title}}” nie powiodło się na komputerze {{computer}}.",
       "machine_task_canceled": "„{{title}}” zatrzymano na komputerze {{computer}}.",
+      "calendar_proposal": "Propozycja wydarzenia: {{title}}",
       "machine_task_interrupted": "„{{title}}” przerwano na komputerze {{computer}}.",
       "machine_task_doneNoComputer": "„{{title}}” zakończone.",
       "machine_task_failedNoComputer": "„{{title}}” nie powiodło się.",
@@ -14811,6 +14835,38 @@
     "update_skill_from_source": {
       "label": "Aktualizuj umiejętności z ich linków",
       "description": "Aktualizuje umiejętności z miejsca, z którego je zainstalowano. Zmiany w skryptach czekają na osobę."
+    },
+    "propose_remove_agents": {
+      "label": "Zaproponuj archiwizację lub usunięcie agentów",
+      "description": "Publikuje kartę z agentami do zarchiwizowania lub usunięcia. Stosuje ją osoba z uprawnieniami."
+    },
+    "offer_answers": {
+      "label": "Zapytaj z odpowiedziami do stuknięcia",
+      "description": "Publikuje pytanie z odpowiedziami, które dana osoba stuka. Każde stuknięcie to jej własna wiadomość."
+    },
+    "propose_team": {
+      "label": "Zaproponuj zespół",
+      "description": "Publikuje kartę z kilkoma agentami, ich kanałami, rutynami i umiejętnościami. Tworzy go człowiek."
+    },
+    "propose_settings_change": {
+      "label": "Zaproponuj ustawienia współpracownika",
+      "description": "Publikuje kartę z nowym modelem, AI, budżetem, opiekunem, odbiorcami lub kanałami współpracownika. Stosuje ją człowiek."
+    },
+    "offer_approvals": {
+      "label": "Pokaż, co czeka na zatwierdzenie",
+      "description": "Publikuje kartę z zatwierdzeniami, które czekają na tę osobę. Zatwierdza lub odrzuca każde na miejscu."
+    },
+    "propose_member_changes": {
+      "label": "Zaproponuj zmiany dotyczące osób",
+      "description": "Publikuje kartę z właścicielami, rolami lub usunięciami do zmiany. Każdą stosuje osoba z uprawnieniami."
+    },
+    "offer_open_page": {
+      "label": "Zaproponuj otwarcie ekranu",
+      "description": "Publikuje kartę z przyciskiem, który otwiera ekran aplikacji, na przykład płatności, role lub stronę agenta."
+    },
+    "set_team_week": {
+      "label": "Zmień kartę Tydzień zespołu",
+      "description": "Zatrzymuje, wznawia lub przenosi cotygodniową kartę Tydzień zespołu w wiadomości bezpośredniej tej osoby."
     },
     "propose_agent": {
       "label": "Zaproponuj agenta",

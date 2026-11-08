@@ -44,6 +44,7 @@
     "today": "Bugün",
     "yesterday": "Dün",
     "loadFailed": "Bu yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+    "gone": "Bu artık burada değil. Silindi ya da artık erişiminiz yok.",
     "notAllowed": "Bunun için izniniz yok.",
     "tooMany": "Çok fazla deneme yapıldı. Daha sonra tekrar deneyin.",
     "offline": "Çevrimdışısınız. Bağlantınızı kontrol edip tekrar deneyin.",
@@ -4764,6 +4765,7 @@
         "too_many_tool_calls": "Tek bir çalıştırmadaki araç sınırını aştı.",
         "stuck": "Takıldığı için durdu.",
         "brain_interrupted": "Yapay zeka bitirmeden durdu.",
+        "brain_unavailable": "Bilgisayarındaki yapay zeka yanıt veremedi. Bilgisayarı kontrol edip yeniden isteyin.",
         "empty_reply": "Model hiçbir şey döndürmedi.",
         "model_refused": "Model yanıt vermeyi reddetti.",
         "agent_archived": "Ajan arşivlendi.",
@@ -5897,6 +5899,7 @@
         "done": "Bitti",
         "canceled": "Yapılmayacak"
       },
+      "stageFull": "{{stage}} zaten {{max}} sütuna sahip, bir aşamanın alabileceği en fazla bu. Önce oradan birini silin.",
       "stageExplain": {
         "todo": "Yeni görevler Yapılacak aşamasının ilk sütununa gelir.",
         "in_progress": "Bir ajan başladığında görev Devam ediyor aşamasının ilk sütununa geçer.",
@@ -11457,6 +11460,7 @@
     },
     "issue": {
       "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
+      "stageFull": "Bir aşama en fazla {{max}} sütun alır. Önce sütunlarından birini silin.",
       "deleteForbidden": "Bu görevi yalnızca oluşturan kişi veya bir yönetici silebilir.",
       "audienceEmpty": "Kimlerin göreceğini seçin."
     },
@@ -11746,6 +11750,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Ajanların tarayıcısı bu bilgisayarın sisteminde çalışmıyor.",
+      "browser_download": "Ajanların tarayıcısı indirilemedi. Bu bilgisayarın bağlantısını kontrol edin, bir sonraki kullanımda yeniden denenir.",
+      "browser_checksum": "Ajanların tarayıcısının indirmesi bozuk geldi, bu yüzden kullanılmadı. Bir sonraki kullanımda yeniden denenir.",
+      "desktop_use_linux": "Ajanların ekranlarındaki uygulamalar, ajan ekranları olan Linux bilgisayarlarda çalışır.",
+      "desktop_use_own_user": "Ajanların ekranlarındaki uygulamalar için her ajanın bu bilgisayarda kendi kullanıcısıyla çalışması gerekir (sistem modu). Burada tüm ajanlar runner kullanıcısıyla çalışıyor.",
+      "desktop_use_install": "Ajanların ekranlarındaki uygulamaların ihtiyaç duyduklarını bu bilgisayara kurun:",
+      "desktop_unavailable": "Ajanların ekranları bu bilgisayarda çalışamaz.",
+      "desktop_linux": "Ajanların ekranları yalnızca Linux bilgisayarlarda çalışır.",
+      "desktop_install": "Ajanların ekranlarını bu bilgisayara kurun:",
+      "not_as_root": "Ajanların ekranları ve terminalleri asla root olarak çalışmaz. Runner'ı normal bir kullanıcıyla çalıştırın.",
+      "runner_bun_old": "Bunun için runner'ın Bun 1.3.5 veya daha yeni sürümde çalışması gerekir. Bu bilgisayardaki runner'ı güncelleyin.",
+      "terminal_unsupported": "Terminaller yalnızca Linux ve Mac bilgisayarlarda çalışır."
+    },
     "egress": {
       "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
       "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
@@ -12484,6 +12502,7 @@
       "techAction": "İşlem",
       "techTool": "Araç",
       "techKind": "Tür",
+      "techSaid": "Verdiği yanıt",
       "techRun": "Çalıştırma",
       "techId": "Kayıt",
       "openConversation": "Sohbeti aç",
@@ -13225,7 +13244,11 @@
         "shell": "İçinde başka komutlar çalıştırıyor",
         "inline": "Satır içinde verilen kodu çalıştırıyor",
         "global": "Tüm bilgisayara kurulum yapıyor",
-        "rules": "Ajanların kendi başına yapabileceklerinin dışında"
+        "rules": "Ajanların kendi başına yapabileceklerinin dışında",
+        "noAccess": "Ajanın buna erişimi yok",
+        "policy": "Bu tür işlerde izin verilmiyor",
+        "credential": "Anahtara benzeyen bir şey gönderiyor",
+        "repo": "Bu depo ajanın listesinde değil"
       },
       "gave": "verildi",
       "answered": "yanıtlandı",
@@ -13502,6 +13525,7 @@
       "machine_task_done": "“{{title}}”, {{computer}} üzerinde bitti.",
       "machine_task_failed": "“{{title}}”, {{computer}} üzerinde başarısız oldu.",
       "machine_task_canceled": "“{{title}}”, {{computer}} üzerinde durduruldu.",
+      "calendar_proposal": "Etkinlik önerisi: {{title}}",
       "machine_task_interrupted": "“{{title}}”, {{computer}} üzerinde kesildi.",
       "machine_task_doneNoComputer": "“{{title}}” bitti.",
       "machine_task_failedNoComputer": "“{{title}}” başarısız oldu.",
@@ -13790,6 +13814,38 @@
     "update_skill_from_source": {
       "label": "Becerileri bağlantılarından güncelle",
       "description": "Becerileri yüklendikleri yerden günceller. Betik değişiklikleri bir kişiyi bekler."
+    },
+    "propose_remove_agents": {
+      "label": "Ajanları arşivlemeyi veya silmeyi öner",
+      "description": "Arşivlenecek veya silinecek ajanları listeleyen bir kart paylaşır. Yetkili bir kişi uygular."
+    },
+    "offer_answers": {
+      "label": "Dokunularak yanıtlanacak bir soru sor",
+      "description": "Kişinin dokunarak yanıtlayacağı bir soru paylaşır. Her dokunuş kendi mesajı olur."
+    },
+    "propose_team": {
+      "label": "Bir ekip öner",
+      "description": "Birkaç ajanı, kanallarını, rutinlerini ve becerilerini içeren bir kart paylaşır. Bir kişi oluşturur."
+    },
+    "propose_settings_change": {
+      "label": "Bir ekip arkadaşının ayarlarını öner",
+      "description": "Bir ekip arkadaşının yeni modelini, yapay zekasını, bütçesini, sorumlusunu, kitlesini veya kanallarını içeren bir kart paylaşır. Bir kişi uygular."
+    },
+    "offer_approvals": {
+      "label": "Onay bekleyenleri göster",
+      "description": "Kişinin onayını bekleyenleri tek bir kartta paylaşır. Kişi her birini orada onaylar veya reddeder."
+    },
+    "propose_member_changes": {
+      "label": "Kişilerde değişiklik öner",
+      "description": "Değiştirilecek sahipleri, rolleri veya çıkarmaları içeren bir kart paylaşır. Yetkili bir kişi her birini uygular."
+    },
+    "offer_open_page": {
+      "label": "Bir ekran açmayı öner",
+      "description": "Düğmesi faturalandırma, roller veya bir ajanın sayfası gibi uygulamanın bir ekranını açan bir kart paylaşır."
+    },
+    "set_team_week": {
+      "label": "Ekibin haftası kartını değiştir",
+      "description": "Kişinin doğrudan mesajındaki haftalık Ekibin haftası kartını durdurur, yeniden başlatır veya zamanını değiştirir."
     },
     "propose_agent": {
       "label": "Ajan öner",

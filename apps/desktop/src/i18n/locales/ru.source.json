@@ -1322,6 +1322,108 @@
   "prefs.activity.resultRunning": {
     "value": "Running"
   },
+  "prefs.activity.said.read": {
+    "value": "read {{path}}"
+  },
+  "prefs.activity.said.wrote": {
+    "value": "wrote {{path}}"
+  },
+  "prefs.activity.said.looked": {
+    "value": "looked at {{path}}"
+  },
+  "prefs.activity.said.sent": {
+    "value": "sent {{path}}"
+  },
+  "prefs.activity.said.thinking": {
+    "value": "thinking with {{brain}}"
+  },
+  "prefs.activity.said.task": {
+    "value": "{{what}}"
+  },
+  "prefs.activity.said.taskStarted": {
+    "value": "started: {{what}}"
+  },
+  "prefs.activity.said.taskFinished": {
+    "value": "finished: {{what}}"
+  },
+  "prefs.activity.said.taskCanceled": {
+    "value": "canceled: {{what}}"
+  },
+  "prefs.activity.said.taskInterrupted": {
+    "value": "interrupted: {{what}}"
+  },
+  "prefs.activity.said.taskTimedOut": {
+    "value": "stopped at its time limit: {{what}}"
+  },
+  "prefs.activity.said.taskFailed": {
+    "value": "failed (exit {{exit}}): {{what}}"
+  },
+  "prefs.activity.said.taskNotStarted": {
+    "value": "didn't start: {{what}}"
+  },
+  "prefs.activity.said.executor.codex": {
+    "value": "Codex task"
+  },
+  "prefs.activity.said.executor.claude": {
+    "value": "Claude Code task"
+  },
+  "prefs.activity.said.paused": {
+    "value": "paused"
+  },
+  "prefs.activity.said.pausedUntil": {
+    "value": "paused until {{until}}"
+  },
+  "prefs.activity.said.resumed": {
+    "value": "resumed"
+  },
+  "prefs.activity.said.connected": {
+    "value": "connected to {{org}}"
+  },
+  "prefs.activity.said.disconnected": {
+    "value": "disconnected"
+  },
+  "prefs.activity.said.disconnectedFrom": {
+    "value": "disconnected from {{org}}"
+  },
+  "prefs.activity.said.accessAsked": {
+    "value": "asked for {{path}}"
+  },
+  "prefs.activity.said.accessNotNow": {
+    "value": "not now: {{path}}"
+  },
+  "prefs.activity.said.accessExpired": {
+    "value": "request expired: {{path}}"
+  },
+  "prefs.activity.said.toolOn": {
+    "value": "turned on {{tool}}"
+  },
+  "prefs.activity.said.toolOff": {
+    "value": "turned off {{tool}}"
+  },
+  "prefs.activity.said.tools.commands": {
+    "value": "commands"
+  },
+  "prefs.activity.said.tools.browser": {
+    "value": "the browser"
+  },
+  "prefs.activity.said.tools.desktop": {
+    "value": "the agents' desktops"
+  },
+  "prefs.activity.said.tools.terminal": {
+    "value": "the terminal"
+  },
+  "prefs.activity.said.folderAllowed": {
+    "value": "allowed {{path}} for {{agents}}"
+  },
+  "prefs.activity.said.folderAgents": {
+    "value": "{{path}} now for {{agents}}"
+  },
+  "prefs.activity.said.folderRemoved": {
+    "value": "removed {{path}}"
+  },
+  "prefs.activity.said.noAgent": {
+    "value": "no agent"
+  },
   "prefs.advanced.title": {
     "value": "Advanced"
   },

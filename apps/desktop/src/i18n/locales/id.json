@@ -492,7 +492,47 @@
       "resultOk": "Berhasil",
       "resultFailed": "Gagal",
       "resultRefused": "Ditolak",
-      "resultRunning": "Berjalan"
+      "resultRunning": "Berjalan",
+      "said": {
+        "read": "membaca {{path}}",
+        "wrote": "menulis {{path}}",
+        "looked": "melihat {{path}}",
+        "sent": "mengirim {{path}}",
+        "thinking": "berpikir dengan {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "dimulai: {{what}}",
+        "taskFinished": "selesai: {{what}}",
+        "taskCanceled": "dibatalkan: {{what}}",
+        "taskInterrupted": "terputus: {{what}}",
+        "taskTimedOut": "berhenti di batas waktunya: {{what}}",
+        "taskFailed": "gagal (keluar {{exit}}): {{what}}",
+        "taskNotStarted": "tidak dimulai: {{what}}",
+        "executor": {
+          "codex": "tugas Codex",
+          "claude": "tugas Claude Code"
+        },
+        "paused": "dijeda",
+        "pausedUntil": "dijeda sampai {{until}}",
+        "resumed": "dilanjutkan",
+        "connected": "terhubung ke {{org}}",
+        "disconnected": "terputus",
+        "disconnectedFrom": "terputus dari {{org}}",
+        "accessAsked": "meminta {{path}}",
+        "accessNotNow": "jangan sekarang: {{path}}",
+        "accessExpired": "permintaan kedaluwarsa: {{path}}",
+        "toolOn": "menyalakan {{tool}}",
+        "toolOff": "mematikan {{tool}}",
+        "tools": {
+          "commands": "perintah",
+          "browser": "browser agen",
+          "desktop": "layar agen",
+          "terminal": "fitur terminal"
+        },
+        "folderAllowed": "mengizinkan {{path}} untuk {{agents}}",
+        "folderAgents": "{{path}} sekarang untuk {{agents}}",
+        "folderRemoved": "menghapus {{path}}",
+        "noAgent": "tidak ada agen"
+      }
     },
     "advanced": {
       "title": "Lanjutan",

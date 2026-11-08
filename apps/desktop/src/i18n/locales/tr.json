@@ -495,7 +495,47 @@
       "resultOk": "Başarılı",
       "resultFailed": "Başarısız",
       "resultRefused": "Reddedildi",
-      "resultRunning": "Çalışıyor"
+      "resultRunning": "Çalışıyor",
+      "said": {
+        "read": "{{path}} okudu",
+        "wrote": "{{path}} yazdı",
+        "looked": "{{path}} inceledi",
+        "sent": "{{path}} gönderdi",
+        "thinking": "{{brain}} ile düşünüyor",
+        "task": "{{what}}",
+        "taskStarted": "başladı: {{what}}",
+        "taskFinished": "bitti: {{what}}",
+        "taskCanceled": "iptal edildi: {{what}}",
+        "taskInterrupted": "kesildi: {{what}}",
+        "taskTimedOut": "süre sınırında durdu: {{what}}",
+        "taskFailed": "başarısız (çıkış {{exit}}): {{what}}",
+        "taskNotStarted": "başlamadı: {{what}}",
+        "executor": {
+          "codex": "Codex görevi",
+          "claude": "Claude Code görevi"
+        },
+        "paused": "duraklatıldı",
+        "pausedUntil": "{{until}} saatine kadar duraklatıldı",
+        "resumed": "devam etti",
+        "connected": "{{org}} ile bağlandı",
+        "disconnected": "bağlantı kesildi",
+        "disconnectedFrom": "{{org}} ile bağlantı kesildi",
+        "accessAsked": "{{path}} istedi",
+        "accessNotNow": "şimdi değil: {{path}}",
+        "accessExpired": "istek süresi doldu: {{path}}",
+        "toolOn": "{{tool}} açtı",
+        "toolOff": "{{tool}} kapattı",
+        "tools": {
+          "commands": "komutlar",
+          "browser": "ajan tarayıcısı",
+          "desktop": "ajanların ekranları",
+          "terminal": "terminal özelliği"
+        },
+        "folderAllowed": "{{path}} için {{agents}} izni verdi",
+        "folderAgents": "{{path}} artık {{agents}} için",
+        "folderRemoved": "{{path}} kaldırdı",
+        "noAgent": "ajan yok"
+      }
     },
     "advanced": {
       "title": "Gelişmiş",
