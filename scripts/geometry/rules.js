@@ -1595,7 +1595,7 @@
         const walk = (node) => {
           for (const n of node.childNodes) {
             if (n.nodeType === 3) {
-              const rects = n.textContent.trim() && seen(n.parentElement) ? textRects(n) : [];
+              const rects = n.textContent.trim() && seen(layoutParent(n)) ? textRects(n) : [];
               if (!rects.length) continue;
               // Its lines' box: their words' box and half the leading, or the box they lay out in when it fits them
               // (a cell's padding is the row's room; a box stretched past its lines isn't).
@@ -1619,7 +1619,14 @@
               add(caps ? caps.top : lines.top, lines.bottom);
               continue;
             }
-            if (n.nodeType !== 1 || !seen(n) || ["absolute", "fixed"].includes(style(n).position)) continue;
+            if (n.nodeType !== 1) continue;
+            // A `display: contents` box has no box of its own: its children lay out in the row (a settings line's
+            // name and status in its phone grid).
+            if (style(n).display === "contents") {
+              walk(n);
+              continue;
+            }
+            if (!seen(n) || ["absolute", "fixed"].includes(style(n).position)) continue;
             // An ⓘ in a line of words counts by its glyph: its 24px target has no plate to see.
             if (n.matches(".ac-hint")) {
               walk(n);
