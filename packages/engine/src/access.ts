@@ -129,6 +129,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   remember: { label: "Remember", description: "Saves a note when someone asks." },
   update_memory: { label: "Update memory", description: "Corrects a saved note." },
   forget: { label: "Forget", description: "Archives a note when someone asks." },
+  save_how_to: {
+    label: "Save how-to",
+    description: "Saves how it did something that took figuring out, to reuse next time.",
+  },
   propose_instruction_change: {
     label: "Propose an instruction change",
     description:
@@ -152,6 +156,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   propose_event: { label: "Propose event", description: "Suggests an event. The person who asked confirms." },
   load_skill: { label: "Load skill", description: "Loads a skill's instructions." },
   read_skill_file: { label: "Read skill file", description: "Reads a reference file of a skill." },
+  update_skill: { label: "Fix skill", description: "Fixes a skill it loaded. A person's skill becomes a proposal." },
   offer_install_skill: {
     label: "Offer to install a skill",
     description: "Posts a card whose button opens the install dialog with the skill's link filled in.",
@@ -225,7 +230,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   },
   offer_answers: {
     label: "Ask with answers to tap",
-    description: "Posts a question with answers the person taps; each tap is their own message.",
+    description: "Posts a question with answers the person taps. Each tap is their own message.",
   },
   propose_team: {
     label: "Propose a team",
@@ -235,6 +240,22 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Propose a teammate's settings",
     description:
       "Posts a card with a teammate's new model, AI, budget, owner, audience or channels. A person applies it.",
+  },
+  offer_approvals: {
+    label: "Show what waits for approval",
+    description: "Posts one card with the approvals waiting for the person, who approves or refuses each there.",
+  },
+  propose_member_changes: {
+    label: "Propose changes to people",
+    description: "Posts one card with owners, roles or removals to change. A person who may applies each one.",
+  },
+  offer_open_page: {
+    label: "Offer to open a screen",
+    description: "Posts a card whose button opens a screen of the app, such as billing, roles or an agent's page.",
+  },
+  set_team_week: {
+    label: "Change the Team week card",
+    description: "Stops, starts again or moves the weekly Team week card in the person's DM.",
   },
   run_code: { label: "Run code", description: "Runs Python, Node or bash on the agent's computer." },
   write_file: { label: "Write to environment", description: "Writes a file in the code environment." },

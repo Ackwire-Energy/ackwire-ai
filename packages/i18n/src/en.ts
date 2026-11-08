@@ -13599,6 +13599,39 @@ export const en = {
       label: "Update skills from their links",
       description: "Updates skills from where they were installed. Changes to scripts wait for a person.",
     },
+    propose_remove_agents: {
+      label: "Propose archiving or deleting agents",
+      description: "Posts one card listing the agents to archive or delete. A person who may applies it.",
+    },
+    offer_answers: {
+      label: "Ask with answers to tap",
+      description: "Posts a question with answers the person taps. Each tap is their own message.",
+    },
+    propose_team: {
+      label: "Propose a team",
+      description: "Posts one card with several agents, their channels, routines and skills. A person creates it.",
+    },
+    propose_settings_change: {
+      label: "Propose a teammate's settings",
+      description:
+        "Posts a card with a teammate's new model, AI, budget, owner, audience or channels. A person applies it.",
+    },
+    offer_approvals: {
+      label: "Show what waits for approval",
+      description: "Posts one card with the approvals waiting for the person, who approves or refuses each there.",
+    },
+    propose_member_changes: {
+      label: "Propose changes to people",
+      description: "Posts one card with owners, roles or removals to change. A person who may applies each one.",
+    },
+    offer_open_page: {
+      label: "Offer to open a screen",
+      description: "Posts a card whose button opens a screen of the app, such as billing, roles or an agent's page.",
+    },
+    set_team_week: {
+      label: "Change the Team week card",
+      description: "Stops, starts again or moves the weekly Team week card in the person's DM.",
+    },
     propose_agent: {
       label: "Propose an agent",
       description: "Posts a card with a new agent to review. A person creates it.",

@@ -13715,6 +13715,39 @@ export const ptBR = {
       label: "Atualizar skills dos links",
       description: "Atualiza skills de onde foram instaladas. Mudanças em scripts esperam uma pessoa.",
     },
+    propose_remove_agents: {
+      label: "Propor arquivar ou excluir agentes",
+      description: "Posta um card com os agentes a arquivar ou excluir. Quem pode aplica.",
+    },
+    offer_answers: {
+      label: "Perguntar com respostas para tocar",
+      description: "Posta uma pergunta com respostas que a pessoa toca. Cada toque vira uma mensagem dela.",
+    },
+    propose_team: {
+      label: "Propor um time",
+      description: "Posta um card com vários agentes, seus canais, rotinas e skills. Uma pessoa cria.",
+    },
+    propose_settings_change: {
+      label: "Propor ajustes de um colega",
+      description:
+        "Posta um card com novo modelo, IA, orçamento, dono, público ou canais de um colega. Uma pessoa aplica.",
+    },
+    offer_approvals: {
+      label: "Mostrar o que espera aprovação",
+      description: "Posta um card com as aprovações que esperam a pessoa, que aprova ou recusa cada uma ali.",
+    },
+    propose_member_changes: {
+      label: "Propor mudanças nas pessoas",
+      description: "Posta um card com donos, papéis ou remoções a mudar. Quem pode aplica cada uma.",
+    },
+    offer_open_page: {
+      label: "Oferecer abrir uma tela",
+      description: "Posta um card cujo botão abre uma tela do app, como cobrança, papéis ou a página de um agente.",
+    },
+    set_team_week: {
+      label: "Mudar o card da Semana da equipe",
+      description: "Para, retoma ou muda o dia do card semanal da equipe na DM da pessoa.",
+    },
     propose_agent: {
       label: "Propor um agente",
       description: "Posta um card com um novo agente para revisar. Uma pessoa cria.",
