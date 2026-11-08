@@ -8517,7 +8517,6 @@ html:not([data-pointer]) .onb__step:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  --card-pad: 18px;
 }
 .newag__sect {
   display: flex;
@@ -9947,11 +9946,12 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
 /* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches into the padding
    as far as `--action-clear` lets it. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
 .agp-card.ac-card {
+  --agp-card-py: 12px;
   gap: 12px;
-  padding-block: 12px;
+  padding-block: var(--agp-card-py);
 }
 .agp-card > .ac-card__head:first-child:has(.ac-card__action .ac-btn) {
-  margin-block: calc(var(--action-clear) - var(--row-py)) -2px;
+  margin-block: calc(var(--action-clear) - var(--agp-card-py)) -2px;
 }
 .agp-card > .ac-card__foot {
   margin-bottom: -12px;

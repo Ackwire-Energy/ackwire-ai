@@ -346,9 +346,6 @@
   .agp-run__r {
     grid-row: 1;
   }
-  .agp-card.ac-card {
-    --card-pad: 16px;
-  }
   .agp-savebar {
     bottom: 10px;
     width: 100%;
@@ -457,9 +454,6 @@
   }
   .agp-run__r {
     grid-row: 1;
-  }
-  .agp-card.ac-card {
-    --card-pad: 16px;
   }
   .agp-savebar {
     bottom: 10px;

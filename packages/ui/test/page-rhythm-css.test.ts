@@ -57,3 +57,14 @@ describe("one page top and side", () => {
     expect(body(".ac-pagehead__actions")).toContain("min-height: var(--control-h-md);");
   });
 });
+
+describe("cards and rows", () => {
+  test("a card is 16 inside, a list row 8 above and below (12 under a finger)", () => {
+    const tokens = readFileSync(new URL("../src/styles/tokens.css", import.meta.url).pathname, "utf8");
+    expect(tokens).toContain("--row-py: var(--space-2);");
+    expect(body(":root", media("(pointer: coarse)"))).toContain("--row-py: var(--space-3);");
+    expect(body(".ac-card")).toContain("--card-pad: var(--space-4);");
+    expect(body(".ac-card__foot")).toContain("padding: var(--row-py) var(--card-pad, 16px);");
+    expect(body(".ac-list__row")).toContain("padding: var(--row-py) var(--space-4);");
+  });
+});

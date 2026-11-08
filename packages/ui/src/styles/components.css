@@ -2981,7 +2981,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex-direction: column;
   gap: var(--space-3);
   /* Read by the foot to reach the card's edges; pages that change the padding set this instead. */
-  --card-pad: 20px;
+  --card-pad: var(--space-4);
   padding: var(--card-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -3011,7 +3011,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px 16px;
+  padding: var(--row-py) var(--space-4);
   color: var(--ink);
   text-decoration: none;
 }
@@ -5605,8 +5605,8 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
    lead. */
 .ac-card__foot {
   /* A quiet line under a hairline, edge to edge of the card (no gray well). */
-  margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
-  padding: var(--row-py) var(--card-pad, 20px);
+  margin: 0 calc(0px - var(--card-pad, 16px)) calc(0px - var(--card-pad, 16px));
+  padding: var(--row-py) var(--card-pad, 16px);
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12.5px;
@@ -9478,6 +9478,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   :root {
     --menu-item-h: 40px;
     --option-h: 44px;
+    --row-py: var(--space-3);
   }
   .ac-menu__reaction {
     width: 40px;

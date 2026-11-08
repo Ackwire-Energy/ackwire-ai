@@ -172,9 +172,9 @@ test("a button inside a field is as far from its end as from its top and bottom,
 test("every hairline between a card's rows, and over its foot, has one step of room on each side", async () => {
   const kit = topLevel(await read(join(UI, "components.css")));
   const tokens = topLevel(await read(join(UI, "tokens.css")));
-  expect(last(tokens, ":root", "--row-py")).toBe("var(--space-3)");
+  expect(last(tokens, ":root", "--row-py")).toBe("var(--space-2)");
   expect(last(kit, ".ac-card", "gap")).toBe("var(--space-3)");
-  expect(last(kit, ".ac-card__foot", "padding")).toBe("var(--row-py) var(--card-pad, 20px)");
+  expect(last(kit, ".ac-card__foot", "padding")).toBe("var(--row-py) var(--card-pad, 16px)");
   const layout = topLevel(await read(join(SRC, "layout.css")));
   expect(last(layout, ".settings-row", "padding")).toBe("var(--row-py) var(--card-pad)");
   expect(last(layout, ".voice-engine__body", "padding")).toBe("var(--row-py) var(--card-pad)");
