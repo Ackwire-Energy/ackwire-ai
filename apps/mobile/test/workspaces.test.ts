@@ -9,6 +9,7 @@ import {
   serverAfter,
   serverListFrom,
   serverSlug,
+  serverToReturn,
   sessionPrefix,
   withoutServer,
   withServer,
@@ -46,6 +47,15 @@ describe("a session per server", () => {
     expect(serverAfter([box, cloud], box)).toBe(cloud);
     expect(serverAfter([box], box)).toBeNull();
     expect(serverAfter([], box)).toBeNull();
+    // The sign-in of a server just added goes back where the app came from, still signed in there.
+    const team = "https://agentes.outra-equipe.com.br";
+    expect(serverToReturn([cloud, box], team, box)).toBe(box);
+    // Came from somewhere signed out since (or nowhere): any other signed in to.
+    expect(serverToReturn([cloud], team, box)).toBe(cloud);
+    expect(serverToReturn([cloud], team, null)).toBe(cloud);
+    // A first sign-in has nowhere to go back.
+    expect(serverToReturn([], team, box)).toBeNull();
+    expect(serverToReturn([team], team, team)).toBeNull();
   });
 });
 

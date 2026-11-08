@@ -96,3 +96,10 @@ export function pushPlace(
 /** The server to open after leaving one (pure): the next one still signed in, or none. */
 export const serverAfter = (signedIn: readonly string[], leaving: string): string | null =>
   signedIn.find((s) => s !== leaving) ?? null;
+
+/**
+ * Where "back" goes from the sign-in of a server added while signed in elsewhere: the server the app came from, when
+ * still signed in there, else any other signed in to; null when there's none (a first sign-in has nowhere to go back).
+ */
+export const serverToReturn = (signedIn: readonly string[], current: string, came: string | null): string | null =>
+  came && came !== current && signedIn.includes(came) ? came : serverAfter(signedIn, current);

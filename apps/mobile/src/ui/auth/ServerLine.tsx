@@ -1,8 +1,7 @@
 import { serverHost } from "@agenteschat/client/lib/server";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { setServer, useServer, useSignedInServers } from "@/lib/server";
-import { serverAfter } from "@/lib/server-choice";
+import { setServer, useServer, useServerToReturn } from "@/lib/server";
 import { AuthLink } from "./AuthLink";
 
 /**
@@ -12,7 +11,7 @@ import { AuthLink } from "./AuthLink";
 export function ServerLine() {
   const { t } = useTranslation();
   const server = useServer();
-  const back = serverAfter(useSignedInServers(), server);
+  const back = useServerToReturn();
   return (
     <>
       <AuthLink

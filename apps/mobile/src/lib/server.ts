@@ -4,6 +4,7 @@ import {
   currentServer,
   prefixesFrom,
   savedServer,
+  serverToReturn,
   serverListFrom,
   serverSlug,
   sessionPrefix,
@@ -40,8 +41,12 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** The server the app was on before the last change: where the sign-in of a newly added one goes back to. */
+let came: string | null = null;
+
 /** Points the app at `next`. Every server stays signed in (ADR 0154): its session waits under its own prefix. */
 export async function setServer(next: string) {
+  if (next !== server) came = server;
   server = next;
   await writeValue(SERVER, savedServer(next, API_URL));
   for (const listener of listeners) listener();
@@ -95,3 +100,11 @@ export const markSignedIn = (target: string) => saveSignedIn(withServer(signedIn
 
 /** Signed out of `target`: off the list. */
 export const markSignedOut = (target: string) => saveSignedIn(withoutServer(signedIn, target));
+
+/**
+ * Where the sign-in screen's back and "Voltar para …" go: the server the app came from while still signed in there,
+ * else another one signed in to; null on a first sign-in.
+ */
+export function useServerToReturn() {
+  return serverToReturn(useSignedInServers(), useServer(), came);
+}
