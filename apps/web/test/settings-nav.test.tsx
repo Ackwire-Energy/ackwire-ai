@@ -141,6 +141,19 @@ describe("finding the settings", () => {
     expect(screen().getByText("Copyright © 2026 Codari Global, LLC e colaboradores")).toBeTruthy();
   });
 
+  test("a section the person's role doesn't open says so where it lands, never silently on Sua conta", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go("settings/skills", state);
+    expect(screen().getByText(/não abre com o seu papel/).textContent).toBe(
+      "Skills não abre com o seu papel neste workspace. Quem gerencia os papéis pode liberar para você.",
+    );
+    cleanup();
+    // Opened from its own nav, the section says nothing more.
+    await go("settings/account", state);
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
+  });
+
   test("an unknown section goes back to Geral", async () => {
     const { router } = await go("settings/nada");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings`);

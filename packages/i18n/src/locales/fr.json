@@ -12997,6 +12997,7 @@
     }
   },
   "settings": {
+    "notOpen": "Votre rôle dans cet espace de travail n'ouvre pas {{section}}. Les personnes qui gèrent les rôles peuvent vous l'ouvrir.",
     "nav": "Sections des paramètres",
     "group": {
       "you": "Vous",

@@ -12929,6 +12929,7 @@
     }
   },
   "settings": {
+    "notOpen": "Tu rol en este espacio de trabajo no abre {{section}}. Quien administra los roles puede habilitarlo para ti.",
     "nav": "Secciones de la configuración",
     "group": {
       "you": "Tú",

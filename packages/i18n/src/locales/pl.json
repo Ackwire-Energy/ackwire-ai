@@ -13445,6 +13445,7 @@
     }
   },
   "settings": {
+    "notOpen": "Twoja rola w tej przestrzeni roboczej nie otwiera sekcji {{section}}. Osoba zarządzająca rolami może ją dla ciebie otworzyć.",
     "nav": "Sekcje ustawień",
     "group": {
       "you": "Ty",

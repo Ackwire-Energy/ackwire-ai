@@ -12127,6 +12127,7 @@
     }
   },
   "settings": {
+    "notOpen": "Peranmu di ruang kerja ini tidak membuka {{section}}. Orang yang mengelola peran bisa membukanya untukmu.",
     "nav": "Bagian pengaturan",
     "group": {
       "you": "Kamu",

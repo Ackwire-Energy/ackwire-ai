@@ -30465,6 +30465,9 @@
   "audit.panel.copied": {
     "value": "Record copied"
   },
+  "settings.notOpen": {
+    "value": "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you."
+  },
   "settings.nav": {
     "value": "Settings sections"
   },

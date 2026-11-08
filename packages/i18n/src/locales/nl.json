@@ -12615,6 +12615,7 @@
     }
   },
   "settings": {
+    "notOpen": "Je rol in deze werkruimte opent {{section}} niet. Wie de rollen beheert, kan het voor je openzetten.",
     "nav": "Onderdelen van de instellingen",
     "group": {
       "you": "Jij",

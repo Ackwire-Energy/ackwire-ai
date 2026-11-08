@@ -12246,6 +12246,7 @@ export const en = {
     },
   },
   settings: {
+    notOpen: "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you.",
     nav: "Settings sections",
     group: {
       you: "You",

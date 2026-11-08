@@ -12344,6 +12344,7 @@ export const ptBR = {
     },
   },
   settings: {
+    notOpen: "{{section}} não abre com o seu papel neste workspace. Quem gerencia os papéis pode liberar para você.",
     nav: "Seções das configurações",
     group: {
       you: "Você",

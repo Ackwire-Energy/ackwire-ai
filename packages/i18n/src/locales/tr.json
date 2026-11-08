@@ -12490,6 +12490,7 @@
     }
   },
   "settings": {
+    "notOpen": "Bu çalışma alanındaki rolünüz {{section}} bölümünü açmıyor. Rolleri yöneten kişi sizin için açabilir.",
     "nav": "Ayarlar bölümleri",
     "group": {
       "you": "Siz",

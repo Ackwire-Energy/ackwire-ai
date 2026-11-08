@@ -40,6 +40,7 @@ import {
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
+  Alert,
   Button,
   Card,
   CardHeader,
@@ -147,8 +148,10 @@ export function SettingsPage({
   const { org } = useOrg();
   const server = useAuthConfig().data;
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
-  // A section this person can't open (a member's link to Geral): their first one, their account.
+  // A section this person can't open (a member's link to Geral): their first one, their account, saying why. Billing
+  // where no billing service runs isn't about their role.
   const current = visible.some((s) => s.id === section) ? section : (visible[0]?.id ?? "account");
+  const refused = current !== section && !(section === "billing" && !server?.billingUrl);
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
   const strip = useRef<HTMLDivElement>(null);
@@ -205,6 +208,7 @@ export function SettingsPage({
         </div>
       </nav>
       <div className="settings__body" data-scroll-restoration-id="settings-section">
+        {refused && <Alert tone="neutral">{t("settings.notOpen", { section: sectionName(section) })}</Alert>}
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
           <PageHeader
             level={2}

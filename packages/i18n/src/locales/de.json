@@ -12554,6 +12554,7 @@
     }
   },
   "settings": {
+    "notOpen": "Deine Rolle in diesem Workspace öffnet {{section}} nicht. Wer die Rollen verwaltet, kann es für dich freigeben.",
     "nav": "Bereiche der Einstellungen",
     "group": {
       "you": "Du",

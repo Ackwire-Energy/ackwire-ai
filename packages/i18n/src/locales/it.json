@@ -13007,6 +13007,7 @@
     }
   },
   "settings": {
+    "notOpen": "Il tuo ruolo in questo spazio di lavoro non apre {{section}}. Chi gestisce i ruoli può aprirlo per te.",
     "nav": "Sezioni delle impostazioni",
     "group": {
       "you": "Tu",
