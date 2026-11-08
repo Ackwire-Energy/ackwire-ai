@@ -294,9 +294,9 @@ describe("the collapsed sidebar", () => {
   test("its scrollbar shows only while the pointer is on the list or the keyboard moves through it", async () => {
     const layout = topLevel(await read("apps/web/src/layout.css"));
     // Through the token: Chrome repaints a scrollbar on a change to its element's style, not to its pseudo-elements'.
-    expect(declarations(layout, ".sidebar__scroll:not(:hover, :has(:focus-visible))")).toEqual([
-      ["--scroll-thumb", "transparent"],
-    ]);
+    const quiet = rules(layout).find((r) => r.selectors.some((s) => s.endsWith(":not(:hover,:has(:focus-visible))")));
+    expect(quiet?.declarations).toEqual([["--scroll-thumb", "transparent"]]);
+    expect(quiet?.selectors[0]).toContain(".sidebar__scroll");
   });
 });
 
@@ -323,5 +323,31 @@ describe("the open sidebar", () => {
     expect(padding + px(value(kit, "::-webkit-scrollbar", "width"))).toBe(sidebar.right);
     // …with what is left of it holding a row's focus ring, which the list would clip.
     expect(padding).toBeGreaterThanOrEqual(await focusRing());
+  });
+});
+
+describe("columns that scroll on their own", () => {
+  /** The work area's columns: each one scrolls by itself, its thumb shows only while the pointer is on it. */
+  const COLUMNS = [
+    ".sidebar__scroll",
+    ".shell__main",
+    ".shell__main .page-split>*",
+    ".issues-col>.issues-col__cards",
+    ".members-side",
+    ".dm-side__scroll",
+    ".thread-panel__page",
+    ".wiki-nav",
+    ".wiki__center",
+    ".cal-side",
+    ".cal-agenda",
+    ".cal-week__scroll",
+  ];
+  test("each hides its thumb until the pointer or the keyboard is on it, with its room kept", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    const quiet = rules(layout).find((r) => r.selectors.some((s) => s.endsWith(":not(:hover,:has(:focus-visible))")));
+    const listed = (quiet?.selectors[0] ?? "").replace(/^:is\(|\):not\(:hover,:has\(:focus-visible\)\)$/g, "");
+    expect(listed.split(",")).toEqual(COLUMNS);
+    // The scrollbar stays drawn (clear), so nothing moves when it shows.
+    expect(quiet?.declarations).toEqual([["--scroll-thumb", "transparent"]]);
   });
 });
