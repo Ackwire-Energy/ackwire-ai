@@ -417,16 +417,19 @@ export function OwnerSelect({
   onChange,
   members,
   meId,
+  card = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   members: Member[];
   meId: string;
+  /** The agent forms' card-like picker; `false` in a stack of plain fields (a dialog), drawn as its selects are. */
+  card?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Select
-      className="newag__sel"
+      className={card ? "newag__sel" : undefined}
       aria-label={t("newAgent.owner")}
       value={value}
       onValueChange={onChange}

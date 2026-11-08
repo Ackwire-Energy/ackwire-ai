@@ -432,7 +432,7 @@ export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string;
       <b>{lead}</b>
       <div className="setup-cl__tasks">
         {asks.map((a) => (
-          <button key={a.label} type="button" className="setup-task" onClick={a.onClick}>
+          <button key={a.label} type="button" className="setup-task ac-iconline" onClick={a.onClick}>
             <Icon name="message" size={16} />
             <span>{a.label}</span>
             <Icon name="arrowRight" size={16} />
@@ -934,7 +934,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
       {asks.dialog}
       {admin && (
         <Field label={t("newAgent.owner")} help={t("agentSetup.who.ownerHelp", g)}>
-          <OwnerSelect value={ownerId} onChange={setOwnerId} members={dir.members} meId={me.user.id} />
+          <OwnerSelect card={false} value={ownerId} onChange={setOwnerId} members={dir.members} meId={me.user.id} />
         </Field>
       )}
     </StepDialog>
