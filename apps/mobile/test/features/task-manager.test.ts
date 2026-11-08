@@ -128,10 +128,13 @@ describe("a task's row (ADR 0128)", () => {
 describe("rows with a face (#41)", () => {
   const read = (f: string) => readFileSync(join(import.meta.dir, "../../src/features/task-manager", f), "utf8");
 
-  test("a routine's task is a MediaRow: its agent, where and who asked on the face's line, Parar at its end", () => {
+  test("a routine's task is a MediaRow: its agent, where and who asked on the face's line, the rest under them", () => {
     const screen = read("TaskManagerScreen.tsx");
     expect(screen).toContain("<AgentFace agentId={task.agentId} size={MEDIA_ROW.card.face} live={false} />");
-    expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*end=\{stop\}/);
+    expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*>/);
+    // Parar under the words, after the state and what it uses, never beside them squeezing the title.
+    expect(screen).toMatch(/<UsingLine task=\{task\} \/>\}\s*\{stop\}/);
+    expect(screen).not.toContain("end={stop}");
     // The title wraps whole, under the face, with the state and what it uses.
     expect(screen).not.toContain("numberOfLines={2}");
     expect(screen).toContain("flatTask: { paddingVertical: 12, paddingHorizontal: 16 }");

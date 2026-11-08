@@ -10,7 +10,7 @@ export interface MediaRowProps {
   name: string;
   /** What it is, muted, after the name on its line (a role, "#129 · há 6 min"). */
   meta?: string;
-  /** At the end of the name's line (a channel, a small action). */
+  /** At the end of the name's line: a time, a count, an icon's control. A labelled action goes under, never beside. */
   end?: ReactNode;
   /** Under the name's line, at the row's full width, 8 apart. */
   children?: ReactNode;

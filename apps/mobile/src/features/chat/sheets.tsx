@@ -34,7 +34,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, CHROME_MAX_SCALE, Count, Icon, Locked, PressScale, Text, useToast } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Count, Icon, Locked, OPTION_ROW, PressScale, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { setPinDraft } from "../dashboards/logic";
@@ -711,7 +711,7 @@ export function NewMissionForm({
             items={[
               ...list.map((a) => ({
                 key: a.agentId,
-                leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
+                leading: <AgentFace agentId={a.agentId} size={OPTION_ROW.face} live={false} />,
                 label: a.name,
                 hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
                 disabled: a.eligible === false,

@@ -51,6 +51,7 @@ import {
   type IconName,
   LineIcon,
   Locked,
+  OPTION_ROW,
   PixelOrbit,
   Text,
   useReducedMotion,
@@ -858,7 +859,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
     ...people.map((who) => ({
       key: `${who.type}:${who.id}`,
       label: who.type === "person" && who.id === meId ? t("mobile.issues.you") : dir.nameOf(who),
-      leading: <Face who={who} size={26} live={false} />,
+      leading: <Face who={who} size={OPTION_ROW.face} live={false} />,
       ...(same(who, i.assignee) ? { trailing: <Icon name="check" size={18} /> } : {}),
       onPress: () => assign(who),
     })),

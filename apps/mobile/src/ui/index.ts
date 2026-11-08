@@ -81,6 +81,7 @@ export {
   useScrollUnderPushedOptions,
 } from "./navigation";
 export { OptionTile } from "./OptionTile";
+export { OPTION_ROW } from "./option-row";
 export { PresenceBadge, type PresenceBadgeProps, WithPresence } from "./PresenceBadge";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";

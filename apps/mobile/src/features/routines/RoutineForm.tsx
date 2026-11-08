@@ -36,6 +36,7 @@ import {
   GroupedRow,
   type IconName,
   Locked,
+  OPTION_ROW,
   Segmented,
   Text,
   useToast,
@@ -411,7 +412,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
           <GroupedList>
             <GroupedRow
               label={agent?.name ?? ""}
-              leading={agent ? <AgentFace agentId={agent.id} size={26} live={false} /> : undefined}
+              leading={agent ? <AgentFace agentId={agent.id} size={OPTION_ROW.face} live={false} /> : undefined}
               icon={agent ? undefined : "agent"}
               value={agent?.role || undefined}
               chevron
@@ -424,7 +425,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
                     <GroupedRow
                       key={a.id}
                       label={a.name}
-                      leading={<AgentFace agentId={a.id} size={26} live={false} />}
+                      leading={<AgentFace agentId={a.id} size={OPTION_ROW.face} live={false} />}
                       value={a.role || undefined}
                       onPress={() => {
                         set({ agentId: a.id });

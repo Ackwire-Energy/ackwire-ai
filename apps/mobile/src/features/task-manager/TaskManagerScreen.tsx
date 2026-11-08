@@ -429,9 +429,9 @@ function AgentGroup({
 }
 
 /**
- * A task: its title, where it is and who asked, its state and time, what it uses now, and "Parar" for who may stop
- * it. Under its agent's row it starts at the name's column; a routine's (`flat`) is a MediaRow: its agent's face, name,
- * where and who asked on one line with "Parar" at its end, the rest under them at the row's width.
+ * A task: its title, where it is and who asked, its state and time, what it uses now, and "Parar" under them for who
+ * may stop it, never beside the words. Under its agent's row it starts at the name's column; a routine's (`flat`) is a
+ * MediaRow: its agent's face, name, where and who asked on one line, the rest under them at the row's width.
  */
 function TaskRow({
   task,
@@ -465,6 +465,7 @@ function TaskRow({
     <>
       <StateLine task={task} state={state} now={now} />
       {state === "stopping" ? null : <UsingLine task={task} />}
+      {stop}
     </>
   );
   return (
@@ -491,7 +492,6 @@ function TaskRow({
           }
           name={agent}
           meta={sub || undefined}
-          end={stop}
         >
           <Text variant="subhead" style={styles.medium}>
             {title}
@@ -499,21 +499,18 @@ function TaskRow({
           {status}
         </MediaRow>
       ) : (
-        <>
-          {/* Whole, wrapping: a task's title and where it is say what it is. */}
-          <View style={styles.taskText}>
-            <Text variant="subhead" style={styles.medium}>
-              {title}
+        // Whole, wrapping: a task's title and where it is say what it is.
+        <View style={styles.taskText}>
+          <Text variant="subhead" style={styles.medium}>
+            {title}
+          </Text>
+          {line ? (
+            <Text variant="footnote" tone="muted">
+              {line}
             </Text>
-            {line ? (
-              <Text variant="footnote" tone="muted">
-                {line}
-              </Text>
-            ) : null}
-            {status}
-          </View>
-          {stop}
-        </>
+          ) : null}
+          {status}
+        </View>
       )}
     </Pressable>
   );
