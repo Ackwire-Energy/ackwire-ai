@@ -230,9 +230,9 @@ describe("artifact viewer", () => {
     await settle(2);
     expect(copied[0]).toBe(`http://localhost:3000/org/${ORG_ID}/drive?artifact=${a.document.id}`);
     expect(screen().getByText("Link copiado.")).toBeTruthy();
-    // The whole text in one click, right after Baixar: the document's Markdown as it was written.
+    // The whole text in one click, right after Baixar and Compartilhar: the document's Markdown as it was written.
     const copy = within(dialog).getByRole("button", { name: "Copiar texto" });
-    expect(copy.previousElementSibling?.textContent).toContain("Baixar");
+    expect(copy.previousElementSibling?.textContent).toContain("Compartilhar");
     await click(copy);
     await settle(2);
     expect(copied[1]).toContain("## O que aconteceu");

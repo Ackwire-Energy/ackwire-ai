@@ -215,6 +215,11 @@ describe("Compartilhar (ADR 0157)", () => {
         : a;
     const list = api.artifacts.list;
     api.artifacts.list = async (...args) => (await list(...args)).map(outsider);
+    const page = api.artifacts.page;
+    api.artifacts.page = async (...args) => {
+      const got = await page(...args);
+      return { ...got, artifacts: got.artifacts.map(outsider) };
+    };
     const get = api.artifacts.get;
     api.artifacts.get = async (...args) => outsider(await get(...args));
     await renderApp(`/org/${ORG_ID}/drive`, { api });
