@@ -44,9 +44,25 @@ describe("MediaRow", () => {
   test("a wrapped head keeps its first line, and what ends it, on the face's middle", () => {
     expect(body(".ac-mediarow")).toContain("align-items: start;");
     expect(body(".ac-mediarow__head")).toContain(
-      "padding-block-start: max(0px, calc((var(--mediarow-face) - 20px) / 2));",
+      "padding-block-start: max(0px, calc((var(--mediarow-axis) - 20px) / 2));",
     );
-    expect(body(".ac-mediarow__end")).toContain("height: var(--mediarow-face);");
+    expect(body(".ac-mediarow__face")).toContain(
+      "margin-block-start: calc((var(--mediarow-axis) - var(--mediarow-face)) / 2);",
+    );
+    expect(body(".ac-mediarow__end")).toContain("height: var(--mediarow-axis);");
+    expect(body(".ac-mediarow")).toContain("--mediarow-axis: var(--mediarow-face);");
+  });
+
+  test("a button with its plate ending the name's line sets the line's axis, so it keeps the row's padding", () => {
+    expect(
+      body(".ac-mediarow:has(> .ac-mediarow__end :is(.ac-btn--sm:not(.ac-btn--ghost), .ac-select, .ac-seg))"),
+    ).toContain("--mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));");
+    // Dropped under the words, it no longer sets it.
+    const narrow = css.match(/@container \(max-width: 479px\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(narrow).toContain(
+      ".ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head)",
+    );
+    expect(narrow).toContain("--mediarow-axis: var(--mediarow-face);");
   });
 
   test("in a box under 480px, what ends the head drops under the text, at its start", () => {
@@ -56,6 +72,8 @@ describe("MediaRow", () => {
     expect(narrow).toContain("order: 1;");
     expect(narrow).toContain("justify-self: start;");
     expect(narrow).toContain("height: auto;");
+    // Its buttons wrap among themselves rather than run past the row's edge.
+    expect(narrow).toContain("flex-wrap: wrap;");
   });
 
   test("a glyph in a face's place keeps its size and the names in line; nothing under the name's line takes no room", () => {

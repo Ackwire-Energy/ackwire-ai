@@ -10852,6 +10852,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
    too (a box as tall as the face, a taller button reaching as far above as below): never the wrapped head's middle. */
 .ac-mediarow {
   --mediarow-face: 32px;
+  /* The first line's axis: the face's middle, or a control's that ends the line and is taller than the face. */
+  --mediarow-axis: var(--mediarow-face);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
@@ -10862,6 +10864,19 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   --mediarow-face: 24px;
   column-gap: var(--space-2);
 }
+/* A button with its plate, a select or a segmented control ending the name's line: the line's axis is its middle, so it
+   keeps the row's padding above and below (a small button grows to 40 on touch). */
+.ac-mediarow:has(> .ac-mediarow__end :is(.ac-btn--sm:not(.ac-btn--ghost), .ac-select, .ac-seg)) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
+}
+.ac-mediarow:has(> .ac-mediarow__end .ac-btn:not(.ac-btn--sm, .ac-btn--ghost)) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
+}
+@media (pointer: coarse) {
+  .ac-mediarow:has(> .ac-mediarow__end .ac-btn--sm:not(.ac-btn--ghost)) {
+    --mediarow-axis: max(var(--mediarow-face), var(--control-h-md));
+  }
+}
 /* As wide and tall as a face at least, so a glyph in a face's place (a check, an icon) keeps the names in line. */
 .ac-mediarow__face {
   grid-area: 1 / 1;
@@ -10870,6 +10885,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   justify-content: center;
   min-width: var(--mediarow-face);
   height: var(--mediarow-face);
+  margin-block-start: calc((var(--mediarow-axis) - var(--mediarow-face)) / 2);
 }
 /* Whatever leads it (a face, a role's mark, a maker's tile) takes the face's size; a glyph keeps its own. */
 .ac-mediarow > .ac-mediarow__face > :not(svg) {
@@ -10883,7 +10899,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 0.4em;
-  padding-block-start: max(0px, calc((var(--mediarow-face) - 20px) / 2));
+  padding-block-start: max(0px, calc((var(--mediarow-axis) - 20px) / 2));
   font-size: 14px;
   line-height: 20px;
   overflow-wrap: anywhere;
@@ -10906,7 +10922,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   display: flex;
   align-items: center;
   column-gap: var(--space-2);
-  height: var(--mediarow-face);
+  height: var(--mediarow-axis);
 }
 /* A row of actions keeps its own gap (`.ac-acts`: its ghosts' words as far apart as two boxes). */
 .ac-mediarow__end.ac-acts {
@@ -10928,6 +10944,13 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
     grid-area: auto / 1 / auto / -1;
     order: 1;
     justify-self: start;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    max-width: 100%;
     height: auto;
+  }
+  /* Its control left the name's line: the face's middle is that line's axis again. */
+  .ac-mediarow:has(> .ac-mediarow__end--wrap) > :is(.ac-mediarow__face, .ac-mediarow__head) {
+    --mediarow-axis: var(--mediarow-face);
   }
 }
