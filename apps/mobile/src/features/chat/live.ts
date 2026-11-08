@@ -4,6 +4,7 @@ import {
   applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
+  applyConversationEvent,
   applyMembershipEvent,
   applyReceiptEvent,
   applyTyping,
@@ -423,6 +424,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       dispatch({ type: "event", event, at: Date.now() });
       applyToCache(qc, orgId, channelId, event);
       applyMembershipEvent(qc, orgId, event);
+      // A file's cards (a deleted one says so) and an agent's memory list, as on the web.
+      applyConversationEvent(qc, orgId, event);
     });
   }, [connection, enabled, orgId, channelId, qc]);
 

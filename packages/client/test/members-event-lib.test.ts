@@ -30,3 +30,13 @@ test("a person's new name: each channel's roster is read again, another workspac
   expect(qc.getQueryState(keys.roster("o1", "c1"))?.isInvalidated).toBe(true);
   expect(qc.getQueryState(keys.roster("o2", "c2"))?.isInvalidated).toBe(false);
 });
+
+test("someone accepted an invitation: the invitations sent and the requests to join read again", () => {
+  const qc = new QueryClient();
+  for (const key of [keys.invitations("o1"), keys.allInvitations("o1"), keys.joinRequests("o1")])
+    qc.setQueryData(key, []);
+  applyWorkspaceEvent(qc, "o1", { type: "org.members" });
+  expect(qc.getQueryState(keys.invitations("o1"))?.isInvalidated).toBe(true);
+  expect(qc.getQueryState(keys.allInvitations("o1"))?.isInvalidated).toBe(true);
+  expect(qc.getQueryState(keys.joinRequests("o1"))?.isInvalidated).toBe(true);
+});

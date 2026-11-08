@@ -20,6 +20,7 @@ import {
   applyChannelEvent,
   applyComputerEvent,
   applyConsultEvent,
+  applyConversationEvent,
   applyDashboardEvent,
   applyIssueEvent,
   applyMachineEvent,
@@ -477,6 +478,15 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
       void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
+      // The Drive, the Wiki, the calendar, the routines and the invitations someone changed meanwhile.
+      for (const key of [
+        keys.artifacts(orgId),
+        keys.wiki(orgId),
+        keys.calendar(orgId),
+        keys.routines(orgId),
+        keys.invitations(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -545,10 +555,6 @@ export function RealtimeProvider({
       }
       // The Vault changed (ADR 0144, org broadcast): what this person may see of it refetches. Never a value.
       if (event.type === "vault.changed") void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
-      // Someone changed the calendar: the open ranges refetch.
-      if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
-        void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
-      }
       // The board's columns changed (org broadcast): set them; a deleted column moved its tasks.
       if (event.type === "issue.columns" && "columns" in event && Array.isArray(event.columns)) {
         qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
@@ -559,8 +565,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
-      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
-      // of agents (the sidebar's sections).
+      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), the groups of
+      // agents (the sidebar's sections), and the lists anyone may have open (Drive, Wiki, calendar, routines, memory).
       applyWorkspaceEvent(qc, orgId, event);
       // Boards and widgets (ADR 0135): only ids come; the boards on screen refetch.
       applyDashboardEvent(qc, orgId, event);
@@ -815,16 +821,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "approval.created" || event.type === "approval.decided") {
         cacheApproval(qc, orgId, event.approval);
       }
-      if (
-        event.type === "artifact.created" ||
-        event.type === "artifact.updated" ||
-        (event.type as string) === "artifact.deleted"
-      ) {
-        // Cards, the open viewer and Drive refetch (a deleted file leaves the list; its cards say so).
-        void qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
-        if ((event.type as string) === "artifact.deleted")
-          void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
-      }
+      // A file's cards and viewer, an agent's memory list.
+      applyConversationEvent(qc, orgId, event);
       if (event.type === "poll.updated") qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       if (event.type === "block.state") {
         const { block } = event;

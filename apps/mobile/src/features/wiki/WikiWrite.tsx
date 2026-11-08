@@ -94,6 +94,9 @@ function Writer({
   const action = useWikiAction(orgId);
   const [mode, setMode] = useState<Mode>("write");
   const [body, setBody] = useState(page?.body ?? "");
+  // The version this text started from: the page follows edits made elsewhere live, and saving over one of those
+  // without its conflict screen would lose it.
+  const [base] = useState(page?.version);
   const [sel, setSel] = useState<Sel>({ start: body.length, end: body.length });
   // A selection set by the bar or a suggestion; the field follows it once, then the person's caret again.
   const [pending, setPending] = useState<Sel | null>(null);
@@ -204,7 +207,7 @@ function Writer({
         const saved = await action.mutateAsync({
           type: "update",
           slug: page.slug,
-          input: { body, baseVersion: baseVersion ?? page.version },
+          input: { body, baseVersion: baseVersion ?? base ?? page.version },
         });
         done(saved, false);
       }
