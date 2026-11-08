@@ -22,7 +22,7 @@ import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, m
 import { appTokenForRepo, botIdentity, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
-import { coAuthorOf } from "./signature";
+import { runCoAuthor } from "./signature";
 
 /**
  * Git on a connected machine through our proxy (ADR 0024 addendum):
@@ -273,14 +273,13 @@ export function codeStart(
 }
 
 /**
- * The turn's commits credit the person behind it (ADR 0153) when they linked GitHub to sign in: the line that says
- * so, next to where the turn starts.
+ * The turn's commits credit the person behind its run (ADR 0153), as the run's commits through GitHub's API do, when
+ * they linked GitHub to sign in: the line that says so, next to where the turn starts.
  */
-async function creditLine(deps: MachineGitDeps, personId: string | null | undefined) {
+async function creditLine(deps: MachineGitDeps, turn: CodeTurn) {
   // ponytail: an instruction the agent follows; a `prepare-commit-msg` hook written by `git.sync` if it forgets.
-  if (!personId) return "";
   const http = deps.github?.http ?? { fetch, apiUrl: "https://api.github.com" };
-  const trailer = await coAuthorOf({ db: deps.db, http }, personId).catch(() => null);
+  const trailer = await runCoAuthor({ db: deps.db, http }, turn).catch(() => null);
   return trailer ? `Commits you make this turn: end each commit message with the line ${trailer}` : "";
 }
 
@@ -292,8 +291,8 @@ export interface CodeTurn {
   trigger: string;
   messages: ReadonlyArray<{ content: string }>;
   session?: { machineId: string; cwd: string; ownFolder?: boolean } | undefined;
-  /** The person behind the turn: its commits credit them. */
-  personId?: string | null;
+  /** Its run: the person behind it gets the credit for its commits. */
+  runId?: string;
 }
 
 /**
@@ -324,7 +323,7 @@ export async function prepareAgentCode(
     if (!status || machineGitUnavailable(status, turn.orgId)) return null;
     const setup = await machineGitSetup(deps, turn.orgId, turn.agentId, session.machineId);
     if (!setup) return null;
-    const credit = await creditLine(deps, turn.personId);
+    const credit = await creditLine(deps, turn);
     const list = await agentRepositoryList(deps.db, turn.orgId, turn.agentId);
     const explicit = list.filter((r) => !r.endsWith("/*"));
     const { agent, ...rest } = setup;

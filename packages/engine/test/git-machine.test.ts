@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   type ConnectorDeps,
   codePrompt,
   codeStart,
@@ -39,7 +40,7 @@ import {
   verifyGitToken,
   ZERO_OID,
 } from "../src";
-import { type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -649,6 +650,7 @@ describe("agents' commits and the GitHub App (ADR 0153)", () => {
       const url = String(input);
       if (url.endsWith("/users/agentes-machine-test%5Bbot%5D")) return Response.json({ id: 77 });
       if (url.endsWith("/user/583231")) return Response.json({ login: "ana-gh" });
+      if (url.endsWith("/user/583232")) return Response.json({ login: "bia-gh" });
       return new Response("unexpected", { status: 500 });
     }) as typeof globalThis.fetch;
     const deps = { ...w.machineDeps, github: { app, http: { apiUrl: API, fetch } } };
@@ -669,7 +671,6 @@ describe("agents' commits and the GitHub App (ADR 0153)", () => {
       trigger: "hi",
       messages: [],
       session: { machineId: w.paired.machineId, cwd: "" },
-      personId: f.owner.id,
     };
     w.answers.fn = () => [];
     // No GitHub linked: no credit, and nothing to say.
@@ -693,8 +694,33 @@ describe("agents' commits and the GitHub App (ADR 0153)", () => {
     expect(code?.start).toBe(`You start in ${FOLDER}/repos/acme/app.\n${credit}`);
     // Picked again for other words, the credit stays.
     expect(code?.pick ? codeStart(code.pick, { trigger: "x", messages: [] }).start : "").toBe(code?.start ?? "-");
-    expect(await prepareAgentCode(deps, { ...turn, personId: null })).toMatchObject({
-      start: `You start in ${FOLDER}/repos/acme/app.`,
+
+    // A run's turn credits who asked, whatever started the sync (the quiet window's early one knows only the run).
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db
+      .insert(schema.accounts)
+      .values({ id: crypto.randomUUID(), accountId: "583232", providerId: "github", userId: bia.id });
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, {
+      body: "oi",
     });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: asked.id,
+        triggerMessageId: asked.id,
+        trigger: "mention",
+        hop: 1,
+      })
+      .returning();
+    expect((await prepareAgentCode(deps, { ...turn, runId: run?.id }))?.start).toBe(
+      `You start in ${FOLDER}/repos/acme/app.\nCommits you make this turn: end each commit message with the line Co-authored-by: bia <583232+bia-gh@users.noreply.github.com>`,
+    );
+    // Nobody asked and nobody answers for the agent: no credit.
+    await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, f.agent.id));
+    expect(await prepareAgentCode(deps, turn)).toMatchObject({ start: `You start in ${FOLDER}/repos/acme/app.` });
   });
 });
