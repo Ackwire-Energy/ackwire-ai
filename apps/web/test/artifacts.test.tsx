@@ -505,7 +505,8 @@ describe("Drive", () => {
     screen()
       .getAllByRole("button")
       .find((b) => b.classList.contains("ac-filter__trigger") && /Tipo|tipos/.test(b.textContent ?? "")) as HTMLElement;
-  const escape = () => act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+  const pressEscape = () =>
+    act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
 
   test("lists everything, newest update first; search and Tipo narrow it", async () => {
     await goDrive();
@@ -539,7 +540,7 @@ describe("Drive", () => {
     expect(names()).toEqual(["Corrige o checkout com carrinho vazio"]);
     // Two kinds: either of them.
     await click(within(kinds).getByRole("option", { name: /^Diagramas/ }));
-    await escape();
+    await pressEscape();
     await settle(4);
     expect(names()).toEqual(["Organograma do time", "Corrige o checkout com carrinho vazio"]);
     expect(kindTrigger().textContent).toContain("2 tipos");
@@ -567,7 +568,7 @@ describe("Drive", () => {
     const kinds = screen().getByRole("listbox", { name: "Tipo" });
     const docs = within(kinds).getByRole("option", { name: /^Documentos/ });
     expect(docs.querySelector(".ac-countchip")?.textContent).toBe(String(documents));
-    await escape();
+    await pressEscape();
     await click(screen().getByRole("button", { name: "Carregar mais" }));
     await settle(6);
     expect(names()).toHaveLength(105);
