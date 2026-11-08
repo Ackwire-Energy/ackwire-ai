@@ -17,7 +17,9 @@ import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { keepLastCrash } from "@/lib/last-crash";
+import { newWorkspaceDone, newWorkspaceMade, newWorkspaceShown, useNewWorkspaceAsk } from "@/lib/new-workspace";
 import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { useServer } from "@/lib/server";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
@@ -82,6 +84,18 @@ function Gate() {
   // "Novo workspace" from a workspace being deleted: the first run, until a new workspace is chosen or they go back.
   const [freshStart, setFreshStart] = useState(false);
   if (freshStart && (!signedIn || (ready && deleting === null))) setFreshStart(false);
+  // "Criar um workspace novo" from Adicionar workspace (ADR 0154): the first run on that server once signed in there,
+  // until the new workspace is chosen or they go back.
+  const server = useServer();
+  const ask = useNewWorkspaceAsk();
+  const openOrg = org.state?.orgId ?? null;
+  const asking = ask !== null && ask.server === server && ready && signedIn && !newWorkspaceMade(ask, openOrg);
+  useEffect(() => {
+    if (!ask || ask.server !== server || !ready || !signedIn) return;
+    if (newWorkspaceMade(ask, openOrg)) newWorkspaceDone();
+    else newWorkspaceShown(openOrg);
+  }, [ask, server, ready, signedIn, openOrg]);
+  const fresh = freshStart || asking;
 
   // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
   // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
@@ -126,13 +140,13 @@ function Gate() {
   const [firstRunBefore, setFirstRunBefore] = useState(false);
   const firstRun = firstRunMounted(
     firstRunBefore,
-    ready && signedIn && (org.none || freshStart) && !accepting && !accountDeletion,
+    ready && signedIn && (org.none || fresh) && !accepting && !accountDeletion,
     onInvite,
   );
   if (firstRun !== firstRunBefore) setFirstRunBefore(firstRun);
   const suspendedShown = suspended !== null && !deletingAccount;
   const deletingShown = deleting !== null && !deletingAccount && !firstRun;
-  const covered = suspendedShown || deletingShown || down !== null || (firstRun && freshStart) || !!accountDeletion;
+  const covered = suspendedShown || deletingShown || down !== null || (firstRun && fresh) || !!accountDeletion;
 
   // The navigator is always mounted (so links and pushes can navigate); the splash covers it until ready.
   return (
@@ -159,7 +173,16 @@ function Gate() {
           invitation is accepted instead). */}
       {firstRun ? (
         <View style={onInvite ? { display: "none" } : StyleSheet.absoluteFill}>
-          <OnboardingFlow onLeave={freshStart ? () => setFreshStart(false) : undefined} />
+          <OnboardingFlow
+            onLeave={
+              fresh
+                ? () => {
+                    setFreshStart(false);
+                    newWorkspaceDone();
+                  }
+                : undefined
+            }
+          />
         </View>
       ) : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}

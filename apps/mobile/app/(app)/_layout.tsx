@@ -158,6 +158,10 @@ function AppStack() {
       <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
+      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154). */}
+      <Stack.Screen name="me/add-workspace" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/team-server" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/scan" options={{ headerShown: false }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="invite-people" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="invite-channels" options={{ ...pushed, ...scrollUnder }} />

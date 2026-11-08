@@ -225,6 +225,11 @@ export interface PushDeps {
   webPush?: WebPushSender | null;
   /** Who has the app open: a push not waiting on them holds `PUSH_ACTIVE_DELAY_MS` (ADR 0071 §7). */
   presence?: Pick<Presence, "online"> | null;
+  /**
+   * This server's address (the origin of `PUBLIC_URL`), sent with every phone push as `server`: a phone signed in to
+   * several servers opens the workspace on the one the push came from (ADR 0154).
+   */
+  server?: string | null;
   now?: () => Date;
 }
 
@@ -388,6 +393,7 @@ export async function deliverPush(
     highRisk = approval ? approvalIsHighRisk(approval) : true;
   }
   const data: Record<string, unknown> = { orgId: row.orgId, kind: row.kind, notificationId: row.id };
+  if (deps.server) data.server = deps.server;
   for (const key of PUSH_PLACE_KEYS) {
     if (source[key] != null && source[key] !== "") data[key] = String(source[key]);
   }

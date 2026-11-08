@@ -1356,6 +1356,11 @@ export const en = {
     /** Beside a workspace's name, only when another of the person's has the same name. */
     createdOn: "Created on {{date}}",
     newWorkspace: "New workspace",
+    /** In the desktop app, in place of New workspace: the app's window to add one (ADR 0154). */
+    addWorkspace: "Add workspace",
+    addWorkspaceHint: "A new one on agentes.chat, or your team's server",
+    /** Beside a server's name above its workspaces, when it isn't agentes.chat. */
+    yourServer: "Your server",
     wiki: "Wiki",
     settings: "Settings",
     workspaceMenu: "Workspace menu",

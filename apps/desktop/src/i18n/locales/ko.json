@@ -130,7 +130,11 @@
     "cloud": "agentes.chat에 로그인",
     "create": "처음이세요?",
     "createLink": "계정 만들기",
-    "own": "내 서버 사용"
+    "own": "내 서버 사용",
+    "addTitle": "워크스페이스 추가",
+    "addLead": "이미 있는 워크스페이스는 각자의 로그인으로 그대로 남습니다.",
+    "addCloud": "agentes.chat에 워크스페이스 만들기",
+    "addOwn": "팀 서버 사용"
   },
   "own": {
     "title": "내 서버",
@@ -269,7 +273,11 @@
     "removeTitle": "이 앱에서 {{host}}을(를) 삭제할까요?",
     "removeBody": "서버와 거기 있는 내 계정은 그대로 남아요.",
     "removeAgents": "그 서버 워크스페이스의 에이전트는 이 {{device}}에서 더 이상 일하지 않아요.",
-    "removed": "{{host}}을(를) 이 앱에서 삭제했어요"
+    "removed": "{{host}}을(를) 이 앱에서 삭제했어요",
+    "workspaces_other": "워크스페이스 {{count}}개",
+    "signedOut": "로그인되지 않음",
+    "newsOne": "새 알림 1개",
+    "newsMany": "새 알림 {{n}}개"
   },
   "server": {
     "title": "이 {{device}}의 agentes.chat",

@@ -2,7 +2,8 @@ import { type OrgSummary, useApi, useMe } from "@agenteschat/client";
 import { useLocaleSync } from "@agenteschat/client/lib/locale-sync";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { accountFailed, chooseOrg, openOrgs } from "@/lib/org-choice";
-import { readValue, STORED, writeValue } from "@/lib/storage";
+import { orgValueName, useServer } from "@/lib/server";
+import { readValue, writeValue } from "@/lib/storage";
 import { deviceLocale, i18n, readLocaleState, rememberLocale, setLocale } from "./i18n";
 import { useSession } from "./session";
 
@@ -44,9 +45,13 @@ const OrgContext = createContext<OrgGate>({
   choose: () => {},
 });
 
-/** The current organization: remembered in SecureStore, switched by `setOrgId` (and by a push's `orgId`). */
+/**
+ * The current organization: remembered in SecureStore for each server (ADR 0154), switched by `setOrgId` (and by a
+ * push's `orgId`).
+ */
 export function OrgProvider({ children }: { children: ReactNode }) {
   const me = useMe();
+  const server = useServer();
   const session = useSession();
   const api = useApi();
   // The person's language here and on the server, matched once their `me` arrives (ADR 0122).
@@ -85,20 +90,25 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [stale, me.isFetching, refetch, refresh]);
 
+  // Each server remembers its own: read again when the app moves to another.
   useEffect(() => {
     let alive = true;
-    readValue(STORED.org).then((v) => {
+    setRemembered(undefined);
+    readValue(orgValueName(server)).then((v) => {
       if (alive) setRemembered(v);
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [server]);
 
-  const setOrgId = useCallback((orgId: string) => {
-    setRemembered(orgId);
-    void writeValue(STORED.org, orgId);
-  }, []);
+  const setOrgId = useCallback(
+    (orgId: string) => {
+      setRemembered(orgId);
+      void writeValue(orgValueName(server), orgId);
+    },
+    [server],
+  );
 
   const orgs = useMemo(() => openOrgs(me.data?.organizations ?? []), [me.data]);
   const orgId = remembered === undefined ? null : chooseOrg(orgs, remembered);

@@ -23,7 +23,7 @@ import { publishUserEvent } from "./events";
 import { cutText } from "./format";
 import type { PreviewMeta } from "./message-preview";
 import { noticeOn, noticePrefsOf, readNoticePrefs } from "./notice-prefs";
-import { requirePermission } from "./organizations";
+import { listMemberships, requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
@@ -1092,6 +1092,24 @@ export async function notificationCounts(deps: NotificationDeps, userId: string,
   await requirePermission(deps.db, userId, orgId, "read");
   const c = await countsOf(deps.db, orgId, userId, nowOf(deps));
   return { unread: c.unread, waiting: c.waiting };
+}
+
+/**
+ * Unread and waiting in every workspace the person reads, in one call: the apps list workspaces from several servers
+ * with their unread counts, one request per server instead of one per workspace (ADR 0154).
+ */
+export async function notificationCountsByOrg(
+  deps: NotificationDeps,
+  userId: string,
+): Promise<{ orgId: string; unread: number; waiting: number }[]> {
+  const now = nowOf(deps);
+  const memberships = (await listMemberships(deps.db, userId)).filter((m) => m.permissions.has("read"));
+  return Promise.all(
+    memberships.map(async (m) => {
+      const c = await countsOf(deps.db, m.orgId, userId, now);
+      return { orgId: m.orgId, unread: c.unread, waiting: c.waiting };
+    }),
+  );
 }
 
 async function publishCounts(deps: NotificationDeps, orgId: string, userId: string) {

@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Linking, Pressable, type TextInput, View } from "react-native";
 import { useLaunched } from "@/features/launch/launched";
 import { authClient } from "@/lib/auth";
+import { setServer, useServerToReturn } from "@/lib/server";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
@@ -347,7 +348,16 @@ export function AuthFlow({
   const [title, lead] = bubble[step];
 
   const backTo = step === "forgot" && !options?.password ? "email" : BACK[step];
-  const onBack = backTo ? () => go(backTo) : router.canGoBack() ? () => router.back() : undefined;
+  // A server added while signed in to another (ADR 0154): its first step goes back there, nothing lost, when this
+  // screen has nothing of its own to go back to.
+  const returnTo = useServerToReturn();
+  const onBack = backTo
+    ? () => go(backTo)
+    : router.canGoBack()
+      ? () => router.back()
+      : returnTo
+        ? () => void setServer(returnTo)
+        : undefined;
 
   const fix = step === "email" || step === "forgot" ? emailTypoFix(email) : null;
   const mail = webmailOf(email);

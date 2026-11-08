@@ -24,6 +24,8 @@ export interface VoiceSend {
   peaks: number[];
   language: string | null;
   createdAt: string;
+  /** The server it was recorded on: it goes there, with that server's session, whichever is open (ADR 0154). */
+  server?: string;
 }
 
 export type VoiceRefusal = "limit" | "refused";
@@ -110,10 +112,12 @@ async function upload(item: VoiceSend) {
   if (item.threadId) form.append("threadId", item.threadId);
   if (item.replyTo) form.append("replyTo", item.replyTo);
   if (item.language) form.append("language", item.language);
-  const res = await authedFetch(`${serverUrl()}/api/app/organizations/${item.orgId}/channels/${item.channelId}/voice`, {
-    method: "POST",
-    body: form,
-  });
+  const server = item.server ?? serverUrl();
+  const res = await authedFetch(
+    `${server}/api/app/organizations/${item.orgId}/channels/${item.channelId}/voice`,
+    { method: "POST", body: form },
+    server,
+  );
   if (res.status >= 400 && res.status < 500) {
     const body = (await res.json().catch(() => null)) as { code?: string } | null;
     if (body?.code === "voice_limit" || body?.code === "voice.limit") return "limit" as const;
@@ -156,7 +160,7 @@ export function queueVoice(
   if (!folder().exists) folder().create({ intermediates: true });
   const file = `${item.clientId}.m4a`;
   new File(uri).move(new File(folder(), file));
-  const full: VoiceSend = { ...item, file, createdAt: new Date().toISOString() };
+  const full: VoiceSend = { ...item, file, createdAt: new Date().toISOString(), server: serverUrl() };
   queue = [...read(), full];
   write();
   showBubble(qc, full);

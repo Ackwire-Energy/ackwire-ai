@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
 import { openPage } from "@/features/ai/parts";
 import { hrefForPush, notificationWebPath, pushAsNotification } from "@/features/links/logic";
+import { openWorkspace } from "@/features/server";
 import { pushOpens } from "@/lib/org-choice";
 import {
   configureForegroundPush,
@@ -19,7 +20,8 @@ import {
   watchPushToken,
 } from "@/lib/push";
 import { readPushData } from "@/lib/push-payload";
-import { serverUrl } from "@/lib/server";
+import { serverUrl, signedInServers } from "@/lib/server";
+import { pushPlace } from "@/lib/server-choice";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { useOrgMaybe } from "./org";
 
@@ -42,6 +44,9 @@ configureForegroundPush();
 
 /** Notifications already opened (the launch one must not reopen when the provider remounts). */
 const opened = new Set<string>();
+
+/** A tapped push from another server: opened once the app is on that server (ADR 0154). */
+let afterSwitch: Notifications.NotificationResponse | null = null;
 
 /**
  * Push for a signed-in person with an organization: registers silently when already allowed, says when our
@@ -121,6 +126,16 @@ export function PushProvider({ children }: { children: ReactNode }) {
       if (opened.has(id)) return;
       opened.add(id);
       const data = readPushData(response.notification.request.content.data);
+      // From another server this phone is signed in to: the app moves there first, then opens it (ADR 0154). One
+      // from a server it left opens nothing.
+      const place = pushPlace(data.server, serverUrl(), signedInServers());
+      if (place.kind === "gone") return;
+      if (place.kind === "switch") {
+        afterSwitch = response;
+        opened.delete(id);
+        void openWorkspace(place.server, data.orgId ?? null);
+        return;
+      }
       const orgId = data.orgId;
       if (orgId && !pushOpens(qc.getQueryData<Me | null>(keys.me)?.organizations ?? [], orgId)) return;
       if (orgId) setOrgRef.current?.(orgId);
@@ -142,6 +157,11 @@ export function PushProvider({ children }: { children: ReactNode }) {
         setTimeout(() => (web ? openPage(`${serverUrl()}${web}`) : router.push(href ?? "/activity")), 0);
       });
     };
+    if (afterSwitch) {
+      const waiting = afterSwitch;
+      afterSwitch = null;
+      open(waiting);
+    }
     try {
       open(Notifications.getLastNotificationResponse());
     } catch {

@@ -10,6 +10,7 @@
     "allow-server-choose",
     "allow-discover",
     "allow-link-take",
+    "allow-welcome-mode-take",
     "allow-show-window",
     "allow-hide-window",
     "allow-app-info",

@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { type authClient, readCookie } from "@/lib/auth";
+import { markSignedIn } from "@/lib/server";
 
 export interface SessionState {
   /** Signed in (a session from the server or SecureStore's cache). */
@@ -17,7 +18,16 @@ const SessionContext = createContext<SessionState | null>(null);
  * The Better Auth session of the current server's client (cached in SecureStore by the Expo plugin, so a
  * signed-in person opens the app straight into it). When it ends, cached server data is dropped.
  */
-export function SessionProvider({ auth, children }: { auth: ReturnType<typeof authClient>; children: ReactNode }) {
+export function SessionProvider({
+  auth,
+  server,
+  children,
+}: {
+  auth: ReturnType<typeof authClient>;
+  /** The server `auth` signs in to: on the list of servers signed in to once a session is there (ADR 0154). */
+  server: string;
+  children: ReactNode;
+}) {
   const session = auth.useSession();
   const queryClient = useQueryClient();
   const user = session.data?.user ?? null;
@@ -34,10 +44,11 @@ export function SessionProvider({ auth, children }: { auth: ReturnType<typeof au
 
   useEffect(() => {
     if (signedIn) {
+      markSignedIn(server);
       // Whatever was cached while signed out (e.g. `me` = null) is stale now.
-      void readCookie().then(() => queryClient.invalidateQueries());
+      void readCookie(server).then(() => queryClient.invalidateQueries());
     } else queryClient.clear();
-  }, [signedIn, queryClient]);
+  }, [signedIn, queryClient, server]);
 
   const value = useMemo<SessionState>(
     () => ({

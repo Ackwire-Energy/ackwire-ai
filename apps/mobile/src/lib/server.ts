@@ -1,10 +1,24 @@
 import { useSyncExternalStore } from "react";
-import { API_URL, APP_VARIANT } from "@/config";
-import { currentServer, savedServer } from "./server-choice";
-import { readValueSync, writeValue } from "./storage";
+import { API_URL, APP_VARIANT, STORAGE_PREFIX } from "@/config";
+import {
+  currentServer,
+  prefixesFrom,
+  savedServer,
+  serverToReturn,
+  serverListFrom,
+  serverSlug,
+  sessionPrefix,
+  withoutServer,
+  withServer,
+} from "./server-choice";
+import { readValueSync, STORED, writeValue, writeValueSync } from "./storage";
 
 /** Not in `STORED`: signing out of a server doesn't leave it. */
 const SERVER = "server";
+/** The servers this phone is signed in to (JSON list, ADR 0154). */
+const SIGNED_IN = "servers";
+/** Each server's session prefix (JSON by server, ADR 0154). */
+const PREFIXES = "session-prefixes";
 
 /** Development builds may use http, on localhost or the local network only. */
 export const ALLOW_HTTP = APP_VARIANT === "development";
@@ -27,9 +41,70 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Points the app at `next`; callers sign out of the current server first (`connectToServer`). */
+/** The server the app was on before the last change: where the sign-in of a newly added one goes back to. */
+let came: string | null = null;
+
+/** Points the app at `next`. Every server stays signed in (ADR 0154): its session waits under its own prefix. */
 export async function setServer(next: string) {
+  if (next !== server) came = server;
   server = next;
   await writeValue(SERVER, savedServer(next, API_URL));
   for (const listener of listeners) listener();
+}
+
+// ── Sessions per server (ADR 0154) ──────────────────────────────────────────────
+
+const rawPrefixes = readValueSync(PREFIXES);
+const prefixes = prefixesFrom(rawPrefixes, server, STORAGE_PREFIX);
+// The first launch that keeps sessions per server: the server used until now keeps the old prefix.
+if (rawPrefixes === null) writeValueSync(PREFIXES, JSON.stringify(prefixes));
+
+/** Where a server's session (cookie and cached session) is stored. */
+export const prefixOf = (target: string) => sessionPrefix(prefixes, target, STORAGE_PREFIX);
+
+/**
+ * The name a per-server value is remembered under: the old one for the server the app used before sessions were kept
+ * per server, so its remembered workspace stays; its own for any other.
+ */
+export const perServer = (name: string, target: string) =>
+  prefixOf(target) === STORAGE_PREFIX ? name : `${name}.${serverSlug(target)}`;
+
+/** The remembered workspace on a server. */
+export const orgValueName = (target: string) => perServer(STORED.org, target);
+
+let signedIn = serverListFrom(readValueSync(SIGNED_IN));
+const signedInListeners = new Set<() => void>();
+
+/** The servers this phone is signed in to, in the order they were added. */
+export const signedInServers = () => signedIn;
+
+/** The servers signed in to, for screens that list them (Workspaces). */
+export function useSignedInServers() {
+  return useSyncExternalStore((listener) => {
+    signedInListeners.add(listener);
+    return () => {
+      signedInListeners.delete(listener);
+    };
+  }, signedInServers);
+}
+
+function saveSignedIn(next: string[]) {
+  if (next.length === signedIn.length && next.every((s, i) => s === signedIn[i])) return;
+  signedIn = next;
+  writeValueSync(SIGNED_IN, JSON.stringify(next));
+  for (const listener of signedInListeners) listener();
+}
+
+/** A session arrived on `target` (signing in, or an older install's saved one read at launch). */
+export const markSignedIn = (target: string) => saveSignedIn(withServer(signedIn, target));
+
+/** Signed out of `target`: off the list. */
+export const markSignedOut = (target: string) => saveSignedIn(withoutServer(signedIn, target));
+
+/**
+ * Where the sign-in screen's back and "Voltar para …" go: the server the app came from while still signed in there,
+ * else another one signed in to; null on a first sign-in.
+ */
+export function useServerToReturn() {
+  return serverToReturn(useSignedInServers(), useServer(), came);
 }

@@ -32,6 +32,8 @@ serde_json = "1"
 # The server here's secrets (local_server.rs): the owner key's SHA-256, base64 for the generated values.
 sha2 = "0.10"
 base64 = "0.22"
+# Every server's workspaces with its own session (workspaces.rs, ADR 0154): a small blocking client, rustls.
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [target.'cfg(unix)'.dependencies]
 # SIGTERM for the server here's graceful stop.
