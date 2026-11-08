@@ -13316,6 +13316,14 @@ export const en = {
     statusReplyQueued: "Waiting for the computer ({{duration}}). I'll read your message when my turn comes.",
     /** The same line for an agent whose computer is away. */
     statusReplyAway: "Waiting for my computer to come back. I'll read your message as soon as it's back.",
+    /** The same line for an agent waiting on its plan's limit: {{when}} is when it is back ("Wednesday at 14:00"). */
+    statusReplyPlan: "I'm waiting for my plan to come back ({{when}}). I'll read your message when it's back.",
+    statusReplyPlanUnknown: "I'm waiting for my plan to come back. I'll read your message as soon as it's back.",
+    /** The same line for an agent whose monthly budget ran out. */
+    statusReplyBudget:
+      "I'm waiting for my monthly budget to renew ({{when}}). I'll read your message then, or sooner if an admin raises the limit.",
+    statusReplyBudgetUnknown:
+      "I'm waiting for my monthly budget to renew. I'll read your message then, or sooner if an admin raises the limit.",
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
