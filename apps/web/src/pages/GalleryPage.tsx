@@ -19,6 +19,7 @@ import {
   EmptyState,
   Field,
   FilterToggle,
+  GroupHeading,
   Icon,
   InfoHint,
   Input,
@@ -56,7 +57,7 @@ import { useTheme } from "@/lib/theme";
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="gallery-section" aria-label={title}>
-      <h2 className="section-title">{title}</h2>
+      <GroupHeading title={title} />
       {children}
     </section>
   );

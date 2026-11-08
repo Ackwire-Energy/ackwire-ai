@@ -3,7 +3,7 @@ import { keys, useWikiPage, useWikiReads, useWikiTrash, useWikiTree } from "@age
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
-import { Button, Checkbox, EmptyState, Icon, Kbd, PageHeader, SearchField } from "@agenteschat/ui";
+import { Button, Checkbox, EmptyState, GroupHeading, Icon, Kbd, PageHeader, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -642,122 +642,120 @@ function WikiHome({
   return (
     <div className="wiki-home">
       <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} />
-      <section className="wiki-home__sec" aria-label={t("wiki.recent")}>
-        <h2 className="wiki-home__h">{t("wiki.recent")}</h2>
-        <div className="wiki-cards">
-          {recent.map((p) => (
-            <Link
-              key={p.slug}
-              to="/org/$orgId/wiki/$slug"
-              params={{ orgId: org.id, slug: p.slug }}
-              className="wiki-card"
-            >
-              {/* The source tag ends the folder's line: a long folder gives way ("…") instead of running under it. */}
-              <span className="wiki-card__where">
-                <Icon name={p.locked ? "lock" : "drive"} size={14} />
-                <span className="wiki-card__folder">{p.folder || t("wiki.root")}</span>
-                {p.sourceType === "obsidian" && (
-                  <span className="wiki-card__src">
-                    <ObsidianMark size={14} />
-                    {t("wiki.legend.obsidian")}
-                  </span>
-                )}
-              </span>
-              <b className="wiki-card__title">{p.title}</b>
-              {p.excerpt && <span className="wiki-card__text">{p.excerpt}</span>}
-              <span className="wiki-card__by ac-iconline">
-                <AuthorAvatar a={p.updatedBy} />
-                <span>
-                  <b>{name(p.updatedBy)}</b>
-                  {p.updatedBy.onBehalfOf
-                    ? ` ${t("wiki.atRequestOf")} ${dir.memberById.get(p.updatedBy.onBehalfOf)?.name ?? ""}`
-                    : ""}
-                  {" · "}
-                  {relativeTime(t, i18n.language, p.updatedAt)}
+      <div className="ac-groups">
+        <section className="wiki-home__sec" aria-label={t("wiki.recent")}>
+          <GroupHeading title={t("wiki.recent")} />
+          <div className="wiki-cards">
+            {recent.map((p) => (
+              <Link
+                key={p.slug}
+                to="/org/$orgId/wiki/$slug"
+                params={{ orgId: org.id, slug: p.slug }}
+                className="wiki-card"
+              >
+                {/* The source tag ends the folder's line: a long folder gives way ("…") instead of running under it. */}
+                <span className="wiki-card__where">
+                  <Icon name={p.locked ? "lock" : "drive"} size={14} />
+                  <span className="wiki-card__folder">{p.folder || t("wiki.root")}</span>
+                  {p.sourceType === "obsidian" && (
+                    <span className="wiki-card__src">
+                      <ObsidianMark size={14} />
+                      {t("wiki.legend.obsidian")}
+                    </span>
+                  )}
                 </span>
-              </span>
-            </Link>
-          ))}
+                <b className="wiki-card__title">{p.title}</b>
+                {p.excerpt && <span className="wiki-card__text">{p.excerpt}</span>}
+                <span className="wiki-card__by ac-iconline">
+                  <AuthorAvatar a={p.updatedBy} />
+                  <span>
+                    <b>{name(p.updatedBy)}</b>
+                    {p.updatedBy.onBehalfOf
+                      ? ` ${t("wiki.atRequestOf")} ${dir.memberById.get(p.updatedBy.onBehalfOf)?.name ?? ""}`
+                      : ""}
+                    {" · "}
+                    {relativeTime(t, i18n.language, p.updatedAt)}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+        <div className="wiki-home__two">
+          <section className="wiki-home__sec" aria-label={t("wiki.topReads")}>
+            <GroupHeading title={t("wiki.topReads")} note={t("wiki.last7Days")} />
+            <div className="wiki-panel">
+              {reads.isLoading ? (
+                <LoadingList count={3} />
+              ) : top.length === 0 ? (
+                <p className="wiki-panel__empty small muted">{t("wiki.topReadsEmpty")}</p>
+              ) : (
+                top.map((r) => (
+                  <Link
+                    key={r.slug}
+                    to="/org/$orgId/wiki/$slug"
+                    params={{ orgId: org.id, slug: r.slug }}
+                    className="wiki-read"
+                  >
+                    <span className="wiki-read__crew">
+                      {r.agents.slice(0, 3).map((a) => (
+                        <AgentAvatar
+                          key={a.agentId}
+                          agentId={a.agentId}
+                          name={dir.agentById.get(a.agentId)?.name ?? ""}
+                          size="sm"
+                        />
+                      ))}
+                    </span>
+                    <span className="wiki-read__t">
+                      <b>{r.title}</b>
+                      <small>
+                        {r.agents
+                          .slice(0, 3)
+                          .map((a) => dir.agentById.get(a.agentId)?.name)
+                          .filter(Boolean)
+                          .join(", ")}
+                      </small>
+                    </span>
+                    <span className="wiki-read__bar" aria-hidden="true">
+                      <i style={{ width: `${Math.round((r.total / max) * 100)}%` }} />
+                    </span>
+                    <span className="ac-num wiki-read__n" title={t("wiki.uses.count", { count: r.total })}>
+                      {r.total}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+          </section>
+          <section className="wiki-home__sec" aria-label={t("wiki.folders")}>
+            <GroupHeading title={t("wiki.folders")} count={t("wiki.pageCount", { count: pages.length })} />
+            <div className="wiki-panel">
+              {tops.length > 0 && (
+                <div className="wiki-folders">
+                  {tops.map((f) => (
+                    <div key={f.path} className="wiki-folder">
+                      <span className="wiki-folder__icon">
+                        <Icon name="drive" size={16} />
+                      </span>
+                      <span>
+                        <b>{f.name}</b>
+                        <small>{t("wiki.pageCount", { count: count(f) })}</small>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" className="wiki-minigraph" onClick={onGraph} aria-label={t("wiki.openGraph")}>
+                <WikiGraphView mini />
+                <span className="wiki-minigraph__label">
+                  <Icon name="diagram" size={14} />
+                  {t("wiki.openGraph")}
+                </span>
+              </button>
+            </div>
+          </section>
         </div>
-      </section>
-      <div className="wiki-home__two">
-        <section className="wiki-home__sec" aria-label={t("wiki.topReads")}>
-          <h2 className="wiki-home__h">
-            {t("wiki.topReads")} <span className="wiki-label__n">{t("wiki.last7Days")}</span>
-          </h2>
-          <div className="wiki-panel">
-            {reads.isLoading ? (
-              <LoadingList count={3} />
-            ) : top.length === 0 ? (
-              <p className="wiki-panel__empty small muted">{t("wiki.topReadsEmpty")}</p>
-            ) : (
-              top.map((r) => (
-                <Link
-                  key={r.slug}
-                  to="/org/$orgId/wiki/$slug"
-                  params={{ orgId: org.id, slug: r.slug }}
-                  className="wiki-read"
-                >
-                  <span className="wiki-read__crew">
-                    {r.agents.slice(0, 3).map((a) => (
-                      <AgentAvatar
-                        key={a.agentId}
-                        agentId={a.agentId}
-                        name={dir.agentById.get(a.agentId)?.name ?? ""}
-                        size="sm"
-                      />
-                    ))}
-                  </span>
-                  <span className="wiki-read__t">
-                    <b>{r.title}</b>
-                    <small>
-                      {r.agents
-                        .slice(0, 3)
-                        .map((a) => dir.agentById.get(a.agentId)?.name)
-                        .filter(Boolean)
-                        .join(", ")}
-                    </small>
-                  </span>
-                  <span className="wiki-read__bar" aria-hidden="true">
-                    <i style={{ width: `${Math.round((r.total / max) * 100)}%` }} />
-                  </span>
-                  <span className="ac-num wiki-read__n" title={t("wiki.uses.count", { count: r.total })}>
-                    {r.total}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-        <section className="wiki-home__sec" aria-label={t("wiki.folders")}>
-          <h2 className="wiki-home__h">
-            {t("wiki.folders")} <span className="wiki-label__n">{t("wiki.pageCount", { count: pages.length })}</span>
-          </h2>
-          <div className="wiki-panel">
-            {tops.length > 0 && (
-              <div className="wiki-folders">
-                {tops.map((f) => (
-                  <div key={f.path} className="wiki-folder">
-                    <span className="wiki-folder__icon">
-                      <Icon name="drive" size={16} />
-                    </span>
-                    <span>
-                      <b>{f.name}</b>
-                      <small>{t("wiki.pageCount", { count: count(f) })}</small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button type="button" className="wiki-minigraph" onClick={onGraph} aria-label={t("wiki.openGraph")}>
-              <WikiGraphView mini />
-              <span className="wiki-minigraph__label">
-                <Icon name="diagram" size={14} />
-                {t("wiki.openGraph")}
-              </span>
-            </button>
-          </div>
-        </section>
       </div>
     </div>
   );

@@ -1146,12 +1146,6 @@ a.mi-pr:hover {
   font-weight: 500;
   color: var(--faint);
 }
-.mi-section-title {
-  margin: 14px 0 6px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--faint);
-}
 .mi-optrow {
   display: flex;
   align-items: flex-start;
@@ -1188,14 +1182,6 @@ a.mi-pr:hover {
 }
 
 /* ── Missões tab: mission cards ──────────────────────────────────────────── */
-.mi-tab {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.mi-tab .mi-section-title {
-  margin-top: 0;
-}
 .mi-mcs {
   display: flex;
   flex-direction: column;

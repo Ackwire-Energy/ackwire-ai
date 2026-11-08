@@ -419,22 +419,13 @@ html:not([data-pointer]) .wiki-import-card:focus-visible {
 .wiki-home {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: var(--space-4);
   animation: wiki-in 0.3s var(--out) both;
 }
 .wiki-home__sec {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-.wiki-home__h {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 2px 12px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
 }
 .wiki-cards {
   display: grid;

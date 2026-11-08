@@ -106,7 +106,7 @@ describe("Configurações → Auditoria", () => {
     expect(first.textContent).toContain("Fazer um deploy · pedido por Walter · #general");
     expect(first.textContent).toContain("Esperando aprovação");
     expect(section().textContent).toContain("rotina Follow-up");
-    expect([...section().querySelectorAll(".audit__day")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
+    expect([...section().querySelectorAll(".ac-grouphead")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
   });
 
   test("a row that didn't end in anything keeps its time in the last column, on a phone too", async () => {

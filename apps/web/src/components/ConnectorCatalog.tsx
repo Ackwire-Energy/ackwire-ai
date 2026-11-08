@@ -10,6 +10,7 @@ import {
   Chip,
   Dialog,
   EmptyState,
+  GroupHeading,
   Icon,
   type IconName,
   initialsOf,
@@ -376,9 +377,7 @@ export function ConnectorCatalogDialog({
             <>
               {suggested.length > 0 && (
                 <section className="catalog__section" aria-labelledby="catalog-suggested">
-                  <h3 id="catalog-suggested" className="catalog__h">
-                    {t("connectors.suggested", { org: org.name })}
-                  </h3>
+                  <GroupHeading level={3} id="catalog-suggested" title={t("connectors.suggested", { org: org.name })} />
                   <ul className="catalog-feat">
                     {suggested.map((e) => (
                       <li key={e.key}>
@@ -400,11 +399,7 @@ export function ConnectorCatalogDialog({
                 </section>
               )}
               <section className="catalog__section" aria-labelledby={suggested.length > 0 ? "catalog-more" : undefined}>
-                {suggested.length > 0 && (
-                  <h3 id="catalog-more" className="catalog__h">
-                    {t("connectors.more")}
-                  </h3>
-                )}
+                {suggested.length > 0 && <GroupHeading level={3} id="catalog-more" title={t("connectors.more")} />}
                 <ul className="catalog-grid">
                   {shown.map((e) => (
                     <li key={e.key}>

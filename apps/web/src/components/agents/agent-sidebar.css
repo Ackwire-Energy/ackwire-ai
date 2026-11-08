@@ -92,28 +92,12 @@
 [data-theme="dark"] .dm-side__sec {
   border-top-color: var(--line2);
 }
-.dm-side__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  font-size: 11.5px;
-  font-weight: 650;
-  line-height: 16px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-.dm-side__count {
-  font-weight: 500;
-  letter-spacing: 0;
+/* Over its rows, whose plates reach 8 past the section's sides: the heading's words start on the plates' edge. */
+.dm-side__sec > .ac-grouphead:has(+ .dm-side__rows) {
+  margin-inline: -8px;
 }
 .dm-side__all {
-  margin-left: auto;
-  font-size: 12.5px;
   font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
 }
 /* The picture: the screen from its top left corner, a click opens the computer. */
 .dm-side__screen {

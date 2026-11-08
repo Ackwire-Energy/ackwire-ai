@@ -52,6 +52,7 @@ import {
   cx,
   EmptyState,
   ExpiryFuse,
+  GroupHeading,
   Icon,
   type IconName,
   Kbd,
@@ -1730,45 +1731,44 @@ export function NotificationsPage() {
         </EmptyState>
       )}
 
-      {waiting.length > 0 && (
-        <section className="nt-wait" aria-label={t("notifications.wait.title")}>
-          <div className="list-group-head">
-            <h2>{t("notifications.wait.title")}</h2>
-            <span className="list-group-head__count">{waiting.length}</span>
-          </div>
-          {waiting.map((n) => (
-            <WaitCard
-              key={n.id}
-              n={n}
-              s={stateOf(n)}
-              h={handlers}
-              dir={dir}
-              mine={mine}
-              resolving={resolving === n.id}
-              channelName={channelName}
-            />
-          ))}
-        </section>
-      )}
-
-      {days.map(([day, rows]) => {
-        const unread = rows.filter((n) => n.readAt === null).length;
-        return (
-          <section key={day} className="nt-day" aria-label={t(`notifications.day.${day}`)}>
-            <div className="list-group-head">
-              <h2>{t(`notifications.day.${day}`)}</h2>
-              <span className="list-group-head__count">
-                {unread ? t("notifications.dayUnread", { count: unread }) : rows.length}
-              </span>
-            </div>
-            <div className="list-card nt-list">
-              {rows.map((n) => (
-                <Row key={n.id} n={n} s={stateOf(n)} h={handlers} dir={dir} mine={mine} channelName={channelName} />
+      <div className="ac-groups">
+        {waiting.length > 0 && (
+          <section className="nt-wait" aria-label={t("notifications.wait.title")}>
+            <GroupHeading title={t("notifications.wait.title")} count={waiting.length} />
+            <div className="nt-wait__cards">
+              {waiting.map((n) => (
+                <WaitCard
+                  key={n.id}
+                  n={n}
+                  s={stateOf(n)}
+                  h={handlers}
+                  dir={dir}
+                  mine={mine}
+                  resolving={resolving === n.id}
+                  channelName={channelName}
+                />
               ))}
             </div>
           </section>
-        );
-      })}
+        )}
+
+        {days.map(([day, rows]) => {
+          const unread = rows.filter((n) => n.readAt === null).length;
+          return (
+            <section key={day} className="nt-day" aria-label={t(`notifications.day.${day}`)}>
+              <GroupHeading
+                title={t(`notifications.day.${day}`)}
+                count={unread ? t("notifications.dayUnread", { count: unread }) : rows.length}
+              />
+              <div className="list-card nt-list">
+                {rows.map((n) => (
+                  <Row key={n.id} n={n} s={stateOf(n)} h={handlers} dir={dir} mine={mine} channelName={channelName} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
 
       {list.hasNextPage && (
         <div className="nt-more-pages">

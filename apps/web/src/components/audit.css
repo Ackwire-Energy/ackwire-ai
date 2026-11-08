@@ -4,36 +4,19 @@
 .audit {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
 }
 .audit__agent {
   min-width: 180px;
 }
 .audit__list {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
-}
-.audit__day {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 22px 0 4px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--faint);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.audit__day::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
 }
 .audit__more {
   display: flex;
   justify-content: center;
-  margin-top: 18px;
 }
 
 /* One row: who, the sentence and its line, how it ended, the time. */

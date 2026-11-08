@@ -22,6 +22,7 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  GroupHeading,
   Icon,
   Locked,
   Menu,
@@ -661,7 +662,7 @@ export function ShareMissionDialog({
               </>
             )}
             {mission.canAct && <JoinRequests mission={mission} enabled={open} />}
-            <h3 className="mi-section-title">{t("missions.share.who")}</h3>
+            <GroupHeading level={3} title={t("missions.share.who")} />
             <ul className="mi-people">
               {list?.owner && (
                 <li className="mi-person">
@@ -813,7 +814,7 @@ function JoinRequests({ mission, enabled }: { mission: Mission; enabled: boolean
     );
   return (
     <>
-      <h3 className="mi-section-title">{t("missions.join.title", { count: list.length })}</h3>
+      <GroupHeading level={3} title={t("missions.join.title", { count: list.length })} />
       <ul className="mi-people">
         {list.map((r) => (
           <li key={r.id} className="mi-person">

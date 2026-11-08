@@ -94,6 +94,7 @@ import {
   Field,
   FilterBar,
   FilterChip,
+  GroupHeading,
   Icon,
   type IconName,
   InfoHint,
@@ -356,10 +357,7 @@ export function RoutinesPage() {
   const group = (title: string, rows: Routine[]) =>
     rows.length > 0 && (
       <section className="routines-group" aria-label={title}>
-        <h2 className="routines-group__title">
-          {title}
-          <span>{rows.length}</span>
-        </h2>
+        <GroupHeading title={title} count={rows.length} />
         <div className="routines-list">
           {rows.map((r) => (
             <RoutineRow
@@ -467,54 +465,59 @@ export function RoutinesPage() {
                 ]}
               />
             </Toolbar>
-            {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
-            {group(t("routines.groupPaused"), paused)}
-            {live.length === 0 && paused.length === 0 && filtered && (
-              <EmptyState
-                size="panel"
-                actions={
-                  <Button
-                    onClick={() => {
-                      setAgents([]);
-                      setQ("");
-                      setStatus("all");
-                    }}
-                  >
-                    {copy.clearAll}
-                  </Button>
-                }
-              >
-                {t("routines.noResults")}
-              </EmptyState>
-            )}
-            {done.length > 0 && status === "all" && (
-              <section className="routines-group" aria-label={t("routines.done")}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={showDone ? "chevronDown" : "chevronRight"}
-                  aria-expanded={showDone}
-                  aria-controls="routines-done-list"
-                  onClick={() => setShowDone((v) => !v)}
+            <div className="ac-groups">
+              {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
+              {group(t("routines.groupPaused"), paused)}
+              {live.length === 0 && paused.length === 0 && filtered && (
+                <EmptyState
+                  size="panel"
+                  actions={
+                    <Button
+                      onClick={() => {
+                        setAgents([]);
+                        setQ("");
+                        setStatus("all");
+                      }}
+                    >
+                      {copy.clearAll}
+                    </Button>
+                  }
                 >
-                  {t("routines.doneToggle", { count: done.length })}
-                </Button>
-                {showDone && (
-                  <div id="routines-done-list" className="routines-list">
-                    {done.map((r) => (
-                      <RoutineRow
-                        key={r.id}
-                        routine={r}
-                        now={now}
-                        selected={r.id === openId}
-                        onOpen={() => toggleOpen(r.id)}
-                        onEdit={() => setOpenId(r.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
+                  {t("routines.noResults")}
+                </EmptyState>
+              )}
+              {done.length > 0 && status === "all" && (
+                <section className="routines-group" aria-label={t("routines.done")}>
+                  <GroupHeading
+                    title={
+                      <button
+                        type="button"
+                        aria-expanded={showDone}
+                        aria-controls="routines-done-list"
+                        onClick={() => setShowDone((v) => !v)}
+                      >
+                        <Icon name={showDone ? "chevronDown" : "chevronRight"} size={14} />
+                        {t("routines.doneToggle", { count: done.length })}
+                      </button>
+                    }
+                  />
+                  {showDone && (
+                    <div id="routines-done-list" className="routines-list">
+                      {done.map((r) => (
+                        <RoutineRow
+                          key={r.id}
+                          routine={r}
+                          now={now}
+                          selected={r.id === openId}
+                          onOpen={() => toggleOpen(r.id)}
+                          onEdit={() => setOpenId(r.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
           </>
         )}
       </div>

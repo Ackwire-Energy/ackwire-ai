@@ -25,9 +25,6 @@
   display: flex;
   flex-direction: column;
 }
-.home-sec .list-group-head {
-  min-height: 24px;
-}
 /* "Ver tudo" and "Ocultar": quiet, at the head's end. */
 .home-sec__more {
   margin-left: auto;

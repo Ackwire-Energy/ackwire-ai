@@ -40,13 +40,13 @@ import {
   Card,
   CardHeader,
   Chip,
-  CountChip,
   Dialog,
   DialogBody,
   DialogFooter,
   Field,
   FilterBar,
   FilterChip,
+  GroupHeading,
   Icon,
   type IconName,
   Input,
@@ -175,9 +175,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
       {!invites && <Suggestions />}
 
       <section aria-labelledby="sec-people" className="section section--tight">
-        <h2 id="sec-people" className="section-title">
-          {t("members.people")}
-        </h2>
+        <GroupHeading id="sec-people" title={t("members.people")} />
         <FilterBar
           label={t("members.filters")}
           clearText={filterCopy.clearAll}
@@ -305,16 +303,17 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
       </section>
 
       <section aria-labelledby="sec-agents" className="section section--tight">
-        <div className="section__head">
-          <h2 id="sec-agents" className="section-title">
-            {t("members.agents")}
-          </h2>
-          {can(org, "create_agents") && (
-            <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link" style={{ fontSize: 14 }}>
-              {t("shell.createAgent")}
-            </Link>
-          )}
-        </div>
+        <GroupHeading
+          id="sec-agents"
+          title={t("members.agents")}
+          aside={
+            can(org, "create_agents") && (
+              <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link">
+                {t("shell.createAgent")}
+              </Link>
+            )
+          }
+        />
         <List>
           {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}
           {dir.agents.map((a) => {
@@ -475,13 +474,8 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
     <>
       {gone && <Alert tone="neutral">{t("members.requests.gone")}</Alert>}
       {requests.length > 0 && (
-        <section aria-labelledby="sec-waiting" className="section section--tight">
-          <div className="members-head">
-            <h2 id="sec-waiting" className="section-title">
-              {t("members.waitingTitle")}
-            </h2>
-            <CountChip strong>{requests.length}</CountChip>
-          </div>
+        <section aria-label={t("members.waitingTitle")} className="section section--tight">
+          <GroupHeading title={t("members.waitingTitle")} count={requests.length} />
           <MembersFull />
           <List>
             {requests.map((r) => {
@@ -699,9 +693,7 @@ function SentInvitations() {
 
   return (
     <section aria-labelledby="sec-sent" className="section section--tight">
-      <h2 id="sec-sent" className="section-title">
-        {t("members.invitations.title")}
-      </h2>
+      <GroupHeading id="sec-sent" title={t("members.invitations.title")} />
       {list.isLoading && <LoadingList count={2} trailing />}
       <List>
         {list.isSuccess && shown.length === 0 && (
@@ -960,9 +952,7 @@ function Suggestions() {
       </Card>
       {waiting.length > 0 && (
         <section aria-labelledby="sec-mine" className="section section--tight">
-          <h2 id="sec-mine" className="section-title">
-            {t("members.suggest.mine")}
-          </h2>
+          <GroupHeading id="sec-mine" title={t("members.suggest.mine")} />
           <List>
             {waiting.map((s: MySuggestion) => (
               // biome-ignore lint/a11y/useSemanticElements: a row of the list, named for whom it suggests

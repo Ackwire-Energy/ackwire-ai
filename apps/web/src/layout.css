@@ -97,12 +97,6 @@ p {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
-.section-title {
-  margin: 0;
-  font-size: 18px;
-  line-height: 24px;
-  font-weight: 650;
-}
 .grid-options {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -604,9 +598,25 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
       --sidebar-fade-bottom 0.2s var(--out);
   }
 }
-/* Its thumb shows only while the pointer is on the list or the keyboard moves through it. Through the token: Chrome
-   repaints a scrollbar when its element's style changes, never for a `:hover` that only its pseudo-elements read. */
-.sidebar__scroll:not(:hover, :has(:focus-visible)) {
+/* A column that scrolls on its own (the sidebar's list, the work area, a split's columns, the board's columns, the side
+   panels, the wiki's and the calendar's) shows its thumb only while the pointer is on it or the keyboard moves through
+   it. The scrollbar is still drawn, clear, so nothing moves when it shows. Through the token: Chrome repaints a
+   scrollbar when its element's style changes, never for a `:hover` that only its pseudo-elements read. A list of
+   columns, not every box: a rule on every box would restyle a long chat's whole subtree on each hover. */
+:is(
+  .sidebar__scroll,
+  .shell__main,
+  .shell__main .page-split > *,
+  .issues-col > .issues-col__cards,
+  .members-side,
+  .dm-side__scroll,
+  .thread-panel__page,
+  .wiki-nav,
+  .wiki__center,
+  .cal-side,
+  .cal-agenda,
+  .cal-week__scroll
+):not(:hover, :has(:focus-visible)) {
   --scroll-thumb: transparent;
 }
 /* The kit's 8px scrollbar sits at the sidebar's edge, in room kept whether the list scrolls or not, and the 4px of the
@@ -884,11 +894,9 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .section--tight {
   gap: var(--space-2);
 }
-.section__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+/* The section's gap is its heading's room above what follows. */
+.section--tight > .ac-grouphead {
+  margin-bottom: 0;
 }
 
 /* Channel */
@@ -4077,11 +4085,25 @@ html:not([data-pointer]) .settings__link:focus-visible {
 .settings-row {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: var(--space-3);
+  min-height: calc(var(--control-h-sm) + 2 * var(--row-py));
+  box-sizing: border-box;
   padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
+.settings-row :is(.ac-select__trigger, .ac-input, .ac-input-affix, .ac-btn:not(.ac-btn--glyph, .ac-btn--icon)) {
+  height: var(--control-h-sm);
+}
 .settings-row:first-child {
+  border-top: 0;
+}
+/* A group's heading among a card's rows (Limites' Por papel): on the rows' words, the hairline above it. */
+.settings-rows > .ac-grouphead {
+  margin: 0;
+  padding: var(--space-4) var(--card-pad) var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.settings-rows > .ac-grouphead + .settings-row {
   border-top: 0;
 }
 /* Under a card's title the rows start below it, a hairline above the first as between the others: a row's hover
@@ -4341,13 +4363,7 @@ html:not([data-pointer]) .catalog__cat:focus-visible {
   padding: 24px var(--dialog-pad) var(--dialog-pad);
   display: flex;
   flex-direction: column;
-  gap: 32px;
-}
-.catalog__h {
-  margin: 0 2px 12px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
+  gap: 24px;
 }
 .catalog-feat,
 .catalog-grid {
@@ -4895,21 +4911,6 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
 .cflow__lead > .cflow__text {
   flex: 1 1 260px;
 }
-.cflow-group__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-.cflow-group__count {
-  font-variant-numeric: tabular-nums;
-  color: var(--faint);
-}
 .cflow-tools {
   list-style: none;
   margin: 0;
@@ -5061,9 +5062,6 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--form-gap);
-}
-.mail-actions .cflow-group__title {
-  margin-top: 0;
 }
 /* One field and what belongs to it: its chips and notes, closer to it than the next field. */
 .mail-list,
@@ -5978,9 +5976,6 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
 /* Page titles: tighter, more editorial. */
 .page-title {
   letter-spacing: var(--track-tighter);
-}
-.section-title {
-  letter-spacing: var(--track-tight);
 }
 
 /* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
@@ -9500,11 +9495,9 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   padding-top: var(--form-gap);
   border-top: 1px solid var(--line);
 }
-.agp-advgroup__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink);
+/* A form's group: its gap is its heading's room above the fields. */
+.agp-advgroup > .ac-grouphead {
+  margin-bottom: 0;
 }
 /* In the dialog "Atende outras pessoas" lines up like the switch under it: its line beside the switch, centered. */
 .agp-advgroup .plan-replies__terms {
@@ -9949,14 +9942,6 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
  * The Ficha (Overview): how it works and who it works with, as two lists of rows on the root card's face. A row is
  * its key, what it is, the value and a chevron (or its own button); the whole row opens its dialog.
  */
-.agp-ficha__h {
-  margin: 0 4px 8px;
-  color: var(--faint);
-  font-size: 12.5px;
-  font-weight: 650;
-  line-height: 16px;
-  letter-spacing: 0.02em;
-}
 .agp-ficha__card {
   container-type: inline-size;
   display: flex;
@@ -9966,29 +9951,26 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
 }
-.agp-work:has(> .agp-ficha__h) {
+.agp-work:has(> .ac-grouphead) {
   gap: 0;
   padding-top: 0;
 }
-.agp-work:has(> .agp-ficha__h) > :not(.agp-ficha__h, .agp-ficha__card) {
+.agp-work:has(> .ac-grouphead) > :not(.ac-grouphead, .agp-ficha__card) {
   margin-top: 10px;
 }
+/* One line each: the key (24), its label, the value with its note after it on its line, then the chevron or a button.
+   One line of words or a 24 key is 40 with the rows' room, a 32 button 48. */
 .agp-ficha__card .agp-frow {
   position: relative;
   display: grid;
-  grid-template-columns: 30px minmax(96px, 140px) minmax(0, 1fr) auto;
-  /* The value's track takes the room the key and the min height leave; the sub's is only as tall as a sub. With two
-     auto tracks the 30px key, spanning both, gave the empty second one 10px and the value sat above the label. */
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "key label value tail"
-    "key label sub tail";
+  grid-template-columns: 24px minmax(96px, 132px) minmax(0, 1fr) auto;
+  grid-template-areas: "key label value tail";
   gap: 0 12px;
   align-items: center;
   width: calc(100% - 8px);
-  min-height: 50px;
+  min-height: 40px;
   margin: 0 4px;
-  padding: 8px 12px;
+  padding: var(--row-py) 12px;
   border: 0;
   border-radius: 13px 13px 13px 4px;
   background: none;
@@ -10255,25 +10237,11 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
   flex-direction: column;
   gap: 24px;
 }
-.agp-tools__h {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 10px;
-  font-size: 15px;
-  font-weight: 650;
-}
-.agp-tools__h .connector-icon {
-  width: 24px;
-  height: 24px;
-  font-size: 11px;
+.agp-tools .ac-grouphead .connector-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
   line-height: 1;
-}
-.agp-tools__n {
-  margin-left: auto;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--muted);
 }
 .agp-tools .tr {
   gap: 0;

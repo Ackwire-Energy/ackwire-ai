@@ -9,11 +9,6 @@
   display: flex;
   flex-direction: column;
 }
-.db-group__hint {
-  margin-left: 8px;
-  font-weight: 500;
-  color: var(--muted);
-}
 /* With only "My Home": one muted line under it, pointing at "New dashboard". */
 .db-group__only {
   margin: 10px 2px 0;

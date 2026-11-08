@@ -45,33 +45,6 @@
  * Grouped by channel; one line each: who carries it, title + last line, then
  * fixed columns (tag right-aligned, people, time) so they line up row to row.
  */
-.threads-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.threads-group__head button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.threads-group__head button:hover {
-  color: var(--ink);
-}
-html:not([data-pointer]) .threads-group__head button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-  border-radius: var(--radius-sm);
-}
-.threads-group__head .ac-icon {
-  color: var(--faint);
-}
 .threads-group__chev {
   transition: transform 0.15s;
 }

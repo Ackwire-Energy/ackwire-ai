@@ -122,6 +122,7 @@ import {
   DialogFooter,
   DialogSearchList,
   EffortPixels,
+  GroupHeading,
   Icon,
   type IconName,
   InfoHint,
@@ -369,9 +370,7 @@ export function WorkCard({
   );
   return (
     <div className="agp-work">
-      <h2 className="agp-ficha__h" id="agp-ficha-work">
-        {t("agentPage.work.cell.label", g)}
-      </h2>
+      <GroupHeading id="agp-ficha-work" title={t("agentPage.work.cell.label", g)} />
       <section className="agp-workcard agp-ficha__card" aria-labelledby="agp-ficha-work">
         {before}
         {/* The Cloud's agents all work on the workspace's own computer, whose state the page's computer entry says:
@@ -1619,7 +1618,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         >
           <DialogBody>
             <section className="agp-advgroup">
-              <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.think")}</h3>
+              <GroupHeading level={3} title={t("agentPage.work.brain.advanced.think")} />
               {kind !== "model" &&
                 (isAuto(planModel) ? (
                   // "Automático" picks the effort too: said where the ramp would be, as the phone's row says it.
@@ -1646,7 +1645,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             </section>
             {kind !== "model" && (
               <section className="agp-advgroup">
-                <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.answers")}</h3>
+                <GroupHeading level={3} title={t("agentPage.work.brain.advanced.answers")} />
                 {agent.ownerUserId && accountKind && (
                   <PlanReplies
                     agent={agent.name}
