@@ -1,5 +1,5 @@
 import { type NoticeCategory, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
-import { Card, CardHeader, Chip, Icon, type IconName, Switch } from "@agenteschat/ui";
+import { Card, CardHeader, Chip, Icon, type IconName, InfoHint, Switch } from "@agenteschat/ui";
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
@@ -43,14 +43,14 @@ export function NoticePrefsSection() {
               id="notice-browser"
               icon="globe"
               label={t("noticePrefs.browser")}
-              help={browser.blocked ? t("shell.browserNoticesBlocked") : t("shell.browserNoticesHint")}
+              hint={browser.blocked ? undefined : t("shell.browserNoticesHint")}
+              status={browser.blocked && t("shell.browserNoticesBlocked")}
               control={
                 <Switch
                   checked={browser.on}
                   onCheckedChange={browser.change}
                   disabled={browser.blocked || browser.busy}
                   aria-label={t("noticePrefs.browser")}
-                  aria-describedby="notice-browser-help"
                 />
               }
             />
@@ -59,7 +59,8 @@ export function NoticePrefsSection() {
             id="notice-phone"
             icon="phone"
             label={t("noticePrefs.phone")}
-            help={phones > 0 ? t("noticePrefs.phoneOn") : t("noticePrefs.phoneOff")}
+            hint={phones > 0 ? t("noticePrefs.phoneOn") : undefined}
+            status={phones > 0 ? undefined : t("noticePrefs.phoneOff")}
             control={
               prefs.data &&
               (phones > 0 ? (
@@ -71,7 +72,7 @@ export function NoticePrefsSection() {
               ))
             }
           />
-          <PrefRow id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} help={t("noticePrefs.macHelp")} />
+          <PrefRow id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} hint={t("noticePrefs.macHelp")} />
         </div>
       </Card>
 
@@ -85,7 +86,7 @@ export function NoticePrefsSection() {
                 id={`notice-${c.id}`}
                 icon={ICONS[c.id]}
                 label={t(`noticePrefs.category.${c.id}.title`)}
-                help={t(`noticePrefs.category.${c.id}.help`)}
+                hint={t(`noticePrefs.category.${c.id}.help`)}
                 control={
                   <Switch
                     checked={c.on}
@@ -96,7 +97,6 @@ export function NoticePrefsSection() {
                       )
                     }
                     aria-label={t(`noticePrefs.category.${c.id}.title`)}
-                    aria-describedby={`notice-${c.id}-help`}
                   />
                 }
               />
@@ -113,16 +113,20 @@ export function NoticePrefsSection() {
 }
 
 /**
- * One line of the person's own settings: its icon (or their face), its name and what it covers, then its control.
- * With `onOpen` the whole line is a button that opens something, a chevron at its end. With a switch the whole line is
- * its label, so a press on its words toggles it as on a line that opens something.
+ * One line of the person's own settings: its icon (or their face), its name with an ⓘ for what it does (`hint`), then
+ * its control, centred on each other. Under the name only what must stay in sight (`status`: why the control is off,
+ * the value a line opens to); a value before the control (`value`: the plan it uses). With `onOpen` the whole line is a
+ * button that opens something, a chevron at its end, and it takes no ⓘ (a button can't hold one). With a switch a press
+ * anywhere on the line toggles it, its name the switch's label.
  */
 export function PrefRow({
   id,
   icon,
   lead,
   label,
-  help,
+  hint,
+  status,
+  value,
   control,
   onOpen,
 }: {
@@ -131,26 +135,56 @@ export function PrefRow({
   /** In place of the icon: the person's face. */
   lead?: ReactNode;
   label: string;
-  help?: ReactNode;
+  /** What the setting does, behind an ⓘ beside the name: plain sentences only. */
+  hint?: ReactNode;
+  /** What must stay in sight under the name: why the control is off, what it waits on, what the line opens to. */
+  status?: ReactNode;
+  /** A value before the control (a plan's logo and name). */
+  value?: ReactNode;
   control?: ReactNode;
   onOpen?: () => void;
 }) {
+  const { t } = useTranslation();
   const toggle = isValidElement(control) && control.type === Switch;
   const switchId = toggle ? ((control.props as { id?: string }).id ?? `${id}-switch`) : undefined;
-  const end = toggle ? cloneElement(control as ReactElement<{ id?: string }>, { id: switchId }) : control;
+  const described = [hint && !onOpen && `${id}-help`, status && `${id}-status`].filter(Boolean).join(" ");
+  const end = toggle
+    ? cloneElement(control as ReactElement<{ id?: string; "aria-describedby"?: string }>, {
+        id: switchId,
+        "aria-describedby": described || undefined,
+      })
+    : control;
+  const name = toggle ? (
+    // The switch's label, stretched over the line (`.settings-row__hit`), so a press on its words or its room toggles.
+    <label htmlFor={switchId} className="settings-row__label settings-row__hit">
+      {label}
+    </label>
+  ) : (
+    <span className="settings-row__label">{label}</span>
+  );
   const body = (
     <>
       <span className="settings-row__icon" aria-hidden="true">
         {lead ?? (icon && <Icon name={icon} size={16} />)}
       </span>
       <span className="settings-row__text ac-actrow__text">
-        <span className="settings-row__label">{label}</span>
-        {help && (
-          <span className="settings-row__help" id={`${id}-help`}>
-            {help}
+        {hint && !onOpen ? (
+          <span className="ac-hintline">
+            {name}
+            <InfoHint id={`${id}-help`} name={t("common.about", { label })}>
+              {hint}
+            </InfoHint>
+          </span>
+        ) : (
+          name
+        )}
+        {status && (
+          <span className="settings-row__status" id={`${id}-status`}>
+            {status}
           </span>
         )}
       </span>
+      {value && <span className="settings-row__value">{value}</span>}
       {onOpen ? (
         <Icon name="chevronRight" size={16} className="settings-row__chevron" />
       ) : (
@@ -164,11 +198,15 @@ export function PrefRow({
         {body}
       </button>
     );
-  return toggle ? (
-    <label htmlFor={switchId} className="settings-row ac-actrow settings-row--lead settings-row--toggle">
+  return (
+    <div
+      className={
+        toggle
+          ? "settings-row ac-actrow settings-row--lead settings-row--toggle"
+          : "settings-row ac-actrow settings-row--lead"
+      }
+    >
       {body}
-    </label>
-  ) : (
-    <div className="settings-row ac-actrow settings-row--lead">{body}</div>
+    </div>
   );
 }

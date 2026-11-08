@@ -864,7 +864,15 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
       onOk={() => void save()}
       onClose={onClose}
     >
-      <Field label={t("audience.section")} help={valid ? modeText(audience.mode) : undefined} error={problem}>
+      <Field
+        label={t("audience.section")}
+        hint={
+          valid
+            ? { name: t("common.about", { label: t("audience.section") }), text: modeText(audience.mode) }
+            : undefined
+        }
+        error={problem}
+      >
         <Select
           value={audience.mode}
           onValueChange={(mode) => setAudience((a) => ({ ...a, mode }))}
@@ -876,7 +884,10 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
         />
       </Field>
       {audience.mode === "people" && (
-        <Field label={t("agentSetup.who.people")} help={always}>
+        <Field
+          label={t("agentSetup.who.people")}
+          hint={{ name: t("common.about", { label: t("agentSetup.who.people") }), text: always }}
+        >
           <div className="setup-dlg__people">
             {(pickedPeople.size > 0 || pickedRoles.size > 0) && (
               <TokenList label={t("audience.picked")}>
@@ -933,7 +944,10 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
       )}
       {asks.dialog}
       {admin && (
-        <Field label={t("newAgent.owner")} help={t("agentSetup.who.ownerHelp", g)}>
+        <Field
+          label={t("newAgent.owner")}
+          hint={{ name: t("common.about", { label: t("newAgent.owner") }), text: t("agentSetup.who.ownerHelp", g) }}
+        >
           <OwnerSelect card={false} value={ownerId} onChange={setOwnerId} members={dir.members} meId={me.user.id} />
         </Field>
       )}
@@ -996,7 +1010,10 @@ function HowDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
       {seesBudget && (
         <Field
           label={t("agentSetup.how.budget")}
-          help={t("agentSetup.how.budgetHelp", g)}
+          hint={{
+            name: t("common.about", { label: t("agentSetup.how.budget") }),
+            text: t("agentSetup.how.budgetHelp", g),
+          }}
           error={budgetOk ? undefined : t("agent.budgetInvalid")}
         >
           <AffixInput
@@ -1015,7 +1032,10 @@ function HowDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
             <Icon name="chevronDown" size={16} />
             {t("agentSetup.how.more")}
           </summary>
-          <Field label={t("agentSetup.how.model")} help={t("brain.auto.hint")}>
+          <Field
+            label={t("agentSetup.how.model")}
+            hint={{ name: t("common.about", { label: t("agentSetup.how.model") }), text: t("brain.auto.hint") }}
+          >
             <ModelSelect
               aria-label={t("agentSetup.how.model")}
               value={model}

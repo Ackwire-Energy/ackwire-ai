@@ -273,14 +273,18 @@ function ConnectStep({
               options={DATABASE_PROVIDERS.map((p) => ({ value: p, label: t(`database.provider.${p}`) }))}
             />
           </Field>
-          <Field label={t("connectFlow.name")} id="db-label" help={t("database.nameHelp")}>
+          <Field
+            label={t("connectFlow.name")}
+            id="db-label"
+            hint={{ name: t("common.about", { label: t("connectFlow.name") }), text: t("database.nameHelp") }}
+          >
             <Input
               value={label}
               placeholder={t("database.namePlaceholder")}
               onChange={(e) => setLabel(e.target.value)}
             />
           </Field>
-          <Field label={t("database.url")} id="db-url" help={t("database.urlHelp")} error={urlError}>
+          <Field label={t("database.url")} id="db-url" example={t("database.urlHelp")} error={urlError}>
             <Input
               autoComplete="off"
               data-1p-ignore
@@ -327,14 +331,25 @@ function ConnectStep({
               <Field
                 label={t("database.database")}
                 id="db-database"
-                help={whole ? t("database.databaseOptional") : undefined}
+                hint={
+                  whole
+                    ? {
+                        name: t("common.about", { label: t("database.database") }),
+                        text: t("database.databaseOptional"),
+                      }
+                    : undefined
+                }
               >
                 <Input autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
               </Field>
               <Field label={t("mail.username")} id="db-username">
                 <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
               </Field>
-              <Field label={t("database.password")} id="db-password" help={t("mail.passwordHelp")}>
+              <Field
+                label={t("database.password")}
+                id="db-password"
+                hint={{ name: t("common.about", { label: t("database.password") }), text: t("mail.passwordHelp") }}
+              >
                 <Input
                   type="password"
                   // "new-password": the browser must not fill a saved login into this form (it put the
@@ -347,7 +362,7 @@ function ConnectStep({
               <Field
                 label={t("database.ssl")}
                 id="db-ssl"
-                help={sslmode === "disable" ? t("database.sslOffHelp") : undefined}
+                example={sslmode === "disable" ? t("database.sslOffHelp") : undefined}
               >
                 <Select
                   value={sslmode}
@@ -390,7 +405,15 @@ function ScopeFields({
   const { t } = useTranslation();
   return (
     <>
-      <Field label={t("database.scope")} group help={whole ? t("database.scopeAllHelp") : undefined}>
+      <Field
+        label={t("database.scope")}
+        group
+        hint={
+          whole
+            ? { name: t("common.about", { label: t("database.scope") }), text: t("database.scopeAllHelp") }
+            : undefined
+        }
+      >
         <Segmented
           label={t("database.scope")}
           value={whole ? "all" : "one"}
@@ -402,7 +425,11 @@ function ScopeFields({
         />
       </Field>
       {whole && (
-        <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
+        <Field
+          label={t("database.prefix")}
+          id="db-prefix"
+          hint={{ name: t("common.about", { label: t("database.prefix") }), text: t("database.prefixHelp") }}
+        >
           <Input
             autoComplete="off"
             spellCheck={false}
@@ -1059,7 +1086,7 @@ export function DatabaseReconnectDialog({
             <Field
               label={t("database.password")}
               id="db-reconnect-password"
-              help={t("mail.passwordHelp")}
+              hint={{ name: t("common.about", { label: t("database.password") }), text: t("mail.passwordHelp") }}
               error={touched && !password ? t("database.passwordInvalid") : undefined}
             >
               <Input

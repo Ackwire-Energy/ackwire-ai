@@ -82,21 +82,21 @@ export function AccountSection() {
             id="account-profile"
             lead={<MyFace className="settings-row__face" />}
             label={t("shell.profile")}
-            help={t("shell.profileHint")}
+            status={t("shell.profileHint")}
             onOpen={() => setProfile("name")}
           />
           <PrefRow
             id="account-zone"
             icon="clock"
             label={t("shell.timezone")}
-            help={zoneDisplayName(zone, i18n.language) ?? timezoneName(zone, i18n.language)}
+            status={zoneDisplayName(zone, i18n.language) ?? timezoneName(zone, i18n.language)}
             onOpen={() => setProfile("timezone")}
           />
           <PrefRow
             id="account-activity"
             icon="layers"
             label={t("settings.account.activity")}
-            help={t("settings.account.activityHelp")}
+            hint={t("settings.account.activityHelp")}
             control={
               <Switch
                 checked={org.showActivity === true}
@@ -104,7 +104,6 @@ export function AccountSection() {
                   showActivity.mutate(on, { onError: () => toast.show(t("settings.account.activityFailed")) })
                 }
                 aria-label={t("settings.account.activity")}
-                aria-describedby="account-activity-help"
               />
             }
           />
@@ -114,7 +113,7 @@ export function AccountSection() {
               id="account-agent-style"
               icon="message"
               label={t("settings.account.agentStyle")}
-              help={t("settings.account.agentStyleHelp")}
+              hint={t("settings.account.agentStyleHelp")}
               control={
                 <Segmented
                   size="sm"
@@ -137,7 +136,7 @@ export function AccountSection() {
             id="account-phone"
             icon="phone"
             label={t("shell.openOnPhone")}
-            help={t("shell.openOnPhoneHint")}
+            status={t("shell.openOnPhoneHint")}
             onOpen={() => setPhone(true)}
           />
           {me.user.hasPassword === false && (
@@ -145,7 +144,7 @@ export function AccountSection() {
               id="account-password"
               icon="key"
               label={t("shell.addPassword")}
-              help={t("shell.addPasswordHint")}
+              status={t("shell.addPasswordHint")}
               onOpen={() => setAccount("password")}
             />
           )}
@@ -161,7 +160,7 @@ export function AccountSection() {
                 id={`account-plan-${p.key}`}
                 lead={<ProviderLogo id={p.logo} size="sm" />}
                 label={p.name}
-                help={<PlanMeter compact usage={p.usage} text={planMeterText(t, i18n.language)} />}
+                status={<PlanMeter compact usage={p.usage} text={planMeterText(t, i18n.language)} />}
                 onOpen={() =>
                   void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "usage" } })
                 }

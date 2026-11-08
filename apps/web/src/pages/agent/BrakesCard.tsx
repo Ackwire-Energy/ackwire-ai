@@ -40,7 +40,10 @@ export function BrakesCard() {
   return (
     <Card as="section" className="agp-card" aria-labelledby="agp-brakes">
       <CardHead id="agp-brakes" icon="shield" title={t("brakes.title")} subtitle={t("brakes.subtitle")} />
-      <SettingRow title={t("brakes.costly")} description={t("brakes.costlyHelp")}>
+      <SettingRow
+        title={t("brakes.costly")}
+        hint={{ name: t("common.about", { label: t("brakes.costly") }), text: t("brakes.costlyHelp") }}
+      >
         <Segmented
           size="sm"
           label={t("brakes.costly")}
@@ -63,7 +66,11 @@ export function BrakesCard() {
           )}
         </SettingNote>
       )}
-      <SettingRow title={t("brakes.atOnce")} description={t("brakes.atOnceHelp")} htmlFor="agp-brakes-once">
+      <SettingRow
+        title={t("brakes.atOnce")}
+        hint={{ name: t("common.about", { label: t("brakes.atOnce") }), text: t("brakes.atOnceHelp") }}
+        htmlFor="agp-brakes-once"
+      >
         <Select
           id="agp-brakes-once"
           size="sm"
@@ -73,7 +80,11 @@ export function BrakesCard() {
           options={AT_ONCE.map((n) => ({ value: n, label: n }))}
         />
       </SettingRow>
-      <SettingRow title={t("brakes.prs")} description={t("brakes.prsHelp")} htmlFor="agp-brakes-prs">
+      <SettingRow
+        title={t("brakes.prs")}
+        hint={{ name: t("common.about", { label: t("brakes.prs") }), text: t("brakes.prsHelp") }}
+        htmlFor="agp-brakes-prs"
+      >
         <Select
           id="agp-brakes-prs"
           size="sm"
@@ -83,7 +94,10 @@ export function BrakesCard() {
           options={PRS.map((n) => ({ value: n, label: n }))}
         />
       </SettingRow>
-      <SettingRow title={t("brakes.call")} description={t("brakes.callHelp")}>
+      <SettingRow
+        title={t("brakes.call")}
+        hint={{ name: t("common.about", { label: t("brakes.call") }), text: t("brakes.callHelp") }}
+      >
         <Segmented
           size="sm"
           label={t("brakes.call")}
@@ -116,7 +130,11 @@ export function BrakesCard() {
           ))}
         </div>
       )}
-      <SettingRow title={t("brakes.project")} description={t("brakes.projectHelp")} htmlFor="agp-brakes-project">
+      <SettingRow
+        title={t("brakes.project")}
+        hint={{ name: t("common.about", { label: t("brakes.project") }), text: t("brakes.projectHelp") }}
+        htmlFor="agp-brakes-project"
+      >
         <Input
           id="agp-brakes-project"
           value={project}

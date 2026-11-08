@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 export function AddressList({
   id,
   label,
-  help,
+  example,
   values,
   onChange,
   disabled,
@@ -26,7 +26,8 @@ export function AddressList({
 }: {
   id: string;
   label: string;
-  help?: string;
+  /** Under the field: what it takes ("Endereços ou @dominio.com"), or what was found for it. */
+  example?: string;
   values: string[];
   onChange: (values: string[]) => void;
   disabled?: boolean;
@@ -63,7 +64,12 @@ export function AddressList({
   };
   return (
     <div className="mail-list">
-      <Field label={label} id={id} help={help} error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}>
+      <Field
+        label={label}
+        id={id}
+        example={example}
+        error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}
+      >
         <AffixInput
           ref={field}
           value={text}

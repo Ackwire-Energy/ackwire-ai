@@ -50,7 +50,13 @@ export function AutoModelsRow() {
   };
   return (
     <>
-      <SettingRow title={t("settings.autoModels.title")} description={t("settings.autoModels.text")}>
+      <SettingRow
+        title={t("settings.autoModels.title")}
+        hint={{
+          name: t("common.about", { label: t("settings.autoModels.title") }),
+          text: t("settings.autoModels.text"),
+        }}
+      >
         <Button size="sm" onClick={() => setChosen(start)}>
           <ProviderLogo id={PROVIDER} size="xs" />
           {t("settings.autoModels.choose")}

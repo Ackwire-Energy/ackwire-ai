@@ -4127,9 +4127,26 @@ html:not([data-pointer]) .settings__link:focus-visible {
   font-size: 14px;
   font-weight: 600;
 }
-.settings-row__help {
+/* What must stay in sight under the label: why the control is off, what it waits on, what the line opens to. */
+.settings-row__status {
   color: var(--ink-muted);
   font-size: 13px;
+  line-height: 18px;
+}
+/* A value before its control (the plan a line uses: its logo and name). */
+.settings-row__value {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.settings-row__value b {
+  color: var(--ink);
+  font-weight: 600;
 }
 .settings-row__control {
   flex: 0 0 300px;
@@ -13342,34 +13359,27 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   font-size: 14px;
 }
 /* A face, or a plan maker's mark, brings its own tile. */
-.settings-row__icon:has(> .ac-avatar, > .ac-brand) {
+.settings-row__icon:has(> .ac-avatar, > .ac-brand, > .ac-rolemark) {
   background: none;
   box-shadow: none;
-}
-/* With a line under the name, the tile's top is on the name's capitals (an `.ac-faceline` picture's place) however far
-   that line wraps: 11px is half the name's 22px line. A name alone stays on the tile's middle. */
-.settings-row--lead:has(> .settings-row__text > .settings-row__help) {
-  align-items: flex-start;
-}
-.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__icon {
-  translate: 0 calc(11px - var(--cap-top));
-}
-.settings-row--lead > .settings-row__end,
-.settings-row--lead > .settings-row__chevron {
-  align-self: center;
 }
 .settings-row__end {
   flex: none;
   display: flex;
   align-items: center;
 }
-/* Configurações › Aprovações (ADR 0139): a row whose box is the choice, the box on the label's first line. */
+/* Configurações › Aprovações (ADR 0139): a row whose box is the choice, centred on its label, on the label's first line
+   when a line says under it why it is off. */
 .settings-row.rh-check {
-  align-items: flex-start;
   gap: 12px;
 }
 .rh-check .ac-check {
   flex: none;
+}
+.settings-row.rh-check:has(.settings-row__status) {
+  align-items: flex-start;
+}
+.settings-row.rh-check:has(.settings-row__status) .ac-check {
   margin-top: 2px;
 }
 .rh-check .ac-check:disabled + .settings-row__text .settings-row__label {
@@ -13405,7 +13415,20 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .settings-row--open:hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
-/* A line with a switch is its label: a press anywhere on it toggles, as a line that opens something opens. */
+/* A line with a switch is its label: a press anywhere on it toggles, as a line that opens something opens. The label
+   reaches over the line (`.settings-row__hit`), under its ⓘ and its control, which stay pressable on their own. */
+.settings-row--toggle {
+  position: relative;
+}
+.settings-row--toggle .settings-row__hit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.settings-row--toggle :is(.ac-hint, .settings-row__status, .settings-row__end) {
+  position: relative;
+  z-index: 1;
+}
 .settings-row--toggle:not(:has(.ac-switch:disabled)) {
   cursor: pointer;
   transition: background-color 0.15s;
@@ -13447,36 +13470,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     flex-basis: 100%;
     box-sizing: border-box;
     min-width: 0;
-    padding-left: 44px;
-  }
-}
-/*
- * With a line under its name, what ends a row (a switch, a choice, the chevron) belongs to the name's line, never to
- * the row's middle however far that line wraps: centred on the name's 22px line (as an `.ac-iconline` lead), but a
- * control taller than that line rises only to `--action-clear` under the hairline above, and the row grows under it.
- * A control that goes under the words on a phone sits where it falls.
- */
-.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end {
-  align-self: flex-start;
-  translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
-}
-.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__chevron {
-  align-self: flex-start;
-  margin-block: 3px;
-}
-@media (max-width: 760px) {
-  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:not(:has(> .ac-switch)) {
-    translate: none;
-  }
-}
-/* A plain row (its label beside its control, the help under the label) does the same where the two sit side by
-   side; on a phone the control goes under the words. */
-@media (min-width: 761px) {
-  .settings-row:has(> .settings-row__text > .settings-row__help):has(> .settings-row__control, > .settings-row__end) {
-    align-items: flex-start;
-  }
-  .settings-row:has(> .settings-row__text > .settings-row__help) > :is(.settings-row__control, .settings-row__end) {
-    translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
+    padding-left: calc(28px + var(--space-3));
   }
 }
 
@@ -13749,15 +13743,6 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
 }
 /* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a
    30px tile beside 13px words), then its account. */
-.rh-set__planline {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
-  color: var(--ink);
-}
-.rh-set__planline b {
-  font-weight: 600;
-}
 /* Wide enough for its placeholder ("Padrão do workspace", longer in es, de, ru) after "US$". */
 .rh-set__budget .ac-input-affix {
   width: 260px;

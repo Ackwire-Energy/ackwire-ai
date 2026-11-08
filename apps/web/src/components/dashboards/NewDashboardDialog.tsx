@@ -80,7 +80,14 @@ function NewDashboardBody({ nameRef, onClose }: { nameRef: RefObject<HTMLInputEl
     >
       <Locked when={create.isPending}>
         <DialogBody className="db-dialog__body">
-          <Field label={t("dashboards.create.name")} id={`${id}-name`} help={t("dashboards.create.askHint")}>
+          <Field
+            label={t("dashboards.create.name")}
+            id={`${id}-name`}
+            hint={{
+              name: t("common.about", { label: t("dashboards.create.name") }),
+              text: t("dashboards.create.askHint"),
+            }}
+          >
             <Input
               ref={nameRef}
               value={title}

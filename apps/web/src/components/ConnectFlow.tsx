@@ -354,7 +354,12 @@ function ConnectStep({
           )}
         </Alert>
       )}
-      <Field label={t("connectors.apiKey")} id="cflow-key" help={t("connectors.apiKeyHelp")} error={keyError}>
+      <Field
+        label={t("connectors.apiKey")}
+        id="cflow-key"
+        hint={{ name: t("common.about", { label: t("connectors.apiKey") }), text: t("connectors.apiKeyHelp") }}
+        error={keyError}
+      >
         <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
       </Field>
     </form>
@@ -382,7 +387,7 @@ function ConnectStep({
             <p className="muted cflow__text">{t("connectFlow.customText")}</p>
           )}
           {askUrl && (
-            <Field label={t("connectors.serverUrl")} id="cflow-url" help={t("connectFlow.urlHelp")} error={urlError}>
+            <Field label={t("connectors.serverUrl")} id="cflow-url" example={t("connectFlow.urlHelp")} error={urlError}>
               <Input
                 value={url}
                 onChange={(e) => {
@@ -644,7 +649,10 @@ function ToolsStep({
             <Field
               label={t("connectFlow.accountName")}
               id="cflow-account"
-              help={t("connectFlow.accountNameHelp")}
+              hint={{
+                name: t("common.about", { label: t("connectFlow.accountName") }),
+                text: t("connectFlow.accountNameHelp"),
+              }}
               error={labelError ?? undefined}
             >
               <Input

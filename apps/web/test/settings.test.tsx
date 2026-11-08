@@ -54,7 +54,7 @@ describe("Configurações do workspace", () => {
   test("Geral: each row is its label and control; what a setting means is behind its ⓘ", async () => {
     await go();
     const org = screen().getByRole("region", { name: "Workspace" });
-    expect(org.querySelectorAll(".settings-row__help")).toHaveLength(0);
+    expect(org.querySelectorAll(".settings-row__status")).toHaveLength(0);
     expect(hintOf("Fuso horário", org)).toMatchObject({
       text: "As rotinas e os resumos usam este fuso.",
       hidden: true,
@@ -96,7 +96,7 @@ describe("Configurações do workspace", () => {
     expect(describedBy(toggle)).toEqual([
       "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
     ]);
-    expect(card.querySelector(".settings-row__help")).toBeNull();
+    expect(card.querySelector(".settings-row__status")).toBeNull();
     await click(toggle);
     await settle(4);
     expect(state.calls.findLast((c) => c.method === "system.setTelemetry")?.args).toEqual([false]);
@@ -113,7 +113,7 @@ describe("Configurações do workspace", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("false");
     expect(toggle.hasAttribute("disabled")).toBe(true);
     // Locked: one line says where it was turned off.
-    expect(card.querySelector(".settings-row__help")?.textContent).toBe(
+    expect(card.querySelector(".settings-row__status")?.textContent).toBe(
       "Desligado nas configurações deste servidor (TELEMETRY=off).",
     );
     expect(describedBy(toggle)).toEqual([
@@ -124,7 +124,7 @@ describe("Configurações do workspace", () => {
     // Run by the desktop app on its own computer: the switch that turned it off is in the app.
     await go(seedState({ telemetry: { enabled: true, envOff: true, report: { report: 1, install: "desktop" } } }));
     const desktop = screen().getByRole("region", { name: "Estatísticas de uso" });
-    expect(desktop.querySelector(".settings-row__help")?.textContent).toBe(
+    expect(desktop.querySelector(".settings-row__status")?.textContent).toBe(
       "Desligado no app do agentes.chat no computador deste servidor (Preferências\u00a0›\u00a0Servidores).",
     );
     expect(desktop.textContent).not.toContain("TELEMETRY=off");
@@ -474,7 +474,7 @@ describe("Configurações do workspace", () => {
       "Ada30%4,5 mi",
       "Atlas11%600 mil",
     ]);
-    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$\u00a092,00 pela API");
+    expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$\u00a092,00 pelo preço da API");
     const api = screen().getByRole("region", { name: "API do workspace" });
     expect(api.textContent).toContain("23% do orçamento");
     expect(api.textContent).toContain("US$\u00a011,50 de US$\u00a050,00 (padrão do workspace)");

@@ -60,14 +60,14 @@ export function MediaSettingsSection() {
             id="media-gifs"
             icon="image"
             label={t("settings.media.gifs")}
-            help={shown.gifsAvailable ? t("settings.media.gifsHelp") : t("settings.media.gifsUnavailable")}
+            hint={shown.gifsAvailable ? t("settings.media.gifsHelp") : undefined}
+            status={!shown.gifsAvailable && t("settings.media.gifsUnavailable")}
             control={
               <Switch
                 checked={gifsOn}
                 onCheckedChange={(on) => save({ gifs: on })}
                 disabled={!editable || !shown.gifsAvailable}
                 aria-label={t("settings.media.gifs")}
-                aria-describedby="media-gifs-help"
               />
             }
           />
@@ -75,7 +75,7 @@ export function MediaSettingsSection() {
             id="media-rating"
             icon="shield"
             label={t("settings.media.rating")}
-            help={t("settings.media.ratingHelp")}
+            hint={t("settings.media.ratingHelp")}
             control={
               <Segmented
                 size="sm"
@@ -91,14 +91,13 @@ export function MediaSettingsSection() {
             id="media-stickers"
             icon="smile"
             label={t("settings.media.stickers")}
-            help={t("settings.media.stickersHelp")}
+            hint={t("settings.media.stickersHelp")}
             control={
               <Switch
                 checked={shown.agentStickers}
                 onCheckedChange={(on) => save({ agentStickers: on })}
                 disabled={!editable}
                 aria-label={t("settings.media.stickers")}
-                aria-describedby="media-stickers-help"
               />
             }
           />
@@ -113,7 +112,8 @@ export function MediaSettingsSection() {
             id="media-level"
             icon="routines"
             label={t("settings.media.level")}
-            help={shown.agentMediaAvailable ? t("settings.media.levelHelp") : t("settings.media.levelUnavailable")}
+            hint={shown.agentMediaAvailable ? t("settings.media.levelHelp") : undefined}
+            status={!shown.agentMediaAvailable && t("settings.media.levelUnavailable")}
             control={
               <Segmented
                 size="sm"
@@ -151,7 +151,7 @@ function AgentMediaRow({ agent }: { agent: Agent }) {
       id={id}
       lead={<AgentAvatar agentId={agent.id} name={agent.name} size="sm" />}
       label={agent.name}
-      help={agent.role || undefined}
+      status={agent.role || undefined}
       control={
         <Switch
           checked={asked ?? saved}

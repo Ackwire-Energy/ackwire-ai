@@ -178,7 +178,7 @@ export function EndpointForm({
               <Field
                 label={t("endpoint.address")}
                 id={`${ids}-url`}
-                help={t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })}
+                example={t("endpoint.addressHelp", { example: endpointBaseExample(draft.style) })}
               >
                 <Input
                   value={draft.baseURL}
@@ -189,7 +189,11 @@ export function EndpointForm({
                   onChange={(e) => set({ baseURL: e.target.value })}
                 />
               </Field>
-              <Field label={t("endpoint.key")} id={`${ids}-key`} help={t("endpoint.keyHelp")}>
+              <Field
+                label={t("endpoint.key")}
+                id={`${ids}-key`}
+                hint={{ name: t("common.about", { label: t("endpoint.key") }), text: t("endpoint.keyHelp") }}
+              >
                 <Input
                   type="password"
                   autoComplete="off"
@@ -303,7 +307,7 @@ export function EndpointForm({
                   </div>
                 );
               })}
-              {draft.models.some((m) => m.on) && <span className="ac-field__help">{t("endpoint.priceUnit")}</span>}
+              {draft.models.some((m) => m.on) && <span className="ac-field__example">{t("endpoint.priceUnit")}</span>}
             </fieldset>
           )}
           {unpriced && <SettingNote icon="info">{t("endpoint.unpriced")}</SettingNote>}

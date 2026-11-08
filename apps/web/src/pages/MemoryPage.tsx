@@ -313,7 +313,10 @@ function EditMemoryDialog({
         <Field
           label={t("memory.text")}
           id="edit-text"
-          help={t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" })}
+          hint={{
+            name: t("common.about", { label: t("memory.text") }),
+            text: t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" }),
+          }}
         >
           <Textarea rows={3} maxLength={8000} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>

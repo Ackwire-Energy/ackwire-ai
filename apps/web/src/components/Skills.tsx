@@ -553,7 +553,11 @@ export function InstallSkillDialog({
                 ]}
               >
                 <TabPanel value="github">
-                  <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
+                  <Field
+                    label={t("skills.githubUrl")}
+                    id="skill-url"
+                    hint={{ name: t("common.about", { label: t("skills.githubUrl") }), text: t("skills.githubHelp") }}
+                  >
                     <Input
                       value={url}
                       onChange={(e) => {
@@ -652,13 +656,24 @@ export function InstallSkillDialog({
                   <Field label={t("skills.name")} id="skill-name">
                     <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                   </Field>
-                  <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
+                  <Field
+                    label={t("skills.description")}
+                    id="skill-desc"
+                    hint={{
+                      name: t("common.about", { label: t("skills.description") }),
+                      text: t("skills.descriptionHelp"),
+                    }}
+                  >
                     <Input
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                     />
                   </Field>
-                  <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
+                  <Field
+                    label={t("skills.body")}
+                    id="skill-body"
+                    hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.bodyHelp") }}
+                  >
                     <Textarea
                       rows={10}
                       value={form.body}
@@ -1270,7 +1285,11 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
         <Field label={t("skills.description")} id="edit-skill-desc">
           <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
-        <Field label={t("skills.body")} id="edit-skill-body" help={t("skills.newVersion")}>
+        <Field
+          label={t("skills.body")}
+          id="edit-skill-body"
+          hint={{ name: t("common.about", { label: t("skills.body") }), text: t("skills.newVersion") }}
+        >
           <Textarea rows={14} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
         </Field>
         <span className="row" style={{ gap: 10, alignItems: "center" }}>

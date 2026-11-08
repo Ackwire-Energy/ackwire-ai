@@ -562,7 +562,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
       >
         <Locked when={deny.isPending}>
           <DialogBody>
-            <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
+            <Field
+              label={t("members.requests.reason")}
+              id="join-deny-reason"
+              hint={{
+                name: t("common.about", { label: t("members.requests.reason") }),
+                text: t("members.requests.reasonHelp"),
+              }}
+            >
               <Textarea
                 rows={3}
                 maxLength={JOIN_REASON_MAX}

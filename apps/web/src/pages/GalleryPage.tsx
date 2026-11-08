@@ -119,7 +119,11 @@ export function GalleryPage() {
 
       <Section title="Field · Input · Select">
         <div className="grid-fields">
-          <Field label="E-mail" id="g-email" help="O convite vale só para este e-mail.">
+          <Field
+            label="E-mail"
+            id="g-email"
+            hint={{ name: "Sobre E-mail", text: "O convite vale só para este e-mail." }}
+          >
             <Input placeholder="nome@empresa.com.br" />
           </Field>
           <Field label="Orçamento mensal (US$)" id="g-budget" error="Use um valor maior que zero.">

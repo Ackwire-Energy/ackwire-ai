@@ -337,7 +337,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
           <Field
             label={t("storage.endpoint")}
             id="st-endpoint"
-            help={t("storage.endpointHelp")}
+            example={t("storage.endpointHelp")}
             error={missing(form.endpoint) ? t("storage.required") : undefined}
           >
             <Input
@@ -361,13 +361,13 @@ function BucketForm({ config }: { config: StorageConfig }) {
           >
             <Input value={form.bucket} onChange={(e) => set("bucket", e.target.value)} autoComplete="off" />
           </Field>
-          <Field label={t("storage.prefix")} id="st-prefix" help={t("storage.prefixHelp")}>
+          <Field label={t("storage.prefix")} id="st-prefix" example={t("storage.prefixHelp")}>
             <Input value={form.prefix} onChange={(e) => set("prefix", e.target.value)} autoComplete="off" />
           </Field>
           <Field
             label={t("storage.accessKey")}
             id="st-access"
-            help={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
+            example={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
             error={touched && keysMissing && !input.accessKeyId ? t("storage.keysRequired") : undefined}
           >
             <Input
@@ -380,7 +380,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
           <Field
             label={t("storage.secret")}
             id="st-secret"
-            help={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
+            example={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
             error={touched && keysMissing && !input.secretAccessKey ? t("storage.keysRequired") : undefined}
           >
             <Input
