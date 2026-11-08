@@ -200,9 +200,11 @@ html:not([data-pointer]) .roles-back:focus-visible {
   gap: 10px;
   flex-wrap: wrap;
 }
+/* On the name's line (a 22px line, the icon's height), never in the middle of the name and its description. */
 .roles-area__icon {
   display: grid;
   flex: none;
+  align-self: flex-start;
   place-items: center;
   width: 22px;
   height: 22px;
@@ -218,6 +220,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
 .roles-area__text b {
   font-size: 14.5px;
   font-weight: 650;
+  line-height: 22px;
 }
 .roles-area__text span {
   font-size: 13px;
