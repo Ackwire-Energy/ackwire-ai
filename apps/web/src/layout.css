@@ -13501,8 +13501,8 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
      line, the status under them at the row's full width, so the icon never owns a column beside three lines. */
   .settings-row--lead:has(> .settings-row__text > .settings-row__status):has(> .settings-row__end > .ac-switch),
   .settings-row--lead:not(.settings-row--open):has(> .settings-row__text > .settings-row__status):not(
-      :has(> .settings-row__end)
-    ) {
+    :has(> .settings-row__end)
+  ) {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -13514,7 +13514,9 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     display: contents;
   }
   .settings-row--lead:has(> .settings-row__end > .ac-switch) > .settings-row__text > .settings-row__status,
-  .settings-row--lead:not(.settings-row--open, :has(> .settings-row__end)) > .settings-row__text > .settings-row__status {
+  .settings-row--lead:not(.settings-row--open, :has(> .settings-row__end))
+    > .settings-row__text
+    > .settings-row__status {
     grid-column: 1 / -1;
   }
   .settings-row--lead:has(> .settings-row__text > .settings-row__status) > .settings-row__end {
