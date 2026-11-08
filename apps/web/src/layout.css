@@ -8896,6 +8896,10 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
 .newag__quick > .ac-btn {
   flex: none;
 }
+/* Alone over a list, at the end its rows' levels keep. */
+.newag__list-head > .newag__quick:only-child {
+  margin-left: auto;
+}
 .newag__addrow {
   display: flex;
   align-items: center;
