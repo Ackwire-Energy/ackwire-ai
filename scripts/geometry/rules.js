@@ -1808,6 +1808,27 @@
             out.push({ rule: "timeedge", node: t, el: sig(t), box: sig(list), px: +(edge - right).toFixed(1) });
       }
     },
+    /**
+     * What opens in a side pane (the side panel, an aside, a split's column) takes the pane's width: a box in it that
+     * holds the view's cards, sections or lists sets no px max-width, whether or not it binds at this width. The pane
+     * sizes its view: a split's column grows with the window, so a page's reading width that fits it at 1280 leaves the
+     * view short of the pane's edge at 1512. A conversation's own widths (its messages, its composer) are the chat's.
+     */
+    panefill(out) {
+      const PANE = "aside,.page-split > *";
+      const HOLDS = ":scope > :is(section,article,form,ul,ol,table,.ac-card)";
+      for (const pane of document.querySelectorAll(PANE)) {
+        if (!seen(pane)) continue;
+        for (const box of pane.querySelectorAll("*")) {
+          if (box.matches(PANE) || box.closest(".shell__main--chat") || box.parentElement.closest(PANE) !== pane)
+            continue;
+          const s = style(box);
+          if (!s.maxWidth.endsWith("px") || !/^(block|flex|grid|flow-root|list-item)$/.test(s.display)) continue;
+          if (!seen(box) || !box.querySelector(HOLDS)) continue;
+          out.push({ rule: "panefill", node: box, el: sig(box), box: sig(pane), maxWidth: s.maxWidth });
+        }
+      }
+    },
   };
 
   /**

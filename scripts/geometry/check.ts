@@ -291,6 +291,7 @@ export const SELF_TESTED = [
   "toolrow",
   "captop",
   "timeedge",
+  "panefill",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */
