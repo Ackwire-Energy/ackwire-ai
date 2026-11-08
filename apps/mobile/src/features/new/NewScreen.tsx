@@ -1,7 +1,7 @@
 import { markTerms } from "@agenteschat/client/lib/search-filters";
 import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { type NativeStackNavigationOptions, useIsFocused, useNavigation } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BackHandler, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
@@ -104,31 +104,33 @@ export function NewScreen() {
 
   return (
     <SheetSurface>
-      <View style={styles.fill}>
-      <View style={styles.head}>
-        <Pressable
-          onPress={cancel}
-          accessibilityRole="button"
-          hitSlop={10}
-          style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
-        >
-          <Text variant="body" tone="ink2">
-            {t("mobile.common.cancel")}
-          </Text>
-        </Pressable>
-        <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
-          {t("mobile.new.title")}
-        </Text>
-        <View style={styles.side} />
-      </View>
       <ScrollView
         style={styles.fill}
+        // The bar rides at the top of the scroll view, pinned: a form sheet tracks its first scroll view, so nothing may
+        // stand before it (a bar above it was drawn under the list).
+        stickyHeaderIndices={[0]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
       >
+        <SheetBar>
+          <Pressable
+            onPress={cancel}
+            accessibilityRole="button"
+            hitSlop={10}
+            style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}
+          >
+            <Text variant="body" tone="ink2">
+              {t("mobile.common.cancel")}
+            </Text>
+          </Pressable>
+          <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
+            {t("mobile.new.title")}
+          </Text>
+          <View style={styles.side} />
+        </SheetBar>
         <Animated.View layout={layout}>
           {/* "Para:" and the words, white with a hairline on the gray, as the system's new message. */}
           <View style={styles.search}>
@@ -222,7 +224,6 @@ export function NewScreen() {
           </View>
         </Animated.View>
       </ScrollView>
-      </View>
     </SheetSurface>
   );
 }
@@ -283,6 +284,12 @@ function TintTile({ icon, color }: { icon: IconName; color: AgentPresetColor }) 
 
 /** The faces in the rows: framed in their skies at 36 (the list's small size); the tiles match them. */
 const FACE = 36;
+/** The sheet's bar, on the sheet's own color so the list passes under it when pinned. */
+function SheetBar({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return <View style={[styles.head, { backgroundColor: colors.grouped }]}>{children}</View>;
+}
+
 const TILE = 36;
 
 const styles = StyleSheet.create({
