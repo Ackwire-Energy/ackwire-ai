@@ -322,6 +322,8 @@ html:not([data-pointer]) .setup-task:focus-visible {
   align-items: center;
   gap: 12px;
   min-height: 52px;
+  /* A plated button's 8px from the dividers on a phone too, where it is 40px tall: the row grows to hold it. */
+  padding-block: var(--action-clear);
   border-top: 1px solid var(--line);
 }
 .setup-apps__row:first-child {
