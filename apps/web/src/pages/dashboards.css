@@ -53,9 +53,11 @@ html:not([data-pointer]) .db-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Its rows share the picture's height inside its padding (a third one is shorter, never cut at the card's edge), and
+   an empty board's dashed tile fills the picture. */
 .db-thumb {
   display: grid;
-  grid-auto-rows: 26px;
+  grid-auto-rows: minmax(0, 26px);
   gap: 4px;
   height: 96px;
   padding: 12px;
@@ -69,6 +71,9 @@ html:not([data-pointer]) .db-card:focus-visible {
   background: var(--wg-tile) 0 0 / 8px 8px;
   image-rendering: pixelated;
   opacity: 0.85;
+}
+.db-thumb:has(> .db-thumb__tile--empty) {
+  grid-auto-rows: 1fr;
 }
 .db-thumb__tile--empty {
   border-style: dashed;

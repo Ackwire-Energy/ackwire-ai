@@ -115,6 +115,16 @@ describe("Dashboards: in the sidebar's More, and the list (ADR 0135 §14)", () =
     expect(document.querySelector(".db-group__only")).toBeNull();
   });
 
+  test("a thumbnail's tiles stay inside the picture: an empty board's dashed tile fills it, a third row fits", async () => {
+    const css = (await Bun.file(new URL("../src/pages/dashboards.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    // 96px tall with 12px of padding: two 26px rows and a gap leave 16px, too little for a third whole one.
+    expect(css).toMatch(/\.db-thumb \{[^}]*grid-auto-rows: minmax\(0, 26px\);/);
+    expect(css).toMatch(/\.db-thumb:has\(> \.db-thumb__tile--empty\) \{\s*grid-auto-rows: 1fr;/);
+  });
+
   test("only My Home: no empty state saying there are none, a line under it pointing at New dashboard", async () => {
     await open(`/org/${ORG_ID}/dashboards`, (fake) => {
       fake.addBoard({ kind: "home" });
