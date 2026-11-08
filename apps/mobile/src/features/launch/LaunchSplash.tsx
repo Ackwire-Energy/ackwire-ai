@@ -292,6 +292,8 @@ const LaunchSky = memo(function LaunchSky({
     t: clock.value / 1000,
     last,
     fade: 2,
+    // Every uniform of the shared sky shader must be given (Skia throws on a missing one): no fade in from the top.
+    fadeTop: 0,
     clear: 0,
     pal,
     level: level.value,
