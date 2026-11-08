@@ -220,7 +220,7 @@ export function GeneralScreen() {
     }
     setUploading(true);
     try {
-      await api.orgs.setLogo(orgId, { imageBase64: a.base64, contentType: photoContentType(a.mimeType, a.fileName) });
+      await api.orgs.setLogo(orgId, { imageBase64: a.base64, contentType: photoContentType(a.mimeType, a.fileName, a.base64) });
       refreshOrg();
       successHaptic();
       toast({ title: t("orgLogo.saved") });

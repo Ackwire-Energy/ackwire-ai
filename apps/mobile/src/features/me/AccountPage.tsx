@@ -151,7 +151,7 @@ export function AccountPage() {
     try {
       await api.orgs.setAvatar(org.orgId, {
         imageBase64: a.base64,
-        contentType: photoContentType(a.mimeType, a.fileName),
+        contentType: photoContentType(a.mimeType, a.fileName, a.base64),
       });
       refresh();
       toast({ title: t("mobile.me.account.photoSaved") });
