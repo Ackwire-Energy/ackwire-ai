@@ -19,7 +19,7 @@ Measure, don't eyeball. Vision misses 1 to 2 px errors, source review can't see 
 ## Rules
 
 Layout
-1. One spacing, padding and toolbar on every page: search on the left, tabs, filters and selects on the right. The page title starts at the same top and side on every page. From 761 the toolbar keeps one row, the search giving way down to 160. When even that can't fit it takes two rows (the search and the actions, then the filters in one sideways row). Never a control alone on a row.
+1. One spacing, padding and toolbar on every page: search on the left, tabs, filters and selects on the right. The page title starts at the same top and side on every page. From 761 the toolbar keeps one row, the search giving way down to 160. When even that can't fit it takes two rows (the search and the actions, then the filters in one sideways row). The search never goes under 160, on a phone either: when the actions don't fit beside it, it takes the top row alone and the actions lead the filters' row. Never a control alone on a row: a lone small filter shares a row, a lone segmented control fills its own.
 2. Dense but comfortable, like Resend. When a screen feels crowded, regroup and space it. Don't just delete.
 3. Content takes all the width it has. Fields in one form fill its width, each control as wide as its stack.
 4. A leading square (face, icon tile, logo) never owns a column while the text beside it is squeezed: face, name and role on one line, text and controls full width below. A square beside 3 or more lines is a bug. This covers cards and the inbox. A DM has no face column at all, its header already says who it is.
