@@ -42,13 +42,15 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
 3. **Signature.** Every body an agent writes to GitHub ends with one line, in the workspace owner's language, naming
    the agent and the person it works for (who asked, a routine's creator, else the agent's responsável; members only):
    "Theo, agente de Ana no agentes.chat", inside `<sub>` after the marker `<!-- agentes.chat -->`, names escaped so
-   they never mention or link anyone. An edit replaces everything from the marker on. It is added whichever token the
-   call goes with, when the call runs: approval cards show the agent's own words. The tools that sign say so in the
+   they never mention or link anyone. An edit takes our earlier line out (the marker on a line of its own and the
+   line under it), nothing else: a signed comment quoted in a reply stays the reply's text. It is added whichever
+   token the call goes with, when the call runs: approval cards show the agent's own words. The tools that sign say so in the
    catalog (`sign`); a pull request without a body gets the line alone.
 4. **Commit credit.** Commits credit the person (`Co-authored-by: Name <id+login@users.noreply.github.com>`) only when
    they linked GitHub to sign in: the id from that sign-in, the login GitHub has for it now (cached for a day). Never
    their email; no linked account or no answer, no trailer. API commits (`push_files`, `create_or_update_file`) get it
-   in their message; on agents' computers each turn says it next to where the turn starts.
+   in their message; on agents' computers each turn says it next to where the turn starts, for the person behind the
+   turn's run as the signature names them.
 5. **Agents' computers.** With an installation bound, commits are authored as `{agent} (agentes.chat)` at the bot's
    noreply address, so GitHub shows them as the app's; pushes already went through the proxy with the app's token.
    Fetch tokens stay read-only. No token is handed to `gh` (below).
@@ -60,10 +62,15 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    hint) and read again a minute after the last read. The flow is bound to the owner's session: a leaked state with
    someone else's code can't plant their app. The owner's account deletion removes it, like the Jev key.
 7. **Remove means uninstall.** Removing an installation from a workspace also uninstalls the app from that GitHub
-   account (`DELETE /app/installations/{id}`, best effort; the response says when GitHub didn't).
+   account (`DELETE /app/installations/{id}`, best effort; the response says when GitHub didn't). Deleting the
+   workspace uninstalls its installations with its other outside grants (`org.delete` retries one GitHub refused).
+   A personal account's installation binds only for that account itself: collaborators on its repositories see it in
+   `GET /user/installations` too.
 8. **No webhook needed.** Reading the panel asks GitHub about each installation, at most once a minute per
    workspace: uninstalled there, it is unbound as `installation.deleted` does; otherwise its account, selection and
-   suspension are refreshed. The webhook still works when set up.
+   suspension are refreshed. The webhook still works when set up; a suspension event follows what GitHub says of the
+   installation then, so a delivery sent again later changes nothing. A repository change made on GitHub's own page
+   comes back without our state and lands on the web app with nothing to finish.
 
 9. **The app first, in every place GitHub is connected.** Where the server has the app, connecting GitHub (Settings ›
    Conectores, an agent's connect card, the phone's sheet) offers **O app agentes.chat** (recommended) before **Uma
