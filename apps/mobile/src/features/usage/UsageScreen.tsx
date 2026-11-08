@@ -63,8 +63,11 @@ export function UsageScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.me.usage")} solid={false} grouped />
+      {/* The default budget's field: Salvar takes the first tap, and the field stays above the keyboard. */}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
         <Segmented

@@ -193,7 +193,13 @@ export function NoticeIsland() {
           <Animated.View pointerEvents={shape === "none" ? "none" : "auto"} style={[styles.island, box]}>
             <Animated.View style={[styles.fill, inner]}>
               {shape === "open" ? (
-                <ScrollView scrollEnabled={scrolls} bounces={false} showsVerticalScrollIndicator={scrolls}>
+                <ScrollView
+                  scrollEnabled={scrolls}
+                  bounces={false}
+                  showsVerticalScrollIndicator={scrolls}
+                  // A reply's send takes the first tap, with the keyboard up.
+                  keyboardShouldPersistTaps="handled"
+                >
                   <View
                     style={{ width: size.w, paddingTop: clear }}
                     onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
