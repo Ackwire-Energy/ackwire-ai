@@ -148,23 +148,19 @@ describe("Jev's key in Configurações › Contas de IA", () => {
   test("its state sits on its name's first line, however many lines its name and line take", async () => {
     await open({ aiStatus: routed("rules"), jev: OFF });
     const head = card().querySelector(".jev__head") as HTMLElement;
-    expect(head.firstElementChild?.classList.contains("ac-brand--sm")).toBe(true);
-    // The name rises to the tile's top; the state's box is that line's, risen with it.
-    expect(head.querySelector(".list-col > :first-child")?.classList.contains("ac-captop")).toBe(true);
-    const tail = head.lastElementChild as HTMLElement;
-    expect([...tail.classList]).toEqual(expect.arrayContaining(["ac-captail", "ac-captop"]));
-    expect(tail.firstElementChild?.classList.contains("ac-chip")).toBe(true);
+    // A MediaRow: its logo, its name and its state on one line, what it does under them at the row's width.
+    expect(head.classList.contains("ac-mediarow")).toBe(true);
+    expect(head.querySelector(":scope > .ac-mediarow__face > .ac-brand--sm")).toBeTruthy();
+    expect(head.querySelector(":scope > .ac-mediarow__head .jev__title")).toBeTruthy();
+    expect(head.querySelector(":scope > .ac-mediarow__end > .ac-chip")).toBeTruthy();
+    expect(head.querySelector(":scope > .ac-mediarow__body")?.textContent).toBeTruthy();
     const layout = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    // Nothing moves the chip off that line any more.
+    // Nothing moves the chip off that line, and no rule of the page lays the head out on its own.
     expect(layout).not.toMatch(/\.jev__head > \.ac-chip/);
-    const components = (
-      await Bun.file(new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname).text()
-    ).replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(components).toMatch(/\n\.ac-captail \{[^}]*align-items: center;[^}]*height: 22px;/);
-    expect(components).toMatch(/\.ac-captail \{\n {4}height: 1lh;/);
+    expect(layout).not.toMatch(/\.jev__head[^{]*\{/);
   });
 
   test("off: why it helps, then its steps in place, each with its link; a short key isn't offered", async () => {

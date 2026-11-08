@@ -183,7 +183,10 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
 }
 
 /* ── The plan ───────────────────────────────────────────────────────────── */
-/* A MediaRow: the mark and the title on one line (Trocar at its end), what it holds under them. */
+/* A MediaRow: the mark and the title on one line (Trocar at its end), what it holds under them, read as one. */
+.imp-head {
+  row-gap: 4px;
+}
 .ac-mediarow__face > .imp-mark {
   width: var(--mediarow-face);
   height: var(--mediarow-face);
