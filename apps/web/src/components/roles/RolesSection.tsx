@@ -570,34 +570,40 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
       ) : (
         <ul className="roles-people">
           {holders.map((p) => (
-            <li key={p.userId} className="roles-person">
-              <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
-              <span className="roles-person__text">
+            <li key={p.userId} className="roles-person ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
+              </span>
+              <span className="ac-mediarow__head">
                 <b>
                   {p.name}
                   {p.userId === me.user.id ? t("common.youSuffix") : ""}
                 </b>
-                <span>{p.email}</span>
+                <span className="ac-mediarow__meta">{p.email}</span>
               </span>
-              <span className="roles-chips">
-                {others(p).map((r) => (
-                  <RoleChip key={r.id} role={r} />
-                ))}
-              </span>
+              {others(p).length > 0 && (
+                <span className="ac-mediarow__body roles-chips">
+                  {others(p).map((r) => (
+                    <RoleChip key={r.id} role={r} />
+                  ))}
+                </span>
+              )}
               {gives && below(p) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("rolesPage.removeOf", { person: p.name, name })}
-                  onClick={() =>
-                    set.mutate(
-                      { userId: p.userId, roleIds: (p.roleIds ?? []).filter((id) => id !== role.id) },
-                      { onError: (e) => toast.show(errorText(t, e), "error") },
-                    )
-                  }
-                >
-                  {t("rolesPage.remove")}
-                </Button>
+                <span className="ac-mediarow__end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t("rolesPage.removeOf", { person: p.name, name })}
+                    onClick={() =>
+                      set.mutate(
+                        { userId: p.userId, roleIds: (p.roleIds ?? []).filter((id) => id !== role.id) },
+                        { onError: (e) => toast.show(errorText(t, e), "error") },
+                      )
+                    }
+                  >
+                    {t("rolesPage.remove")}
+                  </Button>
+                </span>
               )}
             </li>
           ))}
@@ -795,24 +801,28 @@ function OwnerPage({ people, onBack }: { people: Person[]; onBack: () => void })
         {owners.length === 1 && <p className="roles-base">{t("rolesPage.soleOwner")}</p>}
         <ul className="roles-people">
           {owners.map((p) => (
-            <li key={p.userId} className="roles-person">
-              <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
-              <span className="roles-person__text">
+            <li key={p.userId} className="roles-person ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
+              </span>
+              <span className="ac-mediarow__head">
                 <b>
                   {p.name}
                   {p.userId === me.user.id ? t("common.youSuffix") : ""}
                 </b>
-                <span>{p.email}</span>
+                <span className="ac-mediarow__meta">{p.email}</span>
               </span>
               {mine && owners.length > 1 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("rolesPage.removeOf", { person: p.name, name: t("roles.owner") })}
-                  onClick={() => change.mutate({ userId: p.userId, role: "member" }, { onError: fail })}
-                >
-                  {t("rolesPage.remove")}
-                </Button>
+                <span className="ac-mediarow__end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t("rolesPage.removeOf", { person: p.name, name: t("roles.owner") })}
+                    onClick={() => change.mutate({ userId: p.userId, role: "member" }, { onError: fail })}
+                  >
+                    {t("rolesPage.remove")}
+                  </Button>
+                </span>
               )}
             </li>
           ))}

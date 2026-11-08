@@ -299,17 +299,18 @@ html:not([data-pointer]) .roles-back:focus-visible {
   padding: 0;
   list-style: none;
 }
-.roles-person,
+/* A role's people: a MediaRow each (the face, the name and the email on one line, Remover at its end, their other
+   roles under them); a pick's row a plain line. */
+.roles-person {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
 .roles-pick__row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
-}
-.roles-person:first-child,
-.roles-pick li:first-child .roles-pick__row {
-  border-top: 0;
 }
 .roles-person__text {
   flex: 1 1 200px;
@@ -322,14 +323,18 @@ html:not([data-pointer]) .roles-back:focus-visible {
   font-weight: 600;
 }
 .roles-person__text span {
-  overflow: hidden;
   font-size: 12.5px;
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
+.roles-person:first-child,
+.roles-pick li:first-child .roles-pick__row {
+  border-top: 0;
+}
+
 .roles-chips {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
