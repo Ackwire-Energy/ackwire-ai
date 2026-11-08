@@ -148,7 +148,7 @@ test("a tool of a connection the agent lacks names that connection's permission;
   );
   expect(text).not.toContain(theirs.id);
   // The server lists it, but it isn't in our catalog: no agent ever gets it.
-  expect(text).not.toContain("delete_repository");
+  expect(text).not.toContain("star_repository");
 });
 
 const WHY = "I need a person's answer before I go on: this decides what I change next.";

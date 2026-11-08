@@ -3636,7 +3636,8 @@
       "github": {
         "merge_pull_request": "{{repo}}のPR #{{number}}をマージ",
         "pull_request_review_write": "{{repo}}のPR #{{number}}をレビュー",
-        "actions_run_trigger": "{{repo}}で{{method}}を実行"
+        "actions_run_trigger": "{{repo}}で{{method}}を実行",
+        "delete_repository": "リポジトリ{{repo}}を削除"
       }
     }
   },
@@ -5808,6 +5809,26 @@
     "github_actions_run": {
       "label": "ワークフローを実行",
       "description": "GitHub Actionsのワークフローを開始します（デプロイを伴う場合があります）。必ず承認を求めます。"
+    },
+    "github_repo_admin": {
+      "label": "リポジトリを管理",
+      "description": "リポジトリを作成し、ルールセットでブランチを保護します。リポジトリの削除とルールセットの追加は、必ず承認を求めます。"
+    },
+    "github_discussions_read": {
+      "label": "ディスカッションを読む",
+      "description": "GitHub Discussions とそのコメントを一覧表示して読みます。"
+    },
+    "github_discussions_write": {
+      "label": "ディスカッションに書く",
+      "description": "GitHub Discussions でコメントや返信をし、回答をマークします。"
+    },
+    "github_security_read": {
+      "label": "セキュリティアラートを読む",
+      "description": "コードスキャン、Dependabot、シークレットスキャンのアラートとセキュリティアドバイザリを読みます。シークレットのアラートには漏えいしたシークレットが表示されます。"
+    },
+    "github_org_read": {
+      "label": "チームを読む",
+      "description": "組織のチームのメンバーを一覧表示します。"
     },
     "sentry_issues_read": {
       "label": "エラーを読む",
@@ -10657,7 +10678,16 @@
       "cycle": "サイクル|サイクル|サイクルの",
       "analytics": "分析|分析|分析の",
       "revenue": "収益|収益|収益の",
-      "source": "ソース|ソース|ソースの"
+      "source": "ソース|ソース|ソースの",
+      "code": "コード|コード|コードの",
+      "scanning": "スキャン|スキャン|スキャンの",
+      "secret": "シークレット|シークレット|シークレットの",
+      "security": "セキュリティ|セキュリティ|セキュリティの",
+      "advisory": "アドバイザリ|アドバイザリ|アドバイザリの",
+      "discussion": "ディスカッション|ディスカッション|ディスカッションの",
+      "dependabot": "Dependabot|Dependabot|Dependabotの",
+      "org": "組織|組織|組織の",
+      "ruleset": "ルールセット|ルールセット|ルールセットの"
     }
   },
   "toolReview": {
@@ -10772,7 +10802,7 @@
       "recommended": "おすすめ",
       "appText": "エージェントはアプリとして表示され、リポジトリはGitHubで選びます。",
       "account": "GitHubアカウント",
-      "accountText": "エージェントはそのアカウントとして表示されます。GitHub Projectsにはアカウントが必要です。",
+      "accountText": "エージェントはそのアカウントとして表示されます。個人アカウントのGitHub Projectsにはアカウントが必要です。",
       "appNote": "アカウントとリポジトリをGitHubで選んで、ここに戻ってきます。"
     },
     "githubOrgs": {

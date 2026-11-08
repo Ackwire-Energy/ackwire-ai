@@ -576,7 +576,7 @@ export const envVars = {
   GITHUB_APP_ID: {
     schema: z.string().optional(),
     description:
-      "Id of the GitHub App agents act as on GitHub (ADR 0156). With `GITHUB_APP_PRIVATE_KEY`, every GitHub call an agent makes (tools, git pushes and fetches) goes with a short installation token for that repository where the workspace installed the app from agentes.chat, so pull requests, issues, comments and commits come from the app's bot; the workspace's own GitHub connection elsewhere. Repository permissions: contents, pull requests, issues and workflows read and write; checks, commit statuses and actions read; metadata read. Without these variables, the server's owner can create the app from Settings › Connectors (GitHub's manifest flow); set here, they win.",
+      "Id of the GitHub App agents act as on GitHub (ADR 0156). With `GITHUB_APP_PRIVATE_KEY`, every GitHub call an agent makes (tools, git pushes and fetches) goes with a short installation token for that repository where the workspace installed the app from agentes.chat, so pull requests, issues, comments and commits come from the app's bot; the workspace's own GitHub connection elsewhere. Each token asks only what its tool needs. Permissions: read and write on the repository ones agents use (SELF_HOSTING.md, GitHub as an app), metadata read; on organizations, members read and projects read and write. Without these variables, the server's owner can create the app from Settings › Connectors (GitHub's manifest flow); set here, they win.",
     section: "Connectors",
   },
   GITHUB_APP_PRIVATE_KEY: {

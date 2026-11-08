@@ -3634,7 +3634,8 @@
       "github": {
         "merge_pull_request": "{{repo}}의 PR #{{number}} 병합",
         "pull_request_review_write": "{{repo}}의 PR #{{number}} 검토",
-        "actions_run_trigger": "{{repo}}에서 {{method}} 실행"
+        "actions_run_trigger": "{{repo}}에서 {{method}} 실행",
+        "delete_repository": "저장소 {{repo}} 삭제"
       }
     }
   },
@@ -5805,6 +5806,26 @@
     "github_actions_run": {
       "label": "워크플로 실행",
       "description": "GitHub Actions 워크플로를 시작해요(배포될 수 있어요). 항상 승인을 요청해요."
+    },
+    "github_repo_admin": {
+      "label": "저장소 관리",
+      "description": "저장소를 만들고 규칙 세트로 브랜치를 보호해요. 저장소 삭제와 규칙 세트 추가는 항상 승인을 요청해요."
+    },
+    "github_discussions_read": {
+      "label": "디스커션 읽기",
+      "description": "GitHub Discussions와 댓글을 목록으로 보고 읽어요."
+    },
+    "github_discussions_write": {
+      "label": "디스커션에 쓰기",
+      "description": "GitHub Discussions에 댓글과 답글을 달고 답변을 표시해요."
+    },
+    "github_security_read": {
+      "label": "보안 경고 읽기",
+      "description": "코드 스캔, Dependabot, 시크릿 스캔 경고와 보안 권고를 읽어요. 시크릿 경고에는 노출된 시크릿이 보여요."
+    },
+    "github_org_read": {
+      "label": "팀 읽기",
+      "description": "조직에 있는 팀의 멤버를 목록으로 보여줘요."
     },
     "sentry_issues_read": {
       "label": "오류 읽기",
@@ -10651,7 +10672,16 @@
       "cycle": "사이클",
       "analytics": "분석",
       "revenue": "매출",
-      "source": "소스"
+      "source": "소스",
+      "code": "코드",
+      "scanning": "스캔",
+      "secret": "시크릿",
+      "security": "보안",
+      "advisory": "권고",
+      "discussion": "디스커션",
+      "dependabot": "Dependabot",
+      "org": "조직",
+      "ruleset": "규칙 세트"
     }
   },
   "toolReview": {
@@ -10766,7 +10796,7 @@
       "recommended": "추천",
       "appText": "에이전트가 앱으로 표시되고, 저장소는 GitHub에서 골라요.",
       "account": "GitHub 계정",
-      "accountText": "에이전트가 그 계정으로 표시돼요. GitHub Projects에는 계정이 필요해요.",
+      "accountText": "에이전트가 그 계정으로 표시돼요. 개인 계정의 GitHub Projects에는 계정이 필요해요.",
       "appNote": "GitHub에서 계정과 저장소를 고른 뒤 여기로 돌아와요."
     },
     "githubOrgs": {

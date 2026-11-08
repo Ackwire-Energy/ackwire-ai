@@ -33,13 +33,13 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    from `<slug>[bot]`. Where no installation covers the call, the workspace's account connection is used, as before.
    Permission sets are asked most first: a push asks for `workflows: write` and falls back to contents alone on an
    installation that lacks it; `actions.run` asks for `actions: write`, which an installation that hasn't accepted it
-   yet refuses, and the account runs it. Projects never go through the app (GitHub Apps can't reach a person's
-   Projects).
+   yet refuses, and the account runs it. A person's Projects never go through the app (GitHub Apps can't reach
+   them); an organization's do since the addendum below.
 2. **The app alone is a GitHub connection.** Binding a workspace's first installation without a GitHub connection
    makes one (`auth_type = github_app`, no secret, the installations' accounts as `account_label`), every agent's
    like any first connection, so grants, "Aprovar sempre", the proxy URL, repository lists and approvals work
-   unchanged. Its tools are listed with an installation's token; Projects' are hidden. Connecting an account later
-   replaces it (grants and rules move, as on Reconectar). Disconnecting an account while installations remain keeps
+   unchanged. Its tools are listed with an installation's token. Connecting an account later replaces it (grants
+   and rules move, as on Reconectar). Disconnecting an account while installations remain keeps
    the row as the app alone (same id, secret cleared, the token still revoked at GitHub); disconnecting the app alone
    unbinds every installation and uninstalls them. The last installation unbound ends it, as disconnecting does.
 3. **Signature.** Every body an agent writes to GitHub ends with one line, in the workspace owner's language, naming
@@ -59,11 +59,10 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
    Fetch tokens stay read-only. No token is handed to `gh` (below).
 6. **The server's own app.** `GITHUB_APP_*` win. Without them the server's pinned owner, never on agentes.chat, creates
    the app from Settings with GitHub's manifest flow: a server page posts the manifest (agentes.chat's own app's
-   permissions, write on actions, checks, contents, issues, pull requests, commit statuses and workflows and metadata
-   read; its addresses from `PUBLIC_URL`; the webhook off without https) to GitHub, which creates the app under their
-   account and returns a code; `POST /app-manifests/{code}/conversions` gives its id, slug, client id and secret,
-   private key and webhook secret, kept sealed in `instance_secrets` (`github_app`, AAD `instance-secret|github_app`,
-   the slug as hint) and read again a minute after the last read. The flow is bound to the owner's session: a leaked
+   permissions, in the addendum below; its addresses from `PUBLIC_URL`; the webhook off without https) to GitHub,
+   which creates the app under their account and returns a code; `POST /app-manifests/{code}/conversions` gives its
+   id, slug, client id and secret, private key and webhook secret, kept sealed in `instance_secrets` (`github_app`,
+   AAD `instance-secret|github_app`, the slug as hint) and read again a minute after the last read. The flow is bound to the owner's session: a leaked
    state with someone else's code can't plant their app. The owner's account deletion removes it, like the Jev key.
 7. **Remove means uninstall.** Removing an installation from a workspace also uninstalls the app from that GitHub
    account (`DELETE /app/installations/{id}`, best effort; the response says when GitHub didn't). Deleting the
@@ -78,8 +77,8 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
 
 9. **The app first, in every place GitHub is connected.** Where the server has the app, connecting GitHub (Settings ›
    Conectores, an agent's connect card, the phone's sheet) offers **O app agentes.chat** (recommended) before **Uma
-   conta do GitHub**, which stays for what the app can't reach (GitHub Projects). **Repositórios do GitHub** lists each
-   account the app is installed on with its reach, **Gerenciar no GitHub** (GitHub's page of the installation, where
+   conta do GitHub**, which stays for what the app can't reach (a personal account's GitHub Projects).
+   **Repositórios do GitHub** lists each account the app is installed on with its reach, **Gerenciar no GitHub** (GitHub's page of the installation, where
    its repositories are picked) and **Remover** (asked first, it uninstalls, and says when GitHub didn't confirm,
    with its page as the way out); a workspace using an account sees who agents act as today. GitHub through the app
    alone has no Reconectar and offers **Conectar uma conta do GitHub**; Desconectar says what happens to the app. The
@@ -133,3 +132,59 @@ next to a person's connection. GitHub's MCP tools, which do most of the writing,
   a protocol bump, and it could never be signed. Brains already reach the signed tools through the bridge.
 - Assigning the pull request to the person, and listing repositories per installation in searches.
 - A `prepare-commit-msg` hook for the computer's credit, if the instruction proves unreliable.
+
+## Addendum (2026-11-08): agents work on GitHub on their own, as the app
+
+Agents read and write on GitHub without a person in the loop, within their grants, as the app. The app holds wide
+permissions; each call still gets a token with only what its tool needs, and what is destructive asks a person.
+
+- **The app's permissions** (agentes.chat's own app, and `githubAppManifest` for a server's): on repositories,
+  Actions, Administration, Attestations, Checks, Code scanning alerts (`security_events`), Commit statuses
+  (`statuses`), Contents, Custom properties (`repository_custom_properties`), Dependabot alerts
+  (`vulnerability_alerts`), Dependabot secrets, Deployments, Discussions, Environments, Issues, Merge queues, Packages,
+  Pages, Projects (classic) (`repository_projects`), Pull requests, Repository security advisories
+  (`repository_advisories`), Secret scanning alerts, Secrets, Variables (`actions_variables`, not `variables`),
+  Webhooks (`repository_hooks`) and Workflows, write; Metadata read; on organizations, Members read and Projects
+  (`organization_projects`) write. Not asked: Codespaces (agents have their own computers, and Codespaces bill the
+  organization) and an organization's administration, member management, secrets, variables, runners and webhooks.
+  GitHub asks each installation's account to accept new permissions; until it does, calls that need them fall back
+  (below). A server's app made before keeps its permissions until its owner adds them on GitHub.
+- **Least privilege per call** (`github-call.ts`): the token is minted for the call's repository alone (or the account
+  it names) with its tool's permissions (`TOOL_PERMISSIONS`), else its scope's (`SCOPE_PERMISSIONS`), sets asked most
+  first. An installation that hasn't accepted a permission refuses that set and the next is asked; with none granted
+  the account connection runs the call, and through the app alone the agent is told an admin accepts the new
+  permissions on GitHub (Manage on GitHub) or connects an account. The new scopes and what they mint:
+  - `repo.admin` (Manage repositories): `administration: write`.
+  - `discussions.read`, `discussions.write`: `discussions` read, write.
+  - `security.read` (Read security alerts): one permission per tool, the kind of alert it reads: code scanning
+    `security_events`, Dependabot `vulnerability_alerts`, secret scanning `secret_scanning_alerts`, a repository's
+    advisories `repository_advisories: read` (an organization's list is `write`: GitHub shows it only to who may
+    write them).
+  - `org.read` (Read teams): `members: read`.
+  - `projects.read`, `projects.write`: `organization_projects` with issues and pull requests read (an item's title and
+    fields are its issue's or pull request's), then `organization_projects` alone.
+  - `repository_ruleset_read` (in `repo.read`): `administration: read` (rule suites), then metadata.
+- **Organizations only.** GitHub Apps can't reach a person's Projects and create repositories only in an
+  organization: a Projects call or `create_repository` goes as the app only on an organization's installation it
+  names (`owner`, `org` or `organization`); on a personal account's, or naming none, it goes as the account, and
+  through the app alone the agent is told it needs one. Projects' tools are no longer hidden through the app alone.
+- **Toolsets** (`X-MCP-Toolsets`): `discussions`, `labels`, `code_security`, `dependabot`, `secret_protection`,
+  `security_advisories` and `governance` besides the earlier ones (an unknown one is ignored by the server). The
+  catalog takes the tools that use the new permissions: discussions (`list_discussions`, `get_discussion`,
+  `get_discussion_comments`, `list_discussion_categories`, `discussion_comment_write`, signed), labels (`list_label`,
+  `label_write`), security alerts (`list_`/`get_code_scanning_alert(s)`, `…_dependabot_alert(s)`,
+  `…_secret_scanning_alert(s)`, `list_repository_security_advisories`, `list_org_repository_security_advisories`),
+  rulesets (`repository_ruleset_read`, `create_repository_ruleset`), repositories (`create_repository`,
+  `delete_repository`) and `get_team_members`. A tool the catalog doesn't list is still never exposed.
+- **Approvals.** Deleting a repository and creating a ruleset (branch protection: who may push or merge from then on)
+  are sensitive, like merges, workflow runs and reviews: every call asks a person, with its own title. Reads and
+  ordinary writes run on the agent's grant: comments, issues, pull requests, labels, discussions, and creating a
+  repository (GitHub's server makes it private unless the agent says otherwise).
+- **Not done.** GitHub's MCP server has no tools for secrets, variables, webhooks, deployments, environments, Pages,
+  packages, Dependabot secrets, merge queues or attestations, nor for dismissing an alert, classic branch protection,
+  deleting a branch (our `delete_branches` asks a person) or a repository's visibility: the app holds the permissions
+  for when it does. Notifications, gists and stars are a person's, which GitHub gives no app. Custom properties,
+  forks, the global advisory database, Copilot and Code Quality wait for a need. An account connection's sign-in asks
+  no new scope, so deleting a repository as an account fails (GitHub wants `delete_repo`). GitHub's REST schema for
+  installation tokens doesn't list `repository_advisories` (its permissions reference does): one real advisory call
+  checks that GitHub mints it.

@@ -105,6 +105,24 @@ describe("tool names where people see them", () => {
     expect(approvalDetail(approval({ tool: "run_code", detail: "print(1) · 2" }), "pt-BR")).toBe("print(1) · 2");
   });
 
+  test("GitHub's newer tools in words; a repository's deletion says which repository", () => {
+    const deletion = approval({
+      tool: "github_delete_repository",
+      scope: "github:repo.admin",
+      title: "Delete acme/old",
+      connector: "github",
+      params: { owner: "acme", repo: "old" },
+    });
+    expect(approvalTitle(pt, deletion)).toBe("Apagar o repositório acme/old");
+    expect(approvalTitle(en, deletion)).toBe("Delete the repository acme/old");
+    expect(catalogLabel(pt, "github_discussion_comment_write")).toBe("Comentar numa discussão");
+    expect(catalogLabel(en, "github_get_secret_scanning_alert")).toBe("See leaked secret alert");
+    // A language without a column builds them from its own verbs and nouns, none left in English.
+    const name = "list_repository_security_advisories";
+    expect(toolName(es, partsOf(name), name)).toBe("Listar avisos de seguridad del repositorio");
+    expect(toolName(es, partsOf("get_dependabot_alert"), "get_dependabot_alert")).toBe("Obtener alerta de Dependabot");
+  });
+
   test("a custom server's tool: worded unless someone named it on the review", () => {
     const image = approval({
       tool: "higgsfield_generate_image",

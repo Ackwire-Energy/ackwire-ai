@@ -3760,7 +3760,8 @@
       "github": {
         "merge_pull_request": "{{repo}} içinde PR #{{number}} birleştir",
         "pull_request_review_write": "{{repo}} içinde PR #{{number}} incele",
-        "actions_run_trigger": "{{repo}} içinde {{method}} çalıştır"
+        "actions_run_trigger": "{{repo}} içinde {{method}} çalıştır",
+        "delete_repository": "{{repo}} deposunu sil"
       }
     }
   },
@@ -5997,6 +5998,26 @@
     "github_actions_run": {
       "label": "Workflow çalıştırma",
       "description": "GitHub Actions workflow'larını başlatma (dağıtım yapabilir). Her zaman onay ister."
+    },
+    "github_repo_admin": {
+      "label": "Depo yönetme",
+      "description": "Depo oluşturma ve dallarını kural kümeleriyle koruma. Bir depoyu silmek ve kural kümesi eklemek her zaman onay ister."
+    },
+    "github_discussions_read": {
+      "label": "Tartışma okuma",
+      "description": "GitHub Discussions'ı ve yorumlarını listeleme ve okuma."
+    },
+    "github_discussions_write": {
+      "label": "Tartışmalara yazma",
+      "description": "GitHub Discussions'da yorum yapma, yanıtlama ve yanıtları işaretleme."
+    },
+    "github_security_read": {
+      "label": "Güvenlik uyarılarını okuma",
+      "description": "Kod tarama, Dependabot ve gizli bilgi tarama uyarılarını ve güvenlik bildirimlerini okuma. Gizli bilgi uyarıları sızan gizli bilgiyi gösterir."
+    },
+    "github_org_read": {
+      "label": "Ekip okuma",
+      "description": "Bir kuruluşun ekiplerinin üyelerini listeleme."
     },
     "sentry_issues_read": {
       "label": "Hataları okuma",
@@ -11036,7 +11057,16 @@
       "cycle": "döngü|döngüler",
       "analytics": "analiz|analizler",
       "revenue": "gelir|gelirler",
-      "source": "kaynak|kaynaklar"
+      "source": "kaynak|kaynaklar",
+      "code": "kod|kodlar",
+      "scanning": "tarama|taramalar",
+      "secret": "gizli bilgi|gizli bilgiler",
+      "security": "güvenlik|güvenlik",
+      "advisory": "bildirim|bildirimler",
+      "discussion": "tartışma|tartışmalar",
+      "dependabot": "Dependabot",
+      "org": "kuruluş|kuruluşlar",
+      "ruleset": "kural kümesi|kural kümeleri"
     }
   },
   "toolReview": {
@@ -11166,7 +11196,7 @@
       "recommended": "Önerilen",
       "appText": "Ajanlar uygulama olarak görünür ve depoları GitHub'da siz seçersiniz.",
       "account": "Bir GitHub hesabı",
-      "accountText": "Ajanlar o hesap olarak görünür. GitHub Projects için bir hesap gerekir.",
+      "accountText": "Ajanlar o hesap olarak görünür. Kişisel bir hesabın GitHub Projects'i için bir hesap gerekir.",
       "appNote": "Hesapları ve depoları GitHub'da seçip buraya dönersiniz."
     },
     "githubOrgs": {
