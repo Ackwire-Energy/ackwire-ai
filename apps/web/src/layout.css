@@ -801,10 +801,10 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .page {
   max-width: 920px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: var(--page-top) var(--page-x) 32px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-4);
 }
 .page--narrow {
   max-width: 720px;
@@ -818,9 +818,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .page--full {
   max-width: none;
 }
-.page--tight {
-  gap: 20px;
-}
 
 /*
  * List pages (Threads, Aprovações, Notificações): one width, one header, one
@@ -829,33 +826,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
  */
 .page--list {
   max-width: none;
-  gap: 14px;
   padding-bottom: 96px;
-}
-.list-group-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  padding: 0 4px;
-  font-size: 12.5px;
-  font-weight: 650;
-  color: var(--muted);
-}
-.list-group-head h2 {
-  margin: 0;
-  font: inherit;
-  color: inherit;
-}
-.list-group-head__count {
-  font-weight: 500;
-  color: var(--faint);
-}
-/* A title and its count kept together, the words of a head whose actions wrap under them (`.ac-actrow`). */
-.list-group-head__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .list-card {
   border-radius: var(--radius-section);
@@ -3942,7 +3913,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   gap: 40px;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 36px 28px 96px;
+  padding: var(--page-top) var(--page-x) 96px;
   align-items: flex-start;
 }
 .settings__nav {
@@ -4045,29 +4016,29 @@ html:not([data-pointer]) .settings__link:focus-visible {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-4);
 }
 /*
  * Side by side the nav and the section are columns that scroll on their own (`.page-split`). The section's column runs
  * to the work area's right edge, so the wheel scrolls it there too, and its text keeps the old width: the page's
- * centred 1120px, its side room as before (28px, or half of what the window has past 1120px). The page's top room
- * moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings at
- * their edges, which their scroll would cut.
+ * centred 1120px, its side room every page's (`--page-x`, or half of what the window has past 1120px). The page's top
+ * room moves into the columns, so they scroll up to the window's top. Both keep room for the shadows and focus rings
+ * at their edges, which their scroll would cut.
  */
 @media (min-width: 941px) and (min-height: 560px) {
   .settings {
     max-width: none;
     margin: 0;
-    padding: 0 0 0 max(28px, calc(50% - 532px));
+    padding: 0 0 0 max(var(--page-x), calc(50% - 532px));
   }
   .settings__nav {
     flex-basis: 228px;
     margin: 0 -6px;
-    padding: 36px 6px 24px;
+    padding: var(--page-top) 6px 24px;
   }
   .settings__body {
     margin-left: -12px;
-    padding: 36px max(28px, calc(100% - 1064px)) 96px 12px;
+    padding: var(--page-top) max(var(--page-x), calc(100% - 1064px)) 96px 12px;
   }
 }
 .settings__section {
@@ -4225,8 +4196,8 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   .settings__groups {
     flex-direction: row;
     gap: 4px;
-    margin: 0 -28px;
-    padding: 2px 28px 6px;
+    margin: 0 calc(-1 * var(--page-x));
+    padding: 2px var(--page-x) 6px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -4247,13 +4218,6 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   }
 }
 @media (max-width: 760px) {
-  .settings {
-    padding: 20px 16px 96px;
-  }
-  .settings__groups {
-    margin: 0 -16px;
-    padding: 2px 16px 6px;
-  }
   .settings-row {
     flex-direction: column;
     align-items: stretch;
@@ -9248,8 +9212,8 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
  * editing and one save bar that sticks to the bottom while something is
  * unsaved. Cards stay neutral; only the cover and running states use color. */
 .agp {
-  /* Open sky: the page is the cover's width; what is under it keeps a gutter. */
-  --agp-gutter: 40px;
+  /* Open sky: the page is the cover's width; what is under it keeps every page's side room. */
+  --agp-gutter: var(--page-x);
   max-width: none;
   gap: 0;
   padding: 0 0 24px;

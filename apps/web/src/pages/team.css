@@ -1,7 +1,6 @@
 /* Equipe (ADR 0148): one header, five views of the same team. */
 .page.team {
   max-width: none;
-  gap: 20px;
 }
 .team-eyebrow {
   font-size: 11px;
@@ -656,9 +655,6 @@
 }
 
 @media (max-width: 720px) {
-  .page.team {
-    gap: 16px;
-  }
   .team-sectors__grid {
     grid-template-columns: 1fr;
   }

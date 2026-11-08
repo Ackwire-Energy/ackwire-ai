@@ -311,9 +311,7 @@
   }
 }
 @media (max-width: 760px) {
-  /* The cover stays edge to edge: the page's own padding (above) is the gutter under it. */
   .agp {
-    --agp-gutter: 16px;
     padding: 0 0 28px;
   }
 }
@@ -420,11 +418,6 @@
   }
   .agp-tag--dot {
     margin-left: 4px;
-  }
-}
-@container agp-side (max-width: 760px) {
-  .agp {
-    --agp-gutter: 16px;
   }
 }
 @container agp-side (max-width: 640px) {
