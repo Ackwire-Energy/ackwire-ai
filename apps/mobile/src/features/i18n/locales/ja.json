@@ -966,6 +966,8 @@
     "openImage": "画像を開く",
     "imageOf": "画像 {{index}}/{{count}}",
     "place": "{{index}}/{{count}}",
+    "previous": "前の画像",
+    "next": "次の画像",
     "noPreview": "このファイルはアプリでは開けません。共有して別のアプリで開いてください。",
     "video": {
       "play": "再生",

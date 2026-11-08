@@ -253,6 +253,12 @@ export function shareSource(a: Pick<ArtifactDetail, "kind" | "title" | "content"
   }
 }
 
+/** The picture `by` away in the viewer, which doesn't wrap round: its index, or null past the first or the last. */
+export function pageStep(index: number, by: -1 | 1, count: number): number | null {
+  const to = index + by;
+  return to >= 0 && to < count ? to : null;
+}
+
 /** `id@version` pairs for the picture viewer's route (`?files=a@2,b@1`), and back. */
 export function encodeFileList(files: { id: string; version?: number }[]): string {
   return files.map((f) => (f.version ? `${f.id}@${f.version}` : f.id)).join(",");

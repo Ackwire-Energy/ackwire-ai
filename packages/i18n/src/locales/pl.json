@@ -12649,6 +12649,11 @@
       "hintZoomed": "Przeciągnij, aby przesunąć. Esc dopasowuje z powrotem",
       "hintTouch": "Stuknij lub zsuń palce, aby powiększyć",
       "hintZoomedTouch": "Przeciągnij, aby przesunąć. Stuknij, aby dopasować z powrotem"
+    },
+    "nav": {
+      "previous": "Poprzedni obraz",
+      "next": "Następny obraz",
+      "place": "{{index}} z {{count}}"
     }
   },
   "errors": {

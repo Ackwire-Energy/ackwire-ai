@@ -12213,6 +12213,11 @@
       "hintZoomed": "Trascina per spostarti. Esc la riadatta",
       "hintTouch": "Tocca o pizzica per ingrandire",
       "hintZoomedTouch": "Trascina per spostarti. Tocca per riadattarla"
+    },
+    "nav": {
+      "previous": "Immagine precedente",
+      "next": "Immagine successiva",
+      "place": "{{index}} di {{count}}"
     }
   },
   "errors": {

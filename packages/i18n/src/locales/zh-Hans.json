@@ -11356,6 +11356,11 @@
       "hintZoomed": "拖动以移动。按 Esc 恢复适合窗口",
       "hintTouch": "轻点或双指缩放以放大",
       "hintZoomedTouch": "拖动以移动。轻点恢复适合窗口"
+    },
+    "nav": {
+      "previous": "上一张图片",
+      "next": "下一张图片",
+      "place": "{{index}}/{{count}}"
     }
   },
   "errors": {

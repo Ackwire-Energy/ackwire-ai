@@ -1040,6 +1040,8 @@
     "openImage": "Görseli aç",
     "imageOf": "Görsel {{index}} / {{count}}",
     "place": "{{index}} / {{count}}",
+    "previous": "Önceki görsel",
+    "next": "Sonraki görsel",
     "noPreview": "Bu dosya uygulamada açılmıyor. Başka bir uygulamada açmak için paylaşın.",
     "video": {
       "play": "Oynat",

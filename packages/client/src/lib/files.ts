@@ -32,6 +32,10 @@ export function previewKind(contentType: string): PreviewKind | null {
   return PREVIEW[base] ?? null;
 }
 
+/** A file the viewer shows as a picture, with its zoom: a raster image small enough to load whole. */
+export const isPreviewImage = (content: { contentType: string; size: number }) =>
+  previewKind(content.contentType) === "image" && content.size <= MAX_PREVIEW_BYTES;
+
 /** The clean MIME type for a preview blob (never what the browser would sniff). */
 export const previewType = (contentType: string) => contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 

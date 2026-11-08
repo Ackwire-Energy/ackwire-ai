@@ -1063,6 +1063,9 @@ export const featureKeysEn = {
     openImage: "Open picture",
     imageOf: "Picture {{index}} of {{count}}",
     place: "{{index}} of {{count}}",
+    /** The picture viewer's buttons on the picture's sides. */
+    previous: "Previous picture",
+    next: "Next picture",
     noPreview: "This file doesn't open in the app. Share it to open it in another app.",
     /** The video player's controls (a message's video and the file screen). */
     video: {

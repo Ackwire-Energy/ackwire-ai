@@ -11769,6 +11769,11 @@
       "hintZoomed": "Ziehen zum Verschieben. Esc passt es wieder ein",
       "hintTouch": "Zum Vergrößern tippen oder zwei Finger spreizen",
       "hintZoomedTouch": "Ziehen zum Verschieben. Tippen passt es wieder ein"
+    },
+    "nav": {
+      "previous": "Vorheriges Bild",
+      "next": "Nächstes Bild",
+      "place": "{{index}} von {{count}}"
     }
   },
   "errors": {

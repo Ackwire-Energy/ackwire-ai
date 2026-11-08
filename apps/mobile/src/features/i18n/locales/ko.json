@@ -966,6 +966,8 @@
     "openImage": "사진 열기",
     "imageOf": "사진 {{count}}장 중 {{index}}번째",
     "place": "{{count}}개 중 {{index}}번째",
+    "previous": "이전 사진",
+    "next": "다음 사진",
     "noPreview": "이 파일은 앱에서 열리지 않아요. 공유해서 다른 앱으로 열어 보세요.",
     "video": {
       "play": "재생",

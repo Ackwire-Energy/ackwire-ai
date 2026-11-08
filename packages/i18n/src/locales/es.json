@@ -12135,6 +12135,11 @@
       "hintZoomed": "Arrastra para moverte. Esc vuelve a ajustar",
       "hintTouch": "Toca o pellizca para ampliar",
       "hintZoomedTouch": "Arrastra para moverte. Toca para volver a ajustar"
+    },
+    "nav": {
+      "previous": "Imagen anterior",
+      "next": "Imagen siguiente",
+      "place": "{{index}} de {{count}}"
     }
   },
   "errors": {

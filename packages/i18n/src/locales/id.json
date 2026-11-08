@@ -11349,6 +11349,11 @@
       "hintZoomed": "Seret untuk menggeser. Esc menyesuaikan lagi",
       "hintTouch": "Ketuk atau cubit untuk memperbesar",
       "hintZoomedTouch": "Seret untuk menggeser. Ketuk untuk menyesuaikan lagi"
+    },
+    "nav": {
+      "previous": "Gambar sebelumnya",
+      "next": "Gambar berikutnya",
+      "place": "{{index}} dari {{count}}"
     }
   },
   "errors": {

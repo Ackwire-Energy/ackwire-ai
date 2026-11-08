@@ -11830,6 +11830,11 @@
       "hintZoomed": "Sleep om te verschuiven. Esc maakt het weer passend",
       "hintTouch": "Tik of knijp om in te zoomen",
       "hintZoomedTouch": "Sleep om te verschuiven. Tik om het weer passend te maken"
+    },
+    "nav": {
+      "previous": "Vorige afbeelding",
+      "next": "Volgende afbeelding",
+      "place": "{{index}} van {{count}}"
     }
   },
   "errors": {

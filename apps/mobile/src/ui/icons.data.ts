@@ -48,6 +48,8 @@ export const ICONS = {
   hash: [p("M5 9h14M5 15h14M10 4 8 20M16 4l-2 16")],
   chev: [p("m6 9 6 6 6-6")],
   right: [p("m9 6 6 6-6 6")],
+  /** `right` mirrored (not `back`, which is a size larger): ‹ beside › matches it. */
+  left: [p("m15 6-6 6 6 6")],
   image: [r(3.5, 5, 17, 14, 3), c(9, 10, 1.6), p("m4 17 5-4.5 4 3.5 3-2.5 4 3.5")],
   file: [p("M7 3.5h7l4.5 4.5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"), p("M14 3.5V8h4.5")],
   camera: [
