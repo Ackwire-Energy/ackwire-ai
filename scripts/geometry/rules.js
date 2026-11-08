@@ -1455,6 +1455,14 @@
         const l = list.getBoundingClientRect();
         const row = hasSurface(style(list)) ? null : flow(list)[0];
         const edge = row ? row.getBoundingClientRect().left : l.left;
+        // A card's own title over the rows inside it, which run to the card's sides where no words start (a table's
+        // groups, an import's): the card's, whatever its class.
+        let host = head.parentElement;
+        while (host && host !== document.body && !hasSurface(style(host))) host = host.parentElement;
+        if (host && host !== document.body && host.contains(list)) {
+          const inner = host.getBoundingClientRect().left + parseFloat(style(host).borderLeftWidth);
+          if (Math.abs(edge - inner) <= 1) continue;
+        }
         const h = head.getBoundingClientRect();
         const base = { rule: "groupedge", node: head, el: sig(head), box: sig(list) };
         if (Math.abs(ink.left - edge) > 0.5) out.push({ ...base, side: "Left", px: +(ink.left - edge).toFixed(1) });
