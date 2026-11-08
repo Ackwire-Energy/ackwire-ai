@@ -13457,8 +13457,9 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   height: 30px;
   font-size: 12px;
 }
-/* On a phone the icon, the words and a switch or a chevron stay on one line. A choice of several goes under the
-   words, from their edge (the 30px icon and the 14px gap). */
+/* On a phone the icon, the words and a switch or a chevron stay on one line. Any other control (a choice of several,
+   a select, a field, buttons) goes under the words, from their edge (the 30px icon and the 14px gap), so the rows of
+   one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
     flex-direction: row;
@@ -13472,28 +13473,30 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   .settings-row--lead > .settings-row__end {
     margin-left: auto;
   }
-  .settings-row--lead > .settings-row__end:has(> .ac-seg) {
+  .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
     flex-basis: 100%;
     box-sizing: border-box;
+    min-width: 0;
     padding-left: 44px;
   }
 }
 /*
  * With a line under its name, what ends a row (a switch, a choice, the chevron) belongs to the name's line, never to
- * the row's middle however far that line wraps: a box as tall as the name's 22px line, centred on it (as
- * `.ac-captail`). A choice that goes under the words on a phone keeps its own height there.
+ * the row's middle however far that line wraps: centred on the name's 22px line (as an `.ac-iconline` lead), but a
+ * control taller than that line rises only to `--action-clear` under the hairline above, and the row grows under it.
+ * A control that goes under the words on a phone sits where it falls.
  */
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end {
   align-self: flex-start;
-  height: 22px;
+  translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
 }
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__chevron {
   align-self: flex-start;
   margin-block: 3px;
 }
 @media (max-width: 760px) {
-  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:has(> .ac-seg) {
-    height: auto;
+  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:not(:has(> .ac-switch)) {
+    translate: none;
   }
 }
 /* A plain row (its label beside its control, the help under the label) does the same where the two sit side by
@@ -13503,7 +13506,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     align-items: flex-start;
   }
   .settings-row:has(> .settings-row__text > .settings-row__help) > :is(.settings-row__control, .settings-row__end) {
-    height: 22px;
+    translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
   }
 }
 
@@ -13743,9 +13746,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone. */
+/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone: a row with an icon
+   keeps the icon and the words on one line, and what ends it goes under them from their edge, where it falls. */
 @container agp-side (max-width: 479px) {
-  .agp-card .settings-row {
+  .agp-card .settings-row:not(.settings-row--lead) {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -13753,6 +13757,20 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   .agp-card .settings-row__control {
     flex: none;
     justify-content: flex-start;
+  }
+  .agp-card .settings-row--lead {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .agp-card .settings-row--lead > .settings-row__text {
+    flex: 1 1 160px;
+  }
+  .agp-card .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
+    flex-basis: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    padding-left: 44px;
+    translate: none;
   }
 }
 /* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a
