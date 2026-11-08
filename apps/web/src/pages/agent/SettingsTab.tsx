@@ -183,11 +183,9 @@ function IdentityCard() {
           <WasLine changeKey="role" />
         </div>
       )}
-      <span className="small muted">
-        {draft.handle !== agent.handle && !errors.handle
-          ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
-          : t("agent.identityHelp")}
-      </span>
+      {draft.handle !== agent.handle && !errors.handle && (
+        <span className="small muted">{t("agent.handleMoves", { handle: draft.handle, old: agent.handle })}</span>
+      )}
     </>
   );
 }
@@ -250,6 +248,10 @@ export function SettingsTab({
             id="identity"
             title={t("agentPage.settings.identity")}
             fields={["name", "handle", "role", "look", "group"]}
+            hint={{
+              name: t("common.about", { label: t("agentPage.settings.identity") }),
+              text: t("agent.identityHelp"),
+            }}
             action={
               can("look") ? (
                 <Button

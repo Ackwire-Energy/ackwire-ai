@@ -14,7 +14,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
+import { Button, Count, EmptyState, Icon, PixelStop, SCREEN_X, Text, useReducedMotion, weights } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   stop: { marginTop: -6 },
   medium: { fontWeight: weights.medium },
   semibold: { fontWeight: weights.semibold },
-  free: { paddingHorizontal: 20, paddingVertical: 12 },
+  free: { paddingHorizontal: SCREEN_X, paddingVertical: 12 },
   confirm: { paddingHorizontal: 16, paddingTop: 16 },
   foot: {
     flexDirection: "row",

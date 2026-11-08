@@ -16,11 +16,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, EventPillAction, EventPillText, Text, useToast } from "@/ui";
+import { Button, EventPillAction, EventPillText, InfoHint, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { AskDone, AskWaiting } from "../chat/asks";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { peopleMonthLine, personAmount } from "./logic";
 import { Meter, UsageCard } from "./parts";
 
 /*
@@ -61,8 +62,24 @@ export function PeopleList() {
   const data = usage.data;
   const agentName = (id: string) => dir.nameOf({ type: "agent", id });
   const tone = (p: PersonRow) => (p.state === "at" ? c.danger : p.state === "near" ? c.warn : undefined);
+  const month = (
+    <Text variant="footnote" tone="muted">
+      {peopleMonthLine(t, i18n.language, data)}
+    </Text>
+  );
   return (
     <UsageCard icon="members" title={t("peopleUsage.title")}>
+      {data.plansOnly ? (
+        <InfoHint
+          name={t("common.about", { label: t("usageViews.apiPrice") })}
+          text={t("usageViews.apiPriceHint")}
+          variant="footnote"
+        >
+          {month}
+        </InfoHint>
+      ) : (
+        month
+      )}
       {data.people.map((p, i) => (
         <View
           key={p.userId}
@@ -75,9 +92,7 @@ export function PeopleList() {
                 {p.name}
               </Text>
               <Text variant="footnote" tone="ink2" style={styles.tabular}>
-                {data.plansOnly
-                  ? t("peopleUsage.meter.estimate", { amount: formatUsd(i18n.language, p.monthUsd) })
-                  : formatUsd(i18n.language, p.monthUsd)}
+                {personAmount(t, i18n.language, data.plansOnly, p.monthUsd)}
                 {p.limitUsd === null
                   ? ` ${t("peopleUsage.meter.noLimit")}`
                   : ` ${t("peopleUsage.meter.of", { limit: formatDecimal(i18n.language, p.limitUsd) })}`}

@@ -949,7 +949,7 @@ function NewAgentFlow({
               </button>
               {role === "custom" && (
                 <Card as="div" className="newag__card">
-                  <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
+                  <Field label={t("agent.roleLabel")} id="ag-role" example={t("agent.roleHelp")}>
                     <Input
                       value={roleText}
                       maxLength={200}
@@ -1048,7 +1048,10 @@ function NewAgentFlow({
               label={t("newAgent.handle")}
               id="ag-handle"
               error={handleError ? errorText(handleError) : undefined}
-              help={handle ? t("newAgent.handleHelp", { handle }) : t("newAgent.handleEmpty")}
+              hint={{
+                name: t("common.about", { label: t("newAgent.handle") }),
+                text: handle ? t("newAgent.handleHelp", { handle }) : t("newAgent.handleEmpty"),
+              }}
             >
               <AffixInput
                 className="newag__big"
@@ -1361,7 +1364,7 @@ function NewAgentFlow({
           {onStart && start?.autonomy && (
             <SettingRow
               title={t("agentPage.work.brain.copy.withAutonomy")}
-              description={t("newAgent.lastAutonomy", {
+              status={t("newAgent.lastAutonomy", {
                 value: autonomyName(t, start.autonomy),
                 fallback: autonomyName(t, DEFAULT_AUTONOMY),
               })}

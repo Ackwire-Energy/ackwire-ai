@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WorkspaceSky } from "@/sky/Sky";
-import { Icon, type IconName, SectionHeader, Text, textLineOf } from "@/ui";
+import { Icon, type IconName, SCREEN_X, SectionHeader, Text, textLineOf } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
 import { leadBox, weights } from "@/ui/type-scale";
 import { useColors } from "./hooks";
@@ -151,15 +151,15 @@ export function PageRow({
 
 /** The rows' tile, and what a leading face of the same size takes. */
 export const TILE = 36;
-/** The rows' side inset and the gap after the tile: the hairline starts where the text does. */
-const ROW_INSET = 20;
+/** The rows' side inset (the screen's) and the gap after the tile: the hairline starts where the text does. */
+const ROW_INSET = SCREEN_X;
 const ROW_GAP = 12;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
-  band: { paddingHorizontal: 20, paddingBottom: 20 },
+  band: { paddingHorizontal: SCREEN_X, paddingBottom: 20 },
   faceLine: { flexDirection: "row", alignItems: "center", gap: 14 },
   // Wraps: two buttons with long labels (some languages) would run past the screen's edge in one line.
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },

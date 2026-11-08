@@ -810,6 +810,8 @@ function useIssueFields(i: Issue) {
         })),
       ),
       onChange: (v: string) => update({ columnId: v, boardRank: -Date.now() }),
+      // Until the board's columns load, the task's stage: the select never shows an empty box.
+      placeholder: stageName(i.status),
     },
     who: {
       value: actorKey(i.assignee),
@@ -846,7 +848,13 @@ function Details({ issue: i }: { issue: Issue }) {
   return (
     <>
       <Field label={t("issues.column")} id={`is-col-${i.id}`}>
-        <Select size="sm" value={f.column.value} onValueChange={f.column.onChange} options={f.column.options} />
+        <Select
+          size="sm"
+          value={f.column.value}
+          onValueChange={f.column.onChange}
+          options={f.column.options}
+          placeholder={f.column.placeholder}
+        />
       </Field>
       <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
         <Select size="sm" value={f.who.value} onValueChange={f.who.onChange} options={f.who.options} />
@@ -901,6 +909,7 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           value={f.column.value}
           onValueChange={f.column.onChange}
           options={f.column.options}
+          placeholder={f.column.placeholder}
           renderValue={withLeading}
         />,
       )}

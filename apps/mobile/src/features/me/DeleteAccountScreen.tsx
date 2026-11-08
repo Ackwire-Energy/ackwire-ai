@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
-import { Button, Card, HoldButton, type IconName, LineIcon, Locked, Text, useToast } from "@/ui";
+import { Button, CARD_PAD, Card, HoldButton, type IconName, LineIcon, Locked, SCREEN_X, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { openWebPath } from "../links/open-web";
@@ -326,8 +326,8 @@ export function DeleteAccountScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
-  list: { padding: 14, gap: 10 },
+  in: { paddingHorizontal: SCREEN_X, paddingTop: 8, gap: 16 },
+  list: { padding: CARD_PAD, gap: 10 },
   line: { gap: 8 },
   // A line that wraps keeps its icon on the first.
   item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

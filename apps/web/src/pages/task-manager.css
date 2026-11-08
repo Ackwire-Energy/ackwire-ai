@@ -1,6 +1,5 @@
 /* The task manager (ADR 0128): the agents' cards, the tasks now and what ended today, on one page. */
 .tm {
-  gap: 18px;
   /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */
   --tm-heat: color-mix(in srgb, var(--warn) 22%, var(--warn-soft));
 }

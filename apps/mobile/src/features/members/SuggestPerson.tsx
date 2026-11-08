@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { fieldText, GroupedFooter, GroupedHeader, GroupedList, Text, useToast } from "@/ui";
+import { fieldText, GROUPED_ROW, GroupedFooter, GroupedHeader, GroupedList, Text, useToast } from "@/ui";
 import { Page } from "../me/parts";
 import { useColors } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
@@ -111,7 +111,7 @@ export function SuggestPersonScreen() {
 }
 
 const styles = StyleSheet.create({
-  field: { minHeight: 50, paddingHorizontal: 14, justifyContent: "center" },
-  input: { paddingVertical: 12, paddingHorizontal: 0 },
+  field: { minHeight: GROUPED_ROW.minHeight, paddingHorizontal: GROUPED_ROW.padX, justifyContent: "center" },
+  input: { paddingVertical: GROUPED_ROW.tallPadY, paddingHorizontal: 0 },
   error: { paddingTop: 8, paddingHorizontal: 16 },
 });

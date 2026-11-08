@@ -6,6 +6,7 @@ import type { AgentLookInput } from "@/agent/looks";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { Sky } from "@/sky/Sky";
 import { Icon, type IconName } from "./Icon";
+import { SCREEN_X } from "./rhythm";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 
@@ -106,7 +107,7 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   // Stretched to its container's width (the sky spans it), whatever the container centers.
-  wrap: { alignSelf: "stretch", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
+  wrap: { alignSelf: "stretch", alignItems: "center", paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 32 },
   page: { flex: 1, justifyContent: "center", minHeight: 360 },
   inline: { paddingHorizontal: 16, paddingVertical: 12 },
   window: {

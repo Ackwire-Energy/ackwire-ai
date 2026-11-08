@@ -175,7 +175,7 @@ export function JevSteps({
             </Button>
           )}
         </span>
-        <p id={below} className={error ? "jev-steps__below ac-field__error" : "jev-steps__below ac-field__help"}>
+        <p id={below} className={error ? "jev-steps__below ac-field__error" : "jev-steps__below ac-field__example"}>
           {error ?? t("jev.steps.sealed")}
         </p>
         {saved && (

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { atRule, builtCss, declarations, topLevel } from "./built-css";
+import { atRule, builtCss, declarations, rules, topLevel } from "./built-css";
 
 const css = await builtCss("src/styles.css", "src/pages/routines.css", "src/components/plan-usage.css");
 const top = topLevel(css);
@@ -8,25 +8,29 @@ const last = (sheet: string, selector: string, property: string) =>
     .filter(([p]) => p === property)
     .at(-1)?.[1];
 
-test("a settings row's control taller than its name's line stays clear of the hairline above, never in a 22px box", () => {
-  const help = ":has(>.settings-row__text>.settings-row__help)";
-  for (const [sheet, selector] of [
-    [top, `.settings-row--lead${help}>.settings-row__end`],
-    [atRule(css, "@media (min-width: 761px)"), `.settings-row${help}>:is(.settings-row__control,.settings-row__end)`],
-  ] as const) {
-    expect([selector, last(sheet, selector, "height")]).toEqual([selector, undefined]);
-    // On the name's line, risen no closer to the hairline than `--action-clear`.
-    const rise = last(sheet, selector, "translate")?.replace(/\s+/g, "") ?? "";
-    expect(rise).toContain("max(calc(var(--action-clear)-var(--row-py)),calc(11px-50%))");
-  }
+test("a settings row's control centres on its words, never pinned to the first line, the row one compact control tall", () => {
+  // Nothing lifts or tops what ends a row: the label and its control share the row's middle, a status line included.
+  const pinned: string[] = [];
+  for (const rule of rules(css))
+    for (const s of rule.selectors.filter(
+      (s) => s.includes(".settings-row") && /settings-row__(end|control|chevron)/.test(s),
+    ))
+      for (const [p, v] of rule.declarations)
+        if ((p === "translate" && v !== "none") || (p === "align-self" && v === "flex-start"))
+          pinned.push(`${s} {${p}: ${v}}`);
+  expect(pinned).toEqual([]);
+  const row = last(top, ".settings-row", "align-items");
+  expect(row).toBe("center");
+  expect(last(top, ".settings-row", "min-height")?.replace(/\s+/g, "")).toBe(
+    "calc(var(--control-h-sm)+2*var(--row-py))",
+  );
   // On a phone every control but a switch goes under the words, from their edge, and sits where it falls.
   const phone = atRule(css, "@media (max-width: 760px)");
   const under = ".settings-row--lead>.settings-row__end:not(:has(>.ac-switch))";
   expect(last(phone, under, "flex-basis")).toBe("100%");
-  expect(last(phone, under, "padding-left")).toBe("44px");
+  expect(last(phone, under, "padding-left")?.replace(/\s+/g, "")).toBe("calc(28px+var(--space-3))");
   // Never wider than the row: a select or a field shrinks into it instead of running past the card's edge.
   expect(last(phone, under, "min-width")).toBe("0");
-  expect(last(phone, `.settings-row--lead${help}>.settings-row__end:not(:has(>.ac-switch))`, "translate")).toBe("none");
   expect(last(phone, ".settings-row--lead>.settings-row__end:has(>.ac-seg)", "flex-basis")).toBeUndefined();
   // The agent's panel beside a narrow conversation lays a row with an icon out as a phone does.
   const panel = atRule(css, "@container agp-side (max-width: 479px)");

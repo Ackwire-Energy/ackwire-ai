@@ -9,7 +9,7 @@ import { signInOneTime } from "@/lib/auth";
 import { writeValue } from "@/lib/storage";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { Button, Card, haptics, Icon, LineIcon, PixelOrbit, Text, useTheme } from "@/ui";
+import { Button, CARD_PAD, Card, haptics, Icon, LineIcon, PixelOrbit, Text, useTheme } from "@/ui";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { rememberSignIn } from "@/ui/auth/SocialButtons";
 import { router } from "@/ui/navigation";
@@ -211,7 +211,7 @@ function LockLine({ text }: { text: string }) {
 
 const styles = StyleSheet.create({
   // The orbit on the title's line, never centered between the title and the line under it.
-  wait: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
+  wait: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: CARD_PAD },
   grow: { flex: 1, minWidth: 0 },
   strong: { fontWeight: "600" },
   lock: { flexDirection: "row", gap: 8, marginTop: 4 },

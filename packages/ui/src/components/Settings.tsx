@@ -1,6 +1,7 @@
 import { type ReactNode, useId } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { InfoHint } from "./InfoHint";
 
 /**
  * Settings in a dialog: sections with a title and
@@ -65,30 +66,46 @@ export function SettingNote({
   );
 }
 
-/** A setting without a box: a title and one line on the left, its control (a switch, a button) on the right. */
+/**
+ * A setting without a box: its title (and an ⓘ with what it does) at the start, its control (a switch, a button) at
+ * the end, centred on each other. A line under the title only for what must stay in sight (`status`).
+ */
 export function SettingRow({
   title,
-  description,
+  hint,
+  status,
   htmlFor,
   children,
 }: {
   title: ReactNode;
-  description?: ReactNode;
+  /** What the setting does, behind an ⓘ beside the title: plain sentences only. */
+  hint?: { name: string; text: ReactNode };
+  /** Why the control is off or what it waits on: stays in sight under the title. */
+  status?: ReactNode;
   /** The control's id: the title becomes its label. */
   htmlFor?: string;
   children?: ReactNode;
 }) {
+  const label = htmlFor ? (
+    <label className="ac-setrow__title" htmlFor={htmlFor}>
+      {title}
+    </label>
+  ) : (
+    <b className="ac-setrow__title">{title}</b>
+  );
   return (
     <div className="ac-setrow">
       <span className="ac-setrow__text">
-        {htmlFor ? (
-          <label className="ac-setrow__title" htmlFor={htmlFor}>
-            {title}
-          </label>
+        {hint ? (
+          // The ⓘ sits outside the <label>: pressing it never reaches the control.
+          <span className="ac-hintline">
+            {label}
+            <InfoHint name={hint.name}>{hint.text}</InfoHint>
+          </span>
         ) : (
-          <b className="ac-setrow__title">{title}</b>
+          label
         )}
-        {description && <small className="ac-setrow__desc">{description}</small>}
+        {status && <small className="ac-setrow__status">{status}</small>}
       </span>
       {children && <span className="ac-setrow__end">{children}</span>}
     </div>

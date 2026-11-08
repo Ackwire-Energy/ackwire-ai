@@ -252,7 +252,7 @@ function SettingsBody({
       <SettingsSection title={t("missions.settings.defaults.title", g)}>
         <SettingRow
           title={t("missions.settings.defaults.startWith", { value: name(mode) })}
-          description={
+          status={
             !agentDefault
               ? undefined
               : isDefault
@@ -322,7 +322,14 @@ function SettingsBody({
             }))}
           />
           {brainView && brainOption && brainOption.models.length > 0 && (
-            <Field label={t("brain.mission.modelLabel")} id={modelId} help={t("brain.mission.modelHint")}>
+            <Field
+              label={t("brain.mission.modelLabel")}
+              id={modelId}
+              hint={{
+                name: t("common.about", { label: t("brain.mission.modelLabel") }),
+                text: t("brain.mission.modelHint"),
+              }}
+            >
               <Select
                 value={brainView.effectiveModel ?? undefined}
                 disabled={!brainView.canSetModel || setBrain.isPending}
@@ -378,7 +385,10 @@ function SettingsBody({
         <SettingsSection title={t("missions.settings.recovery.title")}>
           <SettingRow
             title={t("missions.settings.recovery.label")}
-            description={t("missions.settings.recovery.hint")}
+            hint={{
+              name: t("common.about", { label: t("missions.settings.recovery.label") }),
+              text: t("missions.settings.recovery.hint"),
+            }}
             htmlFor={resumeId}
           >
             <Switch

@@ -8,7 +8,7 @@
 }
 /* The page's header (PageHeader) where every page's starts: the page's top and side room (`.page`). */
 .cal-page__header {
-  padding: 32px 24px 16px;
+  padding: var(--page-top) var(--page-x) 16px;
 }
 /* The bar under it: the way through the weeks, the view, working days. */
 .cal-page__tools {
@@ -39,7 +39,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  padding: 0 24px 16px;
+  padding: 0 var(--page-x) 16px;
 }
 .cal-page[data-panel] .cal-page__body {
   grid-template-columns: minmax(0, 1fr) 272px;
@@ -854,11 +854,7 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
 }
 @media (max-width: 640px) {
   .cal-page__header {
-    padding: 20px 16px 12px;
-  }
-  .cal-page__body {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-bottom: 12px;
   }
   .cal-agenda__day {
     grid-template-columns: minmax(0, 1fr);

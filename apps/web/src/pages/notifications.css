@@ -64,14 +64,10 @@
 /* ── "Esperando você": what blocks an agent or a decision ───────────────── */
 /* The day groups' head, then each request on a card of its own, the face inside it where a day's row has it, so a
    waiting card and the day's list share both edges and the words' column. */
-.nt-wait {
+.nt-wait__cards {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 4px;
-}
-.nt-wait > .list-group-head {
-  margin-bottom: -4px;
 }
 .nt-wi {
   --nt-wi-side: 16px;
@@ -197,17 +193,15 @@ html:not([data-pointer]) .nt-item:focus-visible {
 }
 
 /* ── Day groups and items ───────────────────────────────────────────────── */
-.nt-day {
-  margin-bottom: 4px;
-}
 /* The shared list card, but tooltips under the last row must not be clipped. */
 .nt-list {
   overflow: visible;
 }
-/* A MediaRow: the face, who and what on its line with the time at its end, the rest under them at the row's width. */
+/* A MediaRow: the face, who and what on its line with the time at its end, the rest under them at the row's width. The
+   face 10 from the top, so the headline's line, centred on it, is 12 from the top as the last line is from the bottom. */
 .nt-item {
   position: relative;
-  padding: 12px 16px 14px;
+  padding: 10px 16px 12px;
   border-top: 1px solid var(--line);
   outline: none;
   cursor: pointer;
@@ -240,6 +234,10 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
+/* The chips 4 under the headline, the snippet the body's 8 under them. */
+.nt-item:has(> .ac-mediarow__body > .nt-tags:first-child) {
+  row-gap: var(--space-1);
+}
 /* In the body its parts stand the body's gap apart. */
 .nt-item > .ac-mediarow__body > * {
   margin-block: 0;
@@ -267,6 +265,7 @@ html:not([data-pointer]) .nt-item:focus-visible {
 .nt-tm {
   font-size: 12px;
   color: var(--faint);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .nt-tags {
@@ -426,10 +425,6 @@ html:not([data-pointer]) .nt-more:focus-visible {
   line-height: 1.5;
 }
 /* Reactions: quieter. */
-.nt-item--rx {
-  padding-top: 10px;
-  padding-bottom: 11px;
-}
 .nt-item--rx > .ac-mediarow__head {
   font-size: 13px;
 }

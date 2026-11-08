@@ -309,6 +309,8 @@ function ConsentForm({
                   label: named(w),
                   disabled: w.paused,
                 }))}
+                // Every one paused: none can be picked, and the box says which there is instead of nothing.
+                placeholder={nonePickable && consent.workspaces[0] ? named(consent.workspaces[0]) : undefined}
               />
             </Field>
           )}

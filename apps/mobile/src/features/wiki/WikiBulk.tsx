@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Card, EmptyState, Icon, Locked, Row, Text, useToast } from "@/ui";
+import { Button, Card, EmptyState, Icon, Locked, Row, SCREEN_X, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
@@ -267,7 +267,7 @@ export function WikiAgentsScreen({ ids }: { ids: string[] }) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
-  lead: { paddingHorizontal: 20, paddingBottom: 8 },
+  lead: { paddingHorizontal: SCREEN_X, paddingBottom: 8 },
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   content: { paddingTop: 8, paddingBottom: 40, gap: 12 },

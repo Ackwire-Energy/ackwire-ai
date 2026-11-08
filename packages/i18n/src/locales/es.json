@@ -1369,7 +1369,7 @@
       "calendar": "Reuniones y plazos",
       "team": "Quién es quién: personas, agentes y sus grupos",
       "dashboards": "Números y gráficos que los agentes mantienen al día",
-      "taskManager": "Lo que cada agente está haciendo ahora, y detener lo que necesites"
+      "taskManager": "Lo que cada agente hace ahora, y detener lo que necesites"
     },
     "customizeSidebar": "Personalizar la barra lateral",
     "sidebarMenu": {
@@ -1605,7 +1605,7 @@
     "list": {
       "agents": "Agentes",
       "people": "Personas",
-      "search": "Buscar por nombre, función o canal",
+      "search": "Buscar en el equipo",
       "filterLabel": "Mostrar agentes",
       "filter": {
         "mine": "Míos",
@@ -8299,6 +8299,9 @@
     "people_one": "{{count}} persona o agente",
     "people_many": "{{count}} personas o agentes",
     "people_other": "{{count}} personas o agentes",
+    "kinds_one": "{{count}} tipo",
+    "kinds_many": "{{count}} tipos",
+    "kinds_other": "{{count}} tipos",
     "clearAll": "Borrar filtros",
     "clearSearch": "Borrar búsqueda"
   },
@@ -10438,7 +10441,6 @@
     "searchHint": "Atajo para buscar",
     "who": "Creado por",
     "everyone": "Todos",
-    "kinds": "Tipos",
     "kindMany": {
       "document": "Documentos",
       "table": "Tablas",
@@ -10450,7 +10452,6 @@
       "poll": "Encuestas",
       "choices": "Opciones"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Vista",
     "viewGrid": "Cuadrícula",
     "viewList": "Lista",
@@ -13711,6 +13712,9 @@
     "sub_one": "{{month}} · {{count}} persona · {{amount}} de IA",
     "sub_many": "{{month}} · {{count}} personas · {{amount}} de IA",
     "sub_other": "{{month}} · {{count}} personas · {{amount}} de IA",
+    "subPlans_one": "{{month}} · {{count}} persona · {{amount}}",
+    "subPlans_many": "{{month}} · {{count}} personas · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} personas · {{amount}}",
     "periodLabel": "Período",
     "period": {
       "month": "Este mes",
@@ -13758,7 +13762,8 @@
     "meter": {
       "of": "de {{limit}}",
       "noLimit": "· sin límite",
-      "estimate": "≈ {{amount}} por la API"
+      "estimate": "≈ {{amount}} a precio de API",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Ahora",
@@ -13799,7 +13804,8 @@
     },
     "limits": {
       "title": "Límite de uso por persona",
-      "lead": "Cuánta IA puede usar cada persona por mes, sumando todos los agentes. Cuenta lo que pide y las rutinas que creó.",
+      "lead": "Cuánta IA puede usar cada persona por mes, sumando todos los agentes.",
+      "leadMore": "Cuenta lo que pide y las rutinas que creó.",
       "default": "Predeterminado del workspace",
       "defaultHint": "Vale para quien no tiene límite por rol ni excepción.",
       "byRole": "Por rol",
@@ -13810,7 +13816,8 @@
       "amount": "Límite por mes",
       "rule": "Vale el límite de la persona. Sin él, el mayor entre sus roles. Sin ninguno, el predeterminado. Los dueños no tienen límite.",
       "whenTitle": "Cuando alguien llega al límite",
-      "block": "Los agentes dejan de empezar trabajo nuevo para esa persona",
+      "whenHint": "Detener trabajo nuevo: los agentes dejan de empezar trabajo nuevo para esa persona. Solo avisar: el trabajo sigue y los admins reciben un aviso.",
+      "blockShort": "Detener trabajo nuevo",
       "notify": "Solo avisar a los admins",
       "warn": "Avisar al 80 %",
       "warnHint": "La persona recibe un aviso, y los admins reciben otro al 100 %.",
@@ -13849,7 +13856,9 @@
     "usesNow": "la usa ahora",
     "monthTokens": "{{tokens}} tokens este mes",
     "tokens": "{{tokens}} tokens",
-    "equivalent": "≈ {{amount}} por la API",
+    "equivalent": "≈ {{amount}} a precio de API",
+    "apiPrice": "el precio de la API",
+    "apiPriceHint": "Cuando los agentes usan planes, nadie paga por uso. Este valor es lo que costaría el mismo uso por la API.",
     "thisMonth": "Este mes",
     "moreAgents_one": "+{{count}} agente",
     "moreAgents_many": "+{{count}} agentes",

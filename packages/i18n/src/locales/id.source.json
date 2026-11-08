@@ -3228,7 +3228,7 @@
     "value": "Numbers and charts the agents keep up to date"
   },
   "shell.moreWhat.taskManager": {
-    "value": "What each agent is doing now, and stopping what you need"
+    "value": "What each agent does now, and stop what you need"
   },
   "shell.customizeSidebar": {
     "value": "Customize sidebar"
@@ -3825,7 +3825,7 @@
     "value": "People"
   },
   "team.list.search": {
-    "value": "Search by name, role or channel"
+    "value": "Search the team"
   },
   "team.list.filterLabel": {
     "value": "Show agents"
@@ -19466,6 +19466,12 @@
       "other": "{{count}} people or agents"
     }
   },
+  "filters.kinds": {
+    "value": {
+      "one": "{{count}} type",
+      "other": "{{count}} types"
+    }
+  },
   "filters.clearAll": {
     "value": "Clear filters"
   },
@@ -24654,9 +24660,6 @@
   "drive.everyone": {
     "value": "Everyone"
   },
-  "drive.kinds": {
-    "value": "Types"
-  },
   "drive.kindMany.document": {
     "value": "Documents"
   },
@@ -24683,9 +24686,6 @@
   },
   "drive.kindMany.choices": {
     "value": "Choices"
-  },
-  "drive.kindCount": {
-    "value": "{{kind}}: {{count}}"
   },
   "drive.view": {
     "value": "View"
@@ -32355,6 +32355,12 @@
       "other": "{{month}} · {{count}} people · {{amount}} of AI"
     }
   },
+  "peopleUsage.subPlans": {
+    "value": {
+      "one": "{{month}} · {{count}} person · {{amount}}",
+      "other": "{{month}} · {{count}} people · {{amount}}"
+    }
+  },
   "peopleUsage.periodLabel": {
     "value": "Period"
   },
@@ -32464,7 +32470,10 @@
     "value": "· no limit"
   },
   "peopleUsage.meter.estimate": {
-    "value": "≈ {{amount}} through the API"
+    "value": "≈ {{amount}} at API prices"
+  },
+  "peopleUsage.meter.approx": {
+    "value": "≈ {{amount}}"
   },
   "peopleUsage.live.title": {
     "value": "Now"
@@ -32560,7 +32569,10 @@
     "value": "Usage limit per person"
   },
   "peopleUsage.limits.lead": {
-    "value": "How much AI each person may use a month, across every agent. It counts what they ask for and the routines they created."
+    "value": "How much AI each person may use a month, across every agent."
+  },
+  "peopleUsage.limits.leadMore": {
+    "value": "It counts what they ask for and the routines they created."
   },
   "peopleUsage.limits.default": {
     "value": "Workspace default"
@@ -32592,8 +32604,11 @@
   "peopleUsage.limits.whenTitle": {
     "value": "When someone reaches the limit"
   },
-  "peopleUsage.limits.block": {
-    "value": "Agents stop starting new work for that person"
+  "peopleUsage.limits.whenHint": {
+    "value": "Stop new work: agents stop starting new work for that person. Only tell: the work goes on and the admins get a notice."
+  },
+  "peopleUsage.limits.blockShort": {
+    "value": "Stop new work"
   },
   "peopleUsage.limits.notify": {
     "value": "Only tell the admins"
@@ -32683,7 +32698,13 @@
     "value": "{{tokens}} tokens"
   },
   "usageViews.equivalent": {
-    "value": "≈ {{amount}} through the API"
+    "value": "≈ {{amount}} at API prices"
+  },
+  "usageViews.apiPrice": {
+    "value": "the API price"
+  },
+  "usageViews.apiPriceHint": {
+    "value": "When agents use plans, nobody pays by use. This amount is what the same use would cost through the API."
   },
   "usageViews.thisMonth": {
     "value": "This month"

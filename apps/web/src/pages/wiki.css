@@ -20,7 +20,7 @@
   min-height: 0;
   overflow-y: auto;
   /* A page's top and side room (`.page`): the wiki's title starts where every page's does. */
-  padding: 32px 24px 96px;
+  padding: var(--page-top) var(--page-x) 96px;
 }
 .wiki__navbtn,
 .wiki__scrim {
@@ -419,22 +419,13 @@ html:not([data-pointer]) .wiki-import-card:focus-visible {
 .wiki-home {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: var(--space-4);
   animation: wiki-in 0.3s var(--out) both;
 }
 .wiki-home__sec {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-.wiki-home__h {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 2px 12px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ink2);
 }
 .wiki-cards {
   display: grid;
@@ -712,25 +703,32 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
 /* One column, the work area's width (pages use the width they have): the page's outline is in the tree, what is
    around the page comes after its text. */
 .wiki-doc {
-  /* The page's bar: 40px controls and its padding; the editor's toolbar sticks right under it. */
-  --wiki-top-h: 64px;
+  /* The page's bar: 40px controls and the room under them; the editor's toolbar sticks right under it. */
+  --wiki-top-h: 50px;
   animation: wiki-in 0.25s var(--out) both;
 }
 .wiki-doc__main {
   min-width: 0;
 }
 /* The trail and the page's actions on one bar that stays on top while the page scrolls, so the title never shares
-   its line with buttons. The scroll area's top padding is pulled under it (sticky counts from inside the padding). */
+   its line with buttons. It starts on the page's top and sticks there (sticky counts from inside the scroll area's
+   padding), its face reaching up over that padding so nothing shows above it. */
 .wiki-top {
   position: sticky;
-  top: -26px;
+  top: 0;
   z-index: 4;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 40px;
-  margin-top: -26px;
-  padding: 14px 0 10px;
+  padding: 0 0 10px;
+}
+/* Its face, under its controls, from the scroll area's top to its own bottom: no plate of its own on the bar. */
+.wiki-top::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--page-top)) 0 0;
   background: var(--bg);
 }
 .wiki-top .wiki-crumbs {
@@ -1340,7 +1338,7 @@ html:not([data-pointer]) .wiki-outline__item:focus-visible {
 /* The editor in place: a glass toolbar that stays on top, right under the page's bar. */
 .wiki-doc .wiki-editor__bar {
   position: sticky;
-  top: calc(var(--wiki-top-h) - 26px);
+  top: var(--wiki-top-h);
   z-index: 3;
   padding: 6px;
   border-radius: 16px;
@@ -1728,15 +1726,8 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
   .wiki__center > .wiki__navbtn {
     margin-bottom: 10px;
   }
-  /* "Páginas" sits above the page here: the bar starts under it. */
-  .wiki__navbtn + .wiki-doc .wiki-top {
-    margin-top: 0;
-  }
 }
 @media (max-width: 720px) {
-  .wiki__center {
-    padding: 20px 16px 96px;
-  }
   .wiki-folders {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1749,15 +1740,8 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .wiki-top {
-    top: -18px;
-  }
-  .wiki-top:first-child {
-    margin-top: -18px;
-  }
   /* The toolbar is a strip here: it scrolls sideways with no scrollbar, in every engine. */
   .wiki-doc .wiki-editor__bar {
-    top: calc(var(--wiki-top-h) - 18px);
     overflow-x: auto;
     scrollbar-width: none;
   }

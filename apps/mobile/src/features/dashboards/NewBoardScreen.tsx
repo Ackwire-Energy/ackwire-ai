@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedFooter, GroupedHeader, Locked, useTheme, useToast } from "@/ui";
+import { GroupedHeader, Locked, useTheme, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
@@ -71,7 +71,14 @@ function NewBoard() {
         contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <Locked when={create.isPending}>
-          <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", { label: t("dashboards.create.name") }),
+              text: t("dashboards.create.askHint"),
+            }}
+          >
+            {t("dashboards.create.name")}
+          </GroupedHeader>
           <TextArea
             value={title}
             onChangeText={setTitle}
@@ -83,7 +90,6 @@ function NewBoard() {
             returnKeyType="done"
             autoFocus
           />
-          <GroupedFooter>{t("dashboards.create.askHint")}</GroupedFooter>
 
           <AudienceFields draft={draft} onChange={setDraft} members={members.data?.length ?? 0} />
         </Locked>

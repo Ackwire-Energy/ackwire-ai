@@ -40,13 +40,13 @@ import {
   Card,
   CardHeader,
   Chip,
-  CountChip,
   Dialog,
   DialogBody,
   DialogFooter,
   Field,
   FilterBar,
   FilterChip,
+  GroupHeading,
   Icon,
   type IconName,
   Input,
@@ -157,7 +157,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   );
 
   return (
-    <div className={`${embedded ? "settings__section" : "page"} members-page`} style={{ gap: 28 }}>
+    <div className={`${embedded ? "settings__section" : "page"} members-page`}>
       <PageHeader
         level={embedded ? 2 : 1}
         title={t("settings.section.members")}
@@ -170,200 +170,201 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
         actions={invites && <InviteActions />}
       />
 
-      {invites && <WaitingRequests focus={search.request} action={search.do} />}
-      {invites && <SentInvitations />}
-      {!invites && <Suggestions />}
+      <div className="ac-groups">
+        {invites && <WaitingRequests focus={search.request} action={search.do} />}
+        {invites && <SentInvitations />}
+        {!invites && <Suggestions />}
 
-      <section aria-labelledby="sec-people" className="section section--tight">
-        <h2 id="sec-people" className="section-title">
-          {t("members.people")}
-        </h2>
-        <FilterBar
-          label={t("members.filters")}
-          clearText={filterCopy.clearAll}
-          onClear={() => setRoles([])}
-          filters={[
-            {
-              key: "role",
-              active: roles.length > 0,
-              node: (
-                <FilterChip
-                  label={t("members.roleFilter")}
-                  icon="members"
-                  multiple
-                  options={[
-                    { value: "owner", label: t("roles.owner") },
-                    ...orgRoles.filter((r) => r.kind === "custom").map((r) => ({ value: r.id, label: r.name })),
-                  ]}
-                  value={roles}
-                  onChange={setRoles}
-                  valueText={(o) => o.label}
-                  countText={(count) => t("members.rolesCount", { count })}
-                  clearLabel={filterCopy.clearOf(t("members.roleFilter"))}
-                />
-              ),
-            },
-          ]}
-        />
-        {peopleQuery.isLoading && <LoadingList count={3} trailing />}
-        <List>
-          {people.map((m) => {
-            const isMe = m.userId === me.user.id;
-            const held = rolesOf(m, orgRoles);
-            // The server says who is below whom; here the "+" shows when there's anything to give.
-            const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
-            return (
-              <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => personEntries(m))}>
-                <ProfileTrigger
-                  actor={{ type: "person", id: m.userId }}
-                  label={t("profile.of", { name: m.name })}
-                  decorative
-                >
-                  <Avatar
-                    size="md"
-                    name={m.name}
-                    imageUrl={m.image}
-                    presence={m.presence}
-                    presenceLabel={t(`presence.${m.presence}`)}
+        <section aria-labelledby="sec-people" className="section section--tight">
+          <GroupHeading id="sec-people" title={t("members.people")} />
+          <FilterBar
+            label={t("members.filters")}
+            clearText={filterCopy.clearAll}
+            onClear={() => setRoles([])}
+            filters={[
+              {
+                key: "role",
+                active: roles.length > 0,
+                node: (
+                  <FilterChip
+                    label={t("members.roleFilter")}
+                    icon="members"
+                    multiple
+                    options={[
+                      { value: "owner", label: t("roles.owner") },
+                      ...orgRoles.filter((r) => r.kind === "custom").map((r) => ({ value: r.id, label: r.name })),
+                    ]}
+                    value={roles}
+                    onChange={setRoles}
+                    valueText={(o) => o.label}
+                    countText={(count) => t("members.rolesCount", { count })}
+                    clearLabel={filterCopy.clearOf(t("members.roleFilter"))}
                   />
-                </ProfileTrigger>
-                <span className="list-col">
+                ),
+              },
+            ]}
+          />
+          {peopleQuery.isLoading && <LoadingList count={3} trailing />}
+          <List>
+            {people.map((m) => {
+              const isMe = m.userId === me.user.id;
+              const held = rolesOf(m, orgRoles);
+              // The server says who is below whom; here the "+" shows when there's anything to give.
+              const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
+              return (
+                <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => personEntries(m))}>
                   <ProfileTrigger
                     actor={{ type: "person", id: m.userId }}
                     label={t("profile.of", { name: m.name })}
-                    className="profile-trigger--name members-person__name ac-captop"
+                    decorative
                   >
-                    {m.name}
-                    {isMe ? t("common.youSuffix") : ""}
+                    <Avatar
+                      size="md"
+                      name={m.name}
+                      imageUrl={m.image}
+                      presence={m.presence}
+                      presenceLabel={t(`presence.${m.presence}`)}
+                    />
                   </ProfileTrigger>
-                  <span className="small muted members-person__ids">
-                    {m.handle && <span>@{m.handle}</span>}
-                    <span>{m.email}</span>
+                  <span className="list-col">
+                    <ProfileTrigger
+                      actor={{ type: "person", id: m.userId }}
+                      label={t("profile.of", { name: m.name })}
+                      className="profile-trigger--name members-person__name ac-captop"
+                    >
+                      {m.name}
+                      {isMe ? t("common.youSuffix") : ""}
+                    </ProfileTrigger>
+                    <span className="small muted members-person__ids">
+                      {m.handle && <span>@{m.handle}</span>}
+                      <span>{m.email}</span>
+                    </span>
                   </span>
-                </span>
-                <span className="members-person__end ac-captail ac-captop">
-                  <span className="small muted members-person__seen">
-                    {m.online
-                      ? t("members.activeNow")
-                      : m.lastSeenAt
-                        ? t("members.seen", { when: relativeTime(t, i18n.language, m.lastSeenAt) })
-                        : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
-                  </span>
-                  {!isMe && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      iconOnly
-                      icon="message"
-                      aria-label={t("profile.messageTo", { name: m.name })}
-                      title={t("profile.messageTo", { name: m.name })}
-                      onClick={() =>
-                        void navigate({
-                          to: "/org/$orgId/dm/person/$userId",
-                          params: { orgId: org.id, userId: m.userId },
-                        })
-                      }
-                    />
-                  )}
-                </span>
-                <span className="members-roles">
-                  {m.role === "owner" && (
-                    <Chip icon="audienceOwner" title={t("roles.ownerTitle")}>
-                      {t("roles.owner")}
-                    </Chip>
-                  )}
-                  {held.map((r) => (
-                    <RoleChip key={r.id} role={r} />
-                  ))}
-                  {gives && (
-                    <RolesPicker
-                      roles={orgRoles}
-                      value={m.roleIds ?? []}
-                      onChange={(roleIds) =>
-                        setRolesOf.mutate(
-                          { userId: m.userId, roleIds },
-                          { onError: (e) => toast.show(errorText(t, e), "error") },
-                        )
-                      }
-                      label={t("members.rolesOf", { name: m.name })}
-                      trigger={
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          iconOnly
-                          icon="plus"
-                          aria-label={t("members.rolesOf", { name: m.name })}
-                        />
-                      }
-                    />
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </List>
-      </section>
-
-      <section aria-labelledby="sec-agents" className="section section--tight">
-        <div className="section__head">
-          <h2 id="sec-agents" className="section-title">
-            {t("members.agents")}
-          </h2>
-          {can(org, "create_agents") && (
-            <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link" style={{ fontSize: 14 }}>
-              {t("shell.createAgent")}
-            </Link>
-          )}
-        </div>
-        <List>
-          {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}
-          {dir.agents.map((a) => {
-            const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId) : undefined;
-            // Its plan's limits, the budget under them only once it spent through the API (ADR 0063 §5).
-            const shown = usageShown(a.brain, a.budgetUsedPercent ?? 0);
-            const budget = shown.budget && a.budgetUsedPercent !== undefined;
-            return (
-              <Link
-                key={a.id}
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: a.id }}
-                className="ac-list__row"
-              >
-                <AgentAvatar agentId={a.id} size="md" name={a.name} />
-                <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>
-                    {a.name}
-                    {a.role ? ` · ${a.role}` : ""}
-                  </span>
-                  <span className="small muted">
-                    {owner ? t("members.ownerLine", { name: owner.name }) : t("members.noOwner")}
-                  </span>
-                </span>
-                {(shown.plan || budget) && (
-                  <div className="list-col" style={{ flex: "0 1 220px", gap: 4 }}>
-                    {shown.plan && (
-                      <PlanMeter
-                        compact
-                        usage={shown.plan.usage}
-                        text={planMeterText(t, i18n.language)}
-                        label={shown.plan.account}
+                  <span className="members-person__end ac-captail ac-captop">
+                    <span className="small muted members-person__seen">
+                      {m.online
+                        ? t("members.activeNow")
+                        : m.lastSeenAt
+                          ? t("members.seen", { when: relativeTime(t, i18n.language, m.lastSeenAt) })
+                          : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
+                    </span>
+                    {!isMe && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        iconOnly
+                        icon="message"
+                        aria-label={t("profile.messageTo", { name: m.name })}
+                        title={t("profile.messageTo", { name: m.name })}
+                        onClick={() =>
+                          void navigate({
+                            to: "/org/$orgId/dm/person/$userId",
+                            params: { orgId: org.id, userId: m.userId },
+                          })
+                        }
                       />
                     )}
-                    {budget && (
-                      <span className="small muted tabular">
-                        {t("members.budgetLine", {
-                          percent: formatPercent(i18n.language, a.budgetUsedPercent ?? 0),
-                          month,
-                        })}
-                      </span>
+                  </span>
+                  <span className="members-roles">
+                    {m.role === "owner" && (
+                      <Chip icon="audienceOwner" title={t("roles.ownerTitle")}>
+                        {t("roles.owner")}
+                      </Chip>
                     )}
-                  </div>
-                )}
-              </Link>
-            );
-          })}
-        </List>
-      </section>
+                    {held.map((r) => (
+                      <RoleChip key={r.id} role={r} />
+                    ))}
+                    {gives && (
+                      <RolesPicker
+                        roles={orgRoles}
+                        value={m.roleIds ?? []}
+                        onChange={(roleIds) =>
+                          setRolesOf.mutate(
+                            { userId: m.userId, roleIds },
+                            { onError: (e) => toast.show(errorText(t, e), "error") },
+                          )
+                        }
+                        label={t("members.rolesOf", { name: m.name })}
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            iconOnly
+                            icon="plus"
+                            aria-label={t("members.rolesOf", { name: m.name })}
+                          />
+                        }
+                      />
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </List>
+        </section>
+
+        <section aria-labelledby="sec-agents" className="section section--tight">
+          <GroupHeading
+            id="sec-agents"
+            title={t("members.agents")}
+            aside={
+              can(org, "create_agents") && (
+                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} className="ac-link">
+                  {t("shell.createAgent")}
+                </Link>
+              )
+            }
+          />
+          <List>
+            {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}
+            {dir.agents.map((a) => {
+              const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId) : undefined;
+              // Its plan's limits, the budget under them only once it spent through the API (ADR 0063 §5).
+              const shown = usageShown(a.brain, a.budgetUsedPercent ?? 0);
+              const budget = shown.budget && a.budgetUsedPercent !== undefined;
+              return (
+                <Link
+                  key={a.id}
+                  to="/org/$orgId/agents/$agentId"
+                  params={{ orgId: org.id, agentId: a.id }}
+                  className="ac-list__row"
+                >
+                  <AgentAvatar agentId={a.id} size="md" name={a.name} />
+                  <span className="list-col">
+                    <span style={{ fontWeight: 600 }}>
+                      {a.name}
+                      {a.role ? ` · ${a.role}` : ""}
+                    </span>
+                    <span className="small muted">
+                      {owner ? t("members.ownerLine", { name: owner.name }) : t("members.noOwner")}
+                    </span>
+                  </span>
+                  {(shown.plan || budget) && (
+                    <div className="list-col" style={{ flex: "0 1 220px", gap: 4 }}>
+                      {shown.plan && (
+                        <PlanMeter
+                          compact
+                          usage={shown.plan.usage}
+                          text={planMeterText(t, i18n.language)}
+                          label={shown.plan.account}
+                        />
+                      )}
+                      {budget && (
+                        <span className="small muted tabular">
+                          {t("members.budgetLine", {
+                            percent: formatPercent(i18n.language, a.budgetUsedPercent ?? 0),
+                            month,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </List>
+        </section>
+      </div>
     </div>
   );
 }
@@ -481,13 +482,8 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
     <>
       {gone && <Alert tone="neutral">{t("members.requests.gone")}</Alert>}
       {requests.length > 0 && (
-        <section aria-labelledby="sec-waiting" className="section section--tight">
-          <div className="members-head">
-            <h2 id="sec-waiting" className="section-title">
-              {t("members.waitingTitle")}
-            </h2>
-            <CountChip strong>{requests.length}</CountChip>
-          </div>
+        <section aria-label={t("members.waitingTitle")} className="section section--tight">
+          <GroupHeading title={t("members.waitingTitle")} count={requests.length} />
           <MembersFull />
           <List>
             {requests.map((r) => {
@@ -574,7 +570,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
       >
         <Locked when={deny.isPending}>
           <DialogBody>
-            <Field label={t("members.requests.reason")} id="join-deny-reason" help={t("members.requests.reasonHelp")}>
+            <Field
+              label={t("members.requests.reason")}
+              id="join-deny-reason"
+              hint={{
+                name: t("common.about", { label: t("members.requests.reason") }),
+                text: t("members.requests.reasonHelp"),
+              }}
+            >
               <Textarea
                 rows={3}
                 maxLength={JOIN_REASON_MAX}
@@ -708,9 +711,7 @@ function SentInvitations() {
 
   return (
     <section aria-labelledby="sec-sent" className="section section--tight">
-      <h2 id="sec-sent" className="section-title">
-        {t("members.invitations.title")}
-      </h2>
+      <GroupHeading id="sec-sent" title={t("members.invitations.title")} />
       {list.isLoading && <LoadingList count={2} trailing />}
       <List>
         {list.isSuccess && shown.length === 0 && (
@@ -974,9 +975,7 @@ function Suggestions() {
       </Card>
       {waiting.length > 0 && (
         <section aria-labelledby="sec-mine" className="section section--tight">
-          <h2 id="sec-mine" className="section-title">
-            {t("members.suggest.mine")}
-          </h2>
+          <GroupHeading id="sec-mine" title={t("members.suggest.mine")} />
           <List>
             {waiting.map((s: MySuggestion) => (
               // biome-ignore lint/a11y/useSemanticElements: a row of the list, named for whom it suggests

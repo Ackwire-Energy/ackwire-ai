@@ -690,14 +690,17 @@ function DesktopUseSection({ machine: m }: { machine: Machine }) {
   const command = linux && !use.available ? commandInReason(use.reason) : null;
   return (
     <>
-      <GroupedHeader>{t("desktop.use.title")}</GroupedHeader>
+      <GroupedHeader
+        hint={{ name: t("common.about", { label: t("desktop.use.title") }), text: t("desktop.use.description") }}
+      >
+        {t("desktop.use.title")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           icon="laptop"
           label={!use.available ? t("desktop.use.unavailable") : off ? t("desktop.use.off") : t("desktop.use.ready")}
         />
       </GroupedList>
-      <GroupedFooter>{t("desktop.use.description")}</GroupedFooter>
       {off ? (
         <>
           <GroupedFooter>{t("desktop.use.offHelp")}</GroupedFooter>
@@ -842,7 +845,9 @@ export function RenameMachineScreen({ machineId }: { machineId: string }) {
       action={{ label: t("common.save"), disabled: !ready, onPress: save }}
       locked={action.isPending}
     >
-      <GroupedHeader>{t("machines.name")}</GroupedHeader>
+      <GroupedHeader hint={{ name: t("common.about", { label: t("machines.name") }), text: t("machines.nameHelp") }}>
+        {t("machines.name")}
+      </GroupedHeader>
       <TextArea
         value={value}
         onChangeText={(v) => {
@@ -861,9 +866,7 @@ export function RenameMachineScreen({ machineId }: { machineId: string }) {
         <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
           {error}
         </Text>
-      ) : (
-        <GroupedFooter>{t("machines.nameHelp")}</GroupedFooter>
-      )}
+      ) : null}
     </SettingsPage>
   );
 }

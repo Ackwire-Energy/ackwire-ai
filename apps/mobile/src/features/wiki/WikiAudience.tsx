@@ -21,7 +21,7 @@ import {
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Locked, Row, Text, useToast } from "@/ui";
+import { Locked, Row, SCREEN_X, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { AccessList, type AccessListRow } from "../shared/AccessList";
@@ -241,5 +241,5 @@ function Form({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { paddingBottom: 40 },
-  lead: { paddingHorizontal: 20, paddingVertical: 12 },
+  lead: { paddingHorizontal: SCREEN_X, paddingVertical: 12 },
 });

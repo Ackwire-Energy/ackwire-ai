@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentReadingBook } from "@/agent/ReadingBook";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Locked, Text, useToast } from "@/ui";
+import { Button, CARD_PAD, Card, Locked, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { canEditMemories } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pressed: { opacity: 0.7 },
-  fact: { gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
+  fact: { gap: 6, paddingHorizontal: CARD_PAD, paddingVertical: 12 },
   row: { flexDirection: "row", gap: 8 },
   grow: { flex: 1 },
 });

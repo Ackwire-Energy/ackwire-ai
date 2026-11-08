@@ -306,8 +306,7 @@ function BucketForm({ config }: { config: StorageConfig }) {
         <GroupedList>
           <GroupedRow
             label={t("storage.pathStyle")}
-            sub={t("storage.pathStyleHelp")}
-            subLines={3}
+            hint={{ name: t("common.about", { label: t("storage.pathStyle") }), text: t("storage.pathStyleHelp") }}
             toggle={form.pathStyle}
             onPress={() => set("pathStyle", !form.pathStyle)}
           />

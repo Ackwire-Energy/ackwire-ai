@@ -27,6 +27,6 @@ test("a card's last settings row is as deep under its control as above its title
   expect(declarations(topLevel(card), ".ac-card")).toContainEqual(["gap", "var(--space-3)"]);
   expect(declarations(topLevel(card), ".ac-card__foot")).toContainEqual([
     "margin",
-    "0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px))",
+    "0 calc(0px - var(--card-pad, 16px)) calc(0px - var(--card-pad, 16px))",
   ]);
 });

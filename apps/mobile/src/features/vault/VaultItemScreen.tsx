@@ -262,6 +262,10 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           <GroupedList>
             <InputField
               label={t("mobile.vault.field.description")}
+              hint={{
+                name: t("common.about", { label: t("mobile.vault.field.description") }),
+                text: t("mobile.vault.field.descriptionHelp"),
+              }}
               value={form.description}
               onChange={(description) => set({ description })}
               editable={editable}
@@ -270,7 +274,6 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
               placeholder={t("mobile.vault.field.descriptionPlaceholder")}
             />
           </GroupedList>
-          <GroupedFooter>{t("mobile.vault.field.descriptionHelp")}</GroupedFooter>
         </>
       ) : null}
 
@@ -374,7 +377,11 @@ export function MatchRows({
   const host = hostOf(origin);
   return (
     <>
-      <GroupedHeader>{t("mobile.vault.match.title")}</GroupedHeader>
+      <GroupedHeader
+        hint={{ name: t("common.about", { label: t("mobile.vault.match.title") }), text: t("mobile.vault.match.help") }}
+      >
+        {t("mobile.vault.match.title")}
+      </GroupedHeader>
       <GroupedList>
         <GroupedRow
           label={t("mobile.vault.match.exact")}
@@ -392,7 +399,6 @@ export function MatchRows({
           onPress={() => onChange("site")}
         />
       </GroupedList>
-      <GroupedFooter>{t("mobile.vault.match.help")}</GroupedFooter>
     </>
   );
 }

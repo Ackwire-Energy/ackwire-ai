@@ -15,7 +15,7 @@ import {
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Filters, IconButton, Text, useReducedMotion } from "@/ui";
+import { Button, Filters, IconButton, SCREEN_X, Text, useReducedMotion } from "@/ui";
 import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { FirstUse } from "../shared/FirstUse";
@@ -183,7 +183,7 @@ function Column({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  title: { paddingHorizontal: 20, paddingTop: 4 },
+  title: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },

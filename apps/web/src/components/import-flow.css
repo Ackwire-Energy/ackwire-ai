@@ -266,7 +266,7 @@ html:not([data-pointer]) .imp-drop__area:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 14px;
+  padding: var(--row-py) 14px;
   border-top: 1px solid var(--line);
 }
 .imp-row > .ac-check,

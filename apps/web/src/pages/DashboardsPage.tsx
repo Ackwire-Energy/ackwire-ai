@@ -1,7 +1,7 @@
 import type { DashboardSummary } from "@agenteschat/client";
 import { dashboardGroups, useDashboards, useMembers } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, Icon, PageHeader } from "@agenteschat/ui";
+import { Button, GroupHeading, Icon, PageHeader } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -58,7 +58,7 @@ export function DashboardsPage() {
       {list.isLoading && <LoadingCards count={3} />}
       {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
       {list.data && (
-        <>
+        <div className="ac-groups">
           <section className="db-group" aria-label={t("dashboards.home")}>
             <div className="db-list">
               {/* With another board on Início (ADR 0135 §18), My Home opens as a board page of its own. */}
@@ -96,7 +96,7 @@ export function DashboardsPage() {
             boards={groups.mine}
             homeId={list.data.homeDashboardId}
           />
-        </>
+        </div>
       )}
       <NewDashboardDialog open={creating} onClose={() => setCreating(false)} />
     </div>
@@ -118,11 +118,7 @@ function BoardGroup({
   if (boards.length === 0) return null;
   return (
     <section className="db-group" aria-label={title}>
-      <div className="list-group-head">
-        <h2>{title}</h2>
-        <span className="list-group-head__count">{boards.length}</span>
-        {hint && <span className="db-group__hint">{hint}</span>}
-      </div>
+      <GroupHeading title={title} count={boards.length} note={hint} />
       <div className="db-list">
         {boards.map((b) => (
           <BoardCard key={b.id} board={b} onHome={b.id === homeId} />

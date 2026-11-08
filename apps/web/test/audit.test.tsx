@@ -6,7 +6,7 @@ setupDom();
 import type { AuditRow } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
 
@@ -106,7 +106,23 @@ describe("Configurações → Auditoria", () => {
     expect(first.textContent).toContain("Fazer um deploy · pedido por Walter · #general");
     expect(first.textContent).toContain("Esperando aprovação");
     expect(section().textContent).toContain("rotina Follow-up");
-    expect([...section().querySelectorAll(".audit__day")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
+    expect([...section().querySelectorAll(".ac-grouphead")].map((d) => d.textContent)).toEqual(["Hoje", "Ontem"]);
+  });
+
+  // The worst case for CI's geometry check: the toolbar's view and agent and the days' headings in German, then in
+  // Japanese. On a phone each control fills its line, never alone beside an empty stretch.
+  test("in German and Japanese the toolbar and the days' headings keep their places", async () => {
+    const { r } = await go();
+    for (const [lang, problems] of [
+      ["de", "Abgelehnt und fehlgeschlagen"],
+      ["ja", "却下と失敗"],
+    ] as const) {
+      await showIn(r.services, lang);
+      const audit = document.querySelector(".audit") as HTMLElement;
+      expect(audit.querySelectorAll(":scope > .ac-toolbar")).toHaveLength(1);
+      expect(audit.querySelector(".ac-toolbar")?.textContent).toContain(problems);
+      expect(audit.querySelectorAll(".ac-grouphead")).toHaveLength(2);
+    }
   });
 
   test("a row that didn't end in anything keeps its time in the last column, on a phone too", async () => {

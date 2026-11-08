@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, Segmented, Text, useTheme, useToast } from "@/ui";
+import { GroupedHeader, Segmented, Text, useTheme, useToast } from "@/ui";
 import { initialText } from "@/ui/type-scale";
 import { bubbleFill, CHAT_TEXT, CHAT_TEXT_MAX_SCALE, chatNameOf } from "../chat/logic";
 import { RowLookContext } from "../chat/look";
@@ -267,7 +267,14 @@ export function ChatLookPage() {
   return (
     <Page title={t("settings.account.chat.title")}>
       <View style={styles.gap} />
-      <GroupedHeader>{t("settings.account.chat.density")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("settings.account.chat.density") }),
+          text: t("settings.account.chat.densityHelp"),
+        }}
+      >
+        {t("settings.account.chat.density")}
+      </GroupedHeader>
       <View style={styles.pad}>
         <Segmented
           items={[
@@ -290,10 +297,16 @@ export function ChatLookPage() {
           </Choice>
         ))}
       </View>
-      <GroupedFooter>{t("settings.account.chat.densityHelp")}</GroupedFooter>
       {style === "bubbles" ? (
         <>
-          <GroupedHeader>
+          <GroupedHeader
+            hint={{
+              name: t("common.about", {
+                label: t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels"),
+              }),
+              text: t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp"),
+            }}
+          >
             {t(dm ? "settings.account.chat.toneDms" : "settings.account.chat.toneChannels")}
           </GroupedHeader>
           <View style={styles.pad}>
@@ -306,12 +319,16 @@ export function ChatLookPage() {
               onChange={(v) => save(dm ? { dmTone: v as ChatTone } : { channelTone: v as ChatTone })}
             />
           </View>
-          <GroupedFooter>
-            {t(dm ? "settings.account.chat.toneDmsHelp" : "settings.account.chat.toneChannelsHelp")}
-          </GroupedFooter>
         </>
       ) : null}
-      <GroupedHeader>{t("settings.account.chat.textSize")}</GroupedHeader>
+      <GroupedHeader
+        hint={{
+          name: t("common.about", { label: t("settings.account.chat.textSize") }),
+          text: t("settings.account.chat.textSizePhone"),
+        }}
+      >
+        {t("settings.account.chat.textSize")}
+      </GroupedHeader>
       <View style={styles.pad}>
         <Segmented
           wide="fit"
@@ -333,7 +350,6 @@ export function ChatLookPage() {
       <View style={styles.pad}>
         <TextPreview size={textSize} style={style} tone={tone} dm={dm} />
       </View>
-      <GroupedFooter>{t("settings.account.chat.textSizePhone")}</GroupedFooter>
       <GroupedHeader>{t("settings.account.chat.openAt")}</GroupedHeader>
       <View style={styles.grid} accessibilityRole="radiogroup">
         <Choice

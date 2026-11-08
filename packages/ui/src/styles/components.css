@@ -244,6 +244,13 @@ html[data-pointer] :focus-visible {
     margin-block-start: calc(var(--cap-top) - 0.5lh);
   }
 }
+/* A first line that holds a pill doesn't rise, nor does the row's when a pill ends the row on it (`.ac-captail`): the
+   pill fills that line, so its top meets the picture's top on the row's padding and the name centres on it. */
+.ac-captop:has(.ac-chip),
+:is(.ac-list__row, .ac-faceline):has(> .ac-captail > .ac-chip) .ac-captop,
+.ac-captail.ac-captop:has(> .ac-chip) {
+  margin-block-start: 0;
+}
 /*
  * What ends a row whose words can wrap (a chip, its buttons, a switch) belongs to the first line, never to the row's
  * middle: `.ac-captail` is a box as tall as that line (in the row's font size and line height), whatever it holds
@@ -531,11 +538,13 @@ html:not([data-pointer]) .ac-link:focus-visible {
   align-items: baseline;
   gap: var(--space-2);
 }
-.ac-field__help {
+.ac-field__example {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
   text-wrap: pretty;
+  /* An address or a path breaks where it must instead of running past the form. */
+  overflow-wrap: anywhere;
 }
 /* A section's heading inside a picker's list (`PickerHeading`): its label, then what picking one means. */
 .ac-picker-head {
@@ -2046,12 +2055,12 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 }
 
 /*
- * Menu (listbox of the Select, dropdown menus, the right click). Its rows are as dense as the message's hover bar:
- * one height and side padding for every menu's item (taller under a finger, below), and one room between the menu's
- * edge and its rows on all four sides (`--menu-pad`).
+ * Menu (listbox of the Select, dropdown menus, the right click, a popover drawn as a menu, a search's list). One
+ * rhythm for every menu: a line 32, a name over its description 50, a row with a face 36 (40, 58 and 44 under a
+ * finger, below), rows 2 apart, and one room between the menu's edge and its rows on all four sides (`--menu-pad`).
  */
 :root {
-  --menu-item-h: 28px;
+  --menu-item-h: 32px;
   --menu-item-px: 8px;
   --menu-pad: var(--space-1);
 }
@@ -2090,6 +2099,18 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   flex-direction: column;
   gap: 2px;
   padding-block: var(--menu-pad);
+}
+/* A group of options or items under its heading keeps the list's rhythm (a select's, a dropdown's radio group, the
+   composer's suggestions' listbox and its groups, the palette's list). */
+:is(.ac-menu--select, .ac-menu--dropdown) [role="group"]:not(.ac-menu__reactions),
+.ac-suggest > [role="listbox"],
+.ac-suggest > [role="listbox"] > [role="presentation"],
+.ac-palette__list,
+.ac-palette__list > [role="presentation"],
+.ac-palette__list > [role="group"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .ac-menu--dropdown {
   min-width: 200px;
@@ -2245,21 +2266,29 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   width: 16px;
 }
 /*
- * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
- * small face or a stack of them) sits on the first line's capitals, as an `.ac-iconline` lead does. A 30px tile stays
- * centred on both lines, which starts the first line's capitals at its top.
+ * An option with a description under its name (a menu's, a select's, SearchSelect's): a lead no taller than 1.25 of
+ * its 20px lines (an icon, a mark, a small face or a stack of them) sits on the first line's capitals, as an
+ * `.ac-iconline` lead does. A 30px tile stays centred on both lines, which starts the first line's capitals at its
+ * top.
  */
-.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+:is(.ac-menu__item, .ac-search__option):has(> .ac-menu__label > .ac-menu__desc)
 > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
   align-self: flex-start;
   /* Browsers without the lh unit: the option's 20px line. */
   translate: 0 calc(10px - var(--cap-mid) - 50%);
 }
 @supports (top: 1lh) {
-  .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
+  :is(.ac-menu__item, .ac-search__option):has(> .ac-menu__label > .ac-menu__desc)
     > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
+}
+/* A list of people puts each description beside its name (below): one line, so the lead centres in its row. */
+:is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar)
+  :is(.ac-menu__item, .ac-search__option)
+  > .ac-menu__leading {
+  align-self: center;
+  translate: none;
 }
 /* A widget's format glyph (the format pickers) leads its option the same way, on the first line. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
@@ -2270,15 +2299,6 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
-}
-/* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
-.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
-  padding-block: var(--menu-item-px);
-}
-/* A list that mixes two-line rows with one-line ones (an option and "+ Nova categoria…"): every row gets the same room,
-   so the action row's padding matches the options above it. */
-.ac-menu:has(.ac-menu__desc) .ac-menu__item {
-  padding-block: var(--menu-item-px);
 }
 .ac-menu__desc {
   font-size: 13px;
@@ -2981,7 +3001,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex-direction: column;
   gap: var(--space-3);
   /* Read by the foot to reach the card's edges; pages that change the padding set this instead. */
-  --card-pad: 20px;
+  --card-pad: var(--space-4);
   padding: var(--card-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -3011,7 +3031,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px 16px;
+  padding: var(--row-py) var(--space-4);
   color: var(--ink);
   text-decoration: none;
 }
@@ -3716,6 +3736,10 @@ html:not([data-pointer]) .ac-receipt__action:focus-visible {
 }
 .ac-popover:focus {
   outline: none;
+}
+/* Rows of a menu (Mais): a menu's 2 between them, so its separator has a menu's room too. */
+.ac-popover:has(> .ac-menu__item) {
+  gap: 2px;
 }
 .ac-popover__title {
   padding: 4px 6px;
@@ -5614,8 +5638,8 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
    lead. */
 .ac-card__foot {
   /* A quiet line under a hairline, edge to edge of the card (no gray well). */
-  margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
-  padding: var(--row-py) var(--card-pad, 20px);
+  margin: 0 calc(0px - var(--card-pad, 16px)) calc(0px - var(--card-pad, 16px));
+  padding: var(--row-py) var(--card-pad, 16px);
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12.5px;
@@ -6756,9 +6780,6 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
 .ac-suggest {
   width: 330px;
   max-width: calc(100vw - 32px);
-}
-.ac-suggest__item {
-  min-height: 40px;
 }
 
 /* Composer: header (reply), files, formatting toolbar, drop target */
@@ -8611,6 +8632,12 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   padding: var(--menu-pad);
   border-bottom: 1px solid var(--line);
 }
+.ac-tz__list,
+.ac-tz__list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .ac-tz__list {
   flex: 1 1 auto;
   min-height: 0;
@@ -8628,8 +8655,9 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  min-height: 36px;
-  padding: 9px 10px;
+  min-height: var(--menu-item-h);
+  padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);
+  line-height: 20px;
   box-sizing: border-box;
   border-radius: var(--radius-item);
   cursor: pointer;
@@ -8735,10 +8763,29 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 
 /*
- * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
- * centre on it), the page's line under it (always there, always one line), the buttons at the end of the title's line,
- * then the page's bar. One shape and one height on every page, so a title and what follows start at the same place
- * wherever you go.
+ * Every page's room, Settings, the wiki and the calendar included: the first line starts `--page-top` under the work
+ * area's top and `--page-x` in from its side. From 761px the title's line centres on the sidebar's workspace row,
+ * whose middle is 38px from the top (the sidebar's 16 above its 44px row).
+ */
+:root {
+  --page-top: calc(38px - var(--control-h-md) / 2);
+  --page-x: 24px;
+}
+@media (max-width: 760px) {
+  :root {
+    --page-top: 20px;
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --page-x: 16px;
+  }
+}
+/*
+ * Every inner page's header (PageHeader): the title, 28px on a line as tall as the page's buttons (so they centre on
+ * it), the page's line under it (always there, always one line), the buttons at the end of the title's line, then the
+ * page's bar. One shape and one height on every page, so a title and what follows start at the same place wherever
+ * you go.
  */
 .ac-pagehead {
   display: flex;
@@ -8768,7 +8815,7 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   min-width: 0;
   font-family: var(--font-display);
   font-size: 28px;
-  line-height: 40px;
+  line-height: var(--control-h-md);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -8787,7 +8834,7 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: var(--control-h-md);
   margin-left: auto;
 }
 .ac-pagehead__bar {
@@ -8819,6 +8866,79 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   .ac-pagehead__actions .ac-btn__kbd {
     display: none;
   }
+}
+
+/*
+ * A list group's heading (GroupHeading): one 20px line whose words start on the list's outer edge, 8 over its rows and
+ * 16 under the toolbar (the page's gap). A stack of groups (`.ac-groups`) puts 24 between them.
+ */
+.ac-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 20px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.ac-grouphead__title {
+  display: inline-flex;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+/* A lead before the words (a stage's icon, a channel's mark, a face): on their capitals' middle, as `.ac-iconline`'s. */
+.ac-grouphead__title > :is(.ac-icon, .ac-avatar):first-child {
+  flex: none;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+.ac-grouphead__count {
+  font-weight: 500;
+  color: var(--faint);
+}
+.ac-grouphead__note {
+  min-width: 0;
+  font-weight: 500;
+}
+/* A heading that folds its group (Concluídos, a channel's threads): its words and their chevron are the button. */
+.ac-grouphead__title > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ac-grouphead__title > button:hover {
+  color: var(--ink);
+}
+.ac-grouphead__title > button > .ac-icon {
+  color: var(--faint);
+}
+html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+.ac-grouphead__aside {
+  margin-left: auto;
+}
+.ac-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+/* With no group to show it takes no room, nor its page's gap. */
+.ac-groups:empty {
+  display: none;
 }
 
 /*
@@ -8893,30 +9013,190 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   font-size: var(--control-fs-sm);
   border-radius: var(--tool-r);
 }
+/*
+ * A page's toolbar (one with a search) keeps one row from 761px: the search on the left gives way first (280 down to
+ * 160), every other control sits at the end, 8 apart. When even that can't fit, Toolbar sets `data-stack` and it takes
+ * the phone's two rows. A toolbar without a search wraps.
+ */
+/* The search's floor, at every width: it gives way down to it, and a stacked toolbar's top row keeps it (`split`). */
+.ac-toolbar > .ac-toolbar__search {
+  min-width: 160px;
+}
+@media (min-width: 761px) {
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) {
+    flex-wrap: nowrap;
+  }
+  .ac-toolbar > .ac-toolbar__search + * {
+    margin-left: auto;
+  }
+  .ac-toolbar > .ac-toolbar__search + .ac-toolbar__filters + .ac-toolbar__actions {
+    margin-left: 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) > .ac-toolbar__filters,
+  .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) > .ac-toolbar__filters > .ac-filterbar {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions {
+    flex: none;
+  }
+}
+/*
+ * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
+ * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
+ * and its 4px of room keep the controls' rings whole. Its basis counts the room its margins give back, so it never
+ * fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
+ */
 @media (max-width: 760px) {
-  /* Phone: the search takes the line; the filters scroll sideways in one row. */
-  .ac-toolbar__search {
-    flex: 1 1 100%;
+  .ac-toolbar > .ac-toolbar__search {
+    flex: 1 1 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions {
+    order: 1;
+    margin-left: 0;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
+    order: 2;
+    flex: 1 1 calc(100% + 8px);
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
     flex-wrap: nowrap;
-    max-width: 100%;
+  }
+  .ac-toolbar__filters {
+    max-width: calc(100% + 8px);
+    margin: -2px -4px;
+    padding: 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
   }
-  .ac-toolbar__filters {
-    margin: 0 -4px;
-    padding: 2px 4px;
-  }
-  .ac-toolbar__filters::-webkit-scrollbar,
-  .ac-toolbar__filters > .ac-filterbar::-webkit-scrollbar {
+  .ac-toolbar__filters::-webkit-scrollbar {
     display: none;
   }
   .ac-toolbar__filters > *,
   .ac-toolbar__filters > .ac-filterbar > * {
     flex: none;
+  }
+}
+.ac-toolbar[data-stack] > .ac-toolbar__search {
+  flex: 1 1 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__actions {
+  order: 1;
+  margin-left: 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters {
+  order: 2;
+  flex: 1 1 calc(100% + 8px);
+  flex-wrap: nowrap;
+  max-width: calc(100% + 8px);
+  margin: -2px -4px;
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters::-webkit-scrollbar {
+  display: none;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-filterbar {
+  flex-wrap: nowrap;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > *,
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-filterbar > * {
+  flex: none;
+}
+/* When the search at its floor and the actions can't share the top row, the search takes it alone and the actions lead
+   the row under it, the filters scrolling after them, or the actions fill that row when there are no filters. */
+.ac-toolbar[data-stack="split"] > .ac-toolbar__search {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack="split"] > .ac-toolbar__filters {
+  flex: 1 1 0;
+}
+.ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions > :only-child {
+  flex: 1 1 auto;
+}
+/*
+ * Stacked, no control sits alone on a row beside an empty stretch. A lone small filter (Tarefas' Filtro) shares a row:
+ * with actions it goes under the search with them, the search filling its own row, and without them it stays beside
+ * the search. It doesn't scroll, so it keeps no scroller's room. A lone segmented control fills its row instead,
+ * scrolling sideways in its own track when its choices are wider.
+ */
+.ac-toolbar[data-stack]:has(
+  > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+  > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+) > :is(.ac-toolbar__filters, .ac-toolbar__actions) {
+  order: 1;
+}
+.ac-toolbar[data-stack]:has(> .ac-toolbar__actions):has(
+    > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+    > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+  )
+  > .ac-toolbar__search {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack]:has(
+    > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+    > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+  )
+  > .ac-toolbar__filters {
+  flex: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-seg:only-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-seg:only-child > .ac-seg__item {
+  flex: 1 0 auto;
+}
+@media (max-width: 760px) {
+  .ac-toolbar:has(> .ac-toolbar__search):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > :is(.ac-toolbar__filters, .ac-toolbar__actions) {
+    order: 1;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):has(> .ac-toolbar__actions):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > .ac-toolbar__search {
+    flex: 1 1 100%;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > .ac-toolbar__filters {
+    flex: none;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .ac-toolbar__filters > .ac-seg:only-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .ac-toolbar__filters > .ac-seg:only-child > .ac-seg__item {
+    flex: 1 0 auto;
+  }
+  /* Without a search, what wraps fills its line, as a search fills its own. */
+  .ac-toolbar:not(:has(> .ac-toolbar__search)) > :is(.ac-toolbar__filters, .ac-toolbar__actions),
+  .ac-toolbar:not(:has(> .ac-toolbar__search))
+    > :is(.ac-toolbar__filters, .ac-toolbar__actions)
+    > :only-child:is(.ac-seg, .ac-select) {
+    flex: 1 1 auto;
   }
 }
 
@@ -8993,6 +9273,11 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 .ac-toolbar .ac-searchfield__input {
   padding-left: 34px;
   font-size: var(--control-fs-sm);
+}
+/* The end's room is the × or the "/" hint's: while neither shows, the words take it ("Buscar arquivos" whole at 320). */
+.ac-searchfield:not(:has(> .ac-searchfield__clear, > .ac-searchfield__hint)) .ac-searchfield__input,
+.ac-searchfield:focus-within:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
+  padding-right: var(--control-px-sm);
 }
 .ac-toolbar .ac-searchfield__icon,
 .ac-searchfield--sm .ac-searchfield__icon {
@@ -9212,6 +9497,9 @@ html:not([data-pointer]) .ac-filter__clear:focus-visible {
   overflow: hidden;
 }
 .ac-filter__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   max-height: 340px;
   overflow-y: auto;
   padding: var(--menu-pad);
@@ -9222,14 +9510,15 @@ html:not([data-pointer]) .ac-filter__clear:focus-visible {
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 34px;
-  padding: 4px 10px;
+  min-height: var(--menu-item-h);
+  padding: calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px);
   border: 0;
   border-radius: var(--radius-item);
   background: transparent;
   color: var(--ink);
   font: inherit;
   font-size: 13.5px;
+  line-height: 20px;
   text-align: left;
   cursor: pointer;
 }
@@ -9254,6 +9543,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* A count (Tipo's kinds) ends the row before the check, on one right edge. */
+.ac-filter__option > .ac-countchip {
+  margin-left: auto;
+}
+.ac-filter__option > .ac-countchip + .ac-tz__check {
+  margin-left: var(--space-2);
 }
 @media (prefers-reduced-motion: reduce) {
   .ac-filter {
@@ -9404,6 +9700,10 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-searchfield--sm .ac-searchfield__input {
     font-size: 16px;
   }
+  /* The "/" hint doesn't show here (below): an empty field's words take its room. */
+  .ac-searchfield:not(:has(> .ac-searchfield__clear)) .ac-searchfield__input {
+    padding-right: var(--control-px-sm);
+  }
   /* No keyboard hints: a button's keys (its `kbd` or a key among its words), the send button's, a search field's,
      the palette's and a menu's. */
   .ac-btn__kbd,
@@ -9478,6 +9778,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   :root {
     --menu-item-h: 40px;
     --option-h: 44px;
+    --row-py: var(--space-3);
   }
   .ac-menu__reaction {
     width: 40px;
@@ -10174,11 +10475,14 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 label.ac-setrow__title {
   cursor: pointer;
 }
-.ac-setrow__desc {
+.ac-setrow__status {
   display: block;
   font-size: 13px;
   color: var(--muted);
   margin-top: 1px;
+}
+.ac-setrow__text > .ac-hintline {
+  font-size: 14px;
 }
 .ac-setrow__end {
   display: inline-flex;
@@ -10460,20 +10764,22 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   color: var(--ink-muted);
 }
 .ac-mo__group {
+  --menu-pad: var(--space-2);
   position: relative;
   max-height: none;
   overflow: visible;
-  padding: var(--space-2);
+  padding: var(--menu-pad);
   border-radius: var(--radius-section);
   box-shadow: var(--e2), var(--top);
 }
 .ac-mo__group > .ac-menu__heading {
   padding: 6px 14px 4px;
 }
+/* The touch row (40) under any pointer: a menu that fills the screen in 15px type. */
 .ac-mo__item {
   align-items: center;
   gap: var(--space-3);
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: calc(var(--radius-section) - var(--space-2));
   font-size: 15px;
   line-height: 20px;
@@ -10495,11 +10801,7 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   color: var(--ink-muted);
 }
 /* An item with a line under its name (Adicionar workspace, Convidar pessoas): its icon on the name's line, as a menu
-   option's lead is, not in the middle of both lines, and the item's own 12px above it (a menu's two-line rows take
-   8), the room a touch screen needs around it. */
-.ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) {
-  padding-block: 12px;
-}
+   option's lead is, not in the middle of both lines. The item keeps its own room, a touch menu's described row (58). */
 .ac-mo__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-icon:first-child {
   align-self: flex-start;
   /* Browsers without the lh unit: the item's 20px line. */

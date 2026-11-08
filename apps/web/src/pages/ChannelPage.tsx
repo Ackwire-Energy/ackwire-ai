@@ -5170,7 +5170,10 @@ function ChannelDetails({
                   <Field
                     label={t("channel.nameLabel")}
                     id="channel-edit-name"
-                    help={channel.name === "general" ? t("channel.generalName") : t("channel.nameHelp")}
+                    hint={{
+                      name: t("common.about", { label: t("channel.nameLabel") }),
+                      text: channel.name === "general" ? t("channel.generalName") : t("channel.nameHelp"),
+                    }}
                     error={nameError}
                   >
                     <AffixInput

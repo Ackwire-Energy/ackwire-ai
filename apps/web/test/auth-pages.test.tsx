@@ -1463,6 +1463,6 @@ describe("Onboarding: the workspace's name", () => {
     const why = document.getElementById(about.getAttribute("aria-describedby") ?? "");
     expect(why?.textContent).toBe("Para rotinas e lembretes. Detectado pelo seu navegador.");
     expect(why?.hidden).toBe(true);
-    expect(document.querySelector(".ac-field__help")).toBeNull();
+    expect(document.querySelector(".ac-field__example")).toBeNull();
   });
 });

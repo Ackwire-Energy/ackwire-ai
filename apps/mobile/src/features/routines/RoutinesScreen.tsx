@@ -10,6 +10,7 @@ import {
   Filters,
   Icon,
   IconButton,
+  SCREEN_X,
   SearchField,
   SectionHeader,
   Segmented,
@@ -211,12 +212,12 @@ function RoutineList() {
 }
 
 const styles = StyleSheet.create({
-  head: { paddingHorizontal: 20, paddingBottom: 12, gap: 14 },
+  head: { paddingHorizontal: SCREEN_X, paddingBottom: 12, gap: 14 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   search: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   status: { paddingHorizontal: 16, paddingBottom: 8 },
-  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 20, paddingVertical: 14 },
+  doneToggle: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: SCREEN_X, paddingVertical: 14 },
   pressed: { opacity: 0.6 },
   bold: { fontWeight: "600" },
 });

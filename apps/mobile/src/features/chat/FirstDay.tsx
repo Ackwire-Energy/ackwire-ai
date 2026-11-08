@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
-import { Icon, Sky, Text } from "@/ui";
+import { CARD_PAD, Icon, Sky, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -120,8 +120,8 @@ const styles = StyleSheet.create({
   welc: {
     alignItems: "center",
     paddingTop: BORN_TOP + BORN + 24,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: CARD_PAD,
+    paddingBottom: CARD_PAD,
     borderRadius: 20,
     overflow: "hidden",
   },

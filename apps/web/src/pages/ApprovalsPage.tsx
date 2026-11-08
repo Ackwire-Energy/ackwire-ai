@@ -53,6 +53,7 @@ import {
   ExpiryFuse,
   type Fact,
   FactStrip,
+  GroupHeading,
   Icon,
   type IconName,
   Kbd,
@@ -452,26 +453,29 @@ export function ApprovalsPage() {
               {filter === "pending"
                 ? shownDecided.length > 0 && (
                     <section className="ap-list__section">
-                      <div className="ap-list__head">
-                        <h2>{t("approvals.recent")}</h2>
-                        <Button variant="ghost" size="sm" onClick={() => setFilter("all")}>
-                          {t("approvals.seeHistory")}
-                        </Button>
+                      <GroupHeading
+                        title={t("approvals.recent")}
+                        aside={
+                          <button type="button" className="ac-link ac-link--muted" onClick={() => setFilter("all")}>
+                            {t("approvals.seeHistory")}
+                          </button>
+                        }
+                      />
+                      <div className="ap-list__rows">
+                        {shownDecided.slice(0, 3).map((a) => (
+                          <ReqRow key={a.id} approval={a} selected={selectedId === a.id} onOpen={() => select(a.id)} />
+                        ))}
                       </div>
-                      {shownDecided.slice(0, 3).map((a) => (
-                        <ReqRow key={a.id} approval={a} selected={selectedId === a.id} onOpen={() => select(a.id)} />
-                      ))}
                     </section>
                   )
                 : groups(shownDecided).map(([key, list]) => (
                     <section key={key} className="ap-list__section">
-                      <div className="ap-list__head">
-                        <h2>{t(`approvals.groups.${key}`)}</h2>
-                        <span className="list-group-head__count">{list.length}</span>
+                      <GroupHeading title={t(`approvals.groups.${key}`)} count={list.length} />
+                      <div className="ap-list__rows">
+                        {list.map((a) => (
+                          <ReqRow key={a.id} approval={a} selected={selectedId === a.id} onOpen={() => select(a.id)} />
+                        ))}
                       </div>
-                      {list.map((a) => (
-                        <ReqRow key={a.id} approval={a} selected={selectedId === a.id} onOpen={() => select(a.id)} />
-                      ))}
                     </section>
                   ))}
             </nav>
@@ -498,10 +502,10 @@ export function ApprovalsPage() {
         )}
 
         {filter === "pending" && (
-          <>
+          <div className="ac-groups">
             <MissionCommandsPending missions={missions} query={query} />
             <MissionsWaitingList missions={missions} query={query} />
-          </>
+          </div>
         )}
         {approvals.isSuccess && filter !== "pending" && !query && shownOpen.length + shownDecided.length === 0 && (
           <EmptyState

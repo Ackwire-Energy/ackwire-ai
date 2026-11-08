@@ -10,7 +10,8 @@ Measure, don't eyeball. Vision misses 1 to 2 px errors, source review can't see 
 ## The kit's numbers (packages/ui tokens)
 
 - Three control heights: 32 (toolbars, list filters, in-row actions, composer), 40 (forms, page and dialog buttons, search, selects, sidebar items), 48 (only the main action of a full screen). Radius is 30% of the height. Pills only for labels you don't press.
-- Spacing steps 4, 8, 12, 16, 24, 32. Form fields 16 apart, a label 4 from its control. List rows 12 above and below their words. A plated button stays 8 from its row's or card's edges (`--action-clear`). A row of actions (`.ac-acts`) puts 16 between what the eye sees, 24 on touch.
+- Spacing steps 4, 8, 12, 16, 24, 32. Form fields 16 apart, a label 4 from its control. List rows 8 above and below (`--row-py`, 12 on touch): one line 36, with a 24 face 40, with a 32 control 48. Cards 16 inside (`--card-pad`). A plated button stays 8 from its row's or card's edges (`--action-clear`). A row of actions (`.ac-acts`) puts 16 between what the eye sees, 24 on touch.
+- Every page starts at `--page-top` (its title's line on the sidebar's workspace row, 20 on phones) and `--page-x` (24, 16 under 640). Header, toolbar and content 16 apart, list groups 24 (`.ac-groups`).
 - No raw px for padding, gaps or heights. Use the tokens.
 - Rounded inside rounded: inner radius is the outer radius minus the gap between them.
 - Fonts are fixed: Source Sans 3 (the app, titles too), JetBrains Mono (code), Funnel Display (brand), Doto (dot type), Onest and Martian Mono (the kit's defaults, the desktop app). Never swap or "improve" them, whatever a tool suggests. A new font gets `--cap-mid` and `--cap-top` measured again.
@@ -18,7 +19,7 @@ Measure, don't eyeball. Vision misses 1 to 2 px errors, source review can't see 
 ## Rules
 
 Layout
-1. One spacing, padding and toolbar on every page: search on the left, tabs, filters and selects on the right. The page title starts at the same top and side on every page.
+1. One spacing, padding and toolbar on every page: search on the left, tabs, filters and selects on the right. The page title starts at the same top and side on every page. From 761 the toolbar keeps one row, the search giving way down to 160. When even that can't fit it takes two rows (the search and the actions, then the filters in one sideways row). The search never goes under 160, on a phone either: when the actions don't fit beside it, it takes the top row alone and the actions lead the filters' row. Never a control alone on a row: a lone small filter shares a row, a lone segmented control fills its own.
 2. Dense but comfortable, like Resend. When a screen feels crowded, regroup and space it. Don't just delete.
 3. Content takes all the width it has. Fields in one form fill its width, each control as wide as its stack.
 4. A leading square (face, icon tile, logo) never owns a column while the text beside it is squeezed: face, name and role on one line, text and controls full width below. A square beside 3 or more lines is a bug. This covers cards and the inbox. A DM has no face column at all, its header already says who it is.
@@ -31,8 +32,8 @@ Alignment and spacing
 9. Faces, tiles and controls stay at least 8 from every row edge and divider, also inside a highlighted or bordered row. Top padding equals bottom, left equals right.
 10. Icons, ⓘ and count badges centre on the capitals' middle within 1 px (`.ac-iconline`, `0.5lh - var(--cap-mid)`), also inside a line of words. A face beside one line centres on it. Words right after an inline face share its baseline. Initials sit optically centred in their tile.
 11. A picture taller than 1.25 lines beside 2 or more lines: the first line's capitals start at its top (`.ac-captop`). A step badge beside a name and a subtitle centres on the whole two-line block.
-12. Menu rows are their kind's height, 2 apart. Every option in one select is the same height, a description line never makes one taller. A select never shows empty. A people select shows a small face.
-13. List times end on one right edge. A list heading sits on its list's outer edge, 8 above it.
+12. Menu rows are their kind's height, 2 apart, the menu's padding 4: a line 32, a name with its description 50, a row with a face 36 (40, 58 and 44 on touch). Every option in one select is the same height, a description line never makes one taller. A select never shows empty. A people select shows a small face.
+13. List times end on one right edge. A list heading (GroupHeading) sits on its list's outer edge, 8 above it, 16 under the toolbar.
 14. Text and placeholders sit vertically centred in their inputs.
 15. Borders and shadows survive rounded corners. Hover backgrounds stay inside their row. A scrolling parent never cuts a control's ring.
 16. One class keeps one height, padding and gap on every screen.
@@ -41,7 +42,7 @@ Text
 17. Wrap meaning, never cut it with an ellipsis. Give a fact value the room to stay on one line. No row wraps word by word.
 18. No button covers text. Desfazer never takes its own column: it goes at the end of its sentence, or under it when there's no room.
 19. Badge, pill and button text 4.5:1 (3:1 for large text) in both themes. An unread or waiting count at least 3:1 against what's behind it.
-20. Less text: a title, at most one short sentence, the controls. Help goes behind an ⓘ beside its label, a title plus one sentence. Background reading goes to a site page, linked once. Cut sentences that only reassure.
+20. Less text: a title, at most one short sentence, the controls. Help goes behind an ⓘ beside its label, a title plus one sentence (Field's and SettingRow's `hint`). Under a field only a format example (`example`) or an error. Under a setting only what must stay in sight (`status`). Background reading goes to a site page, linked once. Cut sentences that only reassure.
 21. No semicolons in product copy, in any language or surface. No em dashes, except member group headers like "DONO — 1". Long "·" chains read dense.
 22. Links use the house link style, never the browser's blue underline. Third-party products and AI providers show their official logo, never a generic icon.
 

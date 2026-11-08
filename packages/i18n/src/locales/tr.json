@@ -1554,7 +1554,7 @@
     "list": {
       "agents": "Ajanlar",
       "people": "Kişiler",
-      "search": "Ad, rol veya kanala göre arayın",
+      "search": "Ekipte ara",
       "filterLabel": "Ajanları göster",
       "filter": {
         "mine": "Benimkiler",
@@ -7991,6 +7991,8 @@
     "channels_other": "{{count}} kanal",
     "people_one": "{{count}} kişi veya ajan",
     "people_other": "{{count}} kişi veya ajan",
+    "kinds_one": "{{count}} tür",
+    "kinds_other": "{{count}} tür",
     "clearAll": "Filtreleri temizle",
     "clearSearch": "Aramayı temizle"
   },
@@ -10059,7 +10061,6 @@
     "searchHint": "Arama kısayolu",
     "who": "Oluşturan",
     "everyone": "Herkes",
-    "kinds": "Türler",
     "kindMany": {
       "document": "Belgeler",
       "table": "Tablolar",
@@ -10071,7 +10072,6 @@
       "poll": "Anketler",
       "choices": "Seçenekler"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "Görünüm",
     "viewGrid": "Izgara",
     "viewList": "Liste",
@@ -13254,6 +13254,8 @@
     "plansAbout": "Plan zaten ödendi. Bu tutar yalnızca kişiler arasındaki kullanımı karşılaştırır.",
     "sub_one": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
     "sub_other": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
+    "subPlans_one": "{{month}} · {{count}} kişi · {{amount}}",
+    "subPlans_other": "{{month}} · {{count}} kişi · {{amount}}",
     "periodLabel": "Dönem",
     "period": {
       "month": "Bu ay",
@@ -13301,7 +13303,8 @@
     "meter": {
       "of": "/ {{limit}}",
       "noLimit": "· limitsiz",
-      "estimate": "API üzerinden ≈ {{amount}}"
+      "estimate": "API fiyatıyla ≈ {{amount}}",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "Şimdi",
@@ -13341,7 +13344,8 @@
     },
     "limits": {
       "title": "Kişi başına kullanım limiti",
-      "lead": "Her kişinin ayda tüm ajanlarda toplam ne kadar yapay zekâ kullanabileceği. İstedikleri ve oluşturdukları rutinler sayılır.",
+      "lead": "Her kişinin ayda tüm ajanlarda toplam ne kadar yapay zekâ kullanabileceği.",
+      "leadMore": "İstedikleri ve oluşturdukları rutinler sayılır.",
       "default": "Çalışma alanı varsayılanı",
       "defaultHint": "Rolden ya da istisnadan limiti olmayan herkes için geçerli.",
       "byRole": "Role göre",
@@ -13352,7 +13356,8 @@
       "amount": "Aylık limit",
       "rule": "Kişinin kendi limiti geçerlidir. Yoksa rollerinin en yükseği. Hiçbiri yoksa varsayılan. Sahiplerin limiti yoktur.",
       "whenTitle": "Biri limite ulaştığında",
-      "block": "Ajanlar o kişi için yeni iş başlatmayı bırakır",
+      "whenHint": "Yeni işi durdur: ajanlar o kişi için yeni iş başlatmayı bırakır. Yalnızca haber ver: iş sürer ve yöneticiler bir bildirim alır.",
+      "blockShort": "Yeni işi durdur",
       "notify": "Yalnızca yöneticilere haber ver",
       "warn": "%80'de uyar",
       "warnHint": "Kişi bir bildirim alır, yöneticiler de %100'de bir tane daha alır.",
@@ -13391,7 +13396,9 @@
     "usesNow": "şu anda kullanıyor",
     "monthTokens": "Bu ay {{tokens}} token",
     "tokens": "{{tokens}} token",
-    "equivalent": "API üzerinden ≈ {{amount}}",
+    "equivalent": "API fiyatıyla ≈ {{amount}}",
+    "apiPrice": "API fiyatı",
+    "apiPriceHint": "Ajanlar plan kullandığında kimse kullanım başına ödeme yapmaz. Bu tutar, aynı kullanımın API üzerinden ne kadar tutacağıdır.",
     "thisMonth": "Bu ay",
     "moreAgents_one": "+{{count}} ajan",
     "moreAgents_other": "+{{count}} ajan",

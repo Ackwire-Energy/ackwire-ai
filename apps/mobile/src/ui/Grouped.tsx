@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } fr
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
+import { GROUPED_ROW } from "./rhythm";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { motion, useTheme } from "./theme";
@@ -52,8 +53,8 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                     marginLeft:
                       (child.props as { icon?: unknown; leading?: unknown }).icon ||
                       (child.props as { leading?: unknown }).leading
-                        ? 14 + LEAD + 12
-                        : 14,
+                        ? GROUPED_ROW.padX + LEAD + 12
+                        : GROUPED_ROW.padX,
                   },
                 ]}
               />
@@ -66,18 +67,51 @@ export function GroupedList({ children }: { children?: ReactNode }) {
   );
 }
 
+interface GroupedHeaderProps {
+  children: string;
+  aside?: ReactNode;
+  /** An ⓘ after the header's words with what the whole group is for; its text shows under the header. */
+  hint?: { name: string; text: string };
+}
+
 /**
  * The small uppercase header of a group (it slides with the groups when one above grows or shrinks), with `aside`
  * at the end of its line: a small text action.
  */
-export function GroupedHeader({ children, aside }: { children: string; aside?: ReactNode }) {
+export function GroupedHeader({ children, aside, hint }: GroupedHeaderProps) {
   const { reducedMotion } = useTheme();
+  if (hint)
+    return (
+      <HintedHeader aside={aside} hint={hint}>
+        {children}
+      </HintedHeader>
+    );
   return (
     <Animated.View layout={reducedMotion ? undefined : SLIDE} style={aside ? styles.headerRow : null}>
       <Text variant="footnote" tone="faint" accessibilityRole="header" style={[styles.header, styles.shrink]}>
         {children.toLocaleUpperCase()}
       </Text>
       {aside ? <View style={styles.headerAside}>{aside}</View> : null}
+    </Animated.View>
+  );
+}
+
+/** The header's words and ⓘ on one line, the aside at its end, the hint's text under them inside the header's room. */
+function HintedHeader({ children, aside, hint }: GroupedHeaderProps & { hint: { name: string; text: string } }) {
+  const { reducedMotion } = useTheme();
+  const info = useInfoHint({ ...hint, variant: "footnote" });
+  return (
+    <Animated.View layout={reducedMotion ? undefined : SLIDE} style={styles.headerRoom}>
+      <View style={styles.headerLine}>
+        <View style={[styles.headerWords, styles.shrink]}>
+          <Text variant="footnote" tone="faint" accessibilityRole="header" style={[styles.headerCaps, styles.shrink]}>
+            {children.toLocaleUpperCase()}
+          </Text>
+          {info.button}
+        </View>
+        {aside}
+      </View>
+      {info.text}
     </Animated.View>
   );
 }
@@ -112,6 +146,8 @@ export interface GroupedRowProps {
   leading?: ReactNode;
   /** The value on the right, faint ("Ligadas"). */
   value?: string;
+  /** A short fact about the value, after it on its line ("Pela API"); a sentence goes in `sub`. */
+  valueNote?: string;
   /** Drawn just before the value (a picked agent's face, a format's glyph). */
   valueLeading?: ReactNode;
   /** A chevron: it opens a screen. */
@@ -127,7 +163,7 @@ export interface GroupedRowProps {
   faint?: boolean;
   disabled?: boolean;
   onPress?: () => void;
-  /** An ⓘ at the row's end: a tap on it shows the note under the row and never presses the row. */
+  /** An ⓘ right after the label: a tap on it shows the note under the row and never presses the row. */
   hint?: { name: string; text: string };
   /** An × at the row's end that takes it off the list; VoiceOver merges it into the row, so it is the row's action too. */
   remove?: { label: string; onPress: () => void };
@@ -140,11 +176,11 @@ export function GroupedRow(props: GroupedRowProps) {
 
 /** VoiceOver merges a button inside the row's button into it: the row reads the note out with its label. */
 function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string; text: string } }) {
-  // On the label's line: in a row whose text wraps the ⓘ stays beside the label, not at the row's top edge.
+  // On the label's first line, also when the label wraps.
   const info = useInfoHint({ ...hint, variant: "body" });
   return (
     <View>
-      <Row {...props} said={hint.text} after={info.button} />
+      <Row {...props} said={hint.text} labelAfter={info.button} />
       <View style={[styles.hint, info.open ? styles.hintOpen : null]}>{info.text}</View>
     </View>
   );
@@ -160,6 +196,7 @@ function Row({
   icon,
   leading,
   value,
+  valueNote,
   valueLeading,
   chevron = false,
   more = false,
@@ -171,8 +208,8 @@ function Row({
   onPress,
   remove,
   said,
-  after,
-}: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
+  labelAfter,
+}: Omit<GroupedRowProps, "hint"> & { said?: string; labelAfter?: ReactNode }) {
   const { colors: c } = useTheme();
   const { fontScale } = useWindowDimensions();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
@@ -194,7 +231,7 @@ function Row({
       onPress={press}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
-      accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
+      accessibilityLabel={[label, belowText, said, value, valueNote].filter(Boolean).join(", ")}
       {...(remove
         ? {
             accessibilityActions: [{ name: "delete", label: remove.label }],
@@ -223,9 +260,18 @@ function Row({
       ) : null}
       {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
-        <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
-          {label}
-        </Text>
+        {labelAfter ? (
+          <View style={styles.labelLine}>
+            <Text variant="body" numberOfLines={labelLines} style={[styles.shrink, { color: tone }]}>
+              {label}
+            </Text>
+            {labelAfter}
+          </View>
+        ) : (
+          <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
+            {label}
+          </Text>
+        )}
         {sub ? (
           <Text variant="footnote" tone="faint" numberOfLines={subLines}>
             {sub}
@@ -238,12 +284,24 @@ function Row({
           </Text>
         ) : null}
       </View>
-      {valueLeading ? (
-        <View style={[styles.value, styles.valued, line ? { minHeight: line.height } : null]}>
+      {valueLeading || valueNote ? (
+        <View
+          style={[
+            styles.value,
+            styles.valued,
+            valueNote ? styles.noted : null,
+            line ? { minHeight: line.height } : null,
+          ]}
+        >
           {valueLeading}
           {value ? (
             <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
               {value}
+            </Text>
+          ) : null}
+          {valueNote ? (
+            <Text variant="footnote" tone="faint" numberOfLines={1}>
+              {valueNote}
             </Text>
           ) : null}
         </View>
@@ -254,7 +312,6 @@ function Row({
           </Text>
         </View>
       ) : null}
-      {after}
       {checked ? (
         <View style={onLine(18)}>
           <Icon name="check" size={18} color={c.ink} />
@@ -376,6 +433,10 @@ const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
   header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  headerRoom: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16 },
+  headerLine: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  headerWords: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  headerCaps: { letterSpacing: 0.4 },
   headerRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   headerAside: { paddingRight: 16 },
   footer: { paddingTop: 8, paddingHorizontal: 16 },
@@ -383,12 +444,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.padY,
   },
-  // Wrapping text starts where a one-line row's label does (its 22 points centred in 50), not 8 from the top.
-  tall: { alignItems: "flex-start", paddingVertical: 14 },
+  // Wrapping text starts where a one-line row's label does, not 8 from the top.
+  tall: { alignItems: "flex-start", paddingVertical: GROUPED_ROW.tallPadY },
   // A control taller than the label's line (the 28-point switch) is centred on it rather than pushed below it.
   onLine: { justifyContent: "center" },
   tile: {
@@ -400,12 +461,21 @@ const styles = StyleSheet.create({
   },
   lead: { width: LEAD, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
+  labelLine: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   value: { flexShrink: 1, maxWidth: "50%" },
   valued: { flexDirection: "row", alignItems: "center", gap: 6 },
-  field: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 50, paddingHorizontal: 14 },
+  // A note that doesn't fit beside its value goes under it, so the value isn't cut for it.
+  noted: { flexWrap: "wrap", justifyContent: "flex-end" },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+  },
   key: { width: 96 },
   keyLine: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   shrink: { flexShrink: 1, minWidth: 0 },
-  hint: { paddingHorizontal: 14 },
+  hint: { paddingHorizontal: GROUPED_ROW.padX },
   hintOpen: { paddingBottom: 12 },
 });

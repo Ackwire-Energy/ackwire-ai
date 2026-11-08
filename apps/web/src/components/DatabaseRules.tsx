@@ -73,7 +73,7 @@ export function DatabaseRulesPanel({
                 placeholder={t("database.rule.databasePlaceholder")}
               />
             )}
-            <span className="ac-field__help">{t("database.rule.databasesHelp")}</span>
+            <span className="ac-field__example">{t("database.rule.databasesHelp")}</span>
           </div>
         )}
         <fieldset className="mail-rules__group">
@@ -109,7 +109,7 @@ export function DatabaseRulesPanel({
         <AddressList
           id={id("hidden")}
           label={t("database.rule.hidden")}
-          help={t("database.rule.hiddenHelp")}
+          example={t("database.rule.hiddenHelp")}
           values={policy.hiddenColumns}
           onChange={(hiddenColumns) => set({ hiddenColumns })}
           disabled={disabled}
@@ -127,7 +127,7 @@ export function DatabaseRulesPanel({
         <Field
           label={t("database.rule.cap")}
           id={id("cap")}
-          help={whole ? t("database.rule.capHelpAll") : t("database.rule.capHelp")}
+          example={whole ? t("database.rule.capHelpAll") : t("database.rule.capHelp")}
         >
           <Input
             className="ac-num mail-rules__cap"
@@ -139,7 +139,14 @@ export function DatabaseRulesPanel({
             onChange={(e) => set({ dailyQueryCap: numberOrNull(e.target.value) })}
           />
         </Field>
-        <Field label={t("database.rule.timeout")} group help={t("database.rule.timeoutHelp")}>
+        <Field
+          label={t("database.rule.timeout")}
+          group
+          hint={{
+            name: t("common.about", { label: t("database.rule.timeout") }),
+            text: t("database.rule.timeoutHelp"),
+          }}
+        >
           <Segmented
             label={t("database.rule.timeout")}
             value={String(policy.timeoutSeconds)}

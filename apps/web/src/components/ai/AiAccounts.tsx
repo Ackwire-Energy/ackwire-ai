@@ -464,7 +464,14 @@ function RenameDialog({
       >
         <Locked when={busy}>
           <DialogBody>
-            <Field label={t("aiAccounts.page.nameLabel")} id="ai-rename" help={t("aiAccounts.done.name")}>
+            <Field
+              label={t("aiAccounts.page.nameLabel")}
+              id="ai-rename"
+              hint={{
+                name: t("common.about", { label: t("aiAccounts.page.nameLabel") }),
+                text: t("aiAccounts.done.name"),
+              }}
+            >
               <Input value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
             </Field>
           </DialogBody>

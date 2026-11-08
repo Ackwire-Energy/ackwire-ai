@@ -27,6 +27,7 @@ import {
   Chip,
   CountChip,
   EmptyState,
+  GroupHeading,
   Icon,
   type IconName,
   PageHeader,
@@ -353,10 +354,7 @@ export function TaskManagerPage({
 
       {computers.length > 0 && (
         <section className="tm-computers" aria-label={t("taskManager.queue.computers")}>
-          <div className="list-group-head">
-            <h2>{t("taskManager.queue.computers")}</h2>
-            <span className="list-group-head__count">{computers.length}</span>
-          </div>
+          <GroupHeading title={t("taskManager.queue.computers")} count={computers.length} />
           <ul className="tm-computers__list ac-card">
             {computers.map((c) => (
               <li key={c.id} className="tm-computer">

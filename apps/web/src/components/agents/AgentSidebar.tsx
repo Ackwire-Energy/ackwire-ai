@@ -29,7 +29,16 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
-import { BrainIcon, Button, ComputerPortrait, Icon, InfoHint, ProviderLogo, Switch } from "@agenteschat/ui";
+import {
+  BrainIcon,
+  Button,
+  ComputerPortrait,
+  GroupHeading,
+  Icon,
+  InfoHint,
+  ProviderLogo,
+  Switch,
+} from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -90,7 +99,7 @@ export function AgentSidebar({ agent, onClose }: { agent: Agent; onClose?: () =>
   if (!onClose) {
     return (
       <aside className="members-side dm-side" aria-label={t("agentSide.label")}>
-        {body}
+        <div className="dm-side__scroll">{body}</div>
       </aside>
     );
   }
@@ -132,18 +141,21 @@ function Section({
 }) {
   return (
     <section className="dm-side__sec" aria-label={title}>
-      <h3 className="dm-side__title">
-        {hint ? (
-          <span className="ac-hintline">
-            <span>{title}</span>
-            <InfoHint name={hint.name}>{hint.text}</InfoHint>
-          </span>
-        ) : (
-          <span>{title}</span>
-        )}
-        {count !== undefined && <span className="dm-side__count ac-num">{count}</span>}
-        {action}
-      </h3>
+      <GroupHeading
+        level={3}
+        title={
+          hint ? (
+            <span className="ac-hintline">
+              <span>{title}</span>
+              <InfoHint name={hint.name}>{hint.text}</InfoHint>
+            </span>
+          ) : (
+            title
+          )
+        }
+        count={count}
+        aside={action}
+      />
       {children}
     </section>
   );

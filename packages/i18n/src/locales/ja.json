@@ -1297,7 +1297,7 @@
       "calendar": "会議と締め切り",
       "team": "誰が誰か：メンバー、エージェント、そのグループ",
       "dashboards": "エージェントが最新に保つ数値やグラフ",
-      "taskManager": "各エージェントが今していることを見て、必要なものを停止できます"
+      "taskManager": "各エージェントが今していることと、必要なものの停止"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
@@ -1503,7 +1503,7 @@
     "list": {
       "agents": "エージェント",
       "people": "メンバー",
-      "search": "名前、役割、チャンネルで検索",
+      "search": "チーム内を検索",
       "filterLabel": "エージェントを表示",
       "filter": {
         "mine": "自分の",
@@ -7712,6 +7712,7 @@
     "noResults": "その名前のものはありません。",
     "channels_other": "{{count}}個のチャンネル",
     "people_other": "人またはエージェント（{{count}}）",
+    "kinds_other": "{{count}} 種類",
     "clearAll": "フィルターをクリア",
     "clearSearch": "検索をクリア"
   },
@@ -9692,7 +9693,6 @@
     "searchHint": "検索のショートカット",
     "who": "作成者",
     "everyone": "全員",
-    "kinds": "種類",
     "kindMany": {
       "document": "ドキュメント",
       "table": "表",
@@ -9704,7 +9704,6 @@
       "poll": "投票",
       "choices": "選択肢"
     },
-    "kindCount": "{{kind}}: {{count}}",
     "view": "表示",
     "viewGrid": "グリッド",
     "viewList": "リスト",
@@ -12817,6 +12816,7 @@
     "about": "各メンバーがどれだけ、どのエージェントで使っているかを確認できます。プライベートな会話の内容はここに表示されません。",
     "plansAbout": "プランは支払い済みです。この金額はメンバー間の利用を比べるためだけのものです。",
     "sub_other": "{{month}} · {{count}}人 · AIに{{amount}}",
+    "subPlans_other": "{{month}} · {{count}}人 · {{amount}}",
     "periodLabel": "期間",
     "period": {
       "month": "今月",
@@ -12864,7 +12864,8 @@
     "meter": {
       "of": "/ {{limit}}",
       "noLimit": "· 上限なし",
-      "estimate": "API換算で≈ {{amount}}"
+      "estimate": "API料金で≈ {{amount}}",
+      "approx": "≈ {{amount}}"
     },
     "live": {
       "title": "いま",
@@ -12903,7 +12904,8 @@
     },
     "limits": {
       "title": "メンバーごとの利用上限",
-      "lead": "各メンバーが1か月に使えるAIの量で、すべてのエージェントの合計です。本人の依頼と、本人が作成したルーティンが含まれます。",
+      "lead": "各メンバーが1か月に使えるAIの量で、すべてのエージェントの合計です。",
+      "leadMore": "本人の依頼と、本人が作成したルーティンが含まれます。",
       "default": "ワークスペースの既定",
       "defaultHint": "ロールや例外による上限がない人に適用されます。",
       "byRole": "ロール別",
@@ -12914,7 +12916,8 @@
       "amount": "月の上限",
       "rule": "本人の上限が優先されます。ない場合はロールのうち最も高いもの。どちらもない場合は既定です。オーナーには上限がありません。",
       "whenTitle": "上限に達したとき",
-      "block": "その人のための新しい作業をエージェントが始めなくなる",
+      "whenHint": "新しい作業を止める：その人のための新しい作業をエージェントが始めなくなります。管理者に知らせるだけ：作業は続き、管理者に通知が届きます。",
+      "blockShort": "新しい作業を止める",
       "notify": "管理者に知らせるだけ",
       "warn": "80%で知らせる",
       "warnHint": "本人に通知が届き、100%で管理者にも通知が届きます。",
@@ -12953,7 +12956,9 @@
     "usesNow": "使用中",
     "monthTokens": "今月{{tokens}}トークン",
     "tokens": "{{tokens}}トークン",
-    "equivalent": "API換算で≈ {{amount}}",
+    "equivalent": "API料金で≈ {{amount}}",
+    "apiPrice": "API料金",
+    "apiPriceHint": "エージェントがプランを使うときは、使った分だけ払う人はいません。この金額は、同じ使い方をAPIでした場合の料金です。",
     "thisMonth": "今月",
     "moreAgents_other": "+{{count}}人のエージェント",
     "paid": "{{amount}}支払い済み",

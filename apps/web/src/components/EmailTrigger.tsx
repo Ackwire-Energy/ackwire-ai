@@ -128,7 +128,7 @@ export function EmailTriggerFields({
       <AddressList
         id="nr-mail-from"
         label={t("mail.routine.from")}
-        help={t("mail.routine.fromHelp")}
+        example={t("mail.routine.fromHelp")}
         values={value.filter.from ?? []}
         onChange={(from) => setFilter({ ...value.filter, from })}
       />

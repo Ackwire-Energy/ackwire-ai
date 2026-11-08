@@ -108,7 +108,7 @@ test("Settings › Lodi on someone else's OpenCode plan: an admin may still let 
   await renderApp(`/org/${ORG_ID}/settings/right_hand`, { api });
   await settle(8);
   const body = document.querySelector(".settings__body") as HTMLElement;
-  expect(body.querySelector("#rh-mine-help, .rh-set__planline")).toBeTruthy();
+  expect(body.querySelector("#rh-mine-help, .settings-row__value")).toBeTruthy();
   expect(body.textContent).toContain("Zen da Ana");
   const share = within(body).getByRole("switch", { name: "Atende outras pessoas" });
   expect(share.hasAttribute("disabled")).toBe(false);
