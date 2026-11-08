@@ -772,8 +772,8 @@ export function PlanPanel(props: PlanPanelProps) {
 /** "For [All agents ▾]": every agent of "All agents" first, with their faces and names, then each agent. */
 function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agents" | "all" | "target" | "onTarget">) {
   const { t } = useTranslation();
-  const face = (a: PlanAgent) => (
-    <AgentAvatar key={a.id} name={a.name} initials={a.initials} appearance={a.appearance} size="xs" />
+  const face = (a: PlanAgent, size: "xs" | "sm" = "xs") => (
+    <AgentAvatar key={a.id} name={a.name} initials={a.initials} appearance={a.appearance} size={size} />
   );
   return (
     <span className="ai-panel__agent">
@@ -795,11 +795,11 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
                     all.map((a) => a.name),
                     NAMES_SHOWN,
                   ),
-                  leading: <AvatarStack>{all.slice(0, 3).map(face)}</AvatarStack>,
+                  leading: <AvatarStack>{all.slice(0, 3).map((a) => face(a))}</AvatarStack>,
                 },
               ]
             : []),
-          ...agents.map((a) => ({ value: a.id, label: a.name, leading: face(a) })),
+          ...agents.map((a) => ({ value: a.id, label: a.name, leading: face(a, "sm") })),
         ]}
       />
     </span>

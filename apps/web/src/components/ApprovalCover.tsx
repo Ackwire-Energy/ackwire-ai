@@ -63,7 +63,7 @@ export function ApprovalsSection() {
   };
   const face = (userId: string) => {
     const m = dir.memberById.get(userId);
-    return <Avatar kind="person" size="xs" name={m?.name ?? ""} imageUrl={m?.image} />;
+    return <Avatar kind="person" size="sm" name={m?.name ?? ""} imageUrl={m?.image} />;
   };
   const people = dir.members
     .filter((m) => m.userId !== meId)

@@ -41,7 +41,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
             description: [`@${a.handle}`, a.role ? t("issues.agentRole", { role: a.role }) : null]
               .filter(Boolean)
               .join(" · "),
-            leading: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
+            leading: <AgentAvatar agentId={a.id} size="sm" name={a.name} />,
             note: here ? undefined : t("mentions.notInChannel"),
             inChannel: here,
             rank: fold(a.name).startsWith(q) || fold(a.handle).startsWith(q) ? 0 : 1,
@@ -57,7 +57,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
               insert: handle,
               label: m.name,
               description: `@${handle}`,
-              leading: <Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />,
+              leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
               inChannel: inChannel("person", m.userId),
               rank: fold(m.name).startsWith(q) || fold(handle).startsWith(q) ? 0 : 1,
               hay: `${fold(m.name)} ${fold(handle)} ${fold(m.email)}`,

@@ -75,7 +75,7 @@ export function CommandMenu() {
         label: a.name,
         sub: a.role ? t("palette.agentRole", { role: a.role }) : t("palette.agent"),
         keywords: a.handle,
-        mark: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
+        mark: <AgentAvatar agentId={a.id} size="sm" name={a.name} />,
         onSelect: () => void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: a.id } }),
       });
     }
@@ -87,7 +87,7 @@ export function CommandMenu() {
         label: m.name,
         sub: t("palette.person"),
         keywords: `${m.handle} ${m.email}`,
-        mark: <Avatar size="xs" name={m.name} imageUrl={m.image} />,
+        mark: <Avatar size="sm" name={m.name} imageUrl={m.image} />,
         onSelect: () => void navigate({ to: "/org/$orgId/dm/person/$userId", params: { orgId, userId: m.userId } }),
       });
     }
@@ -179,7 +179,7 @@ export function CommandMenu() {
           group: t("palette.ask"),
           label: t("palette.askLabel", { name: a.name, text: body || text }),
           sub: t("palette.newConversation"),
-          mark: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
+          mark: <AgentAvatar agentId={a.id} size="sm" name={a.name} />,
           onSelect: () => {
             setDraftFor(`agent:${a.id}`, body || text);
             void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: a.id } });

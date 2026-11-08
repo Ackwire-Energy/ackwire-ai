@@ -66,7 +66,7 @@ export function CallAgentMenu() {
       {actions.channelAgents.map((a) => (
         <MenuItem
           key={a.id}
-          leading={<AgentAvatar agentId={a.id} size="xs" name={a.name} />}
+          leading={<AgentAvatar agentId={a.id} size="sm" name={a.name} />}
           description={`@${a.handle}`}
           onSelect={() => actions.insertMention(a.handle)}
         >
