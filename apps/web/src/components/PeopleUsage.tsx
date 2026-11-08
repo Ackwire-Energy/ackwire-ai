@@ -47,11 +47,13 @@ import {
   agentGradient,
   Button,
   Card,
+  CountChip,
   cx,
   Dialog,
   DialogBody,
   EmptyState,
   EventPillAction,
+  FilterToggle,
   GroupHeading,
   Icon,
   InfoHint,
@@ -64,6 +66,7 @@ import {
   Switch,
   TabPanel,
   Tabs,
+  Toolbar,
   UsageDays,
   UsageSwatch,
 } from "@agenteschat/ui";
@@ -287,7 +290,7 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
           {switcher}
         </span>
       </div>
-      <div className="pu-toolbar">
+      <Toolbar size="sm">
         <Select
           size="sm"
           aria-label={t("peopleUsage.periodLabel")}
@@ -319,22 +322,17 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
             ...dir.agents.map((a) => ({ value: a.id, label: a.name })),
           ]}
         />
-        {PEOPLE_CHIPS.map((c) => {
-          const on = chips.includes(c);
-          return (
-            <button
-              key={c}
-              type="button"
-              className="pu-chip"
-              aria-pressed={on}
-              onClick={() => setChips((l) => (on ? l.filter((x) => x !== c) : [...l, c]))}
-            >
-              {t(`peopleUsage.chips.${c}`)}
-              <span className="pu-chip__n tabular">{counts[c]}</span>
-            </button>
-          );
-        })}
-      </div>
+        {PEOPLE_CHIPS.map((c) => (
+          <FilterToggle
+            key={c}
+            pressed={chips.includes(c)}
+            onPressedChange={(on) => setChips((l) => (on ? [...l, c] : l.filter((x) => x !== c)))}
+            count={counts[c]}
+          >
+            {t(`peopleUsage.chips.${c}`)}
+          </FilterToggle>
+        ))}
+      </Toolbar>
       <p className="pu-summary">
         <span data-tone="near">{t("peopleUsage.summary.near", { n: counts.near })}</span>
         {" · "}
@@ -459,7 +457,7 @@ function LiveCard({ live }: { live: PeopleUsage["live"] }) {
       <h4 id="pu-live-title" className="pu-live__title">
         <span className="pu-live__dot" aria-hidden="true" />
         {t("peopleUsage.live.title")}
-        <span className="pu-chip__n tabular">{people}</span>
+        <CountChip>{people}</CountChip>
       </h4>
       <ul className="pu-live__list">
         {live.slice(0, 8).map((w) => {
