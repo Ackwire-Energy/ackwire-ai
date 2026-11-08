@@ -158,6 +158,7 @@
     "title": "Obrolan",
     "serverError": {
       "offline": "Ponselmu tidak terhubung ke internet.",
+      "answered": "{{host}} merespons, tetapi obrolanmu tidak termuat. Coba lagi sebentar lagi.",
       "text": "Mungkin sedang mati atau di luar jaringanmu. Obrolanmu akan muncul sendiri begitu server kembali.",
       "kept": "Menampilkan yang sudah ada di aplikasi."
     },

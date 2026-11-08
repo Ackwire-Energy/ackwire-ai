@@ -170,6 +170,7 @@
     "title": "Chats",
     "serverError": {
       "offline": "Tu teléfono no tiene internet.",
+      "answered": "{{host}} respondió, pero tus conversaciones no cargaron. Inténtalo de nuevo en un momento.",
       "text": "Puede estar caído o fuera de tu red. Tus chats aparecen solos cuando vuelva.",
       "kept": "Mostrando lo que ya estaba en la app."
     },

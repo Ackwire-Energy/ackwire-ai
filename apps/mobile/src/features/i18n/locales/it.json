@@ -170,6 +170,7 @@
     "title": "Chat",
     "serverError": {
       "offline": "Il telefono non è connesso a internet.",
+      "answered": "{{host}} ha risposto, ma le tue conversazioni non si sono caricate. Riprova tra poco.",
       "text": "Potrebbe essere offline o fuori dalla tua rete. Le chat compaiono da sole appena torna disponibile.",
       "kept": "Mostra quello che era già nell'app."
     },

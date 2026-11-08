@@ -73,7 +73,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <KeyboardProvider>
           <ThemeProvider>
             <I18nextProvider i18n={i18n}>
-              <QueryClientProvider client={scope.queryClient}>
+              {/* Keyed by server: a query hook keeps the client it mounted with (TanStack's observer is made once), so
+                  without a fresh tree the screens kept the first server's cache across a switch and asked this
+                  server for another one's workspace (ADR 0154). */}
+              <QueryClientProvider key={scope.server} client={scope.queryClient}>
                 <ApiProvider client={scope.api}>
                   <SessionProvider auth={scope.auth} server={server}>
                     <OrgProvider>
