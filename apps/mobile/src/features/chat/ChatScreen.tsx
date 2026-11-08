@@ -52,6 +52,7 @@ import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
+import { workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import {
   isMediaAfterReply,
@@ -78,7 +79,7 @@ import { useFocusEffect, useIsFocused, useIsPreview } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, View } from "react-native";
+import { Keyboard, type LayoutChangeEvent, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardController, KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -96,6 +97,7 @@ import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
 import { rightHandSeen } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
+import { usePush } from "@/providers/push";
 import { useRealtime } from "@/providers/realtime";
 import {
   Button,
@@ -122,6 +124,7 @@ import { threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
+import { PushOfferLine } from "../push/PushOfferLine";
 import { FanStrip, QueueWaitRow } from "../queue/parts";
 import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
@@ -143,6 +146,7 @@ import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
 import { AskBar, AskProbes, AskStoreProvider, useAskWatch, useAwayAsk } from "./asks";
+import { AttachmentStrip, MAX_PENDING, type PendingFile } from "./AttachmentStrip";
 import { ChannelHello } from "./ChannelHello";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ChannelPicker } from "./ChannelPicker";
@@ -174,12 +178,13 @@ import {
 import { RowLookContext, useConversationLook, useRhythm } from "./look";
 import { MediaPickerSheet } from "./MediaPickerSheet";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
+import { MessageMenuFor } from "./MessageMenu";
 import { MessageRow } from "./MessageRow";
 import { stickerRowsOnScreen } from "./media";
 import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
-import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { PinnedLines, PinsSheet } from "./PinsSheet";
 import { QuoteBar } from "./QuoteLine";
 import { AgentLocked, UnavailableLines } from "./ReachLines";
 import { RowSight } from "./row-sight";
@@ -202,6 +207,7 @@ import {
 import {
   ChannelOptions,
   MessageActions,
+  type MessageActionsContext,
   MissionSummaryView,
   NewMissionForm,
   PlusActions,
@@ -209,6 +215,7 @@ import {
   ThreadOptions,
 } from "./sheets";
 import { StoppedRunsContext, stoppedRunsKey, stoppedRunsOf } from "./stopped-runs";
+import { SwipeReply } from "./SwipeReply";
 import { turnOrder, turnRuns, withOpacity } from "./turn";
 import { JumpToMessageContext } from "./WorkLine";
 
@@ -275,6 +282,10 @@ const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
 /** How long the conversation is held in place after something opens over it and after it closes (ms). */
 const HOLD_MS = 900;
+/** Holding a message opens the system's menu where there is one (iOS); elsewhere, the app's sheet. */
+const NATIVE_MENU = Platform.OS === "ios";
+/** The notifications line was shown and answered here: it doesn't come back on this screen. */
+const OFFER_DONE = "done";
 /** How long the list keeps ignoring the keyboard after what covered it closed (its closing animation, ms). */
 const FREEZE_AFTER_MS = 450;
 /** The list shows by itself after this even if it never said it was placed (ms). */
@@ -477,24 +488,16 @@ function Chat({
     [live.typing, channelId, meId, threadId],
   );
   const { sendTyping } = live;
-  // While an agent works here, anyone who writes chooses "Juntar" or "Parar e mandar" (the server takes a
-  // steer from them); the composer's "Parar" (the empty field's button) stops every agent at work here I
-  // may stop, writing too, and only shows if there is one.
+  // While an agent works here, a tap on send reaches it at its next pause and holding send stops it and sends (the
+  // server takes a steer). "Parar" itself is a word at the end of the line above the composer (and of the live row
+  // while it shows): the composer keeps only its send, the one ink circle.
   const busyRuns = useMemo(() => stoppableInLine(runs).filter((r) => !r.stopping), [runs]);
-  const stoppable = useMemo(() => busyRuns.filter((r) => canStop(r)), [busyRuns, canStop]);
-  const working = useMemo<ComposerWorking | null>(() => {
-    if (busyRuns.length === 0) return null;
-    const first = stoppable[0];
-    if (!first) return {};
-    return {
-      stop: {
-        label: t("mobile.chat.stopAgent", { name: dir.agentById.get(first.agentId)?.name ?? "" }),
-        onStop: () => {
-          for (const r of stoppable) stopRun(r);
-        },
-      },
-    };
-  }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
+  const stoppable = useMemo(() => stoppableInLine(runs).filter((r) => canStop(r)), [runs, canStop]);
+  const working = useMemo<ComposerWorking | null>(() => (busyRuns.length === 0 ? null : {}), [busyRuns]);
+  const lineStop = useMemo(
+    () => (stoppable.length > 0 ? { runs: stoppable, onStop: stopRun } : undefined),
+    [stoppable, stopRun],
+  );
   // Which agents' live rows are on screen: the line above the composer speaks only for those out of view, and the
   // row itself says its step, its time and its stop (the latest run here I may stop, as on the web).
   const [sight] = useState(() => new RowSight());
@@ -750,6 +753,9 @@ function Chat({
   useEffect(() => {
     if (atEnd) setSeenKey(latestSeen);
   }, [atEnd, latestSeen]);
+  // More than a screen above the end: the round button shows even with nothing new below, and the header's pill
+  // closes to the face.
+  const [far, setFar] = useState(false);
   const unseen: Unseen = useMemo(
     () =>
       atEnd
@@ -994,6 +1000,11 @@ function Chat({
   // Sending always goes to the end. While an agent works, "Parar e mandar" makes it read this one now.
   const onSend = (raw: string, how: SendHow = "join") => {
     const text = raw.trim();
+    // Photos or files waiting above the field: they go with the words, which are their caption (or with none).
+    if (pending.length > 0) {
+      void sendWithFiles(text, how);
+      return;
+    }
     if (!text) return;
     const cmd = parseSlash(text);
     if (!cmd) {
@@ -1055,6 +1066,7 @@ function Chat({
     orgId,
     channelId,
     threadId,
+    agentId: dmAgentId,
     replyTo: quote?.id ?? null,
     authorId: meId ?? "",
     enabled: Boolean(meId && settings?.voiceAvailable && settings.voiceMessages),
@@ -1079,21 +1091,55 @@ function Chat({
       />,
     );
 
-  const upload = async (file: { uri: string; name: string; type: string }) => {
-    toast({ title: t("mobile.chat.uploading"), icon: "file" });
-    try {
-      // React Native's FormData sends `{ uri, name, type }` as a file part.
-      const asFile = file as unknown as Parameters<typeof api.artifacts.upload>[1];
-      const saved: ArtifactDetail = await api.artifacts.upload(orgId, asFile, {
-        channelId,
-        ...(threadId ? { threadId } : {}),
-      });
-      send("", threadId, takeQuote([{ id: saved.id, version: saved.version, title: saved.title }]));
-      toEnd();
-    } catch {
-      toast({ title: t("mobile.chat.uploadFailed"), icon: "x" });
-    }
+  // ── Photos and files ──
+  // Picked, they wait above the field (`AttachmentStrip`): × takes one out, the words typed are their caption, and
+  // send uploads them and sends everything as one message. A thumbnail dims while its upload runs; one that fails
+  // stays, marked, and the caption comes back to the field, so nothing typed is lost.
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [captionBack, setCaptionBack] = useState<{ text: string; at: number } | null>(null);
+  const addPending = (files: { uri: string; name: string; type: string }[]) => {
+    if (files.length === 0) return;
+    const at = Date.now();
+    const picked = files.map((f, i): PendingFile => ({ ...f, id: `${at}-${i}-${f.uri}`, state: "waiting" }));
+    if (pending.length + picked.length > MAX_PENDING)
+      toast({ title: t("mobile.chat.attach.tooMany", { count: MAX_PENDING }), icon: "file" });
+    setPending((now) => [...now, ...picked].slice(0, MAX_PENDING));
   };
+  const removePending = (id: string) => setPending((now) => now.filter((f) => f.id !== id));
+  const uploadOne = async (file: PendingFile): Promise<ArtifactRef> => {
+    // React Native's FormData sends `{ uri, name, type }` as a file part.
+    const part = { uri: file.uri, name: file.name, type: file.type };
+    const asFile = part as unknown as Parameters<typeof api.artifacts.upload>[1];
+    const saved: ArtifactDetail = await api.artifacts.upload(orgId, asFile, {
+      channelId,
+      ...(threadId ? { threadId } : {}),
+    });
+    return { id: saved.id, version: saved.version, title: saved.title };
+  };
+  const sendWithFiles = async (text: string, how: SendHow) => {
+    const files = pending;
+    setPending((now) => now.map((f): PendingFile => ({ ...f, state: "sending" })));
+    const results = await Promise.allSettled(files.map(uploadOne));
+    const failed = new Set(files.filter((_, i) => results[i]?.status === "rejected").map((f) => f.id));
+    if (failed.size > 0) {
+      // Nothing goes half sent: the ones that failed stay marked, the caption comes back to try again.
+      const after = (f: PendingFile): PendingFile["state"] => (failed.has(f.id) ? "failed" : "waiting");
+      setPending((now) => now.map((f) => ({ ...f, state: after(f) })));
+      if (text) setCaptionBack({ text, at: Date.now() });
+      toast({ title: t("mobile.chat.uploadFailed"), icon: "x" });
+      return;
+    }
+    const refs = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+    const meta = takeQuote(refs);
+    send(text, threadId, how === "now" ? { ...meta, steer: "now" } : meta);
+    setPending([]);
+    toEnd();
+  };
+  const pickedAsset = (a: ImagePicker.ImagePickerAsset) => ({
+    uri: a.uri,
+    name: a.fileName ?? (a.type === "video" ? "video.mp4" : "photo.jpg"),
+    type: a.mimeType ?? (a.type === "video" ? "video/mp4" : "image/jpeg"),
+  });
   const onPlus = async (pick: PlusPick) => {
     // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
     // iOS took them away with it and the app waited for an answer that never came.
@@ -1108,25 +1154,26 @@ function Chat({
           return;
         }
         const res = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-        const a = res.canceled ? null : res.assets[0];
-        if (a) await upload({ uri: a.uri, name: a.fileName ?? "photo.jpg", type: a.mimeType ?? "image/jpeg" });
+        if (!res.canceled) addPending(res.assets.map(pickedAsset));
         return;
       }
       case "photos": {
-        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images", "videos"], quality: 0.8 });
-        const a = res.canceled ? null : res.assets[0];
-        if (a)
-          await upload({
-            uri: a.uri,
-            name: a.fileName ?? (a.type === "video" ? "video.mp4" : "photo.jpg"),
-            type: a.mimeType ?? (a.type === "video" ? "video/mp4" : "image/jpeg"),
-          });
+        const res = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images", "videos"],
+          quality: 0.8,
+          allowsMultipleSelection: true,
+          selectionLimit: Math.max(1, MAX_PENDING - pending.length),
+          orderedSelection: true,
+        });
+        if (!res.canceled) addPending(res.assets.map(pickedAsset));
         return;
       }
       case "file": {
-        const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
-        const a = res.canceled ? null : res.assets[0];
-        if (a) await upload({ uri: a.uri, name: a.name, type: a.mimeType ?? "application/octet-stream" });
+        const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true });
+        if (!res.canceled)
+          addPending(
+            res.assets.map((a) => ({ uri: a.uri, name: a.name, type: a.mimeType ?? "application/octet-stream" })),
+          );
         return;
       }
       case "mission":
@@ -1141,29 +1188,33 @@ function Chat({
     }
   };
 
-  // ── Long press ──
+  // ── Holding a message, swiping it ──
+  // "Responder" quotes the message above the field, in the conversation or the thread (the server keeps the quote in
+  // the same place), wherever I can write.
   const canMission = !mission && (Boolean(dm) || Boolean(channel));
   const canReply =
-    isThread &&
     member &&
-    thread.data?.state !== "archived" &&
+    (!isThread || thread.data?.state !== "archived") &&
     channel?.can?.post !== false &&
     (!dmAgent || canTalk(dmAgent));
-  // biome-ignore lint/correctness/useExhaustiveDependencies: openNewMission reads the latest state when called
-  const onLongPress = useCallback(
-    (m: Message) =>
-      sheet.open(
-        <MessageActions
-          message={m}
-          canMission={canMission}
-          inThread={isThread}
-          thread={linkThreads.get(m.threadId ?? m.id)}
-          onMission={(goal, rootId) => openNewMission(goal, rootId)}
-          onRemind={(message) => openRemind({ message })}
-          {...(canReply ? { onReply } : {})}
-        />,
-      ),
-    [sheet, canMission, isThread, linkThreads, canReply, onReply],
+  // What a message's menu works with: the system's menu (iOS) and the app's sheet (Android) list the same actions.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: openNewMission and openRemind read the latest state when called
+  const menuOf = useCallback(
+    (m: Message): MessageActionsContext => ({
+      message: m,
+      canMission,
+      inThread: isThread,
+      thread: linkThreads.get(m.threadId ?? m.id),
+      onMission: (goal, rootId) => openNewMission(goal, rootId),
+      onRemind: (message) => openRemind({ message }),
+      onReply: canReply ? onReply : undefined,
+    }),
+    [canMission, isThread, linkThreads, canReply, onReply],
+  );
+  // The app's own sheet only where the platform has no menu of its own: on iOS a hold is the system's.
+  const onLongPress = useMemo(
+    () => (NATIVE_MENU ? undefined : (m: Message) => sheet.open(<MessageActions {...menuOf(m)} />)),
+    [sheet, menuOf],
   );
 
   // ── Pins ──
@@ -1536,6 +1587,8 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
+        // Reading far up, only the face stays (the screen is the messages); a new reply opens it again.
+        collapsed={far && unseen.messages === 0}
         extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
@@ -1641,7 +1694,7 @@ function Chat({
   );
   rowsRef.current = rows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
-  // The pinned bar shows while something is pinned here (`PinnedBar`).
+  // Something is pinned here: its lines wait above the first message (`PinnedLines`).
   const pinsData = usePins(orgId, channelId, member).data;
   const hasPins = useMemo(() => pinsIn(pinsData ?? [], threadId).length > 0, [pinsData, threadId]);
 
@@ -1697,6 +1750,51 @@ function Chat({
   const loading = isThread
     ? threadMessages.isLoading || (threadMessages.isPlaceholderData && (thread.data?.replyCount ?? 1) > 0)
     : top.isLoading;
+
+  // ── Asking for notifications where it makes sense ──
+  // Right after an agent says it will take a while (a long work it is still on, ADR 0121), once, under that
+  // message: "Quer saber quando a Dora terminar?" with Avisar. Only while the app may still ask (the person
+  // hasn't answered the system yet), and never twice on this screen.
+  const push = usePush();
+  const longWorkAt = useMemo(() => {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m && m.author.type === "agent" && m.longWork && !workIsOver(m.longWork)) return m.id;
+    }
+    return null;
+  }, [list]);
+  const [offerAt, setOfferAt] = useState<string | null>(null);
+  const { markOffered } = push;
+  const mayOffer = push.offer.home && member;
+  useEffect(() => {
+    if (offerAt || !longWorkAt || !mayOffer) return;
+    setOfferAt(longWorkAt);
+    // Counted as offered once it shows: the home's own ask waits its turn after this one.
+    markOffered();
+  }, [offerAt, longWorkAt, mayOffer, markOffered]);
+
+  // A message's own row (`renderItem` wraps it in the swipe and the menu).
+  const rowOf = useCallback(
+    (item: Extract<Row, { kind: "message" }>) => (
+      <MessageRow
+        message={item.message}
+        grouped={item.grouped}
+        newTurn={item.newTurn}
+        run={runPosition(item.grouped, item.continued ?? false)}
+        above={item.above}
+        aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
+        meId={meId}
+        thread={isThread ? undefined : linkThreads.get(item.message.id)}
+        inThread={isThread}
+        {...(onLongPress ? { onLongPress } : {})}
+        onRetry={onRetry}
+        onQuote={onQuote}
+        receipt={item.message.id === markAt ? receipt : undefined}
+        seenBy={item.message.id === seenId ? seenBy : undefined}
+      />
+    ),
+    [isThread, linkThreads, meId, onLongPress, onRetry, onQuote, markAt, receipt, seenId, seenBy],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: Row }) => {
@@ -1772,22 +1870,21 @@ function Chat({
               }
               style={item.message.id === flashId ? { backgroundColor: c.sunken } : undefined}
             >
-              <MessageRow
-                message={item.message}
-                grouped={item.grouped}
-                newTurn={item.newTurn}
-                run={runPosition(item.grouped, item.continued ?? false)}
-                above={item.above}
-                aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
-                meId={meId}
-                thread={isThread ? undefined : linkThreads.get(item.message.id)}
-                inThread={isThread}
-                onLongPress={onLongPress}
-                onRetry={onRetry}
-                onQuote={onQuote}
-                receipt={item.message.id === markAt ? receipt : undefined}
-                seenBy={item.message.id === seenId ? seenBy : undefined}
-              />
+              {/* Swipe right to answer it (a quote above the field); hold it for the system's menu (iOS) or the
+                  app's sheet. A message still on its way has neither. */}
+              <SwipeReply enabled={canReply && !item.message.local} onReply={() => onReply(item.message)}>
+                {NATIVE_MENU && !item.message.local ? (
+                  <MessageMenuFor
+                    context={menuOf(item.message)}
+                    href={chatHref(item.message.channelId, item.message.threadId, item.message.id)}
+                  >
+                    {/* One plain view for the menu to lift (the row can be a fragment: a pair row, a quote). */}
+                    <View collapsable={false}>{rowOf(item)}</View>
+                  </MessageMenuFor>
+                ) : (
+                  rowOf(item)
+                )}
+              </SwipeReply>
               {item.message.author.type === "agent" && item.message.mentionedAgentIds.length > 1 ? (
                 <FanStrip message={item.message} receipt={receipts[item.message.id]} />
               ) : null}
@@ -1799,6 +1896,9 @@ function Chat({
                   connectInline={connectInline}
                   onRetry={onResend}
                 />
+              ) : null}
+              {item.message.id === offerAt ? (
+                <PushOfferLine agent={dir.nameOf(item.message.author)} onDone={() => setOfferAt(OFFER_DONE)} />
               ) : null}
             </Animated.View>
           );
@@ -1830,6 +1930,12 @@ function Chat({
       flashId,
       c.sunken,
       receipts,
+      rowOf,
+      canReply,
+      onReply,
+      menuOf,
+      offerAt,
+      dir,
     ],
   );
 
@@ -1869,7 +1975,9 @@ function Chat({
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
   // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
   // is one, already holds that room). iOS's automatic inset made keyboard moves land short at the end.
-  const hasPin = pinned !== null || hasPins;
+  const hasPin = pinned !== null;
+  // The conversation's first message is loaded (a thread loads whole): what sits above it can show.
+  const atStart = isThread || olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE;
   const listPad = useMemo(
     () => (hasPin ? styles.listPad : [styles.listPad, { paddingTop: headerHeight + 8 }]),
     [hasPin, headerHeight],
@@ -1900,8 +2008,6 @@ function Chat({
     watchAsks();
     watchRows();
   }, [watchAsks, watchRows]);
-  // More than a screen above the end: the round button shows even with nothing new below.
-  const [far, setFar] = useState(false);
   const onListScroll = useCallback(() => {
     watchList();
     const state = listRef.current?.getState();
@@ -2021,11 +2127,11 @@ function Chat({
             system's scroll edge never makes one look different from another. */}
         <PushedHeader title={pill ?? title} plate solid={false} right={right} />
         {hasPin ? (
-          // The bar is see-through (the conversation runs under it): the pinned bar and card start below it.
+          // The bar is see-through (the conversation runs under it): an open mission's card starts below it. Pinned
+          // messages have no bar here: they wait above the first message, revealed by pulling down (`PinnedLines`).
           <View style={{ backgroundColor: c.bg, paddingTop: headerHeight }}>
-            {hasPins ? <PinnedBar channelId={channelId} threadId={threadId} onOpen={openPins} /> : null}
             {pinned ? (
-              <View style={[styles.pin, hasPins && styles.pinBelowBar]}>
+              <View style={styles.pin}>
                 <MissionCardView mission={pinned} pinned />
               </View>
             ) : null}
@@ -2108,17 +2214,26 @@ function Chat({
                               keyboardOffset={lift}
                               contentInsetEndAdjustment={contentInsetEndAdjustment}
                               contentContainerStyle={listPad}
-                              // The right hand's greeting, or a new agent's checklist, stays at the conversation's start,
-                              // once the start is loaded.
+                              // At the conversation's start, once it is loaded: the pinned messages (pulling down past
+                              // the first message reveals them), then the right hand's greeting or a new agent's
+                              // checklist.
                               ListHeaderComponent={
-                                dmAgent &&
-                                (rightHand || setupIntro) &&
-                                (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                                  rightHand ? (
-                                    <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
-                                  ) : (
-                                    <AgentSetupIntro agent={dmAgent} channelId={channelId} />
-                                  )
+                                atStart && (hasPins || (dmAgent && (rightHand || setupIntro))) ? (
+                                  <>
+                                    {hasPins ? (
+                                      <PinnedLines
+                                        channelId={channelId}
+                                        threadId={threadId}
+                                        onOpen={openPins}
+                                        onPick={goToPin}
+                                      />
+                                    ) : null}
+                                    {dmAgent && rightHand ? (
+                                      <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
+                                    ) : dmAgent && setupIntro ? (
+                                      <AgentSetupIntro agent={dmAgent} channelId={channelId} />
+                                    ) : null}
+                                  </>
                                 ) : undefined
                               }
                             />
@@ -2224,6 +2339,7 @@ function Chat({
                     }}
                     sight={sight}
                     onSee={seeRun}
+                    stop={lineStop}
                   />
                 ) : null}
                 {member && dmAgent && !canTalk(dmAgent) ? (
@@ -2245,11 +2361,28 @@ function Chat({
                     {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
                     mentionAt={refQuery}
                     insertMention={insertRef}
-                    prefill={prefill}
+                    prefill={prefill ?? captionBack}
                     focusAt={replyAt}
+                    // Photos and files waiting to go (their caption is the field), then whom it answers.
                     banner={
-                      quote ? <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} /> : undefined
+                      pending.length > 0 || quote ? (
+                        <>
+                          <AttachmentStrip
+                            files={pending}
+                            onRemove={removePending}
+                            onAdd={
+                              pending.length < MAX_PENDING
+                                ? () => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)
+                                : undefined
+                            }
+                          />
+                          {quote ? (
+                            <QuoteBar name={dir.nameOf(quote.author)} onCancel={() => setQuote(null)} />
+                          ) : null}
+                        </>
+                      ) : undefined
                     }
+                    sendEmpty={pending.length > 0}
                     mention={({ query, sigil, pick }) =>
                       sigil === "#" ? (
                         <ChannelPicker query={query} pick={pick} />
@@ -2416,7 +2549,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   pin: { paddingHorizontal: 12, paddingBottom: 10 },
-  pinBelowBar: { paddingTop: 10 },
   day: { alignSelf: "center", textAlign: "center", fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },

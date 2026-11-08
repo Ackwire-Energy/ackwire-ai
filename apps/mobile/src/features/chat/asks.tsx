@@ -428,6 +428,7 @@ export const ASK_ICON: Record<AskKind, IconName> = {
 export function AskCard({
   id,
   kind,
+  agentId,
   waitsFor,
   lead,
   well,
@@ -452,9 +453,12 @@ export function AskCard({
   const ownTop = useCardTop(12);
   const { t } = useTranslation();
   const c = useColors();
+  const dir = useDirectory();
   const surface = useSurface();
   const reduced = useReducedMotion();
   const store = useAskStore();
+  // The asking agent's sky, faint across the card's top: the same card as Atividade's and the home's (`WaitingCard`).
+  const sky = agentLook(dir.agentById.get(agentId)).color;
   const slot = useRef<ComponentRef<typeof View>>(null);
   const [openHere, setOpen] = useState(false);
   const open = well?.more?.open ?? openHere;
@@ -511,6 +515,7 @@ export function AskCard({
     <View ref={slot} collapsable={false} style={ownTop}>
       <Animated.View entering={reduced ? undefined : FadeIn.duration(300)} style={[styles.card, surface]}>
         <View style={styles.clip}>
+          <Sky color={sky} depth={0.55} fade={0.15} surface="raised" style={styles.sky} />
           <View style={styles.head}>
             <Icon name={ASK_ICON[kind]} size={13} color={c.muted} />
             <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.medium, styles.grow]}>
@@ -850,6 +855,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 8,
   },
+  // Across the top, at half strength, under the kind line (as `WaitingCard`).
+  sky: { position: "absolute", top: 0, left: 0, right: 0, height: 56, opacity: 0.5 },
   head: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },

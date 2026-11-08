@@ -58,6 +58,7 @@ import {
   useApproveNow,
   useCancelAhead,
   useOriginShort,
+  useRefuseApproval,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
@@ -429,6 +430,8 @@ function ApprovalGroupItem({
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
+  // "Recusar" asks once, in the system's alert, as the card of one request does.
+  const { refuse, pending: refusing } = useRefuseApproval(a);
   return (
     <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
       <View style={styles.itemRow}>
@@ -467,18 +470,18 @@ function ApprovalGroupItem({
                 <Button
                   variant="primary"
                   size="card"
-                  icon="check"
                   label={t("mobile.approval.approve")}
-                  disabled={busy}
+                  disabled={busy || refusing}
                   onPress={onApprove}
                 />
               )}
-              {always ? <ApproveAlwaysButton approval={a} disabled={busy} onPress={onAlways} /> : null}
+              {always ? <ApproveAlwaysButton approval={a} disabled={busy || refusing} onPress={onAlways} /> : null}
               <Button
                 variant="secondary"
                 size="card"
-                label={t("approval.notNow")}
-                onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+                label={t("mobile.approval.refuse")}
+                disabled={busy || refusing}
+                onPress={refuse}
               />
             </View>
           ) : null}
@@ -531,12 +534,13 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const c = useColors();
   const asks = useAskStore();
   const origin = useOriginShort(a);
-  const name = dir.agentById.get(a.agentId)?.name ?? "";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const requester = requesterDecidesLine(t, a);
-  // The same approving as Atividade's card: the haptic, the toast saying what follows.
+  // The same approving as Atividade's card: the haptic, the toast saying what follows; refusing asks once, in the
+  // system's alert, with the reason optional.
   const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
+  const { refuse, pending: refusing } = useRefuseApproval(a, () => asks?.settle(a.id));
   // A connector's detail is its raw call (`tool · key=value`), so its values in words instead, the call under "Ver
   // detalhes". An email's preview says to whom and about what: its line says only where it goes from.
   const source = useApprovalSource(a);
@@ -592,30 +596,28 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       foot={
         <AskFoot>
           {a.canDecide ? (
-            <>
-              <View style={styles.itemActs}>
-                {high ? (
-                  <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="card"
-                    icon="check"
-                    label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
-                    disabled={pending}
-                    onPress={() => approve()}
-                  />
-                )}
-                <ApproveAlwaysButton approval={a} disabled={pending} onPress={() => approve(true)} />
+            // Aprovar and Recusar, the same two words as everywhere the request shows; "Aprovar sempre" is a switch
+            // in the request's sheet, not a third button here.
+            <View style={styles.itemActs}>
+              {high ? (
+                <HoldButton size="card" label={t("mobile.approval.hold")} onConfirm={() => approve()} />
+              ) : (
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="card"
-                  label={t("approval.notNow")}
-                  onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+                  label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
+                  disabled={pending || refusing}
+                  onPress={() => approve()}
                 />
-              </View>
-              <ApproveAlwaysHint approval={a} name={name} />
-            </>
+              )}
+              <Button
+                variant="secondary"
+                size="card"
+                label={t("mobile.approval.refuse")}
+                disabled={pending || refusing}
+                onPress={refuse}
+              />
+            </View>
           ) : owner ? null : (
             <Text variant="small" tone="muted">
               {t("approval.waitingAdmin")}

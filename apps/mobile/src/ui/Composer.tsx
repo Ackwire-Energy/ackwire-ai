@@ -101,6 +101,8 @@ export interface ComposerProps {
   focusAt?: number;
   /** Right above the field ("Respondendo a Ana"). */
   banner?: ReactNode;
+  /** Something waits above the field to go with the message (photos, files): send shows and sends with no words. */
+  sendEmpty?: boolean;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
   onType?: (text: string) => void;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
@@ -160,6 +162,7 @@ export function Composer({
   prefill,
   focusAt,
   banner,
+  sendEmpty = false,
   onType,
   media,
   voice,
@@ -184,7 +187,7 @@ export function Composer({
   useEffect(() => {
     if (focusAt) input.current?.focus();
   }, [focusAt]);
-  const has = text.trim().length > 0;
+  const has = text.trim().length > 0 || sendEmpty;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has && !voice?.active;
   const button = has || stopMode;
@@ -199,7 +202,7 @@ export function Composer({
 
   const send = (how: SendHow) => {
     const value = text.trim();
-    if (!value) return;
+    if (!value && !sendEmpty) return;
     onSend(value, working ? how : "join");
     put("", 0);
   };

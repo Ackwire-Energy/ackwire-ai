@@ -15,8 +15,9 @@ import { connectorName } from "@agenteschat/client/lib/scopes";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Fuse, LineIcon, Text, useToast } from "@/ui";
+import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Button, Chip, Fuse, haptics, LineIcon, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
@@ -142,6 +143,76 @@ export function useApproveNow(a: Approval, onApproved?: () => void) {
       },
     );
   return { approve, pending: decide.isPending, high };
+}
+
+/**
+ * "Recusar" from a card or the request's sheet: the system's alert asks once, with the reason as an optional
+ * field and Recusar in red; Cancelar leaves everything as it was (no mode of the sheet). Where the platform's
+ * alerts take no text (Android), the request's sheet opens on its refusing step instead. A firm tap when it goes
+ * through, then the toast saying the agent learns from it; `onRefused` lets the card's place know it is settled.
+ */
+export function useRefuseApproval(a: Approval, onRefused?: () => void) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const toast = useToast();
+  const decide = useDecideApproval(orgId);
+  const name = dir.agentById.get(a.agentId)?.name ?? "";
+  const g = genderOf(name);
+  const send = (reason: string) =>
+    decide.mutate(
+      { id: a.id, decision: "refuse", ...(reason.trim() ? { reason: reason.trim() } : {}) },
+      {
+        onSuccess: () => {
+          haptics.medium();
+          onRefused?.();
+          toast({
+            title: t("mobile.approval.refused"),
+            subtitle: t(`mobile.approval.refusedSub${g}`, { name }),
+            agentId: a.agentId,
+          });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
+  const refuse = () => {
+    if (Platform.OS !== "ios") {
+      router.push(`/approval/${a.id}?mode=refuse`);
+      return;
+    }
+    Alert.prompt(
+      t("mobile.approval.refuseAsk"),
+      t(`mobile.approval.refuseWhy${g}`, { name }),
+      [
+        { text: t("mobile.common.cancel"), style: "cancel" },
+        { text: t("mobile.approval.refuse"), style: "destructive", onPress: (reason) => send(reason ?? "") },
+      ],
+      "plain-text",
+    );
+  };
+  return { refuse, pending: decide.isPending };
+}
+
+/**
+ * The name of the app a request goes through, for its "Por onde" row: the catalog's ("GitHub"), a server connected
+ * by address by its own name, the raw id until they load.
+ */
+export function useConnectorNamer(a: Pick<Approval, "connector">): (id: string) => string {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const catalog = useCatalog();
+  const customId = a.connector?.startsWith("custom:") ? a.connector.slice("custom:".length) : null;
+  const servers = useCustomServers(orgId, customId !== null);
+  return (id) => {
+    if (customId) {
+      const server = servers.data?.find((s) => s.id === customId);
+      return server
+        ? itemName(t, fromServer(server, catalog.data?.connectors ?? []))
+        : t("approvals.panel.orgConnector");
+    }
+    const def = catalog.data?.connectors.find((d) => d.id === id);
+    return def ? connectorName(t, def) : id;
+  };
 }
 
 /**
@@ -351,27 +422,8 @@ export function ApprovalDetails({
 }) {
   const { t } = useTranslation();
   const c = useColors();
-  const orgId = useOrgId();
-  const catalog = useCatalog();
-  // A server connected by address (`custom:{connectionId}`) goes by its own name ("Sentry"), as on the web.
-  const customId = a.connector?.startsWith("custom:") ? a.connector.slice("custom:".length) : null;
-  const servers = useCustomServers(orgId, customId !== null);
-  // The connector's name from the catalog ("GitHub"); the raw id until it loads.
-  const rows = approvalTable(
-    a,
-    max,
-    (id) => {
-      if (customId) {
-        const server = servers.data?.find((s) => s.id === customId);
-        return server
-          ? itemName(t, fromServer(server, catalog.data?.connectors ?? []))
-          : t("approvals.panel.orgConnector");
-      }
-      const def = catalog.data?.connectors.find((d) => d.id === id);
-      return def ? connectorName(t, def) : id;
-    },
-    long,
-  );
+  const nameOf = useConnectorNamer(a);
+  const rows = approvalTable(a, max, nameOf, long);
   if (rows.length === 0) return null;
   return (
     // Stacked it opens inside a request card: flat on it, divided by hairlines (never a plate in a card).
