@@ -12856,6 +12856,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   gap: 6px;
   margin: 12px 0 0;
 }
+/* "Carregar mais": the agent's next page of files, centred under them. */
+.agp-files__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
 
 /* The chosen option's panel under the picker, in groups 16px apart: its head (the name's capitals at its mark's top,
    the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in

@@ -34,7 +34,7 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
   const filters = useMemo<ArtifactFilters>(() => (search ? { q: search } : {}), [search]);
   const list = useArtifacts(orgId, filters);
   const pull = usePullRefresh(list.refetch);
-  const all = useMemo(() => (list.data ?? []).filter((a) => matchesType(a, type)), [list.data, type]);
+  const all = useMemo(() => (list.artifacts ?? []).filter((a) => matchesType(a, type)), [list.artifacts, type]);
   // Newest first; the highlighted item is always among those shown.
   const sections = useMemo(() => {
     const sorted = [...all].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -58,6 +58,11 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
     setType("all");
   };
   const visible = sections.reduce((n, s) => n + s.items.length, 0);
+  // Past what loaded, "Mostrar mais" brings the server's next page of files.
+  const more = () => {
+    setShown((n) => n + PAGE);
+    if (visible + PAGE > total && list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+  };
   // The grid fades in over the spinner, and a day that comes or goes with a filter or "Show more" fades while the rest
   // slide into place; what shows when the screen opens doesn't fade card by card.
   const reduced = useReducedMotion();
@@ -103,7 +108,7 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
           </Text>
           <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void list.refetch()} />
         </View>
-      ) : total === 0 ? (
+      ) : total === 0 && !list.hasNextPage ? (
         search || type !== "all" ? (
           <EmptyState
             size="inline"
@@ -137,13 +142,14 @@ export function DriveScreen({ highlightId = null }: { highlightId?: string | nul
                 </View>
               </Animated.View>
             ))}
-            {visible < total ? (
+            {visible < total || list.hasNextPage ? (
               <Animated.View {...fade} layout={layout} style={styles.more}>
                 <Button
                   variant="secondary"
                   size="sm"
                   label={t("mobile.drive.more")}
-                  onPress={() => setShown((n) => n + PAGE)}
+                  loading={list.isFetchingNextPage}
+                  onPress={more}
                 />
               </Animated.View>
             ) : null}

@@ -1,8 +1,7 @@
 import type { Artifact, ArtifactFilters, ArtifactKind } from "@agenteschat/client";
 import { useArtifacts, useChannels } from "@agenteschat/client";
-import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { ARTIFACT_KINDS, KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import {
-  byWho,
   DRIVE_GROUPS,
   DRIVE_SORTS,
   type DriveGroup,
@@ -14,7 +13,6 @@ import {
   isDriveView,
   PRIVATE_SECTION,
   rangeOf,
-  sortArtifacts,
 } from "@agenteschat/client/lib/drive";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -69,7 +67,7 @@ const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="li
  * panel, multi-select with a floating bar, drop to upload and the trash.
  */
 export function DrivePage({ open }: { open?: { id: string; version?: number } }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const look = useRightHandLook();
   const uploads = can(org, "upload_files");
@@ -106,22 +104,22 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const [uploadsHidden, setUploadsHidden] = useState(false);
 
   const search = useDeferredValue(q.trim());
-  // One value of a filter goes to the server; several are matched here.
-  const baseFilters = useMemo<ArtifactFilters>(() => {
+  // Every filter and the order go to the server, so each looks at all the files, not the pages loaded.
+  const filters = useMemo<ArtifactFilters>(() => {
     const f: ArtifactFilters = {};
     if (search) f.q = search;
-    if (channelIds.length === 1) f.channelId = channelIds[0];
-    const [type, id] = (authors.length === 1 ? (authors[0] ?? "") : "").split(":");
-    if ((type === "agent" || type === "person") && id) f.author = { type, id };
+    if (kinds.length > 0) f.kinds = kinds;
+    if (channelIds.length > 0) f.channelIds = channelIds;
+    const picked = authors.flatMap((key) => {
+      const [type, id] = key.split(":");
+      return (type === "agent" || type === "person") && id ? [{ type, id } as const] : [];
+    });
+    if (picked.length > 0) f.authors = picked;
+    if (who !== "all") f.who = who;
+    if (sort !== "recent") f.sort = sort;
     return f;
-  }, [search, channelIds, authors]);
-  const filters = useMemo<ArtifactFilters>(() => {
-    const k = kinds.length === 1 ? kinds[0] : undefined;
-    return k && isArtifactKind(k) ? { ...baseFilters, kind: k } : baseFilters;
-  }, [baseFilters, kinds]);
+  }, [search, kinds, channelIds, authors, who, sort]);
   const list = useArtifacts(org.id, filters);
-  // Without the kind: the counts on the kind chips (the same query when no single kind is picked).
-  const base = useArtifacts(org.id, baseFilters);
 
   const remover = useDeleteArtifact((ids) => {
     setSelected((s) => new Set([...s].filter((id) => !ids.includes(id))));
@@ -153,23 +151,14 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
           : t("drive.dm")
         : t("artifacts.noChannel");
 
-  /** The client-side filters (who made it, several channels or authors). */
-  const matches = (a: Artifact) =>
-    byWho(a, who) &&
-    (channelIds.length < 2 || (a.channelId !== null && channelIds.includes(a.channelId))) &&
-    (authors.length < 2 ||
-      authors.some(
-        (x) => x === `${a.createdBy.type}:${a.createdBy.id}` || x === `${a.updatedBy.type}:${a.updatedBy.id}`,
-      ));
-  const rows = sortArtifacts(
-    (list.data ?? []).filter((a) => matches(a) && (kinds.length < 2 || kinds.includes(a.kind))),
-    sort,
-    i18n.language,
-  );
+  const rows = list.artifacts ?? [];
   const sections = driveSections(rows, group);
   const shown = sections.flatMap((s) => s.items);
-  const counts = new Map<ArtifactKind, number>();
-  for (const a of base.data ?? []) if (matches(a)) counts.set(a.kind, (counts.get(a.kind) ?? 0) + 1);
+  const counts = new Map(Object.entries(list.counts ?? {}) as [ArtifactKind, number][]);
+  // All the files these filters find, beyond the pages loaded (an older server sends no counts).
+  const total = list.counts
+    ? [...counts].reduce((n, [k, c]) => (kinds.length === 0 || kinds.includes(k) ? n + c : n), 0)
+    : rows.length;
 
   const filtered = Boolean(search) || kinds.length > 0 || channelIds.length > 0 || authors.length > 0 || who !== "all";
   const clearFilters = () => {
@@ -548,7 +537,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
 
             {filtered && list.isSuccess && rows.length > 0 && (
               <div className="drive-summary">
-                <span>{t("drive.count", { count: rows.length })}</span>
+                <span>{t("drive.count", { count: total })}</span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -639,6 +628,14 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                     </ul>
                   </section>
                 ))}
+              </div>
+            )}
+
+            {list.hasNextPage && rows.length > 0 && (
+              <div className="drive-more">
+                <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
+                  {t("drive.loadMore")}
+                </Button>
               </div>
             )}
 

@@ -23769,6 +23769,9 @@
   "drive.search": {
     "value": "Search files"
   },
+  "drive.loadMore": {
+    "value": "Load more"
+  },
   "drive.kind": {
     "value": "Type"
   },
@@ -25159,11 +25162,11 @@
   "connectors.active": {
     "value": "Active"
   },
-  "connectors.notReviewed": {
-    "value": "Waiting for review"
-  },
   "connectors.noToolsNow": {
     "value": "No tools right now"
+  },
+  "connectors.notReviewed": {
+    "value": "Waiting for review"
   },
   "connectors.toReview": {
     "value": {

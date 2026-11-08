@@ -1,5 +1,6 @@
 import {
   ARTIFACT_LIMITS,
+  ARTIFACT_PAGE_MAX,
   type ArtifactDeps,
   type ArtifactView,
   addFileVersion,
@@ -9,6 +10,7 @@ import {
   attachmentDisposition,
   BLOCK_REPLY_CHARS,
   BLOCK_STATE_KEYS,
+  countArtifacts,
   createArtifact,
   createFileArtifact,
   DRAW_OPTIONS,
@@ -51,6 +53,28 @@ import {
 const tags = ["Drive"];
 const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll", "choices"]);
 const Author = z.object({ type: z.enum(["agent", "person"]), id: z.string() });
+
+/** A comma-separated list in a query string, each item read by `item` (at most 50). */
+const csv = <T>(description: string, item: z.ZodType<T, string>) =>
+  z
+    .string()
+    .max(4000)
+    .optional()
+    .transform((v) =>
+      v
+        ?.split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(item).max(50).optional())
+    .openapi({ description, type: "string" });
+const AuthorKey = z
+  .string()
+  .regex(/^(agent|person):[\w-]{1,100}$/)
+  .transform((v) => {
+    const [type, id] = v.split(":") as ["agent" | "person", string];
+    return { type, id };
+  });
 
 const textContents = [
   z.object({ kind: z.literal("document"), markdown: z.string() }),
@@ -264,26 +288,73 @@ export function artifactRoutes(deps: AppDeps) {
         query: z.object({
           q: z.string().max(200).optional(),
           kind: Kind.optional(),
+          kinds: csv("Comma-separated kinds: any of them.", Kind),
           channelId: z.uuid().optional(),
+          channelIds: csv("Comma-separated channel or DM ids: in any of them.", z.uuid()),
           authorType: z.enum(["agent", "person"]).optional(),
           authorId: z.string().optional(),
           /** With `authorType`/`authorId`: made or changed by them (any version), not only made. */
           changed: z.literal("1").optional(),
+          authors: csv(
+            "Comma-separated `agent:<id>` or `person:<id>`: made or last changed by any of them.",
+            AuthorKey,
+          ),
+          who: z.enum(["agents", "people"]).optional().openapi({ description: "Made by an agent or by a person." }),
+          sort: z.enum(["recent", "name", "kind"]).optional(),
+          cursor: z
+            .string()
+            .regex(/^\d{1,7}$/)
+            .optional()
+            .openapi({ description: "`nextCursor` of the page before." }),
+          limit: z.coerce.number().int().min(1).max(ARTIFACT_PAGE_MAX).optional(),
         }),
       },
-      responses: { 200: json(z.object({ artifacts: z.array(Artifact) })), ...errors },
+      responses: {
+        200: json(
+          z.object({
+            artifacts: z.array(Artifact),
+            nextCursor: z.string().nullable().openapi({ description: "Where the next page starts; null at the end." }),
+            counts: z
+              .record(z.string(), z.number().int())
+              .optional()
+              .openapi({ description: "First page only: how many files per kind for these filters, kinds left out." }),
+          }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
+      const userId = c.get("user").id;
       const query = c.req.valid("query");
       const author = query.authorType && query.authorId ? { type: query.authorType, id: query.authorId } : undefined;
-      const list = await listArtifacts(db, person(c.get("user").id), orgId, {
+      const filters = {
         q: query.q,
         kind: query.kind,
+        kinds: query.kinds,
         channelId: query.channelId,
+        channelIds: query.channelIds,
+        authors: query.authors,
+        who: query.who,
         ...(query.changed ? { changedBy: author } : { author }),
+      };
+      const limit = query.limit ?? 100;
+      const offset = Number(query.cursor ?? 0);
+      const rows = await listArtifacts(db, person(userId), orgId, {
+        ...filters,
+        sort: query.sort,
+        limit: limit + 1,
+        offset,
       });
-      return c.json({ artifacts: await withPersonFacts(db, c.get("user").id, orgId, list) }, 200);
+      const page = rows.slice(0, limit);
+      return c.json(
+        {
+          artifacts: await withPersonFacts(db, userId, orgId, page),
+          nextCursor: rows.length > limit ? String(offset + limit) : null,
+          ...(query.cursor ? {} : { counts: await countArtifacts(db, person(userId), orgId, filters) }),
+        },
+        200,
+      );
     },
   );
 

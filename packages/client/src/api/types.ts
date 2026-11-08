@@ -3193,12 +3193,31 @@ export interface ArtifactRef {
 }
 
 export interface ArtifactFilters {
+  /** Words in the title, the text or the conversation's name. */
   q?: string;
   kind?: ArtifactKind;
+  /** Any of these kinds. */
+  kinds?: ArtifactKind[];
   channelId?: string;
+  /** In any of these conversations. */
+  channelIds?: string[];
   author?: ArtifactAuthor;
   /** `author` made or changed it (any version), not only made it. */
   changed?: boolean;
+  /** Made or last changed by any of them. */
+  authors?: ArtifactAuthor[];
+  /** Made by an agent or by a person. */
+  who?: "agents" | "people";
+  /** Newest update first (default), by name, or by kind. */
+  sort?: "recent" | "name" | "kind";
+}
+
+/** A page of the Drive: the next one starts at `nextCursor`; the first also counts the files per kind. */
+export interface ArtifactPage {
+  artifacts: Artifact[];
+  nextCursor: string | null;
+  /** First page only (older servers leave it out): how many files each kind has for the filters, kinds left out. */
+  counts?: Partial<Record<ArtifactKind, number>>;
 }
 
 /** Channel event: an artifact was created or got a new version. */

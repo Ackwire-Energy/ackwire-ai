@@ -9668,6 +9668,8 @@ export const en = {
     title: "Drive",
     subtitle: "Everything people and agents made or uploaded.",
     search: "Search files",
+    /** The next page of files, under them. */
+    loadMore: "Load more",
     kind: "Type",
     filters: "Filters",
     allKinds: "All types",
@@ -10149,10 +10151,10 @@ export const en = {
     toolsCount_one: "{{count}} tool",
     toolsCount_other: "{{count}} tools",
     active: "Active",
-    notReviewed: "Waiting for review",
-    toReview_one: "{{count}} new tool to review",
     /** A server by address whose tools couldn't be read last time: agents have none from it now. */
     noToolsNow: "No tools right now",
+    notReviewed: "Waiting for review",
+    toReview_one: "{{count}} new tool to review",
     toReview_other: "{{count}} new tools to review",
     usedBy_one: "{{count}} of {{total}} agents",
     usedBy_other: "{{count}} of {{total}} agents",

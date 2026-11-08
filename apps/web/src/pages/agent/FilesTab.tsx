@@ -5,7 +5,7 @@ import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Card, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
@@ -27,24 +27,28 @@ export function FilesTab() {
   const { org } = useOrg();
   const { agent } = useAgentEdit();
   const g = agentGrammar(agent.name);
-  const files = useArtifacts(org.id, { author: { type: "agent", id: agent.id }, changed: true });
+  const [kind, setKind] = useState<ArtifactKind | "all">("all");
+  const [q, setQ] = useState("");
+  const search = useDeferredValue(q.trim());
+  // The kind and the words go to the server: they look at every file of the agent, not the pages loaded.
+  const files = useArtifacts(org.id, {
+    author: { type: "agent", id: agent.id },
+    changed: true,
+    ...(kind === "all" ? {} : { kind }),
+    ...(search ? { q: search } : {}),
+  });
   const channels = useChannels(org.id);
   const viewer = useArtifactViewer();
   const authorName = useAuthorName();
-  const [kind, setKind] = useState<ArtifactKind | "all">("all");
-  const [q, setQ] = useState("");
-  const list = files.data ?? [];
-  const count = (k: ArtifactKind) => list.filter((a) => a.kind === k).length;
-  const query = q.trim().toLowerCase();
+  const shown = files.artifacts ?? [];
+  const count = (k: ArtifactKind) => files.counts?.[k] ?? 0;
+  const all = KINDS.reduce((n, k) => n + count(k), 0);
+  // The agent has files at all, whatever the search: the toolbar stays.
+  const any = all > 0 || shown.length > 0 || Boolean(search) || kind !== "all";
   const channelName = (id: string | null) => {
     const c = id ? channels.data?.find((x) => x.id === id) : undefined;
     return c ? `#${c.name}` : t("artifacts.noChannel");
   };
-  const shown = list.filter(
-    (a) =>
-      (kind === "all" || a.kind === kind) &&
-      (!query || `${a.title} ${channelName(a.channelId)}`.toLowerCase().includes(query)),
-  );
   const sub = (a: Artifact) =>
     [
       t(`artifacts.kind.${a.kind}`),
@@ -72,7 +76,7 @@ export function FilesTab() {
           </Link>
         }
       />
-      {list.length > 0 && (
+      {any && (
         <Toolbar
           size="sm"
           className="agp-toolbar agp-toolbar--in"
@@ -94,7 +98,7 @@ export function FilesTab() {
             value={kind}
             onValueChange={setKind}
             options={[
-              { value: "all" as const, label: t("agentPage.files.all"), count: list.length },
+              { value: "all" as const, label: t("agentPage.files.all"), count: all },
               ...KINDS.filter((k) => count(k) > 0).map((k) => ({
                 value: k,
                 label: t(`drive.kindMany.${k}`),
@@ -108,7 +112,7 @@ export function FilesTab() {
         <LoadingLine width={260} />
       ) : files.isError && !files.data ? (
         <ErrorState error={files.error} onRetry={() => void files.refetch()} />
-      ) : list.length === 0 ? (
+      ) : !any ? (
         <EmptyState
           size="panel"
           agent={lookOf(agent) ?? true}
@@ -159,7 +163,14 @@ export function FilesTab() {
           ))}
         </ul>
       )}
-      {list.length > 0 && (
+      {files.hasNextPage && shown.length > 0 && (
+        <div className="agp-files__more">
+          <Button size="sm" loading={files.isFetchingNextPage} onClick={() => void files.fetchNextPage()}>
+            {t("drive.loadMore")}
+          </Button>
+        </div>
+      )}
+      {any && (
         <p className="agp-files__note small muted ac-iconline">
           <Icon name="info" size={14} />
           {t("agentPage.files.note")}

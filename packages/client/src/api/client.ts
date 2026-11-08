@@ -68,6 +68,7 @@ import type {
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  ArtifactPage,
   ArtifactVersion,
   AskToJoinResult,
   AuditPage,
@@ -1468,8 +1469,10 @@ export interface ApiClient {
     remove(orgId: string, id: string, series?: { scope: SeriesScope; occurrenceStart: string }): Promise<void>;
   };
   artifacts: {
-    /** Everything the viewer can see, newest update first. */
+    /** Everything the viewer can see, newest update first: the first page. */
     list(orgId: string, filters?: ArtifactFilters): Promise<Artifact[]>;
+    /** One page of what the viewer can see (`cursor`: the page before's `nextCursor`), the first with counts. */
+    page(orgId: string, filters?: ArtifactFilters, cursor?: string): Promise<ArtifactPage>;
     /** One artifact at `version` (default: latest), with content. */
     get(orgId: string, id: string, version?: number): Promise<ArtifactDetail>;
     /** Keeps a block in the Drive (ADR 0113). */
