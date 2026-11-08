@@ -25,10 +25,10 @@ import {
   listMembers,
   listMemberships,
   myAccount,
-  notificationCountsByOrg,
   NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
+  notificationCountsByOrg,
   ONBOARDING_STEPS,
   orgLogoFile,
   pinnedOwner,
@@ -595,7 +595,10 @@ export function accountRoutes(deps: AppDeps) {
       },
     }),
     async (c) =>
-      c.json({ organizations: await notificationCountsByOrg({ db, pubsub: deps.adapters.pubsub }, c.get("user").id) }, 200),
+      c.json(
+        { organizations: await notificationCountsByOrg({ db, pubsub: deps.adapters.pubsub }, c.get("user").id) },
+        200,
+      ),
   );
 
   app.openapi(
