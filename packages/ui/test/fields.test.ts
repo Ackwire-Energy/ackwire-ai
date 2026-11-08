@@ -55,3 +55,25 @@ describe("fields are v2 (no black borders)", () => {
     expect(rules(css).some(([s]) => s === '.ac-option[aria-pressed="true"]::after')).toBe(true);
   });
 });
+
+describe("Field: a stack's controls fill it", () => {
+  test("every kind of control in a field is as wide as the field, a select's trigger too", async () => {
+    const css = await read("../src/styles/components.css");
+    const fill = rules(css).find(([s]) => s.startsWith(".ac-field > :is("))?.[1] ?? "";
+    expect(fill).toContain("width: 100%");
+    expect(fill).toContain("align-self: stretch");
+    const kinds = rules(css).find(([s]) => s.startsWith(".ac-field > :is("))?.[0] ?? "";
+    for (const kind of [".ac-select", ".ac-select__trigger", ".ac-input", ".ac-input-affix", ".ac-seg", "textarea"])
+      expect(kinds).toContain(kind);
+  });
+
+  test("a people or agent select shows the chosen face, 20 and 8 from the trigger's edge", async () => {
+    const css = await read("../src/styles/components.css");
+    const body = (selector: string) => rules(css).find(([s]) => s === selector)?.[1] ?? "";
+    expect(body(".ac-select__lead > .ac-avatar")).toContain("width: 20px");
+    expect(body(".ac-select__trigger:has(.ac-select__lead > .ac-avatar)")).toContain(
+      "padding-inline-start: var(--space-2)",
+    );
+    expect(body(".ac-select__value > span:has(> .ac-select__lead)")).toContain("gap: var(--space-2)");
+  });
+});

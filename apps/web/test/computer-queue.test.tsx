@@ -609,6 +609,7 @@ test("pills never wrap; the pair row before a reply stays one 26px line, its nam
 test("a narrow header fits: the waiting count alone beside the computer, the names give way before any button", async () => {
   const css = await builtCss(
     "src/styles.css",
+    "src/components/channel-header.css",
     "src/components/computer-queue.css",
     "src/components/browser/browser.css",
   );

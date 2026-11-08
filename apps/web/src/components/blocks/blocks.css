@@ -252,10 +252,9 @@
   padding: 0 16px 16px;
   border: 0;
 }
+/* A MediaRow (the kit's `.ac-mediarow`): its letter in the face's place, the option on its line, what it adds (or what
+   was written for Outra resposta) under them at the row's width. */
 .choices__option {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
   width: 100%;
   min-height: 48px;
   padding: 12px 12px 12px 10px;
@@ -276,11 +275,8 @@
   cursor: default;
 }
 .choices__letter {
-  flex: none;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
   border-radius: 8px 8px 8px 3px;
   box-shadow: inset 0 0 0 1px var(--line2);
   font-size: 12px;
@@ -293,14 +289,6 @@
   box-shadow: none;
   color: var(--raised);
 }
-.choices__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 2px;
-}
 .choices__label {
   font-size: 14px;
   line-height: 20px;
@@ -310,6 +298,8 @@
   font-size: 13px;
   line-height: 18px;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 .choices__foot {
   justify-content: space-between;
@@ -355,6 +345,11 @@
   font-size: 14px;
   line-height: 20px;
   font-weight: 600;
+}
+.choices__picked > .choices__letter {
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 /* Beside its 24 px letter: one line sits on the letter's middle, a long written answer wraps under it. */
 .choices__said {

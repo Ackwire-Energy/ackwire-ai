@@ -917,8 +917,8 @@ function RoutineRow({
           {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
         </span>
       </div>
-      <div className="routine-row__when ac-iconline">
-        <span className="routine-row__when-icon" aria-hidden="true">
+      <div className="routine-row__when ac-mediarow ac-mediarow--row">
+        <span className="ac-mediarow__face routine-row__when-icon" aria-hidden="true">
           <Icon
             name={
               r.trigger.type === "event"
@@ -936,8 +936,10 @@ function RoutineRow({
             size={16}
           />
         </span>
-        <span className="routine-row__when-text">
+        <span className="ac-mediarow__head routine-row__when-text">
           <b>{when(r)}</b>
+        </span>
+        <span className="ac-mediarow__body routine-row__when-text">
           <small className={cx(running && "is-live")}>{nextText(r, now)}</small>
         </span>
       </div>
@@ -1114,7 +1116,12 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
           const title = routineTitle(r);
           return (
             <div className="routines-horizon__lane" key={r.id}>
-              <button type="button" className="routines-horizon__label" title={title} onClick={() => onOpen(r.id)}>
+              <button
+                type="button"
+                className="routines-horizon__label ac-iconline"
+                title={title}
+                onClick={() => onOpen(r.id)}
+              >
                 <AgentFace agentId={r.agentId} />
                 <b>{title}</b>
               </button>

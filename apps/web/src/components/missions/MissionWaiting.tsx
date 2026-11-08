@@ -150,15 +150,17 @@ function MissionWaitingRows({ mission: m, query }: { mission: Mission; query: st
   return (
     <>
       {rows.map((row) => (
-        <li key={row.key} className="ap-row ap-mi__row">
-          <AgentAvatar agentId={m.agentId} name={agentName} size="sm" state="waiting" />
-          <div className="ap-row__text">
+        <li key={row.key} className="ap-row ap-mi__row ac-mediarow ac-mediarow--row">
+          <span className="ac-mediarow__face">
+            <AgentAvatar agentId={m.agentId} name={agentName} size="sm" state="waiting" />
+          </span>
+          <span className="ac-mediarow__head">
             <b>{row.text}</b>
-            <small>
-              {m.title} · {relativeTime(t, i18n.language, row.at)}
-            </small>
-          </div>
-          <div className="ap-row__end">
+          </span>
+          <span className="ac-mediarow__body ap-row__sub">
+            {m.title} · {relativeTime(t, i18n.language, row.at)}
+          </span>
+          <div className="ap-row__end ac-mediarow__end ac-mediarow__end--wrap">
             <Chip icon={row.icon}>{row.kind}</Chip>
             <Link
               to="/org/$orgId/threads/$threadId"

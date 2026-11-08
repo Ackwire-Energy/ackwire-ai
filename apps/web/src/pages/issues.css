@@ -46,11 +46,9 @@
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
 }
+/* A MediaRow: the agent and the task's number and time on the face's line, the task and its step under them. */
 .issues-now__card {
   position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
   padding: 12px 14px 16px;
   border: 0;
   border-radius: 18px;
@@ -77,29 +75,20 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
-.issues-now__text {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+/* The task and its step read as one: closer than the row's 8. */
+.issues-now__card > .ac-mediarow__body {
+  gap: 4px;
 }
-.issues-now__who {
-  font-size: 12px;
-  color: var(--faint);
-}
-/* The task's title whole, on two lines when it needs them: cut, it read as another task. */
-.issues-now__text b {
+.issues-now__task {
   font-size: 13.5px;
   font-weight: 600;
-  overflow-wrap: break-word;
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
 .issues-now__step {
-  margin-top: 4px;
   font-size: 12.5px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .issues-now__step.is-live {
   color: var(--ink2);
@@ -129,7 +118,7 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 8px;
+  margin-top: 4px;
   font-size: 12px;
   font-weight: 650;
   color: var(--ink);
@@ -685,6 +674,18 @@ html:not([data-pointer]) .issue-card:focus-visible {
 }
 .issue-list li + li {
   border-top: 1px solid var(--line);
+}
+/* The list clips its rows at its rounded corners: the first and last rows take them, so a picked or focused row's
+   ring is drawn whole there, not cut square. */
+.issue-list > li:first-child,
+.issue-list > li:first-child > .issue-list__row {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.issue-list > li:last-child,
+.issue-list > li:last-child > .issue-list__row {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 .issue-list__row {
   position: relative;
@@ -1246,6 +1247,13 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-github__field {
   margin-top: 12px;
 }
+/* In the aside, as small as the selects above it: one height down the stack. */
+.issue-aside .issue-github__field .ac-input {
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
+}
 .issue-github__chip {
   max-width: 100%;
   color: var(--ink);
@@ -1371,16 +1379,9 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   border-radius: 16px;
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
-/* The face on the title's first line (`.ac-iconline`). */
+/* A MediaRow: the face and the ask on one line, what it does under them; the two read as one. */
 .issue-ask__row {
-  gap: 12px;
-}
-.issue-ask__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  row-gap: 4px;
 }
 .issue-ask__actions {
   display: flex;
@@ -1452,36 +1453,54 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-col {
     scroll-snap-align: start;
   }
+  /* A strip that scrolls clips what it holds at its padding edge: the room keeps the cards' rings and focus whole,
+     the negative margin keeps the cards where they were. */
   .issues-now__list {
     grid-auto-flow: column;
     grid-template-columns: none;
     grid-auto-columns: minmax(78vw, 1fr);
+    margin: -4px -16px -8px;
+    padding: 4px 16px 8px;
+    scroll-padding-inline: 16px;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
-  /* The title takes the row and wraps whole; who works on it goes under it, where an agent's live step line has the
-     width without taking any from the title. */
+  /* No number column: the number reads as the title's first word, so a long title wraps under it, and the title's
+     chips and who works on it share the line under, from the row's start. */
   .issue-list__row {
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 6px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
   }
-  .issue-list__title b {
-    white-space: normal;
-  }
-  .issue-list__who {
-    grid-column: 2;
-  }
-  .issue-list__who:empty {
+  .issue-list__num {
     display: none;
   }
+  .issue-list__title {
+    display: contents;
+  }
+  .issue-list__title b {
+    flex: 1 0 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .issue-list__title b::before {
+    content: attr(data-num);
+    margin-right: 6px;
+    font-size: 12.5px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .issue-list__who:empty,
   .issue-list__due {
     display: none;
   }
-  /* A narrow row wraps whole chips under its title and under the face: side by side they ran past the row's edge. */
-  .issue-list__title,
+  /* Who works on it wraps whole chips too (the title's are the row's own items): side by side they ran past the row's
+     edge. */
   .issue-list__who {
     flex-wrap: wrap;
     row-gap: 4px;
@@ -1965,8 +1984,9 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
  * A task's conversation (ADR 0145). The card's last line is the chat's thread line, quiet inside the card (the card
  * opens; the line isn't a button of its own).
  */
-/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. */
-.issue-card__talk {
+/* A narrow card wraps the line between its parts (faces, count, state, time), never inside one. Doubled: over the
+   thread line's own gap (threads.css), a sheet in another chunk. */
+.issue-card__talk.issue-card__talk {
   flex-wrap: wrap;
   row-gap: 2px;
   margin: 2px 0 0 -6px;

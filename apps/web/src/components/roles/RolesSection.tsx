@@ -170,14 +170,19 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
             />
           </span>
         )}
-        <button type="button" className="roles-row" onClick={() => onOpen(role.id)}>
-          <RoleMark color={role.color} icon={role.icon} size={36} />
-          <span className="roles-row__text">
-            <b>{roleName(t, role)}</b>
-            <span>{roleSummary(t, i18n.language, role, everyone)}</span>
+        <button type="button" className="roles-row ac-mediarow ac-mediarow--row" onClick={() => onOpen(role.id)}>
+          <span className="ac-mediarow__face">
+            <RoleMark color={role.color} icon={role.icon} size={24} />
           </span>
-          <PeopleStack people={peopleWith(role, people)} />
-          <Icon name="chevronRight" size={18} />
+          <span className="ac-mediarow__head">
+            <b>{roleName(t, role)}</b>
+            {isEveryone(role) && <Chip className="roles-base-chip">{t("rolesPage.base")}</Chip>}
+          </span>
+          <span className="ac-mediarow__end">
+            <PeopleStack people={peopleWith(role, people)} />
+            <Icon name="chevronRight" size={18} />
+          </span>
+          <span className="ac-mediarow__body roles-row__sum">{roleSummary(t, i18n.language, role, everyone)}</span>
         </button>
       </div>
     );
@@ -199,18 +204,21 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
       />
       <Card className="roles-list" aria-label={t("settings.section.roles")}>
         <div className="roles-line">
-          <button type="button" className="roles-row" onClick={() => onOpen(OWNER_ID)}>
-            <RoleMark color="violet" icon="audienceOwner" size={36} />
-            <span className="roles-row__text">
-              <b>{t("roles.owner")}</b>
-              <span>{t("rolesPage.summary.owner")}</span>
+          <button type="button" className="roles-row ac-mediarow ac-mediarow--row" onClick={() => onOpen(OWNER_ID)}>
+            <span className="ac-mediarow__face">
+              <RoleMark color="violet" icon="audienceOwner" size={24} />
             </span>
-            <PeopleStack people={owners} />
-            <Icon name="chevronRight" size={18} />
+            <span className="ac-mediarow__head">
+              <b>{t("roles.owner")}</b>
+            </span>
+            <span className="ac-mediarow__end">
+              <PeopleStack people={owners} />
+              <Icon name="chevronRight" size={18} />
+            </span>
+            <span className="ac-mediarow__body roles-row__sum">{t("rolesPage.summary.owner")}</span>
           </button>
         </div>
         {custom.map(row)}
-        <span className="roles-label">{t("rolesPage.base")}</span>
         {everyone && row(everyone)}
         <CardFooter>
           <span className="roles-foot">
@@ -562,34 +570,40 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
       ) : (
         <ul className="roles-people">
           {holders.map((p) => (
-            <li key={p.userId} className="roles-person">
-              <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
-              <span className="roles-person__text">
+            <li key={p.userId} className="roles-person ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
+              </span>
+              <span className="ac-mediarow__head">
                 <b>
                   {p.name}
                   {p.userId === me.user.id ? t("common.youSuffix") : ""}
                 </b>
-                <span>{p.email}</span>
+                <span className="ac-mediarow__meta">{p.email}</span>
               </span>
-              <span className="roles-chips">
-                {others(p).map((r) => (
-                  <RoleChip key={r.id} role={r} />
-                ))}
-              </span>
+              {others(p).length > 0 && (
+                <span className="ac-mediarow__body roles-chips">
+                  {others(p).map((r) => (
+                    <RoleChip key={r.id} role={r} />
+                  ))}
+                </span>
+              )}
               {gives && below(p) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("rolesPage.removeOf", { person: p.name, name })}
-                  onClick={() =>
-                    set.mutate(
-                      { userId: p.userId, roleIds: (p.roleIds ?? []).filter((id) => id !== role.id) },
-                      { onError: (e) => toast.show(errorText(t, e), "error") },
-                    )
-                  }
-                >
-                  {t("rolesPage.remove")}
-                </Button>
+                <span className="ac-mediarow__end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t("rolesPage.removeOf", { person: p.name, name })}
+                    onClick={() =>
+                      set.mutate(
+                        { userId: p.userId, roleIds: (p.roleIds ?? []).filter((id) => id !== role.id) },
+                        { onError: (e) => toast.show(errorText(t, e), "error") },
+                      )
+                    }
+                  >
+                    {t("rolesPage.remove")}
+                  </Button>
+                </span>
               )}
             </li>
           ))}
@@ -787,24 +801,28 @@ function OwnerPage({ people, onBack }: { people: Person[]; onBack: () => void })
         {owners.length === 1 && <p className="roles-base">{t("rolesPage.soleOwner")}</p>}
         <ul className="roles-people">
           {owners.map((p) => (
-            <li key={p.userId} className="roles-person">
-              <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
-              <span className="roles-person__text">
+            <li key={p.userId} className="roles-person ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <Avatar size="sm" name={p.name} imageUrl={p.avatarUrl ?? p.image} />
+              </span>
+              <span className="ac-mediarow__head">
                 <b>
                   {p.name}
                   {p.userId === me.user.id ? t("common.youSuffix") : ""}
                 </b>
-                <span>{p.email}</span>
+                <span className="ac-mediarow__meta">{p.email}</span>
               </span>
               {mine && owners.length > 1 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("rolesPage.removeOf", { person: p.name, name: t("roles.owner") })}
-                  onClick={() => change.mutate({ userId: p.userId, role: "member" }, { onError: fail })}
-                >
-                  {t("rolesPage.remove")}
-                </Button>
+                <span className="ac-mediarow__end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t("rolesPage.removeOf", { person: p.name, name: t("roles.owner") })}
+                    onClick={() => change.mutate({ userId: p.userId, role: "member" }, { onError: fail })}
+                  >
+                    {t("rolesPage.remove")}
+                  </Button>
+                </span>
               )}
             </li>
           ))}

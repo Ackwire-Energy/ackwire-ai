@@ -146,13 +146,15 @@ export function TeamPage() {
             <h2>{t("team.archived")}</h2>
           </div>
           {archived.map((a) => (
-            <div key={a.id} className="member-row">
-              <AgentAvatar agentId={a.id} size="sm" name={a.name} />
-              <span className="list-col">
-                <b>{a.name}</b>
-                {a.role && <span className="small muted">{a.role}</span>}
+            <div key={a.id} className="team-archived__row ac-mediarow ac-mediarow--row">
+              <span className="ac-mediarow__face">
+                <AgentAvatar agentId={a.id} size="sm" name={a.name} />
               </span>
-              <span className="ac-acts">
+              <span className="ac-mediarow__head">
+                <b>{a.name}</b>
+                {a.role && <span className="ac-mediarow__meta">{a.role}</span>}
+              </span>
+              <span className="ac-mediarow__end ac-mediarow__end--wrap ac-acts">
                 <Button
                   size="sm"
                   variant="ghost"

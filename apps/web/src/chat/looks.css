@@ -34,6 +34,16 @@
   --msg-bubble: var(--own-bubble);
   --msg-mine-mix: 30%;
 }
+/* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, 36px face and gap. */
+.channel__messages {
+  --thread-indent: 64px;
+}
+/* Where the messages' side padding narrows to 12px (`responsive.css`). */
+@media (max-width: 760px) {
+  .channel__messages {
+    --thread-indent: 58px;
+  }
+}
 .channel__messages[data-look="bubbles"] {
   padding-inline: 12px;
   /* Quiet rows (an event pill, a thread's line) on the bubbles' column: the row's 8px, the 32px face, the 8px gap. */
@@ -271,11 +281,6 @@
     animation: ac-blink 1s steps(2) infinite;
   }
 }
-/* What hangs under a bubble, in one width. */
-.ac-msg[data-look="bubbles"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done, .rq-open) {
-  width: 100%;
-  max-width: 520px;
-}
 /*
  * An event pill right under a bubble (stopped here, a request waiting or decided) is the bubble's tab: one piece with
  * it, in its color, no frame; the bubble's corner over it squares off. Its actions split by the bubble's own hairline.
@@ -325,6 +330,19 @@
   .ac-msg--own.ac-msg--wide[data-look="bubbles"] > .ac-msg__body {
     --own-max: 100%;
   }
+}
+
+/* A DM whose sides say who spoke shows no faces: its quiet rows start where its rows' words do, at their own padding. */
+.channel__messages[data-faces="false"] {
+  --thread-indent: 16px;
+}
+@media (max-width: 760px) {
+  .channel__messages[data-faces="false"] {
+    --thread-indent: 12px;
+  }
+}
+.channel__messages[data-look="bubbles"][data-faces="false"] {
+  --thread-indent: 8px;
 }
 
 /* ── Compacta: the time, a small face, the name and the text on one line. ── */
@@ -418,11 +436,6 @@
   max-width: min(100%, var(--msg-card-w));
   margin-block: 4px;
 }
-/* On the name's line, as the words are. */
-.ac-msg[data-look="compact"] .choice-reply {
-  display: inline-flex;
-  vertical-align: top;
-}
 .ac-msg[data-look="compact"] .ac-msg__body > .ac-tools .ac-tools__head {
   min-height: 28px;
   padding-block: 1px;
@@ -456,6 +469,7 @@
   position: absolute;
   top: calc(var(--msg-line) / 2 - 9px);
   left: -26px;
+  translate: none;
   width: 18px;
   height: 18px;
   align-items: center;

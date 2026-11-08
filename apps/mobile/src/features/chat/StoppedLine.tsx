@@ -9,7 +9,7 @@ import { Button, EventPill, EventPillAction, PixelStop, useToast } from "@/ui";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { ReasonField } from "../task-manager/parts";
-import { MSG_TEXT } from "./logic";
+import { useQuietInset } from "./look";
 import { useStoppedRun } from "./stopped-runs";
 
 /**
@@ -121,11 +121,12 @@ export function StopPill({
 export function StoppedLine({ message, notice, gap }: { message: Message; notice: StoppedNotice; gap: number }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const inset = useQuietInset();
   const inReply = useStoppedRun(notice.runId);
   if (inReply) return null;
   const agent = dir.nameOf(message.author) || t("channel.unknownAgent");
   return (
-    <View style={[styles.line, { marginTop: gap }]}>
+    <View style={[styles.line, { paddingLeft: inset, marginTop: gap }]}>
       <StopPill agent={agent} notice={notice} at={message.createdAt} fallback={t("mobile.chat.stopped.plain")} />
     </View>
   );
@@ -152,7 +153,7 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
 
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic events (`EventLine`). The list sets its top.
-  line: { paddingLeft: MSG_TEXT, paddingRight: 16 },
+  line: { paddingRight: 16 },
   grow: { flex: 1, minWidth: 0 },
   // Under the pill, the field and Send on one row.
   form: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", marginTop: 4 },

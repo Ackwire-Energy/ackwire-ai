@@ -123,19 +123,32 @@ export function findChrome() {
   return bin;
 }
 
-/** The app's CSS in one file, in the app's order: the entry and what it imports, then what components import after it. */
-export async function bundleCss(out: string) {
+/**
+ * The app's stylesheets in the app's order: the entry and what it imports, then what components import after it. Or
+ * reversed: the page sheets backwards and the entry last, the worst case of the order the build links its chunks in
+ * (the shared chunks' sheets before the main one, in an order that changes with the routes), for `cascadeorder`.
+ */
+export function cssSheets(order: "app" | "reverse" = "app") {
   const main = readFileSync(join(WEB, "src/styles.css"), "utf8");
   const inMain = (file: string) => main.includes(`"./${file.replace(/^src\//, "")}"`);
   const rest = [...new Bun.Glob("src/**/*.css").scanSync(WEB)]
     .filter((f) => f !== "src/styles.css" && !inMain(f))
     .sort();
-  const sheets = ["src/styles.css", ...rest];
-  const entry = join(out, "entry.css");
-  writeFileSync(entry, sheets.map((s) => `@import ${JSON.stringify(join(WEB, s))};`).join("\n"));
+  return order === "app" ? ["src/styles.css", ...rest] : [...rest.reverse(), "src/styles.css"];
+}
+
+/** The app's CSS in one file, in that order. */
+export async function bundleCss(out: string, order: "app" | "reverse" = "app") {
+  const entry = join(out, `entry-${order}.css`);
+  writeFileSync(
+    entry,
+    cssSheets(order)
+      .map((s) => `@import ${JSON.stringify(join(WEB, s))};`)
+      .join("\n"),
+  );
   const built = await Bun.build({
     entrypoints: [entry],
-    outdir: join(out, "css"),
+    outdir: join(out, `css-${order}`),
     naming: { asset: "[name]-[hash].[ext]" },
   });
   if (!built.success) throw new Error(built.logs.join("\n"));
@@ -144,13 +157,19 @@ export async function bundleCss(out: string) {
   return relative(out, css.path);
 }
 
-export function writeFrame(out: string, css: string) {
-  copyFileSync(join(HERE, "rules.js"), join(out, "rules.js"));
+/**
+ * The page the screens are laid out in, and its twin with the CSS in the reverse order. Two small sheets go into both,
+ * after the bundle in the first and before it in the twin: `cascadeorder`'s offender and its sound twin.
+ */
+export function writeFrame(out: string, css: string, reverse: string) {
+  for (const file of ["rules.js", "fixture-a.css", "fixture-b.css"]) copyFileSync(join(HERE, file), join(out, file));
+  const links = (sheets: string[]) => sheets.map((href) => `<link rel="stylesheet" href="${href}">`).join("");
   // Layout only: no motion mid-measure, and scrollbars don't take width differently per machine.
-  const frame = `<!doctype html><html lang="pt-BR" data-theme="light" data-pointer><head><meta charset="utf-8"><link rel="stylesheet" href="${css}"><style>*,*::before,*::after{animation:none!important;transition:none!important}</style><script src="rules.js"></script></head><body></body></html>`;
-  const file = join(out, "frame.html");
-  writeFileSync(file, frame);
-  return `file://${file}`;
+  const frame = (sheets: string[]) =>
+    `<!doctype html><html lang="pt-BR" data-theme="light" data-pointer><head><meta charset="utf-8">${links(sheets)}<style>*,*::before,*::after{animation:none!important;transition:none!important}</style><script src="rules.js"></script></head><body></body></html>`;
+  writeFileSync(join(out, "frame.html"), frame([css, "fixture-a.css", "fixture-b.css"]));
+  writeFileSync(join(out, "frame-rev.html"), frame(["fixture-b.css", "fixture-a.css", reverse]));
+  return { url: `file://${join(out, "frame.html")}`, reverse: `file://${join(out, "frame-rev.html")}` };
 }
 
 export async function launch(bin: string, profile: string) {
@@ -255,7 +274,18 @@ export const SELF_TESTED = [
   "square",
   "touch",
   "floating",
+  "squarecol",
+  "rim",
+  "inlinebase",
+  "iconmid",
+  "fieldwidth",
+  "corner",
+  "clip",
+  "cascadeorder",
 ];
+
+/** Rules about a desktop layout only (panes floating beside the conversation): a phone has none to check. */
+export const DESKTOP_ONLY = ["floating"];
 
 type Tab = Awaited<ReturnType<typeof openTab>>;
 
@@ -268,16 +298,54 @@ async function findingsAt(tab: Tab, width: number) {
   return lasting(found, await tab.run<Finding[]>("geometry.detect()"), width);
 }
 
-/** Every rule fires on its fixture's offender and stays quiet on the sound twin next to it. */
-async function selfTest(tab: Tab) {
+/**
+ * Elements whose own style differs between the two CSS orders: a tie between two sheets that the build can decide the
+ * other way. Named by the element and the property. Both tabs at the same width and height.
+ */
+async function orderFindings(tab: Tab, reverse: Tab): Promise<Finding[]> {
+  const [a, b] = await Promise.all([
+    tab.run<number[]>("geometry.styles()"),
+    reverse.run<number[]>("geometry.styles()"),
+  ]);
+  const differ = a.flatMap((hash, i) => (hash !== b[i] ? [i] : []));
+  if (!differ.length) return [];
+  type Styled = { el: string; at?: string; parent: number; props: string[]; values: string[] };
+  const ask = `geometry.styleOf(${JSON.stringify(differ)})`;
+  const [va, vb] = await Promise.all([tab.run<Styled[]>(ask), reverse.run<Styled[]>(ask)]);
+  const differs = new Set(differ);
+  return va.flatMap((x, k) =>
+    x.props.flatMap((prop, j) =>
+      x.values[j] === vb[k]?.values[j] ||
+      // A size that follows its parent's change (its padding, its width) is that change, reported once on the parent.
+      ((prop === "width" || prop === "height") && differs.has(x.parent))
+        ? []
+        : [{ rule: "cascadeorder", el: x.el, box: prop, at: x.at, a: x.values[j], b: vb[k]?.values[j] }],
+    ),
+  );
+}
+
+/**
+ * Every rule fires on each of its fixture's offenders (`bad-<rule>`, `bad-<rule>--<case>`) and stays quiet on each
+ * sound twin (`good-…`).
+ */
+async function selfTest(tab: Tab, reverse: Tab) {
   const fixture = readFileSync(join(HERE, "fixture.html"), "utf8");
-  await tab.run(`geometry.load(${JSON.stringify(fixture)})`);
-  const found = await findingsAt(tab, 1280);
-  const hit = (rule: string, cls: string) => found.some((f) => f.rule === rule && (f.el + (f.box ?? "")).includes(cls));
+  for (const t of [tab, reverse]) await t.run(`geometry.load(${JSON.stringify(fixture)})`);
+  const twins = [...new Set(fixture.match(/\b(?:bad|good)-[a-z]+(?:--[a-z]+)?\b/g))];
   const wrong: string[] = [];
-  for (const rule of SELF_TESTED) {
-    if (!hit(rule, `bad-${rule}`)) wrong.push(`${rule} missed its offender`);
-    if (hit(rule, `good-${rule}`)) wrong.push(`${rule} flagged a sound element`);
+  // At every width the screens are checked at, a phone's touch sizes included.
+  for (const width of WIDTHS) {
+    await Promise.all([tab.resize(width), reverse.resize(width)]);
+    // The two orders first: `findingsAt` may leave the tab taller than its twin.
+    const found = [...(await orderFindings(tab, reverse)), ...(await findingsAt(tab, width))];
+    const hit = (rule: string, cls: string) =>
+      found.some((f) => f.rule === rule && `${f.el} ${f.box ?? ""} ${f.at ?? ""}`.split(/[.\s]/).includes(cls));
+    for (const rule of SELF_TESTED.filter((r) => width >= 640 || !DESKTOP_ONLY.includes(r))) {
+      for (const cls of twins.filter((c) => c.replace(/^(bad|good)-|--.*$/g, "") === rule)) {
+        if (cls.startsWith("bad-") && !hit(rule, cls)) wrong.push(`${rule}@${width} missed ${cls}`);
+        if (cls.startsWith("good-") && hit(rule, cls)) wrong.push(`${rule}@${width} flagged ${cls}`);
+      }
+    }
   }
   if (wrong.length) throw new Error(`Self-test: ${wrong.join(", ")}`);
 }
@@ -343,9 +411,12 @@ async function main() {
     Array.from({ length: BROWSERS }, (_, i) => launch(findChrome(), join(out, `profile-${i}`))),
   );
   try {
-    const url = writeFrame(out, await bundleCss(out));
-    const tabs = await Promise.all(browsers.map((b) => openTab(b.send, url)));
-    await selfTest(tabs[0] as (typeof tabs)[number]);
+    const frames = writeFrame(out, await bundleCss(out), await bundleCss(out, "reverse"));
+    // Each browser lays a screen out twice: in the app's CSS order and in the reverse one, for `cascadeorder`.
+    const pairs = await Promise.all(
+      browsers.map(async (b) => [await openTab(b.send, frames.url), await openTab(b.send, frames.reverse)] as const),
+    );
+    await selfTest(...(pairs[0] as (typeof pairs)[number]));
 
     const captured = readdirSync(dir).filter((f) => f.endsWith(".html"));
     if (captured.length < MIN_STATES) throw new Error(`Only ${captured.length} screens captured: the capture broke`);
@@ -354,12 +425,13 @@ async function main() {
     const measured = queue.length;
     const hits: Hit[] = [];
     await Promise.all(
-      tabs.map(async (tab) => {
+      pairs.map(async ([tab, reverse]) => {
         for (let name = queue.pop(); name; name = queue.pop()) {
           const raw = read(name);
           const cut = raw.indexOf("-->");
           const { screen } = JSON.parse(raw.slice(4, cut)) as { screen: string };
-          await tab.run(`geometry.load(${JSON.stringify(raw.slice(cut + 4))})`);
+          const load = `geometry.load(${JSON.stringify(raw.slice(cut + 4))})`;
+          await Promise.all([tab.run(load), reverse.run(load)]);
           for (const width of WIDTHS) {
             for (const size of ["", ...(raw.includes("ac-msg") ? textSizes : [])]) {
               await tab.run(
@@ -367,6 +439,12 @@ async function main() {
                   ? `document.documentElement.dataset.textSize = ${JSON.stringify(size)}`
                   : "delete document.documentElement.dataset.textSize",
               );
+              // The two CSS orders at the default text size, both tabs at this width, before `findingsAt` may leave
+              // the tab taller than its twin.
+              if (!size) {
+                await Promise.all([tab.resize(width), reverse.resize(width)]);
+                for (const finding of await orderFindings(tab, reverse)) hits.push({ width, screen, finding });
+              }
               for (const finding of await findingsAt(tab, width)) hits.push({ width, screen, finding });
             }
           }

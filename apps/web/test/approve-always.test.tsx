@@ -208,7 +208,11 @@ describe("Ferramentas e acesso: Aprovado sempre", () => {
     const list = card();
     if (!list) throw new Error("no card");
     expect(list.textContent).toContain("Roda sem pedir, com qualquer valor.");
-    const rows = [...list.querySelectorAll("li")].map((li) => li.querySelector(".level-row__text")?.textContent);
+    // The server on the row's line, what it allows and who allowed it under it.
+    const rows = [...list.querySelectorAll("li")].map(
+      (li) =>
+        `${li.querySelector(".level-row__name")?.textContent}${li.querySelector(".level-row__text")?.textContent}`,
+    );
     expect(rows).toEqual([
       "ComposioComentar numa issue (GitHub)Aprovado por João · agora",
       "ComposioFechar chamadoAprovado · agora",
@@ -313,9 +317,9 @@ describe("a custom server's own tool, as Higgsfield's", () => {
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: createFakeApi(state) });
     await settle(8);
     const list = screen().getByRole("region", { name: "Aprovado sempre" });
-    expect(list.querySelector("li .level-row__text")?.textContent).toBe(
-      "HiggsfieldGerar imagemAprovado por João · agora",
-    );
+    // The server on the row's line, what it allows and who allowed it under it.
+    expect(list.querySelector("li .level-row__name")?.textContent).toBe("Higgsfield");
+    expect(list.querySelector("li .level-row__text")?.textContent).toBe("Gerar imagemAprovado por João · agora");
     await click(within(list).getByRole("button", { name: "Voltar a pedir: Gerar imagem" }));
     expect(state.calls.find((c) => c.method === "approvals.removeRule")?.args).toEqual([ORG_ID, ADA_ID, "rule-img"]);
   });
@@ -386,8 +390,9 @@ describe("git requests", () => {
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: createFakeApi(state) });
     await settle(8);
     const list = screen().getByRole("region", { name: "Aprovado sempre" });
+    expect(list.querySelector(".level-row__name")?.textContent).toBe("GitHub");
     expect(list.querySelector(".level-row__text")?.textContent).toBe(
-      "GitHubenviar para ana/fix em acme/appAprovado por João · agora",
+      "enviar para ana/fix em acme/appAprovado por João · agora",
     );
     expect(within(list).getByText("enviar para ana/fix em acme/app").getAttribute("title")).toBe("acme/app:ana/fix");
     await click(within(list).getByRole("button", { name: "Voltar a pedir: enviar para ana/fix em acme/app" }));

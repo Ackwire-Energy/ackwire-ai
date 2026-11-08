@@ -49,18 +49,16 @@ html:not([data-pointer]) .home-sec__more:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
+/* Its rows' buttons drop under their words by the list's width. */
 .home-list {
   margin: 0;
   padding: 0;
   list-style: none;
+  container-type: inline-size;
 }
 
-/* A row: the face on top (32px), the text beside it, its one button at the end. */
+/* A row, a MediaRow: the face (24), who and what on its line with its one button at the end, the rest under them. */
 .home-row {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
   box-sizing: border-box;
   width: 100%;
   padding: 12px 16px;
@@ -87,18 +85,7 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-inset);
 }
-.home-row__face {
-  display: flex;
-  justify-content: center;
-}
-.home-row__face .ac-avatar {
-  width: 32px;
-  height: 32px;
-}
-.home-row__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.home-row__body {
   gap: 2px;
 }
 .home-row__title {
@@ -107,32 +94,23 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   overflow-wrap: anywhere;
 }
 .home-row__sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: 13.5px;
   line-height: 19px;
   color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .home-row__meta {
   font-size: 12.5px;
   line-height: 18px;
   color: var(--muted);
 }
-/* In the row's middle: on its first line a 32px button (40px on touch) reaches past the row's edge. */
-.home-row__act {
-  align-self: center;
-}
-/* A system face (a computer, a request to join): the same 32px tile as a person's. */
-.home-row__sys {
-  width: 32px;
-  height: 32px;
-}
 
 /* First steps: a check in place of the face; a done one reads quieter. */
 .home-step__mark {
-  align-items: center;
-  height: 20px;
   color: var(--ink);
 }
 .home-step__mark:empty::before {
@@ -167,7 +145,7 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   padding-bottom: 6px;
 }
 .home-row__acts {
-  padding: 0 16px 12px 60px;
+  padding: 0 16px 12px;
 }
 /* A notice with one action: the button at the row's end, where "Review" sits on the others. */
 .home-wrow--side {
@@ -188,21 +166,13 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 
 /* A phone: the button goes under the text, from its start, so the text keeps the row's width. */
 @media (max-width: 640px) {
-  .home-row {
-    grid-template-columns: 32px minmax(0, 1fr);
-  }
-  .home-row__act {
-    grid-column: 2;
-    justify-self: start;
-    margin-top: 4px;
-  }
   .home-wrow--side:has(.home-row__acts--side) > .home-row {
     padding-right: 16px;
     padding-bottom: 6px;
   }
   .home-row__acts--side {
     position: static;
-    padding: 0 16px 12px 60px;
+    padding: 0 16px 12px;
   }
   .home-start {
     width: 100%;
@@ -211,10 +181,10 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 }
 
 /* The right hand's first run while a row is left (ADR 0155 §6): one line back to its checklist. */
+/* A MediaRow (the kit's `.ac-mediarow`): Lodi's face on the first line of words that wrap on a phone, the chevron at
+   that line's end; one line sits in the middle of the row. */
 .home-continue {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  align-content: center;
   min-height: 48px;
   padding: 8px 14px;
   border-radius: var(--radius-md);
@@ -224,11 +194,10 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   font-weight: 600;
   text-decoration: none;
 }
-.home-continue__text {
-  flex: 1;
-  min-width: 0;
+.home-continue > .ac-mediarow__head {
+  font-weight: 600;
 }
-.home-continue > .ac-icon {
+.home-continue > .ac-mediarow__end > .ac-icon {
   color: var(--ink-muted);
 }
 html:not([data-pointer]) .home-continue:focus-visible {

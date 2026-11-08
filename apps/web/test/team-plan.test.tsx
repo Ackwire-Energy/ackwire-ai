@@ -150,6 +150,15 @@ describe("the team card", () => {
     expect(card.textContent).toContain("2 agentes · 1 canal novo · 2 rotinas");
     for (const name of ["Criar o time", "Ver como mapa", "Descartar", "Ajustar Iara", "Ajustar Ada"])
       expect(within(card).getByRole("button", { name })).toBeTruthy();
+    // Each agent a MediaRow: the face, the name and the role on one line, its channel and Ajustar at that line's end
+    // (under the words in a narrow card), what it does under them at the row's width.
+    const iara = within(card).getByRole("button", { name: "Ajustar Iara" }).closest(".tp-agent") as HTMLElement;
+    expect(iara.classList.contains("ac-mediarow")).toBe(true);
+    expect(iara.querySelector(":scope > .ac-mediarow__head > b")?.textContent).toBe("Iara");
+    expect(iara.querySelector(":scope > .ac-mediarow__end--wrap .tp-pill")).toBeTruthy();
+    expect(iara.querySelector(":scope > .ac-mediarow__body > .tp-agent__line")?.textContent).toBe(
+      "Responde os clientes no WhatsApp e no e-mail.",
+    );
   });
 
   test("Criar o time makes it in one click; the receipt has Desfazer and a first task per agent", async () => {
@@ -161,6 +170,12 @@ describe("the team card", () => {
     expect(button("Desfazer")).toBeTruthy();
     const first = screen().getByRole("group", { name: "Primeira tarefa" });
     expect(first.textContent).toContain("Responder a última mensagem que espera");
+    // The task under the name at the row's full width, its button at the name's line's end or under the task.
+    const task = first.querySelector(".tp-agent.ac-mediarow") as HTMLElement;
+    expect(task.querySelector(":scope > .ac-mediarow__body")?.textContent).toBe(
+      "Responder a última mensagem que espera",
+    );
+    expect(task.querySelector(":scope > .ac-mediarow__end--wrap .ac-btn")?.textContent).toBe("Abrir com a tarefa");
     expect(within(first).getByRole("button", { name: "Convidar Bruno" })).toBeTruthy();
     const iara = state.agents.find((a) => a.name === "Iara");
     await click(within(first).getAllByRole("button", { name: "Abrir com a tarefa" })[0] as HTMLElement, 12);

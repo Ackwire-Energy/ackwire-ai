@@ -6,12 +6,20 @@
   min-width: 0;
 }
 
-/* The list: one row per role, one line each; the base role below a label. */
+/* The list: one row per role edge to edge, a MediaRow each (the mark, the name and who holds it on one line, what it
+   allows under them); the base role is a chip on its name. */
 .roles-list {
   --card-pad: 0px;
   padding: 0;
   gap: 0;
   overflow: hidden;
+  container-type: inline-size;
+}
+/* The card clips its rows at its rounded corners: the first row takes them, so its focus ring is drawn whole. */
+.roles-list > .roles-line:first-child,
+.roles-list > .roles-line:first-child > .roles-row {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 .roles-line {
   display: flex;
@@ -27,14 +35,16 @@
   padding-left: 12px;
 }
 .roles-row {
-  all: unset;
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  margin: 0;
   padding: var(--row-py) 20px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
   transition: background-color 0.15s;
 }
@@ -42,25 +52,14 @@
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 html:not([data-pointer]) .roles-row:focus-visible {
+  outline: none;
   box-shadow: var(--focus-ring-inset);
 }
-.roles-row > .ac-icon {
-  flex: none;
+.roles-row > .ac-mediarow__end > .ac-icon {
   color: var(--faint);
 }
-.roles-row__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.roles-row__text b {
-  font-size: 14.5px;
-  font-weight: 650;
-}
 /* The summary wraps: an ellipsis would hide what the role allows. */
-.roles-row__text span {
+.roles-row__sum {
   font-size: 13px;
   color: var(--muted);
   text-wrap: pretty;
@@ -85,12 +84,8 @@ html:not([data-pointer]) .roles-row:focus-visible {
 .roles-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
-.roles-label {
-  padding: 14px 20px 6px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--faint);
+.roles-base-chip {
+  color: var(--muted);
 }
 /* The card has no padding (rows run edge to edge): the foot keeps the rows' 20px so its ⓘ lines up with the marks. */
 .roles-list .ac-card__foot {
@@ -110,6 +105,19 @@ html:not([data-pointer]) .roles-row:focus-visible {
    placed from the line's top, keeps level with the text. */
 .roles-foot > .ac-btn {
   margin-block: -5.5px;
+}
+/* An ActionRow: in a card under 480px the action goes under the hint, its words at the hint's start. */
+@container (max-width: 479px) {
+  .roles-foot {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .roles-foot > span {
+    flex-basis: 100%;
+  }
+  .roles-foot > .ac-btn--ghost {
+    margin-left: calc(-1 * var(--ghost-plate));
+  }
 }
 
 /* A role's page: its mark, name and how many hold it, on one axis with the actions. */
@@ -244,6 +252,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
 }
 .roles-computer .roles-key__text {
   flex: 1 1 220px;
+  min-width: 0;
 }
 .roles-area__items {
   margin: 10px 0 -4px 32px;
@@ -255,9 +264,8 @@ html:not([data-pointer]) .roles-back:focus-visible {
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .roles-key__text {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -291,17 +299,18 @@ html:not([data-pointer]) .roles-back:focus-visible {
   padding: 0;
   list-style: none;
 }
-.roles-person,
+/* A role's people: a MediaRow each (the face, the name and the email on one line, Remover at its end, their other
+   roles under them); a pick's row a plain line. */
+.roles-person {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
 .roles-pick__row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
-}
-.roles-person:first-child,
-.roles-pick li:first-child .roles-pick__row {
-  border-top: 0;
 }
 .roles-person__text {
   flex: 1 1 200px;
@@ -314,14 +323,18 @@ html:not([data-pointer]) .roles-back:focus-visible {
   font-weight: 600;
 }
 .roles-person__text span {
-  overflow: hidden;
   font-size: 12.5px;
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
+.roles-person:first-child,
+.roles-pick li:first-child .roles-pick__row {
+  border-top: 0;
+}
+
 .roles-chips {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
@@ -501,6 +514,10 @@ html:not([data-pointer]) .roles-template:focus-visible {
   .roles-look__row {
     flex-direction: column;
     align-items: stretch;
+  }
+  /* Under its label, the name's field fills the column. */
+  .roles-look__name {
+    width: auto;
   }
   .roles-look__row--switch {
     flex-direction: row;

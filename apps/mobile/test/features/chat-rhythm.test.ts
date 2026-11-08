@@ -97,7 +97,7 @@ describe("one rhythm, the web's numbers (chat-rhythm-css.test.ts holds them to t
     }
     expect(await read("chat/StoppedLine.tsx")).not.toContain("inRow");
     for (const file of ["chat/EventLine.tsx", "chat/StoppedLine.tsx", "chat/issue-work.tsx"])
-      expect(await read(file)).toContain("[styles.line, { marginTop: gap }]");
+      expect(await read(file)).toContain("[styles.line, { paddingLeft: inset, marginTop: gap }]");
   });
 
   test("what stacks inside a row's words takes the part gap too", async () => {

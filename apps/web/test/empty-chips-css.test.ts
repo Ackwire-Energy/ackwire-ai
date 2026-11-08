@@ -29,7 +29,9 @@ test("what ships keeps an empty conversation's suggestions inside their card at 
   expect(card.length).toBeGreaterThan(0);
   expect(card.filter((p) => !/^padding-(inline|left|right)/.test(p))).toEqual([]);
 
-  // Início's rows on a phone: the button goes under the text, which keeps the row's width.
-  expect(last(phone, ".home-row", "grid-template-columns")).toBe("32px minmax(0,1fr)");
-  expect(last(phone, ".home-row__act", "grid-column")).toBe("2");
+  // Início's rows are MediaRows: in a list under 480px their button goes under the text (`__end--wrap`), which keeps
+  // the row's width; no phone rule of the page's own puts it in a column beside the face.
+  expect(last(shipped, ".home-list", "container-type")).toBe("inline-size");
+  expect(last(phone, ".home-row", "grid-template-columns")).toBeUndefined();
+  expect(last(phone, ".home-row__act", "grid-column")).toBeUndefined();
 });

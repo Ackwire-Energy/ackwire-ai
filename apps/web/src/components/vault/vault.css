@@ -50,6 +50,11 @@
   height: 40px;
   border-radius: 12px;
 }
+/* Leading a MediaRow: the face's size. */
+.ac-mediarow__face > .vlt-tile {
+  width: var(--mediarow-face);
+  height: var(--mediarow-face);
+}
 
 /* The list: one grid for every row (tile | name and line | who may use it | last used | chevron), so the columns line
    up row after row; narrow, who and when go under the name. */
@@ -132,13 +137,15 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
 .vlt-row__chev {
   color: var(--faint);
 }
+/* Narrow, who may use it and when it was last used go under the tile and the name, at the row's width: the tile never
+   owns a column beside four lines, and the chevron's column stays as narrow as the chevron. */
 @container (max-width: 640px) {
   .vlt-list .vlt-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
   .vlt-row__who,
   .vlt-row__used {
-    grid-column: 2;
+    grid-column: 1 / -1;
     text-align: left;
   }
   .vlt-row__chev {

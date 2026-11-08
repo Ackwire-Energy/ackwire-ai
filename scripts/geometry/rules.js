@@ -15,6 +15,39 @@
   const GAP_DIFF = 1.5;
   /** The narrowest window a side pane floats in instead of covering the screen (`.thread-panel` in threads.css). */
   const DESKTOP_MIN = 861;
+  /** What `cascadeorder` compares between two CSS orders: the box, its room, its type and its paint. */
+  const ORDER_PROPS = [
+    "display",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "row-gap",
+    "column-gap",
+    "width",
+    "height",
+    "min-height",
+    "font-size",
+    "line-height",
+    "font-weight",
+    "border-top-width",
+    "border-top-left-radius",
+    "background-color",
+    "color",
+    "align-items",
+    "justify-content",
+    "flex-grow",
+    "flex-direction",
+    "grid-template-columns",
+    "position",
+    "box-shadow",
+    "translate",
+    "overflow-x",
+  ];
 
   const sig = (el) => {
     const classes = (typeof el.className === "string" ? el.className : (el.className?.baseVal ?? ""))
@@ -247,6 +280,137 @@
     }
     return null;
   };
+
+  /** Laid out as a row: a flex row, or a grid of two or more columns. */
+  const isRow = (s) =>
+    (s.display.includes("flex") && !s.flexDirection.startsWith("column")) ||
+    (s.display.includes("grid") && s.gridTemplateColumns.split(" ").length > 1);
+  /** What a row can lead with besides a glyph: a face, a tile, a picture. */
+  const FACE = ".ac-avatar,.ac-rolemark,img,canvas,video,picture";
+  /** The box that lays `node` out: its parent, or past a `display: contents` one. */
+  const layoutParent = (node) => {
+    let p = node.parentElement;
+    while (p && style(p).display === "contents") p = p.parentElement;
+    return p;
+  };
+  /** The first words `el` shows: a text node laid out wider than a pixel. */
+  const firstWords = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim() || !seen(n.parentElement) || n.parentElement.closest("textarea,select,svg")) continue;
+      if ([...textRange(n).getClientRects()].some((r) => r.width > 1 && r.height > 1)) return n;
+    }
+    return null;
+  };
+  /**
+   * A probe of no width as tall as the capitals of the font it sits in (`1cap` follows `font-size-adjust`). A tag and
+   * `all: unset` of its own, so no page rule reaches it (`.newag__tip span { display: none }` hid a span).
+   */
+  const capProbe = () => {
+    const p = document.createElement("geo-probe");
+    p.style.cssText = "all:unset;display:inline-block;width:0;height:1cap;vertical-align:baseline";
+    return p;
+  };
+  /** Its bottom is the line's baseline: where the capitals sit and their middle. */
+  const capsOf = (probe) => {
+    const r = probe.getBoundingClientRect();
+    probe.remove();
+    return { base: r.bottom, mid: r.bottom - r.height / 2 };
+  };
+  /**
+   * The baseline and the capitals' middle of the line a text node starts on, by a probe right after its first letter: a
+   * box of no width never moves to another line. A text node laid out straight in a flex or grid box is wrapped for
+   * the moment, so the probe joins its line instead of becoming an item of its own.
+   */
+  const capsAt = (text, also) => {
+    const at = text.data.search(/\S/);
+    if (at < 0) return null;
+    const host = layoutParent(text);
+    const wrap = host && /flex|grid/.test(style(host).display) ? document.createElement("geo-probe") : null;
+    if (wrap) {
+      wrap.style.cssText = "all:unset";
+      text.before(wrap);
+      wrap.append(text);
+    }
+    const rest = text.splitText(at + 1);
+    const probe = capProbe();
+    rest.before(probe);
+    // What is compared with the capitals, read while the probe is in: a probe in a line that fits exactly can push
+    // the line's last item onto the next one, and a caller can tell by it.
+    const beside = also?.();
+    const caps = { ...capsOf(probe), beside };
+    text.appendData(rest.data);
+    rest.remove();
+    if (wrap) {
+      wrap.before(text);
+      wrap.remove();
+    }
+    return caps;
+  };
+  /** The capitals' middle of the line an inline box sits on, by a probe right after it, in its parent's type. */
+  const capsAfter = (el) => {
+    const probe = capProbe();
+    el.after(probe);
+    return capsOf(probe);
+  };
+  const lineHeightOf = (el) => {
+    const s = style(el);
+    const lh = parseFloat(s.lineHeight);
+    return Number.isFinite(lh) ? lh : parseFloat(s.fontSize) * 1.2;
+  };
+  /** The children of `el` as laid out, words in text nodes too: a `display: contents` box hands its own to its parent. */
+  const flowNodes = (el) =>
+    [...el.childNodes].flatMap((n) => {
+      if (n.nodeType === 3) return n.textContent.trim() ? [n] : [];
+      if (n.nodeType !== 1) return [];
+      if (style(n).display === "contents") return flowNodes(n);
+      return seen(n) && !["absolute", "fixed", "sticky"].includes(style(n).position) ? [n] : [];
+    });
+  const wordsOf = (node) => (node.nodeType === 3 ? node : firstWords(node));
+  /** Two boxes on one line: they share more than half the shorter one's height. */
+  const sameLine = (a, b) =>
+    Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > Math.min(a.bottom - a.top, b.bottom - b.top) / 2;
+  const textRects = (node) => [...textRange(node).getClientRects()].filter((r) => r.width > 1 && r.height > 1);
+  /** The distinct lines a set of boxes covers, however their type sizes differ on each line. */
+  const lineCount = (rects) => {
+    const lines = [];
+    for (const r of [...rects].sort((a, b) => a.top - b.top)) {
+      const line = lines.find((l) => sameLine(l, r));
+      if (line) {
+        line.top = Math.min(line.top, r.top);
+        line.bottom = Math.max(line.bottom, r.bottom);
+      } else lines.push({ top: r.top, bottom: r.bottom });
+    }
+    return lines.length;
+  };
+  /** A list's row or item by its class: `.issue-list__row`, `.nt-item`, `.roles-row--base`, not `.home-row__face`. */
+  const ROW_ITEM = /(^|\s|[_-])(row|item)(\s|$|--)/;
+  /** Selected, current, picked or checked: a row that shows a plate at rest. */
+  const PICKED =
+    "[aria-selected=true],[aria-current]:not([aria-current=false]),[data-state=checked],.is-selected,.is-on,.is-cur,.is-picked,.is-active";
+  /** The nearest box that clips or scrolls what runs past it. */
+  const clipperOf = (el) => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const s = style(p);
+      if (s.overflowX !== "visible" || s.overflowY !== "visible") return p;
+    }
+    return null;
+  };
+  /** A box shadow's layers drawn outside the box: offsets, blur and spread, each with a color that shows. */
+  const outerShadows = (value) =>
+    value === "none"
+      ? []
+      : value
+          .split(/,(?![^(]*\))/)
+          .filter((l) => !/\binset\b/.test(l))
+          .map((l) => {
+            const color = l.match(/rgba?\([^)]*\)|#[\da-f]+|[a-z]+(?=\s|$)/i)?.[0] ?? "";
+            const [x = 0, y = 0, blur = 0, spread = 0] = (
+              l.replace(/rgba?\([^)]*\)/, "").match(/-?[\d.]+px/g) ?? []
+            ).map(parseFloat);
+            return { x, y, blur, spread, color };
+          })
+          .filter((l) => painted(l.color));
 
   const rules = {
     edge(out) {
@@ -739,6 +903,400 @@
       }
     },
     /**
+     * A square (a face, a tile, a picture or a box with a surface, 24 to 64px) leading a row, with words on three or more
+     * lines beside it and nothing under it: it owns a column while the words are squeezed. Face, name and role go on one
+     * line, the rest under them at the row's full width (MediaRow). A channel's or a thread's messages keep their face
+     * column. A conversation with no faces (`data-faces="false"`, a DM whose sides say who spoke) shows none at all.
+     */
+    squarecol(out) {
+      for (const face of document.querySelectorAll("[data-faces='false'] .ac-msg__avatar")) {
+        if (seen(face)) out.push({ rule: "squarecol", node: face, el: sig(face), box: placeOf(face), lines: 0 });
+      }
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.matches(".ac-msg") || row.closest("svg") || !isRow(style(row))) continue;
+        const kids = flow(row);
+        if (kids.length < 2) continue;
+        const square = kids[0];
+        const r = square.getBoundingClientRect();
+        if (r.width < 23.5 || r.width > 64.5 || Math.abs(r.width - r.height) > 1) continue;
+        if (
+          !square.matches(FACE) &&
+          !square.querySelector(":scope > img, :scope > canvas") &&
+          !hasSurface(style(square))
+        )
+          continue;
+        const beside = [];
+        for (const kid of kids.slice(1)) {
+          const walker = document.createTreeWalker(kid, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            if (!n.textContent.trim() || !seen(n.parentElement)) continue;
+            beside.push(...textRects(n).filter((t) => t.left >= r.right - 1));
+          }
+        }
+        const lines = lineCount(beside);
+        if (lines < 3) continue;
+        const under = kids.slice(1).some((k) => {
+          const b = k.getBoundingClientRect();
+          return b.top >= r.bottom - 0.5 && b.left < r.right && b.right > r.left;
+        });
+        if (!under) out.push({ rule: "squarecol", node: square, el: sig(square), box: sig(row), lines });
+      }
+    },
+    /**
+     * A face or a mark in an option keeps the row's room around it while the option is highlighted: 6 above and below
+     * (10 on touch) and 6 from its start, so it never touches the highlight's edge (OptionRow). A list row with a plate
+     * at rest (a fill: selected, current) keeps 8 around its lead; one between hairlines, 8 above and below.
+     */
+    rim(out) {
+      const touch = matchMedia("(pointer: coarse)").matches;
+      const leadOf = (row) => {
+        const first = flow(row)[0];
+        if (!first) return null;
+        const inner = first.matches(".ac-menu__leading") ? flow(first)[0] : first;
+        return inner && (inner.matches(FACE) || inner.tagName.toLowerCase() === "svg") && seen(inner) ? inner : null;
+      };
+      const room = (lead, row) => {
+        const a = lead.getBoundingClientRect();
+        const b = row.getBoundingClientRect();
+        const s = style(row);
+        return {
+          top: a.top - b.top - parseFloat(s.borderTopWidth),
+          bottom: b.bottom - parseFloat(s.borderBottomWidth) - a.bottom,
+          start: a.left - b.left - parseFloat(s.borderLeftWidth),
+          end: b.right - parseFloat(s.borderRightWidth) - a.right,
+        };
+      };
+      const options = new Set(
+        [...document.querySelectorAll("[role=option],[role^=menuitem],.ac-menu__item")].filter(seen),
+      );
+      for (const opt of options) {
+        const lead = leadOf(opt);
+        if (!lead) continue;
+        const had = opt.hasAttribute("data-highlighted");
+        if (!had) opt.setAttribute("data-highlighted", "");
+        const px = room(lead, opt);
+        if (!had) opt.removeAttribute("data-highlighted");
+        const block = touch ? 10 : 6;
+        const short = [
+          ["top", px.top, block],
+          ["bottom", px.bottom, block],
+          ["start", px.start, 6],
+        ].find(([, v, want]) => v < want - 0.5);
+        if (short)
+          out.push({ rule: "rim", node: opt, el: sig(lead), box: sig(opt), side: short[0], px: +short[1].toFixed(1) });
+      }
+      for (const row of document.querySelectorAll("li,[role=row],[role=listitem],[class*='row'],[class*='item']")) {
+        if (!seen(row) || options.has(row) || row.closest("[role=option],[role^=menuitem],.ac-menu__item,svg"))
+          continue;
+        if (!row.matches("li,[role=row],[role=listitem]") && !ROW_ITEM.test(row.className)) continue;
+        const s = style(row);
+        if (!isRow(s)) continue;
+        // A plate (a fill, a shadow) shows every side; hairlines only the room above and below.
+        const plate = painted(s.backgroundColor) || s.boxShadow !== "none";
+        const lined = SIDES.some((d) => parseFloat(s[`border${d}Width`]) > 0 && s[`border${d}Style`] !== "none");
+        if (!plate && !lined) continue;
+        const lead = leadOf(row);
+        if (!lead) continue;
+        const px = room(lead, row);
+        const short = (plate ? ["top", "bottom", "start"] : ["top", "bottom"])
+          .map((side) => [side, px[side]])
+          .find(([, v]) => v < 7.5);
+        if (short)
+          out.push({ rule: "rim", node: row, el: sig(lead), box: sig(row), side: short[0], px: +short[1].toFixed(1) });
+      }
+    },
+    /**
+     * Words right after an inline box that leads with a face or a glyph (an inline-flex name with its face) sit on the
+     * baseline of that box's own words, within 0.5px. An inline-flex box's baseline is its first item's: a face's initial.
+     */
+    inlinebase(out) {
+      for (const box of document.body.querySelectorAll("*")) {
+        if (!seen(box) || !/^inline-(flex|grid)$/.test(style(box).display)) continue;
+        const nodes = flowNodes(box);
+        const lead = nodes[0];
+        if (lead?.nodeType !== 1 || !(lead.matches(FACE) || glyphOf(lead))) continue;
+        const own = nodes.slice(1).map(wordsOf).find(Boolean);
+        if (!own) continue;
+        let next = null;
+        for (let at = box; at && !next; at = at.parentElement) {
+          for (let n = at.nextSibling; n; n = n.nextSibling) {
+            if (n.nodeType === 3 && n.textContent.trim()) next = n;
+            else if (n.nodeType === 1 && seen(n) && style(n).display.startsWith("inline")) next = firstWords(n);
+            if (next || (n.nodeType === 1 && seen(n))) break;
+          }
+          if (!at.parentElement || style(at.parentElement).display !== "inline") break;
+        }
+        if (!next) continue;
+        const a = capsAt(own);
+        const b = capsAt(next);
+        if (!a || !b) continue;
+        const px = b.base - a.base;
+        // The words after it wrapped to the next line: no line to share.
+        if (Math.abs(px) > lineHeightOf(box) / 2) continue;
+        if (Math.abs(px) > 0.5)
+          out.push({
+            rule: "inlinebase",
+            node: box,
+            el: sig(box),
+            box: placeOf(box),
+            px: +px.toFixed(1),
+            text: words(box),
+          });
+      }
+    },
+    /**
+     * A glyph's middle on its line's capitals' middle, within 1px, where the eye centres a sign beside words: a row's
+     * lead (a glyph, or a face no taller than 1.25 lines) on its first line, and a glyph inside or after words (an svg, or
+     * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row. A person's initials
+     * sit within 0.5px of their tile's middle.
+     */
+    iconmid(out) {
+      const push = (node, part, px, row) =>
+        out.push({
+          rule: "iconmid",
+          node,
+          el: sig(node),
+          box: row ? sig(row) : placeOf(node),
+          part,
+          px: +px.toFixed(1),
+        });
+      const leads = new Set();
+      for (const row of document.body.querySelectorAll("*")) {
+        if (!seen(row) || row.closest("svg") || !isRow(style(row))) continue;
+        const nodes = flowNodes(row);
+        const lead = nodes[0];
+        if (lead?.nodeType !== 1) continue;
+        const mark = glyphOf(lead) ?? (lead.matches(FACE) ? lead : null);
+        if (!mark) continue;
+        const text = nodes.slice(1).map(wordsOf).find(Boolean);
+        if (!text) continue;
+        const box = mark.getBoundingClientRect();
+        if (box.height > 1.25 * lineHeightOf(text.parentElement) + 0.5) continue;
+        leads.add(mark);
+        leads.add(lead);
+        // A row that wrapped puts its words under the lead, not beside it: no line to share.
+        const first = textRects(text)[0];
+        if (!first || Math.min(first.bottom, box.bottom) <= Math.max(first.top, box.top)) continue;
+        const caps = capsAt(text, () => mark.getBoundingClientRect());
+        // The probe moved the lead (a line that fit exactly and wrapped): this layout can't be measured this way.
+        if (!caps || Math.abs(caps.beside.top - box.top) > 0.5) continue;
+        const px = (box.top + box.bottom) / 2 - caps.mid;
+        if (Math.abs(px) > 1) push(lead, "lead", px, row);
+      }
+      for (const svg of document.body.querySelectorAll("svg")) {
+        if (!seen(svg) || leads.has(svg) || svg.parentElement?.closest("svg,.ac-avatar,.ac-rolemark")) continue;
+        let glyph = svg;
+        for (let p = svg.parentElement; p && p !== document.body; p = p.parentElement) {
+          const ps = style(p);
+          if (ps.display === "contents") continue;
+          if (visibleText(p) || hasSurface(ps) || [...p.querySelectorAll("svg")].filter(seen).length !== 1) break;
+          if (p.matches("button,a,[role=button]") && !p.matches(".ac-hint")) break;
+          if (style(glyph).display.startsWith("inline") && !ps.display.startsWith("inline")) break;
+          glyph = p;
+        }
+        if (leads.has(glyph)) continue;
+        const box = glyph.getBoundingClientRect();
+        if (box.height < 8) continue;
+        let caps = null;
+        if (style(glyph).display.startsWith("inline")) {
+          let line = glyph.parentElement;
+          while (line && style(line).display === "inline") line = line.parentElement;
+          if (!line || box.height > 1.25 * lineHeightOf(line) + 0.5) continue;
+          const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+          let shares = false;
+          for (let n = walker.nextNode(); n && !shares; n = walker.nextNode()) {
+            if (!n.textContent.trim() || glyph.contains(n) || !seen(n.parentElement)) continue;
+            let inline = true;
+            for (let p = n.parentElement; p && p !== line; p = p.parentElement)
+              if (style(p).display !== "inline") inline = false;
+            shares = inline && textRects(n).some((t) => sameLine(t, box));
+          }
+          if (shares) caps = capsAfter(glyph);
+        } else {
+          const row = layoutParent(glyph);
+          if (!row || !isRow(style(row))) continue;
+          const nodes = flowNodes(row);
+          const at = nodes.indexOf(glyph);
+          const words = at > 0 ? nodes[at - 1] : null;
+          const before = words ? wordsOf(words) : null;
+          if (!before || box.height > 1.25 * lineHeightOf(before.parentElement) + 0.5) continue;
+          // After words on one line, on that line. In a row of two lines or more (a select's name and its line, a
+          // setting's name over its value) a glyph ends the control, centred on it.
+          const lines = [];
+          const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode())
+            if (n.textContent.trim() && !glyph.contains(n) && seen(n.parentElement)) lines.push(...textRects(n));
+          if (lineCount(lines) === 1 && lines.some((t) => sameLine(t, box))) caps = capsAt(before);
+        }
+        if (!caps) continue;
+        const px = (box.top + box.bottom) / 2 - caps.mid;
+        if (Math.abs(px) > 1) push(glyph, "inline", px);
+      }
+      for (const face of document.querySelectorAll(".ac-avatar")) {
+        if (!seen(face) || face.querySelector("img,canvas")) continue;
+        const text = firstWords(face);
+        const caps = text && capsAt(text);
+        if (!caps) continue;
+        const r = face.getBoundingClientRect();
+        const px = caps.mid - (r.top + r.bottom) / 2;
+        if (Math.abs(px) > 0.5) push(face, "initials", px);
+      }
+    },
+    /**
+     * In a stack of fields (a box holding two or more), each field's control is as wide as the field and as tall as the
+     * stack's usual control, within 1 and 0.5px. A button that shows a value is drawn as a select, never a plain button.
+     */
+    fieldwidth(out) {
+      const LABEL = ".ac-field__label,.ac-field__label-row,.ac-hintline";
+      const TOGGLE =
+        "[role=checkbox],[role=radio],[role=switch],[role=radiogroup],input[type=checkbox],input[type=radio]";
+      const stacks = new Set();
+      for (const field of document.querySelectorAll(".ac-field")) {
+        const p = layoutParent(field);
+        if (p && seen(field)) stacks.add(p);
+      }
+      for (const stack of stacks) {
+        const pairs = flow(stack)
+          .filter((f) => f.matches(".ac-field:not(.ac-field--inline)"))
+          .map((field) => [field, flow(field).find((c) => !c.matches(LABEL))]);
+        if (pairs.length < 2) continue;
+        // What a person fills or picks: a help line in the control's place is no control.
+        const CONTROL =
+          "input,select,textarea,button,[role=combobox],[role=button],[contenteditable],.ac-select,.ac-seg,.ac-input-affix";
+        const controls = pairs.filter(
+          ([, c]) =>
+            c && (c.matches(CONTROL) || c.querySelector(CONTROL)) && !c.matches(TOGGLE) && !c.querySelector(TOGGLE),
+        );
+        const count = new Map();
+        for (const [, c] of controls) {
+          const h = Math.round(c.getBoundingClientRect().height * 2) / 2;
+          count.set(h, (count.get(h) ?? 0) + 1);
+        }
+        const usual = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
+        for (const [field, control] of controls) {
+          const fs = style(field);
+          const inner =
+            field.getBoundingClientRect().width -
+            parseFloat(fs.paddingLeft) -
+            parseFloat(fs.paddingRight) -
+            parseFloat(fs.borderLeftWidth) -
+            parseFloat(fs.borderRightWidth);
+          const c = control.getBoundingClientRect();
+          const base = { rule: "fieldwidth", node: control, el: sig(control), box: sig(field) };
+          if (control.matches(".ac-btn")) out.push({ ...base, drawn: "button", text: words(control) });
+          if (Math.abs(c.width - inner) > 1) out.push({ ...base, side: "width", px: +(c.width - inner).toFixed(1) });
+          const tall = control.matches("textarea") || control.querySelector("textarea") || c.height > 2 * usual;
+          if (!tall && Math.abs(c.height - usual) > 0.5)
+            out.push({ ...base, side: "height", px: +(c.height - usual).toFixed(1) });
+        }
+      }
+    },
+    /**
+     * A ring (an inset shadow, an outline, a border on both sides of a corner) whose corner meets the rounded inside
+     * corner of the box clipping it is rounded as much, or the clip cuts it there. A row filled at rest (selected,
+     * current) inside a rounded box, clear of its edges, has rounded corners of its own.
+     */
+    corner(out) {
+      const CORNERS = [
+        ["TopLeft", "Top", "Left"],
+        ["TopRight", "Top", "Right"],
+        ["BottomLeft", "Bottom", "Left"],
+        ["BottomRight", "Bottom", "Right"],
+      ];
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!seen(el) || el.closest("svg")) continue;
+        const s = style(el);
+        const ringed = s.boxShadow.includes("inset") || (s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0);
+        const lined = (side) => parseFloat(s[`border${side}Width`]) > 0 && s[`border${side}Style`] !== "none";
+        const rung = CORNERS.filter(([, v, h]) => ringed || (lined(v) && lined(h)));
+        const clip = rung.length ? clipperOf(el) : null;
+        if (clip) {
+          const cs = style(clip);
+          const a = el.getBoundingClientRect();
+          const b = clip.getBoundingClientRect();
+          const edge = {
+            Top: b.top + parseFloat(cs.borderTopWidth),
+            Bottom: b.bottom - parseFloat(cs.borderBottomWidth),
+            Left: b.left + parseFloat(cs.borderLeftWidth),
+            Right: b.right - parseFloat(cs.borderRightWidth),
+          };
+          const at = { Top: a.top, Bottom: a.bottom, Left: a.left, Right: a.right };
+          for (const [name, v, h] of rung) {
+            const want = parseFloat(cs[`border${name}Radius`]) - parseFloat(cs[`border${v}Width`]);
+            if (!(want > 0.5) || Math.abs(at[v] - edge[v]) > 1 || Math.abs(at[h] - edge[h]) > 1) continue;
+            const own = parseFloat(s[`border${name}Radius`]);
+            if (own < want - 0.5)
+              out.push({ rule: "corner", node: el, el: sig(el), box: sig(clip), side: name, px: own, want });
+          }
+        }
+        if (!el.matches(PICKED) || !painted(s.backgroundColor)) continue;
+        if (CORNERS.some(([name]) => parseFloat(s[`border${name}Radius`]) > 0)) continue;
+        for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+          const ps = style(p);
+          if (!CORNERS.some(([name]) => parseFloat(ps[`border${name}Radius`]) > 0)) continue;
+          if (!hasSurface(ps) && ps.overflowX === "visible") continue;
+          const a = el.getBoundingClientRect();
+          const b = p.getBoundingClientRect();
+          if (a.left > b.left + 1 && a.right < b.right - 1 && a.top > b.top + 1 && a.bottom < b.bottom - 1)
+            out.push({ rule: "corner", node: el, el: sig(el), box: sig(p), side: "square" });
+          break;
+        }
+      }
+    },
+    /**
+     * A ring drawn outside a box (an outline, or a box shadow with a spread, or a blur of 2px at most) cut by the box that
+     * clips or scrolls it, on a side where the box itself is inside it: a border that shows only at the corners.
+     */
+    clip(out) {
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!seen(el) || el.closest("svg")) continue;
+        const s = style(el);
+        const reach = { top: 0, bottom: 0, left: 0, right: 0 };
+        for (const l of outerShadows(s.boxShadow)) {
+          if (!(l.spread > 0 || l.blur <= 2)) continue;
+          const grow = l.spread + l.blur;
+          reach.top = Math.max(reach.top, grow - l.y);
+          reach.bottom = Math.max(reach.bottom, grow + l.y);
+          reach.left = Math.max(reach.left, grow - l.x);
+          reach.right = Math.max(reach.right, grow + l.x);
+        }
+        if (s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0) {
+          const o = parseFloat(s.outlineWidth) + parseFloat(s.outlineOffset);
+          for (const side of Object.keys(reach)) reach[side] = Math.max(reach[side], o);
+        }
+        if (!Object.values(reach).some((v) => v > 0.5)) continue;
+        const clip = clipperOf(el);
+        if (!clip) continue;
+        const cs = style(clip);
+        const a = el.getBoundingClientRect();
+        const b = clip.getBoundingClientRect();
+        const pad = {
+          top: b.top + parseFloat(cs.borderTopWidth),
+          bottom: b.bottom - parseFloat(cs.borderBottomWidth),
+          left: b.left + parseFloat(cs.borderLeftWidth),
+          right: b.right - parseFloat(cs.borderRightWidth),
+        };
+        // A side of the clip on the window's own edge cuts nothing the window wouldn't.
+        const cut = [
+          ["top", cs.overflowY, pad.top > 0.5 && a.top >= pad.top - 0.5 && a.top - reach.top < pad.top - 0.5],
+          [
+            "bottom",
+            cs.overflowY,
+            pad.bottom < innerHeight - 0.5 &&
+              a.bottom <= pad.bottom + 0.5 &&
+              a.bottom + reach.bottom > pad.bottom + 0.5,
+          ],
+          ["left", cs.overflowX, pad.left > 0.5 && a.left >= pad.left - 0.5 && a.left - reach.left < pad.left - 0.5],
+          [
+            "right",
+            cs.overflowX,
+            pad.right < innerWidth - 0.5 && a.right <= pad.right + 0.5 && a.right + reach.right > pad.right + 0.5,
+          ],
+        ].find(([, overflow, hit]) => hit && overflow !== "visible");
+        if (cut) out.push({ rule: "clip", node: el, el: sig(el), box: sig(clip), side: cut[0] });
+      }
+    },
+    /**
      * A popover's own actions (its primary button, its actions' row, the field at its foot) cut by its box: scrolled out
      * of sight instead of pinned to its foot. The box, not the window: where a captured screen puts it isn't Radix's.
      */
@@ -759,6 +1317,28 @@
     },
   };
 
+  /**
+   * With everything rendered: a box skipped by `content-visibility: auto` (a conversation's rows) has its placeholder
+   * size in one layout and its own in another, which no CSS order explains.
+   */
+  /**
+   * A picture's own size (an image, a video, a canvas) waits on its file decoding, so the two tabs can catch it at
+   * different moments: it is never a tie between two sheets, and `cascadeorder` leaves it out.
+   */
+  const LOADED = "img,image,video,canvas,iframe,object,embed";
+  const orderValue = (el, s, p) =>
+    (p === "width" || p === "height") && el.matches(LOADED) ? "" : s.getPropertyValue(p);
+  const rendered = (measure) => {
+    const pin = document.createElement("style");
+    pin.textContent = "*{content-visibility:visible!important}";
+    document.head.append(pin);
+    try {
+      return measure();
+    } finally {
+      pin.remove();
+    }
+  };
+
   window.geometry = {
     /** Puts a captured screen in the page and waits for the type its words use. */
     async load(html) {
@@ -776,6 +1356,42 @@
       const out = [];
       for (const rule of Object.values(rules)) rule(out);
       return out.map(({ node, ...f }) => (kitOnly(f.el) && kitOnly(f.box) && node ? { ...f, at: placeOf(node) } : f));
+    },
+    /**
+     * `cascadeorder`: one hash per element over what a tie between two sheets can change, for `check.ts` to compare
+     * the screen laid out in two CSS orders, then the values of the ones that differ.
+     */
+    styles() {
+      return rendered(() =>
+        [...document.body.querySelectorAll("*")].map((el) => {
+          const s = getComputedStyle(el);
+          let h = 0x811c9dc5;
+          for (const p of ORDER_PROPS) {
+            const v = orderValue(el, s, p);
+            for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v.charCodeAt(i), 16777619);
+            h = Math.imul(h ^ 0x7c, 16777619);
+          }
+          return h >>> 0;
+        }),
+      );
+    },
+    styleOf(indices) {
+      return rendered(() => {
+        const all = [...document.body.querySelectorAll("*")];
+        const index = new Map(all.map((el, i) => [el, i]));
+        return indices.map((i) => {
+          const el = all[i];
+          const s = getComputedStyle(el);
+          const signature = sig(el);
+          return {
+            el: signature,
+            at: kitOnly(signature) ? placeOf(el) : undefined,
+            parent: index.get(el.parentElement) ?? -1,
+            props: ORDER_PROPS,
+            values: ORDER_PROPS.map((p) => orderValue(el, s, p)),
+          };
+        });
+      });
     },
   };
 })();

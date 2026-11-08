@@ -18,6 +18,8 @@ import {
   Button,
   fieldText,
   Icon,
+  MEDIA_ROW,
+  MediaRow,
   PixelOrbit,
   PixelStop,
   PixelStopped,
@@ -276,17 +278,19 @@ export function StopConfirm({
   const name = dir.nameOf({ type: "agent", id: agentId }) || t("channel.unknownAgent");
   return (
     <View style={styles.confirm} accessibilityRole="alert">
-      <View style={styles.confirmHead}>
-        <AgentFace agentId={agentId} size={24} live={false} />
-        <Text variant="footnote" tone="muted" style={styles.grow}>
-          <Text variant="footnote" tone="ink" style={styles.semibold}>
-            {helpers
-              ? t("taskManager.confirm.chainTitle", { count: helpers, name })
-              : t("taskManager.confirm.title", { count, name })}
-          </Text>
-          {` ${helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.short", { name })}`}
+      <MediaRow
+        size="row"
+        face={<AgentFace agentId={agentId} size={MEDIA_ROW.row.face} live={false} />}
+        name={
+          helpers
+            ? t("taskManager.confirm.chainTitle", { count: helpers, name })
+            : t("taskManager.confirm.title", { count, name })
+        }
+      >
+        <Text variant="footnote" tone="muted">
+          {helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.short", { name })}
         </Text>
-      </View>
+      </MediaRow>
       <View style={styles.confirmRow}>
         <View style={styles.grow}>
           <ReasonField value={why} onChange={setWhy} placeholder={t("taskManager.confirm.reason")} />
@@ -331,6 +335,5 @@ const styles = StyleSheet.create({
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },
   input: { paddingVertical: 8 },
   confirm: { gap: 10 },
-  confirmHead: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   confirmRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

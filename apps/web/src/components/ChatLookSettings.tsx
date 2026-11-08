@@ -8,6 +8,7 @@ import {
   type ChatTone,
   chatLookOf,
   DEFAULT_TEXT_SIZE,
+  facesShown,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
 import {
@@ -80,17 +81,19 @@ function Mini({
   className,
   look,
   size,
+  faces = true,
   children,
 }: {
   className?: string;
   look: ChatStyle;
   /** Its own Tamanho do texto: the looks' small pictures stay at the default, the size's preview shows the choice. */
   size: ChatTextSize;
+  faces?: boolean;
   children: ReactNode;
 }) {
   return (
     <span className={cx("chat-look__mini", className)} data-text-size={size} aria-hidden="true" inert>
-      <span className="channel__messages" data-look={look}>
+      <span className="channel__messages" data-look={look} data-faces={faces ? undefined : "false"}>
         {children}
       </span>
     </span>
@@ -141,7 +144,7 @@ export function ChatLookSettings() {
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
   const mine = agentGradient(dm ? SAMPLE_AGENT.color : "sky")[1];
-  const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm });
+  const lookOf = (s: ChatStyle) => ({ style: s, tone, mine, names: !dm, faces: facesShown(s, dm) });
   const talk: Line[] = [
     { who: "me", text: t("settings.account.chat.sample.ask"), time: "14:30" },
     { who: "agent", text: t("settings.account.chat.sample.answer"), time: "14:31" },
@@ -200,7 +203,7 @@ export function ChatLookSettings() {
             {CHAT_STYLES.map((s) => (
               <Choice key={s} id={`chat-look-${s}`} value={s} checked={s === style} title={names[s]}>
                 <MessageLookContext.Provider value={lookOf(s)}>
-                  <Mini look={s} size={DEFAULT_TEXT_SIZE}>
+                  <Mini look={s} size={DEFAULT_TEXT_SIZE} faces={facesShown(s, dm)}>
                     <SampleRows lines={talk} />
                   </Mini>
                 </MessageLookContext.Provider>
@@ -258,7 +261,7 @@ export function ChatLookSettings() {
             }))}
           />
           <MessageLookContext.Provider value={lookOf(style)}>
-            <Mini className="chat-look__mini--real" look={style} size={textSize}>
+            <Mini className="chat-look__mini--real" look={style} size={textSize} faces={facesShown(style, dm)}>
               <SampleRows lines={talk.slice(0, 2)} />
             </Mini>
           </MessageLookContext.Provider>
@@ -280,7 +283,12 @@ export function ChatLookSettings() {
                 checked={openAt === "read"}
                 title={t("settings.account.chat.openRead")}
               >
-                <Mini className="chat-look__mini--read" look={style} size={DEFAULT_TEXT_SIZE}>
+                <Mini
+                  className="chat-look__mini--read"
+                  look={style}
+                  size={DEFAULT_TEXT_SIZE}
+                  faces={facesShown(style, dm)}
+                >
                   <SampleRows lines={before.slice(1)} />
                   <div className="channel__unread">{t("channel.unreadDivider")}</div>
                   <SampleRows lines={fresh} />
@@ -295,7 +303,12 @@ export function ChatLookSettings() {
                 checked={openAt === "latest"}
                 title={t("settings.account.chat.openLatest")}
               >
-                <Mini className="chat-look__mini--end" look={style} size={DEFAULT_TEXT_SIZE}>
+                <Mini
+                  className="chat-look__mini--end"
+                  look={style}
+                  size={DEFAULT_TEXT_SIZE}
+                  faces={facesShown(style, dm)}
+                >
                   <SampleRows lines={fresh} />
                 </Mini>
                 <span className="chat-look__composer" aria-hidden="true">

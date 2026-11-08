@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+/* Its rows' buttons (a member change's Aplicar) go under their words by the list's width: a thread is narrow too. */
 .proposal-rows {
   margin: 0;
   padding: 0;
@@ -11,41 +12,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  container-type: inline-size;
 }
-/* Top-aligned on a 24px first line (the face's height): a row whose apps wrap keeps its face, name and switch there. */
+/* A MediaRow: the face, the name and its switch on one line, what changes under them. */
 .proposal-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
   font-size: 13.5px;
   line-height: 20px;
 }
-.proposal-row > .ac-icon {
-  flex: none;
-  margin: 2px;
+.proposal-row > .ac-mediarow__face > .ac-icon {
   color: var(--ink-muted);
 }
-.proposal-row > .ac-switch {
-  margin-top: 2px;
-}
-.proposal-row__what {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.proposal-row__name {
-  line-height: 24px;
-  font-weight: 600;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .proposal-row__status {
-  flex: none;
-  line-height: 24px;
   font-size: 12px;
   color: var(--ink-muted);
 }
@@ -69,7 +46,7 @@
   padding: 8px 0;
 }
 .rq .proposal-row + .proposal-row {
-  box-shadow: 0 -1px 0 var(--line);
+  border-top: 1px solid var(--line);
 }
 
 /* The right hand's approvals card: its line, then each approval as the conversation draws it. */

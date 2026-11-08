@@ -173,7 +173,8 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__line.status-line > :first-child {
   translate: none;
 }
-.members-side__work {
+/* Over the status line's own muted ink (presence.css), a sheet in another chunk. */
+.members-side__line.members-side__work {
   color: var(--ink2);
 }
 .members-side__inner[data-presence="offline"] {

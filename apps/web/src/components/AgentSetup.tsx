@@ -369,35 +369,35 @@ export function SetupCardView({
         {rows.map((r) => (
           <li
             key={r.key}
-            className="setup-row"
+            className="setup-row ac-mediarow ac-mediarow--row"
             data-done={r.done || undefined}
             data-new={r.saying ? true : undefined}
             data-dim={r.dim || undefined}
           >
-            {r.done ? (
-              <span className="setup-row__check">
-                <Icon name="check" size={14} />
-              </span>
-            ) : (
-              <Icon name={r.icon} size={20} />
-            )}
-            <span className="setup-row__text">
-              <b>
-                {r.title}
-                {r.done && r.action && (
-                  <button type="button" className="setup-row__link" onClick={r.action.onClick}>
-                    {r.action.label}
-                  </button>
-                )}
-              </b>
-              {r.saying ? (
-                <span className="setup-row__say">{r.saying}</span>
+            <span className="ac-mediarow__face">
+              {r.done ? (
+                <span className="setup-row__check">
+                  <Icon name="check" size={14} />
+                </span>
               ) : (
-                !r.done && r.desc && <span>{r.desc}</span>
+                <Icon name={r.icon} size={20} />
               )}
             </span>
+            <span className="ac-mediarow__head">
+              <b className="setup-row__title">{r.title}</b>
+              {r.done && r.action && (
+                <button type="button" className="setup-row__link" onClick={r.action.onClick}>
+                  {r.action.label}
+                </button>
+              )}
+            </span>
+            {(r.saying || (!r.done && r.desc)) && (
+              <span className="ac-mediarow__body setup-row__text">
+                {r.saying ? <span className="setup-row__say">{r.saying}</span> : <span>{r.desc}</span>}
+              </span>
+            )}
             {!r.done && (r.action || r.actionNode || r.skip) && (
-              <span className="setup-row__act">
+              <span className="ac-mediarow__end ac-mediarow__end--wrap setup-row__act">
                 {r.skip && (
                   <Button size="sm" variant="ghost" disabled={r.skip.busy} onClick={r.skip.onClick}>
                     {r.skip.label}
@@ -432,7 +432,7 @@ export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string;
       <b>{lead}</b>
       <div className="setup-cl__tasks">
         {asks.map((a) => (
-          <button key={a.label} type="button" className="setup-task" onClick={a.onClick}>
+          <button key={a.label} type="button" className="setup-task ac-iconline" onClick={a.onClick}>
             <Icon name="message" size={16} />
             <span>{a.label}</span>
             <Icon name="arrowRight" size={16} />
@@ -844,7 +844,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
         value: `role:${r.id}`,
         label: r.name,
         group: t("audience.roles"),
-        leading: <RoleMark color={r.color} icon={r.icon} size={18} />,
+        leading: <RoleMark color={r.color} icon={r.icon} size={24} />,
       })),
     ...people
       .filter((m) => !pickedPeople.has(m.userId))
@@ -852,7 +852,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
         value: `person:${m.userId}`,
         label: m.name,
         group: roleList.length ? t("audience.people") : undefined,
-        leading: <Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />,
+        leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
       })),
   ];
   return (
@@ -934,7 +934,7 @@ function WhoDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
       {asks.dialog}
       {admin && (
         <Field label={t("newAgent.owner")} help={t("agentSetup.who.ownerHelp", g)}>
-          <OwnerSelect value={ownerId} onChange={setOwnerId} members={dir.members} meId={me.user.id} />
+          <OwnerSelect card={false} value={ownerId} onChange={setOwnerId} members={dir.members} meId={me.user.id} />
         </Field>
       )}
     </StepDialog>

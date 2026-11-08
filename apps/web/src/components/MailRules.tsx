@@ -1,7 +1,7 @@
 import type { MailAccount, MailPolicy } from "@agenteschat/client";
 import { useMailFolders } from "@agenteschat/client";
 import { AUTO_FROM, canSendWithoutAsking, mailboxAddresses, normalizePolicy } from "@agenteschat/client/lib/mail";
-import { CheckboxPill, Field, Icon, Input, Select, Switch } from "@agenteschat/ui";
+import { AffixInput, CheckboxPill, Field, Icon, Input, Select, Switch } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
 import { useOrg } from "@/components/org-context";
@@ -86,18 +86,16 @@ export function MailRulesPanel({
           disabled={disabled}
         />
         <Field label={t("mail.rule.window")} id={id("window")} help={t("mail.rule.windowHelp")}>
-          <span className="mail-rules__unit">
-            <Input
-              className="ac-num"
-              type="number"
-              min={1}
-              inputMode="numeric"
-              disabled={disabled}
-              value={policy.windowDays ?? ""}
-              onChange={(e) => set({ windowDays: numberOrNull(e.target.value) })}
-            />
-            <span className="small muted">{t("mail.rule.windowUnit")}</span>
-          </span>
+          <AffixInput
+            className="ac-num"
+            type="number"
+            min={1}
+            inputMode="numeric"
+            disabled={disabled}
+            value={policy.windowDays ?? ""}
+            onChange={(e) => set({ windowDays: numberOrNull(e.target.value) })}
+            action={<span className="mail-rules__unit">{t("mail.rule.windowUnit")}</span>}
+          />
         </Field>
       </section>
       <section className="mail-rules__part" aria-labelledby={id("send-h")}>

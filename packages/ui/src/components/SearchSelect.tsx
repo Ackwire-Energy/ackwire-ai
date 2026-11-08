@@ -4,7 +4,7 @@ import { cx } from "../cx";
 import { EDGE_ROOM } from "../floating";
 import { matchesWords } from "../search";
 import { useFieldControl } from "./Field";
-import type { SelectOption } from "./Select";
+import { ChosenValue, type SelectOption } from "./Select";
 import { SearchField } from "./Toolbar";
 
 export interface SearchSelectLabels {
@@ -28,7 +28,7 @@ export interface SearchSelectProps<V extends string = string, O extends SelectOp
   matches?: (option: O, query: string) => boolean;
   /** A row before its check; default: its leading mark, label and description, as `Select` draws them. */
   renderOption?: (option: O) => ReactNode;
-  /** What the trigger shows; default: the chosen option's label, else `placeholder`. */
+  /** What the trigger shows; default: the chosen option's face or logo and its label, as `Select`'s, else `placeholder`. */
   renderValue?: (option: O | undefined) => ReactNode;
   placeholder?: string;
   id?: string;
@@ -156,7 +156,15 @@ export function SearchSelect<V extends string = string, O extends SelectOption<V
             }}
           >
             <span className="ac-select__value">
-              {renderValue ? renderValue(chosen) : (chosen?.label ?? placeholder)}
+              {renderValue ? (
+                renderValue(chosen)
+              ) : chosen ? (
+                <span>
+                  <ChosenValue option={chosen} />
+                </span>
+              ) : (
+                placeholder
+              )}
             </span>
             <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
               <path d="m6 8 4 4 4-4" />

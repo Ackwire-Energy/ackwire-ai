@@ -136,14 +136,20 @@ function StatusForm({
     <>
       <DialogBody className="status-dialog">
         <div className="status-preview">
-          <Avatar name={me.user.name} imageUrl={photo} presence={presence} presenceLabel={word} />
-          <span className="status-preview__text">
-            <span className="status-preview__caption">
-              {draft.availability === "hidden" ? t("presence.hiddenPreview") : t("presence.howOthersSee")}
-            </span>
-            <span className="status-preview__name">{me.user.name}</span>
-            {text ? <StatusLine emoji={draft.emoji ?? STATUS_EMOJI} text={text} /> : <StatusLine text={word} empty />}
+          <span className="status-preview__caption">
+            {draft.availability === "hidden" ? t("presence.hiddenPreview") : t("presence.howOthersSee")}
           </span>
+          <div className="ac-mediarow">
+            <span className="ac-mediarow__face">
+              <Avatar name={me.user.name} imageUrl={photo} presence={presence} presenceLabel={word} />
+            </span>
+            <span className="ac-mediarow__head">
+              <b className="status-preview__name">{me.user.name}</b>
+            </span>
+            <span className="ac-mediarow__body">
+              {text ? <StatusLine emoji={draft.emoji ?? STATUS_EMOJI} text={text} /> : <StatusLine text={word} empty />}
+            </span>
+          </div>
         </div>
 
         <div>
@@ -255,7 +261,6 @@ function StatusForm({
             <Button
               variant="ghost"
               size="sm"
-              className="status-dialog__clear"
               onClick={() => onSave({ availability: draft.availability, status: null })}
             >
               {t("presence.clearStatus")}

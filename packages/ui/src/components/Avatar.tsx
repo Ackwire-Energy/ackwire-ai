@@ -178,7 +178,7 @@ export function Avatar({
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (
-        (initials ?? initialsOf(name))
+        <span className="ac-avatar__initials">{initials ?? initialsOf(name)}</span>
       )}
       {presence && (
         // Pixels of 1 px on the small faces, 1.5 px from the profile cards' 56 px up.

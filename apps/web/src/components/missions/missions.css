@@ -11,12 +11,15 @@
 .mi-card {
   position: relative;
   max-width: var(--msg-card-w);
-  margin-top: 10px;
   padding: 16px;
   border-radius: 20px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   animation: mi-pop 0.3s var(--spring) both;
+}
+/* Its own room outside a message: in one, the conversation's rhythm sets it (`.ac-msg .ac-msg__body > *`). */
+:where(:not(.ac-msg__body)) > .mi-card {
+  margin-top: 10px;
 }
 @keyframes mi-pop {
   from {
@@ -1211,29 +1214,14 @@ a.mi-pr:hover {
   box-shadow: var(--e2), var(--top);
 }
 /* A mission card's header: avatar | title over one meta line, on the title's left edge | chip and menu. */
+/* A MediaRow: the agent's face, the mission's title and its chip and menu on one line, what it runs on under them; in
+   a card under 480px the chip and menu go under, at the start. */
 .mi-head {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-}
-.mi-head > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
-}
-.mi-head__t {
-  min-width: 0;
+  container-type: inline-size;
 }
 .mi-head__t h3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   min-width: 0;
-  /* Its capitals start at the face's top, as a chat name does (`.ac-captop`: the line's half, 0.65em, less the air
-     above the capitals). */
-  margin: calc(var(--cap-top) - 0.65em) 0 0;
-  overflow: hidden;
+  margin: 0;
   overflow-wrap: anywhere;
   font-size: 16px;
   font-weight: 650;
@@ -1272,11 +1260,7 @@ a.mi-pr:hover {
 /* The status and "…" centred on the title's first line (16px on a 1.3 line, with the title's rise), not hung from
    its top. */
 .mi-head__r {
-  display: flex;
-  align-items: center;
   gap: 4px;
-  height: 1.3em;
-  margin-top: calc(var(--cap-top) - 0.65em);
   font-size: 16px;
 }
 /* A quiet text link (where the thread lives): muted, underlined only on hover. */
@@ -1337,15 +1321,10 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 }
 
 @media (max-width: 480px) {
-  /* Narrow: the chip and menu go under the title, on its left edge. */
-  .mi-head {
-    grid-template-columns: 32px minmax(0, 1fr);
-  }
+  /* Narrow: the chip and menu go under the title, at the row's start, spread across it. */
   .mi-head__r {
-    grid-column: 2;
+    justify-self: stretch;
     justify-content: space-between;
-    height: auto;
-    margin-top: 0;
   }
 }
 
@@ -1449,24 +1428,9 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   font-size: 13px;
   color: var(--ink2);
 }
-.mi-blocked__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
+/* An agent that can't take the mission, a MediaRow (the kit's `.ac-mediarow`): its face and name on one line with
+   Conectar at its end, why under them. */
 .mi-blocked__text {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  flex: 1;
-  min-width: 0;
-}
-.mi-blocked__text b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.mi-blocked__text span {
   color: var(--muted);
 }
 .mi-blocked .mi-lnk {

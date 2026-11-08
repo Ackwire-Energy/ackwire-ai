@@ -1,4 +1,4 @@
-import { type ChatPrefs, chatLookOf, textSizeOf } from "@agenteschat/client/lib/chat-look";
+import { type ChatPrefs, chatLookOf, facesShown, textSizeOf } from "@agenteschat/client/lib/chat-look";
 import { type AgentColor, agentGradient, MessageLookContext } from "@agenteschat/ui";
 import { useContext, useLayoutEffect, useMemo } from "react";
 import { useOrg } from "@/components/org-context";
@@ -16,7 +16,10 @@ export function useConversationLook(dm: boolean, agentColor?: AgentColor) {
   const inDm = dm || (around !== null && !around.names);
   const { style, tone } = chatLookOf(org.chatPrefs, inDm);
   const mine = agentColor ? deepOf(agentColor) : inDm && around ? around.mine : deepOf("sky");
-  return useMemo(() => ({ style, tone, mine, names: !inDm }), [style, tone, mine, inDm]);
+  return useMemo(
+    () => ({ style, tone, mine, names: !inDm, faces: facesShown(style, inDm) }),
+    [style, tone, mine, inDm],
+  );
 }
 
 /**

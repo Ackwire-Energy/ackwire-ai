@@ -5,7 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { Field, Select } from "../src";
+import { Field, SearchSelect, Select } from "../src";
 
 const roles = [
   { value: "member", label: "Membro", description: "Conversa, cria issues" },
@@ -100,19 +100,71 @@ describe("Select", () => {
     }
   });
 
-  test("people and agents: 32px faces centred on their two lines, every row of that list with more air", async () => {
+  test("people and agents (OptionRow): a 24px face 6 from the row's top and bottom and 8 from its start, the role on the name's line", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
-    expect(rule(".ac-menu--select .ac-menu__leading > .ac-avatar")).toContain("width: 32px;");
-    const rows = rule(".ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__item");
-    expect(rows).toContain("padding-block: var(--space-2);");
-    expect(rows).toContain("gap: var(--space-3);");
-    // Not on the first line's capitals, as a small mark is: in the middle of the name and its line.
-    expect(
-      rule(
-        ".ac-menu--select .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-avatar)",
-      ),
-    ).toContain("translate: none;");
+    const list = ":is(.ac-menu, .ac-palette__list):has(.ac-menu__leading > .ac-avatar)";
+    expect(css).toContain("--option-face: 24px;");
+    expect(css).toContain("--option-h: 36px;");
+    // 44 under a finger: the face keeps 10 above and below.
+    expect(css).toMatch(/@media \(pointer: coarse\) \{[^@]*--option-h: 44px;/);
+    expect(rule(":is(.ac-menu, .ac-palette__list) .ac-menu__leading > .ac-avatar")).toContain(
+      "width: var(--option-face);",
+    );
+    const rows = rule(`${list} .ac-menu__item`);
+    expect(rows).toContain("padding: calc((var(--option-h) - var(--option-face)) / 2) var(--menu-item-px);");
+    expect(rows).toContain("min-height: var(--option-h);");
+    // Every row of that list leads with a face's width, so a glyph-led choice ("Sem responsável") lines up and matches.
+    expect(rule(`${list} .ac-menu__item > .ac-menu__leading`)).toContain("min-width: var(--option-face);");
+    expect(rule(`${list} .ac-menu__item > .ac-menu__leading`)).toContain("translate: none;");
+    expect(rule(`${list} .ac-menu__label`)).toContain("flex-direction: row;");
+    expect(rule(`${list} .ac-menu__desc`)).toContain("white-space: nowrap;");
+    expect(css).not.toContain(".ac-menu--select .ac-menu__leading > .ac-avatar {\n  width: 32px;");
+  });
+
+  test("every option keeps a check's room at its end, shown on the chosen one; the trigger shows the chosen face", async () => {
+    const faces = [
+      { value: "ada", label: "Ada", description: "Dona", leading: <span className="ac-avatar">A</span> },
+      { value: "bia", label: "Bia", leading: <span className="ac-avatar">B</span> },
+    ];
+    render(<Select aria-label="Responsável" value="ada" onValueChange={() => {}} options={faces} />);
+    const trigger = body().getByRole("combobox", { name: "Responsável" });
+    const lead = trigger.querySelector(".ac-select__lead");
+    expect(lead?.textContent).toBe("A");
+    expect(lead?.getAttribute("aria-hidden")).toBe("true");
+    expect(lead?.nextElementSibling?.className).toBe("ac-select__text");
+    trigger.focus();
+    await key(trigger, "Enter");
+    const options = body().getAllByRole("option");
+    for (const option of options) expect(option.lastElementChild?.getAttribute("class")).toBe("ac-menu__check");
+    expect(options[0]?.getAttribute("data-state")).toBe("checked");
+    expect(options[1]?.getAttribute("data-state")).toBe("unchecked");
+  });
+
+  test("a searchable select's trigger shows the chosen face too, as a select's does", () => {
+    const faces = [{ value: "ada", label: "Ada", leading: <span className="ac-avatar">A</span> }];
+    const labels = { search: "Buscar", searchPlaceholder: "Buscar", noResults: "Nada", list: "Pessoas" };
+    render(
+      <SearchSelect<string> aria-label="Quem" value="ada" onValueChange={() => {}} options={faces} labels={labels} />,
+    );
+    const lead = body().getByRole("combobox", { name: "Quem" }).querySelector(".ac-select__lead");
+    expect(lead?.textContent).toBe("A");
+    expect(lead?.nextElementSibling?.textContent).toBe("Ada");
+  });
+
+  test("a value without a lead shows its words alone, and a value drawn by the caller keeps its drawing", () => {
+    const { container, rerender } = render(<Select value="member" onValueChange={() => {}} options={roles} />);
+    expect(container.querySelector(".ac-select__lead")).toBeNull();
+    rerender(
+      <Select
+        value="member"
+        onValueChange={() => {}}
+        options={roles.map((r) => ({ ...r, leading: <i>x</i> }))}
+        renderValue={(o) => <b className="mine">{o.label}</b>}
+      />,
+    );
+    expect(container.querySelector(".ac-select__lead")).toBeNull();
+    expect(container.querySelector(".mine")?.textContent).toBe("Membro");
   });
 
   test("an action row is set apart by a line, rows keep a gap, two-line rows the sides' room", async () => {

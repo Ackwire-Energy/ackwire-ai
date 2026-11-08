@@ -15,6 +15,7 @@ import {
   CardHeader,
   Chip,
   Composer,
+  EventPill,
   FilterChip,
   Icon,
   type IconName,
@@ -259,6 +260,8 @@ describe("Card", () => {
     expect(rule(".ac-card__head")).toContain("align-items: flex-start");
     expect(rule(".ac-card__head:not(:has(.ac-card__sub))")).toContain("align-items: center");
     expect(rule(".ac-card__action")).toContain("align-self: center");
+    // The foot's words take its line, so an action among them reaches its end.
+    expect(rule(".ac-card__foot > span")).toContain("flex: 1;");
     for (const row of [".ac-card__foot", ".ac-setnote", ".ac-alert"]) {
       expect(rule(row)).not.toContain("display:");
       expect(rule(row)).not.toContain("align-items:");
@@ -275,6 +278,66 @@ test("an avatar's initials sit in the middle of its tile at any size: it brings 
   const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
   expect(rule(".ac-avatar")).toContain("place-items: center;");
   expect(rule(".ac-avatar")).toContain("line-height: 1;");
+});
+
+test("an avatar's initials are a box of their own trimmed to their capitals, so the tile centres the letters", async () => {
+  const { container } = render(
+    <>
+      <Avatar name="João Silva" />
+      <Avatar name="Ana" imageUrl="data:image/png;base64,iVBORw0KGgo=" />
+    </>,
+  );
+  const [initials, photo] = [...container.querySelectorAll(".ac-avatar")];
+  expect(initials?.querySelector(":scope > .ac-avatar__initials")?.textContent).toBe("JS");
+  expect(photo?.querySelector(".ac-avatar__initials")).toBeNull();
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  expect(rule(".ac-avatar__initials")).toContain("text-box: trim-both cap alphabetic;");
+  // Where text-box is unknown, the line's own offset: the capitals' middle sits --cap-mid above the line's.
+  expect(css).toMatch(
+    /@supports not \(text-box: trim-both cap alphabetic\) \{\s*\.ac-avatar__initials \{\s*translate: 0 var\(--cap-mid\);/,
+  );
+});
+
+test("an event pill's mark sits on its sentence's first line and its time on that line's baseline, wrapped or not", async () => {
+  const { container } = render(
+    <EventPill mark={<Icon name="pause" size={14} />} time="14:16">
+      Você parou a Ada
+    </EventPill>,
+  );
+  const main = container.querySelector(".ac-eventpill__main");
+  expect([...(main?.children ?? [])].map((c) => c.className)).toEqual([
+    "ac-eventpill__mark",
+    "ac-eventpill__text",
+    "ac-eventpill__time",
+  ]);
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  expect(rule(".ac-eventpill__main")).toContain("align-items: flex-start;");
+  expect(rule(".ac-eventpill__mark")).toContain("translate: 0 calc(9px - var(--cap-mid) - 50%);");
+  expect(css).toContain(
+    "@supports (top: 1lh) {\n  .ac-eventpill__mark {\n    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);",
+  );
+  for (const words of [".ac-eventpill__text", ".ac-eventpill__time"])
+    expect(rule(words)).toContain("align-self: baseline;");
+});
+
+test("a glyph inside words sits on their capitals (Icon inline), with its size for the formula", async () => {
+  const { container } = render(
+    <p>
+      Ada <Icon name="pause" size={14} inline /> <Icon name="pause" size={14} />
+    </p>,
+  );
+  const [inline, plain] = [...container.querySelectorAll("svg")];
+  expect(inline?.getAttribute("class")).toBe("ac-icon ac-icon--inline");
+  expect((inline as SVGElement | undefined)?.style.getPropertyValue("--glyph")).toBe("14px");
+  expect(plain?.getAttribute("class")).toBe("ac-icon");
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+  const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+  // The inline face's formula (`.ac-who > .ac-avatar`): its middle where the capitals' middle is, above the baseline.
+  expect(rule(".ac-icon--inline")).toContain(
+    "vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--glyph, 20px) / 2);",
+  );
 });
 
 describe("single-line controls", () => {

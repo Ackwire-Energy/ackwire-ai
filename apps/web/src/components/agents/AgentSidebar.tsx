@@ -29,7 +29,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
-import { BrainIcon, Button, ComputerPortrait, Icon, ProviderLogo, Switch } from "@agenteschat/ui";
+import { BrainIcon, Button, ComputerPortrait, Icon, InfoHint, ProviderLogo, Switch } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,7 +41,7 @@ import { useOpenComputer } from "@/components/computer/open";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { StatusLine } from "@/components/Presence";
-import { RightHandMineRow } from "@/components/RightHandSettings";
+import { RightHandMineRow, useRightHandMineHint } from "@/components/RightHandSettings";
 import { SidePanel } from "@/components/SidePanel";
 import { AgentCover, colorOf } from "@/components/Sky";
 import { useAgentThinks } from "@/hooks/useAgentThinks";
@@ -66,12 +66,13 @@ const ROWS = 3;
  */
 export function AgentSidebar({ agent, onClose }: { agent: Agent; onClose?: () => void }) {
   const { t } = useTranslation();
+  const mineHint = useRightHandMineHint(agent);
   const body = (
     <ErrorBoundary resetKey={agent} fallback={() => null}>
       <AgentHead agent={agent} />
       {isRightHand(agent) ? (
         // No computer of its own, and each person's DM thinks with their own plan (ADR 0137 §11).
-        <Section title={t("agentSide.thinks")}>
+        <Section title={t("agentSide.thinks")} hint={mineHint}>
           <RightHandMineRow agent={agent} />
         </Section>
       ) : (
@@ -119,17 +120,27 @@ function Section({
   title,
   count,
   action,
+  hint,
   children,
 }: {
   title: string;
   count?: number;
   action?: ReactNode;
+  /** What the section is for, behind an ⓘ after its title, on the title's capitals. */
+  hint?: { name: string; text: ReactNode };
   children: ReactNode;
 }) {
   return (
     <section className="dm-side__sec" aria-label={title}>
       <h3 className="dm-side__title">
-        <span>{title}</span>
+        {hint ? (
+          <span className="ac-hintline">
+            <span>{title}</span>
+            <InfoHint name={hint.name}>{hint.text}</InfoHint>
+          </span>
+        ) : (
+          <span>{title}</span>
+        )}
         {count !== undefined && <span className="dm-side__count ac-num">{count}</span>}
         {action}
       </h3>

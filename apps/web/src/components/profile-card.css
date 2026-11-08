@@ -184,9 +184,6 @@ html:not([data-pointer]) .mcard__edit:focus-visible {
   gap: 2px;
   padding-right: 4px;
 }
-.mcard__dm input {
-  padding-left: 12px;
-}
 .mcard__emoji {
   display: grid;
   place-items: center;

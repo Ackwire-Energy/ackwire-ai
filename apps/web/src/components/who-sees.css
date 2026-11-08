@@ -1,14 +1,8 @@
-/* "Quem vê" (ADR 0151): three options, and the people when it's some of them. */
+/* "Quem vê" (ADR 0151): three options, and the people when it's some of them. Each option a MediaRow (the kit's
+   `.ac-mediarow`), so its icon stays on the first line of a title that wraps on a phone. */
 .who-sees__options {
   display: grid;
   gap: var(--space-2);
-}
-.who-sees__options .ac-option {
-  align-items: center;
-}
-.who-sees__button {
-  align-self: flex-start;
-  max-width: 100%;
 }
 .who-sees__people {
   list-style: none;

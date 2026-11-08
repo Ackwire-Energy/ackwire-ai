@@ -642,10 +642,11 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline .agp-addacct__busy")).toContain(
       "margin-left: calc((var(--lead) - 14px) / 2 - var(--lead) - 12px)",
     );
-    // The head's hairline runs edge to edge, as the foot's does; for whom centres on the name's line, risen with it.
+    // The head's hairline runs edge to edge, as the foot's does; for whom ends the name's line (a MediaRow's end), no
+    // rise of its own.
     expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
-    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: 20px");
-    expect(ruleOf(layout, ".ai-panel__agent")).toContain("margin-top: calc(var(--cap-top) * 15 / 13 - 10px)");
+    expect(ruleOf(layout, ".ai-panel__agent")).not.toContain("margin-top");
+    expect(ruleOf(layout, ".ai-panel__agent")).not.toContain("height");
   });
 
   test("a step's button sits right under its words, on their column, at every width; a failure's note sits in its button's middle", async () => {
@@ -1347,11 +1348,13 @@ describe("Atende outras pessoas, in the plan's panel", () => {
 });
 
 describe("All agents: one plan for the team, a login per agent", () => {
-  test("the head: the name's capitals at the mark's top, For with All agents first where the plan allows it", async () => {
+  test("the head: the mark and the name on one line, For at its end, All agents first where the plan allows it", async () => {
     const { dialog, choose } = await connect({ crew: true });
     const head = () => dialog.querySelector(".ai-panel__head") as HTMLElement;
-    expect(head().classList.contains("ac-faceline")).toBe(true);
-    expect(head().querySelector(".ai-panel__title > b")?.classList.contains("ac-captop")).toBe(true);
+    expect(head().classList.contains("ac-mediarow")).toBe(true);
+    expect(head().querySelector(":scope > .ac-mediarow__head > .ai-panel__name")).toBeTruthy();
+    expect(head().querySelector(":scope > .ac-mediarow__end .ai-panel__agent")).toBeTruthy();
+    expect(head().querySelector(":scope > .ac-mediarow__body.ai-panel__sub")).toBeTruthy();
     expect(within(head()).getByText("Para")).toBeTruthy();
     // ChatGPT like Claude: all of them by default, one sign-in per agent.
     await choose("ChatGPT");

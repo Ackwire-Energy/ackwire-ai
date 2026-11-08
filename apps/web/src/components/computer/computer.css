@@ -1,15 +1,18 @@
 /* ---------- the agent's computer: one entry on its page, one dialog everywhere ---------- */
 
-/* The entry: one row, the size of the browser's row it replaced. */
+/* The entry: one row, the size of the browser's row it replaced. A card of its own where it stands alone; on the
+   agent's page it is one of the page's rows (`.agp-ficha__card .agp-frow` in layout.css, a layer under this sheet). */
 .cmp-entry {
   position: relative;
+}
+.cmp-entry:where(:not(.agp-ficha__card .cmp-entry)) {
   overflow: hidden;
   border-radius: var(--radius-section) var(--radius-section) var(--radius-section) var(--radius-cut);
   /* The root card's face, like the sections under it. */
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
 }
-.cmp-entry[data-tone="warn"] {
+.cmp-entry[data-tone="warn"]:where(:not(.agp-ficha__card .cmp-entry)) {
   background: var(--raised);
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
@@ -44,6 +47,8 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+.cmp-entry__line:where(:not(.agp-ficha__card .agp-frow__value .cmp-entry__line)) {
   color: var(--muted);
   font-size: 12.5px;
 }

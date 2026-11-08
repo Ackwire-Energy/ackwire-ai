@@ -2,7 +2,17 @@ import { useRoles, type VaultAccess, type VaultScope } from "@agenteschat/client
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import { Button, fieldText, GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GroupedField,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  OPTION_ROW,
+  Text,
+} from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -207,7 +217,7 @@ export function AgentPickSheet({
           },
           ...agents.map((a) => ({
             key: a.id,
-            leading: <AgentFace agentId={a.id} size={28} live={false} />,
+            leading: <AgentFace agentId={a.id} size={OPTION_ROW.face} live={false} />,
             label: a.name,
             ...(a.role ? { hint: a.role } : {}),
             checked: agentOn(pick, a.id),

@@ -13,10 +13,10 @@
   flex: 1;
 }
 
-/* Avatars at the design's sizes (the engine draws to the box). */
-.nt-av28 {
-  width: 28px;
-  height: 28px;
+/* Avatars at the design's sizes (the engine draws to the box). A row's face is a MediaRow's, 24. */
+.nt-av24 {
+  width: 24px;
+  height: 24px;
 }
 .nt-av30 {
   width: 30px;
@@ -75,7 +75,6 @@
 }
 .nt-wi {
   --nt-wi-side: 16px;
-  --nt-wi-text: 56px;
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -84,7 +83,8 @@
   outline: none;
   cursor: pointer;
 }
-/* The face on the card's first line (who asks, its kind), at a day's row's place and size; over the card. */
+/* A MediaRow on the card: the face (a day's row's size) on its first line (who asks, its kind), centred on that line,
+   the words after it, and everything else under them at the card's full width. */
 .nt-wi > .nt-face {
   position: absolute;
   z-index: 1;
@@ -97,15 +97,8 @@
   max-width: none;
   margin: 0;
 }
-/* The card's words start where a day's row's do; its footer strip stays edge to edge, its buttons on that column. */
-.nt-wi > :is(.rq, .nt-wr__main) {
-  padding-left: var(--nt-wi-text);
-}
-.nt-wi > :is(.rq, .nt-wr__main) > .rq__foot,
-.nt-wi > .rq > .rq__form > .ac-locked > .rq__foot,
-.nt-wi > .rq > .ac-locked > .rq__foot {
-  margin-left: calc(-1 * var(--nt-wi-text));
-  padding-left: var(--nt-wi-text);
+.nt-wi > :is(.rq, .nt-wr__main) > .rq__head {
+  padding-left: 32px;
 }
 /* The one the keys are on (J/K): its card's edge a step stronger. */
 .nt-wi.is-cur > :is(.rq, .nt-wr__main) {
@@ -211,11 +204,9 @@ html:not([data-pointer]) .nt-item:focus-visible {
 .nt-list {
   overflow: visible;
 }
+/* A MediaRow: the face, who and what on its line with the time at its end, the rest under them at the row's width. */
 .nt-item {
   position: relative;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 0 12px;
   padding: 12px 16px 14px;
   border-top: 1px solid var(--line);
   outline: none;
@@ -245,37 +236,16 @@ html:not([data-pointer]) .nt-item:focus-visible {
   --nt-ground: color-mix(in srgb, var(--sunken) 75%, var(--raised));
   background: var(--nt-ground);
 }
-/* A box of its own, so the face's top is the row's (no line around it). */
-.nt-who {
-  display: flex;
-}
-.nt-c {
-  min-width: 0;
-}
-/* The face's top is the headline's 22px line's (its chips'), as a chat name sits beside its face. A headline alone
-   comes down to the face's middle: (28 - 22) / 2. */
-.nt-l1 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+.nt-item > .ac-mediarow__head {
   font-size: 13.5px;
   color: var(--muted);
 }
-.nt-l1:only-child {
-  margin-top: 3px;
-}
-/* With a line under it, the headline's capitals start at the face's top (the kit's `.ac-captop` rise on its 22px
-   line), as a chat name does; its chips and time rise with it. */
-.nt-l1:not(:only-child) {
-  line-height: 22px;
-  margin-top: calc(var(--cap-top) - 11px);
+/* In the body its parts stand the body's gap apart. */
+.nt-item > .ac-mediarow__body > * {
+  margin-block: 0;
 }
 .nt-what {
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .nt-what b {
   color: var(--ink);
@@ -295,19 +265,14 @@ html:not([data-pointer]) .nt-item:focus-visible {
   font-weight: 500;
 }
 .nt-tm {
-  margin-left: auto;
-  padding-left: 8px;
   font-size: 12px;
   color: var(--faint);
   white-space: nowrap;
-  flex: none;
 }
-/* The source chips ride on the headline line, after the words. */
 .nt-tags {
-  display: inline-flex;
-  flex: none;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-left: 4px;
 }
 .nt-tags .ac-chip {
   height: 22px;
@@ -323,7 +288,7 @@ html:not([data-pointer]) .nt-item:focus-visible {
   color: var(--warn);
 }
 .nt-snip {
-  margin: 9px 0 0;
+  margin: 0;
   font-size: 14px;
   color: var(--ink2);
   line-height: 1.5;
@@ -367,18 +332,18 @@ html:not([data-pointer]) .nt-item:focus-visible {
 .nt-sys {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 30%;
   background: var(--sunken);
   color: var(--ink2);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* A group: two stacked faces. */
+/* A group: two stacked faces in one face's room. */
 .nt-stk {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: block;
 }
 .nt-stk > *:first-child {
@@ -465,7 +430,7 @@ html:not([data-pointer]) .nt-more:focus-visible {
   padding-top: 10px;
   padding-bottom: 11px;
 }
-.nt-item--rx .nt-l1 {
+.nt-item--rx > .ac-mediarow__head {
   font-size: 13px;
 }
 .nt-item--rx .nt-what b {
@@ -474,16 +439,16 @@ html:not([data-pointer]) .nt-more:focus-visible {
 .nt-emo {
   position: relative;
   display: block;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex: none;
 }
 .nt-emo span {
   position: absolute;
   left: 0;
   top: 0;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--sunken);
   box-shadow: 0 0 0 2px var(--nt-ground, var(--raised));
@@ -498,7 +463,6 @@ html:not([data-pointer]) .nt-more:focus-visible {
   top: 6px;
 }
 .nt-item--rx .nt-quote {
-  margin-top: 4px;
   font-size: 13px;
   color: var(--muted);
 }
@@ -759,33 +723,7 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  /* The source chips go under the headline: beside it, two of them (a task's number and its status change) took
-     ~300px and never shrank, leaving the words nothing and running past the card. */
-  .nt-l1 {
-    flex-wrap: wrap;
-    row-gap: 4px;
-    align-items: flex-start;
-  }
-  .nt-l1:only-child {
-    margin-top: 0;
-  }
-  .nt-what {
-    flex: 1 1 0;
-    white-space: normal;
-  }
-  .nt-tags {
-    order: 1;
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    min-width: 0;
-    margin-left: 0;
-  }
-  .nt-tm {
-    padding-top: 1px;
-  }
   .nt-item {
-    grid-template-columns: 28px minmax(0, 1fr);
-    gap: 0 10px;
     padding: 12px 14px;
   }
   /* The actions: a row under the tapped item. */
@@ -793,7 +731,7 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     position: static;
     grid-column: 1 / -1;
     display: none;
-    margin-top: 10px;
+    margin-top: 2px;
     padding: 0;
     background: transparent;
     box-shadow: none;

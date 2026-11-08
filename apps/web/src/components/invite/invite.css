@@ -102,7 +102,6 @@
 .invite-host__face {
   display: flex;
   flex: none;
-  margin-top: 2px;
 }
 .invite-host .auth__bubble {
   padding: 14px 18px;
@@ -113,15 +112,6 @@
 }
 .invite-host .auth__lead {
   line-height: 20px;
-}
-/* The answers start where the bubble does: the host's 36px and the 14px beside it. */
-.invite-answer {
-  padding-left: 50px;
-}
-@media (max-width: 560px) {
-  .invite-answer {
-    padding-left: 0;
-  }
 }
 /* Back (or Cancelar) on the left, what goes on on the right. */
 .invite-foot__gap {
@@ -142,29 +132,19 @@
   margin: 0;
 }
 /* "Prefere mandar um link?": a well pressed into the dialog, its icon on a key-like tile. */
+/* A MediaRow on a well: the tile, the question and its button on one line, what it means under them; the button under
+   that too where the well is under 480px. */
 .invite-orlink {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  container-type: inline-size;
   padding: 12px 14px;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-cut);
   background: var(--card-well, var(--sunken));
   box-shadow: var(--card-well-shadow, none);
 }
 .invite-orlink__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-  line-height: 19px;
-}
-.invite-orlink__text b {
-  font-weight: 600;
-}
-.invite-orlink__text span {
   color: var(--muted);
   font-size: 13px;
+  line-height: 18px;
 }
 .invite-tile {
   flex: none;
@@ -499,9 +479,8 @@ html:not([data-pointer]) .invite-each:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .invite-waiting__text {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   font-size: 14px;

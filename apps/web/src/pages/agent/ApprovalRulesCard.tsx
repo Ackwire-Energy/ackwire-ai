@@ -41,14 +41,18 @@ export function ApprovalRulesCard() {
           const who = rule.createdByUserId ? dir.memberById.get(rule.createdByUserId)?.name : undefined;
           const when = relativeTime(t, i18n.language, rule.createdAt);
           return (
-            <li key={rule.id} className="level-row ac-faceline">
-              <ResourceIcon
-                resource={{ connectionId: rule.connectionId, area: rule.connectionId ? null : "sandbox" }}
-                items={items}
-                name={approvalRuleServer(t, rule)}
-              />
-              <span className="level-row__text">
-                <span className="level-row__name ac-captop">{approvalRuleServer(t, rule)}</span>
+            <li key={rule.id} className="level-row ac-mediarow">
+              <span className="ac-mediarow__face">
+                <ResourceIcon
+                  resource={{ connectionId: rule.connectionId, area: rule.connectionId ? null : "sandbox" }}
+                  items={items}
+                  name={approvalRuleServer(t, rule)}
+                />
+              </span>
+              <span className="ac-mediarow__head">
+                <span className="level-row__name">{approvalRuleServer(t, rule)}</span>
+              </span>
+              <span className="ac-mediarow__body level-row__text">
                 <span title={rule.action || rule.tool}>{what}</span>
                 <span className="small muted">
                   {who
@@ -57,19 +61,21 @@ export function ApprovalRulesCard() {
                 </span>
               </span>
               {mayRemove && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  aria-label={t("agentPage.access.always.remove", { what })}
-                  disabled={remove.isPending}
-                  onClick={() =>
-                    remove.mutate(rule.id, {
-                      onSuccess: () => toast.show(t("agentPage.access.always.removed", { name: agent.name })),
-                    })
-                  }
-                />
+                <span className="ac-mediarow__end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="close"
+                    aria-label={t("agentPage.access.always.remove", { what })}
+                    disabled={remove.isPending}
+                    onClick={() =>
+                      remove.mutate(rule.id, {
+                        onSuccess: () => toast.show(t("agentPage.access.always.removed", { name: agent.name })),
+                      })
+                    }
+                  />
+                </span>
               )}
             </li>
           );

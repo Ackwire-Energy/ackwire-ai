@@ -186,35 +186,47 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
           <button
             key={o.label}
             type="button"
-            className="choices__option"
+            className="choices__option ac-mediarow ac-mediarow--row"
             aria-pressed={d.picks[d.step] === i}
             disabled={answer.isPending}
             onClick={() => pick(i)}
           >
-            <span className="choices__letter" aria-hidden="true">
-              {choiceLetter(i)}
+            <span className="ac-mediarow__face">
+              <span className="choices__letter" aria-hidden="true">
+                {choiceLetter(i)}
+              </span>
             </span>
-            <span className="choices__text">
+            <span className="ac-mediarow__head">
               <span className="choices__label">{o.label}</span>
-              {o.description && <span className="choices__description">{o.description}</span>}
             </span>
+            {o.description && (
+              <span className="ac-mediarow__body">
+                <span className="choices__description">{o.description}</span>
+              </span>
+            )}
           </button>
         ))}
         <button
           type="button"
-          className="choices__option"
+          className="choices__option ac-mediarow ac-mediarow--row"
           aria-pressed={d.picks[d.step] === other}
           aria-expanded={writing}
           disabled={answer.isPending}
           onClick={write}
         >
-          <span className="choices__letter" aria-hidden="true">
-            {choiceLetter(other)}
+          <span className="ac-mediarow__face">
+            <span className="choices__letter" aria-hidden="true">
+              {choiceLetter(other)}
+            </span>
           </span>
-          <span className="choices__text">
+          <span className="ac-mediarow__head">
             <span className="choices__label">{t("ask.otherAnswer")}</span>
-            {d.others[d.step] && !writing && <span className="choices__description">{d.others[d.step]}</span>}
           </span>
+          {d.others[d.step] && !writing && (
+            <span className="ac-mediarow__body">
+              <span className="choices__description">{d.others[d.step]}</span>
+            </span>
+          )}
         </button>
       </fieldset>
       {writing && (

@@ -161,11 +161,11 @@ import {
   buildRows,
   type ChatRow,
   dayInView,
-  MSG_TEXT,
   mayStopRun,
   mergeTimeline,
   parseSlash,
   pinTarget,
+  quietInset,
   readMark,
   rowStopOf,
   stoppableInLine,
@@ -365,6 +365,7 @@ function Chat({
     dmAgent ? agentLook(dmAgent).color : undefined,
   );
   const rhythm = CHAT_RHYTHM[rowLook.style];
+  const quiet = quietInset(rowLook);
   // The right hand (ADR 0137): its own line and composer hint, no computer, and its greeting on top.
   const rightHand = isRightHand(dmAgent) && !isThread;
   // A new agent's setup checklist (ADR 0155 §2) for whoever sets it up: its greeting and the checklist on top.
@@ -1727,7 +1728,7 @@ function Chat({
           return (
             <Animated.View
               entering={isFresh(item.key) ? ENTER : undefined}
-              style={[styles.browserRow, { marginTop: rhythm.turn }]}
+              style={[styles.browserRow, { paddingLeft: quiet, marginTop: rhythm.turn }]}
             >
               {item.run ? (
                 <BrowserRunCard
@@ -1806,6 +1807,7 @@ function Chat({
     [
       when,
       rhythm,
+      quiet,
       meId,
       channelId,
       isThread,
@@ -2409,7 +2411,7 @@ function Connection({ status }: { status: ConnectionStatus }) {
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   // Under the agent's words, like a card on its message.
-  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16 },
+  browserRow: { paddingRight: 16 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },

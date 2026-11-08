@@ -51,6 +51,7 @@ import {
   type IconName,
   LineIcon,
   Locked,
+  OPTION_ROW,
   PixelOrbit,
   Text,
   useReducedMotion,
@@ -854,7 +855,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
     ...people.map((who) => ({
       key: `${who.type}:${who.id}`,
       label: who.type === "person" && who.id === meId ? t("mobile.issues.you") : dir.nameOf(who),
-      leading: <Face who={who} size={26} live={false} />,
+      leading: <Face who={who} size={OPTION_ROW.face} live={false} />,
       ...(same(who, i.assignee) ? { trailing: <Icon name="check" size={18} /> } : {}),
       onPress: () => assign(who),
     })),
@@ -911,7 +912,10 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
     },
     {
       key: "assignee",
-      icon: "agent",
+      // Who it is, by their face, as a select shows its choice; a glyph only while nobody is.
+      ...(i.assignee
+        ? { leading: <Face who={i.assignee} size={OPTION_ROW.face} live={false} /> }
+        : { icon: "agent" as const }),
       label: t("mobile.issues.actions.assignee"),
       hint: i.assignee ? dir.nameOf(i.assignee) : t("mobile.issues.nobody"),
       onPress: () => pick(assigneeItems()),

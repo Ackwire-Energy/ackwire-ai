@@ -37,7 +37,7 @@ import {
 } from "@agenteschat/ui";
 import { type MouseEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { useFileShare } from "@/components/artifacts/ShareDialog";
@@ -46,10 +46,10 @@ import { DriveDetails } from "@/components/drive/DriveDetails";
 import { DriveCard, DriveRow, type ItemProps } from "@/components/drive/DriveItems";
 import { DriveTrash } from "@/components/drive/DriveTrash";
 import { DropOverlay, UploadProgress, useFileDrop } from "@/components/drive/DriveUploads";
+import { useActorFilterOptions } from "@/components/filters";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SelectionBar } from "@/components/SelectionBar";
-import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -74,7 +74,6 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const look = useRightHandLook();
   const uploads = can(org, "upload_files");
   const viewer = useArtifactViewer();
-  const dir = useDirectory(org.id);
   const authorName = useAuthorName();
   const channels = useChannels(org.id);
   const toast = useToast();
@@ -246,20 +245,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   };
   const deletable = picked.filter((a) => a.canDelete);
 
-  const authorOptions: FilterOption[] = [
-    ...dir.agents.map((a) => ({
-      value: `agent:${a.id}`,
-      label: a.name,
-      group: t("drive.agents"),
-      leading: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
-    })),
-    ...dir.members.map((m) => ({
-      value: `person:${m.userId}`,
-      label: m.name,
-      group: t("drive.people"),
-      leading: <ActorAvatar actor={{ type: "person", id: m.userId }} size="xs" name={m.name} />,
-    })),
-  ];
+  const authorOptions = useActorFilterOptions();
   const channelOptions: FilterOption[] = (channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` }));
   const clearOf = (name: string) => t("filters.clear", { name });
   const chipText = {

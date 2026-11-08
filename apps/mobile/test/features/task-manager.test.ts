@@ -125,6 +125,30 @@ describe("a task's row (ADR 0128)", () => {
   });
 });
 
+describe("rows with a face (#41)", () => {
+  const read = (f: string) => readFileSync(join(import.meta.dir, "../../src/features/task-manager", f), "utf8");
+
+  test("a routine's task is a MediaRow: its agent, where and who asked on the face's line, the rest under them", () => {
+    const screen = read("TaskManagerScreen.tsx");
+    expect(screen).toContain("<AgentFace agentId={task.agentId} size={MEDIA_ROW.card.face} live={false} />");
+    expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*>/);
+    // Parar under the words, after the state and what it uses, never beside them squeezing the title.
+    expect(screen).toMatch(/<UsingLine task=\{task\} \/>\}\s*\{stop\}/);
+    expect(screen).not.toContain("end={stop}");
+    // The title wraps whole, under the face, with the state and what it uses.
+    expect(screen).not.toContain("numberOfLines={2}");
+    expect(screen).toContain("flatTask: { paddingVertical: 12, paddingHorizontal: 16 }");
+  });
+
+  test("stopping several asks with the agent's face and the question on one line, what happens under them", () => {
+    const parts = read("parts.tsx");
+    expect(parts).toMatch(
+      /<MediaRow\s*size="row"\s*face=\{<AgentFace agentId=\{agentId\} size=\{MEDIA_ROW\.row\.face\}/,
+    );
+    expect(parts).not.toContain("confirmHead");
+  });
+});
+
 describe("what a task uses now", () => {
   test("a computer brain says what it called through us", async () => {
     const t = await translator("pt-BR");

@@ -28,6 +28,8 @@ import {
   Count,
   EmptyState,
   Icon,
+  MEDIA_ROW,
+  MediaRow,
   PixelDone,
   PixelFail,
   PixelOrbit,
@@ -427,8 +429,9 @@ function AgentGroup({
 }
 
 /**
- * A task: its title, where it is and who asked, its state and time, what it uses now, and "Parar" for who may stop
- * it. Under its agent's row it starts at the name's column; a routine's (`flat`) carries its agent's face.
+ * A task: its title, where it is and who asked, its state and time, what it uses now, and "Parar" under them for who
+ * may stop it, never beside the words. Under its agent's row it starts at the name's column; a routine's (`flat`) is a
+ * MediaRow: its agent's face, name, where and who asked on one line, the rest under them at the row's width.
  */
 function TaskRow({
   task,
@@ -453,41 +456,62 @@ function TaskRow({
   const title = taskTitle(t, task);
   const sub = taskSubline(t, task, meId, title, (id) => dir.anyAgent(id)?.name);
   const words = taskStateWords(t, i18n.language, task, state, now);
-  const line = flat ? [dir.nameOf({ type: "agent", id: task.agentId }), sub].filter(Boolean).join(" · ") : sub;
+  const agent = dir.nameOf({ type: "agent", id: task.agentId });
+  const line = flat ? [agent, sub].filter(Boolean).join(" · ") : sub;
+  const stop = task.canStop ? (
+    <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} />
+  ) : null;
+  const status = (
+    <>
+      <StateLine task={task} state={state} now={now} />
+      {state === "stopping" ? null : <UsingLine task={task} />}
+      {stop}
+    </>
+  );
   return (
     <Pressable
       onPress={() => router.push(taskHref(task.runId))}
       accessibilityRole="button"
       accessibilityLabel={[title, line, words.state, words.next].filter(Boolean).join(", ")}
       style={({ pressed }) => [
-        styles.task,
-        flat ? styles.flat : styles.indented,
+        flat ? styles.flatTask : [styles.task, styles.indented],
         pressed && { backgroundColor: c.sunken },
       ]}
     >
       {divider ? (
-        <View style={[styles.divider, flat ? styles.flatDivider : styles.taskDivider, { backgroundColor: c.line2 }]} />
+        <View
+          style={[styles.divider, flat ? styles.flatTaskDivider : styles.taskDivider, { backgroundColor: c.line2 }]}
+        />
       ) : null}
       {flat ? (
-        <OpensAgent agentId={task.agentId}>
-          <AgentFace agentId={task.agentId} size={30} live={false} />
-        </OpensAgent>
-      ) : null}
-      <View style={styles.taskText}>
-        <Text variant="subhead" numberOfLines={2} style={styles.medium}>
-          {title}
-        </Text>
-        {line ? (
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
-            {line}
+        <MediaRow
+          face={
+            <OpensAgent agentId={task.agentId}>
+              <AgentFace agentId={task.agentId} size={MEDIA_ROW.card.face} live={false} />
+            </OpensAgent>
+          }
+          name={agent}
+          meta={sub || undefined}
+        >
+          <Text variant="subhead" style={styles.medium}>
+            {title}
           </Text>
-        ) : null}
-        <StateLine task={task} state={state} now={now} />
-        {state === "stopping" ? null : <UsingLine task={task} />}
-      </View>
-      {task.canStop ? (
-        <StopButton label={t("taskManager.actions.stop")} stopping={state === "stopping"} onPress={onStop} />
-      ) : null}
+          {status}
+        </MediaRow>
+      ) : (
+        // Whole, wrapping: a task's title and where it is say what it is.
+        <View style={styles.taskText}>
+          <Text variant="subhead" style={styles.medium}>
+            {title}
+          </Text>
+          {line ? (
+            <Text variant="footnote" tone="muted">
+              {line}
+            </Text>
+          ) : null}
+          {status}
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -582,7 +606,7 @@ const CHEVRON = 16;
 const GROUP_FACE = 34;
 /** Where a task's words start under its agent's row: the name's column (14 + chevron + 8 + face + 8 + 2). */
 const TASK_INSET = 14 + CHEVRON + 8 + GROUP_FACE + 10;
-/** A routine's and an ended task's words: after the face (16 + 30 + 12). */
+/** An ended task's words: after the face (16 + 30 + 12). */
 const FLAT_INSET = 58;
 
 const styles = StyleSheet.create({
@@ -601,6 +625,9 @@ const styles = StyleSheet.create({
   task: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingRight: 16 },
   indented: { paddingLeft: TASK_INSET },
   flat: { paddingLeft: 16 },
+  // A routine's task (a MediaRow): its words under the face at the row's width, so its hairline starts there too.
+  flatTask: { paddingVertical: 12, paddingHorizontal: 16 },
+  flatTaskDivider: { left: 16 },
   taskText: { flex: 1, minWidth: 0, gap: 4 },
   divider: { position: "absolute", top: 0, right: 0, height: StyleSheet.hairlineWidth },
   agentDivider: { left: 14 },

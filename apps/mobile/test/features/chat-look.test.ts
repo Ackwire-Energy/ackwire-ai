@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { CHAT_TEXT_SIZES, chatLookOf, mineOnRight, textSizeOf } from "@agenteschat/client/lib/chat-look";
+import { CHAT_TEXT_SIZES, chatLookOf, facesShown, mineOnRight, textSizeOf } from "@agenteschat/client/lib/chat-look";
 import { AGENT_GRADIENTS, type AgentColorName, contrastOf, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import {
+  BUBBLES_INSET,
   bubbleFill,
   CHAT_TEXT,
   CHAT_TEXT_MAX_SCALE,
@@ -9,7 +10,12 @@ import {
   chatCodeOf,
   chatNameOf,
   chatTimeOf,
+  MSG_INSET,
+  MSG_TEXT,
   nameInk,
+  quietInset,
+  ROW_BODY_INSET,
+  rowBodyInset,
 } from "../../src/features/chat/logic";
 import { appColors } from "../../src/ui/palette";
 import { typeScale } from "../../src/ui/type-scale";
@@ -70,6 +76,52 @@ describe("the rows follow the same choice as the web", () => {
     expect(chat).toContain("holdAt(id ?? undefined, 0, false);");
   });
 
+  test("a DM whose sides say who spoke has no face: its bodies and quiet rows start at the rows' own padding", () => {
+    const dm = (style: "comfortable" | "bubbles") => ({ style, faces: facesShown(style, true) });
+    expect(rowBodyInset(dm("bubbles"))).toEqual({ left: BUBBLES_INSET, right: ROW_BODY_INSET.bubbles.right });
+    expect(rowBodyInset(dm("comfortable"))).toEqual({ left: MSG_INSET, right: ROW_BODY_INSET.comfortable.right });
+    expect(quietInset(dm("bubbles"))).toBe(BUBBLES_INSET);
+    expect(quietInset(dm("comfortable"))).toBe(MSG_INSET);
+    // A channel, and a DM in a look with everyone on the left, keep the face and the words' column.
+    for (const style of ["comfortable", "bubbles", "left", "compact"] as const) {
+      expect(rowBodyInset({ style, faces: facesShown(style, false) })).toEqual(ROW_BODY_INSET[style]);
+      expect(quietInset({ style, faces: facesShown(style, false) })).toBe(MSG_TEXT);
+    }
+    expect(quietInset({ style: "left", faces: facesShown("left", true) })).toBe(MSG_TEXT);
+  });
+
+  test("the look says it, and every row with a face column and every quiet row reads it", async () => {
+    expect(await read("chat/look.ts")).toContain("faces: facesShown(style, dm)");
+    expect(await read("chat/look.ts")).toContain("paddingLeft: BUBBLES_INSET");
+    for (const file of ["chat/MessageRow.tsx", "chat/LiveRows.tsx"]) {
+      expect(await read(file)).toContain("{look.faces ? (");
+    }
+    const queue = await read("queue/parts.tsx");
+    expect(queue).toContain("{faces ? (");
+    expect(await read("chat/QuoteLine.tsx")).toContain(
+      "look.faces ? WORDS_START[look.style] : rowBodyInset(look).left",
+    );
+    expect(await read("chat/ConsultGroup.tsx")).toContain("const inset = rowBodyInset(useRowLook());");
+    expect(await read("chat/ChatScreen.tsx")).toContain("const quiet = quietInset(rowLook);");
+    for (const file of [
+      "chat/EventLine.tsx",
+      "chat/issue-work.tsx",
+      "chat/StoppedLine.tsx",
+      "chat/AgentReceipts.tsx",
+      "queue/parts.tsx",
+    ]) {
+      const src = await read(file);
+      expect(src).toContain("useQuietInset()");
+      expect(src).not.toContain("MSG_TEXT");
+    }
+  });
+
+  test("Conversa's DM previews draw it as the conversation does", async () => {
+    const page = await read("me/ChatLookPage.tsx");
+    expect(page).toContain("const faced = !right && facesShown(style, dm);");
+    expect(page.match(/\{faced \? <View style=\{styles\.faceSlot\}>\{face\}<\/View> : null\}/g)).toHaveLength(2);
+  });
+
   test("Você opens Conversa, which saves on the server", async () => {
     expect(await read("me/MeScreen.tsx")).toContain('href: "/me/chat-look"');
     const page = await read("me/ChatLookPage.tsx");
@@ -127,7 +179,7 @@ describe("Tamanho do texto on the phone", () => {
 
   test("every conversation reads the step from its look, and Conversa saves it on the server with a preview", async () => {
     expect(await read("chat/look.ts")).toContain("const text = CHAT_TEXT[textSizeOf(org?.chatPrefs)];");
-    expect(await read("chat/look.ts")).toContain("text: null };");
+    expect(await read("chat/look.ts")).toMatch(/ROW_LOOK_DEFAULT: RowLook = \{[^}]*\btext: null,?\s*\}/);
     const page = await read("me/ChatLookPage.tsx");
     expect(page).toContain("save({ textSize: v as ChatTextSize })");
     expect(page).toContain("<TextPreview size={textSize} style={style} tone={tone} dm={dm} />");

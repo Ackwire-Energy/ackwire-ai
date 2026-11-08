@@ -13,7 +13,8 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Icon, Sky, Text, useToast } from "@/ui";
+import { Icon, MEDIA_ROW, MediaRow, Sky, Text, useToast } from "@/ui";
+import { initialText } from "@/ui/type-scale";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
@@ -83,11 +84,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                 </Text>
               ) : null}
               <View style={styles.picked}>
-                <View style={[styles.letter, { backgroundColor: c.ink, borderColor: c.ink }]}>
-                  <Text variant="caption" style={[styles.bold, { color: c.raised }]}>
-                    {s.letter}
-                  </Text>
-                </View>
+                <Letter letter={s.letter} on />
                 <Text variant="body" style={[styles.flex, styles.bold, styles.said]}>
                   {s.label}
                 </Text>
@@ -169,27 +166,13 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
               onPress={() => pick(i)}
               style={({ pressed }) => [styles.option, { borderColor: c.line2 }, pressed && { backgroundColor: c.line }]}
             >
-              <View
-                style={[styles.letter, { borderColor: c.line2 }, on && { backgroundColor: c.ink, borderColor: c.ink }]}
-              >
-                <Text
-                  variant="caption"
-                  tone={on ? undefined : "muted"}
-                  style={[styles.bold, on && { color: c.raised }]}
-                >
-                  {choiceLetter(i)}
-                </Text>
-              </View>
-              <View style={styles.flex}>
-                <Text variant="body" style={styles.bold}>
-                  {o.label}
-                </Text>
+              <MediaRow size="row" name={o.label} face={<Letter letter={choiceLetter(i)} on={on} />}>
                 {o.description ? (
                   <Text variant="footnote" tone="muted">
                     {o.description}
                   </Text>
                 ) : null}
-              </View>
+              </MediaRow>
             </Pressable>
           );
         })}
@@ -216,31 +199,17 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             }
             style={({ pressed }) => [styles.option, { borderColor: c.line2 }, pressed && { backgroundColor: c.line }]}
           >
-            <View
-              style={[
-                styles.letter,
-                { borderColor: c.line2 },
-                d.picks[d.step] === other && { backgroundColor: c.ink, borderColor: c.ink },
-              ]}
+            <MediaRow
+              size="row"
+              name={t("ask.otherAnswer")}
+              face={<Letter letter={choiceLetter(other)} on={d.picks[d.step] === other} />}
             >
-              <Text
-                variant="caption"
-                tone={d.picks[d.step] === other ? undefined : "muted"}
-                style={[styles.bold, d.picks[d.step] === other && { color: c.raised }]}
-              >
-                {choiceLetter(other)}
-              </Text>
-            </View>
-            <View style={styles.flex}>
-              <Text variant="body" style={styles.bold}>
-                {t("ask.otherAnswer")}
-              </Text>
               {d.others[d.step] ? (
                 <Text variant="footnote" tone="muted">
                   {d.others[d.step]}
                 </Text>
               ) : null}
-            </View>
+            </MediaRow>
           </Pressable>
         ) : null}
       </View>
@@ -288,6 +257,25 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   );
 }
 
+/** An option's letter in its 24 tile inside its 1-point border: centred in the 22 left, as an initial is. */
+const LETTER_TEXT = initialText(MEDIA_ROW.row.face - 2, 12);
+
+/** An option's letter, its row's face: filled once it is the pick. */
+function Letter({ letter, on }: { letter: string; on: boolean }) {
+  const c = useColors();
+  return (
+    <View style={[styles.letter, { borderColor: c.line2 }, on && { backgroundColor: c.ink, borderColor: c.ink }]}>
+      <Text
+        variant="caption"
+        tone={on ? undefined : "muted"}
+        style={[styles.bold, LETTER_TEXT, on && { color: c.raised }]}
+      >
+        {letter}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // As wide as the message, under what comes before it (the files' cards keep the same gap).
   card: {
@@ -307,10 +295,8 @@ const styles = StyleSheet.create({
   question: { paddingHorizontal: 14, paddingTop: 6 },
   options: { gap: 6, padding: 14, paddingTop: 10 },
   sending: { opacity: 0.6 },
+  // A MediaRow in its plate: the letter in the face's place, what the option adds under its line at the row's width.
   option: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
     minHeight: 52,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -321,8 +307,8 @@ const styles = StyleSheet.create({
   letter: {
     alignItems: "center",
     justifyContent: "center",
-    width: 26,
-    height: 26,
+    width: MEDIA_ROW.row.face,
+    height: MEDIA_ROW.row.face,
     borderWidth: 1,
     borderRadius: 8,
     borderBottomLeftRadius: 3,

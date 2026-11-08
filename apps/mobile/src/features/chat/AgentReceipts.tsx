@@ -49,7 +49,7 @@ import {
   receiptShows,
 } from "./agent-receipts";
 import { requestComposerText } from "./composer-request";
-import { MSG_TEXT } from "./logic";
+import { useQuietInset } from "./look";
 
 /**
  * Under a person's latest message, for what asks something of you (./agent-receipts.ts says what): the agents'
@@ -78,6 +78,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const reduced = useReducedMotion();
   const sheet = useSheet();
   const steer = useSteerState(orgId, m.channelId, m.id);
+  const inset = useQuietInset();
   const held = usePlanHold(orgId, org) !== null;
   const line = held ? keptLine(receiptLine(receipt)) : receiptLine(receipt);
   if (!receiptShows(line, Boolean(steer))) return null;
@@ -134,7 +135,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
     <Animated.View
       key={line.mark}
       entering={reduced ? undefined : FadeIn.duration(200)}
-      style={[styles.line, mine ? styles.end : styles.start]}
+      style={[styles.line, mine ? styles.end : [styles.start, { paddingLeft: inset }]]}
       accessibilityLiveRegion="polite"
     >
       <Pressable
@@ -407,7 +408,7 @@ const styles = StyleSheet.create({
   // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text.
   line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, minHeight: 20 },
   end: { alignSelf: "flex-end", paddingRight: 16, paddingLeft: 64 },
-  start: { alignSelf: "flex-start", paddingLeft: MSG_TEXT, paddingRight: 16 },
+  start: { alignSelf: "flex-start", paddingRight: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   faces: { flexDirection: "row", alignItems: "center", gap: 2 },
   words: { flexShrink: 1 },

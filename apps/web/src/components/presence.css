@@ -115,23 +115,18 @@
 .ac-dialog__body.status-dialog {
   gap: 18px;
 }
+/* What it says above, then the face, the name and the status as a MediaRow. */
 .status-preview {
   --presence-ring: var(--card-well, var(--sunken));
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   padding: 12px 14px;
   border-radius: 14px 14px 14px 4px;
   background: var(--card-well, var(--sunken));
   box-shadow: var(--card-well-shadow, none);
 }
-.status-preview__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
 .status-preview__caption {
-  margin-bottom: 2px;
   font-size: 12px;
   color: var(--faint);
 }
@@ -223,8 +218,4 @@ html:not([data-pointer]) .status-field__emoji:focus-visible {
 }
 .status-avail__opt .ac-radio {
   margin: 0;
-}
-/* "Limpar status" starts the foot, its words on the dialog's edge like the body's. */
-.status-dialog__clear {
-  margin-left: -10px;
 }

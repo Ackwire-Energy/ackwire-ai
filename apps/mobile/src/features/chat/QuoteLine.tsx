@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
+import { rowBodyInset } from "./logic";
 import type { RowLook } from "./look";
 
 /** What a reply answers, in one line (the web's `QuotedMessage`): face, name and words; a tap goes to the original. */
@@ -52,7 +53,7 @@ export function QuoteLine({
 const FACE_MIDDLE = { comfortable: 31, left: 31, bubbles: 25, compact: 59 };
 const WORDS_START = { comfortable: 59, left: 59, bubbles: 48, compact: 74 };
 
-/** The line above a row, joined to its face by a small curve. */
+/** The line above a row, joined to its face by a small curve; a row with no face has it at its words, no curve. */
 export function QuoteAbove({
   look,
   reply,
@@ -67,10 +68,12 @@ export function QuoteAbove({
 }) {
   const c = useColors();
   const middle = FACE_MIDDLE[look.style];
-  const start = WORDS_START[look.style];
+  const start = look.faces ? WORDS_START[look.style] : rowBodyInset(look).left;
   return (
     <View style={[styles.above, { paddingLeft: start, marginTop: gap }]}>
-      <View style={[styles.curve, { left: middle - 1, width: start - middle - 4, borderColor: c.line2 }]} />
+      {look.faces ? (
+        <View style={[styles.curve, { left: middle - 1, width: start - middle - 4, borderColor: c.line2 }]} />
+      ) : null}
       <QuoteLine reply={reply} onJump={onJump} />
     </View>
   );

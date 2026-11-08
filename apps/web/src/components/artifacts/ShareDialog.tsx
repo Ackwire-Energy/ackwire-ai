@@ -188,12 +188,15 @@ export function ShareDialog({ artifact, onClose }: { artifact: Artifact; onClose
                 {MODES.map((m) => (
                   <OptionCard
                     key={m.mode}
+                    className="ac-mediarow ac-mediarow--row"
                     pressed={mode === m.mode}
                     disabled={!canShare}
                     onClick={() => choose(m.mode)}
                   >
-                    <Icon name={m.icon} size={16} />
-                    <span className="ac-option__text">
+                    <span className="ac-mediarow__face">
+                      <Icon name={m.icon} size={16} />
+                    </span>
+                    <span className="ac-mediarow__head">
                       <span className="ac-option__title">{t(m.label as "share.people")}</span>
                     </span>
                   </OptionCard>

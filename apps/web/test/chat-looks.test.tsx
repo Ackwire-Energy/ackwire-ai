@@ -90,6 +90,20 @@ describe("the defaults", () => {
     expect(theirs.querySelector(".ac-msg__head")).toBeNull();
     expect(theirs.querySelector(".ac-msg__text .ac-msg__stamp")).not.toBeNull();
   });
+
+  test("a DM whose sides say who spoke shows no face; one in Esquerda, and a channel, keep it", async () => {
+    await openDm();
+    expect(row("a1").querySelector(".ac-msg__avatar")).toBeNull();
+    expect(row("a1").dataset.faces).toBe("false");
+    expect(document.querySelector(".channel__messages")?.getAttribute("data-faces")).toBe("false");
+    cleanup();
+    await openDm({ dmStyle: "left" });
+    expect(row("a1").querySelector(".ac-msg__avatar")).not.toBeNull();
+    expect(document.querySelector(".channel__messages")?.hasAttribute("data-faces")).toBe(false);
+    cleanup();
+    await openChannel({ channelStyle: "bubbles" });
+    expect(row("a1").querySelector(".ac-msg__avatar")).not.toBeNull();
+  });
 });
 
 describe("each style in a channel and in a DM", () => {

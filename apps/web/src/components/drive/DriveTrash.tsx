@@ -69,43 +69,51 @@ export function DriveTrash() {
           const left = daysLeft(a.purgeAt);
           const soon = left <= SOON_DAYS;
           return (
-            <li key={a.id} className="drive-trash__row" data-kind={a.kind}>
-              <span className="drive-trash__icon">
-                <Icon name={itemIcon(a)} />
+            <li key={a.id} className="drive-trash__row ac-mediarow" data-kind={a.kind}>
+              <span className="ac-mediarow__face">
+                <span className="drive-trash__icon">
+                  <Icon name={itemIcon(a)} />
+                </span>
               </span>
-              <span className="drive-trash__text">
-                <b>{a.title}</b>
-                <small>
-                  <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
-                  <span className="drive-trash__by">
-                    {t("drive.trashBy", {
-                      name: authorName(a.createdBy),
-                      when: relativeTime(t, i18n.language, a.deletedAt),
-                    })}
-                  </span>
-                </small>
+              <span className="ac-mediarow__head">
+                <b className="drive-trash__title">{a.title}</b>
               </span>
-              <Chip
-                icon="clock"
-                tone={soon ? "waiting" : "neutral"}
-                title={new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
-                  new Date(a.purgeAt),
-                )}
-              >
-                {soon ? t("drive.goneIn", { count: left }) : t("drive.daysLeft", { count: left })}
-              </Chip>
-              <Button size="sm" icon="undo" onClick={() => void remover.restore(a.id).then(() => void trash.refetch())}>
-                {t("artifacts.restore")}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="trash"
-                aria-label={t("drive.purgeLabel", { title: a.title })}
-                title={t("drive.purge")}
-                onClick={() => setDoomed(a)}
-              />
+              <small className="ac-mediarow__body drive-trash__meta">
+                <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
+                <span className="drive-trash__by">
+                  {t("drive.trashBy", {
+                    name: authorName(a.createdBy),
+                    when: relativeTime(t, i18n.language, a.deletedAt),
+                  })}
+                </span>
+              </small>
+              <span className="ac-mediarow__end ac-mediarow__end--wrap drive-trash__acts">
+                <Chip
+                  icon="clock"
+                  tone={soon ? "waiting" : "neutral"}
+                  title={new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
+                    new Date(a.purgeAt),
+                  )}
+                >
+                  {soon ? t("drive.goneIn", { count: left }) : t("drive.daysLeft", { count: left })}
+                </Chip>
+                <Button
+                  size="sm"
+                  icon="undo"
+                  onClick={() => void remover.restore(a.id).then(() => void trash.refetch())}
+                >
+                  {t("artifacts.restore")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="trash"
+                  aria-label={t("drive.purgeLabel", { title: a.title })}
+                  title={t("drive.purge")}
+                  onClick={() => setDoomed(a)}
+                />
+              </span>
             </li>
           );
         })}

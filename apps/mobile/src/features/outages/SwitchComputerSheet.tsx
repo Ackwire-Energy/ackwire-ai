@@ -15,6 +15,7 @@ import {
   GroupedRow,
   LineIcon,
   Locked,
+  OPTION_ROW,
   ProviderLogo,
   SheetScreen,
   Text,
@@ -164,7 +165,7 @@ function SwitchForm({
           {o.agents.map((a) => (
             <GroupedRow
               key={a.agentId}
-              leading={<AgentFace agentId={a.agentId} size={28} mode="rest" live={false} />}
+              leading={<AgentFace agentId={a.agentId} size={OPTION_ROW.face} mode="rest" live={false} />}
               label={a.name}
               value={waitingText(t, a)}
               toggle={chosen.has(a.agentId)}

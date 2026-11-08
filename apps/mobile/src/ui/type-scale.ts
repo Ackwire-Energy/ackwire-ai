@@ -127,6 +127,21 @@ export function countBadge(fontSize: number) {
 }
 
 /**
+ * A tile's initial (a person's face, a maker without a mark, a voter): one line exactly the tile's height, centred both
+ * ways, Android's extra font padding off, as a count sits in its pill (`countBadge`). With no line height the line box
+ * centres instead of the letter.
+ */
+export function initialText(size: number, fontSize = size * 0.42) {
+  return {
+    fontSize,
+    lineHeight: size,
+    includeFontPadding: false,
+    textAlign: "center" as const,
+    textAlignVertical: "center" as const,
+  };
+}
+
+/**
  * Where the eye reads a line of text, from the top of its line box (points). The letters are centered in the
  * line, but text reads at its small letters (the x-height), a hair under the line's middle: an icon beside
  * text centers there, or it looks too high.

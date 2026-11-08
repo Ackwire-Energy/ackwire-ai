@@ -619,7 +619,8 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     await go(seedState({ notifications: [ready, hold] }));
     const row = (id: string) => document.querySelector(`[data-n="${id}"]`) as HTMLElement;
     expect(row("n-ready").textContent).toContain("O computador do seu workspace está pronto");
-    for (const id of ["n-ready", "n-hold"]) expect(row(id).querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    for (const id of ["n-ready", "n-hold"])
+      expect(row(id).querySelector(".ac-mediarow__face .nt-sys svg")).toBeTruthy();
     expect(row("n-ready").classList.contains("is-unread")).toBe(true);
     expect(row("n-hold").classList.contains("is-unread")).toBe(false);
     // With nobody to name, a screen reader reads what it tells.
@@ -648,7 +649,7 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
     );
     // How to contest it is never cut off.
     expect(line?.classList.contains("nt-snip--whole")).toBe(true);
-    expect(row.querySelector(".nt-who .nt-sys svg")).toBeTruthy();
+    expect(row.querySelector(".ac-mediarow__face .nt-sys svg")).toBeTruthy();
     expect(row.getAttribute("aria-label")).toBe("Ada está em pausa, não lida");
   });
 
@@ -778,28 +779,27 @@ describe("its computer is ready: what comes next", () => {
     }
   });
 
-  test("its face's top is its headline's line's, and a headline alone sits in the middle of the face", async () => {
+  test("a row is a MediaRow: the face, who and what on its line with the time at its end, the rest under them", async () => {
+    await go();
+    const row = document.querySelector('[data-n="n-thread"]') as HTMLElement;
+    expect(row.classList.contains("ac-mediarow")).toBe(true);
+    expect(
+      row.querySelector(":scope > .ac-mediarow__face .ac-avatar, :scope > .ac-mediarow__face .nt-stk"),
+    ).toBeTruthy();
+    expect(row.querySelector(":scope > .ac-mediarow__head .nt-what")?.textContent).toBeTruthy();
+    expect(row.querySelector(":scope > .ac-mediarow__end.nt-tm")?.textContent).toBeTruthy();
+    // The chips and the snippet go under the face, at the row's width: nothing is in a column beside it.
+    expect(row.querySelector(":scope > .ac-mediarow__body > .nt-snip")).toBeTruthy();
     const css = (await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    const phone = css.split("\n@media (max-width: 720px) {")[1]?.split("\n}")[0] ?? "";
-    const body = (selector: string, sheet = css) =>
-      new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
-    const px = (selector: string, prop: string, sheet = css) =>
-      Number(new RegExp(`\\b${prop}: (-?\\d+)(px)?;`).exec(body(selector, sheet))?.[1]);
-    const face = px(".nt-sys", "height");
-    expect(px(".nt-av28", "height")).toBe(face);
-    const line = px(".nt-tags .ac-chip", "height");
-    // The face's box starts at the row's top, as the headline's line does: no line box around it, and nothing moves
-    // it, with lines under the headline or not, on a phone too.
-    expect(body(".nt-who")).toContain("display: flex");
-    expect(body(".nt-who")).not.toMatch(/\b(padding|margin)(-top)?:/);
-    expect(css).not.toContain("> .nt-who {");
-    expect(body(".nt-who", phone)).toBe("");
-    // A headline alone comes down to the face's middle. On a phone, where a headline wraps, it stays at the top.
-    expect(px(".nt-l1:only-child", "margin-top")).toBe((face - line) / 2);
-    expect(px(".nt-l1:only-child", "margin-top", phone)).toBe(0);
+    const body = (selector: string) =>
+      new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+    expect(body(".nt-item")).not.toContain("grid-template-columns");
+    expect(css).not.toContain(".nt-who");
+    // One face size in the inbox, a MediaRow row's: a person, the workspace's own tile, two faces or two emoji.
+    for (const face of [".nt-av24", ".nt-sys", ".nt-stk", ".nt-emo"]) expect(body(face)).toContain("height: 24px");
   });
 });
 

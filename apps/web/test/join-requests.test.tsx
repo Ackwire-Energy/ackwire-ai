@@ -1152,7 +1152,7 @@ test("the inviter's notice when someone joins: their face and name, a Members ch
   expect(row.querySelector(".nt-what b")?.textContent).toBe("Carla <b>Dias</b>");
   expect(row.querySelector(".nt-what b")?.children.length).toBe(0);
   expect(row.querySelector(".nt-tags .ac-chip")?.textContent).toBe("Membros");
-  expect(row.querySelector(".nt-who .ac-avatar")).toBeTruthy();
+  expect(row.querySelector(".ac-mediarow__face .ac-avatar")).toBeTruthy();
   await click(within(row).getByRole("button", { name: "Abrir" }));
   await settle(6);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/person/u-carla`);
@@ -1166,7 +1166,7 @@ test("the inviter's notice when someone joins: their face and name, a Members ch
   await settle(6);
   const known = document.querySelector('[data-n="n-in"]') as HTMLElement;
   expect(known.querySelector(".nt-what")?.textContent).toBe("Carla Dias aceitou seu convite e entrou na Acme");
-  expect(known.querySelector(".nt-who .ac-avatar")?.textContent).toBe("CD");
+  expect(known.querySelector(".ac-mediarow__face .ac-avatar")?.textContent).toBe("CD");
   // No workspace on it: who joined, all the same.
   cleanup();
   await renderApp(`/org/${ORG_ID}/notifications`, {

@@ -4,7 +4,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { mayReportTo, reportsOf, supervisorOf } from "@agenteschat/client/lib/team-views";
-import { Field, MenuRadioGroup, Select } from "@agenteschat/ui";
+import { Field, Icon, MenuRadioGroup, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -72,9 +72,18 @@ export function ReportsToField({ agentId, id }: { agentId: string; id: string })
             className="newag__sel"
             value={current?.id ?? NOBODY}
             onValueChange={(v) => setReportsTo([{ agentId, reportsToAgentId: v || null }])}
+            // A list of agents shows their faces (the empty choice a glyph in a face's room), the trigger the chosen one's.
             options={[
-              { value: NOBODY, label: t("team.reportsTo.none") },
-              ...supervisorChoices(agent, team, lodiId).map((a) => ({ value: a.id, label: a.name })),
+              {
+                value: NOBODY,
+                label: t("team.reportsTo.none"),
+                leading: <Icon name="person" size={18} className="muted" />,
+              },
+              ...supervisorChoices(agent, team, lodiId).map((a) => ({
+                value: a.id,
+                label: a.name,
+                leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
+              })),
             ]}
           />
         </Field>

@@ -355,9 +355,12 @@ describe("Contas de IA: a plan with a login per agent", () => {
     expect(row?.textContent).toContain("chave …4f2a · Ada, Theo e Lia pensam com ela");
     expect(row?.querySelectorAll(".ac-planmeter")).toHaveLength(1);
     expect(row?.textContent).toContain("62%");
-    // Its name's capitals start at its mark's top; its actions, evenly spaced, on the name's line, risen with it.
-    expect(row?.querySelector(".list-col > :first-child")?.classList.contains("ac-captop")).toBe(true);
-    expect(row?.querySelector(":scope > .ac-acts.ac-captail.ac-captop")).not.toBeNull();
+    // A MediaRow: its mark and its name on one line, its actions, evenly spaced, at that line's end (under its words
+    // in a narrow list), the facts and the meter under them.
+    expect(row?.classList.contains("ac-mediarow")).toBe(true);
+    expect(row?.querySelector(":scope > .ac-mediarow__head > .ai-accounts__name")).not.toBeNull();
+    expect(row?.querySelector(":scope > .ac-acts.ac-mediarow__end--wrap")).not.toBeNull();
+    expect(row?.querySelector(":scope > .ac-mediarow__body .ac-planmeter")).not.toBeNull();
   });
 
   test("one login signed out: whose, said under the facts", async () => {

@@ -146,29 +146,21 @@
   max-width: none;
   padding: var(--menu-pad);
 }
-/* The buttons on the room (`.ac-popover`), in its corner; the face, the words and the reason further in. The face
-   on the title's first line (`.ac-iconline` on its 20px line). */
+/* The buttons on the room (`.ac-popover`), in its corner; the face, the words and the reason further in. A MediaRow:
+   the face and the title on one line, what it does under them. */
 .tm-confirm__head {
-  gap: 12px;
   padding: var(--popover-in) var(--popover-in) 0;
-  line-height: 20px;
 }
 .tm-confirm > .tm-why.ac-input {
   width: auto;
   margin-inline: var(--popover-in);
 }
-.tm-confirm__text {
-  min-width: 0;
-}
-.tm-confirm__text b {
-  display: block;
+.tm-confirm__head .tm-confirm__title {
   font-size: 14.5px;
   font-weight: 650;
-  line-height: 20px;
-  color: var(--ink);
 }
-.tm-confirm__text p {
-  margin: 2px 0 0;
+.tm-confirm__text {
+  margin: 0;
   font-size: 13px;
   line-height: 18px;
   color: var(--muted);
@@ -443,11 +435,10 @@
 .tm-taskcard__row > .ac-btn {
   margin-top: -4px;
 }
+/* No width of its own: the kit's ActionRow (`.ac-actrow__text`) sets it, and a page rule would outrank the kit. */
 .tm-taskcard__label {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  min-width: 0;
   line-height: 1.35;
 }
 .tm-taskcard__title {

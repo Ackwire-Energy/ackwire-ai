@@ -182,62 +182,22 @@ html:not([data-pointer]) .db-card:focus-visible {
 }
 
 /* An agent's request to publish the board (ADR 0135 §11): a line in its tone above the grid. */
+/* A MediaRow: the agent's face and what it asks on one line, its two buttons at that line's end (under the words in a
+   banner under 480px), for whom and why under them. */
 .db-proposal {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--surface-raised);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wg-s) 30%, transparent);
+  container-type: inline-size;
 }
 .db-proposal__text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  gap: 0;
   font-size: 13.5px;
   color: var(--ink2);
 }
-.db-proposal__text b {
-  font-size: 14px;
-  color: var(--ink);
-}
 .db-proposal__why {
   color: var(--muted);
-}
-.db-proposal__acts {
-  display: flex;
-  flex: none;
-  gap: 8px;
-}
-/* With its buttons: the face and the buttons on the title's line, not the middle of the title, the audience and the
-   why under it. The words keep the room a small button takes (32, 40 on touch), as a toast's do, so the title's line
-   runs through the buttons' middle. */
-.db-proposal:has(> .db-proposal__acts) {
-  --db-line-pad: calc((var(--control-h-sm) - 22px) / 2);
-  align-items: flex-start;
-}
-@media (pointer: coarse) {
-  .db-proposal:has(> .db-proposal__acts) {
-    --db-line-pad: calc((var(--control-h-md) - 22px) / 2);
-  }
-}
-.db-proposal:has(> .db-proposal__acts) > .db-proposal__text {
-  margin-top: var(--db-line-pad);
-}
-/* The 24px face's middle on the 22px line's. */
-.db-proposal:has(> .db-proposal__acts) > :first-child {
-  margin-top: calc(var(--db-line-pad) - 1px);
-}
-@media (max-width: 760px) {
-  .db-proposal {
-    flex-wrap: wrap;
-  }
-  .db-proposal__acts {
-    width: 100%;
-    justify-content: flex-end;
-  }
 }
 
 /* ── Dialogs: shared fields ─────────────────────────────────────────────── */
@@ -283,11 +243,8 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-opts > * + * {
   border-top: 1px solid var(--line);
 }
+/* Each a MediaRow: the audience's tile, its name and its radio on one line, who it covers under them. */
 .db-opt {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
   padding: 10px 14px;
   cursor: pointer;
 }
@@ -304,22 +261,14 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-opt__icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
   border-radius: 10px;
   background: var(--plate);
   color: var(--ink2);
 }
-.db-opt__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.db-opt__text b {
-  font-size: 14px;
+.db-opt .db-opt__title {
   font-weight: 650;
 }
-.db-opt__text small {
+.db-opt__hint {
   font-size: 12.5px;
   color: var(--muted);
 }
@@ -327,7 +276,7 @@ html:not([data-pointer]) .db-card:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 4px 14px 14px 62px;
+  padding: 4px 14px 14px;
   background: color-mix(in srgb, var(--sunken) 70%, transparent);
 }
 .db-opts > .db-roles {
@@ -385,10 +334,8 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
   max-height: 280px;
   overflow: auto;
 }
+/* Each a MediaRow: the face, the name and its roles on one line, what they may do at its end. */
 .db-people li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   padding: 9px 14px;
 }
 .db-people li + li {
@@ -396,20 +343,6 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
 }
 .db-people li[data-on="false"] {
   opacity: 0.5;
-}
-.db-people__who {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.db-people__who b {
-  font-size: 14px;
-  font-weight: 600;
-}
-.db-people__who small {
-  font-size: 12.5px;
-  color: var(--muted);
 }
 .db-people__can {
   font-size: 13px;
@@ -591,13 +524,9 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
   line-height: 18px;
   color: var(--ink);
 }
-.nwc__stale > .ac-icon {
-  flex: none;
+/* Its icon on the first line of the words (`.ac-iconline`), which take the ActionRow's width. */
+.nwc__stale .ac-iconline > .ac-icon {
   color: var(--warn);
-}
-.nwc__stale > span {
-  flex: 1;
-  min-width: 0;
 }
 .nwc__stale .ac-btn {
   flex: none;

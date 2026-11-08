@@ -150,10 +150,6 @@ p {
 .ai-picker__or--note {
   margin-bottom: 0;
 }
-/* Its mark leads its first line (an `.ac-iconline`). */
-.ai-picker > .ai-picker__key {
-  align-items: flex-start;
-}
 .grid-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
@@ -836,54 +832,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 14px;
   padding-bottom: 96px;
 }
-/*
- * A list or a nav beside what it opens (Aprovações, Propostas, Settings): `.page-split` holds the columns. Where they
- * sit side by side, the page fills the work area and never scrolls: the split takes the height under the page's
- * header and each of its columns scrolls on its own, so the header, a column's head and a footer floating at its
- * bottom stay put. Every element between the work area and the split hands the height down. Narrower (these pages
- * stack their columns at 940px), the page scrolls as any other. So it does in a window under 560px tall (a small or
- * zoomed-in one): there the page's header would leave the columns too little room, or none, and what they hold out of
- * reach. `.shell__main` in each selector: the pages' own stylesheets load after this one and must not win.
- */
-@media (min-width: 941px) and (min-height: 560px) {
-  .shell__main:has(.page-split) {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .shell__main > :is(:has(.page-split), .page-split) {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    padding-bottom: 0;
-  }
-  .shell__main :has(.page-split) {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    min-height: 0;
-  }
-  .shell__main :has(.page-split) > * {
-    flex-shrink: 0;
-  }
-  .shell__main :has(.page-split) > :is(:has(.page-split), .page-split) {
-    flex: 1 1 auto;
-  }
-  .shell__main .page-split {
-    min-height: 0;
-    align-items: stretch;
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .shell__main .page-split > * {
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  /* A column is as tall as the split, not as its content: what it holds scrolls in it instead of squeezing to fit. */
-  .shell__main .page-split > * > * {
-    flex-shrink: 0;
-  }
-}
 .list-group-head {
   display: flex;
   align-items: center;
@@ -916,6 +864,18 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   overflow: hidden;
   /* Faces stacked in its rows are cut out of its face, not the page's (the kit's `--stack-ring`). */
   --stack-ring: var(--raised);
+}
+/* It clips its rows at its rounded corners: the first and last rows (or the one thing in a first or last item) take
+   them, so a row's focus ring or plate there is drawn whole, not cut square. */
+.list-card > :first-child,
+.list-card > li:first-child > :only-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.list-card > :last-child,
+.list-card > li:last-child > :only-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 .page__header {
   display: flex;
@@ -1049,45 +1009,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex-direction: column;
   padding: 16px 8px 24px;
 }
-/*
- * Turns are told apart by space. What stands in the list takes the turn gap above it; the next row of a turn, and a
- * quiet line under another, the part gap. A row gives back the room of its plate, so it counts as what shows. Two
- * classes' weight: a notice or a card keeps its margin for where it stands alone, and never here.
- */
-.channel__messages > :not(.channel__empty) {
-  --row-gap: var(--msg-turn-gap);
-  margin-block: var(--row-gap) 0;
-}
-.channel__messages > :first-child,
-.channel__messages > .channel__spacer + * {
-  --row-gap: 0px;
-}
-.channel__messages > .ac-msg + .ac-msg--grouped,
-.channel__messages
-  > :not(.ac-msg, .ac-divider, .channel__unread, .channel__spacer)
-  + :not(.ac-msg, .ac-divider, .channel__unread) {
-  --row-gap: var(--msg-part-gap);
-}
-/* A card in a row of its own under the same author's words: as far off them as in the same row. */
-.channel__messages > .ac-msg + .ac-msg--grouped:not(:has(.ac-msg__text)):has(.rq, .mi-card, .iw-card, .brw-ac) {
-  --row-gap: var(--msg-card-gap);
-}
-/* A message that ends on the agents' line (`.ag-rc--talk`) already holds part of the turn's gap under it. */
-.channel__messages
-  > .ac-msg:has(
-    > .ac-msg__body
-      > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden, .ac-msg__aside--floating))
-      > .ag-rc--talk:last-child
-  )
-  + * {
-  --row-gap: var(--msg-part-gap);
-}
-.channel__messages > .ac-msg {
-  margin-block: calc(var(--row-gap) - var(--msg-block)) calc(-1 * var(--msg-block));
-}
-.channel__messages > :is(.ac-divider, .channel__notice) {
-  padding-block: 0;
-}
 /* A message that @mentions the viewer: a tinted row, its corners all round. No accent bar on its left edge: the tint
    and the name in the words say it. No other row carries a plate at rest (only a hover on someone else's row, an open
    menu or a linked message, and those pass). */
@@ -1106,14 +1027,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
 .ac-msg--own .ac-msg__text .md__table {
   background: var(--bg);
-}
-/* Its line is never capped by a short bubble's width (a narrow panel): it grows to the left, into the row's room,
-   instead of its words running out of its plate. */
-.ac-msg--own .thread-line {
-  align-self: flex-end;
-  max-width: none;
-  margin-right: -6px;
-  border-radius: 10px 10px 3px 10px;
 }
 .channel__composer {
   position: relative;
@@ -1248,17 +1161,15 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex: 1;
   min-width: 0;
 }
-/* Canais arquivados: the rows alone, a channel's long name wrapping where it can't break. */
+/* Canais arquivados: the rows alone, each a MediaRow (the kit's `.ac-mediarow`): the channel's mark and name on one line
+   with Restaurar at its end, when it was archived under them. */
 .archived-channels {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.archived-channels .member-row {
+.archived-channels__row {
   padding-block: var(--space-2);
-}
-.archived-channels .list-col b {
-  overflow-wrap: anywhere;
 }
 .member-row__you {
   display: inline-flex;
@@ -3561,35 +3472,26 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 }
 
 /* Agent access: one level per connector (Sem acesso / Ler / Ler e escrever). Neutral surfaces, light and dark. */
+/* Its rows' controls drop under their words by the list's width. */
 .level-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  container-type: inline-size;
 }
-/* An `.ac-faceline`: the tile, the name's capitals and the level control start at one top; long tool lists stay at
-   two lines. */
+/* A MediaRow: the tile, the name and its level on one line, what it covers under them; long tool lists stay at two
+   lines. */
 .level-row {
-  flex-wrap: wrap;
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
 .level-row:first-child {
   border-top: 0;
 }
-/* As tall as the 36px icon at least: a name alone centres on it; with lines under it the name leads the icon's top. */
 .level-row__text {
-  flex: 1 1 220px;
-  min-width: 0;
-  min-height: 36px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   gap: 2px;
 }
 /* The level control's middle on the icon's. */
-.level-row > .level-row__choice {
-  margin-top: calc((36px - var(--control-h-sm)) / 2);
-}
 .level-row__name {
   font-weight: 600;
 }
@@ -3662,10 +3564,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   white-space: normal;
   overflow-wrap: break-word;
 }
-/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
+/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. There an agent's
+   face goes over its name and role: beside them, in that column, it owned a column of three lines. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
+  }
+  .level-matrix__agent {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .level-matrix__agent > :first-child {
+    translate: none;
   }
 }
 .level-matrix__head .connector-icon {
@@ -4213,9 +4123,6 @@ html:not([data-pointer]) .settings__link:focus-visible {
    plate never reaches the title. */
 .ac-card__head + .settings-rows {
   margin-top: 0;
-}
-.ac-card__head + .settings-rows > .settings-row:first-child {
-  border-top: 1px solid var(--line);
 }
 /* Over a card's foot the last row ends on the foot's hairline, as deep below as above (the card's gap is
    `--space-3`). */
@@ -4883,30 +4790,16 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   height: 12px;
 }
 
-/* Settings → Conectores: one row per connected service. */
-/*
- * One grid for every connected row (service, email box, database): the icon beside the name and details, its top on
- * the name's capitals however far the details wrap (the name rises, `.ac-captop`), then who uses it and the actions
- * under them, one gap apart, the same way on every row. The details wrap whole, never cut.
- * A row with no actions (someone who can't manage connectors) has room for who uses it beside the text when the
- * list is wide; the actions never do: four or five buttons would leave the name a sliver.
- */
+/* Settings → Conectores: one row per connected service, a MediaRow (the tile and the name on one line, the details,
+   who uses it and the actions under them at the row's width). The details wrap whole, never cut. */
 .connected-list {
   container-type: inline-size;
-}
-.connected-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  column-gap: 16px;
-  row-gap: var(--list-part-gap);
 }
 .connected-row__text {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .connected-row__who {
-  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4914,23 +4807,9 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   white-space: nowrap;
 }
 .connected-row__actions {
-  grid-column: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-@container (width > 720px) {
-  .connected-row:not(:has(> .connected-row__actions)) {
-    grid-template-columns: auto minmax(0, 1fr) 10.5rem;
-  }
-  .connected-row:not(:has(> .connected-row__actions)) > .connected-row__who {
-    grid-column: auto;
-    /* On the name's line: a box as tall as it (as `.ac-captail`), risen with a name that rises. */
-    height: 22px;
-  }
-  .connected-row:not(:has(> .connected-row__actions)):has(> .connected-row__text > .ac-captop) > .connected-row__who {
-    margin-block-start: calc(var(--cap-top) - 11px);
-  }
 }
 
 /*
@@ -5319,14 +5198,11 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
   padding: 0;
   margin-bottom: var(--field-gap);
 }
+/* A number's unit at its field's end. */
 .mail-rules__unit {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.mail-rules__unit > input,
-.mail-rules__cap {
-  max-width: 96px;
+  padding-inline-end: var(--control-px-md);
+  font-size: 13px;
+  color: var(--ink-muted);
 }
 /* Two parts: what the agent reads, what it sends. */
 .mail-rules__part {
@@ -5438,7 +5314,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   font-size: 14.5px;
 }
 .tr-subj__h small,
-.tr-decide__t small {
+.tr-decide__help {
   display: block;
   color: var(--muted);
   font-size: 12.5px;
@@ -5482,15 +5358,11 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .tr-decide:only-child {
   border-radius: 18px;
 }
+/* A MediaRow: the asking mark, how many wait and Aceitar todas on one line (under them in a head under 480px), what to
+   do under them. */
 .tr-decide__h {
-  display: flex;
-  align-items: center;
-  gap: 14px;
   padding: 14px 16px 10px;
-}
-.tr-decide__t {
-  flex: 1;
-  min-width: 0;
+  container-type: inline-size;
 }
 .tr-decide .tr-row__nm {
   white-space: normal;
@@ -5685,14 +5557,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
     gap: 6px;
   }
   .tr-decide__h {
-    flex-wrap: wrap;
     padding: 14px 14px 8px;
-  }
-  .tr-decide__t {
-    flex-basis: calc(100% - 58px);
-  }
-  .tr-decide__h .tr-link {
-    margin-left: 52px;
   }
   .tr-decide .tr-row__ctl {
     gap: 8px;
@@ -6160,16 +6025,19 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
   letter-spacing: var(--track-tight);
 }
 
-/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. */
+/* "Lembrete" next to the agent's name on a reminder message; "Rotina «X»" on what a routine found. Its words on the
+   baseline of the words around it (the name's, Ver relatório after it), its glyph or face in their line's middle. */
 .msg-reminder {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
   margin-left: 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  vertical-align: middle;
+}
+.msg-reminder > :is(.ac-icon, .ac-brand, .ac-avatar) {
+  align-self: center;
 }
 .msg-reminder--link {
   text-decoration: none;
@@ -6352,10 +6220,6 @@ html:not([data-pointer]) .photo-drop:focus-visible {
 }
 .wiki-link:hover {
   background: var(--plate);
-}
-html:not([data-pointer]) .wiki-link:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
 }
 .wiki-link--missing {
   /* No chip behind it, so no chip's side padding: its words line up with the text around them. */
@@ -7695,14 +7559,14 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   word-break: break-word;
 }
 
-/* Settings → Computadores. */
-.machine-row {
-  align-items: center;
-  gap: 14px;
+/* Settings → Computadores: a MediaRow each, the portrait (drawn at whole pixels, 48 tall) and the name on one line,
+   what it is under them. A row's button (Usar o computador deste servidor, a tool's Desligar) goes under its words by
+   the list's width, not the window's. */
+.machine-list {
+  container-type: inline-size;
 }
-.machine-row__main {
-  flex: 1 1 260px;
-  min-width: 0;
+.machine-row {
+  --mediarow-face: 48px;
 }
 .machine-row__agents {
   display: inline-flex;
@@ -8161,12 +8025,34 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   gap: 2px;
   margin-right: 10px;
 }
+/* On a phone a profile's name and state take the row: beside the people, the count and the actions they were squeezed
+   to a letter a line. Those go on the line under them, the actions at its end. */
+@media (max-width: 640px) {
+  .pf-list {
+    display: block;
+  }
+  .pf-list > .machine-page__agent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-bottom: 10px;
+  }
+  .pf-list > .machine-page__agent-row > .machine-page__agent {
+    flex: 1 0 100%;
+  }
+  .pf-list .pf-stack {
+    padding: 0 8px 0 14px;
+  }
+  .pf-list .pf-count {
+    padding-right: 8px;
+  }
+  .pf-list .pf-acts {
+    margin-left: auto;
+  }
+}
 .machine-page__agent {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 10px 14px;
   color: inherit;
   text-decoration: none;
@@ -8179,15 +8065,18 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .machine-page__agent:hover {
   background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
 }
-.machine-page__agent > .ac-icon {
-  flex: none;
+/* A browser profile's row has no face: its words, then its people. */
+.machine-page__agent:not(.ac-mediarow) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.machine-page__agent .ac-icon {
   color: var(--faint);
 }
 .machine-page__agent-name {
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .machine-page__agent-name .muted {
   font-weight: 400;
@@ -8211,19 +8100,8 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .machine-folder__tail {
   gap: var(--space-3);
 }
-/* A tool: a name alone centres on its tile with its state; with a line under it (Commands, on) it is an
-   `.ac-faceline`, the name and the state on the tile's top line (`.ac-captop`, `.ac-captail`). */
-.machine-tool {
-  align-items: center;
-}
-.machine-tool:has(> .list-col > .ac-captop) {
-  align-items: flex-start;
-  /* Room above the risen name's line for Turn off, centred on it. */
-  padding-block: var(--row-py);
-}
+/* A tool, a MediaRow: its tile, its name and its state on one line, Commands' warning under them. */
 .machine-tool__tail {
-  display: flex;
-  align-items: center;
   gap: var(--space-3);
 }
 .machine-folder__name {
@@ -8757,10 +8635,10 @@ html:not([data-pointer]) .onb__step:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Sem responsável" among the people of a picker: as big as their faces. */
+/* "Sem responsável" among the people of a picker: as big as their faces (OptionRow), so every option is one size. */
 .ac-menu--select .ac-menu__leading > .newag__ib {
-  width: 32px;
-  height: 32px;
+  width: var(--option-face);
+  height: var(--option-face);
 }
 /* The role step: "Do zero" first (its Cargo field right under it, one card's gap apart), then the groups of presets
    under small headings. */
@@ -9537,12 +9415,17 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   margin-inline: -12px;
 }
+/* A MediaRow: the key and what it is on one line (the chevron at its end), the value and its line under them. */
 .agp-cell {
   position: relative;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 14px;
-  align-items: start;
-  gap: 10px;
+  grid-template-areas:
+    "key label chev"
+    "value value value"
+    "sub sub sub";
+  align-items: center;
+  gap: 2px 10px;
   min-width: 0;
   padding: 10px 12px;
   border: 0;
@@ -9556,6 +9439,10 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 }
 .agp-cell--ro {
   grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-areas:
+    "key label"
+    "value value"
+    "sub sub";
   cursor: default;
 }
 .agp-cell:hover:not(.agp-cell--ro) {
@@ -9591,7 +9478,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
     inset 0 0 0 1px var(--line),
     var(--top);
   font-size: 12px;
-  translate: 0 calc(8px - var(--cap-top));
+  grid-area: key;
 }
 /* A logo brings its own tile. */
 .agp-cell__key:has(> .ac-brand) {
@@ -9602,11 +9489,11 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   border-radius: inherit;
 }
 .agp-cell__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  display: contents;
 }
 .agp-cell__text small {
+  grid-area: label;
+  min-width: 0;
   color: var(--faint);
   font-size: 12px;
   font-weight: 500;
@@ -9618,6 +9505,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   overflow-wrap: anywhere;
 }
 .agp-cell__value {
+  grid-area: value;
   display: block;
   font-size: 15px;
   font-weight: 600;
@@ -9639,12 +9527,13 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 500;
 }
 .agp-cell__sub {
+  grid-area: sub;
   color: var(--muted);
   font-size: 12.5px;
   line-height: 17px;
 }
 .agp-cell__chev {
-  align-self: center;
+  grid-area: chev;
   color: var(--faint);
 }
 /* The sentence's dialogs: the link by the buttons ("Conectar outro computador"). */
@@ -10282,15 +10171,17 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   gap: 2px 6px;
   font-size: inherit;
 }
-/* Narrow (the panel, a phone): the label over the value, the key and the chevron beside both. */
+/* Narrow (the panel, a phone): a MediaRow, the key, the label and the chevron on one line, the value and its line under
+   them at the row's width. */
 @container (max-width: 520px) {
   .agp-ficha__card .agp-frow {
     grid-template-columns: 30px minmax(0, 1fr) auto;
     grid-template-rows: auto auto auto;
     grid-template-areas:
       "key label tail"
-      "key value tail"
-      "key sub tail";
+      "value value value"
+      "sub sub sub";
+    row-gap: 2px;
   }
 }
 /* The routines' dialog: each name a link to its page. */
@@ -10491,36 +10382,21 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-ib[data-tone="bad"] {
   color: var(--danger);
 }
+/* What ends a tile's line drops under its words by the column's width. */
 .agp-attns {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  container-type: inline-size;
 }
-/* An `.ac-faceline`: the title's capitals at the tile's top, the button centred on the title's line however long the
-   line under it runs. */
+/* A MediaRow: the tile, the title and its button on one line, what it is about under them. */
 .agp-attn {
   padding: 12px 14px;
   border-radius: 16px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
-.agp-attn__t {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.agp-attn__t b {
-  font-weight: 600;
-}
-/* In the row's middle, as Home's rows: on the title's line a 32px button would reach the card's edge. */
-.agp-attn__tail {
-  display: flex;
-  flex: none;
-  align-self: center;
-  align-items: center;
-}
-.agp-attn__t span {
+.agp-attn__sub {
   color: var(--muted);
   font-size: 12.5px;
 }
@@ -10615,9 +10491,7 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 }
 /* Which GitHub repositories, under the GitHub row; the chips that open a menu or a tab. */
 .level-row__below {
-  flex-basis: 100%;
   min-width: 0;
-  padding-left: 48px;
 }
 .agp-repos {
   display: flex;
@@ -13080,6 +12954,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-panel {
   gap: var(--ai-steps-gap);
   text-wrap: pretty;
+  container-type: inline-size;
 }
 .ai-panel > .ac-setnote {
   margin: 0;
@@ -13122,9 +12997,8 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-panel--plan > .grid-options--sm .ac-option__title {
   padding-right: 22px;
 }
+/* A MediaRow: the option's mark and its name on one line, for whom at that line's end, what it covers under them. */
 .ai-panel__head {
-  flex-wrap: wrap;
-  gap: 12px;
   /* Its hairline runs edge to edge, as the foot's does. */
   margin-inline: calc(-1 * var(--card-pad));
   padding: 0 var(--card-pad) 16px;
@@ -13253,31 +13127,18 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
-.ai-panel__title {
-  flex: 1 1 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.ai-panel__title > b {
+.ai-panel__head > .ac-mediarow__head > .ai-panel__name {
   font-size: 15px;
-  line-height: 20px;
   font-weight: 650;
 }
-.ai-panel__title > span {
+.ai-panel__sub {
   font-size: 13px;
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* For whom: on the name's line, not the mark's middle: a box as tall as that 20px line, risen with it as the name is
-   (`.ac-captop`, measured in the name's 15px type), the select centred on it (as `.ac-captail`). */
 .ai-panel__agent {
   display: flex;
   align-items: center;
-  align-self: flex-start;
-  height: 20px;
-  margin-top: calc(var(--cap-top) * 15 / 13 - 10px);
   gap: 8px;
   font-size: 13px;
   color: var(--ink-muted);
@@ -13385,12 +13246,15 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
-/* A plan's or a key's mark beside its name and facts: the name's capitals at the mark's top, what follows them (a
-   chip, the actions) on the name's line (`.ac-captail`), however far the facts, notes and meter run under it. As
-   deep as it is wide at its ends: a plan's meter makes it a block. */
+/* A plan's or a key's row is a MediaRow: the maker's logo and its name on one line, the facts, notes and meter under
+   them; its actions end the name's line, or go under the words in a list under 480px. As deep as it is wide at its
+   ends: a plan's meter makes it a block. */
+.ai-accounts__list,
+.key-list {
+  container-type: inline-size;
+}
 .ai-accounts__row,
 .key-row {
-  align-items: flex-start;
   padding: var(--space-4);
 }
 .key-row__tail {
@@ -13429,13 +13293,8 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state and the key's actions
    on the name's line (`.ac-captail`). */
-.jev__head,
 .jev__key {
   align-items: flex-start;
-}
-/* On a phone the name and its line wrap, so the state stays on their row. */
-.jev__head > .list-col {
-  flex-basis: 0;
 }
 /* A fact breaks between facts, never inside one ("US$ 0,13"). */
 .jev__fact {
@@ -13941,6 +13800,10 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 .rh-set__model {
   width: 280px;
   max-width: 100%;
+}
+/* "Sua IA", a MediaRow: its actions drop under its words by its own width. */
+.rh-mine {
+  container-type: inline-size;
 }
 .rh-set__budget,
 .rh-set__acts {
