@@ -6597,6 +6597,15 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* "Atualizar" hangs over its 16px line as the failed run's buttons do over theirs: the line keeps its own height. */
+.run-quiet > .ac-btn {
+  margin-block: calc((16px - var(--control-h-sm)) / 2);
+}
+@media (pointer: coarse) {
+  .run-quiet > .ac-btn {
+    margin-block: calc((16px - var(--control-h-md)) / 2);
+  }
+}
 .stop-run-wrap {
   position: relative;
   display: inline-flex;

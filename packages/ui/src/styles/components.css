@@ -1287,7 +1287,7 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   margin-top: var(--msg-card-gap);
 }
 /* The name stays on its words, and a line's caption on its bubble. */
-.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open) {
+.ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .ac-msg__error-row, .rq-done, .rq-open) {
   margin-top: 2px;
 }
 .ac-msg.ac-msg .ac-msg__body > :is(.ac-msg__own-foot, .ac-msg__foot) {
@@ -1436,8 +1436,8 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 }
 /*
  * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
- * middle of a reason that wraps. The words start as far down as a small button (32, 40 on touch) centres a line, so a
- * one-line error is as tall as before and its first line runs through the buttons' middle.
+ * middle of a reason that wraps. The buttons (32, 40 on touch) hang over the 20px line by as much as they outgrow it,
+ * so the row is as tall as its words and the words sit where a message's text would.
  */
 .ac-msg__error-row {
   display: flex;
@@ -1446,11 +1446,14 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
-  margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
+  margin: 0;
+}
+.ac-msg__error-row > .ac-btn {
+  margin-block: calc((20px - var(--control-h-sm)) / 2);
 }
 @media (pointer: coarse) {
-  .ac-msg__error-row > .ac-msg__error {
-    margin-top: calc((var(--control-h-md) - 20px) / 2);
+  .ac-msg__error-row > .ac-btn {
+    margin-block: calc((20px - var(--control-h-md)) / 2);
   }
 }
 .ac-mention {

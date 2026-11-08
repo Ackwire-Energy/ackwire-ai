@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { CHAT_RHYTHM } from "@agenteschat/client/lib/chat-look";
-import { atRule, builtCss, declarations, rules } from "./built-css";
+import { atRule, builtCss, declarations, rules, topLevel } from "./built-css";
 
 const SHEETS = [
   "src/styles.css",
@@ -171,9 +171,52 @@ test("an event pill is a part: the body sets its top, and a bubble's tab stands 
     ),
   );
   expect(tab?.declarations).toEqual([["margin-top", "1px"]]);
-  expect(last(".ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .rq-done, .rq-open)", "margin-top")).toBe(
-    "2px",
-  );
+  expect(
+    last(
+      ".ac-msg .ac-msg__body > .ac-msg__head + :is(.ac-msg__text, .ac-msg__error-row, .rq-done, .rq-open)",
+      "margin-top",
+    ),
+  ).toBe("2px");
+});
+
+/** A length the sheet wrote (`32px`, `0`, `calc((20px - var(--control-h-sm))/2)`), in px, with the tokens' values. */
+const px = (value: string | undefined): number => {
+  const text = (value ?? "").replace(/var\((--[\w-]+)\)/g, (_m, token: string) => last(":root", token) ?? "").trim();
+  const half = /^calc\(\(\s*(-?[\d.]+)px\s*-\s*(-?[\d.]+)px\s*\)\s*\/\s*2\s*\)$/.exec(text);
+  if (half) return (Number(half[1]) - Number(half[2])) / 2;
+  const plain = /^(-?[\d.]+)(?:px)?$/.exec(text);
+  if (plain) return Number(plain[1]);
+  throw new Error(`not a length: ${value}`);
+};
+
+test("a failed reply's reason sits under the name like the text it stands for, its buttons hung on its first line", () => {
+  // Under the name: the 2px a message's text gets, never the gap between parts plus a push to centre the buttons.
+  const reason = ".ac-msg__error-row > .ac-msg__error";
+  expect(px(last(reason, "margin"))).toBe(0);
+  const line = px(last(".ac-msg__error", "line-height"));
+  expect(line).toBe(20);
+  // Each button (the fix, the ×) hangs over the reason's first line by as much as it outgrows it: centred on it, and
+  // the row no taller than its words. On touch the small buttons grow to the default step of the ruler.
+  const at = (sheet: string, selector: string) =>
+    declarations(sheet, selector)
+      .filter(([p]) => p === "margin-block")
+      .at(-1)?.[1];
+  const button = at(topLevel(css), ".ac-msg__error-row > .ac-btn");
+  const touch = at(atRule(css, "@media (pointer: coarse)"), ".ac-msg__error-row > .ac-btn");
+  for (const [margin, height] of [
+    [button, px(last(":root", "--control-h-sm"))],
+    [touch, px(last(":root", "--control-h-md"))],
+  ] as const) {
+    const m = px(margin);
+    expect(height + 2 * m).toBe(line);
+    expect(m + height / 2).toBe(line / 2);
+  }
+  // "sem notícias há N min · Atualizar": its button hangs over its 16px line the same way.
+  const quiet = px(last(".ac-msg__activity", "line-height"));
+  expect(px(at(topLevel(css), ".run-quiet > .ac-btn")) * 2 + px(last(":root", "--control-h-sm"))).toBe(quiet);
+  expect(
+    px(at(atRule(css, "@media (pointer: coarse)"), ".run-quiet > .ac-btn")) * 2 + px(last(":root", "--control-h-md")),
+  ).toBe(quiet);
 });
 
 test("in Compacta a pill's time stays one line in the clock's column, however long", () => {
