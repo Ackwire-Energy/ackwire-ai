@@ -123,6 +123,9 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
     case "search":
       return "/search";
     case "drive":
+      // A file's link (`filePath`): the file itself, at its version when named.
+      if (isSafeId(q.artifact))
+        return /^\d{1,9}$/.test(q.v ?? "") ? `/file/${q.artifact}?v=${q.v}` : `/file/${q.artifact}`;
       return "/drive";
     case "wiki":
       if (id === undefined) return "/wiki";

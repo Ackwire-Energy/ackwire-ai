@@ -10494,6 +10494,7 @@
     "onlyDriveText": "Non ancora condiviso in un canale.",
     "dm": "Messaggio diretto",
     "dmWith": "Messaggio diretto con {{name}}",
+    "dmBetween": "Messaggio diretto tra {{names}}",
     "inDm": "Inviato in un messaggio diretto",
     "inThread": "In un thread della conversazione",
     "audience": {
@@ -10501,7 +10502,8 @@
       "publicChannel": "Tutti nello spazio di lavoro possono vederlo: è nel canale pubblico #{{name}}",
       "privateChannel": "Solo i membri di #{{name}} e gli amministratori possono vederlo",
       "dm": "Solo tu e {{name}} potete vederlo: viene da un messaggio diretto",
-      "dmGone": "Solo le persone di quella conversazione possono vederlo: viene da un messaggio diretto"
+      "dmGone": "Solo le persone di quella conversazione possono vederlo: viene da un messaggio diretto",
+      "dmBetween": "Solo {{names}} possono vederlo: viene da un messaggio diretto"
     },
     "private": "Privato",
     "privateHint": "Solo le persone della conversazione vedono questi file. In un canale, anche gli amministratori.",
@@ -12462,7 +12464,14 @@
       "fileNameRequired": "Il file ha bisogno di un nome.",
       "notFound": "Questo file non esiste più o non hai accesso.",
       "deleteForbidden": "Solo chi l'ha creato, chi l'ha chiesto all'agente, il responsabile dell'agente o un admin può eliminarlo.",
-      "restoreForbidden": "Solo chi poteva eliminarlo può ripristinarlo."
+      "restoreForbidden": "Solo chi poteva eliminarlo può ripristinarlo.",
+      "versionNotFound": "Questa versione del file non esiste.",
+      "formatUnavailable": "Questo file non si può salvare in quel formato.",
+      "sharingOpen": "Tutto lo spazio di lavoro vede già questo file.",
+      "sharingForbidden": "Solo chi è nella conversazione del file cambia chi lo vede.",
+      "sharingEmpty": "Scegli chi lo vede.",
+      "sharingTooMany": "Scegli al massimo {{max}} persone e {{max}} ruoli.",
+      "notInDrive": "Questo vive solo nella sua conversazione, quindi non si può condividere."
     },
     "machine": {
       "forbidden": "Solo un admin, o chi ha collegato il computer, può farlo.",
@@ -16561,6 +16570,85 @@
     "receipt": "Chi lo vede: {{who}}",
     "limited": "accesso limitato",
     "rolesToo": "I ruoli già su questa pagina continuano a vederla."
+  },
+  "share": {
+    "button": "Condividi",
+    "title": "Condividi {{name}}",
+    "conversation": "Solo la conversazione",
+    "people": "Persone e ruoli che scegli",
+    "everyone": "Tutto lo spazio di lavoro",
+    "whereDm": "Il messaggio diretto con {{name}}",
+    "whereDmGone": "Un messaggio diretto",
+    "whereDmBetween": "Il messaggio diretto tra {{names}}",
+    "whereChannel": "Membri di #{{name}}",
+    "add": "Aggiungi una persona o un ruolo",
+    "addSearch": "Cerca persone e ruoli",
+    "noResults": "Nessuno con questo nome",
+    "groupPeople": "Persone",
+    "groupRoles": "Ruoli",
+    "access": "Chi ha accesso",
+    "you": "{{name}} (tu)",
+    "agent": "Agente",
+    "role": "Ruolo",
+    "remove": "Togli {{name}}",
+    "admins": "Gli amministratori lo vedono sempre.",
+    "copyLink": "Copia link",
+    "copied": "Link copiato.",
+    "done": "Fatto",
+    "onlyHere": "Chi non è in questa conversazione non aprirà il link.",
+    "choosePeople": "Scegli persone",
+    "readOnly": "Solo chi è nella conversazione cambia chi lo vede.",
+    "open": "Tutto lo spazio di lavoro vede questo file.",
+    "savedEveryone": "Ora tutto lo spazio di lavoro vede il file.",
+    "savedPeople": "Ora le persone scelte vedono il file.",
+    "savedConversation": "Ora solo la conversazione vede il file.",
+    "undo": "Annulla",
+    "fileRef": "File {{title}}",
+    "fileRefNone": "File senza accesso",
+    "also": "{{text}}. Condiviso anche con {{who}}.",
+    "someOnlyHere": "Alcuni di questi link si aprono solo per chi è nella conversazione del file."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Accedi per aprire questo link",
+      "text": "Dopo l'accesso torni subito qui."
+    },
+    "file": {
+      "title": "Questo file non è disponibile per te",
+      "text": "Potrebbe essere stato eliminato o essere condiviso solo in una conversazione in cui non sei. Chiedi a chi te l'ha inviato di condividerlo con te dal pulsante Condividi del file."
+    },
+    "link": {
+      "title": "Questo link non è disponibile per te",
+      "text": "Potrebbe essere scaduto, già usato o portare in un posto in cui non sei. Chiedine uno nuovo a chi te l'ha inviato."
+    },
+    "version": {
+      "title": "Questa versione del file non esiste",
+      "text": "Il link chiede una versione che il file non ha."
+    },
+    "format": {
+      "title": "Questo file non è disponibile in quel formato",
+      "text": "Il link chiede un formato in cui questo file non si può salvare."
+    },
+    "busy": {
+      "title": "Troppi tentativi di fila",
+      "text": "Aspetta un momento e riprova."
+    },
+    "server": {
+      "title": "Qualcosa è andato storto da parte nostra",
+      "text": "Non è stato niente di quello che hai fatto. Riprova tra un momento."
+    },
+    "other": {
+      "title": "Questo link non si è aperto",
+      "text": "L'indirizzo è incompleto o non funziona più. Chiedine uno nuovo a chi te l'ha inviato."
+    },
+    "action": {
+      "signIn": "Accedi",
+      "open": "Apri agentes.chat",
+      "latest": "Apri la versione più recente",
+      "file": "Apri il file",
+      "retry": "Riprova"
+    },
+    "errorId": "Codice dell'errore: {{id}}"
   },
   "teamTemplates": {
     "lead": "Un team per {{org}}, ogni agente nel suo canale. Puoi modificarlo prima di crearlo.",

@@ -217,6 +217,7 @@ function AppStack() {
       <Stack.Screen name="wiki-new" options={wikiSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
+      <Stack.Screen name="file-share" options={requestsSheet} />
       <Stack.Screen name="code" options={formSheet} />
       <Stack.Screen name="chart" options={formSheet} />
       <Stack.Screen

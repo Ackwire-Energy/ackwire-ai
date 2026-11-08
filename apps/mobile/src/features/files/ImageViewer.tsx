@@ -168,9 +168,12 @@ function Viewer({
 
       <Chrome visible={chrome} drag={drag} style={[styles.bottom, { paddingBottom: insets.bottom + 14 }]}>
         <View style={styles.actions}>
+          {detail?.inDrive !== false ? (
+            <Action icon="person" label={t("share.button")} disabled={!detail} onPress={actions.shareSheet} />
+          ) : null}
           <Action
             icon="share"
-            label={t("mobile.files.share")}
+            label={t("mobile.files.send")}
             busy={actions.busy === "share"}
             disabled={!detail}
             onPress={actions.share}

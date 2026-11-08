@@ -28,6 +28,7 @@ import {
   replyToBlock,
   restoreArtifact,
   setBlockState,
+  setFileSharing,
   updateArtifact,
   ValidationError,
   votePoll,
@@ -145,16 +146,37 @@ const multipart = <T extends z.ZodType>(schema: T) => ({
 const Audience = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("workspace") }),
-    z.object({ kind: z.literal("channel"), name: z.string(), private: z.boolean() }),
+    z.object({
+      kind: z.literal("channel"),
+      name: z.string(),
+      private: z.boolean(),
+      outside: z.literal(true).optional().openapi({
+        description: "I don't read the channel: the file was shared with me (ADR 0157), so it can't be opened.",
+      }),
+    }),
     z.object({
       kind: z.literal("dm"),
       with: Author.nullable().openapi({ description: "The other participant." }),
       gone: z.literal(true).optional().openapi({
         description: "The other side is an archived agent or a person who left: the DM can't be opened.",
       }),
+      between: z.array(Author).optional().openapi({
+        description: "I'm not in the DM, the file was shared with me (ADR 0157): its sides, and no `with`.",
+      }),
     }),
   ])
   .openapi("ArtifactAudience", { description: "Who can see the file, from the conversation it came from." });
+
+const Sharing = z
+  .object({
+    mode: z.enum(["conversation", "people", "everyone"]),
+    userIds: z.array(z.string()).max(200),
+    roleIds: z.array(z.string()).max(200),
+  })
+  .openapi("ArtifactSharing", {
+    description:
+      "Who sees it on top of its conversation (ADR 0157): nobody more, the people and roles listed (and administrators), or the whole workspace.",
+  });
 
 const Artifact = z
   .object({
@@ -176,6 +198,10 @@ const Artifact = z
     inDrive: z.boolean().openapi({ description: "False for a block or a poll, which live in their conversation." }),
     canDelete: z.boolean().openapi({ description: "I may move it to the trash (and restore it)." }),
     audience: Audience,
+    sharing: Sharing,
+    canShare: z.boolean().openapi({
+      description: "I may change its sharing: it lives in a conversation not everyone reads, and I read it there.",
+    }),
   })
   .openapi("Artifact");
 
@@ -563,6 +589,33 @@ export function artifactRoutes(deps: AppDeps) {
       "cache-control": "private, no-store, no-transform",
     });
   });
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/artifacts/{artifactId}/sharing",
+      tags,
+      security,
+      summary: "Who sees a file on top of its conversation (Compartilhar); whoever reads it there may change it",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({
+            mode: z.enum(["conversation", "people", "everyone"]),
+            userIds: z.array(z.string()).max(200).optional(),
+            roleIds: z.array(z.string()).max(200).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(Artifact), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const saved = await setFileSharing(artifacts(), userId, orgId, artifactId, c.req.valid("json"));
+      return c.json(await withFacts(userId, orgId, saved), 200);
+    },
+  );
 
   app.openapi(
     createRoute({

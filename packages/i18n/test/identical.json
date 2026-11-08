@@ -433,7 +433,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "team.chart.supervisor",
-      "team.sectors.supervisor"
+      "team.sectors.supervisor",
+      "share.groupRoles"
     ],
     "fr": [
       "settings.about.version",
@@ -793,7 +794,8 @@
       "routines.setup.github.type",
       "routines.setup.github.url",
       "routines.setup.sentry.url",
-      "agentSetup.how.instructions"
+      "agentSetup.how.instructions",
+      "share.agent"
     ],
     "de": [
       "settings.about.version",
@@ -1165,7 +1167,8 @@
       "browser.live.emulated.tablet",
       "browser.live.emulated.desktop",
       "team.chart.supervisor",
-      "team.sectors.supervisor"
+      "team.sectors.supervisor",
+      "share.agent"
     ],
     "it": [
       "queue.fill.routine",
@@ -1465,7 +1468,8 @@
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
       "browser.live.emulated.desktop",
-      "artifacts.files"
+      "artifacts.files",
+      "share.fileRef"
     ],
     "nl": [
       "wiki.bulk.agents",
@@ -1979,7 +1983,8 @@
       "team.chart.supervisor",
       "team.map.band",
       "team.sectors.supervisor",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "share.agent"
     ],
     "ja": [
       "access.area.vault",
@@ -2580,7 +2585,8 @@
       "browser.live.emulated.desktop",
       "team.chart.supervisor",
       "team.sectors.supervisor",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "share.fileRef"
     ],
     "tr": [
       "chat.wait.said",
@@ -2950,7 +2956,8 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "share.agent"
     ],
     "ru": [
       "agent.builtinName",

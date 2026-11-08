@@ -10156,6 +10156,7 @@
     "onlyDriveText": "Nog niet gedeeld in een kanaal.",
     "dm": "Direct bericht",
     "dmWith": "Direct bericht met {{name}}",
+    "dmBetween": "Direct bericht tussen {{names}}",
     "inDm": "Verstuurd in een direct bericht",
     "inThread": "In een thread van het gesprek",
     "audience": {
@@ -10163,7 +10164,8 @@
       "publicChannel": "Iedereen in de werkruimte kan het zien: het staat in het openbare kanaal #{{name}}",
       "privateChannel": "Alleen leden van #{{name}} en beheerders kunnen het zien",
       "dm": "Alleen jij en {{name}} kunnen het zien: het komt uit een direct bericht",
-      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht"
+      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht",
+      "dmBetween": "Alleen {{names}} kunnen het zien: het komt uit een direct bericht"
     },
     "private": "Privé",
     "privateHint": "Alleen de mensen in het gesprek zien deze bestanden. In een kanaal ook beheerders.",
@@ -12079,7 +12081,14 @@
       "fileNameRequired": "Het bestand heeft een naam nodig.",
       "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang.",
       "deleteForbidden": "Alleen wie het maakte, wie het de agent vroeg, de eigenaar van de agent of een beheerder kan dit verwijderen.",
-      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen."
+      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen.",
+      "versionNotFound": "Deze versie van het bestand bestaat niet.",
+      "formatUnavailable": "Dit bestand kan niet in dat formaat worden opgeslagen.",
+      "sharingOpen": "De hele werkruimte ziet dit bestand al.",
+      "sharingForbidden": "Alleen wie in het gesprek van het bestand zit, verandert wie het ziet.",
+      "sharingEmpty": "Kies wie het ziet.",
+      "sharingTooMany": "Kies hoogstens {{max}} mensen en {{max}} rollen.",
+      "notInDrive": "Dit bestaat alleen in zijn gesprek, dus het kan niet worden gedeeld."
     },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
@@ -16108,6 +16117,85 @@
     "receipt": "Wie het ziet: {{who}}",
     "limited": "beperkte toegang",
     "rolesToo": "De rollen die al op deze pagina staan, blijven haar zien."
+  },
+  "share": {
+    "button": "Delen",
+    "title": "{{name}} delen",
+    "conversation": "Alleen het gesprek",
+    "people": "Mensen en rollen die je kiest",
+    "everyone": "De hele werkruimte",
+    "whereDm": "Het directe bericht met {{name}}",
+    "whereDmGone": "Een direct bericht",
+    "whereDmBetween": "Het directe bericht tussen {{names}}",
+    "whereChannel": "Leden van #{{name}}",
+    "add": "Persoon of rol toevoegen",
+    "addSearch": "Mensen en rollen zoeken",
+    "noResults": "Niemand met die naam",
+    "groupPeople": "Mensen",
+    "groupRoles": "Rollen",
+    "access": "Wie toegang heeft",
+    "you": "{{name}} (jij)",
+    "agent": "Agent",
+    "role": "Rol",
+    "remove": "{{name}} verwijderen",
+    "admins": "Beheerders zien het altijd.",
+    "copyLink": "Link kopiëren",
+    "copied": "Link gekopieerd.",
+    "done": "Klaar",
+    "onlyHere": "Wie niet in dit gesprek zit, kan de link niet openen.",
+    "choosePeople": "Mensen kiezen",
+    "readOnly": "Alleen wie in het gesprek zit, verandert wie het ziet.",
+    "open": "De hele werkruimte ziet dit bestand.",
+    "savedEveryone": "Nu ziet de hele werkruimte het bestand.",
+    "savedPeople": "Nu zien de gekozen mensen het bestand.",
+    "savedConversation": "Nu ziet alleen het gesprek het bestand.",
+    "undo": "Ongedaan maken",
+    "fileRef": "Bestand {{title}}",
+    "fileRefNone": "Bestand zonder toegang",
+    "also": "{{text}}. Ook gedeeld met {{who}}.",
+    "someOnlyHere": "Sommige van deze links gaan alleen open voor wie in het gesprek van het bestand zit."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Log in om deze link te openen",
+      "text": "Na het inloggen kom je meteen hier terug."
+    },
+    "file": {
+      "title": "Dit bestand is niet beschikbaar voor jou",
+      "text": "Het is misschien verwijderd of alleen gedeeld in een gesprek waar je niet in zit. Vraag wie het stuurde om het met je te delen via de knop Delen van het bestand."
+    },
+    "link": {
+      "title": "Deze link is niet beschikbaar voor jou",
+      "text": "Hij is misschien verlopen, al gebruikt of leidt naar een plek waar je niet bent. Vraag wie hem stuurde om een nieuwe."
+    },
+    "version": {
+      "title": "Deze versie van het bestand bestaat niet",
+      "text": "De link vraagt om een versie die het bestand niet heeft."
+    },
+    "format": {
+      "title": "Dit bestand bestaat niet in dat formaat",
+      "text": "De link vraagt om een formaat waarin dit bestand niet kan worden opgeslagen."
+    },
+    "busy": {
+      "title": "Te veel pogingen achter elkaar",
+      "text": "Wacht even en probeer het opnieuw."
+    },
+    "server": {
+      "title": "Er ging iets mis aan onze kant",
+      "text": "Het lag niet aan jou. Probeer het zo opnieuw."
+    },
+    "other": {
+      "title": "Deze link ging niet open",
+      "text": "Het adres is onvolledig of werkt niet meer. Vraag wie het stuurde om een nieuw."
+    },
+    "action": {
+      "signIn": "Inloggen",
+      "open": "agentes.chat openen",
+      "latest": "Nieuwste versie openen",
+      "file": "Bestand openen",
+      "retry": "Opnieuw proberen"
+    },
+    "errorId": "Foutcode: {{id}}"
   },
   "teamTemplates": {
     "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",

@@ -28,6 +28,8 @@ export interface SearchQuery {
   visibleChannelIds: string[];
   /** Scopes the reader sees on tasks' documents only: a DM's id here reaches its tasks, never its messages. */
   visibleIssueScopes?: string[];
+  /** Files' documents the reader sees by their own id (`sourceId`), past their channels: shared with them (ADR 0157). */
+  visibleFileScopes?: string[];
   kinds?: SearchKind[];
   limit?: number;
   /**
@@ -212,10 +214,13 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
           const text = q.text.trim();
           const filtered = Boolean(q.messages || q.after || q.before);
           if (!text && !q.embedding && !filtered) return [];
-          const visible = q.visibleIssueScopes?.length
-            ? sql`(${t.channelIds} <@ ${uuids(q.visibleChannelIds)}
-                or (${t.kind} = 'issue' and ${t.channelIds} <@ ${uuids(q.visibleIssueScopes)}))`
-            : sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`;
+          const issues = q.visibleIssueScopes?.length
+            ? [sql`(${t.kind} = 'issue' and ${t.channelIds} <@ ${uuids(q.visibleIssueScopes)})`]
+            : [];
+          const files = q.visibleFileScopes?.length
+            ? [sql`(${t.kind} = 'file' and ${t.sourceId} = any(${uuids(q.visibleFileScopes)}))`]
+            : [];
+          const visible = sql`(${sql.join([sql`${t.channelIds} <@ ${uuids(q.visibleChannelIds)}`, ...issues, ...files], sql` or `)})`;
           const kinds = q.messages
             ? eq(t.kind, "message")
             : q.kinds && q.kinds.length > 0

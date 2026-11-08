@@ -10885,6 +10885,7 @@
     "onlyDriveText": "Jeszcze nie udostępniono na kanale.",
     "dm": "Wiadomość bezpośrednia",
     "dmWith": "Wiadomość bezpośrednia z: {{name}}",
+    "dmBetween": "Wiadomość bezpośrednia między: {{names}}",
     "inDm": "Wysłano w wiadomości bezpośredniej",
     "inThread": "W wątku rozmowy",
     "audience": {
@@ -10892,7 +10893,8 @@
       "publicChannel": "Widzą go wszyscy w przestrzeni roboczej: jest na publicznym kanale #{{name}}",
       "privateChannel": "Widzą go tylko członkowie #{{name}} i administratorzy",
       "dm": "Widzisz go tylko ty i {{name}}: pochodzi z wiadomości bezpośredniej",
-      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej"
+      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej",
+      "dmBetween": "Widzą go tylko {{names}}: pochodzi z wiadomości bezpośredniej"
     },
     "private": "Prywatne",
     "privateHint": "Te pliki widzą tylko osoby z rozmowy. W kanale także administratorzy.",
@@ -12898,7 +12900,14 @@
       "fileNameRequired": "Plik musi mieć nazwę.",
       "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu.",
       "deleteForbidden": "Usunąć to może tylko osoba, która to utworzyła, osoba, która poprosiła agenta, właściciel agenta albo administrator.",
-      "restoreForbidden": "Przywrócić to może tylko osoba, która mogła to usunąć."
+      "restoreForbidden": "Przywrócić to może tylko osoba, która mogła to usunąć.",
+      "versionNotFound": "Ta wersja pliku nie istnieje.",
+      "formatUnavailable": "Tego pliku nie da się zapisać w tym formacie.",
+      "sharingOpen": "Cała przestrzeń robocza już widzi ten plik.",
+      "sharingForbidden": "Tylko osoby z rozmowy, w której jest plik, zmieniają, kto go widzi.",
+      "sharingEmpty": "Wybierz, kto to widzi.",
+      "sharingTooMany": "Wybierz najwyżej {{max}} osób i {{max}} ról.",
+      "notInDrive": "To istnieje tylko w swojej rozmowie, więc nie da się tego udostępnić."
     },
     "machine": {
       "forbidden": "Może to zrobić tylko administrator albo osoba, która podłączyła komputer.",
@@ -17033,6 +17042,85 @@
     "receipt": "Kto to widzi: {{who}}",
     "limited": "ograniczony dostęp",
     "rolesToo": "Role, które są już na tej stronie, nadal ją widzą."
+  },
+  "share": {
+    "button": "Udostępnij",
+    "title": "Udostępnij {{name}}",
+    "conversation": "Tylko rozmowa",
+    "people": "Osoby i role, które wybierzesz",
+    "everyone": "Cała przestrzeń robocza",
+    "whereDm": "Wiadomość bezpośrednia z: {{name}}",
+    "whereDmGone": "Wiadomość bezpośrednia",
+    "whereDmBetween": "Wiadomość bezpośrednia między: {{names}}",
+    "whereChannel": "Członkowie #{{name}}",
+    "add": "Dodaj osobę lub rolę",
+    "addSearch": "Szukaj osób i ról",
+    "noResults": "Nikt o takim imieniu",
+    "groupPeople": "Osoby",
+    "groupRoles": "Role",
+    "access": "Kto ma dostęp",
+    "you": "{{name}} (ty)",
+    "agent": "Agent",
+    "role": "Rola",
+    "remove": "Usuń: {{name}}",
+    "admins": "Administratorzy zawsze to widzą.",
+    "copyLink": "Kopiuj link",
+    "copied": "Skopiowano link.",
+    "done": "Gotowe",
+    "onlyHere": "Osoby spoza tej rozmowy nie otworzą linku.",
+    "choosePeople": "Wybierz osoby",
+    "readOnly": "Tylko osoby z rozmowy zmieniają, kto to widzi.",
+    "open": "Cała przestrzeń robocza widzi ten plik.",
+    "savedEveryone": "Teraz cała przestrzeń robocza widzi plik.",
+    "savedPeople": "Teraz wybrane osoby widzą plik.",
+    "savedConversation": "Teraz plik widzi tylko rozmowa.",
+    "undo": "Cofnij",
+    "fileRef": "Plik {{title}}",
+    "fileRefNone": "Plik bez dostępu",
+    "also": "{{text}}. Udostępniono też: {{who}}.",
+    "someOnlyHere": "Niektóre z tych linków otworzą tylko osoby z rozmowy, w której jest plik."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Zaloguj się, aby otworzyć ten link",
+      "text": "Po zalogowaniu wrócisz prosto tutaj."
+    },
+    "file": {
+      "title": "Ten plik nie jest dla ciebie dostępny",
+      "text": "Mógł zostać usunięty albo jest udostępniony tylko w rozmowie, w której cię nie ma. Poproś osobę, która go wysłała, żeby udostępniła ci go przyciskiem Udostępnij przy pliku."
+    },
+    "link": {
+      "title": "Ten link nie jest dla ciebie dostępny",
+      "text": "Mógł wygasnąć, zostać już użyty albo prowadzi do miejsca, w którym cię nie ma. Poproś osobę, która go wysłała, o nowy."
+    },
+    "version": {
+      "title": "Ta wersja pliku nie istnieje",
+      "text": "Link prosi o wersję, której plik nie ma."
+    },
+    "format": {
+      "title": "Ten plik nie jest dostępny w tym formacie",
+      "text": "Link prosi o format, w którym tego pliku nie da się zapisać."
+    },
+    "busy": {
+      "title": "Za dużo prób z rzędu",
+      "text": "Poczekaj chwilę i spróbuj ponownie."
+    },
+    "server": {
+      "title": "Coś poszło nie tak po naszej stronie",
+      "text": "To nie twoja wina. Spróbuj ponownie za chwilę."
+    },
+    "other": {
+      "title": "Ten link się nie otworzył",
+      "text": "Adres jest niepełny albo już nie działa. Poproś osobę, która go wysłała, o nowy."
+    },
+    "action": {
+      "signIn": "Zaloguj się",
+      "open": "Otwórz agentes.chat",
+      "latest": "Otwórz najnowszą wersję",
+      "file": "Otwórz plik",
+      "retry": "Spróbuj ponownie"
+    },
+    "errorId": "Kod błędu: {{id}}"
   },
   "teamTemplates": {
     "lead": "Zespół dla {{org}}, każdy agent na własnym kanale. Możesz go dostosować przed utworzeniem.",

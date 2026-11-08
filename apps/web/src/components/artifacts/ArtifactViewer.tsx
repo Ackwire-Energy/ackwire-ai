@@ -11,6 +11,7 @@ import { artifactText, KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, formatBytes, isPreviewImage, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { filePath } from "@agenteschat/client/lib/message-links";
 import {
   Alert,
   Button,
@@ -37,6 +38,7 @@ import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { ArtifactMoreMenu, type DownloadFormat, useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { fileSaver } from "./fileSaver";
+import { useFileShare } from "./ShareDialog";
 import { UploadButton, useDriveUpload } from "./Upload";
 import { ArtifactContentView, TableEditor } from "./views";
 
@@ -44,7 +46,7 @@ export { fileSaver };
 
 /** Link to an artifact (opens Drive with the viewer). */
 export const artifactLink = (origin: string, orgId: string, id: string, version?: number) =>
-  `${origin}/org/${orgId}/drive?artifact=${encodeURIComponent(id)}${version ? `&v=${version}` : ""}`;
+  `${origin}${filePath(orgId, id, version)}`;
 
 /** Where the viewer is a phone's full-screen sheet (DetailsDialog's CSS): no room for "2 de 4" beside the title. */
 const SHEET_QUERY = "(max-width: 640px)";
@@ -165,6 +167,7 @@ export function ArtifactViewer({
     onVersion(undefined);
   });
   const downloads = useArtifactDownload();
+  const share = useFileShare();
   const save = (format?: DownloadFormat) => {
     if (a) void downloads.save(a, format, a.shownVersion, a.content);
   };
@@ -266,6 +269,18 @@ export function ArtifactViewer({
             </MenuItem>
           ))}
         </Menu>
+      )}
+      {a.inDrive !== false && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="personAdd"
+          className="artifact-share"
+          title={t("share.button")}
+          onClick={() => share.open(a)}
+        >
+          {words(t("share.button"))}
+        </Button>
       )}
       {text && (
         <Button
@@ -436,6 +451,7 @@ export function ArtifactViewer({
         </div>
       )}
       {remover.dialog}
+      {share.dialog}
     </DetailsDialog>
   );
 }

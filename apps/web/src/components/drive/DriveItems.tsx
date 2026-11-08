@@ -51,54 +51,61 @@ export function DriveCard({
   const name = authorName(a.createdBy);
   const menu = useItemMenu(a, onOpen, onDelete);
   return (
-    <article
-      className={cx("drive-card", open && "drive-card--open", selected && "drive-card--selected")}
-      data-kind={a.kind}
-      {...menu}
-    >
-      <DrivePreview artifact={a} />
-      <span className="drive-card__kind">
-        <Icon name={itemIcon(a)} size={14} />
-        <span>
-          {t(`artifacts.kind.${a.kind}`)}
-          {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
+    <>
+      <article
+        className={cx("drive-card", open && "drive-card--open", selected && "drive-card--selected")}
+        data-kind={a.kind}
+        {...menu.props}
+      >
+        <DrivePreview artifact={a} />
+        <span className="drive-card__kind">
+          <Icon name={itemIcon(a)} size={14} />
+          <span>
+            {t(`artifacts.kind.${a.kind}`)}
+            {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
+          </span>
         </span>
-      </span>
-      <div className="drive-card__body">
-        <button
-          type="button"
-          className="drive-card__title drive-hit"
-          aria-haspopup="dialog"
-          onClick={(e) => onPick(a, e)}
-        >
-          {a.title}
-        </button>
-        <span className="drive-card__meta">
-          <ActorAvatar size="xs" actor={a.createdBy} name={name} />
-          <span className="drive-card__name">{name}</span>
-          <span className="drive-card__where">{channelName(a)}</span>
-          <time className="drive-card__when tabular" dateTime={a.updatedAt}>
-            {relativeTime(t, i18n.language, a.updatedAt)}
-          </time>
-        </span>
-      </div>
-      <Checkbox
-        className="drive-check"
-        checked={selected}
-        onCheckedChange={() => onToggle(a)}
-        aria-label={t("drive.select", { title: a.title })}
-      />
-    </article>
+        <div className="drive-card__body">
+          <button
+            type="button"
+            className="drive-card__title drive-hit"
+            aria-haspopup="dialog"
+            onClick={(e) => onPick(a, e)}
+          >
+            {a.title}
+          </button>
+          <span className="drive-card__meta">
+            <ActorAvatar size="xs" actor={a.createdBy} name={name} />
+            <span className="drive-card__name">{name}</span>
+            <span className="drive-card__where">{channelName(a)}</span>
+            <time className="drive-card__when tabular" dateTime={a.updatedAt}>
+              {relativeTime(t, i18n.language, a.updatedAt)}
+            </time>
+          </span>
+        </div>
+        <Checkbox
+          className="drive-check"
+          checked={selected}
+          onCheckedChange={() => onToggle(a)}
+          aria-label={t("drive.select", { title: a.title })}
+        />
+      </article>
+      {menu.dialog}
+    </>
   );
 }
 
-/** A card's or row's right click and menu key: the same actions as its "…", with open and download first. */
+/**
+ * A card's or row's right click and menu key: the same actions as its "…", with open and download first. `dialog`
+ * (its share dialog) goes beside the item, so the dialog's keys never reach the item's own.
+ */
 function useItemMenu(a: Artifact, onOpen: (a: Artifact) => void, onDelete: (a: Artifact) => void) {
   const entries = useArtifactEntries();
-  return entityMenu(() => [
+  const props = entityMenu(() => [
     { kind: "header", label: a.title },
     ...entries(a, { onOpen: () => onOpen(a), onDelete: () => onDelete(a), download: true }),
   ]);
+  return { props, dialog: entries.dialog };
 }
 
 /** A list row: checkbox, small preview + title, who, where, when, "…". */
@@ -118,49 +125,52 @@ export function DriveRow({
   const when = relativeTime(t, i18n.language, a.updatedAt);
   const menu = useItemMenu(a, onOpen, onDelete);
   return (
-    <li
-      className={cx("drive-row", open && "drive-row--open", selected && "drive-row--selected")}
-      data-kind={a.kind}
-      {...menu}
-    >
-      <Checkbox
-        className="drive-check"
-        checked={selected}
-        onCheckedChange={() => onToggle(a)}
-        aria-label={t("drive.select", { title: a.title })}
-      />
-      <span className="drive-row__name">
-        <DrivePreview artifact={a} size="sm" />
-        <span className="drive-row__text">
-          <button
-            type="button"
-            className="drive-row__title drive-hit"
-            aria-haspopup="dialog"
-            onClick={(e) => onPick(a, e)}
-          >
-            {a.title}
-          </button>
-          <span className="drive-row__sub">
-            <Icon name={itemIcon(a)} size={14} />
-            <span className="drive-row__subtext">
-              {t(`artifacts.kind.${a.kind}`)}
-              {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
-              <span className="drive-row__mobile">{` · ${name} · ${when}`}</span>
+    <>
+      <li
+        className={cx("drive-row", open && "drive-row--open", selected && "drive-row--selected")}
+        data-kind={a.kind}
+        {...menu.props}
+      >
+        <Checkbox
+          className="drive-check"
+          checked={selected}
+          onCheckedChange={() => onToggle(a)}
+          aria-label={t("drive.select", { title: a.title })}
+        />
+        <span className="drive-row__name">
+          <DrivePreview artifact={a} size="sm" />
+          <span className="drive-row__text">
+            <button
+              type="button"
+              className="drive-row__title drive-hit"
+              aria-haspopup="dialog"
+              onClick={(e) => onPick(a, e)}
+            >
+              {a.title}
+            </button>
+            <span className="drive-row__sub">
+              <Icon name={itemIcon(a)} size={14} />
+              <span className="drive-row__subtext">
+                {t(`artifacts.kind.${a.kind}`)}
+                {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
+                <span className="drive-row__mobile">{` · ${name} · ${when}`}</span>
+              </span>
             </span>
           </span>
         </span>
-      </span>
-      <span className="drive-row__who">
-        <ActorAvatar size="xs" actor={a.createdBy} name={name} />
-        <span>{name}</span>
-      </span>
-      <span className="drive-row__where">{channelName(a)}</span>
-      <time className="drive-row__when tabular" dateTime={a.updatedAt}>
-        {when}
-      </time>
-      <span className="drive-row__more">
-        <ArtifactMoreMenu artifact={a} onOpen={() => onOpen(a)} onDelete={() => onDelete(a)} />
-      </span>
-    </li>
+        <span className="drive-row__who">
+          <ActorAvatar size="xs" actor={a.createdBy} name={name} />
+          <span>{name}</span>
+        </span>
+        <span className="drive-row__where">{channelName(a)}</span>
+        <time className="drive-row__when tabular" dateTime={a.updatedAt}>
+          {when}
+        </time>
+        <span className="drive-row__more">
+          <ArtifactMoreMenu artifact={a} onOpen={() => onOpen(a)} onDelete={() => onDelete(a)} />
+        </span>
+      </li>
+      {menu.dialog}
+    </>
   );
 }

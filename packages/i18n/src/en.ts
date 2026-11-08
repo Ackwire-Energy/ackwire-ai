@@ -10020,6 +10020,8 @@ export const en = {
     onlyDriveText: "Not shared in a channel yet.",
     dm: "Direct message",
     dmWith: "Direct message with {{name}}",
+    /** A file of a DM the person isn't in, shared with them (ADR 0157): the DM's two sides. */
+    dmBetween: "Direct message between {{names}}",
     inDm: "Sent in a direct message",
     inThread: "In a thread of the conversation",
     audience: {
@@ -10028,6 +10030,8 @@ export const en = {
       privateChannel: "Only members of #{{name}} and administrators can see it",
       dm: "Only you and {{name}} can see it: it came from a direct message",
       dmGone: "Only the people in that conversation can see it: it came from a direct message",
+      /** For someone who isn't in the DM and got the file through Compartilhar (ADR 0157). */
+      dmBetween: "Only {{names}} can see it: it came from a direct message",
     },
     private: "Private",
     privateHint: "Only the people in the conversation see these files. In a channel, administrators do too.",
@@ -11738,6 +11742,13 @@ export const en = {
       notFound: "This file no longer exists or you don't have access.",
       deleteForbidden: "Only who created it, who asked the agent, the agent's owner or an admin can delete this.",
       restoreForbidden: "Only who could delete it can restore it.",
+      versionNotFound: "This version of the file doesn't exist.",
+      formatUnavailable: "This file can't be saved in that format.",
+      sharingOpen: "Everyone in the workspace sees this file already.",
+      sharingForbidden: "Only who's in the file's conversation changes who sees it.",
+      sharingEmpty: "Choose who sees it.",
+      sharingTooMany: "Choose at most {{max}} people and {{max}} roles.",
+      notInDrive: "This lives only in its conversation, so it can't be shared.",
     },
     machine: {
       forbidden: "Only an admin, or whoever connected the computer, can do that.",
@@ -15790,6 +15801,94 @@ export const en = {
     receipt: "Who sees it: {{who}}",
     limited: "limited access",
     rolesToo: "The roles already on this page keep seeing it.",
+  },
+  /** Compartilhar (ADR 0157): who sees a file on top of the conversation it lives in, and its link. */
+  share: {
+    button: "Share",
+    title: "Share {{name}}",
+    conversation: "Only the conversation",
+    people: "People and roles you choose",
+    everyone: "Everyone in the workspace",
+    whereDm: "The DM with {{name}}",
+    whereDmGone: "A DM",
+    /** For someone who isn't in the DM and got the file through Compartilhar. */
+    whereDmBetween: "The DM between {{names}}",
+    whereChannel: "Members of #{{name}}",
+    add: "Add a person or a role",
+    addSearch: "Search people and roles",
+    noResults: "Nobody with that name",
+    groupPeople: "People",
+    groupRoles: "Roles",
+    access: "Who has access",
+    you: "{{name}} (you)",
+    agent: "Agent",
+    role: "Role",
+    remove: "Remove {{name}}",
+    admins: "Administrators always see it.",
+    copyLink: "Copy link",
+    copied: "Link copied.",
+    done: "Done",
+    /** Beside Copiar link while only a private conversation sees the file. */
+    onlyHere: "People outside this conversation won't open the link.",
+    choosePeople: "Choose people",
+    readOnly: "Only who's in the conversation changes who sees it.",
+    open: "Everyone in the workspace sees this file.",
+    savedEveryone: "Everyone in the workspace sees the file now.",
+    savedPeople: "The people you chose see the file now.",
+    savedConversation: "Only the conversation sees the file now.",
+    undo: "Undo",
+    fileRef: "File {{title}}",
+    fileRefNone: "File without access",
+    /** Who sees the file (`text`, no full stop) and who Compartilhar added. */
+    also: "{{text}}. Also shared with {{who}}.",
+    /** Copiar links of several files, some only their conversation opens: the toast, with Compartilhar. */
+    someOnlyHere: "Some of these links open only for who's in the file's conversation.",
+  },
+  /**
+   * A link a person opens in a browser that the server refuses (ADR 0157): each cause's title and words, the button
+   * that gets them out, and the error's code on a failure of ours.
+   */
+  linkErrors: {
+    signIn: {
+      title: "Sign in to open this link",
+      text: "Once you're in, you come right back here.",
+    },
+    file: {
+      title: "This file isn't available to you",
+      text: "It may have been deleted, or be shared only in a conversation you're not in. Ask whoever sent it to share it with you from the file's Share button.",
+    },
+    link: {
+      title: "This link isn't available to you",
+      text: "It may have expired, been used already, or lead to a place you're not in. Ask whoever sent it for a new one.",
+    },
+    version: {
+      title: "This version of the file doesn't exist",
+      text: "The link asks for a version the file doesn't have.",
+    },
+    format: {
+      title: "This file doesn't come in that format",
+      text: "The link asks for a format this file can't be saved in.",
+    },
+    busy: {
+      title: "Too many tries in a row",
+      text: "Wait a moment and try again.",
+    },
+    server: {
+      title: "Something failed on our side",
+      text: "It wasn't anything you did. Try again in a moment.",
+    },
+    other: {
+      title: "This link didn't open",
+      text: "The address is incomplete or no longer works. Ask whoever sent it for a new one.",
+    },
+    action: {
+      signIn: "Sign in",
+      open: "Open agentes.chat",
+      latest: "Open the latest version",
+      file: "Open the file",
+      retry: "Try again",
+    },
+    errorId: "Error code: {{id}}",
   },
   teamTemplates: {
     lead: "A team for {{org}}, each agent in its own channel. You can adjust it before creating.",

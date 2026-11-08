@@ -9727,6 +9727,7 @@
     "onlyDriveText": "尚未在频道中分享。",
     "dm": "私信",
     "dmWith": "与 {{name}} 的私信",
+    "dmBetween": "{{names}} 之间的私信",
     "inDm": "在私信中发送",
     "inThread": "在对话的话题中",
     "audience": {
@@ -9734,7 +9735,8 @@
       "publicChannel": "工作区中的所有人都能看到：它在公开频道 #{{name}} 中",
       "privateChannel": "只有 #{{name}} 的成员和管理员能看到",
       "dm": "只有你和 {{name}} 能看到：它来自私信",
-      "dmGone": "只有那段对话中的成员能看到：它来自私信"
+      "dmGone": "只有那段对话中的成员能看到：它来自私信",
+      "dmBetween": "只有 {{names}} 能看到：它来自私信"
     },
     "private": "私密",
     "privateHint": "只有对话中的成员能看到这些文件。在频道中，管理员也能看到。",
@@ -11605,7 +11607,14 @@
       "fileNameRequired": "文件需要一个名称。",
       "notFound": "这个文件已不存在，或你无权访问。",
       "deleteForbidden": "只有创建者、向智能体提出请求的人、智能体负责人或管理员可以删除它。",
-      "restoreForbidden": "只有可以删除它的人才能恢复它。"
+      "restoreForbidden": "只有可以删除它的人才能恢复它。",
+      "versionNotFound": "这个版本的文件不存在。",
+      "formatUnavailable": "这个文件无法保存为这种格式。",
+      "sharingOpen": "整个工作区已经能看到这个文件。",
+      "sharingForbidden": "只有文件所在对话里的人能更改谁能看到。",
+      "sharingEmpty": "请选择谁能看到。",
+      "sharingTooMany": "最多选择 {{max}} 个人和 {{max}} 个角色。",
+      "notInDrive": "它只存在于自己的对话中，所以无法共享。"
     },
     "machine": {
       "forbidden": "只有管理员或连接这台电脑的人可以执行此操作。",
@@ -15561,6 +15570,85 @@
     "receipt": "谁能看到：{{who}}",
     "limited": "访问受限",
     "rolesToo": "已在此页面上的角色仍可查看。"
+  },
+  "share": {
+    "button": "共享",
+    "title": "共享 {{name}}",
+    "conversation": "仅限对话",
+    "people": "你选择的人和角色",
+    "everyone": "整个工作区",
+    "whereDm": "与 {{name}} 的私信",
+    "whereDmGone": "一条私信",
+    "whereDmBetween": "{{names}} 之间的私信",
+    "whereChannel": "#{{name}} 的成员",
+    "add": "添加人或角色",
+    "addSearch": "搜索人和角色",
+    "noResults": "没有这个名字的人",
+    "groupPeople": "人",
+    "groupRoles": "角色",
+    "access": "谁有访问权限",
+    "you": "{{name}}（你）",
+    "agent": "智能体",
+    "role": "角色",
+    "remove": "移除 {{name}}",
+    "admins": "管理员始终可以看到。",
+    "copyLink": "复制链接",
+    "copied": "链接已复制。",
+    "done": "完成",
+    "onlyHere": "不在这个对话里的人打不开这个链接。",
+    "choosePeople": "选择人",
+    "readOnly": "只有对话里的人能更改谁能看到。",
+    "open": "整个工作区都能看到这个文件。",
+    "savedEveryone": "现在整个工作区都能看到这个文件。",
+    "savedPeople": "现在你选择的人能看到这个文件。",
+    "savedConversation": "现在只有对话里的人能看到这个文件。",
+    "undo": "撤销",
+    "fileRef": "文件 {{title}}",
+    "fileRefNone": "无权访问的文件",
+    "also": "{{text}}。也已与 {{who}} 共享。",
+    "someOnlyHere": "其中一些链接只有文件所在对话里的人能打开。"
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "登录后打开这个链接",
+      "text": "登录后，你会直接回到这里。"
+    },
+    "file": {
+      "title": "你无法访问这个文件",
+      "text": "它可能已被删除，或者只在你不在的对话里共享。请发送者通过文件的共享按钮与你共享。"
+    },
+    "link": {
+      "title": "你无法使用这个链接",
+      "text": "它可能已过期、已被使用，或者通往你不在的地方。请发送者给你一个新的链接。"
+    },
+    "version": {
+      "title": "这个版本的文件不存在",
+      "text": "链接要的版本这个文件没有。"
+    },
+    "format": {
+      "title": "这个文件没有这种格式",
+      "text": "链接要的格式无法用来保存这个文件。"
+    },
+    "busy": {
+      "title": "连续尝试次数太多",
+      "text": "请稍等片刻再试。"
+    },
+    "server": {
+      "title": "我们这边出了问题",
+      "text": "这不是你造成的。请稍后再试。"
+    },
+    "other": {
+      "title": "这个链接没有打开",
+      "text": "地址不完整或已失效。请发送者给你一个新的。"
+    },
+    "action": {
+      "signIn": "登录",
+      "open": "打开 agentes.chat",
+      "latest": "打开最新版本",
+      "file": "打开文件",
+      "retry": "重试"
+    },
+    "errorId": "错误代码：{{id}}"
   },
   "teamTemplates": {
     "lead": "为{{org}}准备的团队，每个智能体都有自己的频道。创建前可以调整。",

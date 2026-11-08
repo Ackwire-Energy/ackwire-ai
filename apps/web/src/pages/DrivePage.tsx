@@ -11,9 +11,11 @@ import {
   type DriveWho,
   driveSections,
   isDriveView,
+  onlyItsConversation,
   PRIVATE_SECTION,
   rangeOf,
 } from "@agenteschat/client/lib/drive";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -38,6 +40,7 @@ import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { useFileShare } from "@/components/artifacts/ShareDialog";
 import { UploadButton, useDriveUpload } from "@/components/artifacts/Upload";
 import { DriveDetails } from "@/components/drive/DriveDetails";
 import { DriveCard, DriveRow, type ItemProps } from "@/components/drive/DriveItems";
@@ -76,6 +79,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const channels = useChannels(org.id);
   const toast = useToast();
   const downloads = useArtifactDownload();
+  const share = useFileShare();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [q, setQ] = useState("");
@@ -145,9 +149,11 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     a.audience.kind === "channel"
       ? `#${a.audience.name}`
       : a.audience.kind === "dm"
-        ? a.audience.with
-          ? t("drive.dmWith", { name: authorName(a.audience.with) })
-          : t("drive.dm")
+        ? a.audience.between
+          ? t("drive.dmBetween", { names: joinNames(a.audience.between.map(authorName), t) })
+          : a.audience.with
+            ? t("drive.dmWith", { name: authorName(a.audience.with) })
+            : t("drive.dm")
         : t("artifacts.noChannel");
 
   const rows = list.artifacts ?? [];
@@ -232,7 +238,11 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     await navigator.clipboard?.writeText(
       picked.map((a) => artifactLink(window.location.origin, org.id, a.id)).join("\n"),
     );
-    toast.show(t("drive.linksCopied", { count: picked.length }));
+    // The share dialog's rule, for many at once: say which links only their conversation opens, with the way to share.
+    const closed = picked.find(onlyItsConversation);
+    if (closed) {
+      toast.show(t("share.someOnlyHere"), "info", { label: t("share.button"), run: () => share.open(closed) });
+    } else toast.show(t("drive.linksCopied", { count: picked.length }));
   };
   const deletable = picked.filter((a) => a.canDelete);
 
@@ -360,6 +370,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
 
         {trashOpen && <DriveTrash />}
         {remover.dialog}
+        {share.dialog}
 
         {!trashOpen && (
           <>

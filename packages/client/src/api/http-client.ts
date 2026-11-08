@@ -1337,6 +1337,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       create: (orgId, input) => request<ArtifactDetail>(`${org(orgId)}/artifacts`, { json: input }),
       update: (orgId, id, input) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),
+      setSharing: (orgId, id, sharing) =>
+        request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/sharing`, { method: "PUT", json: sharing }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
       trash: async (orgId) => {
         // The server answers `{ files }`.

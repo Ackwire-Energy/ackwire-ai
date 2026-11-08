@@ -2539,8 +2539,8 @@
   "files.more": {
     "value": "More options"
   },
-  "files.share": {
-    "value": "Share"
+  "files.send": {
+    "value": "Send"
   },
   "files.savePhotos": {
     "value": "Save to Photos"
@@ -2558,7 +2558,7 @@
     "value": "Allow it in Settings to save pictures."
   },
   "files.shareFailed": {
-    "value": "Couldn't share the file."
+    "value": "Couldn't send the file."
   },
   "files.saveFailed": {
     "value": "Couldn't save the picture."
@@ -2582,7 +2582,7 @@
     "value": "Next picture"
   },
   "files.noPreview": {
-    "value": "This file doesn't open in the app. Share it to open it in another app."
+    "value": "This file doesn't open in the app. Send it to another app to open it."
   },
   "files.video.play": {
     "value": "Play"

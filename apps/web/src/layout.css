@@ -3472,6 +3472,20 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   width: 1em;
   height: 1em;
 }
+/* A file's link (FileRef): the #channel pill, its name wrapping like the words around it, led by the file's 14px icon in
+   its padding as LinkPill's logo is (below), so the icon never ends a line alone. At 0.3em its middle sits on the
+   capitals' middle within a pixel, measured both as the chat's button and as the link it is outside a viewer. */
+.file-ref {
+  position: relative;
+  padding-left: 20px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.file-ref > .ac-icon {
+  position: absolute;
+  top: 0.3em;
+  left: 3px;
+}
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a
    table squeeze the column to a letter per line. The logo sits in the padding, not in the text: a picture in the text
@@ -7089,12 +7103,13 @@ html:not([data-pointer]) .run-continue:focus-visible {
     padding: 0 16px 12px;
   }
 }
-/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Copiar texto, Enviar nova
-   versão, Editar, … and × on the bar. On a phone the actions are their icons alone: with their words the title's column
-   shrank until a file's name wrapped letter by letter. */
+/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Compartilhar, Copiar texto,
+   Enviar nova versão, Editar, … and × on the bar. On a phone the actions are their icons alone: with their words the
+   title's column shrank until a file's name wrapped letter by letter. */
 .artifact-sheet__title {
   display: block;
 }
+/* Narrow: the bar's buttons are their icons (named by their titles), so the title keeps the width. */
 @media (max-width: 720px) {
   .artifact-action__label {
     position: absolute;

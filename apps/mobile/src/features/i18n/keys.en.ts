@@ -1051,13 +1051,13 @@ export const featureKeysEn = {
       file: "File",
     },
     more: "More options",
-    share: "Share",
+    send: "Send",
     savePhotos: "Save to Photos",
     drive: "View in Drive",
     saved: "Saved to Photos",
     photosDenied: "No access to Photos",
     photosDeniedSub: "Allow it in Settings to save pictures.",
-    shareFailed: "Couldn't share the file.",
+    shareFailed: "Couldn't send the file.",
     saveFailed: "Couldn't save the picture.",
     loadFailed: "Couldn't open the file.",
     openImage: "Open picture",
@@ -1066,7 +1066,7 @@ export const featureKeysEn = {
     /** The picture viewer's buttons on the picture's sides. */
     previous: "Previous picture",
     next: "Next picture",
-    noPreview: "This file doesn't open in the app. Share it to open it in another app.",
+    noPreview: "This file doesn't open in the app. Send it to another app to open it.",
     /** The video player's controls (a message's video and the file screen). */
     video: {
       play: "Play",

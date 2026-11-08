@@ -1,6 +1,6 @@
 import { everyoneWord, isEveryoneWord } from "@agenteschat/client/lib/everyone";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
-import { parseMessageLink } from "@agenteschat/client/lib/message-links";
+import { parseFileLink, parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,7 @@ import { ownLinkHref } from "../links/app-links";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
+import { FileRefText } from "./FileRefText";
 import { IdRefText } from "./IdRefText";
 import { LinkPillText } from "./LinkPillText";
 import {
@@ -32,8 +33,8 @@ import { useRowLook } from "./look";
 import { MessageRefText } from "./MessageRefText";
 
 /**
- * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, an internal id as what it names,
- * @mentions, #channels), inside a Text. `channelRefs`: the
+ * Inline marks of a message (bold, italic, `code`, links, a message's or a file's link as its pill, an internal id as
+ * what it names, @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
 export function Spans({
@@ -84,9 +85,11 @@ export function Spans({
               </RNText>
             );
           case "link": {
-            // A message here: its pill, opening it in the app.
+            // A message or a file here: its pill, opening it in the app.
             const message = parseMessageLink(s.href, [serverUrl()]);
             if (message) return <MessageRefText key={key} link={message} />;
+            const file = parseFileLink(s.href, [serverUrl()]);
+            if (file) return <FileRefText key={key} link={file} />;
             // An address as written, whatever way: the words of a link written with its own stay.
             const pill = !live && s.text === s.href ? linkPill(s.href) : null;
             if (pill) return <LinkPillText key={key} href={s.href} pill={pill} />;

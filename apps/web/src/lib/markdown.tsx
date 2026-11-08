@@ -2,8 +2,9 @@ import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { loneIdRef, splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
-import { parseMessageLink } from "@agenteschat/client/lib/message-links";
+import { parseFileLink, parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { type ReactNode, useMemo } from "react";
+import { FileRef } from "@/chat/FileRef";
 import { LinkPill } from "@/chat/LinkPill";
 import { MessageRef } from "@/chat/MessageRef";
 import { MermaidOrCode } from "@/components/artifacts/Mermaid";
@@ -96,12 +97,15 @@ function withMentions(text: string, key: string, mention?: MentionRenderer, word
 }
 
 /**
- * A link opens in a new tab; one to a message here (`parseMessageLink`) is its pill, opening in the app. `bare`: an
+ * A link opens in a new tab; one to a message or a file here (`parseMessageLink`, `parseFileLink`) is its pill, opening
+ * in the app. `bare`: an
  * address written as it is, shown as its service's pill when its shape is known (`linkPill`).
  */
 function link(href: string, key: string, children: ReactNode, bare = false) {
   const message = parseMessageLink(href, [window.location.origin]);
   if (message) return <MessageRef key={key} link={message} />;
+  const file = parseFileLink(href, [window.location.origin]);
+  if (file) return <FileRef key={key} link={file} />;
   const pill = bare ? linkPill(href) : null;
   if (pill) return <LinkPill key={key} href={href} pill={pill} />;
   return (
