@@ -103,6 +103,15 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
     ]);
     expect(appPermissionsFor("actions_run_trigger", "actions.run")).toEqual([{ actions: "write" }]);
     expect(appPermissionsFor("projects_list", "projects.read")).toBeNull();
+    // A pull request's number goes through the issues endpoints too (comments, labels, assignees).
+    expect(appPermissionsFor("add_issue_comment", "issues.write")).toEqual([
+      { issues: "write", pull_requests: "write" },
+      { issues: "write" },
+    ]);
+    expect(appPermissionsFor("issue_read", "issues.read")).toEqual([
+      { issues: "read", pull_requests: "read" },
+      { issues: "read" },
+    ]);
   });
 
   test("a covered repository goes with its app token; anywhere else with the account, as before", async () => {
@@ -114,7 +123,10 @@ describe("GitHub's tools act as the app where it is installed (ADR 0156)", () =>
       body: "Done",
     });
     expect(covered.auth).toBe("Bearer ghs_app_1");
-    expect(w.rest.minted.at(-1)?.body).toEqual({ repositories: ["api"], permissions: { issues: "write" } });
+    expect(w.rest.minted.at(-1)?.body).toEqual({
+      repositories: ["api"],
+      permissions: { issues: "write", pull_requests: "write" },
+    });
     const elsewhere = await w.call("github_add_issue_comment", {
       owner: "other",
       repo: "x",
