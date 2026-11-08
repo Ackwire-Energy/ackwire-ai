@@ -41,6 +41,8 @@ export const ptBR = {
     code: "Código",
     fullScreen: "Tela cheia",
     wrapLines: "Quebrar linhas",
+    /** A formatted block (JSON) shown as it was written. */
+    raw: "Original",
     table: "Tabela",
     chartItem: "Item",
     chartShare: "Parte",

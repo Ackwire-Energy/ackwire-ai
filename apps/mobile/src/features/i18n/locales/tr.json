@@ -69,6 +69,7 @@
     "copied": "Kopyalandı",
     "fullScreen": "Tam ekran",
     "wrap": "Satırları kaydır",
+    "raw": "Ham",
     "more": "{{count}} satırın tümünü gör",
     "gone": "Bu kod artık açık değil."
   },

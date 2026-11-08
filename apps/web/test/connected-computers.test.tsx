@@ -160,6 +160,22 @@ describe("uploaded files in the Drive", () => {
     expect(dialog.querySelector("textarea")).toBeNull();
   });
 
+  test("a JSON file reads formatted in a code card, the text as written one press away", async () => {
+    const api = createFakeApi(seedState());
+    const raw = '{"status":"ok","checks":[{"id":"db","ms":12}]}';
+    const file = await api.artifacts.upload(ORG_ID, new File([raw], "saude.json", { type: "application/json" }));
+    await renderApp(`/org/${ORG_ID}/drive?artifact=${file.id}`, { api });
+    await settle(8);
+    const dialog = screen().getByRole("dialog", { name: "saude.json" });
+    expect(dialog.querySelector(".file-view__text")).toBeNull();
+    const code = () => dialog.querySelector(".code-card .code-card__code") as HTMLElement;
+    expect(code().textContent).toBe(
+      '{\n  "status": "ok",\n  "checks": [\n    {\n      "id": "db",\n      "ms": 12\n    }\n  ]\n}',
+    );
+    await click(within(dialog).getByRole("button", { name: "Original" }));
+    expect(code().textContent).toBe(raw);
+  });
+
   test("an upload keeps the original name, type and size, and is always untrusted", async () => {
     const api = createFakeApi(seedState());
     const file = await api.artifacts.upload(ORG_ID, png("mapa.png"));

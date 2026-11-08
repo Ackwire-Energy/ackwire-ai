@@ -494,9 +494,10 @@ html:not([data-pointer]) .ac-link:focus-visible {
   gap: var(--form-gap);
   min-width: 0;
 }
-/* A paragraph among fields takes the form's gap, not its browser margins on top. */
-:where(.ac-form, .ac-field, .ac-dialog__body) > p {
-  margin: 0;
+/* A paragraph or a list among fields or in a card takes the stack's gap, not its browser margins on top (13px more on
+   each side of a small note). A class with margins of its own keeps them. */
+:where(.ac-form, .ac-field, .ac-dialog__body, .ac-card, .ac-details__section) > :where(p, ul, ol) {
+  margin-block: 0;
 }
 .ac-form__actions {
   display: flex;
@@ -3059,9 +3060,11 @@ html:not([data-pointer]) .ac-row:focus-visible {
   /* Over a modal dialog too, which turns the page's own off. */
   pointer-events: auto;
 }
+/* A name or a title in it (a setor someone named) breaks a word longer than the toast instead of running past it. */
 .ac-toast__text {
   flex: 1;
   min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Progress bars */
@@ -3437,11 +3440,13 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Selectable list item in a side list */
+/* Selectable list item in a side list. What people and agents wrote in it (a version's note, a proposal's title) breaks
+   a word longer than its line instead of running past the card ("alerta15:15:57,link/ts"). */
 .ac-navcard {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  overflow-wrap: break-word;
   text-align: left;
   padding: var(--space-3);
   font: inherit;
@@ -9877,8 +9882,8 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 .ac-setnote + .ac-setnote {
   margin-top: 8px;
 }
-/* In a stack (a form, a field, a dialog's body) the stack's gap is the room above it, as for any paragraph there. */
-:is(.ac-form, .ac-field, .ac-dialog__body) > .ac-setnote {
+/* In a stack (a form, a field, a dialog's body, a card) the stack's gap is the room above it, as for any paragraph there. */
+:is(.ac-form, .ac-field, .ac-dialog__body, .ac-card) > .ac-setnote {
   margin: 0;
 }
 .ac-setnote .ac-icon {

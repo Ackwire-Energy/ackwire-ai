@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
-import { declarations } from "./built-css";
+import { declarations, rules } from "./built-css";
 
 const ROOT = path.join(import.meta.dir, "../../..");
 const sheet = (file: string) => Bun.file(path.join(ROOT, file)).text();
@@ -44,4 +44,24 @@ test("the audience popover's Cancelar and Salvar stay pinned to its foot when th
   expect(last(declarations(card, ".mcard-audience__acts"), "position")).toBe("sticky");
   expect(last(declarations(card, ".mcard-audience__acts"), "bottom")).toBe("0");
   expect(last(declarations(card, ".mcard-audience__acts"), "padding")).toBe("12px 0 var(--menu-pad)");
+});
+
+test("a paragraph or a list in a stack takes the stack's gap, never its browser margins on top", async () => {
+  const layout = await sheet("apps/web/src/layout.css");
+  const kit = await sheet("packages/ui/src/styles/components.css");
+  // The rule for these stacks' paragraphs and lists, and what it sets.
+  const reset = (css: string, stack: string) =>
+    rules(css)
+      .filter((r) => r.selectors.some((s) => s.endsWith(">:where(p,ul,ol)") && s.includes(`${stack},`)))
+      .flatMap((r) => r.declarations);
+  // An agent's card: "só responde a" sat 13px further than the 12px gap from the bar above and the button below.
+  expect(last(reset(layout, ".profile-card__body"), "margin-block")).toBe("0");
+  for (const stack of [".stack-4", ".skill-sheet__main", ".issue-aside", ".cal-side__section"])
+    expect(last(reset(layout, stack), "margin-block")).toBe("0");
+  // The kit's cards (settings sections, dialogs' cards) as its forms and fields already did; their notes too.
+  for (const stack of [".ac-form", ".ac-dialog__body", ".ac-card"])
+    expect(last(reset(kit, stack), "margin-block")).toBe("0");
+  expect(last(declarations(kit, ":is(.ac-form, .ac-field, .ac-dialog__body, .ac-card) > .ac-setnote"), "margin")).toBe(
+    "0",
+  );
 });

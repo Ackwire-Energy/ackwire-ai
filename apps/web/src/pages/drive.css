@@ -400,10 +400,12 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   background: var(--ink);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent);
 }
+/* A version's note is what someone wrote: a word longer than the column breaks instead of running under "Ver". */
 .drive-versions__text {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow-wrap: break-word;
 }
 .drive-versions__head {
   display: flex;

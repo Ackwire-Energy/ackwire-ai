@@ -176,6 +176,9 @@
   "code.wrap": {
     "value": "Wrap lines"
   },
+  "code.raw": {
+    "value": "Raw"
+  },
   "code.more": {
     "value": "See all {{count}} lines"
   },

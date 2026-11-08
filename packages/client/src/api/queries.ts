@@ -46,7 +46,7 @@ import {
   SIDEBAR_SECTIONS,
   withSidebarPlace,
 } from "../lib/sidebar-items";
-import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
+import { repinAgent, SIDEBAR_VIEW_DEFAULT, unpinAgents } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
@@ -974,13 +974,29 @@ export type AgentGroupAction =
   | { type: "create"; name: string; agentIds?: string[]; color?: string; icon?: string }
   | ({ type: "update"; groupId: string } & AgentGroupPatch)
   | { type: "remove"; groupId: string }
-  | { type: "move"; agentId: string; groupId: string | null; index?: number };
+  | {
+      type: "move";
+      agentId: string;
+      groupId: string | null;
+      index?: number;
+      /** Desfazer of a move that took the agent's pin off: pinned again at this place. */
+      pinAt?: number;
+    };
 
-/** Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. */
+/**
+ * Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. Agents I put
+ * in a group leave my pins (`unpinAgents`), so they show in it; `pinnedAt` in a move's result says where one was.
+ */
 export function useAgentGroupAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const key = keys.agentGroups(orgId);
+  const setView = useSetSidebarView(orgId);
+  const pinnedAt = (agentId: string) =>
+    qc.getQueryData<SidebarView>(keys.sidebarView(orgId))?.pins?.agents.indexOf(agentId) ?? -1;
+  const unpin = (ids: readonly string[]) => {
+    if (ids.some((id) => pinnedAt(id) >= 0)) setView((now) => unpinAgents(now, ids) ?? now);
+  };
   return useMutation({
     mutationFn: (action: AgentGroupAction): Promise<AgentGroup[]> => {
       switch (action.type) {
@@ -1006,12 +1022,21 @@ export function useAgentGroupAction(orgId: string) {
       await qc.cancelQueries({ queryKey: key });
       const before = qc.getQueryData<AgentGroup[]>(key);
       if (before) qc.setQueryData(key, moveInGroups(before, action.agentId, action.groupId, action.index));
-      return { before };
+      const { agentId, pinAt } = action;
+      const at = action.groupId ? pinnedAt(agentId) : -1;
+      if (pinAt !== undefined) setView((now) => repinAgent(now, agentId, pinAt));
+      else if (at >= 0) unpin([agentId]);
+      return { before, pinnedAt: at };
     },
-    onError: (_error, _action, context) => {
+    onError: (_error, action, context) => {
       if (context?.before) qc.setQueryData(key, context.before);
+      if (action.type === "move" && context && context.pinnedAt >= 0)
+        setView((now) => repinAgent(now, action.agentId, context.pinnedAt));
     },
-    onSuccess: (groups) => qc.setQueryData(key, groups),
+    onSuccess: (groups, action) => {
+      qc.setQueryData(key, groups);
+      if (action.type === "create") unpin(action.agentIds ?? []);
+    },
   });
 }
 

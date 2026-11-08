@@ -69,6 +69,7 @@
     "copied": "Kopiert",
     "fullScreen": "Vollbild",
     "wrap": "Zeilen umbrechen",
+    "raw": "Original",
     "more": "Alle {{count}} Zeilen ansehen",
     "gone": "Dieser Code ist nicht mehr geöffnet."
   },

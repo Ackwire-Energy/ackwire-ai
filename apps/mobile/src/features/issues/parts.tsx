@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   talk: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   overlap: { marginLeft: -4 },
   step: { flex: 1, minWidth: 0 },
-  meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
+  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 6 },
   track: { flexDirection: "row", alignItems: "center", gap: 8 },
   cells: { flex: 1, flexDirection: "row", gap: 2 },
   cell: { flex: 1, height: 7 },

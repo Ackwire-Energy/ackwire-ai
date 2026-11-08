@@ -1,4 +1,6 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
+import { formatJson, highlightCode } from "@agenteschat/client/lib/code";
+import { isJsonFile } from "@agenteschat/client/lib/files";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
@@ -7,6 +9,7 @@ import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, Vi
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { Button, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
+import { CodeText, RawToggle } from "../chat/CodeCard";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { copyText, goBack, MONO } from "../shared/parts";
@@ -101,7 +104,7 @@ function Viewer({ id, version }: { id: string; version?: number }) {
             <ActivityIndicator color={c.faint} />
           </Center>
         ) : info.view === "markdown" || info.view === "text" ? (
-          <TextPage detail={detail} markdown={info.view === "markdown"} />
+          <TextPage detail={detail} markdown={info.view === "markdown"} json={isJsonFile(info.name, info.mime)} />
         ) : pdf ? (
           <PdfPage detail={detail} />
         ) : info.view === "video" ? (
@@ -150,17 +153,27 @@ function useFileText(detail: ArtifactDetail | undefined, enabled: boolean) {
   });
 }
 
-/** Markdown with the messages' renderer, plain text in mono, on a raised page. */
-function TextPage({ detail, markdown }: { detail: ArtifactDetail; markdown: boolean }) {
+/**
+ * Markdown with the messages' renderer, plain text in mono, on a raised page. JSON formatted and colored as a code
+ * block reads it, the text as written one press away ("Original").
+ */
+function TextPage({ detail, markdown, json }: { detail: ArtifactDetail; markdown: boolean; json: boolean }) {
   const { t } = useTranslation();
   const c = useColors();
   const text = useFileText(detail, true);
+  const formatted = useMemo(() => (json && text.data !== undefined ? formatJson(text.data) : null), [json, text.data]);
+  const [raw, setRaw] = useState(false);
   return (
     <View style={[styles.page, { backgroundColor: c.raised }]}>
       {text.data !== undefined ? (
         <ScrollView contentContainerStyle={styles.pageInner}>
           {markdown ? (
             <MessageText body={text.data} />
+          ) : formatted !== null ? (
+            <View style={styles.json}>
+              {formatted !== text.data.trim() ? <RawToggle on={raw} onPress={() => setRaw((r) => !r)} /> : null}
+              <CodeText lines={highlightCode(raw ? text.data : formatted, "json")} wrap />
+            </View>
           ) : (
             <RNText selectable style={[styles.mono, { color: c.ink2 }]}>
               {text.data}
@@ -300,6 +313,7 @@ const styles = StyleSheet.create({
   clip: { overflow: "hidden" },
   pageInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
+  json: { gap: 10, alignItems: "flex-start" },
   web: { flex: 1, backgroundColor: "transparent" },
   video: { backgroundColor: "#000", borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },
   picture: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },

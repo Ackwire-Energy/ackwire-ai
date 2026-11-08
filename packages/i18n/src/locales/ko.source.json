@@ -89,6 +89,9 @@
   "common.wrapLines": {
     "value": "Wrap lines"
   },
+  "common.raw": {
+    "value": "Raw"
+  },
   "common.table": {
     "value": "Table"
   },

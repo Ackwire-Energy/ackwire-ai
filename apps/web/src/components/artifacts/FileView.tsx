@@ -1,10 +1,18 @@
 import type { ArtifactFileContent } from "@agenteschat/client";
 import { useArtifactBlob } from "@agenteschat/client";
-import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind, previewType } from "@agenteschat/client/lib/files";
+import {
+  fileIcon,
+  formatBytes,
+  isJsonFile,
+  MAX_PREVIEW_BYTES,
+  previewKind,
+  previewType,
+} from "@agenteschat/client/lib/files";
 import { Icon, Spinner, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { CodeBlock } from "@/components/CodeBlock";
 import { useOrg } from "@/components/org-context";
 import { ImageZoom } from "./ImageZoom";
 
@@ -120,7 +128,8 @@ export function FileVideo({
 /**
  * An uploaded file in the viewer (its name, size and Baixar are in the viewer's header): an inline preview only for
  * raster images and PDF (a blob of exactly that type, never the file's own origin), videos in our player (a media
- * element never runs the file as a page), and the text of small text files, read-only.
+ * element never runs the file as a page), and the text of small text files, read-only (JSON formatted, as a code
+ * block reads it).
  */
 export function FileView({
   content,
@@ -188,11 +197,15 @@ export function FileView({
         </div>
       )}
       {kind !== null && !canPreview && <p className="small muted">{t("files.tooBigToPreview")}</p>}
-      {kind === null && content.text !== undefined && (
-        <pre className="file-view__text">
-          <code>{content.text}</code>
-        </pre>
-      )}
+      {kind === null &&
+        content.text !== undefined &&
+        (isJsonFile(content.name, content.contentType) ? (
+          <CodeBlock lang="json" text={content.text} />
+        ) : (
+          <pre className="file-view__text">
+            <code>{content.text}</code>
+          </pre>
+        ))}
       {kind === null && content.text === undefined && <p className="small muted">{t("files.downloadOnly")}</p>}
     </div>
   );

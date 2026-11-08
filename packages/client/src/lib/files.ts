@@ -100,6 +100,10 @@ const BY_EXTENSION: Record<string, FileIconName> = {
   diff: "code",
 };
 
+/** A JSON file, by its name or its type (`application/json`, `…+json`): the viewers show it formatted. */
+export const isJsonFile = (name: string, contentType = "") =>
+  extension(name) === "json" || /^application\/(?:[\w.-]+\+)?json$/.test(previewType(contentType));
+
 /** An icon for a file from its name, then its type. */
 export function fileIcon(name: string, contentType = ""): FileIconName {
   const byName = BY_EXTENSION[extension(name)];

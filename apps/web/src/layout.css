@@ -2327,6 +2327,16 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overflow-x: auto;
   max-height: 420px;
 }
+/* Formatted JSON: a long line wraps in the card, going on under its own indent (`--hang`), never off its edge. */
+.code-card__code[data-wrap="true"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-card__code[data-wrap="true"] .code-line {
+  display: block;
+  padding-left: var(--hang, 0);
+  text-indent: calc(-1 * var(--hang, 0));
+}
 /* A block drawn in place of its code (a ```mermaid diagram), centered: shrunk to fit its box but never below 60% of
    its own size (`--w`), so its labels stay readable; a wider or taller one scrolls inside the card, as code does. */
 .code-card__preview {
@@ -2435,7 +2445,8 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .code-tok--number {
   color: var(--code-number);
 }
-.code-tok--function {
+.code-tok--function,
+.code-tok--property {
   color: var(--code-function);
 }
 .code-tok--comment {
@@ -3312,6 +3323,22 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+/* A paragraph or a list in the app's own stacks takes the stack's gap, not its browser margins on top: an agent card's
+   "só responde a" note sat 25px from the bar and the button around it, its gap 12. The kit does the same in its cards
+   and forms; a class with margins of its own keeps them. */
+:where(
+  .profile-card__body,
+  .stack-4,
+  .skill-sheet__main,
+  .skill-history,
+  .issue-aside,
+  .wiki-editor,
+  .cal-side__section,
+  .cflow__key,
+  .imp-block
+) > :where(p, ul, ol) {
+  margin-block: 0;
 }
 .profile-card__head {
   display: flex;
