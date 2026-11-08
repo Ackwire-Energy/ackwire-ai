@@ -202,6 +202,25 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { microphonePermission: "To record voice messages in your conversations.", recordAudioAndroid: true },
     ],
     [
+      // "Compartilhar com…": the app in the system's share sheet (an iOS share extension and Android's send intents),
+      // for photos, videos, files, links and text; what arrives opens the agent picker (src/features/share). The
+      // extension takes the app's name and shares its URL scheme; it reaches phones only with a new native build.
+      "expo-share-intent",
+      {
+        iosShareExtensionName: variant === "production" ? "agentes" : `agentes ${variant}`,
+        iosActivationRules: {
+          NSExtensionActivationSupportsText: true,
+          NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+          NSExtensionActivationSupportsWebPageWithMaxCount: 1,
+          NSExtensionActivationSupportsImageWithMaxCount: 10,
+          NSExtensionActivationSupportsMovieWithMaxCount: 10,
+          NSExtensionActivationSupportsFileWithMaxCount: 10,
+        },
+        androidIntentFilters: ["text/*", "image/*", "video/*", "application/*"],
+        androidMultiIntentFilters: ["image/*", "video/*", "*/*"],
+      },
+    ],
+    [
       // Salvar em Fotos: add-only access (the read text matches expo-image-picker's).
       "expo-media-library",
       {
