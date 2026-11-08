@@ -3,6 +3,7 @@ import { Pressable, Text as RNText, ScrollView, type ScrollViewInstance, View } 
 import { Count } from "./Count";
 import { haptics } from "./haptics";
 import type { IconName } from "./icons.data";
+import { TOOL_H, TOUCH } from "./rhythm";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
@@ -44,7 +45,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
       keyboardShouldPersistTaps="handled"
       // A ScrollView grows by default: in a screen's column beside another one, the chips took half the height.
       style={{ flexGrow: 0 }}
-      contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 4 }}
+      contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 4 }}
     >
       {items.map((item) => {
         const on = item.key === value;
@@ -59,13 +60,13 @@ export function Filters({ items, value, onChange }: FiltersProps) {
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
-            // The pill is 34 tall: the slop makes its target the 44 a finger needs without spacing the row out.
-            hitSlop={{ top: 5, bottom: 5 }}
+            // The slop makes the pill's target the 44 a finger needs without spacing the row out.
+            hitSlop={{ top: (TOUCH - TOOL_H) / 2, bottom: (TOUCH - TOOL_H) / 2 }}
             style={({ pressed }) => (pressed && !on ? { opacity: 0.6 } : null)}
           >
             <View
               style={{
-                minHeight: 34,
+                minHeight: TOOL_H,
                 paddingHorizontal: 14,
                 borderRadius: 999,
                 backgroundColor: on ? colors.ink : colors.sunken,

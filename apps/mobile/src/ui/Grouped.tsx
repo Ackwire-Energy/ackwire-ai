@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } fr
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
+import { GROUPED_ROW } from "./rhythm";
 import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { motion, useTheme } from "./theme";
@@ -52,8 +53,8 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                     marginLeft:
                       (child.props as { icon?: unknown; leading?: unknown }).icon ||
                       (child.props as { leading?: unknown }).leading
-                        ? 14 + LEAD + 12
-                        : 14,
+                        ? GROUPED_ROW.padX + LEAD + 12
+                        : GROUPED_ROW.padX,
                   },
                 ]}
               />
@@ -66,18 +67,51 @@ export function GroupedList({ children }: { children?: ReactNode }) {
   );
 }
 
+interface GroupedHeaderProps {
+  children: string;
+  aside?: ReactNode;
+  /** An ⓘ after the header's words with what the whole group is for; its text shows under the header. */
+  hint?: { name: string; text: string };
+}
+
 /**
  * The small uppercase header of a group (it slides with the groups when one above grows or shrinks), with `aside`
  * at the end of its line: a small text action.
  */
-export function GroupedHeader({ children, aside }: { children: string; aside?: ReactNode }) {
+export function GroupedHeader({ children, aside, hint }: GroupedHeaderProps) {
   const { reducedMotion } = useTheme();
+  if (hint)
+    return (
+      <HintedHeader aside={aside} hint={hint}>
+        {children}
+      </HintedHeader>
+    );
   return (
     <Animated.View layout={reducedMotion ? undefined : SLIDE} style={aside ? styles.headerRow : null}>
       <Text variant="footnote" tone="faint" accessibilityRole="header" style={[styles.header, styles.shrink]}>
         {children.toLocaleUpperCase()}
       </Text>
       {aside ? <View style={styles.headerAside}>{aside}</View> : null}
+    </Animated.View>
+  );
+}
+
+/** The header's words and ⓘ on one line, the aside at its end, the hint's text under them inside the header's room. */
+function HintedHeader({ children, aside, hint }: GroupedHeaderProps & { hint: { name: string; text: string } }) {
+  const { reducedMotion } = useTheme();
+  const info = useInfoHint({ ...hint, variant: "footnote" });
+  return (
+    <Animated.View layout={reducedMotion ? undefined : SLIDE} style={styles.headerRoom}>
+      <View style={styles.headerLine}>
+        <View style={[styles.headerWords, styles.shrink]}>
+          <Text variant="footnote" tone="faint" accessibilityRole="header" style={[styles.headerCaps, styles.shrink]}>
+            {children.toLocaleUpperCase()}
+          </Text>
+          {info.button}
+        </View>
+        {aside}
+      </View>
+      {info.text}
     </Animated.View>
   );
 }
@@ -376,6 +410,10 @@ const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
   header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  headerRoom: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16 },
+  headerLine: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  headerWords: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  headerCaps: { letterSpacing: 0.4 },
   headerRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   headerAside: { paddingRight: 16 },
   footer: { paddingTop: 8, paddingHorizontal: 16 },
@@ -383,12 +421,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.padY,
   },
-  // Wrapping text starts where a one-line row's label does (its 22 points centred in 50), not 8 from the top.
-  tall: { alignItems: "flex-start", paddingVertical: 14 },
+  // Wrapping text starts where a one-line row's label does, not 8 from the top.
+  tall: { alignItems: "flex-start", paddingVertical: GROUPED_ROW.tallPadY },
   // A control taller than the label's line (the 28-point switch) is centred on it rather than pushed below it.
   onLine: { justifyContent: "center" },
   tile: {
@@ -402,10 +440,16 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   value: { flexShrink: 1, maxWidth: "50%" },
   valued: { flexDirection: "row", alignItems: "center", gap: 6 },
-  field: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 50, paddingHorizontal: 14 },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+  },
   key: { width: 96 },
   keyLine: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   shrink: { flexShrink: 1, minWidth: 0 },
-  hint: { paddingHorizontal: 14 },
+  hint: { paddingHorizontal: GROUPED_ROW.padX },
   hintOpen: { paddingBottom: 12 },
 });

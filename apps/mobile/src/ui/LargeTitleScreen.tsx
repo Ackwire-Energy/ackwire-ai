@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
+import { SCREEN_X } from "./rhythm";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 
@@ -140,7 +141,7 @@ const BAR_TITLE_TO = 48;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  head: { paddingHorizontal: SCREEN_X, paddingTop: 2, paddingBottom: 10 },
   headTight: { paddingBottom: 4 },
   subtitle: { marginTop: 2 },
 });
