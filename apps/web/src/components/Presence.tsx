@@ -23,7 +23,7 @@ export function StatusEmoji({
 }) {
   return (
     <span className={cx("status-emoji", className)} role="img" aria-label={text} title={text}>
-      {icon ? <Icon name={icon} size={14} /> : emoji}
+      {icon ? <Icon name={icon} size={14} inline /> : emoji}
     </span>
   );
 }

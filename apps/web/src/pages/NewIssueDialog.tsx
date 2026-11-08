@@ -190,12 +190,14 @@ export function NewIssueDialog({
   };
   const pick = () => picker.current?.click();
   const agentNote = agent && (
-    <p className="issue-agent-note">
+    <p className="issue-agent-note ac-iconline">
       <Icon name="shield" size={14} />
-      {t(
-        files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts",
-        agentGrammar(agent.name),
-      )}
+      <span>
+        {t(
+          files.items.length > 0 || wide ? "issues.form.agentStartsAll" : "issues.form.agentStarts",
+          agentGrammar(agent.name),
+        )}
+      </span>
     </p>
   );
   const priorityLabel = (p: IssuePriority) => t(`issues.priority.${p}`);

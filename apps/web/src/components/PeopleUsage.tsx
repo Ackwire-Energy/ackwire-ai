@@ -238,8 +238,8 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
     <>
       <div className="pu-head">
         <div className="pu-head__text">
-          <h3 className="pu-title">
-            {t("peopleUsage.title")}
+          <h3 className="pu-title ac-hintline">
+            <span>{t("peopleUsage.title")}</span>
             <InfoHint name={t("common.about", { label: t("peopleUsage.title") })}>
               {data.plansOnly
                 ? t("common.joinSentences", { a: t("peopleUsage.about"), b: t("peopleUsage.plansAbout") })

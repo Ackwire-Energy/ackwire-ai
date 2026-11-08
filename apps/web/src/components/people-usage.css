@@ -19,10 +19,8 @@
   gap: 2px;
   min-width: 0;
 }
+/* With its ⓘ, an `.ac-hintline`: the ⓘ after the last word, on that line's capitals. */
 .pu-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   margin: 0;
   font-size: 19px;
   font-weight: 700;

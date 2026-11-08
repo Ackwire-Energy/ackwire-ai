@@ -452,3 +452,19 @@ html:not([data-pointer]) .imp-link:focus-visible {
 .imp-aiapp {
   text-align: left;
 }
+
+/* "Arquivos que ficaram de fora": each reason's chip and its files on one line, on one baseline, wrapping as words. */
+.imp-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.imp-left > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}

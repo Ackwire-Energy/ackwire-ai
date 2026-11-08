@@ -102,13 +102,13 @@ function AgentsTable({ agents, groups }: { agents: TeamAgent[]; groups: AgentGro
   );
   const showSector = groupBy !== "sector" && groups.length > 0;
   const columns = 6 + (showSector ? 1 : 0) + (manages ? 1 : 0);
-  const section = (key: string, title: ReactNode, list: TeamAgent[]) =>
+  // The count joins the title's own words, so a title led by a face or a mark shares their baseline.
+  const section = (key: string, title: (count: ReactNode) => ReactNode, list: TeamAgent[]) =>
     list.length === 0 ? null : (
       <Fragment key={key}>
         <tr className="team-table__section">
           <th colSpan={columns} scope="colgroup">
-            {title}
-            <span className="muted"> · {list.length}</span>
+            {title(<span className="muted"> · {list.length}</span>)}
           </th>
         </tr>
         {list.map(row)}
@@ -212,15 +212,29 @@ function AgentsTable({ agents, groups }: { agents: TeamAgent[]; groups: AgentGro
         ...by.groups.map(({ group, items }) =>
           section(
             group.id,
-            <span className="team-sector">
-              <span className="team-eyebrow">{t("agentGroups.group")}</span>
-              <SectorMark group={group} size={14} />
-              <b>{group.name}</b>
-            </span>,
+            (count) => (
+              <span className="team-sector">
+                <span className="team-eyebrow">{t("agentGroups.group")}</span>
+                <SectorMark group={group} size={14} />
+                <span>
+                  <b>{group.name}</b>
+                  {count}
+                </span>
+              </span>
+            ),
             items,
           ),
         ),
-        section("none", <b>{t("agentGroups.none")}</b>, by.ungrouped),
+        section(
+          "none",
+          (count) => (
+            <>
+              <b>{t("agentGroups.none")}</b>
+              {count}
+            </>
+          ),
+          by.ungrouped,
+        ),
       ];
     }
     if (groupBy === "owner") {
@@ -228,14 +242,21 @@ function AgentsTable({ agents, groups }: { agents: TeamAgent[]; groups: AgentGro
       return owners.map((id) =>
         section(
           id ?? "none",
-          id ? (
-            <span className="team-who">
-              <PersonAvatar id={id} name={look.personName(id)} size="xs" />
-              <b>{look.personName(id)}</b>
-            </span>
-          ) : (
-            <b>{t("team.noOwner")}</b>
-          ),
+          (count) =>
+            id ? (
+              <span className="team-who">
+                <PersonAvatar id={id} name={look.personName(id)} size="xs" />
+                <span>
+                  <b>{look.personName(id)}</b>
+                  {count}
+                </span>
+              </span>
+            ) : (
+              <>
+                <b>{t("team.noOwner")}</b>
+                {count}
+              </>
+            ),
           rows.filter((a) => a.ownerUserId === id),
         ),
       );
