@@ -63,7 +63,6 @@ import {
 } from "@agenteschat/client/lib/providers";
 import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -82,6 +81,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";

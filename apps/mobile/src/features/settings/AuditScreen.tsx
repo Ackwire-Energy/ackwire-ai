@@ -26,7 +26,6 @@ import {
 import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -45,6 +44,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";

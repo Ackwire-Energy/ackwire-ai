@@ -44,7 +44,6 @@ import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -63,6 +62,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { CostlyProposalCard } from "../ai/CostlyProposalCard";

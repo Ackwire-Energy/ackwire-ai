@@ -18,7 +18,6 @@ import { AUTO } from "@agenteschat/client/lib/providers";
 import { rightHandFallback, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { dayText, hourText } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
@@ -35,6 +34,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";

@@ -1,12 +1,12 @@
 import { type InvitationPreview, useAuthConfig } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { agentLook } from "@/features/shared/logic";
 import { useSession } from "@/providers/session";
 import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { CENTER } from "@/ui/auth/AuthScaffold";
+import { router } from "@/ui/navigation";
 import { Terms } from "./AuthFlow";
 import { boldParts } from "./links";
 

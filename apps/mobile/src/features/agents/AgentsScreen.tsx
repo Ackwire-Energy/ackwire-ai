@@ -13,13 +13,13 @@ import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages"
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router } from "expo-router";
 import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
 import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { usePlanHold } from "../ai/parts";
 import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
 import { usePins } from "../chats/pins";

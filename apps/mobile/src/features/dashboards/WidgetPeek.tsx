@@ -1,8 +1,9 @@
 import { useRefreshWidget, useRemoveWidget, type Widget } from "@agenteschat/client";
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Alert, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { widgetHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";

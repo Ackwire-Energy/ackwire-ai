@@ -74,7 +74,7 @@ import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/reac
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect, useIsFocused, useIsPreview } from "expo-router";
+import { useFocusEffect, useIsFocused, useIsPreview } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -113,6 +113,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { usePlanHold } from "../ai/parts";
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";

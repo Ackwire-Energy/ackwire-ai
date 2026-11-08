@@ -1,10 +1,10 @@
 import { useAgentStatuses, useAiStatus, useOverview, useRoutines } from "@agenteschat/client";
 import { type FirstStep, firstSteps, startingOut, stepPermissions } from "@agenteschat/client/lib/home";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { Icon, ListRow } from "@/ui";
+import { router } from "@/ui/navigation";
 import { usePlanHold } from "../ai/parts";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Tile } from "../shared/parts";

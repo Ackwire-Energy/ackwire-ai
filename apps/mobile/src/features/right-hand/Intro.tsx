@@ -18,13 +18,13 @@ import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agentesc
 import { BUSINESS_TYPES, isTemplateBusiness, startCardAnswer } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, EventPillAction, EventPillText, Icon, type IconName, LineIcon, Locked, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";

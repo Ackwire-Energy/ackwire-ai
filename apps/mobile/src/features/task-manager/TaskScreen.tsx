@@ -7,12 +7,12 @@ import {
   taskState,
   taskTitle,
 } from "@agenteschat/client/lib/task-manager";
-import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, Text, weights } from "@/ui";
+import { router } from "@/ui/navigation";
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
 import { useOpenQueue } from "../queue/QueueSheet";

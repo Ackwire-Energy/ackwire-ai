@@ -1,9 +1,9 @@
 import { busyWidgets } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { FirstUse } from "../shared/FirstUse";
 import { usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";

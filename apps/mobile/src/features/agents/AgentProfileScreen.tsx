@@ -31,7 +31,6 @@ import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { planLine } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -60,6 +59,7 @@ import {
   WithPresence,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
+import { router } from "@/ui/navigation";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";

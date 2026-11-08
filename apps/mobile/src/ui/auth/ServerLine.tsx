@@ -1,7 +1,7 @@
 import { serverHost } from "@agenteschat/client/lib/server";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useServer } from "@/lib/server";
+import { router } from "@/ui/navigation";
 import { AuthLink } from "./AuthLink";
 
 /** "Servidor: agentes.chat · Trocar": where this sign-in goes, and the way to another server. */

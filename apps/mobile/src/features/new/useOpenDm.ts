@@ -1,9 +1,9 @@
 import { keys, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { requestComposerText } from "../chat/composer-request";
 import { chatHref } from "../links/logic";
 import { useOrgId } from "../shared/hooks";

@@ -20,7 +20,6 @@ import {
   WIDGET_SIZES,
   type WidgetSize,
 } from "@agenteschat/ui/widgets/spec";
-import { router } from "expo-router";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -40,6 +39,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";

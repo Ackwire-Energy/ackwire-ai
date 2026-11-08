@@ -10,12 +10,12 @@ import {
   taskTitle,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { Button, Count, EmptyState, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";

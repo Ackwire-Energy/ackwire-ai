@@ -1,10 +1,10 @@
 import { useMe } from "@agenteschat/client";
-import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { type HeaderAction, PersonAvatar } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "./hooks";
 import { OrgAvatar } from "./OrgAvatar";
 import { usePersonPhoto } from "./photo";

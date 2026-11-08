@@ -9,7 +9,6 @@ import {
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
-import { router } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { CoverBarBackdrop, useCoverScroll } from "@/ui/cover";
+import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, PushedHeader, successHaptic, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";

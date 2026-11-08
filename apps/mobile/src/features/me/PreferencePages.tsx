@@ -13,7 +13,7 @@ import {
 import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { type AppLocale, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -33,6 +33,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 

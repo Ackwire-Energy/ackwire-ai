@@ -1,8 +1,8 @@
 import { type DashboardSummary, dashboardGroups, useDashboards } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";

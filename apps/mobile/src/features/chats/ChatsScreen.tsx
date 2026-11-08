@@ -4,12 +4,13 @@ import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages"
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, RefreshControl, StyleSheet } from "react-native";
 import { usePush } from "@/providers/push";
 import { GroupedRow, LargeTitleScreen, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";

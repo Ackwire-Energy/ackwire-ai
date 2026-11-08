@@ -15,7 +15,7 @@ import { mediaWord } from "@agenteschat/client/lib/media";
 import { latestText } from "@agenteschat/client/lib/message-body";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import type { TFunction } from "i18next";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,6 +39,7 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openPage } from "../ai/parts";
 import { approvalAction } from "../approvals/logic";
 import { ApprovalMark, ApprovalWhy, useApprovalSource, useApproveNow } from "../approvals/parts";

@@ -28,7 +28,6 @@ import {
 } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -57,6 +56,7 @@ import {
   useToast,
 } from "@/ui";
 import { SocialMark } from "@/ui/auth/SocialMarks";
+import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";

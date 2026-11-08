@@ -2,7 +2,6 @@ import { type AiStatus, keys, type Me, useApi } from "@agenteschat/client";
 import { type PushOfferMoment, pushOfferDue, pushOffersFrom } from "@agenteschat/client/lib/push-offer";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
-import { router } from "expo-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
@@ -21,6 +20,7 @@ import {
 import { readPushData } from "@/lib/push-payload";
 import { serverUrl } from "@/lib/server";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
+import { router } from "@/ui/navigation";
 import { useOrgMaybe } from "./org";
 
 interface PushApi {

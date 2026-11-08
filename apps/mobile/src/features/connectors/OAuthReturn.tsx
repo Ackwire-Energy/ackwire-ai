@@ -2,11 +2,12 @@ import { type Connection, type CustomServer, keys, useCatalog, useCompleteOAuth 
 import { connectedItems, outcomeText } from "@agenteschat/client/lib/connected";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, successHaptic } from "../shared/parts";
 import { isFinishing } from "./logic";

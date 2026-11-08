@@ -1,5 +1,5 @@
 import { useApi } from "@agenteschat/client";
-import { type Href, router, useLocalSearchParams } from "expo-router";
+import { type Href, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { openOwnPage } from "@/features/ai/parts";
@@ -8,6 +8,7 @@ import { takeLink } from "@/features/links/pending";
 import { useColors } from "@/features/shared/hooks";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
+import { router } from "@/ui/navigation";
 
 /**
  * A link to the website opened in the app (`app/+native-intent.tsx`): switches to the link's workspace when the

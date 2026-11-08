@@ -34,12 +34,12 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Count, EventPillAction, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,

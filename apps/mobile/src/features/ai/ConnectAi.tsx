@@ -21,13 +21,14 @@ import {
 } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, SheetScreen, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ConnectAiFlow, viewOf } from "./ConnectAiSteps";
 import type { FlowView } from "./logic";

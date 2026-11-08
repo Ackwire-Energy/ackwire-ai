@@ -1,9 +1,9 @@
 import type { Message, TeamCheck } from "@agenteschat/client";
 import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";

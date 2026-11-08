@@ -3,7 +3,6 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
@@ -26,6 +25,7 @@ import {
   useTheme,
 } from "@/ui";
 import { WholeAccount } from "@/ui/auth/WholeAccount";
+import { router } from "@/ui/navigation";
 import { leadBox } from "@/ui/type-scale";
 import { fullLook } from "../agents/edit";
 import { openPage } from "../ai/parts";

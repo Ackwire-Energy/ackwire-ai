@@ -15,13 +15,13 @@ import {
   smoothPath,
 } from "@agenteschat/ui/sky/chart";
 import { Canvas, Circle, Group, Path, Skia } from "@shopify/react-native-skia";
-import { router } from "expo-router";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, IconButton, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
 import type { Inline } from "./logic";
 import { Table } from "./MessageSpans";

@@ -38,7 +38,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { countryFlagSvg } from "@agenteschat/ui/brand/flags";
 import { useQueries } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -58,6 +57,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";

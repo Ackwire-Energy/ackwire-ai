@@ -1,5 +1,4 @@
 import { checkServer, normalizeServer, serverHost } from "@agenteschat/client/lib/server";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_URL } from "@/config";
@@ -12,6 +11,7 @@ import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Locked } from "@/ui/Locked";
+import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 import { useToast } from "@/ui/Toast";
 

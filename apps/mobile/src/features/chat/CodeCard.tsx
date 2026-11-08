@@ -1,11 +1,11 @@
 import { type CodeToken, type CodeTokenKind, codeLabel, highlightCode } from "@agenteschat/client/lib/code";
-import { router } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
 import { copyText, MONO } from "../shared/parts";
 

@@ -1,11 +1,11 @@
 import { useChannelCategories } from "@agenteschat/client";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { FirstUse, LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";

@@ -22,12 +22,12 @@ import {
   queueView,
   queueWhereText,
 } from "@agenteschat/client/lib/computer-queue";
-import { router } from "expo-router";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text, useReducedMotion } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
 import { AgentFace, OpensAgent } from "../shared/Face";

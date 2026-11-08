@@ -1,16 +1,16 @@
 import {
   DarkTheme,
   DefaultTheme,
+  router as expoRouter,
   type Href,
   type NativeStackNavigationOptions,
   type Theme as NavigationTheme,
-  router,
   Stack,
 } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform } from "react-native";
-import { needsHeaderBlur } from "@/lib/nav";
+import { needsHeaderBlur, pushOnce } from "@/lib/nav";
 import { IconButton } from "./IconButton";
 import { sheetColors } from "./palette";
 import { useTheme } from "./theme";
@@ -22,6 +22,16 @@ import { useTheme } from "./theme";
  */
 
 const legacyBlur = needsHeaderBlur(Platform.OS, Platform.Version);
+
+const push = pushOnce((...args: Parameters<typeof expoRouter.push>) => expoRouter.push(...args));
+/**
+ * The app's router: expo-router's, whose screens a quick double tap would push twice (its stack only folds a push of a
+ * screen marked `singular`), pushing each screen once per tap (`pushOnce`). expo-router binds its methods after the
+ * first render, so each is read when called. Every screen imports this one, never expo-router's.
+ */
+export const router: typeof expoRouter = new Proxy(expoRouter, {
+  get: (target, key, receiver) => (key === "push" ? push : Reflect.get(target, key, receiver)),
+});
 
 /** A piece of the native header that changes with the screen (actions, a custom title). */
 export interface HeaderSlotStore {

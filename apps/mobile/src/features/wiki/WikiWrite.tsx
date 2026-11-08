@@ -3,7 +3,7 @@ import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees"
 import { prefixLines, wikiQuery, wrapSelection } from "@agenteschat/client/lib/wiki";
 import { diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, usePreventRemove } from "expo-router";
+import { usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +36,7 @@ import {
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, MONO, PushedHeader, successHaptic, Tile, tapHaptic } from "../shared/parts";

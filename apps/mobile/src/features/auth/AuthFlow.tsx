@@ -9,7 +9,7 @@ import {
   webmailOf,
 } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,6 +28,7 @@ import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Icon } from "@/ui/Icon";
 import { Locked } from "@/ui/Locked";
+import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";

@@ -18,7 +18,6 @@ import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agen
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
@@ -37,6 +36,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";

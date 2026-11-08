@@ -6,11 +6,11 @@ import {
   type RoutineTemplateOption,
   routineTemplateOptions,
 } from "@agenteschat/client/lib/routine-templates";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, GroupedHeader, GroupedList, GroupedRow, type IconName, Sheet, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { useOrgId } from "../shared/hooks";
 import { PickList } from "../shared/PickList";

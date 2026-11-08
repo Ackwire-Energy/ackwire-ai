@@ -1,10 +1,10 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text as RNText, StyleSheet, View } from "react-native";
 import { Button, Icon, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { useColors, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";

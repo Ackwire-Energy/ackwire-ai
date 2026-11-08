@@ -10,7 +10,6 @@ import {
   taskTitle,
   taskWaitWords,
 } from "@agenteschat/client/lib/task-manager";
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -39,6 +38,7 @@ import {
   useReducedMotion,
   weights,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { CollapsibleSection } from "../chats/HomeSection";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, OpensAgent } from "../shared/Face";

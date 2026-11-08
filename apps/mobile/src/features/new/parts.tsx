@@ -1,7 +1,7 @@
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { IconButton, type IconName, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import type { AppHref } from "../links/logic";
 import { goBack } from "../shared/parts";
 

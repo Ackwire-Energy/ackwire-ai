@@ -9,12 +9,12 @@ import {
   whoSeesLabel,
   wikiAudienceOf,
 } from "@agenteschat/client/lib/who-sees";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { Face } from "./Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "./hooks";

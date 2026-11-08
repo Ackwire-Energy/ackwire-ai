@@ -1,12 +1,12 @@
 import { useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, Loaded, PushedHeader } from "../shared/parts";
 import { BottomBar, ChangedTools } from "./ToolChanges";

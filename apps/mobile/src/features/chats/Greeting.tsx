@@ -1,10 +1,10 @@
 import { useMe } from "@agenteschat/client";
-import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, Icon, Sky, Text, WorkspaceSky } from "@/ui";
+import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";

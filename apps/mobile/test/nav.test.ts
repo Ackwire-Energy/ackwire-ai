@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { contrastRatio, needsHeaderBlur, TAB_BADGE, tabBadge } from "../src/lib/nav";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { AGAIN_MS, contrastRatio, needsHeaderBlur, pushOnce, TAB_BADGE, tabBadge } from "../src/lib/nav";
 import { coverTransform, PARALLAX, progress } from "../src/lib/parallax";
 import { parseTabGlyphKey, TAB_GLYPHS, tabGlyphKey, tabGlyphSvg } from "../src/ui/tabGlyphs";
 
@@ -132,5 +134,43 @@ describe("tab glyphs", () => {
     }
     expect(parseTabGlyphKey("house")).toBeNull();
     expect(parseTabGlyphKey("house.selected")).toBeNull();
+  });
+});
+
+describe("a quick double tap opens a screen once", () => {
+  test("the same screen pushed again within a moment goes once; another screen, or the same later, goes", () => {
+    let now = 1000;
+    const pushed: unknown[] = [];
+    const push = pushOnce(
+      (to: unknown) => pushed.push(to),
+      () => now,
+    );
+    push("/chat/c1");
+    now += 120;
+    push("/chat/c1");
+    expect(pushed).toEqual(["/chat/c1"]);
+    push("/agent/a1");
+    expect(pushed).toEqual(["/chat/c1", "/agent/a1"]);
+    now += AGAIN_MS;
+    push("/agent/a1");
+    expect(pushed).toEqual(["/chat/c1", "/agent/a1", "/agent/a1"]);
+    // The same path with other params is another screen.
+    push({ pathname: "/chat/[channelId]", params: { channelId: "c1" } });
+    push({ pathname: "/chat/[channelId]", params: { channelId: "c2" } });
+    expect(pushed).toHaveLength(5);
+  });
+
+  test("every screen navigates with the app's router, never expo-router's own (which pushes a double tap twice)", () => {
+    const root = join(import.meta.dir, "..");
+    const own = join(root, "src/ui/navigation.tsx");
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+      );
+    const direct = [...files(join(root, "src")), ...files(join(root, "app"))].filter(
+      (f) => f !== own && /import\s*\{[^}]*\brouter\b[^}]*\}\s*from\s*"expo-router"/.test(readFileSync(f, "utf8")),
+    );
+    expect(direct).toEqual([]);
+    expect(readFileSync(own, "utf8")).toContain("export const router: typeof expoRouter = new Proxy(expoRouter");
   });
 });

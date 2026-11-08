@@ -1,9 +1,10 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
 import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { workTitle } from "../agents/work";
 import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";

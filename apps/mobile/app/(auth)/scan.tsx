@@ -1,6 +1,5 @@
 import { parseConnectLink } from "@agenteschat/client/lib/server";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, Linking, StyleSheet, View } from "react-native";
@@ -11,6 +10,7 @@ import { Button } from "@/ui/Button";
 import { Glass } from "@/ui/Glass";
 import { haptics } from "@/ui/haptics";
 import { IconButton } from "@/ui/IconButton";
+import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 
 /**

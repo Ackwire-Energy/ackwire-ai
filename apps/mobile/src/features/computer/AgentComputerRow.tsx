@@ -9,12 +9,13 @@ import { entryLine, entryState, pictureWhen } from "@agenteschat/client/lib/agen
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Image } from "expo-image";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, Icon, PressScale, useTheme, useToast } from "@/ui";
 import { BUTTON_SIZES } from "@/ui/Button";
+import { router } from "@/ui/navigation";
 import { useDirectory, useNow } from "../shared/hooks";
 import { phoneEntryButton } from "./logic";
 import { useSetupWait } from "./SetupWait";

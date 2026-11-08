@@ -1,9 +1,10 @@
 import { useNotifications } from "@agenteschat/client";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { notificationHref } from "@/features/links/logic";
 import { useColors, useOrgId } from "@/features/shared/hooks";
+import { router } from "@/ui/navigation";
 
 /**
  * A bare link to an agent's request for help in its browser (`agenteschat://handoff/<id>`): the request

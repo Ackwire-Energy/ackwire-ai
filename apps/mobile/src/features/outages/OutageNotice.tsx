@@ -1,10 +1,10 @@
 import { outageKey } from "@agenteschat/client/lib/outages";
-import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { Button, IconButton, LineIcon, Text, textLineOf } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors, useEdition } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { computerIcon, dismissedOutages, type MachineOutage, noticeText } from "./logic";

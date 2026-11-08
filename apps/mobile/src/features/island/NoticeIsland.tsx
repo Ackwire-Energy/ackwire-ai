@@ -3,7 +3,6 @@ import { useNotificationAction, useNotificationReply } from "@agenteschat/client
 import { type IslandItem, islandLead, noticeLine } from "@agenteschat/client/lib/island";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { replyTarget, waitingCardOf } from "@agenteschat/client/lib/notifications";
-import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +25,7 @@ import { setIslandLive } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
 import { useRealtime } from "@/providers/realtime";
 import { haptics, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
 import { openPage } from "../ai/parts";
