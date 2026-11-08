@@ -34,7 +34,7 @@ import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Button, Composer, cx, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
+import { Button, Composer, EmptyState, Icon, PageHeader, Select } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -385,15 +385,21 @@ function RowBody({
 }) {
   return (
     <>
-      <span className="home-row__face">{face}</span>
-      <span className="home-row__text">
-        {/* Over a line of its own, the title's capitals start at the face's top; alone, it sits on the face's
-            first line as the button beside it does. */}
-        <span className={cx("home-row__title", (sub || meta) && "ac-captop")}>{title}</span>
-        {sub && <span className="home-row__sub">{sub}</span>}
-        {meta && <span className="home-row__meta">{meta}</span>}
+      <span className="ac-mediarow__face">{face}</span>
+      <span className="ac-mediarow__head">
+        <span className="home-row__title">{title}</span>
       </span>
-      {action && <span className="home-row__act ac-btn ac-btn--sm">{action}</span>}
+      {(sub || meta) && (
+        <span className="ac-mediarow__body home-row__body">
+          {sub && <span className="home-row__sub">{sub}</span>}
+          {meta && <span className="home-row__meta">{meta}</span>}
+        </span>
+      )}
+      {action && (
+        <span className="ac-mediarow__end ac-mediarow__end--wrap">
+          <span className="home-row__act ac-btn ac-btn--sm">{action}</span>
+        </span>
+      )}
     </>
   );
 }
@@ -427,14 +433,10 @@ function InboxRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: number }
   const actor = n.actors[0];
   return (
     <li>
-      <button type="button" className="home-row" onClick={open}>
+      <button type="button" className="home-row ac-mediarow ac-mediarow--row" onClick={open}>
         <RowBody
           face={
-            actor ? (
-              <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} />
-            ) : (
-              <SystemFace n={n} className="home-row__sys" />
-            )
+            actor ? <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} /> : <SystemFace n={n} />
           }
           title={<Headline n={n} dir={dir} channelName={channelName} />}
           sub={sub}
@@ -468,15 +470,11 @@ function WidgetNoticeRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: n
   const kind = widgetNoticeOf(n)?.kind;
   return (
     <li className={kind === "proposal" ? "home-wrow" : "home-wrow home-wrow--side"}>
-      <button type="button" className="home-row" onClick={open}>
+      <button type="button" className="home-row ac-mediarow ac-mediarow--row" onClick={open}>
         <RowBody
           action={kind === "alert" ? t("widgets.notice.openWidget") : undefined}
           face={
-            actor ? (
-              <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} />
-            ) : (
-              <SystemFace n={n} className="home-row__sys" />
-            )
+            actor ? <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} /> : <SystemFace n={n} />
           }
           title={<Headline n={n} dir={dir} channelName={channelName} />}
           sub={widgetNoticeLine(t, n, dir)}
@@ -503,7 +501,11 @@ function MissionRow({ m, dir }: { m: Mission; dir: Dir }) {
   const name = dir.anyAgent(m.agentId)?.name ?? t("channel.unknownAgent");
   return (
     <li>
-      <Link className="home-row" to="/org/$orgId/threads/$threadId" params={{ orgId: org.id, threadId: m.threadId }}>
+      <Link
+        className="home-row ac-mediarow ac-mediarow--row"
+        to="/org/$orgId/threads/$threadId"
+        params={{ orgId: org.id, threadId: m.threadId }}
+      >
         <RowBody
           face={<AgentAvatar agentId={m.agentId} name={name} state="waiting" />}
           title={<Trans i18nKey="home.mission" values={{ name }} components={{ b: <b /> }} {...TYPED_VALUES} />}
@@ -544,15 +546,27 @@ function WorkRow({ w, dir, now }: { w: WorkItem; dir: Dir; now: number }) {
   return (
     <li>
       {w.threadId ? (
-        <Link className="home-row" to="/org/$orgId/threads/$threadId" params={{ orgId: org.id, threadId: w.threadId }}>
+        <Link
+          className="home-row ac-mediarow ac-mediarow--row"
+          to="/org/$orgId/threads/$threadId"
+          params={{ orgId: org.id, threadId: w.threadId }}
+        >
           {body}
         </Link>
       ) : w.where.kind === "dm" ? (
-        <Link className="home-row" to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: w.agentId }}>
+        <Link
+          className="home-row ac-mediarow ac-mediarow--row"
+          to="/org/$orgId/dm/agent/$agentId"
+          params={{ orgId: org.id, agentId: w.agentId }}
+        >
           {body}
         </Link>
       ) : (
-        <Link className="home-row" to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: w.channelId }}>
+        <Link
+          className="home-row ac-mediarow ac-mediarow--row"
+          to="/org/$orgId/c/$channelId"
+          params={{ orgId: org.id, channelId: w.channelId }}
+        >
           {body}
         </Link>
       )}
@@ -567,7 +581,12 @@ function RoutineRow({ r, dir, now }: { r: Routine; dir: Dir; now: number }) {
   const name = dir.anyAgent(r.agentId)?.name ?? t("channel.unknownAgent");
   return (
     <li>
-      <Link className="home-row" to="/org/$orgId/routines" params={{ orgId: org.id }} search={{ open: r.id }}>
+      <Link
+        className="home-row ac-mediarow ac-mediarow--row"
+        to="/org/$orgId/routines"
+        params={{ orgId: org.id }}
+        search={{ open: r.id }}
+      >
         <RowBody
           face={<AgentAvatar agentId={r.agentId} name={name} />}
           title={<b>{r.name}</b>}
@@ -596,15 +615,23 @@ function FirstSteps({ steps, onAsk, onHide }: { steps: FirstStep[]; onAsk: () =>
       </div>
       <ol className="list-card home-list">
         {steps.map((s) => (
-          <li key={s.id} className="home-row home-step" data-done={s.done || undefined}>
-            <span className="home-row__face home-step__mark">
+          <li key={s.id} className="home-row home-step ac-mediarow ac-mediarow--row" data-done={s.done || undefined}>
+            <span className="ac-mediarow__face home-step__mark">
               {s.done ? <Icon name="check" size={16} label={t("home.steps.done")} /> : null}
             </span>
-            <span className="home-row__text">
+            <span className="ac-mediarow__head">
               <span className="home-row__title">{t(`home.steps.${s.id}.title`)}</span>
-              {!s.done && <span className="home-row__sub">{t(`home.steps.${s.id}.text`)}</span>}
             </span>
-            {!s.done && <StepAction id={s.id} onAsk={onAsk} />}
+            {!s.done && (
+              <span className="ac-mediarow__body home-row__body">
+                <span className="home-row__sub">{t(`home.steps.${s.id}.text`)}</span>
+              </span>
+            )}
+            {!s.done && (
+              <span className="ac-mediarow__end ac-mediarow__end--wrap">
+                <StepAction id={s.id} onAsk={onAsk} />
+              </span>
+            )}
           </li>
         ))}
       </ol>

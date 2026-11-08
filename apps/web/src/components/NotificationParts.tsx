@@ -78,7 +78,7 @@ export function Face({
  * Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. Someone
  * asking to join isn't a member yet: their initials.
  */
-export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
+export function SystemFace({ n, className = "nt-av24" }: { n: AppNotification; className?: string }) {
   // A board's notice with nobody named: its agent (ADR 0135).
   const widget = widgetNoticeOf(n);
   if (widget?.agentId) return <AgentAvatar agentId={widget.agentId} name="" size="md" className={className} />;
