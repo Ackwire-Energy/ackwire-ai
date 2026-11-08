@@ -9,14 +9,14 @@ const value = (selector: string, property: string) =>
 test("a channel's # is no louder than a category's chevron, in its column, and every name starts in one column", () => {
   const mark = '.sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__channel-icon';
   const chevron = ".sidebar__section-chevron";
-  // The chevron's 14px and faint ink, in the 18px icons' place (2px each side).
+  // The chevron's 14px and faint ink, in the 16px icons' place (1px each side).
   expect([value(mark, "width"), value(mark, "height"), value(mark, "color"), value(mark, "margin")]).toEqual([
     "14px",
     "14px",
     "var(--faint)",
-    "0 2px",
+    "0 1px",
   ]);
-  expect([value(chevron, "color"), value(chevron, "margin")]).toEqual(["var(--faint)", "0 2px"]);
+  expect([value(chevron, "color"), value(chevron, "margin")]).toEqual(["var(--faint)", "0 1px"]);
   // A category's header starts and spaces its chevron and name as a row does its icon and name.
   const row = '.sidebar:not([data-rail="true"]) .sidebar__item';
   const header = ".sidebar__section-toggle";
@@ -44,21 +44,22 @@ test("an agent's role sits under its name, one line, beside a face as tall as bo
     "column",
     "0",
   ]);
-  // The face spans the name's line and a one-line role's, and sits centred on them (no rule tops it any more).
+  // A 32 face, 8 from the plate's edges: a name alone centres on it, a name over a role is a face line (the name's
+  // capitals on the face's top, `.ac-captop` on the label) with what ends the row on its middle.
   const face = '.sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm';
   // The rail's 40px tile keeps its smaller face, with room for the presence badge and the unread count.
   expect(value(".sidebar__item > .ac-avatar--sm", "height")).toBe("28px");
-  const px = (v: string | undefined) => Number.parseFloat(v ?? "");
-  expect(px(value(face, "height"))).toBe(
-    px(value('.sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label', "line-height")) +
-      px(value(role, "line-height")),
-  );
-  expect(value(face, "width")).toBe(value(face, "height"));
-  const twoLines = '.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)';
-  expect(declarations(css, twoLines)).toEqual([]);
+  expect([value(face, "width"), value(face, "height")]).toEqual(["32px", "32px"]);
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("8px");
+  const twoLines =
+    '.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar + .sidebar__item-text > .sidebar__item-role)';
+  expect(declarations(css, twoLines)).toEqual([["align-items", "flex-start"]]);
+  expect(value(`${twoLines} > :not(.ac-avatar, .sidebar__item-text)`, "align-self")).toBe("center");
   expect(value(".sidebar__item", "align-items")).toBe("center");
-  // 3px over and under every face, a name alone (a DM) or a name and a role, so the list keeps even gaps.
-  expect(value('.sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar)', "padding-block")).toBe("3px");
+  // The icons' rows: 32, their 16px icons 8 from the plate's edges.
+  const item = '.sidebar:not([data-rail="true"]) .sidebar__item';
+  expect([value(item, "min-height"), value(item, "padding")]).toEqual(["32px", "0 8px"]);
+  expect(value(`${item} > .ac-icon`, "height")).toBe("16px");
   expect(value('.sidebar[data-rail="true"] .sidebar__item-text', "display")).toBe("contents");
   expect(value('.sidebar[data-rail="true"] .sidebar__item-role', "display")).toBe("none");
 });
