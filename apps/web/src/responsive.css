@@ -484,6 +484,9 @@
   .agp-id {
     flex-direction: column;
   }
+  .agp-id__fields {
+    align-self: stretch;
+  }
   .agp-roleedit {
     flex: 1 1 auto;
   }

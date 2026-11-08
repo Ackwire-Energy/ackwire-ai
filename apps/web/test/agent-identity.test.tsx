@@ -170,6 +170,19 @@ describe("the agent's identity as a card", () => {
     await settings(noRole);
     expect(card().querySelector(".agp-roletag")?.textContent).toBe("Sem cargo");
   });
+
+  test("a long name and role read whole, as the screen's worst case: nothing cut to fit the card", async () => {
+    const long = seedState();
+    const ada = long.agents.find((a) => a.id === ADA_ID);
+    const role = "Desenvolvedora de software sênior responsável pelas integrações com os parceiros";
+    if (ada) {
+      ada.name = "Ada Beatriz Lovelace Byron de Almeida";
+      ada.role = role;
+    }
+    await settings(long);
+    expect(nameButton().textContent).toBe("Ada Beatriz Lovelace Byron de Almeida");
+    expect(card().querySelector(".agp-roletag__text")?.textContent).toBe(role);
+  });
 });
 
 test("a role's icon is the one Criar agente gives that name in the person's language, else the agent's", () => {

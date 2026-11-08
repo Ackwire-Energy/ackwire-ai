@@ -11333,7 +11333,7 @@ html:not([data-pointer]) .msg-mem:focus-visible {
 .agp-inplace {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   min-width: 0;
   max-width: calc(100% + 16px);
   margin: -4px -8px;
@@ -11356,11 +11356,14 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
   background: var(--sunken);
   box-shadow: var(--focus-ring);
 }
-/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. */
+/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. It stays on the
+   first line of a name that wraps, in the middle of a box as tall as that line (as `.ac-captail`). */
 .agp-inplace__pen {
   display: inline-flex;
+  align-items: center;
   flex: none;
   width: 0;
+  height: 1.25em;
   margin-left: 0;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11369,6 +11372,11 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
     width 0.15s,
     margin 0.15s,
     opacity 0.15s;
+}
+@supports (top: 1lh) {
+  .agp-inplace__pen {
+    height: 1lh;
+  }
 }
 .agp-inplace:hover .agp-inplace__pen,
 html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
@@ -11408,16 +11416,17 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
 }
 
 /* The role as a tag (RoleTag): the role's icon and name, a pencil on hover; the field it turns into keeps its shape,
-   the roles the app knows in a list under it. Who can't change it reads the same tag, still. */
+   the roles the app knows in a list under it. Who can't change it reads the same tag, still. A long role wraps inside
+   the tag, its icon and pencil on its first 20px line (28px tall with one). */
 .agp-roletag {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 28px;
-  padding: 0 10px 0 8px;
+  min-height: 28px;
+  padding: 4px 10px 4px 8px;
   border: 0;
   border-radius: 9px 9px 9px 3px;
   background: var(--plate);
@@ -11425,20 +11434,20 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 20px;
+  text-align: left;
   transition:
     background 0.15s,
     box-shadow 0.15s;
 }
 .agp-roletag > .ac-icon {
   flex: none;
+  margin-block: 2px;
   color: var(--ink2);
 }
 .agp-roletag__text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agp-roletag[data-empty] .agp-roletag__text {
   color: var(--ink-muted);
@@ -11458,6 +11467,7 @@ html:not([data-pointer]) button.agp-roletag:focus-visible {
   display: inline-flex;
   flex: none;
   width: 0;
+  margin-block: 3px;
   margin-left: -6px;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11481,7 +11491,10 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   max-width: 100%;
 }
 .agp-roletag.agp-roletag--edit {
+  align-items: center;
   width: 100%;
+  height: 28px;
+  padding-block: 0;
   background: var(--field-bg);
   box-shadow:
     inset 0 0 0 1px var(--field-line),
@@ -11582,11 +11595,15 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   gap: 8px;
   font-size: 11.5px;
 }
-/* Phones: the tile above its card, both on the left edge; the role's field takes the rest of its line (wrapping
-   under the @ when that is short), its list as wide as it. */
+/* Phones: the tile above its card, both on the left edge, the card as wide as the page (sized to its words, a long
+   role or name ran past the edge); the role's field takes the rest of its line (wrapping under the @ when that is
+   short), its list as wide as it. */
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
+  }
+  .agp-id__fields {
+    align-self: stretch;
   }
   .agp-roleedit {
     flex: 1 1 auto;

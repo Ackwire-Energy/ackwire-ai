@@ -65,3 +65,17 @@ test("usage on a phone: the figures under the name, as wide as the row, not sque
 test("a long workspace name never widens the settings' nav", () => {
   expect(last(top, ".settings__nav", "min-width")).toBe("0");
 });
+
+test("an agent's identity on a phone: its card as wide as the page, a long role wrapping inside its tag", () => {
+  for (const sheet of [atRule(css, "@media (max-width: 640px)"), atRule(css, "@container agp-side (max-width: 640px)")])
+    expect(last(sheet, ".agp-id__fields", "align-self")).toBe("stretch");
+  expect(last(top, ".agp-roletag", "height")).toBeUndefined();
+  expect(last(top, ".agp-roletag", "min-height")).toBe("28px");
+  expect(last(top, ".agp-roletag__text", "white-space")).toBeUndefined();
+  expect(last(top, ".agp-roletag__text", "text-overflow")).toBeUndefined();
+  // The field it turns into keeps the tag's one line.
+  expect(last(top, ".agp-roletag.agp-roletag--edit", "height")).toBe("28px");
+  // A name that wraps keeps its pencil on its first line.
+  expect(last(top, ".agp-inplace", "align-items")).toBe("flex-start");
+  expect(last(atRule(css, "@supports (top: 1lh)"), ".agp-inplace__pen", "height")).toBe("1lh");
+});
