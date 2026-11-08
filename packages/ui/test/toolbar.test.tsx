@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
-import { FilterChip, Toolbar } from "../src";
+import { Button, FilterChip, FilterToggle, SearchField, Toolbar } from "../src";
 
 const body = () => within(document.body);
 
@@ -38,8 +38,13 @@ describe("Toolbar", () => {
     const ro = observe();
     try {
       const { container } = render(
-        <Toolbar search={<input aria-label="Buscar arquivos" />} actions={<button type="button">Data</button>}>
-          <button type="button">Canal</button>
+        <Toolbar
+          search={<SearchField aria-label="Buscar arquivos" placeholder="Buscar arquivos" />}
+          actions={<Button size="sm">Data</Button>}
+        >
+          <FilterToggle pressed={false} onPressedChange={() => {}}>
+            Canal
+          </FilterToggle>
         </Toolbar>,
       );
       const bar = container.querySelector(".ac-toolbar") as HTMLElement;
@@ -58,6 +63,38 @@ describe("Toolbar", () => {
       width(filters as HTMLElement, 150);
       ro.resize();
       expect(bar.hasAttribute("data-stack")).toBe(false);
+    } finally {
+      ro.restore();
+    }
+  });
+
+  test("stacked, the search keeps its floor: when it and the actions can't share the top row, it takes it alone", () => {
+    const ro = observe();
+    try {
+      const { container } = render(
+        <Toolbar
+          search={<SearchField aria-label="Buscar no time" placeholder="Buscar no time" />}
+          actions={<Button size="sm">Agrupar por: responsável</Button>}
+        >
+          <FilterToggle pressed={false} onPressedChange={() => {}}>
+            Meus
+          </FilterToggle>
+        </Toolbar>,
+      );
+      const bar = container.querySelector(".ac-toolbar") as HTMLElement;
+      const [search, filters, actions] = [...bar.children] as HTMLElement[];
+      Object.defineProperty(bar, "clientWidth", { configurable: true, value: 288 });
+      bar.style.columnGap = "8px";
+      (search as HTMLElement).style.minWidth = "160px";
+      width(filters as HTMLElement, 90);
+      width(actions as HTMLElement, 200);
+      ro.resize();
+      // 160 + 8 + 200 is wider than 288: the search alone on top, the actions leading the filters' row.
+      expect(bar.getAttribute("data-stack")).toBe("split");
+      width(actions as HTMLElement, 112);
+      ro.resize();
+      // 160 + 8 + 112 fits: the search and the actions on top.
+      expect(bar.getAttribute("data-stack")).toBe("");
     } finally {
       ro.restore();
     }

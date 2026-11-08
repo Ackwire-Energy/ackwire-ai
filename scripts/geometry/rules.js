@@ -435,10 +435,19 @@
         : p.getBoundingClientRect().width;
     return need <= bar.clientWidth + 0.5;
   };
+  /** Stacked, whether the search at its floor and the actions share the top row. Mirrors `topRowFits` in Toolbar.tsx. */
+  const topRowFits = (bar) => {
+    const search = bar.querySelector(":scope > .ac-toolbar__search");
+    const actions = bar.querySelector(":scope > .ac-toolbar__actions");
+    if (!search || !actions) return true;
+    const gap = parseFloat(style(bar).columnGap) || 0;
+    const floor = parseFloat(style(search).minWidth) || 0;
+    return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+  };
   const stackToolbars = () => {
     for (const bar of document.querySelectorAll(".ac-toolbar:has(> .ac-toolbar__search)")) {
       bar.removeAttribute("data-stack");
-      if (!fitsOneRow(bar)) bar.setAttribute("data-stack", "");
+      if (!fitsOneRow(bar)) bar.setAttribute("data-stack", topRowFits(bar) ? "" : "split");
     }
   };
   /** What a toolbar's rows hold, each once: its search field, filters and toggles, a segmented control, buttons, selects. */
@@ -1662,7 +1671,8 @@
     },
     /**
      * A toolbar's controls by rows: a page's toolbar keeps one row from 761px, two at most once it stacks (under 761 or
-     * with `data-stack`), and no control sits alone on a row, unless it is a search as wide as the toolbar.
+     * with `data-stack`), and no control sits alone on a row beside an empty stretch, unless it fills the row (a search,
+     * a stacked toolbar's control). From 761px a toolbar without a search wraps its chips, as a list of tags does.
      */
     toolrow(out) {
       for (const bar of document.querySelectorAll(".ac-toolbar")) {
@@ -1684,7 +1694,7 @@
         for (const { items } of rows) {
           const only = items.length === 1 ? items[0] : null;
           if (!only) continue;
-          if (only.matches(".ac-searchfield") && only.getBoundingClientRect().width >= 0.9 * bar.clientWidth) continue;
+          if (only.getBoundingClientRect().width >= 0.9 * bar.clientWidth || (!page && !stacked)) continue;
           out.push({ ...base, node: only, el: sig(only), side: "alone" });
         }
       }

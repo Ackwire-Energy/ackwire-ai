@@ -105,6 +105,20 @@ export function fitsOneRow(bar: HTMLElement) {
 }
 
 /**
+ * Stacked, whether the search at its floor (its `min-width`) and the actions share the top row. When they can't, the
+ * search takes that row alone and the actions lead the filters' row (`data-stack="split"`): the search never shrinks
+ * under its floor. scripts/geometry/rules.js mirrors it for captured screens.
+ */
+export function topRowFits(bar: HTMLElement) {
+  const search = bar.querySelector(":scope > .ac-toolbar__search");
+  const actions = bar.querySelector(":scope > .ac-toolbar__actions");
+  if (!search || !actions) return true;
+  const gap = Number.parseFloat(getComputedStyle(bar).columnGap) || 0;
+  const floor = Number.parseFloat(getComputedStyle(search).minWidth) || 0;
+  return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+}
+
+/**
  * The bar above a list: the search on the left, the filters (FilterBar, FilterChip, FilterToggle, a Segmented) and
  * `actions` at the end, on one row from 761px, the search giving way first. When they can't fit even so, it takes
  * the phone's two rows (`data-stack`): the search and the actions, then the filters in one row that scrolls sideways.
@@ -142,7 +156,7 @@ export function Toolbar({
         watch.observe(part);
       }
       el.removeAttribute("data-stack");
-      if (!fitsOneRow(el)) el.setAttribute("data-stack", "");
+      if (!fitsOneRow(el)) el.setAttribute("data-stack", topRowFits(el) ? "" : "split");
     };
     const watch = new ResizeObserver(measure);
     measure();

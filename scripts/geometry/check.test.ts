@@ -112,6 +112,15 @@ describe("geometry check", () => {
       expect(rules).toContain(part);
       expect(toolbar).toContain(part);
     }
+    // Stacked, the top row keeps the search at its floor beside the actions, or the search takes it alone (`split`).
+    for (const part of [
+      'querySelector(":scope > .ac-toolbar__actions")',
+      "floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5",
+      '"data-stack", topRowFits(',
+    ]) {
+      expect(rules).toContain(part);
+      expect(toolbar).toContain(part);
+    }
     expect(rules).toMatch(/detect\(\) \{\s*stackToolbars\(\);/);
     expect(rules).toMatch(/styles\(\) \{\s*stackToolbars\(\);/);
   });

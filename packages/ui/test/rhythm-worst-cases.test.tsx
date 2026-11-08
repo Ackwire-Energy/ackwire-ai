@@ -50,77 +50,80 @@ describe("worst cases", () => {
   });
 
   test("a toolbar whose filters hold long values, with a view switch and an action", () => {
+    // In a page's room, as every toolbar is: the filters' row reaches 4px past the toolbar to keep its rings whole.
     const { container } = render(
-      <Toolbar
-        search={<SearchField aria-label="Buscar arquivos" placeholder="Buscar arquivos" />}
-        actions={
-          <>
-            <Segmented
-              size="sm"
-              label="Ver como"
-              value="grid"
-              onValueChange={() => {}}
-              options={[
-                { value: "grid", label: "Grade" },
-                { value: "list", label: "Lista" },
-              ]}
-            />
-            <Button size="sm">Novo documento</Button>
-          </>
-        }
-      >
-        <FilterBar
-          label="Filtros"
-          clearText="Limpar filtros"
-          onClear={() => {}}
-          filters={[
-            {
-              key: "channel",
-              active: true,
-              node: (
-                <FilterChip
-                  label="Canal"
-                  icon="channel"
-                  clearLabel="Limpar Canal"
-                  value={["c"]}
-                  onChange={() => {}}
-                  valueText={(o) => o.label}
-                  options={[{ value: "c", label: "#lancamento-campanha-black-friday-2026" }]}
-                />
-              ),
-            },
-            {
-              key: "who",
-              active: true,
-              node: (
-                <FilterChip
-                  label="Pessoa ou agente"
-                  icon="person"
-                  clearLabel="Limpar Pessoa ou agente"
-                  value={["a"]}
-                  onChange={() => {}}
-                  options={[{ value: "a", label: "Aleksandra Wiśniewska-Kowalczyk" }]}
-                />
-              ),
-            },
-            {
-              key: "kind",
-              active: false,
-              node: (
-                <FilterChip
-                  label="Tipo"
-                  icon="file"
-                  clearLabel="Limpar Tipo"
-                  multiple
-                  value={[]}
-                  onChange={() => {}}
-                  options={[{ value: "docs", label: "Documentos", count: 3 }]}
-                />
-              ),
-            },
-          ]}
-        />
-      </Toolbar>,
+      <div className="page">
+        <Toolbar
+          search={<SearchField aria-label="Buscar arquivos" placeholder="Buscar arquivos" />}
+          actions={
+            <>
+              <Segmented
+                size="sm"
+                label="Ver como"
+                value="grid"
+                onValueChange={() => {}}
+                options={[
+                  { value: "grid", label: "Grade" },
+                  { value: "list", label: "Lista" },
+                ]}
+              />
+              <Button size="sm">Novo documento</Button>
+            </>
+          }
+        >
+          <FilterBar
+            label="Filtros"
+            clearText="Limpar filtros"
+            onClear={() => {}}
+            filters={[
+              {
+                key: "channel",
+                active: true,
+                node: (
+                  <FilterChip
+                    label="Canal"
+                    icon="channel"
+                    clearLabel="Limpar Canal"
+                    value={["c"]}
+                    onChange={() => {}}
+                    valueText={(o) => o.label}
+                    options={[{ value: "c", label: "#lancamento-campanha-black-friday-2026" }]}
+                  />
+                ),
+              },
+              {
+                key: "who",
+                active: true,
+                node: (
+                  <FilterChip
+                    label="Pessoa ou agente"
+                    icon="person"
+                    clearLabel="Limpar Pessoa ou agente"
+                    value={["a"]}
+                    onChange={() => {}}
+                    options={[{ value: "a", label: "Aleksandra Wiśniewska-Kowalczyk" }]}
+                  />
+                ),
+              },
+              {
+                key: "kind",
+                active: false,
+                node: (
+                  <FilterChip
+                    label="Tipo"
+                    icon="file"
+                    clearLabel="Limpar Tipo"
+                    multiple
+                    value={[]}
+                    onChange={() => {}}
+                    options={[{ value: "docs", label: "Documentos", count: 3 }]}
+                  />
+                ),
+              },
+            ]}
+          />
+        </Toolbar>
+      </div>,
     );
     expect(container.querySelectorAll(".ac-filter--active")).toHaveLength(2);
   });

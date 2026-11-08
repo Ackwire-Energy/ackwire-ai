@@ -119,7 +119,9 @@ describe("the toolbar", () => {
   test("from 761px a page's toolbar keeps one row: the search giving way down to 160, the rest at the end", () => {
     const wide = media("(min-width: 761px)");
     expect(body(".ac-toolbar:has(> .ac-toolbar__search):not([data-stack])", wide)).toContain("flex-wrap: nowrap;");
-    expect(body(".ac-toolbar > .ac-toolbar__search", wide)).toContain("min-width: 160px;");
+    // The search's floor holds at every width: a phone's top row keeps it too.
+    expect(body(".ac-toolbar > .ac-toolbar__search")).toContain("min-width: 160px;");
+    expect(body(".ac-toolbar > .ac-toolbar__search", wide)).not.toContain("min-width");
     expect(body(".ac-toolbar__search")).toContain("flex: 0 1 280px;");
     expect(body(".ac-toolbar > .ac-toolbar__search + *", wide)).toContain("margin-left: auto;");
     expect(body(".ac-toolbar > .ac-toolbar__search + .ac-toolbar__filters + .ac-toolbar__actions", wide)).toContain(
@@ -133,11 +135,15 @@ describe("the toolbar", () => {
   test("two rows on a phone and when one doesn't fit: the search and the actions, then the filters in one scroller", () => {
     const phone = media("(max-width: 760px)");
     expect(body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__actions", phone)).toContain("order: 1;");
-    expect(body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters", phone)).toContain("order: 2;");
+    // Its basis counts the room its margins give back: a full row, never beside a search without actions to share
+    // the search's, which it would squeeze to nothing.
+    const row = body(".ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters", phone);
+    expect(row).toContain("order: 2;");
+    expect(row).toContain("flex: 1 1 calc(100% + 8px);");
     expect(body(".ac-toolbar[data-stack] > .ac-toolbar__actions")).toContain("order: 1;");
     const stacked = body(".ac-toolbar[data-stack] > .ac-toolbar__filters");
     expect(stacked).toContain("order: 2;");
-    expect(stacked).toContain("flex: 1 1 100%;");
+    expect(stacked).toContain("flex: 1 1 calc(100% + 8px);");
     expect(stacked).toContain("overflow-x: auto;");
     // The filter bar inside the row doesn't scroll on its own, so the row's 4px on every side keep its controls'
     // rings whole (an active filter's ring too), pulled back by as much so the row keeps its place.
@@ -145,6 +151,52 @@ describe("the toolbar", () => {
     expect(body(".ac-toolbar__filters", phone)).toContain("padding: 4px;");
     expect(body(".ac-toolbar__filters", phone)).toContain("margin: -2px -4px;");
     expect(stacked).toContain("padding: 4px;");
+  });
+
+  test("stacked, a search that can't keep its floor beside the actions takes the top row alone, the actions leading the next", () => {
+    expect(body('.ac-toolbar[data-stack="split"] > .ac-toolbar__search')).toContain("flex: 1 1 100%;");
+    expect(body('.ac-toolbar[data-stack="split"] > .ac-toolbar__filters')).toContain("flex: 1 1 0;");
+    // With no filters to share that row, the actions fill it.
+    expect(body('.ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions')).toContain(
+      "flex: 1 1 100%;",
+    );
+    // Later than the stacked rules it overrides, which are as specific.
+    expect(kit.indexOf('.ac-toolbar[data-stack="split"] > .ac-toolbar__filters')).toBeGreaterThan(
+      kit.indexOf(".ac-toolbar[data-stack] > .ac-toolbar__filters {"),
+    );
+  });
+
+  test("stacked, no control sits alone beside an empty stretch: a lone small filter shares a row, a lone segmented control fills its own", () => {
+    const squash = (s: string) => s.replace(/\s+/g, "");
+    /** The bodies of the rules whose selector holds `part` (whitespace aside). */
+    const where = (part: string, css = kit) =>
+      [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((m) => split(m[1] ?? "").some((s) => squash(s).includes(squash(part))))
+        .map((m) => m[2])
+        .join("\n");
+    const lone =
+      ":has(> .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg), > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child)";
+    const phone = media("(max-width: 760px)");
+    for (const [stacked, css] of [
+      [".ac-toolbar[data-stack]", kit],
+      [".ac-toolbar:has(> .ac-toolbar__search)", phone],
+    ] as const) {
+      // After the search, with the actions when there are some: the search then fills its own row.
+      expect(where(`${stacked}${lone} > :is(.ac-toolbar__filters, .ac-toolbar__actions)`, css)).toContain("order: 1;");
+      expect(where(`${stacked}:has(> .ac-toolbar__actions)${lone} > .ac-toolbar__search`, css)).toContain(
+        "flex: 1 1 100%;",
+      );
+      // One control doesn't scroll: no scroller's room around it.
+      expect(where(`${stacked}${lone} > .ac-toolbar__filters`, css)).toContain("overflow: visible;");
+    }
+    // A lone segmented control (Atividade's, Auditoria's) fills its row and scrolls in its own track when wider.
+    expect(where(".ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-seg:only-child")).toContain("flex: 1 1 auto;");
+    expect(where(".ac-toolbar__filters > .ac-seg:only-child", phone)).toContain("min-width: 0;");
+    expect(where(".ac-toolbar__filters > .ac-seg:only-child > .ac-seg__item", phone)).toContain("flex: 1 0 auto;");
+    // Without a search (Auditoria's view and agent): what wraps fills its line on a phone.
+    expect(
+      where(".ac-toolbar:not(:has(> .ac-toolbar__search)) > :is(.ac-toolbar__filters, .ac-toolbar__actions)", phone),
+    ).toContain("flex: 1 1 auto;");
   });
 
   test("an empty search field gives the hidden hint's room back to its words", () => {

@@ -8983,12 +8983,13 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
  * 160), every other control sits at the end, 8 apart. When even that can't fit, Toolbar sets `data-stack` and it takes
  * the phone's two rows. A toolbar without a search wraps.
  */
+/* The search's floor, at every width: it gives way down to it, and a stacked toolbar's top row keeps it (`split`). */
+.ac-toolbar > .ac-toolbar__search {
+  min-width: 160px;
+}
 @media (min-width: 761px) {
   .ac-toolbar:has(> .ac-toolbar__search):not([data-stack]) {
     flex-wrap: nowrap;
-  }
-  .ac-toolbar > .ac-toolbar__search {
-    min-width: 160px;
   }
   .ac-toolbar > .ac-toolbar__search + * {
     margin-left: auto;
@@ -9008,7 +9009,8 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 /*
  * Two rows, on a phone and when one doesn't fit: the search and the actions on top, the tabs and filters under them in
  * one row that scrolls sideways. That row is the only scroller (the filter bar inside it doesn't scroll on its own),
- * and its 4px of room keep the controls' rings whole.
+ * and its 4px of room keep the controls' rings whole. Its basis counts the room its margins give back, so it never
+ * fits beside a search that has no actions to share its row, which would squeeze that search to nothing.
  */
 @media (max-width: 760px) {
   .ac-toolbar > .ac-toolbar__search {
@@ -9020,7 +9022,7 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
   }
   .ac-toolbar:has(> .ac-toolbar__search) > .ac-toolbar__filters {
     order: 2;
-    flex: 1 1 100%;
+    flex: 1 1 calc(100% + 8px);
   }
   .ac-toolbar__filters,
   .ac-toolbar__filters > .ac-filterbar {
@@ -9051,7 +9053,7 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 }
 .ac-toolbar[data-stack] > .ac-toolbar__filters {
   order: 2;
-  flex: 1 1 100%;
+  flex: 1 1 calc(100% + 8px);
   flex-wrap: nowrap;
   max-width: calc(100% + 8px);
   margin: -2px -4px;
@@ -9069,6 +9071,98 @@ html:not([data-pointer]) .ac-grouphead__title > button:focus-visible {
 .ac-toolbar[data-stack] > .ac-toolbar__filters > *,
 .ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-filterbar > * {
   flex: none;
+}
+/* When the search at its floor and the actions can't share the top row, the search takes it alone and the actions lead
+   the row under it, the filters scrolling after them, or the actions fill that row when there are no filters. */
+.ac-toolbar[data-stack="split"] > .ac-toolbar__search {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack="split"] > .ac-toolbar__filters {
+  flex: 1 1 0;
+}
+.ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack="split"]:not(:has(> .ac-toolbar__filters)) > .ac-toolbar__actions > :only-child {
+  flex: 1 1 auto;
+}
+/*
+ * Stacked, no control sits alone on a row beside an empty stretch. A lone small filter (Tarefas' Filtro) shares a row:
+ * with actions it goes under the search with them, the search filling its own row, and without them it stays beside
+ * the search. It doesn't scroll, so it keeps no scroller's room. A lone segmented control fills its row instead,
+ * scrolling sideways in its own track when its choices are wider.
+ */
+.ac-toolbar[data-stack]:has(
+  > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+  > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+) > :is(.ac-toolbar__filters, .ac-toolbar__actions) {
+  order: 1;
+}
+.ac-toolbar[data-stack]:has(> .ac-toolbar__actions):has(
+    > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+    > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+  )
+  > .ac-toolbar__search {
+  flex: 1 1 100%;
+}
+.ac-toolbar[data-stack]:has(
+    > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+    > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+  )
+  > .ac-toolbar__filters {
+  flex: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-seg:only-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ac-toolbar[data-stack] > .ac-toolbar__filters > .ac-seg:only-child > .ac-seg__item {
+  flex: 1 0 auto;
+}
+@media (max-width: 760px) {
+  .ac-toolbar:has(> .ac-toolbar__search):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > :is(.ac-toolbar__filters, .ac-toolbar__actions) {
+    order: 1;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):has(> .ac-toolbar__actions):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > .ac-toolbar__search {
+    flex: 1 1 100%;
+  }
+  .ac-toolbar:has(> .ac-toolbar__search):has(
+      > .ac-toolbar__filters > :only-child:not(.ac-filterbar, .ac-seg),
+      > .ac-toolbar__filters > .ac-filterbar:only-child > :only-child
+    )
+    > .ac-toolbar__filters {
+    flex: none;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .ac-toolbar__filters > .ac-seg:only-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .ac-toolbar__filters > .ac-seg:only-child > .ac-seg__item {
+    flex: 1 0 auto;
+  }
+  /* Without a search, what wraps fills its line, as a search fills its own. */
+  .ac-toolbar:not(:has(> .ac-toolbar__search)) > :is(.ac-toolbar__filters, .ac-toolbar__actions),
+  .ac-toolbar:not(:has(> .ac-toolbar__search))
+    > :is(.ac-toolbar__filters, .ac-toolbar__actions)
+    > :only-child:is(.ac-seg, .ac-select) {
+    flex: 1 1 auto;
+  }
 }
 
 .ac-searchfield {
