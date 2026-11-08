@@ -4879,6 +4879,7 @@ export const ptBR = {
         too_many_tool_calls: "Passou do limite de ferramentas numa execução.",
         stuck: "Parou porque travou.",
         brain_interrupted: "A IA parou antes de terminar.",
+        brain_unavailable: "A IA do computador não conseguiu responder. Confira o computador e peça de novo.",
         empty_reply: "O modelo não respondeu nada.",
         model_refused: "O modelo se recusou a responder.",
         agent_archived: "O agente foi arquivado.",

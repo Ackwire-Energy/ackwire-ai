@@ -4848,6 +4848,8 @@ export const en = {
         too_many_tool_calls: "Went over the tool limit for one run.",
         stuck: "Stopped because it got stuck.",
         brain_interrupted: "The AI stopped before finishing.",
+        /** A computer brain had no AI to think with this time; its own words show only on hover. */
+        brain_unavailable: "The AI on its computer couldn't answer. Check the computer and ask again.",
         empty_reply: "The model returned nothing.",
         model_refused: "The model refused to answer.",
         agent_archived: "The agent was archived.",

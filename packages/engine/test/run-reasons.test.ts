@@ -27,6 +27,17 @@ test("a failed run's reason: a CLI's failed turn is the computer's, a missing ac
   expect(routineFailureCode("provider_error: invalid key")).toBe("provider_error");
 });
 
+test("a computer brain cut mid-turn, or with no AI to think with, has its own reason, never its prefix and English", () => {
+  expect(runErrorDetail("brain_interrupted: The computer stopped answering")).toEqual({
+    errorCode: "run.brain_interrupted",
+    errorParams: { detail: "The computer stopped answering" },
+  });
+  expect(runErrorDetail("brain_unavailable: Codex is turned off on this computer")).toEqual({
+    errorCode: "run.brain_unavailable",
+    errorParams: { detail: "Codex is turned off on this computer" },
+  });
+});
+
 const failure = (message: string, status: number | undefined, said?: string, platformKey = false) => {
   const error = new ProviderError(message, false, status, undefined, said);
   error.provider = "OpenRouter";
