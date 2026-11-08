@@ -1972,7 +1972,7 @@
       "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
       "audience": "Wie het mag gebruiken",
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
-      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
+      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Ongevraagd plaatst hij alleen de Teamweek, voor admins.",
       "audit": "Bekijk wat {{name}} deed",
       "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",

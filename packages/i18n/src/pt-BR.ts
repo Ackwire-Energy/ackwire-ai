@@ -1981,8 +1981,9 @@ export const ptBR = {
       audience: "Quem pode usar",
       audienceHelp: "Fora do público, a pessoa não vê o {{name}} na barra lateral.",
       audienceHelp_female: "Fora do público, a pessoa não vê a {{name}} na barra lateral.",
-      lock: "O {{name}} não pode ser arquivado nem apagado. Ele não posta nada sem que alguém fale com ele.",
-      lock_female: "A {{name}} não pode ser arquivada nem apagada. Ela não posta nada sem que alguém fale com ela.",
+      lock: "O {{name}} não pode ser arquivado nem apagado. Sem ser chamado, ele só posta a Semana da equipe, para os admins.",
+      lock_female:
+        "A {{name}} não pode ser arquivada nem apagada. Sem ser chamada, ela só posta a Semana da equipe, para os admins.",
       audit: "Ver o que o {{name}} fez",
       audit_female: "Ver o que a {{name}} fez",
       change: "Mudar",

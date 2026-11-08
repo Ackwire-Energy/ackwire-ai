@@ -2049,7 +2049,7 @@
       "budgetHelp": "Quand il atteint la limite, il s’arrête et prévient, comme tout agent.",
       "audience": "Qui peut l’utiliser",
       "audienceHelp": "Hors de ce public, la personne ne voit pas {{name}} dans la barre latérale.",
-      "lock": "{{name}} ne peut être ni archivé ni supprimé. Il ne publie rien tant que personne ne lui parle.",
+      "lock": "{{name}} ne peut être ni archivé ni supprimé. Sans qu’on lui parle, il ne publie que la Semaine de l’équipe, pour les admins.",
       "audit": "Voir ce que {{name}} a fait",
       "change": "Changer",
       "planHelp": "C'est le titulaire de l'abonnement qui paie. Si son ordinateur n'est pas disponible, la conversation le signale et propose une clé API.",

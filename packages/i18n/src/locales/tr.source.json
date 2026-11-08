@@ -4842,7 +4842,7 @@
     "value": "Outside it, a person doesn't see {{name}} in the sidebar."
   },
   "rightHand.settings.lock": {
-    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+    "value": "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins."
   },
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"

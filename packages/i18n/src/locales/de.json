@@ -1973,7 +1973,7 @@
       "budgetHelp": "Am Limit hält er an und sagt Bescheid, wie jeder Agent.",
       "audience": "Wer es nutzen darf",
       "audienceHelp": "Wer nicht dazugehört, sieht {{name}} nicht in der Seitenleiste.",
-      "lock": "{{name}} kann weder archiviert noch gelöscht werden. Er postet nichts, solange niemand mit ihm spricht.",
+      "lock": "{{name}} kann weder archiviert noch gelöscht werden. Ungefragt postet er nur die Teamwoche, für Admins.",
       "audit": "Ansehen, was {{name}} getan hat",
       "change": "Ändern",
       "planHelp": "Es zahlt, wem das Abo gehört. Ist sein Computer nicht erreichbar, sagt die Unterhaltung das und bietet einen API-Schlüssel an.",

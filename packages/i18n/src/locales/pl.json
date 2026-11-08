@@ -2122,7 +2122,7 @@
       "budgetHelp": "Gdy dojdzie do limitu, zatrzymuje się i daje znać, jak każdy agent.",
       "audience": "Kto może korzystać",
       "audienceHelp": "Osoba spoza tej grupy nie widzi {{name}} na pasku bocznym.",
-      "lock": "{{name}} nie da się zarchiwizować ani usunąć. Nic nie publikuje, dopóki nikt do niego nie napisze.",
+      "lock": "{{name}} nie da się zarchiwizować ani usunąć. Bez pytania publikuje tylko Tydzień zespołu, dla adminów.",
       "audit": "Zobacz, co zrobił {{name}}",
       "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",

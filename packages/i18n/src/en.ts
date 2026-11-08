@@ -1983,7 +1983,7 @@ export const en = {
       budgetHelp: "When it reaches the limit, it stops and tells you, like any agent.",
       audience: "Who can use it",
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
-      lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
+      lock: "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins.",
       audit: "See what {{name}} did",
       change: "Change",
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",

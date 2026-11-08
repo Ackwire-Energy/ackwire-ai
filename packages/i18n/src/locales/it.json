@@ -2045,7 +2045,7 @@
       "budgetHelp": "Quando arriva al limite, si ferma e avvisa, come qualsiasi agente.",
       "audience": "Chi può usarlo",
       "audienceHelp": "Fuori dal pubblico, la persona non vede {{name}} nella barra laterale.",
-      "lock": "{{name}} non si può archiviare né eliminare. Non pubblica nulla finché nessuno gli parla.",
+      "lock": "{{name}} non si può archiviare né eliminare. Senza che nessuno gli parli, pubblica solo la Settimana del team, per gli admin.",
       "audit": "Vedi cosa ha fatto {{name}}",
       "change": "Cambia",
       "planHelp": "Paga chi è titolare del piano. Se il suo computer non è disponibile, la conversazione lo dice e propone una chiave API.",

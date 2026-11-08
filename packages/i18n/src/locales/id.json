@@ -1898,7 +1898,7 @@
       "budgetHelp": "Saat mencapai batas, ia berhenti dan memberi tahu, seperti agen lain.",
       "audience": "Siapa yang bisa memakai",
       "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
-      "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Ia tidak memposting apa pun kalau tak ada yang mengajaknya bicara.",
+      "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Tanpa diajak bicara, ia hanya memposting Minggu tim, untuk admin.",
       "audit": "Lihat apa yang dilakukan {{name}}",
       "change": "Ubah",
       "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",

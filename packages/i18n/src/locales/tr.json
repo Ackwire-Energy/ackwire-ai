@@ -1969,7 +1969,7 @@
       "budgetHelp": "Sınıra ulaşınca her ajan gibi durur ve haber verir.",
       "audience": "Kimler kullanabilir",
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
-      "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
+      "lock": "{{name}} arşivlenemez ve silinemez. Kimse onunla konuşmadan paylaştığı tek şey, yöneticilere giden Ekibin haftası.",
       "audit": "{{name}} neler yaptı, gör",
       "change": "Değiştir",
       "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
