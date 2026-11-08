@@ -167,6 +167,9 @@ describe("never empty before the answer, and never on an error", () => {
     api.artifacts.list = async () => {
       throw new Error("offline");
     };
+    api.artifacts.page = async () => {
+      throw new Error("offline");
+    };
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=files`, { api });
     await settle(8);
     expect(document.body.textContent).not.toContain("Peça um relatório");
