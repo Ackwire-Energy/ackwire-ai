@@ -33626,6 +33626,9 @@
   "chat.work.step.proposingChange": {
     "value": "Proposed a change"
   },
+  "chat.work.step.workingOnWorkspace": {
+    "value": "Worked on the workspace"
+  },
   "chat.work.step.updatingThread": {
     "value": "Updated a thread"
   },
@@ -33940,6 +33943,9 @@
   },
   "chat.activity.proposingChange": {
     "value": "proposing a change"
+  },
+  "chat.activity.workingOnWorkspace": {
+    "value": "working on the workspace"
   },
   "chat.activity.updatingThread": {
     "value": "updating a thread"
