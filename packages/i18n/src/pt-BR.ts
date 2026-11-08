@@ -2342,6 +2342,9 @@ export const ptBR = {
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared:
         "Conecte o seu plano para conversar com {{name}}: o plano do workspace só atende o próprio dono.",
+      /** Um pedido que não veio de uma pessoa (de outro agente, de uma rotina): o plano de ninguém responderia a ele. */
+      plan_unattended:
+        "{{name}} não respondeu: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
       runner_outdated:
         "{{name}} não consegue responder agora: o programa no computador do plano precisa ser atualizado.",
       plan_tools:
@@ -14016,6 +14019,8 @@ export const ptBR = {
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared:
         "Não consigo te responder pelo plano do workspace: ele só atende o próprio dono. Conecte o seu plano e eu respondo.",
+      no_ai_plan_unattended:
+        "Não respondi: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
       no_ai_runner_outdated:
         "Agora não consigo responder: o programa no computador do meu plano precisa ser atualizado.",
       no_ai_plan_tools:

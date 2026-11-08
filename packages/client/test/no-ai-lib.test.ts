@@ -960,6 +960,21 @@ describe("a card says the real cause, not that the agent has no AI", () => {
     );
   });
 
+  test("the right hand's run nobody asked for never says to connect your plan: only a key, for who sets its AI", () => {
+    expect(card("plan_unattended")?.planLine).toBe("plan_unattended");
+    expect(pt("noAi.rightHand.plan_unattended", { name: "Bento" })).toBe(
+      "Bento não respondeu: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
+    );
+    expect(serverBody(pt, "…", meta("plan_unattended"))).toBe(
+      "Não respondi: o pedido não veio de uma pessoa, e o plano do workspace só atende o próprio dono.",
+    );
+    const rightHand = { ownerUserId: "u1", builtin: "right_hand" as const };
+    expect(planLineFix("plan_unattended", rightHand, "u1", { permissions: [] })).toBe("useKey");
+    expect(planLineFix("plan_unattended", rightHand, "u2", { permissions: ["manage_agents"] })).toBe("useKey");
+    // A member's own plan never answers it: no Connect for them.
+    expect(planLineFix("plan_unattended", rightHand, "u2", { permissions: [] })).toBeNull();
+  });
+
   test("a wait that doesn't pass by itself names its cause and who fixes it", () => {
     const wait = (code: string) => ({
       bodyCode: "brain_unavailable",
