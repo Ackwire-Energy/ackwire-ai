@@ -283,11 +283,13 @@ html:not([data-pointer]) .brw-site button:focus-visible {
 .brw-rq__res--ok > .ac-icon {
   color: var(--ok);
 }
+/* The agent's own words beside the bar: a word longer than the card breaks instead of running past it. */
 .brw-rq__why {
   font-size: 13px;
   color: var(--muted);
   display: flex;
   gap: 10px;
+  overflow-wrap: anywhere;
 }
 .brw-rq__why::before {
   content: "";

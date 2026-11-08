@@ -1,6 +1,6 @@
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { router } from "@/ui/navigation";
 import { AuthLink } from "./AuthLink";
 
 /** "Idioma · Português (Brasil)": the language before signing in, picked on its own page (ADR 0122). */

@@ -4,12 +4,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useOrgId, useWhen } from "../shared/hooks";
 import { whenKind } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { openInDrive, saveToPhotos, shareFile } from "./source";
 
-/** Compartilhar, Salvar em Fotos and Ver no Drive for one file, with their toasts; one at a time. */
+/**
+ * Compartilhar (who sees it and its link, ADR 0157), Enviar (the system's share sheet with the file), Salvar
+ * em Fotos and Ver no Drive for one file, with their toasts; one at a time.
+ */
 export function useFileActions(detail: ArtifactDetail | undefined) {
   const { t } = useTranslation();
   const api = useApi();
@@ -49,10 +53,15 @@ export function useFileActions(detail: ArtifactDetail | undefined) {
     openInDrive(orgId, detail).catch(() => toast({ title: t("mobile.files.loadFailed"), icon: "x" }));
   };
 
+  const shareSheet = () => {
+    if (detail) router.push({ pathname: "/file-share", params: { id: detail.id } });
+  };
+
   /** The "…" of the top bar: the same actions as a native menu. */
   const more = (withPhotos: boolean) => {
     const items = [
-      { label: t("mobile.files.share"), run: share },
+      ...(detail?.inDrive !== false ? [{ label: t("share.button"), run: shareSheet }] : []),
+      { label: t("mobile.files.send"), run: share },
       ...(withPhotos ? [{ label: t("mobile.files.savePhotos"), run: savePhotos }] : []),
       { label: t("mobile.files.drive"), run: drive },
     ];
@@ -71,7 +80,7 @@ export function useFileActions(detail: ArtifactDetail | undefined) {
     ]);
   };
 
-  return { share, savePhotos, drive, more, busy };
+  return { share, shareSheet, savePhotos, drive, more, busy };
 }
 
 /** "hoje 10:03", "ontem 18:20", "12 de out. 09:15": when the file was saved. */

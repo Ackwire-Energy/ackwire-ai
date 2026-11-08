@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { redactCommon } from "@agenteschat/adapters/redact";
-import type { ActivityEntry } from "@agenteschat/adapters/runner-control";
+import type { ActivityEntry, ActivitySaid } from "@agenteschat/adapters/runner-control";
 import { ROTATE_BYTES, ROTATE_KEEP, RotatingFile } from "./logfile";
 
 /**
@@ -39,6 +39,13 @@ export class ActivityLog {
       ...(entry.command ? { command: clean(entry.command).slice(0, COMMAND_MAX) } : {}),
       ...(entry.where ? { where: entry.where.slice(0, 200) } : {}),
       ...(entry.result ? { result: entry.result } : {}),
+      ...(entry.said
+        ? {
+            said: Object.fromEntries(
+              Object.entries(entry.said).map(([k, v]) => [k, clean(v).slice(0, SUMMARY_MAX)]),
+            ) as ActivitySaid,
+          }
+        : {}),
     };
     try {
       this.file.append(`${JSON.stringify(out)}\n`);

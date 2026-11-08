@@ -39,7 +39,10 @@ export const blobs = pgTable(
   (t) => [index().on(t.orgId)],
 );
 
-/** `s3` = the org's own S3-compatible bucket. Planned: `google_drive`, `onedrive` (OAuth into a folder). */
+/**
+ * `s3` = the org's own S3-compatible bucket. `google_drive` and `onedrive` stay in the type unused: no native storage
+ * there is planned, those services connect through Conectores (ADR 0107).
+ */
 export const storageKindEnum = pgEnum("storage_kind", ["s3", "google_drive", "onedrive"]);
 /**
  * `tested`: passed the probe, waiting to be switched on; `failed`: the probe
@@ -176,7 +179,7 @@ export const artifactKindEnum = pgEnum("artifact_kind", [
 /**
  * Files people and agents make (Drive): documents, tables, diffs, HTML
  * pages, diagrams, and binary files as is (`file`, ADR 0025). Visibility comes from the channel of origin (null =
- * the whole organization). Content lives in the blob store, one object per
+ * the whole organization), widened by `share` (ADR 0157). Content lives in the blob store, one object per
  * version (`artifact_versions`).
  */
 export const artifacts = pgTable(
@@ -198,6 +201,13 @@ export const artifacts = pgTable(
     inDrive: boolean().notNull().default(true),
     /** Text for search (first part of the latest version). */
     excerpt: text().notNull().default(""),
+    /**
+     * Who sees it past its conversation (ADR 0157): `conversation` adds nobody, `people` adds `shareUserIds`, whoever
+     * holds one of `shareRoleIds` and administrators, `everyone` the whole workspace.
+     */
+    share: text().$type<"conversation" | "people" | "everyone">().notNull().default("conversation"),
+    shareUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    shareRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     currentVersion: integer().notNull().default(1),
     createdByType: text().notNull(),
     createdById: text().notNull(),

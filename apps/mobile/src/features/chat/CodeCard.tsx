@@ -1,13 +1,22 @@
-import { type CodeToken, type CodeTokenKind, codeLabel, highlightCode } from "@agenteschat/client/lib/code";
-import { router } from "expo-router";
+import {
+  type CodeToken,
+  type CodeTokenKind,
+  codeLabel,
+  formatJson,
+  highlightCode,
+  isJsonLang,
+} from "@agenteschat/client/lib/code";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
 import { copyText, MONO } from "../shared/parts";
+import { CHAT_TEXT_MAX_SCALE, chatCodeOf } from "./logic";
+import { useRowLook } from "./look";
 
 /** Lines a card shows in the conversation; the rest open in full screen. */
 const SHOWN = 14;
@@ -30,12 +39,17 @@ function openFull(lang: string, text: string) {
  * Fenced code in a message: the language on top, copy (the icon turns
  * into a check and "Copiado") and full screen, a native form sheet: the system
  * shrinks and dims the conversation behind it and closes it with a drag. Long code shows its first lines
- * and "Ver as N linhas". Colors from the shared highlighter (`@agenteschat/client/lib/code`).
+ * and "Ver as N linhas". Colors from the shared highlighter (`@agenteschat/client/lib/code`). JSON reads formatted
+ * (`formatJson`) and wrapped, the text as written one press away ("Original"), as on the web; copy takes what shows.
  */
 export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; text: string }) {
   const { t } = useTranslation();
   const c = useColors();
-  const lines = useMemo(() => highlightCode(text, lang), [text, lang]);
+  const formatted = useMemo(() => (isJsonLang(lang) ? formatJson(text) : null), [lang, text]);
+  const [raw, setRaw] = useState(false);
+  const pretty = formatted !== null && !raw;
+  const code = pretty ? formatted : text;
+  const lines = useMemo(() => highlightCode(code, lang), [code, lang]);
   const shown = lines.length > SHOWN + 2 ? lines.slice(0, SHOWN) : lines;
   return (
     <View style={[styles.card, { backgroundColor: c.sunken, borderColor: c.line }]}>
@@ -43,10 +57,13 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
         <Text variant="label" tone="faint" style={styles.lang} numberOfLines={1}>
           {codeLabel(lang) || t("mobile.code.label")}
         </Text>
-        <CopyButton text={text} />
+        {formatted !== null && formatted !== text.trim() ? (
+          <RawToggle on={raw} onPress={() => setRaw((r) => !r)} />
+        ) : null}
+        <CopyButton text={code} />
         <PressScale
           to={0.88}
-          onPress={() => openFull(lang, text)}
+          onPress={() => openFull(lang, code)}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.code.fullScreen")}
           hitSlop={6}
@@ -56,12 +73,18 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
           <Icon name="expand" size={18} color={c.muted} />
         </PressScale>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
-        <CodeText lines={shown} />
-      </ScrollView>
+      {pretty ? (
+        <View style={styles.body}>
+          <CodeText lines={shown} wrap />
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
+          <CodeText lines={shown} />
+        </ScrollView>
+      )}
       {shown.length < lines.length ? (
         <PressScale
-          onPress={() => openFull(lang, text)}
+          onPress={() => openFull(lang, code)}
           accessibilityRole="button"
           style={[styles.more, { borderTopColor: c.line }]}
           contentStyle={styles.center}
@@ -75,7 +98,27 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
   );
 });
 
-function CodeText({
+/** "Original": a formatted block (JSON) shown as it was written while on. */
+export function RawToggle({ on, onPress }: { on: boolean; onPress: () => void }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <PressScale
+      onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: on }}
+      hitSlop={4}
+      style={[styles.raw, { backgroundColor: on ? c.ink : c.plate }]}
+      contentStyle={styles.center}
+    >
+      <Text variant="label" style={{ color: on ? c.bg : c.ink2 }}>
+        {t("mobile.code.raw")}
+      </Text>
+    </PressScale>
+  );
+}
+
+export function CodeText({
   lines,
   numbered = false,
   wrap = false,
@@ -86,6 +129,8 @@ function CodeText({
 }) {
   const c = useColors();
   const { scheme } = useTheme();
+  // In a conversation, the person's Tamanho do texto, as the words around it; full screen keeps its own size.
+  const sized = useRowLook().text;
   const colors = TOKEN[scheme];
   const color = (kind: CodeTokenKind) =>
     kind === "plain"
@@ -94,12 +139,18 @@ function CodeText({
         ? c.faint
         : kind === "inserted"
           ? c.ok
-          : kind === "deleted"
-            ? c.danger
-            : colors[kind];
+          : kind === "property"
+            ? colors.function
+            : kind === "deleted"
+              ? c.danger
+              : colors[kind];
   const gutter = String(lines.length).length;
   return (
-    <RNText selectable style={[styles.mono, { color: c.ink2 }, wrap ? styles.wrap : null]}>
+    <RNText
+      selectable
+      style={[styles.mono, sized ? chatCodeOf(sized) : null, { color: c.ink2 }, wrap ? styles.wrap : null]}
+      maxFontSizeMultiplier={sized ? CHAT_TEXT_MAX_SCALE : undefined}
+    >
       {lines.map((line, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the lines of one block, in order
         <RNText key={i}>
@@ -241,6 +292,7 @@ const styles = StyleSheet.create({
   sheetTitle: { flex: 1, textAlign: "center" },
   sheetTools: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 16 },
+  raw: { height: 28, paddingHorizontal: 12, marginRight: 4, borderRadius: 14 },
   fill: { flex: 1 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 4 },
 });

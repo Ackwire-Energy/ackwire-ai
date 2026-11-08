@@ -22,6 +22,7 @@ import { OrgMark } from "./ProfilePhoto";
  * phone ≤ 640px · compact ≤ 760px (sidebar = drawer, panels = full-screen sheets)
  * · tablet 761–1199px (sidebar = icon rail) · desktop ≥ 1200px.
  */
+export const PHONE_QUERY = "(max-width: 640px)";
 export const COMPACT_QUERY = "(max-width: 760px)";
 export const DESKTOP_QUERY = "(min-width: 1200px)";
 /** The sidebar's id: the menu buttons control it. */

@@ -105,13 +105,15 @@ describe("Tool Gateway", () => {
 
     const call = (name: string, input: Record<string, unknown>) =>
       tools.invoke(ctx, { toolUseId: `tu_${name}_${Math.random()}`, name, input });
-    // The model asks for a tool it was not given: refused by scope, never by prompt.
+    // The model asks for a tool it was not given: refused by scope, never by prompt. People read why in their words
+    // (`refusal`); the text is the agent's.
     expect(await call("github_merge_pr", { repo: "a/b", pr: 1 })).toEqual({
       type: "result",
       output: {
         content:
           "Not allowed: this agent lacks the scope github:pr.merge, which request_permission can't offer. Only an admin can give it, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never ask the person to try again",
         isError: true,
+        data: { refusal: "noAccess" },
       },
     });
     expect(await call("rm_rf", {})).toMatchObject({ output: { isError: true, content: "Unknown tool rm_rf" } });

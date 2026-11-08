@@ -35,7 +35,9 @@ test("receipts: listed on the agent's reply, undo/redo/undo-all over the API, co
     threadRootId: ask.id,
     triggerMessageId: ask.id,
   };
-  const [create] = (await createIssueToolSource({ db: t.db }).tools(ctx)).filter((x) => x.name === "create_issue");
+  const [create] = (await createIssueToolSource(t.engine.artifacts).tools(ctx)).filter(
+    (x) => x.name === "create_issue",
+  );
   await create?.execute({ title: "Uma" }, ctx);
   await create?.execute({ title: "Outra" }, ctx);
   // Asked in the channel: the reply is in the main timeline.

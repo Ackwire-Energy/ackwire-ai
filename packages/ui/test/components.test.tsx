@@ -466,7 +466,8 @@ describe("Message", () => {
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.className).toBe("ac-msg ac-msg--agent ac-msg--streaming");
     expect(first?.getAttribute("aria-busy")).toBe("true");
-    expect(first?.querySelector(".ac-msg__meta")?.textContent).toBe("escrevendo…");
+    const time = first?.querySelector(".ac-msg__time--details");
+    expect(document.getElementById(time?.getAttribute("aria-describedby") ?? "")?.textContent).toBe("escrevendo…");
     expect(second?.querySelector(".ac-avatar")).toBeNull();
     expect(second?.querySelector(".ac-visually-hidden")?.textContent).toContain("Atlas");
   });
@@ -488,10 +489,11 @@ describe("Message", () => {
     expect(article?.className).toContain("ac-msg--enter");
     const time = article?.querySelector(".ac-msg__time--details") as HTMLElement;
     expect(time.tabIndex).toBe(0);
-    const tip = within(container).getByRole("tooltip");
-    expect(time.getAttribute("aria-describedby")).toBe(tip.id);
-    expect(time.contains(tip)).toBe(true);
-    expect(tip.textContent).toBe("sonnet 5.5 · 1.240 tokens · US$ 0,004");
+    // Read out from the time itself; the tip that shows them opens on the floating layer (floating.test.tsx).
+    const details = document.getElementById(time.getAttribute("aria-describedby") ?? "");
+    expect(time.contains(details)).toBe(true);
+    expect(details?.hidden).toBe(true);
+    expect(details?.textContent).toBe("sonnet 5.5 · 1.240 tokens · US$ 0,004");
     const status = article?.querySelector(".ac-msg__status");
     expect(status?.textContent).toBe("enviando…");
     expect(status?.querySelector("svg")).not.toBeNull();

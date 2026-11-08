@@ -120,6 +120,16 @@ describe("finding the settings", () => {
     }
   });
 
+  test("a long workspace name wraps under the nav's title beside its mark, whole, never widening the nav", async () => {
+    const state = seedState();
+    const name = "Cooperativa Agroindustrial dos Produtores Rurais do Vale do Jequitinhonha";
+    if (state.me?.organizations[0]) state.me.organizations[0].name = name;
+    await go("settings/general", state);
+    const org = document.querySelector(".settings__org") as HTMLElement;
+    expect(org.classList.contains("ac-iconline")).toBe(true);
+    expect(org.textContent).toBe(name);
+  });
+
   test("Sobre o agentes.chat: for a member too, with the license's attribution, the version and the source", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
@@ -139,6 +149,51 @@ describe("finding the settings", () => {
         .getAttribute("href"),
     ).toBe("https://git.example.com/fork");
     expect(screen().getByText("Copyright © 2026 Codari Global, LLC e colaboradores")).toBeTruthy();
+  });
+
+  test("Sobre o agentes.chat only on a self-hosted server: agentes.chat Cloud lists it nowhere, its link opens Sua conta", async () => {
+    const nav = () => within(screen().getByRole("navigation", { name: "Seções das configurações" }));
+    const license = () => screen().queryByRole("link", { name: "GNU Affero General Public License v3" });
+    const inPalette = async () => {
+      await act(async () => fireEvent.keyDown(window, { key: "k", metaKey: true }));
+      await type(screen().getByRole("combobox", { name: "Ir para, ou pedir a um agente" }), "sobre");
+      return screen().queryByRole("option", { name: /Sobre o agentes\.chat/ }) !== null;
+    };
+    await go("settings/about", seedState({ authConfig: { cloud: false } }));
+    expect(nav().getByRole("link", { name: "Sobre o agentes.chat" }).getAttribute("aria-current")).toBe("page");
+    expect(license()).not.toBeNull();
+    expect(await inPalette()).toBe(true);
+    cleanup();
+
+    await go("settings/about", seedState({ authConfig: { cloud: true } }));
+    expect(nav().queryByRole("link", { name: "Sobre o agentes.chat" })).toBeNull();
+    expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
+    // The Cloud has no Sobre for anyone: nothing to say about the person's role.
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
+    expect(license()).toBeNull();
+    expect(await inPalette()).toBe(false);
+  });
+
+  test("a section the person's role doesn't open says so where it lands, never silently on Sua conta", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go("settings/skills", state);
+    expect(screen().getByText(/não abre com o seu papel/).textContent).toBe(
+      "Skills não abre com o seu papel neste workspace. Quem gerencia os papéis pode liberar para você.",
+    );
+    cleanup();
+    // Opened from its own nav, the section says nothing more.
+    await go("settings/account", state);
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
+  });
+
+  test("Configurações with no section named, opened by a member, lands on their first section with nothing to explain", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go("settings", state);
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(nav.querySelector('[aria-current="page"]')).toBeTruthy();
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
   });
 
   test("an unknown section goes back to Geral", async () => {

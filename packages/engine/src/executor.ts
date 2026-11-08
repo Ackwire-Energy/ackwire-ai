@@ -61,7 +61,7 @@ import {
 import type { BlockSpecReader } from "./block-state";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
-import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
+import { brainSessionId, missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
@@ -221,7 +221,15 @@ import {
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
-import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
+import {
+  getMessage,
+  insertMessage,
+  type Message,
+  messageView,
+  unreachedAgents,
+  unreachedNote,
+  unreachedPeople,
+} from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { type NoAiCardReason, postNoAiCard } from "./no-ai";
 import {
@@ -1918,6 +1926,10 @@ async function executeRunInner(
             authorAgentId: run.agentId,
             body: said,
           });
+    const missed =
+      note || !channelRow || isAgentOnlyDm(channelRow)
+        ? []
+        : await unreachedPeople(tx, { orgId: run.orgId, channelId: run.channelId, body: said });
     const m = await postAgentMessage(
       tx,
       run,
@@ -1931,6 +1943,7 @@ async function executeRunInner(
         work,
         ...(teamChecks.length > 0 ? { teamChecks } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+        ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
       },
       createdAt,
     );
@@ -4739,8 +4752,17 @@ async function executeRunInner(
               handedTo: run.id,
             }).catch(() => [])
           : [];
+      const unseen =
+        text.includes("@") && channelRow && !betweenAgents
+          ? await unreachedPeople(db, { orgId: run.orgId, channelId: run.channelId, body: text }).catch(() => [])
+          : [];
       const unreached = channelRow
-        ? unreachedNote(outside, channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`, channelRow.kind !== "dm")
+        ? unreachedNote(
+            outside,
+            channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
+            channelRow.kind !== "dm",
+            unseen,
+          )
         : "";
       const judging = evidenceFor(t);
       // Help it asked for in this run and stopped waiting on (a person wrote meanwhile): only then a lookup.
@@ -4983,6 +5005,8 @@ function createBrain(
       const t = transcript();
       return { system: t.system, messages: t.messages, notesAt: t.notesAt };
     },
+    // Where it answers, as a computer brain's session counts it: its thread, or the channel it answers in.
+    session: brainSessionId(agent.id, replyThreadOf(run) ?? run.channelId, "model"),
   });
 }
 

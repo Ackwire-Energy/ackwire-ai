@@ -1,5 +1,6 @@
 import {
   ARTIFACT_LIMITS,
+  ARTIFACT_PAGE_MAX,
   type ArtifactDeps,
   type ArtifactView,
   addFileVersion,
@@ -9,6 +10,7 @@ import {
   attachmentDisposition,
   BLOCK_REPLY_CHARS,
   BLOCK_STATE_KEYS,
+  countArtifacts,
   createArtifact,
   createFileArtifact,
   DRAW_OPTIONS,
@@ -26,6 +28,7 @@ import {
   replyToBlock,
   restoreArtifact,
   setBlockState,
+  setFileSharing,
   updateArtifact,
   ValidationError,
   votePoll,
@@ -51,6 +54,28 @@ import {
 const tags = ["Drive"];
 const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll", "choices"]);
 const Author = z.object({ type: z.enum(["agent", "person"]), id: z.string() });
+
+/** A comma-separated list in a query string, each item read by `item` (at most 50). */
+const csv = <T>(description: string, item: z.ZodType<T, string>) =>
+  z
+    .string()
+    .max(4000)
+    .optional()
+    .transform((v) =>
+      v
+        ?.split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(item).max(50).optional())
+    .openapi({ description, type: "string" });
+const AuthorKey = z
+  .string()
+  .regex(/^(agent|person):[\w-]{1,100}$/)
+  .transform((v) => {
+    const [type, id] = v.split(":") as ["agent" | "person", string];
+    return { type, id };
+  });
 
 const textContents = [
   z.object({ kind: z.literal("document"), markdown: z.string() }),
@@ -121,16 +146,37 @@ const multipart = <T extends z.ZodType>(schema: T) => ({
 const Audience = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("workspace") }),
-    z.object({ kind: z.literal("channel"), name: z.string(), private: z.boolean() }),
+    z.object({
+      kind: z.literal("channel"),
+      name: z.string(),
+      private: z.boolean(),
+      outside: z.literal(true).optional().openapi({
+        description: "I don't read the channel: the file was shared with me (ADR 0157), so it can't be opened.",
+      }),
+    }),
     z.object({
       kind: z.literal("dm"),
       with: Author.nullable().openapi({ description: "The other participant." }),
       gone: z.literal(true).optional().openapi({
         description: "The other side is an archived agent or a person who left: the DM can't be opened.",
       }),
+      between: z.array(Author).optional().openapi({
+        description: "I'm not in the DM, the file was shared with me (ADR 0157): its sides, and no `with`.",
+      }),
     }),
   ])
   .openapi("ArtifactAudience", { description: "Who can see the file, from the conversation it came from." });
+
+const Sharing = z
+  .object({
+    mode: z.enum(["conversation", "people", "everyone"]),
+    userIds: z.array(z.string()).max(200),
+    roleIds: z.array(z.string()).max(200),
+  })
+  .openapi("ArtifactSharing", {
+    description:
+      "Who sees it on top of its conversation (ADR 0157): nobody more, the people and roles listed (and administrators), or the whole workspace.",
+  });
 
 const Artifact = z
   .object({
@@ -152,6 +198,10 @@ const Artifact = z
     inDrive: z.boolean().openapi({ description: "False for a block or a poll, which live in their conversation." }),
     canDelete: z.boolean().openapi({ description: "I may move it to the trash (and restore it)." }),
     audience: Audience,
+    sharing: Sharing,
+    canShare: z.boolean().openapi({
+      description: "I may change its sharing: it lives in a conversation not everyone reads, and I read it there.",
+    }),
   })
   .openapi("Artifact");
 
@@ -189,9 +239,16 @@ const Choices = z
     answer: z
       .object({
         userId: z.string(),
-        picks: z.array(z.number()).openapi({ description: "The option picked for each question, in order." }),
+        picks: z.array(z.number()).openapi({
+          description:
+            "The option picked for each question, in order. One past the question's last option: a written answer (`others`).",
+        }),
         messageId: z.string().nullable(),
         at: z.string(),
+        others: z
+          .array(z.string().nullable())
+          .optional()
+          .openapi({ description: "What was written for each question answered in words (null for a picked option)." }),
       })
       .nullable(),
   })
@@ -264,26 +321,73 @@ export function artifactRoutes(deps: AppDeps) {
         query: z.object({
           q: z.string().max(200).optional(),
           kind: Kind.optional(),
+          kinds: csv("Comma-separated kinds: any of them.", Kind),
           channelId: z.uuid().optional(),
+          channelIds: csv("Comma-separated channel or DM ids: in any of them.", z.uuid()),
           authorType: z.enum(["agent", "person"]).optional(),
           authorId: z.string().optional(),
           /** With `authorType`/`authorId`: made or changed by them (any version), not only made. */
           changed: z.literal("1").optional(),
+          authors: csv(
+            "Comma-separated `agent:<id>` or `person:<id>`: made or last changed by any of them.",
+            AuthorKey,
+          ),
+          who: z.enum(["agents", "people"]).optional().openapi({ description: "Made by an agent or by a person." }),
+          sort: z.enum(["recent", "name", "kind"]).optional(),
+          cursor: z
+            .string()
+            .regex(/^\d{1,7}$/)
+            .optional()
+            .openapi({ description: "`nextCursor` of the page before." }),
+          limit: z.coerce.number().int().min(1).max(ARTIFACT_PAGE_MAX).optional(),
         }),
       },
-      responses: { 200: json(z.object({ artifacts: z.array(Artifact) })), ...errors },
+      responses: {
+        200: json(
+          z.object({
+            artifacts: z.array(Artifact),
+            nextCursor: z.string().nullable().openapi({ description: "Where the next page starts; null at the end." }),
+            counts: z
+              .record(z.string(), z.number().int())
+              .optional()
+              .openapi({ description: "First page only: how many files per kind for these filters, kinds left out." }),
+          }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
+      const userId = c.get("user").id;
       const query = c.req.valid("query");
       const author = query.authorType && query.authorId ? { type: query.authorType, id: query.authorId } : undefined;
-      const list = await listArtifacts(db, person(c.get("user").id), orgId, {
+      const filters = {
         q: query.q,
         kind: query.kind,
+        kinds: query.kinds,
         channelId: query.channelId,
+        channelIds: query.channelIds,
+        authors: query.authors,
+        who: query.who,
         ...(query.changed ? { changedBy: author } : { author }),
+      };
+      const limit = query.limit ?? 100;
+      const offset = Number(query.cursor ?? 0);
+      const rows = await listArtifacts(db, person(userId), orgId, {
+        ...filters,
+        sort: query.sort,
+        limit: limit + 1,
+        offset,
       });
-      return c.json({ artifacts: await withPersonFacts(db, c.get("user").id, orgId, list) }, 200);
+      const page = rows.slice(0, limit);
+      return c.json(
+        {
+          artifacts: await withPersonFacts(db, userId, orgId, page),
+          nextCursor: rows.length > limit ? String(offset + limit) : null,
+          ...(query.cursor ? {} : { counts: await countArtifacts(db, person(userId), orgId, filters) }),
+        },
+        200,
+      );
     },
   );
 
@@ -488,6 +592,33 @@ export function artifactRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/artifacts/{artifactId}/sharing",
+      tags,
+      security,
+      summary: "Who sees a file on top of its conversation (Compartilhar); whoever reads it there may change it",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({
+            mode: z.enum(["conversation", "people", "everyone"]),
+            userIds: z.array(z.string()).max(200).optional(),
+            roleIds: z.array(z.string()).max(200).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(Artifact), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const saved = await setFileSharing(artifacts(), userId, orgId, artifactId, c.req.valid("json"));
+      return c.json(await withFacts(userId, orgId, saved), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "post",
       path: "/organizations/{orgId}/artifacts/{artifactId}/keep",
       tags,
@@ -681,13 +812,20 @@ export function artifactRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/choices/{artifactId}/answer",
       tags,
       security,
-      summary: "Answer a choice card: one option per question, sent to its agent as the person's own message",
-      description: "Once: the first answer in wins (409 `choices.answered` after that).",
+      summary:
+        "Answer a choice card: one option per question, or a written answer, sent to its agent as the person's own message",
+      description:
+        'Once: the first answer in wins (409 `choices.answered` after that). A question answered in words ("Outra resposta") takes the pick one past its last option and the text at its place in `others`.',
       request: {
         params: ArtifactParams,
         body: body(
           z.object({
             picks: z.array(z.number().int().min(0)).min(1).max(ARTIFACT_LIMITS.choiceQuestions),
+            others: z
+              .array(z.string().max(ARTIFACT_LIMITS.choiceOtherChars).nullable())
+              .max(ARTIFACT_LIMITS.choiceQuestions)
+              .nullable()
+              .optional(),
             clientId: z.string().max(64).nullable().optional(),
           }),
         ),

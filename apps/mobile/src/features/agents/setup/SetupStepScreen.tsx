@@ -42,12 +42,12 @@ import {
 } from "@agenteschat/client/lib/setup-checklist";
 import { BUSINESS_TYPES, type BusinessType, isTemplateBusiness } from "@agenteschat/client/lib/team-plan";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EmptyState, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openAgentAi } from "../../ai/AgentAiScreen";
 import { PlanReplies } from "../../ai/parts";
 import { useWidenAsk } from "../../chat/ReachLines";

@@ -11,6 +11,7 @@ import {
   SkeletonConversation,
   SkeletonGroup,
   SkeletonList,
+  SwapLabel,
   TopProgress,
 } from "../src";
 
@@ -154,6 +155,32 @@ describe("Button loading", () => {
     const button = body().getByRole("button", { name: "Salvar" });
     expect(button.hasAttribute("aria-busy")).toBe(false);
     expect(button.querySelector(".ac-pixspin")).toBeNull();
+  });
+});
+
+describe("SwapLabel", () => {
+  test("words that take turns keep the button as wide as the wider one: the other stays, unseen and unread", async () => {
+    const { rerender } = render(
+      <Button>
+        <SwapLabel label="Copiar link de convite" alt="Copiado" showAlt={false} />
+      </Button>,
+    );
+    expect(body().getByRole("button", { name: "Copiar link de convite" })).toBeTruthy();
+    rerender(
+      <Button>
+        <SwapLabel icon="copy" altIcon="check" label="Copiar link de convite" alt="Copiado" showAlt />
+      </Button>,
+    );
+    const button = body().getByRole("button", { name: "Copiado" });
+    expect(button.textContent).toBe("Copiar link de conviteCopiado");
+    // Each word with its own icon: the one shown keeps its icon beside it, in the middle of the room the other keeps.
+    expect(button.querySelectorAll(":scope > .ac-swap > * > .ac-icon")).toHaveLength(2);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-swap")).toContain("display: inline-grid");
+    expect(rule(".ac-swap > *")).toContain("grid-area: 1 / 1");
+    expect(rule(".ac-swap > *")).toContain("justify-self: center");
+    expect(rule('.ac-swap > [aria-hidden="true"]')).toContain("visibility: hidden");
   });
 });
 

@@ -197,6 +197,34 @@ describe("the menu's banners say only what matters there", () => {
       );
     }));
 
+  test("paused: Resume now, pressed, waits for its answer: it shows it and takes no second press", () =>
+    withMenu(async (el, store) => {
+      await act(async () => {
+        await store.requestAll({ type: "pause", until: null });
+      });
+      await until(() => banners(el).some((b) => b.title === "Paused until you resume"));
+      const sent: string[] = [];
+      let answer = () => {};
+      const real = store.requestAll.bind(store);
+      store.requestAll = ((request: { type: string }) => {
+        sent.push(request.type);
+        return new Promise((resolve) => {
+          answer = () => resolve(real(request as never));
+        });
+      }) as typeof store.requestAll;
+      const resume = () =>
+        [...el.querySelectorAll<HTMLButtonElement>(".dk-banner__acts button")].find(
+          (b) => b.textContent === "Resume now",
+        );
+      await act(async () => resume()?.click());
+      await act(async () => resume()?.click());
+      expect(sent).toEqual(["resume"]);
+      expect(resume()?.getAttribute("aria-busy")).toBe("true");
+      expect(resume()?.disabled).toBe(true);
+      await act(async () => answer());
+      await until(() => !banners(el).some((b) => b.title === "Paused until you resume"));
+    }));
+
   test("Quit: what happens to the work running here, and to everyone when agentes.chat runs here", async () => {
     const quit = async (el: HTMLElement) => {
       const button = [...el.querySelectorAll("button.dk-mi")].find((b) => b.textContent?.includes("Quit agentes.chat"));

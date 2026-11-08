@@ -500,7 +500,47 @@
       "resultOk": "成功",
       "resultFailed": "失败",
       "resultRefused": "已拒绝",
-      "resultRunning": "运行中"
+      "resultRunning": "运行中",
+      "said": {
+        "read": "读取了 {{path}}",
+        "wrote": "写入了 {{path}}",
+        "looked": "查看了 {{path}}",
+        "sent": "发送了 {{path}}",
+        "thinking": "正在用 {{brain}} 思考",
+        "task": "{{what}}",
+        "taskStarted": "已开始：{{what}}",
+        "taskFinished": "已完成：{{what}}",
+        "taskCanceled": "已取消：{{what}}",
+        "taskInterrupted": "已中断：{{what}}",
+        "taskTimedOut": "因超时停止：{{what}}",
+        "taskFailed": "失败（退出码 {{exit}}）：{{what}}",
+        "taskNotStarted": "未能开始：{{what}}",
+        "executor": {
+          "codex": "Codex 任务",
+          "claude": "Claude Code 任务"
+        },
+        "paused": "已暂停",
+        "pausedUntil": "暂停至 {{until}}",
+        "resumed": "已恢复",
+        "connected": "已连接到 {{org}}",
+        "disconnected": "已断开连接",
+        "disconnectedFrom": "已断开与 {{org}} 的连接",
+        "accessAsked": "请求了 {{path}}",
+        "accessNotNow": "暂不：{{path}}",
+        "accessExpired": "请求已过期：{{path}}",
+        "toolOn": "开启了{{tool}}",
+        "toolOff": "关闭了{{tool}}",
+        "tools": {
+          "commands": "命令",
+          "browser": "浏览器",
+          "desktop": "智能体屏幕",
+          "terminal": "终端"
+        },
+        "folderAllowed": "允许 {{agents}} 使用 {{path}}",
+        "folderAgents": "{{path}} 现在供 {{agents}} 使用",
+        "folderRemoved": "移除了 {{path}}",
+        "noAgent": "没有智能体"
+      }
     },
     "advanced": {
       "title": "高级",

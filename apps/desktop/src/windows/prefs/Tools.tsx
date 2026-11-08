@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useSnapshot, useStore } from "../../app";
 import { pairedHomes } from "../../control/store";
 import { toolsHere } from "../../control/this-mac";
-import { useLocalServer } from "../../hooks";
+import { useLocalServer, usePending } from "../../hooks";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { listNames } from "../../ui/time";
@@ -32,14 +32,17 @@ export function Tools() {
   // The lines kept in sight under Commands describe its switch too: where it's on, and what commands can reach.
   const commandsLines = commandsOnlyFor.length > 0 ? "tool-commands-some tool-commands-warn" : "tool-commands-warn";
 
-  const set = async (tool: keyof RunnerTools, on: boolean) => {
-    try {
-      await store.requestAll({ type: "tools.set", tool, on });
-      if (tool === "commands" && on) toast(t("desktop.prefs.tools.commandsOn"), "code");
-    } catch {
-      toast(t("desktop.common.error"), "alert");
-    }
-  };
+  // One tool's change at a time: its switch, and the others, wait for it.
+  const [pending, run] = usePending<keyof RunnerTools>();
+  const set = (tool: keyof RunnerTools, on: boolean) =>
+    run(tool, async () => {
+      try {
+        await store.requestAll({ type: "tools.set", tool, on });
+        if (tool === "commands" && on) toast(t("desktop.prefs.tools.commandsOn"), "code");
+      } catch {
+        toast(t("desktop.common.error"), "alert");
+      }
+    });
 
   const exec = (info: RunnerExecutorInfo | undefined) =>
     !info ? (
@@ -84,7 +87,7 @@ export function Tools() {
               id="tool-claude"
               aria-describedby="tool-claude-hint"
               checked={tools.claude && !!executors.claude}
-              disabled={!executors.claude || homes.length === 0}
+              disabled={!executors.claude || homes.length === 0 || pending !== null}
               onCheckedChange={(on) => void set("claude", on)}
             />
           }
@@ -105,7 +108,7 @@ export function Tools() {
               id="tool-codex"
               aria-describedby="tool-codex-hint"
               checked={tools.codex && !!executors.codex}
-              disabled={!executors.codex || homes.length === 0}
+              disabled={!executors.codex || homes.length === 0 || pending !== null}
               onCheckedChange={(on) => void set("codex", on)}
             />
           }
@@ -120,7 +123,7 @@ export function Tools() {
               id="tool-commands"
               aria-describedby={`tool-commands-hint ${commandsLines}`}
               checked={tools.commands}
-              disabled={homes.length === 0}
+              disabled={homes.length === 0 || pending !== null}
               onCheckedChange={(on) => void set("commands", on)}
             />
           }
@@ -154,7 +157,7 @@ export function Tools() {
               id="tool-browser"
               aria-describedby="tool-browser-hint tool-browser-logins"
               checked={tools.browser === true}
-              disabled={homes.length === 0}
+              disabled={homes.length === 0 || pending !== null}
               onCheckedChange={(on) => void set("browser", on)}
             />
           }

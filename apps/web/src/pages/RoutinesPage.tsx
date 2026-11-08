@@ -151,6 +151,7 @@ import { RoutineTemplateSelect } from "@/components/RoutineTemplates";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
@@ -1736,16 +1737,27 @@ function RoutineAside({
       {value}
     </div>
   );
+  const onAirWords = (
+    <>
+      <b>{t(r.active ? "routines.panel.state.live" : "routines.panel.state.paused")}</b>
+      <small>{t(r.active ? "routines.panel.onAirLine" : "routines.panel.offAirLine")}</small>
+    </>
+  );
   return (
     <aside aria-label={t("routines.panel.label", { name: routineTitle(r) })} className="issue-aside">
       {!fired && (
         <div className="issue-aside__item routine-onair">
-          <span className="routine-onair__text">
-            <b>{t(r.active ? "routines.panel.state.live" : "routines.panel.state.paused")}</b>
-            <small>{t(r.active ? "routines.panel.onAirLine" : "routines.panel.offAirLine")}</small>
-          </span>
+          {/* Its words are the switch's label: a press on them toggles it. */}
+          {manage ? (
+            <label className="routine-onair__text" htmlFor={`rt-onair-${r.id}`}>
+              {onAirWords}
+            </label>
+          ) : (
+            <span className="routine-onair__text">{onAirWords}</span>
+          )}
           {manage && (
             <Switch
+              id={`rt-onair-${r.id}`}
               checked={r.active}
               onCheckedChange={(on) => controls.setActive(on, onSaved)}
               aria-label={t("routines.panel.state.live")}
@@ -2325,6 +2337,7 @@ function RoutineDialog({
   const info = described.data?.ok ? described.data : null;
   // The picker opens on demand ("Ajustar"); the sentence and next runs always show.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const unsaved = useEdited(open, [prompt, name, phrase]);
   const upcoming = info?.nextRuns.length
     ? info.nextRuns.slice(0, 3).map((iso) => runLabel(i18n.language, iso, rule.timezone))
     : upcomingLabels(i18n.language, rule);
@@ -2524,6 +2537,7 @@ function RoutineDialog({
       onOpenChange={(o) => !o && onClose()}
       title={part ? t(part === "when" ? "routines.panel.when" : "routines.panel.where") : t("routines.new")}
       closeLabel={t("common.close")}
+      unsaved={unsaved}
       width={560}
     >
       <form
@@ -2606,8 +2620,10 @@ function RoutineDialog({
                     ]}
                   />
                 </Field>
-                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
-                {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
+                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} agentId={agentId} />}
+                {kind === "connector" && (
+                  <ConnectorTriggerFields value={connector} onChange={setConnector} agentId={agentId} />
+                )}
                 {kind === "webhook" &&
                   (routine?.trigger.type === "webhook" ? (
                     <WebhookPanel routine={routine} runs={routine.recentRuns} />

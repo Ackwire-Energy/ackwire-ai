@@ -5,7 +5,9 @@ setupDom();
 
 import { keys, type Message } from "@agenteschat/client";
 import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { useLayoutEffect } from "react";
+import { usePageTextSize } from "@/chat/look";
 import {
   ADA_ID,
   createFakeApi,
@@ -128,6 +130,41 @@ describe("each style in a channel and in a DM", () => {
   });
 });
 
+describe("Tamanho do texto in a conversation", () => {
+  test("a step chosen on another device is the page's, for every conversation and panel on it, until it closes", async () => {
+    await openChannel({ textSize: "xs" });
+    expect(document.documentElement.dataset.textSize).toBe("xs");
+    expect(row("a1").closest("[data-text-size]")).toBe(document.documentElement);
+    cleanup();
+    expect(document.documentElement.dataset.textSize).toBeUndefined();
+    await openDm();
+    expect(document.documentElement.dataset.textSize).toBe("md");
+  });
+
+  test("the page has the step before it paints: rows from the device's snapshot never show at the default first", () => {
+    delete document.documentElement.dataset.textSize;
+    let painted: string | undefined;
+    function Page() {
+      usePageTextSize({ textSize: "xl" });
+      return null;
+    }
+    // A later sibling's layout effect runs ahead of every passive one, when the browser is about to paint.
+    function Rows() {
+      useLayoutEffect(() => {
+        painted = document.documentElement.dataset.textSize;
+      }, []);
+      return null;
+    }
+    render(
+      <>
+        <Page />
+        <Rows />
+      </>,
+    );
+    expect(painted).toBe("xl");
+  });
+});
+
 describe("a row with no bubble in a DM", () => {
   test("keeps its name ahead of its time, as in a channel: a time alone beside a face reads as a broken line", async () => {
     const state = seedState();
@@ -209,6 +246,41 @@ describe("Sua conta › Conversa", () => {
     );
     await click(within(open).getByRole("radio", { name: "Última mensagem lida" }));
     expect(state.calls).toContainEqual({ method: "orgs.setChatPrefs", args: [ORG_ID, { openAt: "read" }] });
+  });
+
+  test("Tamanho do texto: five steps, Padrão until the person picks, and a pick shows at once on the page", async () => {
+    const state = withChatPrefs(seedState());
+    await openSettings(state);
+    const sizes = screen().getByRole("radiogroup", { name: "Tamanho do texto" });
+    const names = ["Menor", "Pequeno", "Padrão", "Grande", "Maior"];
+    expect(
+      within(sizes)
+        .getAllByRole("radio")
+        .map((r) => r.getAttribute("title")),
+    ).toEqual(names);
+    for (const name of names) expect(within(sizes).getByRole("radio", { name }).textContent).toContain("A");
+    // Each step an A in its own size; only the default says its name on screen.
+    const glyphs = [...sizes.querySelectorAll<HTMLElement>(".chat-look__a")];
+    expect(glyphs.map((g) => g.dataset.textSize)).toEqual(["xs", "sm", "md", "lg", "xl"]);
+    expect(sizes.querySelectorAll(".ac-visually-hidden")).toHaveLength(4);
+    expect(within(sizes).getByRole("radio", { name: "Padrão" }).getAttribute("aria-checked")).toBe("true");
+    expect(document.documentElement.dataset.textSize).toBe("md");
+    // The preview: two of the conversation's own rows at the step's real size, in the look of the switch's choice.
+    const preview = () => document.querySelector<HTMLElement>(".chat-look__mini--real");
+    expect(preview()?.dataset.textSize).toBe("md");
+    expect(preview()?.querySelectorAll("article.ac-msg")).toHaveLength(2);
+    expect(preview()?.querySelector(".channel__messages")?.getAttribute("data-look")).toBe("left");
+
+    await click(within(sizes).getByRole("radio", { name: "Maior" }));
+    expect(state.calls).toContainEqual({ method: "orgs.setChatPrefs", args: [ORG_ID, { textSize: "xl" }] });
+    expect(within(sizes).getByRole("radio", { name: "Maior" }).getAttribute("aria-checked")).toBe("true");
+    expect(document.documentElement.dataset.textSize).toBe("xl");
+    expect(preview()?.dataset.textSize).toBe("xl");
+    // The looks' small pictures stay at the default size, so a big step never crowds them.
+    const pictures = [...document.querySelectorAll<HTMLElement>(".chat-look__mini:not(.chat-look__mini--real)")];
+    expect(pictures).toHaveLength(6);
+    expect(new Set(pictures.map((m) => m.dataset.textSize))).toEqual(new Set(["md"]));
+    expect(state.me?.organizations[0]?.chatPrefs).toEqual({ textSize: "xl" });
   });
 
   test("a server from before the choice shows no card", async () => {

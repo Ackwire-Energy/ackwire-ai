@@ -27,7 +27,6 @@ import {
   usageParts,
   whereItRuns,
 } from "@agenteschat/client/lib/routine-view";
-import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
@@ -48,6 +47,7 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { approvalTitleText, useCancelAhead } from "../approvals/parts";
 import { FoldedBody } from "../chat/FoldedBody";
 import { chatHref, widgetHref } from "../links/logic";

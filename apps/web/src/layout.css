@@ -1248,6 +1248,18 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex: 1;
   min-width: 0;
 }
+/* Canais arquivados: the rows alone, a channel's long name wrapping where it can't break. */
+.archived-channels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.archived-channels .member-row {
+  padding-block: var(--space-2);
+}
+.archived-channels .list-col b {
+  overflow-wrap: anywhere;
+}
 .member-row__you {
   display: inline-flex;
   align-items: center;
@@ -1554,8 +1566,8 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   bottom: 8px;
 }
 
-/* Unread: a bold label. A row's number only for what calls on me (a mention of me in a channel, a DM's unread),
-   Discord's red pill. */
+/* Unread: a bold label and the row's number. Red only for what calls on me (a mention of me in a channel, a DM's
+   unread), Discord's red pill; a channel's other unread messages in a neutral one. */
 .sidebar__item[data-unread="true"] .sidebar__item-label {
   font-weight: 600;
 }
@@ -1570,6 +1582,10 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   font-size: 11.5px;
   font-weight: 700;
   font-variant-numeric: normal;
+}
+.sidebar__unread--quiet {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
 }
 .sidebar__label-row {
   display: flex;
@@ -2327,6 +2343,16 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overflow-x: auto;
   max-height: 420px;
 }
+/* Formatted JSON: a long line wraps in the card, going on under its own indent (`--hang`), never off its edge. */
+.code-card__code[data-wrap="true"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-card__code[data-wrap="true"] .code-line {
+  display: block;
+  padding-left: var(--hang, 0);
+  text-indent: calc(-1 * var(--hang, 0));
+}
 /* A block drawn in place of its code (a ```mermaid diagram), centered: shrunk to fit its box but never below 60% of
    its own size (`--w`), so its labels stay readable; a wider or taller one scrolls inside the card, as code does. */
 .code-card__preview {
@@ -2347,13 +2373,16 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
-   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate. */
+   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate.
+   Its code takes the words' Tamanho do texto, as inline code does (12.5px on a 20px line at the default). */
 .ac-msg__text .code-card__code {
   margin: 0;
   padding: 0 16px 14px;
   background: none;
   border-radius: 0;
   overflow-y: auto;
+  font-size: calc(var(--msg-text) - 1.5px);
+  line-height: var(--msg-line-tight);
 }
 .md .code-card code,
 .md .code-viewer code {
@@ -2435,7 +2464,8 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .code-tok--number {
   color: var(--code-number);
 }
-.code-tok--function {
+.code-tok--function,
+.code-tok--property {
   color: var(--code-function);
 }
 .code-tok--comment {
@@ -3313,6 +3343,22 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   flex-direction: column;
   gap: 12px;
 }
+/* A paragraph or a list in the app's own stacks takes the stack's gap, not its browser margins on top: an agent card's
+   "só responde a" note sat 25px from the bar and the button around it, its gap 12. The kit does the same in its cards
+   and forms; a class with margins of its own keeps them. */
+:where(
+  .profile-card__body,
+  .stack-4,
+  .skill-sheet__main,
+  .skill-history,
+  .issue-aside,
+  .wiki-editor,
+  .cal-side__section,
+  .cflow__key,
+  .imp-block
+) > :where(p, ul, ol) {
+  margin-block: 0;
+}
 .profile-card__head {
   display: flex;
   align-items: center;
@@ -3411,6 +3457,23 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   background: var(--surface-sunken);
   color: var(--ink-muted);
   font-weight: 600;
+}
+/* A file's pill (FilePill: a file's link or its id) and what else an id names (IdRef: a task, the pill while it loads):
+   laid out as a known service's pill (.link-pill below), its words wrapping like the ones around it and its icon in the
+   padding, never ending a line alone. */
+.id-ref,
+.file-ref {
+  position: relative;
+  padding-left: calc(1em + 6px);
+  overflow-wrap: break-word;
+}
+.id-ref > .ac-icon,
+.file-ref > .ac-icon {
+  position: absolute;
+  top: 0.27em;
+  left: 3px;
+  width: 1em;
+  height: 1em;
 }
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a
@@ -3592,17 +3655,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 .level-matrix tbody th {
   font-weight: 600;
 }
+/* An agent's name and role, and a connector's name, wrap by words, their face or icon on the first line: a long one
+   keeps the levels in the table instead of pushing them past its edge. A level stays whole. Breaking anywhere would let
+   the table squeeze them a letter a line. */
+.level-matrix th {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 /* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
   }
-}
-.level-matrix__head,
-.level-matrix__agent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .level-matrix__head .connector-icon {
   width: 24px;
@@ -3979,6 +4043,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 }
 .settings__nav {
   flex: 0 0 216px;
+  min-width: 0;
   position: sticky;
   top: 24px;
   display: flex;
@@ -3998,18 +4063,15 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   font-weight: 700;
   letter-spacing: -0.015em;
 }
+/* The workspace's name wraps under the mark, which stays on its first line: a long one never widens the nav. */
 .settings__org {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
   color: var(--ink-muted);
   font-size: 13px;
 }
 .settings__org > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .settings__groups {
   display: flex;
@@ -5082,6 +5144,10 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   display: flex;
   flex-direction: column;
   font-weight: 600;
+  cursor: pointer;
+}
+.cflow-agent:has(.ac-switch:disabled) .cflow-agent__name {
+  cursor: default;
 }
 /* "Todos os agentes": the main choice, raised over the agents' own rows, which line up with its content. */
 .cflow-agent--all {
@@ -7026,12 +7092,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
     padding: 0 16px 12px;
   }
 }
-/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Editar, … and × on the bar. */
+/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Compartilhar, Copiar texto,
+   Enviar nova versão, Editar, … and × on the bar. On a phone the actions are their icons alone: with their words the
+   title's column shrank until a file's name wrapped letter by letter. */
 .artifact-sheet__title {
   display: block;
 }
+/* Narrow: the bar's buttons are their icons (named by their titles), so the title keeps the width. */
 @media (max-width: 720px) {
-  .artifact-edit__label {
+  .artifact-action__label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -7544,6 +7613,66 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 @container (max-width: 439px) {
   .izoom__actual {
     display: none;
+  }
+}
+/* "Loading…" only when a picture takes a moment: moving to one already here shows no flash of it (with reduced
+   motion it shows at once). The zoom bar comes with the picture (no "100%" while its bytes are on the way). */
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__status {
+    animation: izoom-wait 0.3s;
+  }
+}
+@keyframes izoom-wait {
+  from,
+  to {
+    opacity: 0;
+  }
+}
+.izoom:not(:has(.izoom__img[data-ready])) .izoom__bar {
+  visibility: hidden;
+}
+/* Moving through a message's pictures: square buttons on the stage's sides, halfway down, raised like the zoom bar so
+   they read on any picture, and "2 de 4" in the head before Baixar. */
+.artifact-viewer--image .artifact-viewer__main {
+  position: relative;
+}
+.artifact-nav {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  translate: 0 -50%;
+  box-shadow: var(--e2);
+}
+.artifact-nav--prev {
+  left: 12px;
+}
+.artifact-nav--next {
+  right: 12px;
+}
+.artifact-sheet__place {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+/* The picture moved to slides in from its side as it fades up; the first one opens as it always did. */
+@media (prefers-reduced-motion: no-preference) {
+  .artifact-viewer[data-moved] .izoom__img[data-ready] {
+    animation: izoom-in-next 0.22s var(--out);
+  }
+  .artifact-viewer[data-moved="prev"] .izoom__img[data-ready] {
+    animation-name: izoom-in-prev;
+  }
+}
+@keyframes izoom-in-next {
+  from {
+    opacity: 0;
+    translate: 32px 0;
+  }
+}
+@keyframes izoom-in-prev {
+  from {
+    opacity: 0;
+    translate: -32px 0;
   }
 }
 .file-view__pdf {
@@ -10258,6 +10387,7 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   font-size: 14.5px;
   line-height: 1.65;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .agp-instructions.ac-input {
   min-height: 300px;
@@ -11384,7 +11514,7 @@ html:not([data-pointer]) .msg-mem:focus-visible {
 .agp-inplace {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   min-width: 0;
   max-width: calc(100% + 16px);
   margin: -4px -8px;
@@ -11407,11 +11537,14 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
   background: var(--sunken);
   box-shadow: var(--focus-ring);
 }
-/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. */
+/* The pencil takes no room until the pointer or the keys are there, so "@ada ·" keeps its spacing. It stays on the
+   first line of a name that wraps, in the middle of a box as tall as that line (as `.ac-captail`). */
 .agp-inplace__pen {
   display: inline-flex;
+  align-items: center;
   flex: none;
   width: 0;
+  height: 1.25em;
   margin-left: 0;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11420,6 +11553,11 @@ html:not([data-pointer]) .agp-inplace:focus-visible {
     width 0.15s,
     margin 0.15s,
     opacity 0.15s;
+}
+@supports (top: 1lh) {
+  .agp-inplace__pen {
+    height: 1lh;
+  }
 }
 .agp-inplace:hover .agp-inplace__pen,
 html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
@@ -11459,16 +11597,17 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
 }
 
 /* The role as a tag (RoleTag): the role's icon and name, a pencil on hover; the field it turns into keeps its shape,
-   the roles the app knows in a list under it. Who can't change it reads the same tag, still. */
+   the roles the app knows in a list under it. Who can't change it reads the same tag, still. A long role wraps inside
+   the tag, its icon and pencil on its first 20px line (28px tall with one). */
 .agp-roletag {
   box-sizing: border-box;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 28px;
-  padding: 0 10px 0 8px;
+  min-height: 28px;
+  padding: 4px 10px 4px 8px;
   border: 0;
   border-radius: 9px 9px 9px 3px;
   background: var(--plate);
@@ -11476,20 +11615,20 @@ html:not([data-pointer]) .agp-inplace:focus-visible .agp-inplace__pen {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 20px;
+  text-align: left;
   transition:
     background 0.15s,
     box-shadow 0.15s;
 }
 .agp-roletag > .ac-icon {
   flex: none;
+  margin-block: 2px;
   color: var(--ink2);
 }
 .agp-roletag__text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agp-roletag[data-empty] .agp-roletag__text {
   color: var(--ink-muted);
@@ -11509,6 +11648,7 @@ html:not([data-pointer]) button.agp-roletag:focus-visible {
   display: inline-flex;
   flex: none;
   width: 0;
+  margin-block: 3px;
   margin-left: -6px;
   overflow: hidden;
   color: var(--ink-muted);
@@ -11532,7 +11672,10 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   max-width: 100%;
 }
 .agp-roletag.agp-roletag--edit {
+  align-items: center;
   width: 100%;
+  height: 28px;
+  padding-block: 0;
   background: var(--field-bg);
   box-shadow:
     inset 0 0 0 1px var(--field-line),
@@ -11633,11 +11776,15 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   gap: 8px;
   font-size: 11.5px;
 }
-/* Phones: the tile above its card, both on the left edge; the role's field takes the rest of its line (wrapping
-   under the @ when that is short), its list as wide as it. */
+/* Phones: the tile above its card, both on the left edge, the card as wide as the page (sized to its words, a long
+   role or name ran past the edge); the role's field takes the rest of its line (wrapping under the @ when that is
+   short), its list as wide as it. */
 @media (max-width: 640px) {
   .agp-id {
     flex-direction: column;
+  }
+  .agp-id__fields {
+    align-self: stretch;
   }
   .agp-roleedit {
     flex: 1 1 auto;
@@ -12920,6 +13067,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   gap: 6px;
   margin: 12px 0 0;
 }
+/* "Carregar mais": the agent's next page of files, centred under them. */
+.agp-files__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
 
 /* The chosen option's panel under the picker, in groups 16px apart: its head (the name's capitals at its mark's top,
    the tiers under it, for whom at the right, under the name at phone width) over a hairline, the computer's wait in
@@ -13490,7 +13643,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
-.ac-card:has(> .settings-rows > .settings-row--open) {
+.ac-card:has(> .settings-rows > :is(.settings-row--open, .settings-row--toggle)) {
   overflow: hidden;
 }
 .settings-row--open {
@@ -13507,6 +13660,14 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .settings-row--open:hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
+/* A line with a switch is its label: a press anywhere on it toggles, as a line that opens something opens. */
+.settings-row--toggle:not(:has(.ac-switch:disabled)) {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.settings-row--toggle:not(:has(.ac-switch:disabled)):hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
 html:not([data-pointer]) .settings-row--open:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring-inset);
@@ -13521,8 +13682,9 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   height: 30px;
   font-size: 12px;
 }
-/* On a phone the icon, the words and a switch or a chevron stay on one line. A choice of several goes under the
-   words, from their edge (the 30px icon and the 14px gap). */
+/* On a phone the icon, the words and a switch or a chevron stay on one line. Any other control (a choice of several,
+   a select, a field, buttons) goes under the words, from their edge (the 30px icon and the 14px gap), so the rows of
+   one card start their controls on one edge. */
 @media (max-width: 760px) {
   .settings-row--lead {
     flex-direction: row;
@@ -13536,28 +13698,30 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   .settings-row--lead > .settings-row__end {
     margin-left: auto;
   }
-  .settings-row--lead > .settings-row__end:has(> .ac-seg) {
+  .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
     flex-basis: 100%;
     box-sizing: border-box;
+    min-width: 0;
     padding-left: 44px;
   }
 }
 /*
  * With a line under its name, what ends a row (a switch, a choice, the chevron) belongs to the name's line, never to
- * the row's middle however far that line wraps: a box as tall as the name's 22px line, centred on it (as
- * `.ac-captail`). A choice that goes under the words on a phone keeps its own height there.
+ * the row's middle however far that line wraps: centred on the name's 22px line (as an `.ac-iconline` lead), but a
+ * control taller than that line rises only to `--action-clear` under the hairline above, and the row grows under it.
+ * A control that goes under the words on a phone sits where it falls.
  */
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end {
   align-self: flex-start;
-  height: 22px;
+  translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
 }
 .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__chevron {
   align-self: flex-start;
   margin-block: 3px;
 }
 @media (max-width: 760px) {
-  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:has(> .ac-seg) {
-    height: auto;
+  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:not(:has(> .ac-switch)) {
+    translate: none;
   }
 }
 /* A plain row (its label beside its control, the help under the label) does the same where the two sit side by
@@ -13567,7 +13731,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     align-items: flex-start;
   }
   .settings-row:has(> .settings-row__text > .settings-row__help) > :is(.settings-row__control, .settings-row__end) {
-    height: 22px;
+    translate: 0 max(calc(var(--action-clear) - var(--row-py)), calc(11px - 50%));
   }
 }
 
@@ -13807,9 +13971,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone. */
+/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone: a row with an icon
+   keeps the icon and the words on one line, and what ends it goes under them from their edge, where it falls. */
 @container agp-side (max-width: 479px) {
-  .agp-card .settings-row {
+  .agp-card .settings-row:not(.settings-row--lead) {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -13817,6 +13982,20 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   .agp-card .settings-row__control {
     flex: none;
     justify-content: flex-start;
+  }
+  .agp-card .settings-row--lead {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .agp-card .settings-row--lead > .settings-row__text {
+    flex: 1 1 160px;
+  }
+  .agp-card .settings-row--lead > .settings-row__end:not(:has(> .ac-switch)) {
+    flex-basis: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    padding-left: 44px;
+    translate: none;
   }
 }
 /* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a

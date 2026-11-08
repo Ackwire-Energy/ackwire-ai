@@ -8,9 +8,11 @@ import {
   collapseRoutines,
   type ItemSource,
   isBarItem,
+  myRsvp,
   onDay,
   rangeLabel,
   sameDay,
+  slotText,
   startOfDay,
   stepFocus,
   toItems,
@@ -50,8 +52,10 @@ import { MonthView } from "@/components/calendar/MonthView";
 import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
 import { TimeGrid } from "@/components/calendar/TimeGrid";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { PHONE_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { matchesNow } from "@/hooks/useMatchMedia";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./calendar.css";
@@ -95,13 +99,14 @@ const shortcutsFree = (e: KeyboardEvent) => {
  */
 export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: string }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const toast = useToast();
   const action = useCalendarAction(org.id);
   const reminders = useReminderAction(org.id);
   const [today] = useState(() => todayProp ?? new Date());
   const [now, setNow] = useState(() => new Date());
-  const [view, setView] = useState<CalendarView>("week");
+  // A phone's width holds one day's column, not a week of seven unreadable ones.
+  const [view, setView] = useState<CalendarView>(() => (matchesNow(PHONE_QUERY) ? "day" : "week"));
   // A link to an event (an invitation's email) says its day, so the view starts on its week.
   const [linked, setLinked] = useOpenParam("open", WITH_OPEN);
   const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));
@@ -270,9 +275,25 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
       },
     );
   };
+  const respond = (item: CalItem, status: "accepted" | "declined") => {
+    const e = events.get(item.key);
+    if (!e) return;
+    action.mutate(
+      { type: "respond", id: e.id, status },
+      { onError: (error) => toast.show(errorText(t, error, i18n.language), "error") },
+    );
+  };
+  const rsvpOf = (item: CalItem) => {
+    const e = item.kind === "event" ? events.get(item.key) : undefined;
+    const status = myRsvp(e, me.user.id);
+    if (!e || !status) return undefined;
+    const answers = new Map(e.rsvp.filter((r) => r.type === "person").map((r) => [r.id, r.status]));
+    return { status, answers, onRespond: (next: "accepted" | "declined") => respond(item, next) };
+  };
   const details = (item: CalItem) => (
     <ItemDetails
       item={item}
+      rsvp={rsvpOf(item)}
       onEdit={
         item.kind === "event"
           ? () => {
@@ -533,7 +554,7 @@ function Proposal({ proposal }: { proposal: CalendarRange["proposals"][number] }
   const actors = useActors();
   const action = useCalendarAction(org.id);
   const agent = { type: "agent" as const, id: proposal.agentId };
-  const when = `${dayLabel(i18n.language, new Date(proposal.start))}, ${formatTime(i18n.language, proposal.start)}–${formatTime(i18n.language, proposal.end)}`;
+  const when = slotText(i18n.language, proposal.start, proposal.end);
   const people = joinNames(proposal.participants.map(actors.name), t);
   return (
     <ApprovalCard

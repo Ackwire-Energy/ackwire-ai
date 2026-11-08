@@ -57,6 +57,7 @@ import {
   MenuNote,
   PageHeader,
   PlanMeter,
+  SwapLabel,
   Textarea,
 } from "@agenteschat/ui";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
@@ -378,10 +379,16 @@ function InviteActions() {
     if (url) copy("link", url);
   };
   return (
-    <div className="row members-acts">
+    <>
       {!held && (
-        <Button icon={copied ? "check" : "link"} loading={make.isPending} onClick={() => void copyLink()}>
-          {copied ? t("common.copied") : t("members.copyInviteLink")}
+        <Button loading={make.isPending} onClick={() => void copyLink()}>
+          <SwapLabel
+            icon="link"
+            altIcon="check"
+            label={t("members.copyInviteLink")}
+            alt={t("common.copied")}
+            showAlt={copied !== null}
+          />
         </Button>
       )}
       {invite && (
@@ -389,7 +396,7 @@ function InviteActions() {
           {t("members.inviteTitle")}
         </Button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -587,11 +594,14 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
               aria-label={t("members.requests.copyTitle", { name: handOff?.name ?? "" })}
               onFocus={(e) => e.currentTarget.select()}
             />
-            <Button
-              icon={copied ? "check" : "copy"}
-              onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}
-            >
-              {copied ? t("common.copied") : t("common.copy")}
+            <Button onClick={() => handOff && void copyText(handOff.url, () => setCopied(true))}>
+              <SwapLabel
+                icon="copy"
+                altIcon="check"
+                label={t("common.copy")}
+                alt={t("common.copied")}
+                showAlt={copied}
+              />
             </Button>
           </div>
         </DialogBody>
@@ -764,12 +774,17 @@ function SentInvitations() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        icon={copied === inv.id ? "check" : "copy"}
                         onClick={() =>
                           copy(inv.id, inv.url ?? "", t(`members.invitations.${words.copied}`, { email: inv.email }))
                         }
                       >
-                        {copied === inv.id ? t("common.copied") : t("members.copyLink")}
+                        <SwapLabel
+                          icon="copy"
+                          altIcon="check"
+                          label={t("members.copyLink")}
+                          alt={t("common.copied")}
+                          showAlt={copied === inv.id}
+                        />
                       </Button>
                     )}
                     <Button

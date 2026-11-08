@@ -39,6 +39,7 @@ import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import { routineBriefOf } from "./routine-brief";
 import { issueRunToolToken } from "./run-tool-tokens";
+import { runnerUpdateWay } from "./runner-update";
 import { replyThreadOf } from "./runs";
 import { hopLimitReached, runStretchOf } from "./stretch";
 import type { ToolContext } from "./tools/types";
@@ -267,16 +268,17 @@ export interface StartTaskInput {
 /** What a task waiting in our queue keeps to start later (`machine_tasks.start_request`). */
 export type QueuedTaskStart = Omit<StartTaskInput, "protocol" | "machineName">;
 
-/** A runner older than protocol 4 can't run background tasks: the person has to update it. */
+/** A runner older than protocol 4 can't run background tasks: the computer needs an update (`runnerUpdateWay`). */
 export class RunnerOutdatedError extends Error {
   constructor(
     readonly machineName: string,
     missions = false,
+    computer?: Parameters<typeof runnerUpdateWay>[0],
   ) {
     super(
       missions
-        ? `The runner on the computer ${machineName} is too old for missions. Its owner should update it: run agentes-runner update.`
-        : `The runner on the computer ${machineName} is too old for background tasks. Tell the person: its owner should update it with \`agentes-runner update\` (until then use run_code).`,
+        ? `The runner on the computer ${machineName} is too old for missions. ${runnerUpdateWay(computer)}`
+        : `The runner on the computer ${machineName} is too old for background tasks (until then use run_code). ${runnerUpdateWay(computer)}`,
     );
     this.name = "RunnerOutdatedError";
   }
@@ -370,14 +372,22 @@ export async function taskSignIn(
  * kept as `failed` with the reason, and the error goes up.
  */
 export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, input: StartTaskInput) {
-  checkTaskProtocol(input);
+  await checkTaskProtocol(deps.db, input);
   const row = await insertTask(deps.db, input, null);
   return (await launchTask(deps, row, input)).row;
 }
 
-function checkTaskProtocol(input: Pick<StartTaskInput, "protocol" | "machineName" | "mission">) {
-  if (input.protocol < TASKS_PROTOCOL) throw new RunnerOutdatedError(input.machineName);
-  if (input.mission && input.protocol < MISSION_PROTOCOL) throw new RunnerOutdatedError(input.machineName, true);
+async function checkTaskProtocol(
+  db: Executor,
+  input: Pick<StartTaskInput, "protocol" | "machineName" | "machineId" | "mission">,
+) {
+  const missions = input.protocol >= TASKS_PROTOCOL && Boolean(input.mission) && input.protocol < MISSION_PROTOCOL;
+  if (input.protocol >= TASKS_PROTOCOL && !missions) return;
+  const [computer] = await db
+    .select({ kind: schema.machines.kind, executors: schema.machines.executors })
+    .from(schema.machines)
+    .where(eq(schema.machines.id, input.machineId));
+  throw new RunnerOutdatedError(input.machineName, missions, computer);
 }
 
 async function insertTask(
@@ -537,7 +547,7 @@ export async function launchTask(
  * the runner when it may start (`claimQueuedTask`). Returns the row.
  */
 export async function queueMachineTask(deps: TaskDeps, input: StartTaskInput) {
-  checkTaskProtocol(input);
+  await checkTaskProtocol(deps.db, input);
   const { protocol: _p, machineName: _n, ...queued } = input;
   const row = await insertTask(deps.db, queued, queued);
   await publishTaskEvent(deps.pubsub, row);
@@ -1005,7 +1015,7 @@ export async function taskResumesByItself(db: Database, row: MachineTaskRow) {
  * `created_at`), so it goes before items queued after it.
  */
 async function queueResumed(db: Executor, input: StartTaskInput, from: MachineTaskRow) {
-  checkTaskProtocol(input);
+  await checkTaskProtocol(db, input);
   const { protocol: _p, machineName: _n, ...queued } = input;
   return insertTask(db, queued, queued, { createdAt: from.createdAt });
 }

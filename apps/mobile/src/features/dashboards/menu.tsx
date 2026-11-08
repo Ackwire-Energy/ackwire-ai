@@ -5,11 +5,11 @@ import {
   useSetHomeDashboard,
   useUpdateDashboard,
 } from "@agenteschat/client";
-import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { Icon, type IconName, useTheme, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
 import { type ActionItem, ActionList, goBack, successHaptic } from "../shared/parts";

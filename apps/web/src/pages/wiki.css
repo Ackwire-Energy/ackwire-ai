@@ -1304,11 +1304,14 @@ html:not([data-pointer]) .wiki-outline__item:focus-visible {
   max-height: 60vh;
   overflow-y: auto;
 }
+/* A version's note is what someone wrote: a word longer than the column breaks (anywhere: the text beside the face is
+   a flex item, which break-word alone can't shrink). */
 .wiki-history__item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   width: 100%;
+  overflow-wrap: anywhere;
   padding: 8px;
   border: 0;
   border-radius: 10px;

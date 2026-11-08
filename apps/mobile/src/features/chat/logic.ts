@@ -11,7 +11,9 @@ import type {
 import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import type { ChatTextSize } from "@agenteschat/client/lib/chat-look";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
+import { loneIdRef, splitIdRefs } from "@agenteschat/client/lib/id-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
@@ -50,6 +52,52 @@ export const MSG_AVATAR = 34;
 export const MSG_GAP = 12;
 /** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
 export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
+
+/**
+ * A message's words per Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), in points, both systems
+ * alike. The system's own text size (Dynamic Type, Android's font scale) multiplies them, up to `CHAT_TEXT_MAX_SCALE`.
+ * `md`, the default, is under the system body the words had before (17 on 24 on iOS, 16 on 24 on Android); `lg` is
+ * iOS's again. Lines about 1.4 times the size.
+ */
+export const CHAT_TEXT: Record<ChatTextSize, { fontSize: number; lineHeight: number }> = {
+  xs: { fontSize: 13, lineHeight: 18 },
+  sm: { fontSize: 14, lineHeight: 20 },
+  md: { fontSize: 15, lineHeight: 21 },
+  lg: { fontSize: 17, lineHeight: 24 },
+  xl: { fontSize: 19, lineHeight: 27 },
+};
+/**
+ * How far the system's text size may grow a message's words and the name over them: every Android scale (up to 2) and
+ * iOS's larger sizes up to its second accessibility one. Past it a row's column holds a word or two a line.
+ */
+export const CHAT_TEXT_MAX_SCALE = 2;
+export type ChatText = (typeof CHAT_TEXT)[ChatTextSize];
+/** The name over the words: a step under them, on a line that holds it (14 on 19 at the default, as before). */
+export const chatNameOf = (text: ChatText) => ({
+  fontSize: text.fontSize - 1,
+  lineHeight: text.lineHeight - 2,
+});
+/** The time beside the name, on its line: 13 at the default (iOS's footnote), never under 11. */
+export const chatTimeOf = (text: ChatText) => ({
+  fontSize: Math.max(11, text.fontSize - 2),
+  lineHeight: text.lineHeight - 2,
+});
+/** Code, inline or in its card: the mono face runs wide, so two points under the words (13 on 20 at the default). */
+export const chatCodeOf = (text: ChatText) => ({
+  fontSize: text.fontSize - 2,
+  lineHeight: text.lineHeight - 1,
+});
+/**
+ * A table's cell: its own variant's size moved by as many points as the step moves the words, so the default table
+ * keeps its size and a larger step grows it with the words around it.
+ */
+export const chatCellOf = (cell: { fontSize?: number; lineHeight?: number }, text: ChatText) => {
+  const by = text.fontSize - CHAT_TEXT.md.fontSize;
+  return {
+    fontSize: (cell.fontSize ?? text.fontSize) + by,
+    lineHeight: (cell.lineHeight ?? text.lineHeight) + Math.round(by * 1.4),
+  };
+};
 
 /**
  * A row in the list, `gap` under what shows above it. Its plate (a mention, a press) reaches past its content, and it
@@ -609,6 +657,8 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
   | { kind: "link"; text: string; href: string }
+  /** An internal id (`splitIdRefs`, `code` when alone in a code span): the pill of what it names, or its text as written. */
+  | { kind: "id"; text: string; id: string; code?: true }
   /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
   | { kind: "channel"; text: string; name: string };
 export type Block =
@@ -671,11 +721,17 @@ export function mentionTint(
   return { color: tone.ink, backgroundColor: tone.background };
 }
 
-/** `#channel` references, then @mentions in the words between them. */
+/** Internal ids, then `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
-  for (const part of splitChannelRefs(text)) {
-    if (part.name === undefined) atMentions(part.text, out, kind);
-    else out.push({ kind: "channel", text: part.text, name: part.name });
+  for (const piece of splitIdRefs(text)) {
+    if (piece.id !== undefined) {
+      out.push({ kind: "id", text: piece.text, id: piece.id });
+      continue;
+    }
+    for (const part of splitChannelRefs(piece.text)) {
+      if (part.name === undefined) atMentions(part.text, out, kind);
+      else out.push({ kind: "channel", text: part.text, name: part.name });
+    }
   }
 }
 
@@ -726,8 +782,10 @@ export function parseInline(text: string): Inline[] {
     let tok = m[0];
     if (m[5]) tok = trimUrl(tok);
     if (at > last) mentions(text.slice(last, at), out, "text");
-    if (m[1]) out.push({ kind: "code", text: tok.slice(1, -1) });
-    else if (m[2]) {
+    if (m[1]) {
+      const id = loneIdRef(tok.slice(1, -1));
+      out.push(id ? { kind: "id", text: tok.slice(1, -1), id, code: true } : { kind: "code", text: tok.slice(1, -1) });
+    } else if (m[2]) {
       // An image shows its words; a link to anything but the web or e-mail is just its words.
       const label = m[3] ?? "";
       const href = m[4] ?? "";

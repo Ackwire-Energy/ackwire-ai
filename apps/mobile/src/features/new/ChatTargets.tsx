@@ -1,9 +1,9 @@
-import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EmptyState, Icon, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { AgentFace, Face } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";

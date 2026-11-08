@@ -7,6 +7,7 @@ import {
   consultationConversation,
   consultationsIn,
   createChannel,
+  idRef,
   joinChannel,
   listChannelMembers,
   listChannels,
@@ -295,6 +296,50 @@ export function chatRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
       return c.json(await messageCard(db, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/refs/{id}",
+      tags,
+      security,
+      summary: "What an internal id written in a text names, as its pill shows it",
+      description:
+        "A file, a task, or a message (a run's id: its reply; a background work's: its card, else where it started), only when the viewer may see it. 404 for anything else: the text shows the id as written.",
+      request: { params: OrgParams.extend({ id: z.string().max(64) }) },
+      responses: {
+        200: json(
+          z.discriminatedUnion("kind", [
+            z.object({
+              kind: z.literal("file"),
+              id: z.uuid(),
+              title: z.string(),
+              artifactKind: z.string(),
+              fileName: z.string().nullable(),
+              contentType: z.string().nullable(),
+            }),
+            z.object({ kind: z.literal("task"), id: z.uuid(), number: z.number().int(), title: z.string() }),
+            z.object({
+              kind: z.literal("message"),
+              message: z.object({
+                id: z.uuid(),
+                channelId: z.uuid(),
+                threadId: z.uuid().nullable(),
+                kind: z.enum(["channel", "dm"]),
+                name: z.string(),
+                author: z.string(),
+              }),
+            }),
+          ]),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, id } = c.req.valid("param");
+      return c.json(await idRef(db, c.get("user").id, orgId, id), 200);
     },
   );
 

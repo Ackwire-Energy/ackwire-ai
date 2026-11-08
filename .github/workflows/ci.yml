@@ -301,10 +301,11 @@ jobs:
         run: bun test --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
       # Lays those screens out in the runner's Chrome at 1280 and 320 px and fails on an offender that isn't in
       # scripts/geometry/baseline.json: an action on its row's edge, uneven padding in a chip, a row wrapping word by word.
+      # A screen with messages also at the smallest and largest Tamanho do texto.
       - name: Geometry (the layout rules on every screen the tests reach)
         if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
         timeout-minutes: 8
-        run: bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md
+        run: bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
       - name: Test (new event dialog, alone)

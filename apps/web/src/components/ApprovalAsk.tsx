@@ -12,8 +12,8 @@ import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
   approvalAskLine,
+  approvalDetail,
   approvalGroupWaitsFor,
-  approvalSummary,
   approvalTitle,
   approvalWaitsFor,
   decisionOutcome,
@@ -81,9 +81,7 @@ export function ApprovalAsk({
   const previewed = Boolean(email);
   // What the preview already shows isn't said again on the action's line. A connector's detail is its raw call
   // (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
-  const detail = previewed
-    ? undefined
-    : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
+  const detail = previewed ? undefined : approvalDetail(approval, i18n.language) || undefined;
   return (
     <RequestCard
       id={approval.id}
@@ -386,7 +384,7 @@ function GroupItem({
   const email = approval.email;
   const detail = email
     ? [email.to.join(", "), email.subject].filter(Boolean).join(" · ")
-    : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
+    : approvalDetail(approval, i18n.language) || undefined;
   const pending = approval.status === "pending";
   const own = itemOwnWords(approval, lead);
   const ahead = aheadPhase(approval);

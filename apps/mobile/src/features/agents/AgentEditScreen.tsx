@@ -5,7 +5,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { router, usePreventRemove } from "expo-router";
+import { usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
@@ -23,6 +23,8 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
+import { MessageText } from "../chat/MessageText";
 import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -264,6 +266,7 @@ export function AgentEditScreen({ id }: { id: string }) {
                 {fields.has("instructions") ? (
                   <TextArea
                     value={draft.instructions}
+                    maxLength={50_000}
                     onChangeText={(v) => set("instructions", v)}
                     placeholder={t("newAgent.instructionsPlaceholder")}
                     accessibilityLabel={t("agent.instructions")}
@@ -271,9 +274,14 @@ export function AgentEditScreen({ id }: { id: string }) {
                     scrollEnabled={false}
                     style={styles.bare}
                   />
+                ) : agent.instructions.trim() ? (
+                  // Read as the chat reads Markdown: an imported agent's "## Papel" and "**sempre**" never show as marks.
+                  <View style={styles.field}>
+                    <MessageText body={agent.instructions} />
+                  </View>
                 ) : (
                   <Text variant="body" tone="ink2" selectable style={styles.field}>
-                    {agent.instructions || t("agentPage.none")}
+                    {t("agentPage.none")}
                   </Text>
                 )}
               </GroupedList>

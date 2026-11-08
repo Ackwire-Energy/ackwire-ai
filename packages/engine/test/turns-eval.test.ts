@@ -104,7 +104,8 @@ const size = (r: ModelRequest) =>
  * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
  * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
  * `person` and the rule that what is said in a DM stays there, 45,216 with the `ask_user` rule leaving to its
- * description what that says already; the ceiling leaves a little room. Where each workspace gets its own computer,
+ * description what that says already, and 45,437 with each choice question's written answer (`ask_choices`, its
+ * other words tightened for it); the ceiling leaves a little room. Where each workspace gets its own computer,
  * `workspaceComputerText` adds its 441 to that.
  */
 const OI_CEILING_CHARS = 45_900;

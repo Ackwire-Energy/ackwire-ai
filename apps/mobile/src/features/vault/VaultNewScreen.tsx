@@ -6,10 +6,10 @@ import {
   type VaultScope,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Gap, SettingsPage } from "../settings/parts";
 import { useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";

@@ -32,6 +32,10 @@ export function previewKind(contentType: string): PreviewKind | null {
   return PREVIEW[base] ?? null;
 }
 
+/** A file the viewer shows as a picture, with its zoom: a raster image small enough to load whole. */
+export const isPreviewImage = (content: { contentType: string; size: number }) =>
+  previewKind(content.contentType) === "image" && content.size <= MAX_PREVIEW_BYTES;
+
 /** The clean MIME type for a preview blob (never what the browser would sniff). */
 export const previewType = (contentType: string) => contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 
@@ -99,6 +103,10 @@ const BY_EXTENSION: Record<string, FileIconName> = {
   patch: "code",
   diff: "code",
 };
+
+/** A JSON file, by its name or its type (`application/json`, `…+json`): the viewers show it formatted. */
+export const isJsonFile = (name: string, contentType = "") =>
+  extension(name) === "json" || /^application\/(?:[\w.-]+\+)?json$/.test(previewType(contentType));
 
 /** An icon for a file from its name, then its type. */
 export function fileIcon(name: string, contentType = ""): FileIconName {

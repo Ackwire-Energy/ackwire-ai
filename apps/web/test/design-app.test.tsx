@@ -251,7 +251,7 @@ describe("the block's logos are the services' own", () => {
     expect(rows.map((r) => [r.querySelector("b")?.textContent, r.querySelector("small")?.textContent ?? null])).toEqual(
       [
         ["Consultou o Gmail", "wnogueira search"],
-        ["Consultou o GitHub", "search issues"],
+        ["Consultou o GitHub", "Buscar issues"],
         ["Criou uma tarefa", null],
       ],
     );

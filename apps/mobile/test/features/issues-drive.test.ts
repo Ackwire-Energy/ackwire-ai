@@ -515,4 +515,33 @@ describe("a task's GitHub link", () => {
     expect(screen).toContain("sheet.open(<GithubLinkForm issue={i} />)");
     expect(screen).toContain("<Locked when={action.isPending}>");
   });
+
+  test("on a narrow card the date, the chip and the face wrap onto the next line instead of running past its edge", () => {
+    expect(source("parts.tsx")).toMatch(/meta: \{ flexDirection: "row", flexWrap: "wrap",/);
+  });
+});
+
+describe("an agent picked for a task that couldn't start", () => {
+  test("Nova tarefa and Responsável start it through one hook, which says why with Pedir de novo", () => {
+    const src = (f: string) => readFileSync(join(import.meta.dir, "../../src/features/issues", f), "utf8");
+    expect(src("NewIssueForm.tsx")).toContain("start.run(issue, who.id, { created: true })");
+    expect(src("IssueScreen.tsx")).toContain('start.run(i, who.id, { done: t("mobile.issues.changed") })');
+    const hook = src("useStartAgent.ts");
+    for (const piece of [
+      "useStartAgentOnTask(",
+      "errorText(t, error)",
+      't("issues.form.askAgain")',
+      't("issues.form.notStarted"',
+      't("issues.notStarted"',
+    ])
+      expect([piece, hook.includes(piece)]).toEqual([piece, true]);
+  });
+});
+
+describe("the Drive past what loaded", () => {
+  test("Mostrar mais brings the server's next page once the loaded files are shown", () => {
+    const screen = readFileSync(join(import.meta.dir, "../../src/features/drive/DriveScreen.tsx"), "utf8");
+    expect(screen).toContain("void list.fetchNextPage()");
+    expect(screen).toContain("visible < total || list.hasNextPage");
+  });
 });

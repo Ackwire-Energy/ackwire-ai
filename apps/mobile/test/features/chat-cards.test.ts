@@ -331,3 +331,32 @@ describe("the secret card on the phone", () => {
     expect(asks).toContain('{waitsFor && waitsFor !== "you" ? (');
   });
 });
+
+describe("a JSON block", () => {
+  const files = (path: string) => readFileSync(join(import.meta.dir, "../../src/features/files", path), "utf8");
+
+  test("reads formatted and wrapped, the text as written one press away, copy taking what shows", () => {
+    const card = source("CodeCard.tsx");
+    expect(card).toContain("isJsonLang(lang) ? formatJson(text) : null");
+    expect(card).toContain("<RawToggle on={raw} onPress={() => setRaw((r) => !r)} />");
+    expect(card).toContain("<CopyButton text={code} />");
+    expect(card).toMatch(/\{pretty \? \(\s*<View style=\{styles\.body\}>\s*<CodeText lines=\{shown\} wrap \/>/);
+    // Keys apart from the strings, in the web's colors.
+    expect(card).toContain('kind === "property"');
+  });
+
+  test("a JSON file opens formatted too", () => {
+    const viewer = files("DocumentViewer.tsx");
+    expect(viewer).toContain("json={isJsonFile(info.name, info.mime)}");
+    expect(viewer).toContain('<CodeText lines={highlightCode(raw ? text.data : formatted, "json")} wrap />');
+  });
+});
+
+describe("an agent's offer card is done for everyone once it's done", () => {
+  test("the skill library is read whatever the viewer may do: only the button asks for managing agents", () => {
+    const offer = readFileSync(join(import.meta.dir, "../../src/features/ai/OfferCard.tsx"), "utf8");
+    const install = offer.slice(offer.indexOf("function InstallSkill("), offer.indexOf("\nfunction UpdateSkills("));
+    expect(install).toContain("useSkills(orgId)");
+    expect(install).toContain('action={may ? t("actionCard.install_skill.open") : null}');
+  });
+});

@@ -9,6 +9,7 @@ import { Button, Icon, normalizeAppearance, PixelSpinner } from "@agenteschat/ui
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
+import { saidText } from "../control/activity";
 import { siteLink } from "../control/browser";
 import {
   finishedOf,
@@ -20,11 +21,11 @@ import {
 } from "../control/notch";
 import { homeServer } from "../control/server";
 import { type Home, pairedHomes } from "../control/store";
-import { agentOf } from "../hooks";
+import { agentOf, usePending } from "../hooks";
 import type { NotchInfo } from "../host/types";
 import { AgentFace, BrandFace, Count } from "../ui/bits";
 import { useToast } from "../ui/Toast";
-import { elapsedClock } from "../ui/time";
+import { clock, elapsedClock } from "../ui/time";
 
 /** Each wing beside the notch. */
 const WING = 74;
@@ -320,29 +321,31 @@ function HelpLine({ home, help, row }: { home: Home | undefined; help: NotchHelp
 }
 
 function DoneLine({ home, done, row }: { home: Home | undefined; done: Done; row?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const agent = agentOf(home, done.work.agent ?? { id: "", name: t("desktop.notch.someAgent") });
+  const what = saidText(t, done.work, (iso) => clock(iso, i18n.language, new Date()));
   return (
     <div className={row ? "dk-notch__row" : "dk-notch__line"}>
       <AgentFace agent={agent} size="sm" expression="happy" />
       <span className="dk-notch__text">
         <b>{t("desktop.notch.done", { agent: agent.name })}</b>
-        <small>{[done.work.summary, elapsedClock(done.ms)].filter(Boolean).join(" · ")}</small>
+        <small>{[what, elapsedClock(done.ms)].filter(Boolean).join(" · ")}</small>
       </span>
     </div>
   );
 }
 
 function WorkRow({ home, work, now }: { home: Home | undefined; work: NotchWork; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const agent = work.agent ? agentOf(home, work.agent) : null;
+  const what = saidText(t, work, (iso) => clock(iso, i18n.language, new Date()));
   const color = normalizeAppearance(agent?.look).color;
   const started = work.startedAt ? Date.parse(work.startedAt) : Number.NaN;
   const title = work.browser
     ? t("desktop.notch.inBrowser", { agent: agent?.name || t("desktop.notch.someAgent") })
     : agent
-      ? `${agent.name} · ${work.summary}`
-      : work.summary;
+      ? `${agent.name} · ${what}`
+      : what;
   return (
     <div className="dk-notch__row">
       {agent ? <AgentFace agent={agent} size="sm" state="writing" /> : <BrandFace size="sm" />}
@@ -365,13 +368,9 @@ function OpenList({ homes, state, done, now }: { homes: Home[]; state: NotchStat
   const store = useStore();
   const toast = useToast();
   const homeOf = (id: string) => homes.find((h) => h.homeId === id);
-  const resume = async () => {
-    try {
-      await store.requestAll({ type: "resume" });
-    } catch {
-      toast(t("desktop.common.error"), "alert");
-    }
-  };
+  const [pending, run] = usePending<"resume">();
+  const resume = () =>
+    run("resume", () => store.requestAll({ type: "resume" }).catch(() => toast(t("desktop.common.error"), "alert")));
   return (
     <>
       <div className="dk-notch__head">
@@ -383,7 +382,7 @@ function OpenList({ homes, state, done, now }: { homes: Home[]; state: NotchStat
             <b>{t("desktop.notch.pausedTitle")}</b>
             <small>{t("desktop.notch.pausedBody")}</small>
           </span>
-          <Button size="sm" variant="primary" icon="play" onClick={() => void resume()}>
+          <Button size="sm" variant="primary" icon="play" loading={pending === "resume"} onClick={() => void resume()}>
             {t("desktop.notch.resume")}
           </Button>
         </div>

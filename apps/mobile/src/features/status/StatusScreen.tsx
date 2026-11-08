@@ -6,7 +6,6 @@ import {
   STATUS_SUGGESTIONS,
   UNTIL_CHOICES,
 } from "@agenteschat/client/lib/presence";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -22,6 +21,7 @@ import {
   useToast,
   WithPresence,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Gap, SettingsPage } from "../settings/parts";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";

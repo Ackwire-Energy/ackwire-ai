@@ -17,6 +17,7 @@ import type {
   Approval,
   ApprovalCovers,
   ApprovalRule,
+  ArchivedChannel,
   AuditRow,
   AuthConfig,
   Availability,
@@ -40,6 +41,7 @@ import type {
   GitHubAppInfo,
   GitHubRepositories,
   HttpApi,
+  IdRef,
   ImportedSource,
   ImportItemKind,
   ImportItemResult,
@@ -218,6 +220,8 @@ export interface FakeState {
   agentGroups?: AgentGroup[];
   /** Agents no longer in the team (`agents.former`); a purge moves one here. */
   former?: FormerAgent[];
+  /** The archived channels the viewer may bring back (`chat.archived`). */
+  archivedChannels?: ArchivedChannel[];
   channels: Channel[];
   /** Sidebar categories (ADR 0080); absent: none. */
   channelCategories?: ChannelCategory[];
@@ -438,6 +442,8 @@ export interface FakeState {
   sidebarOrder?: SidebarSection[];
   /** How I look at Tarefas (`orgs.issuesView`); unset = never changed (the default). */
   issuesView?: IssuesView;
+  /** What ids written in texts name (`chat.idRef`); an id not here is a 404. */
+  idRefs?: Record<string, IdRef>;
   /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
   sidebarToolOrder?: SidebarItem[];
   /** How my sidebar shows the agents and what I pinned (`orgs.sidebarView`); unset = never changed. */
@@ -2373,6 +2379,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return state.mailLoss?.[agentId] ?? [];
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
+      unarchive: async (orgId, agentId) => {
+        log("agents.unarchive", orgId, agentId);
+        state.former = (state.former ?? []).filter((a) => a.id !== agentId || a.deleted);
+      },
       purge: async (orgId, agentId) => {
         log("agents.purge", orgId, agentId);
         const was =
@@ -2924,6 +2934,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           author: author ?? "",
         };
       },
+      idRef: async (_orgId, id) => {
+        const ref = state.idRefs?.[id];
+        if (!ref) throw new ApiError(404, "not_found", "Nothing here has this id");
+        return structuredClone(ref);
+      },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
       archive: async (orgId, channelId) => {
         log("chat.archive", orgId, channelId);
@@ -2931,7 +2946,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       unarchive: async (orgId, channelId) => {
         log("chat.unarchive", orgId, channelId);
+        state.archivedChannels = (state.archivedChannels ?? []).filter((c) => c.id !== channelId);
       },
+      archived: async () => state.archivedChannels ?? [],
       leave: async (orgId, channelId) => {
         log("chat.leave", orgId, channelId);
         const c = state.channels.find((x) => x.id === channelId);

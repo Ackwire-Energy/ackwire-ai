@@ -80,9 +80,9 @@ export function pushWorthy(
 }
 
 /**
- * Called by `notify` for each row it created or merged into (with the person's choices, read there): the
- * first event of a group (count 1) the person wants on their devices enqueues `push.send`, when they have
- * a phone or a browser registered.
+ * A row the person wants on their devices now (their choices, read by the caller when it has them) enqueues
+ * `push.send` once per `dedupeKey`, when they have a phone or a browser registered: `notify` for a group's first
+ * event, and a reminder or a snooze's wake under keys of their own.
  */
 export async function enqueuePush(
   db: Database,
@@ -91,7 +91,6 @@ export async function enqueuePush(
   prefs?: NoticePrefs,
   dedupeKey = `push.send:${row.id}`,
 ): Promise<boolean> {
-  if (row.count !== 1) return false;
   if (!pushWorthy(row, now, prefs ?? (await readNoticePrefs(db, row.orgId, row.userId)))) return false;
   const [device] = await db
     .select({ id: pushDevices.id })
@@ -331,6 +330,16 @@ async function isLooking(presence: PushDeps["presence"], orgId: string, userId: 
 }
 
 /**
+ * What a push quotes of the latest message: never a body the server wrote (English: only the apps word it, by its code,
+ * so the push says to open it), and of a reply a restart or its computer cut, only what the agent itself wrote.
+ */
+export function pushQuote(latest: Pick<NotificationLatest, "text" | "meta">): string | null {
+  if (latest.meta?.bodyCode) return null;
+  const cut = latest.meta?.brainInterrupted ?? latest.meta?.interrupted;
+  return cut ? cut.text || null : (latest.text ?? null);
+}
+
+/**
  * Sends the push of one notification to every device of its person, unless
  * it was read, done or snoozed meanwhile: phones through `push` (one call),
  * browsers whose session is still on through `webPush` (one per subscription).
@@ -404,8 +413,7 @@ export async function deliverPush(
     actorType: actor?.type ?? null,
     label: source.label,
     title: latest.title,
-    // A body the server wrote is English: only the apps word it (`previewBody`), so the push says to open it.
-    text: latest.meta?.bodyCode ? null : latest.text,
+    text: pushQuote(latest),
     media: await sentMediaOf(db, row.orgId, row.kind, source, latest),
     suggestedBy: latest.suggestedBy ?? null,
     highRisk,

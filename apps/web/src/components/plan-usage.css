@@ -35,12 +35,11 @@
 .plan-acct__chip--out {
   color: var(--warn);
 }
+/* Its maker and whose it is (an address) wrap, never cut. */
 .plan-acct__sub {
   font-size: 13.5px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .plan-empty {
@@ -258,27 +257,45 @@
   color: var(--muted);
 }
 
+/* A phone: the face and the name on one line, the figures under them as wide as the row, left-aligned (a column of
+   their own squeezed "US$ 0,32 de US$ 50,00 (padrão do workspace)" into five lines). */
 @media (max-width: 720px) {
   .plan-api__row {
-    grid-template-columns: 28px minmax(0, 1fr) 120px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    row-gap: var(--space-1);
   }
   .plan-api__meter {
     display: none;
   }
+  .plan-api__value {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+    text-align: left;
+  }
   .plan-source {
-    grid-template-columns: minmax(0, 1fr) 100px;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
   }
   .plan-source > .ac-meter {
     display: none;
+  }
+  .plan-source__n {
+    align-items: flex-start;
+    text-align: left;
   }
 }
-/* The agent's Usage tab also opens in the panel beside its DM (`agp-side`, 420–760px): the same two columns there, or
-   the meter and the figures leave the name a sliver. */
+/* The agent's Usage tab also opens in the panel beside its DM (`agp-side`, 420–760px): the same there, or the meter
+   and the figures leave the name a sliver. */
 @container agp-side (max-width: 720px) {
   .plan-source {
-    grid-template-columns: minmax(0, 1fr) 100px;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
   }
   .plan-source > .ac-meter {
     display: none;
+  }
+  .plan-source__n {
+    align-items: flex-start;
+    text-align: left;
   }
 }

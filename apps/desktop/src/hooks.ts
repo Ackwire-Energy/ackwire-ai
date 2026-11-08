@@ -188,3 +188,24 @@ export function writePref<T>(key: string, value: T) {
     // ignore
   }
 }
+
+/**
+ * The action running now, by name: its button shows `loading` and no other starts until it ends, so a second press
+ * never sends it twice. Each action says its own errors.
+ */
+export function usePending<K extends string>() {
+  const [pending, setPending] = useState<K | null>(null);
+  const running = useRef(false);
+  const run = useCallback(async (key: K, action: () => Promise<unknown>) => {
+    if (running.current) return;
+    running.current = true;
+    setPending(key);
+    try {
+      await action();
+    } finally {
+      running.current = false;
+      setPending(null);
+    }
+  }, []);
+  return [pending, run] as const;
+}

@@ -32,6 +32,7 @@
     "code": "Code",
     "fullScreen": "Volledig scherm",
     "wrapLines": "Regels afbreken",
+    "raw": "Origineel",
     "table": "Tabel",
     "chartItem": "Item",
     "chartShare": "Aandeel",
@@ -44,6 +45,7 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "loadFailed": "Dit kon niet geladen worden. Controleer je verbinding en probeer het opnieuw.",
+    "gone": "Dit is er niet meer. Het is verwijderd, of je hebt er geen toegang meer toe.",
     "notAllowed": "Je hebt hier geen toestemming voor.",
     "tooMany": "Te veel pogingen. Probeer het later opnieuw.",
     "offline": "Je bent offline. Controleer je verbinding en probeer het opnieuw.",
@@ -1542,6 +1544,9 @@
     "workingNow": "Nu aan het werk",
     "available": "Beschikbaar",
     "archived": "Gearchiveerd",
+    "restore": "Terugzetten",
+    "restoreAction": "{{name}} terugzetten",
+    "restored": "{{name}} is terug in het team.",
     "emptyTitle": "Stel je team van agents samen",
     "empty": "Elke agent heeft een rol en werkt samen met mensen, in dezelfde kanalen.",
     "emptyViewerTitle": "Je team van agents verschijnt hier",
@@ -1809,6 +1814,14 @@
     "generalName": "#general houdt zijn naam.",
     "archive": "Kanaal archiveren",
     "archived": "#{{channel}} gearchiveerd. Het gesprek blijft bewaard.",
+    "archivedTitle": "Gearchiveerde kanalen",
+    "archivedCount_one": "{{count}} gearchiveerd kanaal",
+    "archivedCount_other": "{{count}} gearchiveerde kanalen",
+    "archivedNone": "Geen gearchiveerde kanalen om terug te zetten",
+    "archivedOn": "Gearchiveerd op {{date}}",
+    "restore": "Terugzetten",
+    "restoreName": "#{{channel}} terugzetten",
+    "restored": "#{{channel}} is terug.",
     "leave": "Kanaal verlaten",
     "left": "Je hebt #{{channel}} verlaten",
     "leaveTitle": "#{{channel}} verlaten?",
@@ -1981,7 +1994,7 @@
       "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
       "audience": "Wie het mag gebruiken",
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
-      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
+      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Ongevraagd plaatst hij alleen de Teamweek, voor admins.",
       "audit": "Bekijk wat {{name}} deed",
       "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
@@ -2102,6 +2115,38 @@
       "open": "Openen",
       "web": "Openen op de website",
       "notAllowed": "Je hebt geen toegang tot dit scherm"
+    },
+    "action": {
+      "title": "Wijziging in de werkruimte",
+      "only": "Alleen wie deze wijziging mag maken, past haar toe",
+      "ask": "Sturen naar wie het mag",
+      "other": "Iets wijzigen in de werkruimte",
+      "create_role": "Rol <b>{{name}}</b> maken",
+      "update_role": "Rol <b>{{name}}</b> wijzigen",
+      "delete_role": "Rol <b>{{name}}</b> definitief verwijderen",
+      "move_role": "Rol <b>{{name}}</b> verplaatsen",
+      "set_member_roles": "Rollen van <b>{{name}}</b> wijzigen: {{change}}",
+      "set_channel_permissions": "Wijzigen wat {{who}} mag in <b>#{{channel}}</b>",
+      "set_my_status": "Je status instellen: <b>{{what}}</b>",
+      "set_notifications_on": "Je meldingen voor <b>{{category}}</b> aanzetten",
+      "set_notifications_off": "Je meldingen voor <b>{{category}}</b> uitzetten",
+      "set_my_timezone": "Je tijdzone op <b>{{timezone}}</b> zetten",
+      "set_my_timezone_workspace": "Weer de tijdzone van de werkruimte volgen",
+      "set_invitation_roles": "Rollen die de uitnodiging van <b>{{email}}</b> geeft wijzigen: {{change}}",
+      "update_channel": "Kanaal <b>#{{channel}}</b> wijzigen",
+      "archive_channel": "<b>#{{channel}}</b> archiveren",
+      "archive_channel_back": "<b>#{{channel}}</b> terugzetten",
+      "channel_people": "Wijzigen wie er in <b>#{{channel}}</b> zit: {{change}}",
+      "delete_channel": "Kanaal <b>#{{channel}}</b> definitief verwijderen, met zijn berichten en bestanden",
+      "revoke_invitation": "Uitnodiging van <b>{{email}}</b> intrekken",
+      "resend_invitation": "Uitnodiging opnieuw naar <b>{{email}}</b> sturen",
+      "decide_join_request_approve": "<b>{{email}}</b> toelaten tot de werkruimte",
+      "decide_join_request_deny": "Verzoek van <b>{{email}}</b> om mee te doen afwijzen",
+      "stop_work": "Stoppen wat <b>{{agent}}</b> aan het doen is",
+      "continue_work": "<b>{{agent}}</b> laten doorgaan",
+      "update_workspace": "Werkruimte <b>{{name}}</b> wijzigen",
+      "set_action_check_on": "De check van wat het team al deed aanzetten",
+      "set_action_check_off": "De check van wat het team al deed uitzetten"
     }
   },
   "teamWeek": {
@@ -2675,7 +2720,8 @@
       "updated_status": "<b>#{{number}}</b> verplaatst naar {{status}} · {{title}}",
       "updated_priority": "Prioriteit van <b>#{{number}}</b> op {{priority}} gezet · {{title}}",
       "assigned": "<b>#{{number}}</b> toegewezen aan {{assignee}} · {{title}}",
-      "assigned_self": "<b>#{{number}}</b> zelf opgepakt · {{title}}"
+      "assigned_self": "<b>#{{number}}</b> zelf opgepakt · {{title}}",
+      "files": "Bijgevoegd: {{names}}"
     },
     "memory": {
       "saved": "Opgeslagen in <b>geheugen</b>: {{text}}",
@@ -2719,6 +2765,35 @@
       "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemerged",
       "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemerged"
     },
+    "workspace": {
+      "changed": "Iets gewijzigd in de werkruimte",
+      "changed_create_role": "Rol <b>{{name}}</b> aangemaakt",
+      "changed_update_role": "Rol <b>{{name}}</b> gewijzigd",
+      "changed_delete_role": "Rol <b>{{name}}</b> verwijderd",
+      "changed_move_role": "Rol <b>{{name}}</b> verplaatst",
+      "changed_set_member_roles": "Rollen van <b>{{name}}</b> gewijzigd: {{change}}",
+      "changed_set_channel_permissions": "Gewijzigd wat {{who}} mag in <b>#{{channel}}</b>",
+      "changed_set_my_status": "Je status ingesteld: <b>{{what}}</b>",
+      "changed_set_notifications_on": "Je meldingen voor <b>{{category}}</b> aangezet",
+      "changed_set_notifications_off": "Je meldingen voor <b>{{category}}</b> uitgezet",
+      "changed_set_my_timezone": "Je tijdzone op <b>{{timezone}}</b> gezet",
+      "changed_set_my_timezone_workspace": "Je tijdzone volgt weer die van de werkruimte",
+      "changed_set_invitation_roles": "Rollen die de uitnodiging van <b>{{email}}</b> geeft gewijzigd: {{change}}",
+      "changed_update_channel": "Kanaal <b>#{{channel}}</b> gewijzigd",
+      "changed_archive_channel": "<b>#{{channel}}</b> gearchiveerd",
+      "changed_archive_channel_back": "<b>#{{channel}}</b> teruggezet",
+      "changed_channel_people": "Gewijzigd wie er in <b>#{{channel}}</b> zit: {{change}}",
+      "changed_delete_channel": "Kanaal <b>#{{channel}}</b> verwijderd",
+      "changed_revoke_invitation": "Uitnodiging van <b>{{email}}</b> ingetrokken",
+      "changed_resend_invitation": "Uitnodiging opnieuw naar <b>{{email}}</b> gestuurd",
+      "changed_decide_join_request_approve": "<b>{{email}}</b> toegelaten tot de werkruimte",
+      "changed_decide_join_request_deny": "Verzoek van <b>{{email}}</b> om mee te doen afgewezen",
+      "changed_stop_work": "Gestopt wat <b>{{agent}}</b> aan het doen was",
+      "changed_continue_work": "<b>{{agent}}</b> laten doorgaan",
+      "changed_update_workspace": "Werkruimte <b>{{name}}</b> gewijzigd",
+      "changed_set_action_check_on": "De check van wat het team al deed aangezet",
+      "changed_set_action_check_off": "De check van wat het team al deed uitgezet"
+    },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
     "issueFields": {
@@ -2730,7 +2805,8 @@
       "labels": "de labels",
       "dueDate": "de deadline",
       "githubUrl": "de GitHub-link",
-      "criteria": "de criteria"
+      "criteria": "de criteria",
+      "files": "de bijlagen"
     },
     "routineFields": {
       "name": "de naam",
@@ -4452,6 +4528,8 @@
           "stepTwo": "Plak de code die Claude toont",
           "codeLabel": "Claude-code",
           "notCode": "Dat lijkt geen code van Claude.",
+          "stepTwoGoogle": "Plak de code die Google laat zien",
+          "codeLabelGoogle": "Code of link",
           "send": "Naar {{computer}} sturen",
           "sending": "Code naar {{computer}} sturen…",
           "sent": "Code verstuurd. Inloggen wordt afgerond op {{computer}}.",
@@ -4798,6 +4876,7 @@
         "too_many_tool_calls": "Over de toollimiet voor één run gegaan.",
         "stuck": "Gestopt omdat hij vastliep.",
         "brain_interrupted": "De AI stopte voordat hij klaar was.",
+        "brain_unavailable": "De AI op zijn computer kon niet antwoorden. Controleer de computer en vraag het opnieuw.",
         "empty_reply": "Het model gaf niets terug.",
         "model_refused": "Het model weigerde te antwoorden.",
         "agent_archived": "De agent is gearchiveerd.",
@@ -6192,6 +6271,7 @@
         "done": "Afgerond",
         "canceled": "Wordt niet gedaan"
       },
+      "stageFull": "{{stage}} heeft al {{max}} kolommen, het maximum voor een fase. Verwijder er daar eerst een.",
       "stageExplain": {
         "todo": "Nieuwe taken komen in de eerste kolom van Te doen.",
         "in_progress": "Als een agent begint, gaat de taak naar de eerste kolom van Bezig.",
@@ -6302,6 +6382,8 @@
       "cancel": "Annuleren",
       "create": "Taak maken",
       "created": "Taak #{{number}} gemaakt.",
+      "notStarted": "Taak #{{number}} gemaakt, maar {{name}} is niet begonnen.",
+      "askAgain": "Opnieuw vragen",
       "intro": "Wie hem oppakt, een mens of een agent, staat op het bord met de voortgang.",
       "criteriaFound_one": "{{count}} acceptatiecriterium",
       "criteriaFound_other": "{{count}} acceptatiecriteria",
@@ -6351,6 +6433,7 @@
     "askSection": "Vraag het een agent",
     "asked": "Verzoek verstuurd. {{name}} werkt in het gesprek over de taak, dat iedereen die de taak ziet kan volgen.",
     "asked_female": "Verzoek verstuurd. {{name}} werkt in het gesprek over de taak, dat iedereen die de taak ziet kan volgen.",
+    "notStarted": "{{name}} is niet begonnen.",
     "activity": "Activiteit",
     "noActivity": "Nog niets.",
     "discussion": "Gesprek",
@@ -6398,7 +6481,8 @@
       "add": "Bestanden toevoegen",
       "addHint": "of sleep ze hierheen",
       "grid": "Raster",
-      "empty": "Nog geen bijlagen. Sleep bestanden hierheen of plak een screenshot.",
+      "emptyTitle": "De bestanden van de taak staan hier",
+      "empty": "Sleep bestanden hierheen, plak een screenshot of stuur ze in het gesprek van de taak.",
       "fromCreation": "Bij het maken · {{when}}",
       "fromComment": "Reactie van {{name}} · {{when}}",
       "linked": "Gekoppeld door {{name}}"
@@ -6427,6 +6511,8 @@
       "github_linked": "heeft het aan GitHub gekoppeld",
       "github_unlinked": "heeft de GitHub-link verwijderd",
       "artifact_linked": "heeft een bestand toegevoegd",
+      "files_attached": "heeft {{names}} toegevoegd",
+      "files_removed": "heeft {{names}} uit de bijlagen gehaald",
       "criterion_checked": "heeft het criterium \"{{text}}\" aangevinkt",
       "criterion_unchecked": "heeft het criterium \"{{text}}\" uitgevinkt",
       "agent_asked": "heeft {{name}} gevraagd het te doen"
@@ -8202,6 +8288,19 @@
     "confirm": "Bevestigen en uitnodigen",
     "otherTime": "Ander tijdstip",
     "confirmed": "Afspraak gemaakt en uitnodigingen verstuurd.",
+    "proposalDismissed": "Voorstel afgewezen",
+    "proposalWaits": "{{name}} bevestigt deze afspraak.",
+    "rsvp": {
+      "accept": "Ik kom",
+      "decline": "Ik kom niet",
+      "accepted": "komt",
+      "declined": "komt niet",
+      "mine": {
+        "needs_action": "Je bent uitgenodigd voor deze afspraak.",
+        "accepted": "Je komt.",
+        "declined": "Je komt niet."
+      }
+    },
     "kind": {
       "event": "Afspraak",
       "routine": "Routine",
@@ -10031,6 +10130,7 @@
     "title": "Drive",
     "subtitle": "Alles wat mensen en agents hebben gemaakt of geüpload.",
     "search": "Bestanden zoeken",
+    "loadMore": "Meer laden",
     "kind": "Type",
     "filters": "Filters",
     "allKinds": "Alle types",
@@ -10117,6 +10217,7 @@
     "onlyDriveText": "Nog niet gedeeld in een kanaal.",
     "dm": "Direct bericht",
     "dmWith": "Direct bericht met {{name}}",
+    "dmBetween": "Direct bericht tussen {{names}}",
     "inDm": "Verstuurd in een direct bericht",
     "inThread": "In een thread van het gesprek",
     "audience": {
@@ -10124,7 +10225,8 @@
       "publicChannel": "Iedereen in de werkruimte kan het zien: het staat in het openbare kanaal #{{name}}",
       "privateChannel": "Alleen leden van #{{name}} en beheerders kunnen het zien",
       "dm": "Alleen jij en {{name}} kunnen het zien: het komt uit een direct bericht",
-      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht"
+      "dmGone": "Alleen de mensen in dat gesprek kunnen het zien: het komt uit een direct bericht",
+      "dmBetween": "Alleen {{names}} kunnen het zien: het komt uit een direct bericht"
     },
     "private": "Privé",
     "privateHint": "Alleen de mensen in het gesprek zien deze bestanden. In een kanaal ook beheerders.",
@@ -10171,9 +10273,6 @@
     },
     "s3": "Je eigen bucket",
     "s3Text": "S3, R2, MinIO en andere die compatibel zijn met S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Binnenkort",
     "current": "In gebruik",
     "usage": {
       "files": "{{size}} aan bestanden",
@@ -10737,6 +10836,7 @@
     "toolsCount_one": "{{count}} tool",
     "toolsCount_other": "{{count}} tools",
     "active": "Actief",
+    "noToolsNow": "Nu geen tools",
     "notReviewed": "Wacht op controle",
     "toReview_one": "{{count}} nieuwe tool om te controleren",
     "toReview_other": "{{count}} nieuwe tools om te controleren",
@@ -10896,6 +10996,7 @@
   },
   "toolNames": {
     "order": "modifiers-first",
+    "catalog": "none",
     "verb": {
       "get": "Ophalen",
       "list": "Weergeven",
@@ -11633,6 +11734,11 @@
       "subject": "Onderwerp bevat",
       "text": "Tekst bevat",
       "noMailbox": "Koppel eerst een mailbox bij Connectors.",
+      "readsNone": "{{name}} leest nog geen enkele mailbox.",
+      "cantRead": "{{name}} leest deze mailbox niet.",
+      "connectorReadsNone": "{{name}} leest {{connector}} nog niet.",
+      "connectorCantRead": "{{name}} leest {{connector}} niet.",
+      "giveAccess": "Toegang geven",
       "openConnectors": "Connectors openen",
       "when": "Als er een mail binnenkomt op {{address}}",
       "whenFolder": "Als er een mail binnenkomt op {{address}} ({{folder}})",
@@ -11792,6 +11898,11 @@
       "hintZoomed": "Sleep om te verschuiven. Esc maakt het weer passend",
       "hintTouch": "Tik of knijp om in te zoomen",
       "hintZoomedTouch": "Sleep om te verschuiven. Tik om het weer passend te maken"
+    },
+    "nav": {
+      "previous": "Vorige afbeelding",
+      "next": "Volgende afbeelding",
+      "place": "{{index}} van {{count}}"
     }
   },
   "errors": {
@@ -11810,6 +11921,8 @@
       "checkAddress": "Controleer het adres en probeer het opnieuw.",
       "tooLong": "Dat is te lang. Maak het korter en probeer het opnieuw.",
       "updateComputerApp": "De app op de computer is hiervoor te oud. Werk hem bij en probeer het opnieuw.",
+      "computerUpdatesItself": "De computer van de werkruimte werkt zichzelf hiervoor bij. Probeer het zo opnieuw.",
+      "notInvited": "Je bent niet uitgenodigd voor deze afspraak.",
       "offHere": "Dit staat hier uit.",
       "notInConversation": "Niet in dit gesprek.",
       "accountStart": "De computer kon het inloggen niet starten. Controleer of hij aanstaat en probeer het opnieuw.",
@@ -11852,6 +11965,7 @@
     },
     "issue": {
       "assigneeOutside": "Deze persoon ziet deze taak niet. Voeg die eerst toe bij Wie het ziet.",
+      "stageFull": "Een fase heeft hoogstens {{max}} kolommen. Verwijder eerst een van de kolommen.",
       "deleteForbidden": "Alleen wie deze taak heeft gemaakt of een beheerder kan hem verwijderen.",
       "audienceEmpty": "Kies wie het ziet."
     },
@@ -12028,7 +12142,14 @@
       "fileNameRequired": "Het bestand heeft een naam nodig.",
       "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang.",
       "deleteForbidden": "Alleen wie het maakte, wie het de agent vroeg, de eigenaar van de agent of een beheerder kan dit verwijderen.",
-      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen."
+      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen.",
+      "versionNotFound": "Deze versie van het bestand bestaat niet.",
+      "formatUnavailable": "Dit bestand kan niet in dat formaat worden opgeslagen.",
+      "sharingOpen": "De hele werkruimte ziet dit bestand al.",
+      "sharingForbidden": "Alleen wie in het gesprek van het bestand zit, verandert wie het ziet.",
+      "sharingEmpty": "Kies wie het ziet.",
+      "sharingTooMany": "Kies hoogstens {{max}} mensen en {{max}} rollen.",
+      "notInDrive": "Dit bestaat alleen in zijn gesprek, dus het kan niet worden gedeeld."
     },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
@@ -12141,6 +12262,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "De browser van de agents werkt niet op het systeem van deze computer.",
+      "browser_download": "De browser van de agents kon niet worden gedownload. Controleer de verbinding van deze computer, dan probeert hij het bij het volgende gebruik opnieuw.",
+      "browser_checksum": "De download van de browser van de agents kwam beschadigd binnen en is niet gebruikt. Hij probeert het bij het volgende gebruik opnieuw.",
+      "desktop_use_linux": "Apps op de schermen van de agents werken op Linux-computers met de schermen van de agents.",
+      "desktop_use_own_user": "Apps op de schermen hebben voor elke agent een eigen gebruiker op deze computer nodig (systeemmodus). Hier werken alle agents als de gebruiker van de runner.",
+      "desktop_use_install": "Installeer op deze computer wat apps op de schermen nodig hebben:",
+      "desktop_unavailable": "De schermen van de agents kunnen niet op deze computer draaien.",
+      "desktop_linux": "De schermen van de agents draaien alleen op Linux-computers.",
+      "desktop_install": "Installeer op deze computer de schermen van de agents:",
+      "not_as_root": "De schermen en terminals van de agents draaien nooit als root. Start de runner als een gewone gebruiker.",
+      "runner_bun_old": "Hiervoor is de runner op Bun 1.3.5 of nieuwer nodig. Werk de runner op deze computer bij.",
+      "terminal_unsupported": "Terminals werken alleen op Linux- en Mac-computers."
+    },
     "egress": {
       "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
       "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
@@ -12879,6 +13014,7 @@
       "techAction": "Actie",
       "techTool": "Tool",
       "techKind": "Soort",
+      "techSaid": "Wat het antwoordde",
       "techRun": "Run",
       "techId": "Record",
       "openConversation": "Gesprek openen",
@@ -12888,6 +13024,7 @@
     }
   },
   "settings": {
+    "notOpen": "Je rol in deze werkruimte opent {{section}} niet. Wie de rollen beheert, kan het voor je openzetten.",
     "nav": "Onderdelen van de instellingen",
     "group": {
       "you": "Jij",
@@ -12976,6 +13113,14 @@
         "openAt": "Als ik een gesprek open, breng me naar",
         "openRead": "Laatst gelezen bericht",
         "openLatest": "Nieuwste bericht",
+        "textSize": "Tekstgrootte",
+        "textSizeHelp": "Van berichten, in alle gesprekken en op al je apparaten",
+        "textSizePhone": "De tekstgrootte in de instellingen van je telefoon telt ook mee",
+        "textXs": "Kleiner",
+        "textSm": "Klein",
+        "textMd": "Standaard",
+        "textLg": "Groot",
+        "textXl": "Groter",
         "sample": {
           "ask": "Hoeveel nog?",
           "answer": "Nog 14. Zal ik het laten weten?",
@@ -13631,7 +13776,11 @@
         "shell": "Het voert er andere opdrachten in uit",
         "inline": "Het voert meegegeven code direct uit",
         "global": "Het installeert voor de hele computer",
-        "rules": "Buiten wat agents zelf mogen doen"
+        "rules": "Buiten wat agents zelf mogen doen",
+        "noAccess": "De agent heeft hier geen toegang toe",
+        "policy": "Niet toegestaan bij dit soort werk",
+        "credential": "Het verstuurt iets wat op een sleutel lijkt",
+        "repo": "Die repository staat niet op de lijst van de agent"
       },
       "gave": "gegeven",
       "answered": "beantwoord",
@@ -13736,6 +13885,7 @@
         "runningRoutine": "Een routine nu uitgevoerd",
         "proposingTeam": "Een team voorgesteld",
         "proposingChange": "Een wijziging voorgesteld",
+        "workingOnWorkspace": "In de werkruimte gewerkt",
         "updatingThread": "Een thread bijgewerkt",
         "addingAgent": "Een agent aan een kanaal toegevoegd",
         "readingConversation": "Het gesprek gelezen",
@@ -13844,6 +13994,7 @@
       "runningRoutine": "een routine nu aan het uitvoeren",
       "proposingTeam": "een team aan het voorstellen",
       "proposingChange": "een wijziging aan het voorstellen",
+      "workingOnWorkspace": "in de werkruimte aan het werken",
       "updatingThread": "een thread aan het bijwerken",
       "addingAgent": "een agent aan een kanaal aan het toevoegen",
       "readingConversation": "het gesprek aan het lezen",
@@ -13989,6 +14140,8 @@
       "action_update_skills": "Skills bijwerken",
       "action_approvals": "Goedkeuringen die op jou wachten",
       "action_open_page": "Een scherm openen",
+      "calendar_proposal": "Voorstel voor een afspraak: {{title}}",
+      "action_workspace": "Stelde een wijziging in de werkruimte voor",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "team_proposal": "Stelde een team voor: {{names}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",
@@ -14199,6 +14352,38 @@
     "update_skill_from_source": {
       "label": "Skills bijwerken vanaf hun links",
       "description": "Werkt skills bij vanaf waar ze zijn geïnstalleerd. Wijzigingen in scripts wachten op een persoon."
+    },
+    "propose_remove_agents": {
+      "label": "Archiveren of verwijderen van agents voorstellen",
+      "description": "Plaatst een kaart met de agents om te archiveren of te verwijderen. Iemand die dat mag past hem toe."
+    },
+    "offer_answers": {
+      "label": "Vragen met antwoorden om aan te tikken",
+      "description": "Plaatst een vraag met antwoorden die iemand aantikt. Elke tik is een eigen bericht."
+    },
+    "propose_team": {
+      "label": "Een team voorstellen",
+      "description": "Plaatst een kaart met meerdere agents, hun kanalen, routines en skills. Een mens maakt het aan."
+    },
+    "propose_settings_change": {
+      "label": "Instellingen van een collega voorstellen",
+      "description": "Plaatst een kaart met het nieuwe model, de AI, het budget, de eigenaar, het publiek of de kanalen van een collega. Een mens past hem toe."
+    },
+    "offer_approvals": {
+      "label": "Tonen wat op goedkeuring wacht",
+      "description": "Plaatst een kaart met de goedkeuringen die op iemand wachten, die elk daar goedkeurt of weigert."
+    },
+    "propose_member_changes": {
+      "label": "Wijzigingen bij mensen voorstellen",
+      "description": "Plaatst een kaart met eigenaren, rollen of verwijderingen om te wijzigen. Iemand die dat mag past elk ervan toe."
+    },
+    "offer_open_page": {
+      "label": "Aanbieden een scherm te openen",
+      "description": "Plaatst een kaart met een knop die een scherm van de app opent, zoals facturering, rollen of de pagina van een agent."
+    },
+    "set_team_week": {
+      "label": "De kaart Teamweek wijzigen",
+      "description": "Stopt, hervat of verplaatst de wekelijkse kaart Teamweek in het directe bericht van die persoon."
     },
     "propose_agent": {
       "label": "Agent voorstellen",
@@ -15996,6 +16181,85 @@
     "receipt": "Wie het ziet: {{who}}",
     "limited": "beperkte toegang",
     "rolesToo": "De rollen die al op deze pagina staan, blijven haar zien."
+  },
+  "share": {
+    "button": "Delen",
+    "title": "{{name}} delen",
+    "conversation": "Alleen het gesprek",
+    "people": "Mensen en rollen die je kiest",
+    "everyone": "De hele werkruimte",
+    "whereDm": "Het directe bericht met {{name}}",
+    "whereDmGone": "Een direct bericht",
+    "whereDmBetween": "Het directe bericht tussen {{names}}",
+    "whereChannel": "Leden van #{{name}}",
+    "add": "Persoon of rol toevoegen",
+    "addSearch": "Mensen en rollen zoeken",
+    "noResults": "Niemand met die naam",
+    "groupPeople": "Mensen",
+    "groupRoles": "Rollen",
+    "access": "Wie toegang heeft",
+    "you": "{{name}} (jij)",
+    "agent": "Agent",
+    "role": "Rol",
+    "remove": "{{name}} verwijderen",
+    "admins": "Beheerders zien het altijd.",
+    "copyLink": "Link kopiëren",
+    "copied": "Link gekopieerd.",
+    "done": "Klaar",
+    "onlyHere": "Wie niet in dit gesprek zit, kan de link niet openen.",
+    "choosePeople": "Mensen kiezen",
+    "readOnly": "Alleen wie in het gesprek zit, verandert wie het ziet.",
+    "open": "De hele werkruimte ziet dit bestand.",
+    "savedEveryone": "Nu ziet de hele werkruimte het bestand.",
+    "savedPeople": "Nu zien de gekozen mensen het bestand.",
+    "savedConversation": "Nu ziet alleen het gesprek het bestand.",
+    "undo": "Ongedaan maken",
+    "fileRef": "Bestand {{title}}",
+    "fileRefNone": "Bestand zonder toegang",
+    "also": "{{text}}. Ook gedeeld met {{who}}.",
+    "someOnlyHere": "Sommige van deze links gaan alleen open voor wie in het gesprek van het bestand zit."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Log in om deze link te openen",
+      "text": "Na het inloggen kom je meteen hier terug."
+    },
+    "file": {
+      "title": "Dit bestand is niet beschikbaar voor jou",
+      "text": "Het is misschien verwijderd of alleen gedeeld in een gesprek waar je niet in zit. Vraag wie het stuurde om het met je te delen via de knop Delen van het bestand."
+    },
+    "link": {
+      "title": "Deze link is niet beschikbaar voor jou",
+      "text": "Hij is misschien verlopen, al gebruikt of leidt naar een plek waar je niet bent. Vraag wie hem stuurde om een nieuwe."
+    },
+    "version": {
+      "title": "Deze versie van het bestand bestaat niet",
+      "text": "De link vraagt om een versie die het bestand niet heeft."
+    },
+    "format": {
+      "title": "Dit bestand bestaat niet in dat formaat",
+      "text": "De link vraagt om een formaat waarin dit bestand niet kan worden opgeslagen."
+    },
+    "busy": {
+      "title": "Te veel pogingen achter elkaar",
+      "text": "Wacht even en probeer het opnieuw."
+    },
+    "server": {
+      "title": "Er ging iets mis aan onze kant",
+      "text": "Het lag niet aan jou. Probeer het zo opnieuw."
+    },
+    "other": {
+      "title": "Deze link ging niet open",
+      "text": "Het adres is onvolledig of werkt niet meer. Vraag wie het stuurde om een nieuw."
+    },
+    "action": {
+      "signIn": "Inloggen",
+      "open": "agentes.chat openen",
+      "latest": "Nieuwste versie openen",
+      "file": "Bestand openen",
+      "retry": "Opnieuw proberen"
+    },
+    "errorId": "Foutcode: {{id}}"
   },
   "teamTemplates": {
     "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",

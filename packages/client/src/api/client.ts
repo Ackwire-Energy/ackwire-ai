@@ -65,10 +65,13 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
+  ArtifactPage,
+  ArtifactSharing,
   ArtifactVersion,
   AskToJoinResult,
   AuditPage,
@@ -135,6 +138,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  IdRef,
   ImportedFile,
   ImportedSource,
   ImportFileInput,
@@ -317,6 +321,8 @@ import type {
   WikiUpdateInput,
   WikiVersion,
   WorkingRun,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkspaceLimits,
 } from "./types";
 
@@ -649,6 +655,8 @@ export interface ApiClient {
     /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
     mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;
+    /** An archived agent back in the team (who manages agents); never a deleted one. */
+    unarchive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
@@ -806,11 +814,15 @@ export interface ApiClient {
     card(orgId: string, channelId: string): Promise<ChannelCard>;
     /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */
     messageCard(orgId: string, messageId: string): Promise<MessageCard>;
+    /** What an internal id in a text names, as its pill; 404 for anything I can't see or that isn't ours. */
+    idRef(orgId: string, id: string): Promise<IdRef>;
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
-    /** "Desfazer" right after archiving. */
+    /** An archived channel back as it was (its creator or who manages channels). */
     unarchive(orgId: string, channelId: string): Promise<void>;
+    /** The archived channels the viewer may bring back, the latest first. */
+    archived(orgId: string): Promise<ArchivedChannel[]>;
     /** Owners and admins, never #general: the channel and what it held go for good. `name`: typed to confirm. */
     deleteChannel(orgId: string, channelId: string, name: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
@@ -1483,6 +1495,8 @@ export interface ApiClient {
     /** Confirms an agent's proposal: creates the event and invites the people. */
     confirmProposal(orgId: string, id: string): Promise<CalendarEvent>;
     dismissProposal(orgId: string, id: string): Promise<void>;
+    /** Accepts or declines an invitation (the viewer's own answer). */
+    respond(orgId: string, id: string, status: "accepted" | "declined"): Promise<CalendarEvent>;
     /** A recurring event: `scope` and the occurrence's original start say which occurrences change. */
     update(
       orgId: string,
@@ -1493,8 +1507,10 @@ export interface ApiClient {
     remove(orgId: string, id: string, series?: { scope: SeriesScope; occurrenceStart: string }): Promise<void>;
   };
   artifacts: {
-    /** Everything the viewer can see, newest update first. */
+    /** Everything the viewer can see, newest update first: the first page. */
     list(orgId: string, filters?: ArtifactFilters): Promise<Artifact[]>;
+    /** One page of what the viewer can see (`cursor`: the page before's `nextCursor`), the first with counts. */
+    page(orgId: string, filters?: ArtifactFilters, cursor?: string): Promise<ArtifactPage>;
     /** One artifact at `version` (default: latest), with content. */
     get(orgId: string, id: string, version?: number): Promise<ArtifactDetail>;
     /** Keeps a block in the Drive (ADR 0113). */
@@ -1512,12 +1528,16 @@ export interface ApiClient {
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;
     /** A choice card's answer (ADR 0124). */
     choices(orgId: string, id: string): Promise<Choices>;
-    /** Answers a choice card: one option per question, sent to its agent as the person's own message. */
+    /**
+     * Answers a choice card: one option per question, or a written answer (the pick past its last option, the text
+     * in `others` at its place), sent to its agent as the person's own message.
+     */
     answerChoices(
       orgId: string,
       id: string,
       picks: number[],
       clientId: string,
+      others?: (string | null)[],
     ): Promise<{ choices: Choices; messageId: string }>;
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
@@ -1548,6 +1568,12 @@ export interface ApiClient {
       id: string,
       input: { content: ArtifactContent; note?: string | null; baseVersion: number; title?: string },
     ): Promise<ArtifactDetail>;
+    /** Who sees it on top of its conversation (ADR 0157); 403 `artifact.sharing_forbidden` for who got it shared. */
+    setSharing(
+      orgId: string,
+      id: string,
+      sharing: { mode: ArtifactSharing["mode"]; userIds?: string[]; roleIds?: string[] },
+    ): Promise<Artifact>;
     /** To the trash for 30 days (403 `artifact.delete_forbidden`). */
     remove(orgId: string, id: string): Promise<void>;
     trash(orgId: string): Promise<TrashedArtifact[]>;
@@ -1637,6 +1663,18 @@ export interface ApiClient {
     redo(orgId: string, actionId: string): Promise<AgentAction>;
     /** Desfazer tudo: every receipt of the message still undoable, newest first. */
     undoMessage(orgId: string, messageId: string): Promise<UndoAllResult>;
+  };
+  /**
+   * The right hand's cards of a workspace change (`workspace_action`): read where it is (its conversation, or the inbox
+   * of whom it was sent to), applied as whoever clicks, dismissed, or sent to whoever may. 409 `action_card.decided`.
+   */
+  actionCards?: {
+    get(orgId: string, messageId: string): Promise<WorkspaceActionCardView>;
+    decide(
+      orgId: string,
+      messageId: string,
+      decision: "apply" | "dismiss" | "ask",
+    ): Promise<{ card: WorkspaceActionCard }>;
   };
   /** "O que fez por você": what an agent did that involves the viewer (agent profile). */
   agentForYou?: {

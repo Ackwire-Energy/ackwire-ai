@@ -8,7 +8,7 @@ import type { ArtifactView } from "./artifacts";
 import type { BlockStateView } from "./block-state";
 import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
-import type { CalendarEventView } from "./calendar";
+import type { CalendarEventView, CalendarProposalView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
 import { oneLine } from "./mail/text";
@@ -569,6 +569,14 @@ export type ChannelEvent =
   | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
   /** An event of this channel's calendar was created. */
   | { type: "calendar.event_created" | "calendar.event_updated"; channelId: string; event: CalendarEventView }
+  /** An agent's event proposal was confirmed or dismissed: its card (`meta.calendarProposal`) as it is now. */
+  | {
+      type: "calendar.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      proposal: CalendarProposalView;
+    }
   /** An event (or some of its occurrences: `scope`) was deleted. */
   | {
       type: "calendar.event_deleted";
@@ -689,6 +697,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       card: TeamProposalCard;
+    }
+  /** A catalog action's card of the right hand was applied, dismissed or sent to whoever may: the whole card. */
+  | {
+      type: "action_card.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: Record<string, unknown>;
     }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
   | {
@@ -838,6 +854,17 @@ export const publishAgentsChanged = (pubsub: PubSub | undefined, orgId: string) 
  */
 export const publishChannelsChanged = (pubsub: PubSub | undefined, orgId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "channels.changed" } });
+
+/**
+ * A list any member may have open changed: the Drive's files (saved, changed, moved, deleted, restored), the calendar,
+ * the routines, or agents' memories learned in the background. Same contract as the agents': no ids, each app reads
+ * again what its person may see.
+ */
+export const publishListChanged = (
+  pubsub: PubSub | undefined,
+  orgId: string,
+  list: "artifacts" | "calendar" | "routines" | "memory",
+) => publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: `${list}.changed` } });
 
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };

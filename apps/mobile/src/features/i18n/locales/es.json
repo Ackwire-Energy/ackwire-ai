@@ -71,6 +71,7 @@
     "copied": "Copiado",
     "fullScreen": "Pantalla completa",
     "wrap": "Ajustar líneas",
+    "raw": "Original",
     "more": "Ver las {{count}} líneas",
     "gone": "Este código ya no está abierto."
   },
@@ -1101,19 +1102,21 @@
       "file": "Archivo"
     },
     "more": "Más opciones",
-    "share": "Compartir",
+    "send": "Enviar",
     "savePhotos": "Guardar en Fotos",
     "drive": "Ver en Drive",
     "saved": "Guardada en Fotos",
     "photosDenied": "Sin acceso a Fotos",
     "photosDeniedSub": "Permítelo en Configuración para guardar imágenes.",
-    "shareFailed": "No se pudo compartir el archivo.",
+    "shareFailed": "No se pudo enviar el archivo.",
     "saveFailed": "No se pudo guardar la imagen.",
     "loadFailed": "No se pudo abrir el archivo.",
     "openImage": "Abrir imagen",
     "imageOf": "Imagen {{index}} de {{count}}",
     "place": "{{index}} de {{count}}",
-    "noPreview": "Este archivo no se abre en la app. Compártelo para abrirlo en otra app.",
+    "previous": "Imagen anterior",
+    "next": "Imagen siguiente",
+    "noPreview": "Este archivo no se abre en la app. Envíalo a otra app para abrirlo.",
     "video": {
       "play": "Reproducir",
       "pause": "Pausar",
@@ -1681,6 +1684,7 @@
     "everyoneFailed": "No se pudo cambiar el acceso de todos. Inténtalo de nuevo.",
     "disconnectFailed": "No se pudo desconectar {{name}}. Inténtalo de nuevo.",
     "needsReconnect": "La cuenta de {{name}} dejó de funcionar. Los agentes no pueden usarla hasta que alguien la reconecte.",
+    "noTools": "No se pudieron leer las herramientas de {{name}}. Los agentes no las tienen hasta que se lean de nuevo, en Herramientas.",
     "accountTitle": "Esta cuenta",
     "renameFailed": "No se pudo cambiar el nombre. Inténtalo de nuevo.",
     "whoTitle": "Quién lo usa y hasta dónde",
@@ -1813,7 +1817,7 @@
   },
   "crash": {
     "title": "Algo salió mal en esta pantalla",
-    "subtitle": "La app tuvo un error al mostrar esto. Inténtalo de nuevo. Si sigue pasando, envíanos el texto de abajo.",
+    "subtitle": "La app tuvo un error al mostrar esto. Inténtalo de nuevo.",
     "retry": "Reintentar"
   },
   "notFound": {

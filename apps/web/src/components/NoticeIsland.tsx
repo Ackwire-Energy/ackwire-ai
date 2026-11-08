@@ -1,5 +1,6 @@
 import type { AppNotification } from "@agenteschat/client";
-import { useChannels, useNotificationAction, useNotificationReply } from "@agenteschat/client";
+import { useApprovals, useChannels, useNotificationAction, useNotificationReply } from "@agenteschat/client";
+import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { type IslandItem, islandLead, noticeLine } from "@agenteschat/client/lib/island";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import {
@@ -242,7 +243,11 @@ function Who({ n, dir, className }: { n: AppNotification; dir: Dir; className?: 
 
 function Line({ n, className }: { n: AppNotification; className?: string }) {
   const { t } = useTranslation();
-  const line = noticeLine(n, (kind) => mediaWord(t, kind));
+  const { org } = useOrg();
+  // A request's title in words, from the request itself (the notification keeps the tool's raw title), as the phone.
+  const approvals = useApprovals(org.id);
+  const request = n.kind === "approval" ? approvals.data?.find((a) => a.id === n.source.approvalId) : undefined;
+  const line = request ? approvalTitle(t, request) : noticeLine(n, (kind) => mediaWord(t, kind));
   return line ? <span className={className}>{line}</span> : null;
 }
 

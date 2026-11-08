@@ -996,6 +996,33 @@ describe("several accounts of one service", () => {
 });
 
 describe("a server whose tools can't be read", () => {
+  test("Conectores says so on the row: a dead sign-in Precisa reconectar with Reconectar; tools unread, Sem ferramentas agora", async () => {
+    const state = seedState();
+    const github = state.connections[0];
+    if (github) github.status = "needs_reconnect";
+    const api = createFakeApi(state);
+    // A long name: the chip beside it still fits the row at any width.
+    const label = "Suporte ao cliente das lojas da região sul e do centro-oeste";
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.suporte.example.com",
+      label,
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    const list = api.customConnectors.list;
+    api.customConnectors.list = async (orgId) =>
+      (await list(orgId)).map((s) => ({ ...s, toolsError: "Streamable HTTP error: upstream timed out" }));
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const row = (name: string) =>
+      [...document.querySelectorAll<HTMLElement>(".connected-row")].find((r) =>
+        r.querySelector(".list-title")?.textContent?.startsWith(name),
+      ) as HTMLElement;
+    expect(row("GitHub").querySelector(".list-title")?.textContent).toBe("GitHubPrecisa reconectar");
+    expect(within(row("GitHub")).getByRole("button", { name: "Reconectar GitHub" })).toBeTruthy();
+    expect(row(label).querySelector(".list-title")?.textContent).toBe(`${label}Sem ferramentas agora`);
+  });
+
   test("the review says why with Tentar de novo, not '0 ferramentas'; a working retry lists them", async () => {
     const api = createFakeApi(seedState({ connections: [] }));
     const res = await api.customConnectors.connect(ORG_ID, {

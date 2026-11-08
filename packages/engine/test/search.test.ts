@@ -3,6 +3,7 @@ import { createPostgresSearchResolver } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
   agentVisibleChannels,
+  archiveThread,
   createChannel,
   drainOutbox,
   joinChannel,
@@ -10,6 +11,7 @@ import {
   reindexOrg,
   searchForUser,
   searchVisible,
+  unarchiveThread,
 } from "../src";
 import { deliverNotice } from "../src/delivery";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -114,5 +116,29 @@ describe("search index (Postgres, hybrid)", () => {
     await f.db.delete(schema.searchDocuments);
     expect(await reindexOrg(deps, f.org.id)).toBe(1);
     expect(await searchForUser(deps, f.owner.id, f.org.id, { text: "postgres" })).toHaveLength(1);
+  });
+
+  test("an archived thread's replies are out of a person's search, as its toast says, until it's unarchived", async () => {
+    f = await setup();
+    const root = await post(f, f.general.id, "release checklist");
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "the rollback plan is ready",
+      threadId: root.id,
+    });
+    await post(f, f.general.id, "rollback drill on monday");
+    await drainOutbox(f.db, f.handlers);
+    const deps = { db: f.db, search: f.search, gateway: f.gateway };
+    const found = async (filters: { channelIds?: string[] } = {}) =>
+      (await searchForUser(deps, f.owner.id, f.org.id, { text: "rollback", ...filters })).map((h) => h.snippet).sort();
+    expect(await found()).toEqual(["rollback drill on monday", "the rollback plan is ready"]);
+
+    await archiveThread({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, root.id);
+    expect(await found()).toEqual(["rollback drill on monday"]);
+    expect(await found({ channelIds: [f.general.id] })).toEqual(["rollback drill on monday"]);
+    // Its root stays in the channel's timeline, so it stays found.
+    expect((await searchForUser(deps, f.owner.id, f.org.id, { text: "checklist" })).length).toBe(1);
+
+    await unarchiveThread({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, root.id);
+    expect(await found()).toEqual(["rollback drill on monday", "the rollback plan is ready"]);
   });
 });

@@ -108,6 +108,7 @@ export type ActivityKind =
   | "runningRoutine"
   | "proposingTeam"
   | "proposingChange"
+  | "workingOnWorkspace"
   | "updatingThread"
   | "addingAgent"
   | "readingConversation"
@@ -265,6 +266,8 @@ const BUILTIN: Record<string, ActivityKind> = {
   propose_settings_change: "proposingChange",
   propose_member_changes: "proposingChange",
   propose_remove_agents: "proposingChange",
+  // The right hand's catalog of what a person can do: a look for the action, the change at once, or its card.
+  workspace_action: "workingOnWorkspace",
   update_thread: "updatingThread",
   add_agent_to_channel: "addingAgent",
 };

@@ -196,7 +196,7 @@ describe("lists of things", () => {
     const card = document.querySelector(".drive-card");
     if (!card) throw new Error("no Drive card");
     await rightClick(card);
-    expect(items().slice(0, 3)).toEqual(["Abrir", "Baixar", "Copiar link"]);
+    expect(items().slice(0, 4)).toEqual(["Abrir", "Baixar", "Compartilhar", "Copiar link"]);
   });
 
   test("a routine: run, pause, then its … (edit, runs, duplicate, delete); the … lists the same", async () => {

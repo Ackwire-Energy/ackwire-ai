@@ -40,7 +40,7 @@ const STEP_ICON: Record<"ok" | "failed" | "skipped", IconName> = { ok: "check", 
  * Armazenamento (admins), as the web's: where the workspace's files stay. Our storage on the Cloud, this server where
  * people run it (said by where it keeps them), or the workspace's own S3-compatible bucket, tested before it is
  * turned on; once on it, the files kept before can be copied there, or it goes back. The option in use says what the
- * files there take. Google Drive and OneDrive come later.
+ * files there take.
  */
 export function StorageScreen() {
   const { t, i18n } = useTranslation();
@@ -95,8 +95,6 @@ export function StorageScreen() {
               checked={choice === "s3"}
               onPress={() => setChoice("s3")}
             />
-            <GroupedRow label={t("storage.gdrive")} value={t("storage.soon")} disabled />
-            <GroupedRow label={t("storage.onedrive")} value={t("storage.soon")} disabled />
           </GroupedList>
           {config.kind === "s3" ? <InUse config={config} place={place} /> : null}
           {choice === "s3" ? <BucketForm config={config} /> : null}

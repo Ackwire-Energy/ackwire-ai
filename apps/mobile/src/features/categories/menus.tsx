@@ -1,8 +1,8 @@
 import { useChannels } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
+import { router } from "@/ui/navigation";
 import type { ConversationRow } from "../chats/logic";
 import { usePins } from "../chats/pins";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";

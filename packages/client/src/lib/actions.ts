@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule } from "../api/types";
+import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule, WORKSPACE_ACTION_IDS } from "../api/types";
 import { joinNames } from "./format";
 
 /** A receipt's `params.rule` when it is a rule (`freq`, `timezone`); anything else is none. */
@@ -63,6 +63,7 @@ export const undoableNow = (list: AgentAction[], now = Date.now()) =>
   list.filter((a) => actionPhase(a, now) === "undo");
 
 const KNOWN_KINDS = new Set<string>(AGENT_ACTION_KINDS);
+const KNOWN_ACTIONS = new Set<string>(WORKSPACE_ACTION_IDS);
 
 /**
  * The i18n key of a receipt's sentence: `agentActions.issue.created`… (params: `action.params`). A kind this build
@@ -80,6 +81,12 @@ const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ?
 export const routineOwnActions = (a: Pick<AgentAction, "kind" | "params">): string[] =>
   a.kind === "routine.created" && Array.isArray(a.params.ownActions)
     ? a.params.ownActions.filter((v): v is string => typeof v === "string")
+    : [];
+
+/** The files an agent's task change brought (its receipt's `files`: their names), for the line under its sentence. */
+export const receiptFiles = (a: Pick<AgentAction, "kind" | "params">): string[] =>
+  a.kind.startsWith("issue.") && Array.isArray(a.params.files)
+    ? a.params.files.filter((v): v is string => typeof v === "string")
     : [];
 
 /**
@@ -173,8 +180,40 @@ export function actionTextValues(
       return p.number
         ? { repo: str(p.repo), number: str(p.number) }
         : { repo: str(p.repo), ref: str(p.ref), context: "branch" };
+    case "workspace.changed": {
+      // Its words as the server wrote them, and the catalog action as the sentence's context (`changed_create_role`).
+      const words = Object.fromEntries(
+        Object.entries(p).flatMap(([k, v]) => (k !== "action" && typeof v === "string" ? [[k, v]] : [])),
+      );
+      const action = str(p.action);
+      return {
+        ...workspaceActionWords(action, words, t),
+        context: KNOWN_ACTIONS.has(action) ? workspaceActionContext(action, words) : "",
+      };
+    }
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};
   }
+}
+
+/** A catalog action's sentence with its variant when it has one (`archive_channel_back`, `set_action_check_on`). */
+export const workspaceActionContext = (action: string, words: Record<string, string>) =>
+  words.variant ? `${action}_${words.variant}` : action;
+
+/**
+ * A catalog action's words in the reader's language: what the server can't say (a bare availability, a kind of
+ * notification) said here, so "Mudei seu status: ausente" never reads "away".
+ */
+export function workspaceActionWords(action: string, words: Record<string, string>, t: TFunction) {
+  if (action === "set_my_status" && !words.what && words.availability) {
+    const key = words.availability === "auto" ? "online" : words.availability;
+    return { ...words, what: t(`presence.lower.${key}` as never, { defaultValue: words.availability }) as string };
+  }
+  if (action === "set_notifications" && words.category)
+    return {
+      ...words,
+      category: t(`noticePrefs.category.${words.category}.title` as never, { defaultValue: words.category }) as string,
+    };
+  return words;
 }

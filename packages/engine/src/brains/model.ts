@@ -28,6 +28,8 @@ export interface ModelBrainOptions {
   maxOutputTokens: number;
   /** Read at the start of every turn (the engine appends to the same transcript between turns). */
   conversation(): ModelConversation;
+  /** The agent's conversation, the same on each of its calls (`StreamOptions.session`). */
+  session?: string;
 }
 
 /**
@@ -87,6 +89,7 @@ export class ModelBrain implements Brain {
       ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
       // The prompt up to the conversation stays cached for an hour: a message after a pause reads it.
       cacheTtl: "1h" as const,
+      ...(this.options.session ? { session: this.options.session } : {}),
     };
   }
 

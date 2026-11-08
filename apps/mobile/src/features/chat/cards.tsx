@@ -26,6 +26,7 @@ import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
   alwaysRoutineName,
   approvalAskLine,
+  approvalDetail,
   approvalGroupWaitsFor,
   approvalSummary,
   approvalWaitsFor,
@@ -34,12 +35,12 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Count, EventPillAction, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -424,7 +425,7 @@ function ApprovalGroupItem({
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
-      ? a.detail
+      ? approvalDetail(a, i18n.language)
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
@@ -543,7 +544,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const detail = previewed
     ? source.name
     : !a.connector
-      ? a.detail
+      ? approvalDetail(a, i18n.language)
       : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   return (
     <AskCard

@@ -14,7 +14,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { accountShares, noWindowsText, planMeterText, splitUsage } from "@agenteschat/client/lib/plan-usage";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import { gradientOf } from "@agenteschat/ui/agent/engine";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -22,6 +21,7 @@ import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { PlanHoldNote, usePlanHold } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
 import { FirstUse } from "../shared/FirstUse";
@@ -63,8 +63,11 @@ export function UsageScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("mobile.me.usage")} solid={false} grouped />
+      {/* The default budget's field: Salvar takes the first tap, and the field stays above the keyboard. */}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
         <Segmented

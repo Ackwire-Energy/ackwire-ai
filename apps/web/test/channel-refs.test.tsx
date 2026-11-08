@@ -80,6 +80,25 @@ describe("#channel autocomplete", () => {
   });
 });
 
+describe("@mention autocomplete", () => {
+  test("Enter on a name typed in full picks it and posts nothing; the next Enter sends", async () => {
+    const { state } = await go(`c/${GENERAL_ID}`);
+    const box = composer();
+    await typeIn(box, "oi @ada");
+    expect(screen().getByRole("listbox", { name: "Pessoas e agentes" })).toBeTruthy();
+    await keyDown(box, "Enter");
+    expect(box.value).toBe("oi @ada ");
+    expect(box.getAttribute("aria-expanded")).toBe("false");
+    expect(state.calls.filter((c) => c.method === "chat.post")).toHaveLength(0);
+    await typeIn(box, "oi @ada pode revisar?");
+    await keyDown(box, "Enter");
+    await settle(4);
+    expect(
+      state.calls.filter((c) => c.method === "chat.post").map((c) => (c.args[2] as { body: string }).body),
+    ).toEqual(["oi @ada pode revisar?"]);
+  });
+});
+
 describe("#channel links in messages", () => {
   test("a #name of a channel I see links to it (any case); code and other words stay text", async () => {
     await go(`c/${GENERAL_ID}`, withMessage("Leva para #ENG, não `#eng` nem #nada"));
@@ -153,5 +172,38 @@ describe("#channel links in messages", () => {
     expect(screen().getByRole("dialog", { name: "Sobre #eng" })).toBeTruthy();
     expect(document.activeElement?.textContent).toBe("Abrir");
     await act(async () => fireEvent.pointerDown(document.body));
+  });
+});
+
+describe("an archived #channel", () => {
+  test("its card offers Restaurar to who may bring it back, which opens it again", async () => {
+    const state = withMessage("veja #lancamento", { channelRefs: { lancamento: "ch-old" } });
+    state.archivedChannels = [
+      { id: "ch-old", name: "lancamento", topic: "", visibility: "public", archivedAt: "2026-11-01T12:00:00.000Z" },
+    ];
+    const api = createFakeApi(state);
+    const card = api.chat.card;
+    api.chat.card = async (orgId, channelId) =>
+      channelId === "ch-old"
+        ? {
+            id: "ch-old",
+            name: "lancamento",
+            topic: "",
+            visibility: "public",
+            isMember: true,
+            archived: true,
+            people: 1,
+            agents: 0,
+          }
+        : card(orgId, channelId);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
+    await settle(8);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Canal #lancamento, arquivado" })));
+    await settle(6);
+    const sheet = screen().getByRole("dialog", { name: "Sobre #lancamento" });
+    await act(async () => fireEvent.click(within(sheet).getByRole("button", { name: "Restaurar" })));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "chat.unarchive")?.args).toEqual([ORG_ID, "ch-old"]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/ch-old`);
   });
 });

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
 import { ControlError } from "../../control/client";
 import { type Home, orgName, pairedHomes } from "../../control/store";
+import { usePending } from "../../hooks";
 import { AgentFace, HelpLink, OrgTile } from "../../ui/bits";
 import { PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
@@ -20,6 +21,7 @@ export function Folders() {
   const [picked, setPicked] = useState<string | null>(null);
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [removing, setRemoving] = useState<RunnerFolderGrant | null>(null);
+  const [pending, run] = usePending<"add" | "remove">();
   const home = homes.find((h) => h.homeId === picked) ?? homes[0];
 
   // Preferences shows this tab only while an organization's agents work here: no empty state of its own.
@@ -63,7 +65,7 @@ export function Folders() {
         title={t("desktop.prefs.folders.title")}
         lead={t("desktop.prefs.folders.lead")}
         action={
-          <Button variant="primary" icon="plus" onClick={() => void add()}>
+          <Button variant="primary" icon="plus" loading={pending === "add"} onClick={() => void run("add", add)}>
             {t("desktop.prefs.folders.add")}
           </Button>
         }
@@ -108,17 +110,17 @@ export function Folders() {
 
       <Dialog
         open={!!removing}
-        onOpenChange={(o) => !o && setRemoving(null)}
+        onOpenChange={(o) => !o && pending !== "remove" && setRemoving(null)}
         title={t("desktop.prefs.folders.removeTitle", { folder: removing ? baseName(removing.path) : "" })}
         description={t("desktop.prefs.folders.removeBody")}
         closeLabel={t("desktop.common.close")}
         width={440}
       >
         <DialogFooter bar>
-          <Button variant="ghost" onClick={() => setRemoving(null)}>
+          <Button variant="ghost" disabled={pending === "remove"} onClick={() => setRemoving(null)}>
             {t("desktop.common.cancel")}
           </Button>
-          <Button variant="danger" onClick={() => void remove()}>
+          <Button variant="danger" loading={pending === "remove"} onClick={() => void run("remove", remove)}>
             {t("desktop.common.remove")}
           </Button>
         </DialogFooter>
@@ -146,6 +148,8 @@ function FolderRow({
   const agents = home.status?.agents ?? [];
   const name = baseName(folder.path);
   const using = agents.filter((a) => folder.agents.includes(a.id));
+  // Each change sends the whole list: the next waits for the one before it.
+  const [pending, run] = usePending<"agents">();
 
   const toggle = async (agentId: string, on: boolean) => {
     const next = on ? [...new Set([...folder.agents, agentId])] : folder.agents.filter((id) => id !== agentId);
@@ -213,7 +217,8 @@ function FolderRow({
                     <Checkbox
                       id={id}
                       checked={folder.agents.includes(a.id)}
-                      onCheckedChange={(on) => void toggle(a.id, on)}
+                      disabled={pending !== null}
+                      onCheckedChange={(on) => void run("agents", () => toggle(a.id, on))}
                     />
                     <AgentFace agent={a} size="xs" />
                     <b>{a.name}</b>

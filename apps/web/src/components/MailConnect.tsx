@@ -45,6 +45,7 @@ import {
   Locked,
   Segmented,
   Select,
+  useUnsavedInDialog,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -60,6 +61,7 @@ import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "@/components/ToolReview";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEdited } from "@/hooks/useEdited";
 import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
@@ -284,6 +286,7 @@ export function ImapStep({
   const [advanced, setAdvanced] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<MailConnectError | null>(null);
+  useUnsavedInDialog(useEdited(true, [address, password, username, imapHost, imapPort, smtpHost, smtpPort]));
   const testing = useStepText(connectImap.isPending, [
     t("mail.testing.login"),
     t("mail.testing.send"),

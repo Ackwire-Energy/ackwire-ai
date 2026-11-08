@@ -4,12 +4,14 @@ import {
   applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
+  applyConversationEvent,
   applyMembershipEvent,
   applyReceiptEvent,
   applyTyping,
   type BlockState,
   type ChannelEvent,
   type ConsultsState,
+  cacheActionCard,
   cacheAgentProposal,
   cacheApproval,
   cacheCardDelegate,
@@ -57,6 +59,7 @@ import {
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +82,8 @@ interface LiveState {
   receipts: ReceiptsState;
   /** Who is typing (`user.typing`), only while it lasts: what ran out is swept on time. */
   typing: TypingState;
+  /** Agents I named here that won't answer me (`agent.unavailable`): only for me, never stored. */
+  notices: AgentUnavailableEvent[];
 }
 
 type Action =
@@ -92,7 +97,8 @@ type Action =
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
   | { type: "sweep"; at: number }
-  | { type: "typed"; at: number };
+  | { type: "typed"; at: number }
+  | { type: "unavailable"; event: AgentUnavailableEvent };
 
 /** A "pensando…" the server never confirmed is dropped after this long (the web's `PROVISIONAL_TTL_MS`). */
 export const PROVISIONAL_TTL_MS = 20_000;
@@ -119,7 +125,17 @@ function reduce(state: LiveState, action: Action): LiveState {
         receipts === state.receipts &&
         typing === state.typing
         ? state
-        : { streams, consults, receipts, typing };
+        : { ...state, streams, consults, receipts, typing };
+    }
+    // The agent won't answer me: its "pensando…" on that message goes, and the line says why, once per agent.
+    case "unavailable": {
+      const e = action.event;
+      const notices = [...state.notices.filter((n) => n.agentId !== e.agentId), e];
+      return {
+        ...state,
+        notices,
+        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.threadId ?? e.messageId}`),
+      };
     }
     case "typed": {
       const typing = expireTyping(state.typing, action.at);
@@ -316,6 +332,14 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
       cacheTeamCard(qc, orgId, event, event.card);
       break;
+    case "calendar.proposal.updated":
+      // An agent's event proposal was confirmed or dismissed: its card says so.
+      cacheMessageMeta(qc, orgId, channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
+      break;
+    case "action_card.updated":
+      // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
+      cacheActionCard(qc, orgId, event, event.card);
+      break;
     case "browser.handoff.updated": {
       const { handoff } = event;
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
@@ -354,13 +378,21 @@ export interface ChatLive {
   typing: TypingState;
   /** "I'm typing" here or in a thread, throttled (at most one frame every 3 s). */
   sendTyping: (threadId: string | null, text?: string) => void;
+  /** Agents I named here that won't answer me, newest last (`agent.unavailable`). */
+  notices: AgentUnavailableEvent[];
 }
 
 export function useChatLive(orgId: string, channelId: string, enabled: boolean): ChatLive {
   const connection = useConnection();
   const qc = useQueryClient();
   const api = useApi();
-  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {}, typing: {} });
+  const [state, dispatch] = useReducer(reduce, {
+    streams: emptyStreams,
+    consults: {},
+    receipts: {},
+    typing: {},
+    notices: [],
+  });
   const stateRef = useRef(state);
   stateRef.current = state;
   const meId = useMeId();
@@ -415,6 +447,14 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     };
   }, [api, connection, enabled, orgId, channelId, qc]);
 
+  // On my own topic, as on the web: an agent my message here named won't answer me.
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    return connection.onUserEvent((event) => {
+      if (isAgentUnavailable(event) && event.channelId === channelId) dispatch({ type: "unavailable", event });
+    });
+  }, [connection, enabled, channelId]);
+
   useEffect(() => {
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
@@ -423,6 +463,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       dispatch({ type: "event", event, at: Date.now() });
       applyToCache(qc, orgId, channelId, event);
       applyMembershipEvent(qc, orgId, event);
+      // A file's cards (a deleted one says so) and an agent's memory list, as on the web.
+      applyConversationEvent(qc, orgId, event);
     });
   }, [connection, enabled, orgId, channelId, qc]);
 
@@ -496,7 +538,18 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const runs = useMemo(() => runsInChannel(state.streams, channelId), [state.streams, channelId]);
   const consults = useMemo(() => consultsIn(state.consults, channelId), [state.consults, channelId]);
   return useMemo(
-    () => ({ runs, consults, receipts: state.receipts, expect, seed, picking, stop, typing: state.typing, sendTyping }),
-    [runs, consults, state.receipts, state.typing, expect, seed, picking, stop, sendTyping],
+    () => ({
+      runs,
+      consults,
+      receipts: state.receipts,
+      expect,
+      seed,
+      picking,
+      stop,
+      typing: state.typing,
+      sendTyping,
+      notices: state.notices,
+    }),
+    [runs, consults, state.receipts, state.typing, expect, seed, picking, stop, sendTyping, state.notices],
   );
 }

@@ -10,7 +10,6 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,7 +21,6 @@ import {
   type TextInputInstance,
   View,
 } from "react-native";
-import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -36,7 +34,9 @@ import {
   Text,
   useToast,
 } from "@/ui";
-import { Note, openPage } from "../ai/parts";
+import { router } from "@/ui/navigation";
+import { Note } from "../ai/parts";
+import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
@@ -340,6 +340,7 @@ export function GeneralScreen() {
       <TextArea
         ref={contextField}
         value={context}
+        maxLength={20_000}
         onChangeText={changeContext}
         onBlur={flushContext}
         editable={editable}
@@ -376,7 +377,7 @@ export function GeneralScreen() {
               label={t("deleteOrg.card.title")}
               danger
               chevron
-              onPress={() => openPage(`${serverUrl()}/org/${orgId}/settings/general?delete=1`)}
+              onPress={() => openWebPath(`/org/${orgId}/settings/general?delete=1`)}
             />
           </GroupedList>
           <GroupedFooter>{t("deleteOrg.card.text", { name: org.name })}</GroupedFooter>

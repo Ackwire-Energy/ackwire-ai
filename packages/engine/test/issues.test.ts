@@ -603,7 +603,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const run = (name: string, input: Record<string, unknown>) => {
       const tool = tools.find((t) => t.name === name);
       if (!tool) throw new Error(`no ${name}`);
@@ -635,6 +635,37 @@ describe("issues", () => {
     expect(row?.assignee).toEqual({ type: "agent", id: f.agent.id });
   });
 
+  test("assigning a task to another agent says it doesn't start it, and how to hand it the job", async () => {
+    f = await setup();
+    await createAgent(f.db, f.owner.id, f.org.id, { name: "Bia", handle: "bia" }, { model: "claude-sonnet-5-5" });
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
+    const run = async (name: string, input: Record<string, unknown>) =>
+      (await tools.find((t) => t.name === name)?.execute(input, ctx))?.content ?? "";
+    const created = await run("create_issue", { title: "Revisar o contrato", assignee: "@bia" });
+    expect(created).toContain("Assigning doesn't tell @bia or start its work");
+    expect(created).toContain("tell_agent");
+    const [issue] = await listIssues(f.db, person(f.owner.id), f.org.id, { q: "contrato" });
+    const ref = `#${issue?.number}`;
+    // The same assignee kept, a change of its own, or the agent itself: nothing to hand over.
+    expect(await run("update_issue", { issue: ref, priority: "high" })).not.toContain("tell_agent");
+    expect(await run("update_issue", { issue: ref, assignee: "me" })).not.toContain("tell_agent");
+    expect(await run("update_issue", { issue: ref, assignee: "@bia" })).toContain(
+      "Assigning doesn't tell @bia or start its work",
+    );
+    expect(await run("update_issue", { issue: ref, assignee: "@bia", status: "in_progress" })).not.toContain(
+      "tell_agent",
+    );
+  });
+
   test("list_issues shows each due date, so a late-tasks routine reads them from the list", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };
@@ -649,7 +680,7 @@ describe("issues", () => {
     };
     await createIssue(deps, person(f.owner.id), f.org.id, { title: "Com prazo", dueDate: "2026-10-20" });
     await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem prazo" });
-    const list = (await createIssueToolSource(deps).tools(ctx)).find((t) => t.name === "list_issues");
+    const list = (await createIssueToolSource(f.artifactDeps).tools(ctx)).find((t) => t.name === "list_issues");
     const { content } = (await list?.execute({}, ctx)) ?? { content: "" };
     expect(content).toContain("Com prazo due 2026-10-20 id=");
     expect(content).toMatch(/Sem prazo id=/);
@@ -667,7 +698,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const update = tools.find((t) => t.name === "update_issue");
     if (!update) throw new Error("no update_issue");
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Corrigir o login" });
@@ -702,7 +733,7 @@ describe("issues", () => {
       threadRootId: crypto.randomUUID(),
       triggerMessageId: crypto.randomUUID(),
     };
-    const tools = await createIssueToolSource(deps).tools(ctx);
+    const tools = await createIssueToolSource(f.artifactDeps).tools(ctx);
     const tool = (name: string) => {
       const found = tools.find((t) => t.name === name);
       if (!found) throw new Error(name);

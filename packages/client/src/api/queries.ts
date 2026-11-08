@@ -10,11 +10,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
+import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
@@ -45,7 +46,7 @@ import {
   SIDEBAR_SECTIONS,
   withSidebarPlace,
 } from "../lib/sidebar-items";
-import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
+import { repinAgent, SIDEBAR_VIEW_DEFAULT, unpinAgents } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
@@ -92,6 +93,7 @@ import type {
   BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
+  CalendarProposal,
   CardDelegate,
   Channel,
   ChannelEvent,
@@ -181,6 +183,8 @@ import type {
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkView,
 } from "./types";
 
@@ -646,6 +650,18 @@ export const useFormerAgents = (orgId: string) => {
   return useQuery({ queryKey: keys.formerAgents(orgId), queryFn: () => api.agents.former(orgId), staleTime: 30_000 });
 };
 
+/** Restaurar on an archived agent (Equipe, the phone's Agentes): back in the team and its lists. */
+export function useUnarchiveAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentId: string) => api.agents.unarchive(orgId, agentId),
+    onSuccess: () => {
+      for (const key of [keys.agents(orgId), keys.team(orgId)]) void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 /** The team screen: refetched every 30 s and on focus, so new consultations show up. */
 export const useTeam = (orgId: string) => {
   const api = useApi();
@@ -704,6 +720,47 @@ export function useAgentProposal(orgId: string, messageId: string | null) {
     queryKey: keys.agentProposal(orgId, messageId ?? ""),
     queryFn: () => api.agents.proposal(orgId, messageId ?? ""),
     enabled: Boolean(messageId),
+  });
+}
+
+/** The right hand's card of a workspace change, whole (its event or a click): in the conversation and its own query. */
+export function cacheActionCard(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  card: WorkspaceActionCard,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ actionCard: card }));
+  qc.setQueryData<WorkspaceActionCardView>(keys.actionCard(orgId, where.messageId), (old) =>
+    old ? { ...old, card } : old,
+  );
+}
+
+/** The card where it was sent (the inbox of whoever may): read on its own, since its conversation isn't theirs. */
+export function useActionCard(orgId: string, messageId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.actionCard(orgId, messageId ?? ""),
+    queryFn: () => part(api, "actionCards").get(orgId, messageId ?? ""),
+    enabled: Boolean(messageId),
+  });
+}
+
+/**
+ * Aplicar, Descartar or Pedir a quem pode on the right hand's card of a workspace change: the card comes back as it is
+ * now, and what the change touches (roles, people, channels) is read again.
+ */
+export function useDecideActionCard(orgId: string, where: { channelId: string; messageId: string }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: "apply" | "dismiss" | "ask") =>
+      part(api, "actionCards").decide(orgId, where.messageId, decision),
+    onSuccess: ({ card }) => {
+      cacheActionCard(qc, orgId, where, card);
+      for (const key of [keys.roles(orgId), keys.members(orgId), keys.channels(orgId)])
+        void qc.invalidateQueries({ queryKey: key });
+    },
   });
 }
 
@@ -973,13 +1030,29 @@ export type AgentGroupAction =
   | { type: "create"; name: string; agentIds?: string[]; color?: string; icon?: string }
   | ({ type: "update"; groupId: string } & AgentGroupPatch)
   | { type: "remove"; groupId: string }
-  | { type: "move"; agentId: string; groupId: string | null; index?: number };
+  | {
+      type: "move";
+      agentId: string;
+      groupId: string | null;
+      index?: number;
+      /** Desfazer of a move that took the agent's pin off: pinned again at this place. */
+      pinAt?: number;
+    };
 
-/** Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. */
+/**
+ * Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. Agents I put
+ * in a group leave my pins (`unpinAgents`), so they show in it; `pinnedAt` in a move's result says where one was.
+ */
 export function useAgentGroupAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const key = keys.agentGroups(orgId);
+  const setView = useSetSidebarView(orgId);
+  const pinnedAt = (agentId: string) =>
+    qc.getQueryData<SidebarView>(keys.sidebarView(orgId))?.pins?.agents.indexOf(agentId) ?? -1;
+  const unpin = (ids: readonly string[]) => {
+    if (ids.some((id) => pinnedAt(id) >= 0)) setView((now) => unpinAgents(now, ids) ?? now);
+  };
   return useMutation({
     mutationFn: (action: AgentGroupAction): Promise<AgentGroup[]> => {
       switch (action.type) {
@@ -1005,12 +1078,21 @@ export function useAgentGroupAction(orgId: string) {
       await qc.cancelQueries({ queryKey: key });
       const before = qc.getQueryData<AgentGroup[]>(key);
       if (before) qc.setQueryData(key, moveInGroups(before, action.agentId, action.groupId, action.index));
-      return { before };
+      const { agentId, pinAt } = action;
+      const at = action.groupId ? pinnedAt(agentId) : -1;
+      if (pinAt !== undefined) setView((now) => repinAgent(now, agentId, pinAt));
+      else if (at >= 0) unpin([agentId]);
+      return { before, pinnedAt: at };
     },
-    onError: (_error, _action, context) => {
+    onError: (_error, action, context) => {
       if (context?.before) qc.setQueryData(key, context.before);
+      if (action.type === "move" && context && context.pinnedAt >= 0)
+        setView((now) => repinAgent(now, action.agentId, context.pinnedAt));
     },
-    onSuccess: (groups) => qc.setQueryData(key, groups),
+    onSuccess: (groups, action) => {
+      qc.setQueryData(key, groups);
+      if (action.type === "create") unpin(action.agentIds ?? []);
+    },
   });
 }
 
@@ -1208,6 +1290,17 @@ export const useMessageCard = (orgId: string, messageId: string) => {
     queryKey: keys.messageCard(orgId, messageId),
     queryFn: () => api.chat.messageCard(orgId, messageId),
     staleTime: 60_000,
+    retry: false,
+  });
+};
+
+/** What an internal id in a text names (`IdRef`), for its pill; an error (404) leaves the text as written. */
+export const useIdRef = (orgId: string, id: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.idRef(orgId, id),
+    queryFn: () => api.chat.idRef(orgId, id),
+    staleTime: 5 * 60_000,
     retry: false,
   });
 };
@@ -2206,9 +2299,9 @@ export function useDisconnect(orgId: string) {
   });
 }
 
-export const useAgentScopes = (orgId: string, agentId: string) => {
+export const useAgentScopes = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
+  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId), enabled });
 };
 
 // ── Mailboxes (ADR 0038) ────────────────────────────────────────────────────
@@ -3023,6 +3116,27 @@ export function useArchiveChannel(orgId: string) {
   });
 }
 
+/** The archived channels the viewer may bring back (`enabled`: only where they're offered). */
+export const useArchivedChannels = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.archivedChannels(orgId),
+    queryFn: () => api.chat.archived(orgId),
+    enabled,
+    staleTime: 60_000,
+  });
+};
+
+/** "Restaurar" an archived channel: back in everyone's list as it was. */
+export function useUnarchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.unarchive(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 /** "Sair do canal": it leaves my list, or stays in it to join again when it is public. */
 export function useLeaveChannel(orgId: string) {
   const api = useApi();
@@ -3584,14 +3698,27 @@ export function useStartMigration(orgId: string) {
   });
 }
 
-export const useArtifacts = (orgId: string, filters: ArtifactFilters) => {
+/**
+ * The Drive's files for `filters`, a page of 100 at a time (`fetchNextPage` while `hasNextPage`): `artifacts` is what
+ * loaded so far, `counts` how many each kind has for these filters (kinds left out), from the first page.
+ */
+export function useArtifacts(orgId: string, filters: ArtifactFilters) {
   const api = useApi();
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: keys.artifactList(orgId, filters),
-    queryFn: () => api.artifacts.list(orgId, filters),
+    queryFn: ({ pageParam }) => api.artifacts.page(orgId, filters, pageParam || undefined),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: (prev) => prev,
   });
-};
+  const pages = query.data?.pages;
+  // A file that moved to another page while the next one loaded comes once, where it came first.
+  const artifacts = useMemo(
+    () => [...new Map((pages ?? []).flatMap((p) => p.artifacts).map((a) => [a.id, a])).values()],
+    [pages],
+  );
+  return { ...query, artifacts: query.data ? artifacts : undefined, counts: pages?.[0]?.counts ?? null };
+}
 
 /** One artifact at a version (latest when omitted). */
 /** `GET …/artifacts-trash`: deleted files (30 days). */
@@ -3647,7 +3774,8 @@ export const useAnswerChoices = (orgId: string, id: string) => {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (picks: number[]) => api.artifacts.answerChoices(orgId, id, picks, newClientId()),
+    mutationFn: ({ picks, others }: ChoiceAnswer) =>
+      api.artifacts.answerChoices(orgId, id, picks, newClientId(), others),
     onSuccess: (out) => qc.setQueryData(keys.choices(orgId, id), out.choices),
     // The card says it itself, and says nothing when someone answered first.
     meta: { silent: true },
@@ -3799,6 +3927,18 @@ export function useSaveArtifact(orgId: string, id: string) {
     mutationFn: (input: { content: ArtifactContent; note?: string | null; baseVersion: number }) =>
       api.artifacts.update(orgId, id, input),
     // The viewer explains a stale version (409) itself.
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+}
+
+/** "Compartilhar" (ADR 0157): who sees a file on top of its conversation. The dialog says a failure itself. */
+export function useSetArtifactSharing(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; sharing: Parameters<typeof api.artifacts.setSharing>[2] }) =>
+      api.artifacts.setSharing(orgId, input.id, input.sharing),
     meta: { silent: true },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
   });
@@ -3965,6 +4105,31 @@ export function useIssueAction(orgId: string) {
           return api.issues.askAgent(orgId, action.id, action.agentId);
         case "audience":
           return api.issues.setAudience(orgId, action.id, action.audience);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+/**
+ * An agent picked for a task starts on it ("Pedir"). When it can't, the agent stays the task's, as the person picked
+ * it, and the call rejects with why: the caller says it with the task's own words and offers to ask again, so it's
+ * silent here (no second toast).
+ */
+export function useStartAgentOnTask(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async ({ issueId, agentId }: { issueId: string; agentId: string }) => {
+      try {
+        return await api.issues.askAgent(orgId, issueId, agentId);
+      } catch (error) {
+        await api.issues.update(orgId, issueId, { assignee: { type: "agent", id: agentId } }).catch(() => {});
+        throw error;
       }
     },
     onSettled: () => {
@@ -4213,15 +4378,37 @@ export function useCalendarAction(orgId: string) {
             patch: CalendarEventPatch;
             series?: { scope: SeriesScope; occurrenceStart: string };
           }
-        | { type: "remove"; id: string; series?: { scope: SeriesScope; occurrenceStart: string } },
+        | { type: "remove"; id: string; series?: { scope: SeriesScope; occurrenceStart: string } }
+        | { type: "respond"; id: string; status: "accepted" | "declined" },
     ): Promise<unknown> => {
       if (action.type === "create") return api.calendar.create(orgId, action.input);
+      if (action.type === "respond") return api.calendar.respond(orgId, action.id, action.status);
       if (action.type === "update") return api.calendar.update(orgId, action.id, action.patch, action.series);
       if (action.type === "remove") return api.calendar.remove(orgId, action.id, action.series);
       if (action.type === "confirm") return api.calendar.confirmProposal(orgId, action.id);
       return api.calendar.dismissProposal(orgId, action.id);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.calendar(orgId) }),
+  });
+}
+
+/**
+ * An event proposal's card in its conversation: Confirmar creates the event, Dispensar drops it, and the card says so
+ * at once (others see it through `calendar.proposal.updated`).
+ */
+export function useCalendarProposal(orgId: string, where: { channelId: string; messageId: string }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ proposal, decision }: { proposal: CalendarProposal; decision: "confirm" | "dismiss" }) => {
+      if (decision === "confirm") await api.calendar.confirmProposal(orgId, proposal.id);
+      else await api.calendar.dismissProposal(orgId, proposal.id);
+      return { ...proposal, status: decision === "confirm" ? ("confirmed" as const) : ("dismissed" as const) };
+    },
+    onSuccess: (proposal) => {
+      cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ calendarProposal: proposal }));
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
   });
 }
 
@@ -5559,7 +5746,16 @@ export function useNotificationReply(orgId: string) {
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
 function part<
-  K extends "pins" | "threadFollows" | "reads" | "working" | "reminders" | "actions" | "agentForYou" | "gifs",
+  K extends
+    | "pins"
+    | "threadFollows"
+    | "reads"
+    | "working"
+    | "reminders"
+    | "actions"
+    | "actionCards"
+    | "agentForYou"
+    | "gifs",
 >(api: ApiClient, name: K): NonNullable<ApiClient[K]> {
   const value = api[name];
   if (!value) throw new Error(`This API client has no ${name}`);

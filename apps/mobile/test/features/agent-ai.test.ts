@@ -660,6 +660,27 @@ describe("the agent's AI", () => {
       ["Big Pickle", "Grátis", true],
       ["glm-5.3", null, false],
     ]);
+    // An OpenCode key: the computer listed its CLI's models with no key (the free tier), so OpenCode Go's models come
+    // after them, as its CLI names them with that key. DeepSeek V4.1 Flash is there, with the region it needs.
+    const keyed = modelRows(
+      t,
+      {
+        brain: "opencode",
+        effectiveModel: "opencode-go/deepseek-v4.1-flash",
+        options: [opencode],
+        account: "oc",
+        accounts: [account("oc", { kind: "opencode", provider: "zen", keyHint: "Q7f2" })],
+      },
+      undefined,
+    );
+    expect(keyed.slice(0, 3).map((r) => r.label)).toEqual(["Automático", "Big Pickle", "glm-5.3"]);
+    expect(keyed.find((r) => r.checked)).toMatchObject({
+      value: "opencode-go/deepseek-v4.1-flash",
+      label: "DeepSeek V4.1 Flash",
+      maker: "deepseek",
+      needs: "globalRegion",
+    });
+    expect(keyed).toHaveLength(3 + 30);
   });
 
   test("picking a model saves as the web does: Automático picks the effort too, a fixed one after it starts at Médio", () => {

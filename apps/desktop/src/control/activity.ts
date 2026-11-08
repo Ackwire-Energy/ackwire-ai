@@ -4,7 +4,8 @@
  * merges them by time and keeps the newest `limit`; each home's cursor moves to the last entry of
  * it that was shown, so what wasn't shown comes again on the next page.
  */
-import type { ActivityEntry } from "@agenteschat/adapters/runner-control";
+import type { ActivityEntry, ActivitySaid } from "@agenteschat/adapters/runner-control";
+import type { TFunction } from "i18next";
 
 export interface HomeEntry extends ActivityEntry {
   homeId: string;
@@ -92,4 +93,26 @@ export function groupByDay<T extends { at: string }>(entries: readonly T[], now:
     g.entries.push(e);
   }
   return groups;
+}
+
+/**
+ * An activity line or a job in the person's words (`desktop.prefs.activity.said.<key>`), from what the runner says it
+ * was (`said`); one from an older runner, or with words this app doesn't have, reads as it came (`summary`, English).
+ * `clock` writes a time the line names (paused until).
+ */
+export function saidText(
+  t: TFunction,
+  line: { summary: string; said?: ActivitySaid },
+  clock: (iso: string) => string,
+): string {
+  const said = line.said;
+  if (!said?.key) return line.summary;
+  const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  const words = (key: string) => tt(`desktop.prefs.activity.said.${key}`, { defaultValue: "" });
+  const values: Record<string, unknown> = { ...said };
+  if (said.executor) values.what = words(`executor.${said.executor}`) || said.executor;
+  if (said.tool) values.tool = words(`tools.${said.tool}`) || said.name || said.tool;
+  if (said.agents === "") values.agents = words("noAgent");
+  if (said.until) values.until = clock(said.until);
+  return tt(`desktop.prefs.activity.said.${said.key}`, { ...values, defaultValue: line.summary }) || line.summary;
 }

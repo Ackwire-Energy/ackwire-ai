@@ -66,7 +66,7 @@ async function lodiRun(userId: string, body: string): Promise<ToolContext & { dm
 }
 
 async function createIssue(ctx: ToolContext, input: Record<string, unknown>) {
-  const gateway = createToolGateway({ sources: [createIssueToolSource({ db: f.db, pubsub: f.pubsub })] });
+  const gateway = createToolGateway({ sources: [createIssueToolSource(f.artifactDeps)] });
   const res = await gateway.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name: "create_issue", input });
   if (res.type !== "result") throw new Error(`not a result: ${res.type}`);
   return res.output as { content: string; isError?: boolean; data?: Record<string, unknown> };

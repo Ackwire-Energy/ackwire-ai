@@ -2137,6 +2137,27 @@ export async function consultationCardThread(db: Executor, orgId: string, runId:
   return origin ? origin.threadId : fallback;
 }
 
+/** What a tool says when its card would land where no person reads it. */
+export const NO_PERSON_READS =
+  "No person reads this conversation: you are answering another agent. Answer with what you know and say in your answer what is missing.";
+
+/**
+ * Where a run's card for a person goes (a Connect card, an invite, a proposal): where it replies, or, from an agents'
+ * DM, which no person reads, the conversation where the person behind the chain asked (`consultationOrigin`, as
+ * `postPauseCards` places questions). Null when no person would see it there.
+ */
+export async function cardPlace(
+  ctx: Pick<ToolContext, "orgId" | "channelId" | "runId" | "threadRootId" | "triggerMessageId"> & { db: Executor },
+): Promise<{ channelId: string; threadId: string | null } | null> {
+  const [here] = await ctx.db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, ctx.orgId), eq(channels.id, ctx.channelId)));
+  if (!here || !isAgentOnlyDm(here)) return { channelId: ctx.channelId, threadId: replyThreadOf(ctx) };
+  const origin = ctx.runId ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId) : null;
+  return origin ? { channelId: origin.channelId, threadId: origin.threadId } : null;
+}
+
 /**
  * The person a run in an agents' DM may ask something (an `ask_user` question, a secret): the person behind
  * it (`personBehindCall`, ADR 0034 addendum of 2026-10-18 §3) when it answers another agent's question or

@@ -301,8 +301,9 @@ export function useMoveAgent(groups: AgentGroup[]) {
       { type: "move", agentId, groupId, index },
       {
         onError: (e) => toast.show(errorText(t, e), "error"),
-        onSuccess: () => {
+        onSuccess: (_groups, _action, result) => {
           if ((from?.id ?? null) === groupId) return;
+          const pinAt = result && result.pinnedAt >= 0 ? result.pinnedAt : undefined;
           toast.show(
             to
               ? t("agentGroups.moved", { name, group: to.name })
@@ -310,7 +311,7 @@ export function useMoveAgent(groups: AgentGroup[]) {
             "info",
             {
               label: t("agentGroups.undo"),
-              run: () => action.mutate({ type: "move", agentId, groupId: from?.id ?? null, index: at }),
+              run: () => action.mutate({ type: "move", agentId, groupId: from?.id ?? null, index: at, pinAt }),
             },
           );
         },
@@ -328,15 +329,28 @@ export function useAgentDrag(groups: AgentGroup[]) {
   const move = useMoveAgent(groups);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ groupId: string | null; index: number } | null>(null);
-  const indexAt = (e: DragEvent<HTMLElement>) => {
-    const rows = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-agent-row]")].filter(
+  const rowsOf = (e: DragEvent<HTMLElement>) =>
+    [...e.currentTarget.querySelectorAll<HTMLElement>("[data-agent-row]")].filter(
       (el) => el.dataset.agentRow !== dragging,
     );
+  const indexAt = (e: DragEvent<HTMLElement>) => {
+    const rows = rowsOf(e);
     const k = rows.findIndex((el) => {
       const r = el.getBoundingClientRect();
       return e.clientY < r.top + r.height / 2;
     });
     return k < 0 ? rows.length : k;
+  };
+  // The server counts the place among all the group's agents in its own order: the ones not listed (pinned on top,
+  // or not talking to me) and the person's sort would shift a place counted among the rows.
+  const placeAt = (e: DragEvent<HTMLElement>, groupId: string) => {
+    const ids = rowsOf(e).map((el) => el.dataset.agentRow ?? "");
+    const k = indexAt(e);
+    const order = (groups.find((g) => g.id === groupId)?.agentIds ?? []).filter((id) => id !== dragging);
+    const before = order.indexOf(ids[k] ?? "");
+    if (before >= 0) return before;
+    const after = order.indexOf(ids[k - 1] ?? "");
+    return after >= 0 ? after + 1 : order.length;
   };
   const end = () => {
     setDragging(null);
@@ -371,7 +385,7 @@ export function useAgentDrag(groups: AgentGroup[]) {
         if (!dragging) return;
         e.preventDefault();
         const agentId = dragging;
-        const index = groupId ? indexAt(e) : undefined;
+        const index = groupId ? placeAt(e, groupId) : undefined;
         end();
         const from = groupOf(groups, agentId);
         if ((from?.id ?? null) === groupId && (groupId === null || from?.agentIds.indexOf(agentId) === index)) return;

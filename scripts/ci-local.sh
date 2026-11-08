@@ -48,7 +48,7 @@ step "test backend 2/3" "bun test packages/engine/test/[!a-m]*.test.ts packages/
 step "test backend 3/3" "bun test apps/server"
 geometry=$(mktemp -d "${TMPDIR:-/tmp}/agentes-geometry.XXXXXX")
 step "test web and design system" "GEOMETRY_OUT=$geometry bun test --preload ./scripts/geometry/capture.ts apps/web packages/ui"
-step "geometry" "bun run check:geometry $geometry"
+step "geometry" "bun run check:geometry $geometry --text-size xs,xl"
 rm -rf "$geometry"
 step "test new event dialog alone" "RUN_NEW_EVENT=1 bun test --timeout 20000 apps/web/test/new-event.test.tsx"
 step "test phone and desktop apps" "bun test apps/mobile/test apps/desktop/test"

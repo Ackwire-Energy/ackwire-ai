@@ -201,6 +201,20 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
     expect(section.getByRole("button", { name: "Atlas em GitHub: Sem acesso" })).toBeTruthy();
   });
 
+  test("an agent's long name and role wrap beside its face, so its levels stay in the table", async () => {
+    const state = seedState();
+    const atlas = state.agents.find((a) => a.name === "Atlas");
+    if (atlas) {
+      atlas.name = "Atlas Monteiro de Albuquerque Figueiredo";
+      atlas.role = "Operações de infraestrutura, implantações e plantão de fim de semana";
+    }
+    const section = await goAccess(state);
+    const head = section.getAllByRole("rowheader")[1]?.querySelector(".level-matrix__agent") as HTMLElement;
+    expect(head.classList.contains("ac-iconline")).toBe(true);
+    expect(head.textContent).toContain("Atlas Monteiro de Albuquerque Figueiredo · Operações de infraestrutura");
+    expect(section.getByRole("button", { name: /^Atlas Monteiro de Albuquerque Figueiredo em GitHub/ })).toBeTruthy();
+  });
+
   test("built-in areas in the same matrix: their own levels", async () => {
     const state = seedState();
     const section = await goAccess(state);

@@ -14,7 +14,7 @@ import {
   INSTALL_PAGE,
   isHelpSlug,
 } from "../src/help";
-import { en, ptBR } from "../src/index";
+import { en, ptBR, STRINGS } from "../src/index";
 import { bannedIn, CLOUD_BANNED, SELFHOST_BANNED, TECHNICAL } from "./edition-words";
 import { MAKER_WORDS, sourceFiles, withoutComments } from "./maker-words";
 
@@ -255,6 +255,26 @@ describe("help pages in every language", () => {
       expect(helpDocsUrl("memory", "ja")).toBe("https://agentes.chat/docs/memory");
     } finally {
       HELP.ja.memory = ja;
+    }
+  });
+
+  test("Approvals names the controls the app has, in each language's own words for them", () => {
+    const keys = [
+      "approval.always.button",
+      "approval.always.routine",
+      "agentPage.tabs.access",
+      "permissions.approve_actions.title",
+      "approvalCover.title",
+    ];
+    const at = (tree: unknown, key: string) =>
+      key
+        .split(".")
+        .reduce<unknown>((n, k) => (n && typeof n === "object" ? (n as Record<string, unknown>)[k] : undefined), tree);
+    for (const [code, pages] of Object.entries(HELP)) {
+      const text = linesOf(pages.approvals ?? helpDocument("approvals", "en")).join("\n");
+      const words = STRINGS[code as keyof typeof STRINGS];
+      const missing = keys.filter((k) => !text.includes(String(at(words, k) ?? at(STRINGS.en, k))));
+      expect({ code, missing }).toEqual({ code, missing: [] });
     }
   });
 

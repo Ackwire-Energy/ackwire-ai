@@ -1,5 +1,13 @@
 import { expect, test } from "bun:test";
-import { dayOnePins, pinsOf, SIDEBAR_VIEW_DEFAULT, sortAgents, togglePin } from "../src/lib/sidebar-view";
+import {
+  dayOnePins,
+  pinsOf,
+  repinAgent,
+  SIDEBAR_VIEW_DEFAULT,
+  sortAgents,
+  togglePin,
+  unpinAgents,
+} from "../src/lib/sidebar-view";
 
 const agent = (id: string, name: string, ownerUserId: string | null = null) => ({ id, name, ownerUserId });
 
@@ -43,4 +51,18 @@ test("a group's order: the workspace's, mine first or working first, each keepin
   expect(ids(sortAgents(list, "workspace", "me"))).toEqual(["a", "b", "c", "d"]);
   expect(ids(sortAgents(list, "mine", "me"))).toEqual(["b", "d", "a", "c"]);
   expect(ids(sortAgents(list, "working", "me", new Set(["c"])))).toEqual(["c", "a", "b", "d"]);
+});
+
+test("an agent put in a group leaves the pins (a pin takes it out of its group); Desfazer pins it back in its place", () => {
+  const view = { ...SIDEBAR_VIEW_DEFAULT, pins: { agents: ["a", "b", "c"], channels: ["x"], people: [] } };
+  expect(unpinAgents(view, ["b"])).toEqual({ ...view, pins: { agents: ["a", "c"], channels: ["x"], people: [] } });
+  // Nothing pinned to take off, or day one (no saved pins): nothing to save.
+  expect(unpinAgents(view, ["z"])).toBeNull();
+  expect(unpinAgents(SIDEBAR_VIEW_DEFAULT, ["a"])).toBeNull();
+  const off = unpinAgents(view, ["b"]) ?? view;
+  expect(repinAgent(off, "b", 1).pins?.agents).toEqual(["a", "b", "c"]);
+  // Already pinned again, or five pinned meanwhile: as it is.
+  expect(repinAgent(view, "b", 0)).toBe(view);
+  const full = { ...view, pins: { ...view.pins, agents: ["a", "c", "d", "e", "f"] } };
+  expect(repinAgent(full, "b", 1)).toBe(full);
 });

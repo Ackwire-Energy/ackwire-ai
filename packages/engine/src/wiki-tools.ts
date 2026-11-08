@@ -1,8 +1,10 @@
 import { type ActionRecord, actWithUndo } from "./agent-actions";
+import { getAgentCached } from "./agents";
 import { agentRoom } from "./artifacts";
 import { cutText } from "./format";
-import { getMembership } from "./organizations";
+import { can, getMembership } from "./organizations";
 import { chosenAudience, personBehindCall, routineCreatorOfCall, visibleToField, wikiActorOfCall } from "./requester";
+import { isRightHand } from "./right-hand";
 import { audienceOfConversation } from "./task-access";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
@@ -26,7 +28,7 @@ const failed = (error: unknown): ToolOutput => ({
 
 /** Shown when an agent tries to write with nobody who could have asked. */
 export const WIKI_WRITE_REFUSAL =
-  "Not allowed: nobody asked for this. An agent writes to the wiki when a person asks for it, or a routine a person set up says so. Offer to save it instead.";
+  "Not allowed: nobody asked for this, or the person who asked can't edit the wiki. An agent writes to the wiki when a person who may asks for it, or a routine a person set up says so. Offer to save it instead.";
 
 /**
  * The receipt of a wiki edit (none when the text came out the same). Everyone in the channel sees it, so a restricted
@@ -73,7 +75,10 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     const inRoom = await agentRoom(ctx.db, ctx.orgId, ctx.channelId);
     const userId = (await personBehindCall(ctx)) ?? (inRoom ? await routineCreatorOfCall(ctx) : null);
     // A run stays its person's for good: someone who left asks for nothing.
-    if (!userId || !(await getMembership(ctx.db, userId, ctx.orgId))) return null;
+    const membership = userId ? await getMembership(ctx.db, userId, ctx.orgId) : null;
+    if (!userId || !membership) return null;
+    // The right hand writes as its person could (ADR 0137 amendment of 2026-11-07): never past their `edit_wiki`.
+    if (!can(membership, "edit_wiki") && isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId))) return null;
     return { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId };
   }
 

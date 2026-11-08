@@ -1,15 +1,17 @@
 import { useAnswerChoices, useArtifact, useChoices } from "@agenteschat/client";
 import {
   answeredFirst,
+  CHOICE_OTHER_MAX,
   type ChoiceDraft,
   choiceLetter,
   choiceOfKey,
   choiceSummary,
   emptyDraft,
   moveStep,
+  otherChoice,
   pickChoice,
 } from "@agenteschat/client/lib/choices";
-import { Button, Spinner } from "@agenteschat/ui";
+import { Button, Spinner, Textarea } from "@agenteschat/ui";
 import { type KeyboardEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -21,7 +23,8 @@ import "./blocks.css";
 /**
  * An agent asks the person to pick (ADR 0124): options as big rows lettered A, B, C…, one question at a time. A click
  * (or its letter, or arrows and Enter) answers at once: it goes to the agent as the person's message, and the card
- * then shows what was picked to everyone. The app's own card, like a vote: a pick is an act of the person's.
+ * then shows what was picked to everyone. The last row, "Outra resposta", opens a field to write the answer instead,
+ * sent with Enviar (or Enter). The app's own card, like a vote: a pick is an act of the person's.
  */
 export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const { t } = useTranslation();
@@ -33,6 +36,9 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const answer = useAnswerChoices(org.id, id);
   const [draft, setDraft] = useState<ChoiceDraft | null>(null);
   const [closed, setClosed] = useState(false);
+  // "Outra resposta" open on the question in view, and what is being written there.
+  const [writing, setWriting] = useState(false);
+  const [text, setText] = useState("");
   const list = useRef<HTMLFieldSetElement>(null);
   const a = artifact.data;
   if (a?.content.kind !== "choices" || !query.data) {
@@ -59,14 +65,16 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
           </span>
         </header>
         <ul className="choices__summary">
-          {choiceSummary(questions, answered.picks).map((s) => (
+          {choiceSummary(questions, answered.picks, answered.others).map((s) => (
             <li key={s.question}>
               {questions.length > 1 && <span className="choices__asked">{s.question}</span>}
               <span className="choices__picked">
                 <span className="choices__letter" aria-hidden="true">
                   {s.letter}
                 </span>
-                {s.label}
+                <span className="choices__said" data-written={s.written ? "" : undefined}>
+                  {s.label}
+                </span>
               </span>
             </li>
           ))}
@@ -89,13 +97,19 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const d = draft ?? emptyDraft(questions);
   const q = questions[d.step];
   if (!q) return null;
+  const other = otherChoice(q);
   // Another question's options replace the focused button: the first of them takes the focus, so keys keep working.
   const focusFirst = () =>
     requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>("button")?.focus());
-  const pick = (option: number) => {
+  const closeWriting = () => {
+    setWriting(false);
+    setText("");
+  };
+  const pick = (option: number, written?: string) => {
     if (answer.isPending) return;
-    const next = pickChoice(d, option);
+    const next = pickChoice(d, option, written);
     setDraft(next.draft);
+    closeWriting();
     if (next.send)
       answer.mutate(next.send, {
         onError: (e) => {
@@ -105,12 +119,26 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
       });
     else focusFirst();
   };
+  // What was written before on this question comes back in the field.
+  const write = () => {
+    setText(d.others[d.step] ?? "");
+    setWriting(true);
+  };
+  const send = () => {
+    const words = text.trim();
+    if (words) pick(other, words);
+  };
+  const go = (next: ChoiceDraft) => {
+    setDraft(next);
+    closeWriting();
+  };
   const onKeyDown = (e: KeyboardEvent<HTMLFieldSetElement>) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const letter = choiceOfKey(e.key, q.options.length);
+    const letter = choiceOfKey(e.key, q.options.length + 1);
     if (letter !== null) {
       e.preventDefault();
-      pick(letter);
+      if (letter === other) write();
+      else pick(letter);
       return;
     }
     const rows = [...(list.current?.querySelectorAll<HTMLButtonElement>(".choices__option") ?? [])];
@@ -122,7 +150,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
     } else if (questions.length > 1 && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       e.preventDefault();
       const next = moveStep(d, e.key === "ArrowRight" ? 1 : -1);
-      setDraft(next);
+      go(next);
       if (next !== d) focusFirst();
     }
   };
@@ -151,7 +179,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
         ref={list}
         className="choices__options"
         aria-labelledby={`choices-${id}-q`}
-        aria-keyshortcuts={q.options.map((_, i) => choiceLetter(i)).join(" ")}
+        aria-keyshortcuts={[...q.options.map((_, i) => choiceLetter(i)), choiceLetter(other)].join(" ")}
         onKeyDown={onKeyDown}
       >
         {q.options.map((o, i) => (
@@ -172,10 +200,61 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             </span>
           </button>
         ))}
+        <button
+          type="button"
+          className="choices__option"
+          aria-pressed={d.picks[d.step] === other}
+          aria-expanded={writing}
+          disabled={answer.isPending}
+          onClick={write}
+        >
+          <span className="choices__letter" aria-hidden="true">
+            {choiceLetter(other)}
+          </span>
+          <span className="choices__text">
+            <span className="choices__label">{t("ask.otherAnswer")}</span>
+            {d.others[d.step] && !writing && <span className="choices__description">{d.others[d.step]}</span>}
+          </span>
+        </button>
       </fieldset>
+      {writing && (
+        <div className="choices__write">
+          <Textarea
+            rows={2}
+            autoGrow
+            autoFocus
+            value={text}
+            maxLength={CHOICE_OTHER_MAX}
+            placeholder={t("question.placeholder")}
+            aria-label={t("question.placeholder")}
+            disabled={answer.isPending}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                send();
+              }
+            }}
+          />
+          <span className="choices__write-acts">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={!text.trim() || answer.isPending}
+              loading={answer.isPending}
+              onClick={send}
+            >
+              {t("channel.send")}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={answer.isPending} onClick={closeWriting}>
+              {t("common.cancel")}
+            </Button>
+          </span>
+        </div>
+      )}
       {questions.length > 1 && (
         <div className="live-block__foot choices__foot">
-          <Button size="sm" variant="ghost" disabled={d.step === 0} onClick={() => setDraft(moveStep(d, -1))}>
+          <Button size="sm" variant="ghost" disabled={d.step === 0} onClick={() => go(moveStep(d, -1))}>
             {t("choices.back")}
           </Button>
           <span className="choices__dots" aria-hidden="true">
@@ -192,7 +271,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             size="sm"
             variant="ghost"
             disabled={d.step === questions.length - 1 || d.picks[d.step] === null}
-            onClick={() => setDraft(moveStep(d, 1))}
+            onClick={() => go(moveStep(d, 1))}
           >
             {t("choices.next")}
           </Button>

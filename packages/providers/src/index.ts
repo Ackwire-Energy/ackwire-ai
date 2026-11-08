@@ -19,14 +19,17 @@ export * from "./types";
 
 /**
  * One adapter per entry of `PROVIDERS`, by the protocol it speaks: the server's defaults (modules may replace any).
- * `endpointFetch`: how calls reach workspaces' own endpoints (the server's guarded fetch on agentes.chat Cloud).
+ * `endpointFetch`: how calls reach workspaces' own endpoints (the server's guarded fetch on agentes.chat Cloud);
+ * `version`: this server's, in the User-Agent an endpoint that asks for one gets.
  */
-export function createModelProviders(options: { endpointFetch?: typeof fetch } = {}): Record<string, ModelProvider> {
+export function createModelProviders(
+  options: { endpointFetch?: typeof fetch; version?: string } = {},
+): Record<string, ModelProvider> {
   return Object.fromEntries(
     (Object.entries(PROVIDERS) as [string, ProviderInfo][]).map(([id, p]) => [
       id,
       p.protocol === "custom"
-        ? createCustomProvider({ fetch: options.endpointFetch })
+        ? createCustomProvider({ fetch: options.endpointFetch, version: options.version })
         : p.protocol === "openai"
           ? createOpenAIProvider()
           : p.protocol === "gemini"

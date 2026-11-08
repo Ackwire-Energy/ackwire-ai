@@ -34,6 +34,7 @@ import {
   freeLabel,
   freeToolPrefix,
   grantToEveryAgent,
+  noteRefusedSignIn,
   OAUTH_STATE_TTL_MS,
   oauthRedirectUri,
   prefixService,
@@ -172,7 +173,7 @@ export interface CustomServerView {
   iconUrl: string | null;
   /** A service through Composio (ADR 0107): its page signs in, and its address means nothing to people. */
   via?: "composio";
-  /** `needs_reconnect`: its Composio account stopped working, and it has no tools until Reconectar. */
+  /** `needs_reconnect`: its sign-in stopped working (a Composio account too), and it has no tools until Reconectar. */
   status: "active" | "needs_reconnect";
   /** Why its tools couldn't be read the last time we asked (short, the server's or the SDK's words); null when read. */
   toolsError: string | null;
@@ -453,7 +454,10 @@ export async function storeCustomConnection(
     oauthClientId: input.oauthClientId ?? null,
     resource: input.resource ?? null,
     ...(account ? { accountId: account.id, accountLabel: named } : named ? { accountLabel: named } : {}),
-    ...(input.composio ? { composioAccountId: input.composio.accountId, status: "active", lastError: null } : {}),
+    // New credentials: whatever stopped working before is behind it.
+    status: "active",
+    lastError: null,
+    ...(input.composio ? { composioAccountId: input.composio.accountId } : {}),
   };
   if (target) {
     const [row] = await deps.db
@@ -579,7 +583,8 @@ async function fillAccount(deps: CustomDeps, c: ConnectorConnection) {
     } finally {
       await session.close().catch(() => {});
     }
-  } catch {
+  } catch (error) {
+    await noteRefusedSignIn(deps.db, c, error);
     return null;
   }
 }
@@ -625,7 +630,8 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   } catch (error) {
     const reason = oneLine(error instanceof Error ? error.message : String(error), 200) || "failed";
     deps.log?.warn("custom connector tools unreadable", { orgId: c.orgId, connectionId: c.id, reason });
-    // A Composio account marked to reconnect keeps its own reason.
+    await noteRefusedSignIn(deps.db, c, error);
+    // A connection marked to reconnect keeps its own reason.
     await deps.db
       .update(connectorConnections)
       .set({ lastError: reason })

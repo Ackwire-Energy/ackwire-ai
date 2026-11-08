@@ -306,6 +306,7 @@ function EditMemoryDialog({
       onOpenChange={(open) => !open && onClose()}
       title={t("memory.editTitle", { kind: memory ? t(`memory.kindsLower.${memory.kind}`) : "" })}
       closeLabel={t("common.close")}
+      unsaved={memory !== null && text !== memory.text}
       width={520}
     >
       <DialogBody>
@@ -314,7 +315,7 @@ function EditMemoryDialog({
           id="edit-text"
           help={t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" })}
         >
-          <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+          <Textarea rows={3} maxLength={8000} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
       </DialogBody>
       <DialogFooter>

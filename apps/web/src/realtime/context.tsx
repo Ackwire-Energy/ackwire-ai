@@ -20,6 +20,7 @@ import {
   applyChannelEvent,
   applyComputerEvent,
   applyConsultEvent,
+  applyConversationEvent,
   applyDashboardEvent,
   applyIssueEvent,
   applyMachineEvent,
@@ -36,6 +37,7 @@ import {
   type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
+  cacheActionCard,
   cacheAgentProposal,
   cacheApproval,
   cacheCardDelegate,
@@ -43,6 +45,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
   cacheReceipts,
@@ -87,6 +90,7 @@ import {
   useIssueLive,
   useSendWaiting,
 } from "@agenteschat/client";
+import { type AgentUnavailableEvent, isAgentUnavailable } from "@agenteschat/client/lib/audience";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
@@ -139,26 +143,10 @@ export interface LiveNotice {
   agentId: string;
   threadId: string | null;
   messageId: string;
-  text: string;
-  /** `channel.agents_denied`: this channel's exceptions, not the agent's audience (ADR 0134). */
+  /** `channel.agents_denied` (this channel's exceptions, ADR 0134) or the agent's audience, with what words it. */
   code?: string;
+  params?: Record<string, unknown>;
 }
-
-/** `agent.unavailable` (user scope): my message mentioned an agent that doesn't answer me. */
-export interface AgentUnavailableEvent {
-  type: "agent.unavailable";
-  agentId: string;
-  channelId: string;
-  threadId: string | null;
-  messageId: string;
-  text: string;
-  code?: string;
-}
-
-export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
-  e.type === "agent.unavailable" &&
-  typeof (e as AgentUnavailableEvent).agentId === "string" &&
-  typeof (e as AgentUnavailableEvent).channelId === "string";
 
 export interface LiveMemoryCard {
   key: string;
@@ -359,8 +347,8 @@ export function createStreamsStore(
         agentId: e.agentId,
         threadId: e.threadId,
         messageId: e.messageId,
-        text: e.text,
         code: e.code,
+        params: e.params,
       };
       set({
         ...state,
@@ -477,6 +465,15 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
       void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
+      // The Drive, the Wiki, the calendar, the routines and the invitations someone changed meanwhile.
+      for (const key of [
+        keys.artifacts(orgId),
+        keys.wiki(orgId),
+        keys.calendar(orgId),
+        keys.routines(orgId),
+        keys.invitations(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -545,10 +542,6 @@ export function RealtimeProvider({
       }
       // The Vault changed (ADR 0144, org broadcast): what this person may see of it refetches. Never a value.
       if (event.type === "vault.changed") void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
-      // Someone changed the calendar: the open ranges refetch.
-      if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
-        void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
-      }
       // The board's columns changed (org broadcast): set them; a deleted column moved its tasks.
       if (event.type === "issue.columns" && "columns" in event && Array.isArray(event.columns)) {
         qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
@@ -559,8 +552,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
-      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
-      // of agents (the sidebar's sections).
+      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), the groups of
+      // agents (the sidebar's sections), and the lists anyone may have open (Drive, Wiki, calendar, routines, memory).
       applyWorkspaceEvent(qc, orgId, event);
       // Boards and widgets (ADR 0135): only ids come; the boards on screen refetch.
       applyDashboardEvent(qc, orgId, event);
@@ -815,16 +808,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "approval.created" || event.type === "approval.decided") {
         cacheApproval(qc, orgId, event.approval);
       }
-      if (
-        event.type === "artifact.created" ||
-        event.type === "artifact.updated" ||
-        (event.type as string) === "artifact.deleted"
-      ) {
-        // Cards, the open viewer and Drive refetch (a deleted file leaves the list; its cards say so).
-        void qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
-        if ((event.type as string) === "artifact.deleted")
-          void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
-      }
+      // A file's cards and viewer, an agent's memory list.
+      applyConversationEvent(qc, orgId, event);
       if (event.type === "poll.updated") qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       if (event.type === "block.state") {
         const { block } = event;
@@ -844,7 +829,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
       // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
       if (event.type === "team.proposal.updated") cacheTeamCard(qc, orgId, event, event.card);
+      // An agent's event proposal was confirmed or dismissed: its card says so.
+      if (event.type === "calendar.proposal.updated")
+        cacheMessageMeta(qc, orgId, event.channelId, event.messageId, () => ({ calendarProposal: event.proposal }));
       if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
+      // A right hand's card of a workspace change was applied, dismissed or sent on: the whole card.
+      if (event.type === "action_card.updated") cacheActionCard(qc, orgId, event, event.card);
       // A DM between people: the other one read it ("Visto" moves).
       if (event.type === "channel.read") cacheDmRead(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.

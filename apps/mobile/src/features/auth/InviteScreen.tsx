@@ -22,7 +22,6 @@ import {
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
@@ -34,6 +33,7 @@ import { Button, haptics, Icon, InfoHint, Locked, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
+import { router } from "@/ui/navigation";
 import { AskWaiting } from "./AskWaiting";
 import { EmailSteps } from "./EmailSteps";
 import { useHumanCheck } from "./HumanCheck";

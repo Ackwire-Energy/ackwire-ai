@@ -3,7 +3,7 @@ import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees"
 import { prefixLines, wikiQuery, wrapSelection } from "@agenteschat/client/lib/wiki";
 import { diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, usePreventRemove } from "expo-router";
+import { usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +36,7 @@ import {
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, MONO, PushedHeader, successHaptic, Tile, tapHaptic } from "../shared/parts";
@@ -93,6 +94,9 @@ function Writer({
   const action = useWikiAction(orgId);
   const [mode, setMode] = useState<Mode>("write");
   const [body, setBody] = useState(page?.body ?? "");
+  // The version this text started from: the page follows edits made elsewhere live, and saving over one of those
+  // without its conflict screen would lose it.
+  const [base] = useState(page?.version);
   const [sel, setSel] = useState<Sel>({ start: body.length, end: body.length });
   // A selection set by the bar or a suggestion; the field follows it once, then the person's caret again.
   const [pending, setPending] = useState<Sel | null>(null);
@@ -203,7 +207,7 @@ function Writer({
         const saved = await action.mutateAsync({
           type: "update",
           slug: page.slug,
-          input: { body, baseVersion: baseVersion ?? page.version },
+          input: { body, baseVersion: baseVersion ?? base ?? page.version },
         });
         done(saved, false);
       }

@@ -352,7 +352,7 @@ export async function setup(
     ...(options.chatTools
       ? [createChatToolSource({ pubsub, artifacts: artifactDeps, gif: createAgentGifPoster(options.gifs) })]
       : []),
-    ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
+    ...(options.issueTools ? [createIssueToolSource(artifactDeps)] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools
       ? [

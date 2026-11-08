@@ -8,12 +8,14 @@ import {
   useWidenAudience,
 } from "@agenteschat/client";
 import {
+  type AgentUnavailableEvent,
   audienceNotice,
   audienceWith,
   audienceWithMe,
   canEditAudience,
   modeOf,
   opensOthersPlan,
+  unavailableNotice,
   widenQuestion,
 } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -205,6 +207,36 @@ export function AgentLocked({ agent }: { agent: Agent }) {
 }
 
 /**
+ * Over the composer, as the web's line under my message: why each agent my message here named won't answer me
+ * (`agent.unavailable`), in my words.
+ */
+export function UnavailableLines({ notices }: { notices: AgentUnavailableEvent[] }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const dir = useDirectory();
+  const roles = useRoles(useOrgId()).data?.roles;
+  if (notices.length === 0) return null;
+  return (
+    <View style={styles.unavailable} accessibilityLiveRegion="polite">
+      {notices.map((n) => (
+        <View key={n.agentId} style={styles.unavailableRow}>
+          <LineIcon name="lock" size={13} color={colors.muted} variant="footnote" />
+          <Text variant="footnote" tone="muted" style={styles.grow}>
+            {unavailableNotice(
+              t,
+              n,
+              dir.agentById.get(n.agentId),
+              (id) => dir.memberById.get(id)?.name,
+              (id) => roles?.find((r) => r.id === id)?.name,
+            )}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
  * The one question before a wider audience (`widenQuestion`), as an alert: on someone else's plan, that it uses their
  * plan and they get an email, and the mailboxes other people gave the agent that it loses. `ask(next)(mailboxes)`
  * answers whether to go on, at once when there is nothing to ask. Every save that widens an audience goes through it.
@@ -243,6 +275,9 @@ export function confirmQuestion(t: TFunction, question: { title: string; descrip
 const styles = StyleSheet.create({
   list: { gap: LIST_GAP },
   locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
+  unavailable: { gap: 4, paddingHorizontal: 16, paddingBottom: 6 },
+  unavailableRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  grow: { flex: 1, minWidth: 0 },
   lockedText: { textAlign: "center" },
   bold: { fontWeight: "600" },
   // As the team checks' line (TeamChecks): the icon, the first line and the action (32, in a 50 row) share one middle,

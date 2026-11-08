@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "../src/index";
 import {
+  connectionReader,
   hookCurl,
   isRefusedHookCall,
   isRoutineCall,
+  mailboxReader,
   platformZoneName,
   routineHookUrl,
   routineReplyOf,
   timezoneName,
+  triggerChoices,
   zoneDisplayName,
 } from "../src/lib/routines";
 import { buildTimeline } from "../src/lib/timeline";
@@ -123,5 +126,35 @@ describe("a webhook routine's address", () => {
     expect((["bad_signature", "too_large", "rate_limited"] as const).every(isRefusedHookCall)).toBe(true);
     expect(isRefusedHookCall("accepted")).toBe(false);
     expect(isRefusedHookCall("duplicate")).toBe(false);
+  });
+});
+
+describe("what a routine's email trigger offers for its agent", () => {
+  const a = { id: "a", address: "vendas@loja.com" };
+  const b = { id: "b", address: "ana@loja.com" };
+  const reads =
+    (...ids: string[]) =>
+    (id: string) =>
+      ids.includes(id);
+
+  test("only the mailboxes the agent reads; every one until that is known", () => {
+    expect(triggerChoices([a, b], reads("b"), "")).toEqual({ options: [b], cantRead: false });
+    expect(triggerChoices([a, b], undefined, "")).toEqual({ options: [a, b], cantRead: false });
+  });
+
+  test("the one already picked stays, said as one the agent can't read; none read is said too", () => {
+    expect(triggerChoices([a, b], reads("b"), "a")).toEqual({ options: [a, b], cantRead: true });
+    expect(triggerChoices([a, b], reads(), "")).toEqual({ options: [], cantRead: true });
+    expect(triggerChoices([a, b], reads("a", "b"), "a")).toEqual({ options: [a, b], cantRead: false });
+  });
+
+  test("a mailbox read from its level, a connection from its read grant", () => {
+    const mail = mailboxReader([
+      { accountId: "a", level: "none", canDelete: false, policy: {} as never },
+      { accountId: "b", level: "read", canDelete: false, policy: {} as never },
+    ]);
+    expect([mail("a"), mail("b"), mail("c")]).toEqual([false, true, false]);
+    const grants = connectionReader([{ connectionId: "c1", scope: "custom:c1:read" }]);
+    expect([grants("c1"), grants("c2")]).toEqual([true, false]);
   });
 });

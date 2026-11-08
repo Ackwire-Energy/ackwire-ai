@@ -572,10 +572,12 @@ html:not([data-pointer]) .issue-card:focus-visible {
   color: var(--ink2);
   font-weight: 600;
 }
+/* A narrow card wraps whole chips onto the next line: they never shrink (below), so one row ran past the card's edge. */
 .issue-card__foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   min-width: 0;
 }
 /* Nobody has it: an empty place the size of a face, before the words. */
@@ -1098,6 +1100,12 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-criterion:focus-within .issue-criterion__pen {
   opacity: 1;
 }
+/* No hover on touch: the pencil a tap reaches is always there. */
+@media (hover: none) {
+  .issue-criterion__pen {
+    opacity: 1;
+  }
+}
 .issue-criterion--edit {
   background: var(--sunken);
 }
@@ -1471,6 +1479,12 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   }
   .issue-list__due {
     display: none;
+  }
+  /* A narrow row wraps whole chips under its title and under the face: side by side they ran past the row's edge. */
+  .issue-list__title,
+  .issue-list__who {
+    flex-wrap: wrap;
+    row-gap: 4px;
   }
   .issue-aside {
     max-width: none;

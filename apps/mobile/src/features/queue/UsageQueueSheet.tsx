@@ -11,11 +11,11 @@ import {
   usageQueueWhere,
   usageQueueWho,
 } from "@agenteschat/client/lib/usage-queue";
-import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, EmptyState, PixelOrbit, Segmented, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { AnswerAnywayButton, DontRunButton } from "../ai/UsagePauseCard";
 import { chatHref } from "../links/logic";

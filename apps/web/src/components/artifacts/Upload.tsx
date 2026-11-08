@@ -64,6 +64,7 @@ export function UploadButton({
   size = "sm",
   variant,
   className,
+  labelClassName,
 }: {
   label: string;
   onFiles: (files: File[]) => void;
@@ -72,6 +73,8 @@ export function UploadButton({
   size?: ButtonProps["size"];
   variant?: ButtonProps["variant"];
   className?: string;
+  /** The words in a span of this class (a bar that shows only the icon on a phone), the button titled with them. */
+  labelClassName?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
@@ -84,8 +87,9 @@ export function UploadButton({
         loading={busy}
         disabled={busy}
         onClick={() => input.current?.click()}
+        {...(labelClassName ? { title: label } : {})}
       >
-        {label}
+        {labelClassName ? <span className={labelClassName}>{label}</span> : label}
       </Button>
       <input
         ref={input}

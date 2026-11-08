@@ -26,6 +26,7 @@ import {
   locationText,
   loginRead,
   loginReadPasses,
+  machineReasonText,
   normalizeUserCode,
   otherThanHint,
   platformOf,
@@ -64,6 +65,22 @@ describe("connected computers helpers (ADR 0036)", () => {
     );
     expect(commandInReason("Desktop use runs on Linux computers only")).toBeNull();
     expect(commandInReason(null)).toBeNull();
+  });
+
+  test("why a computer can't yet: the runner's code in the person's words; an older runner's own English as it is", async () => {
+    const { ptBR, resources } = await import("@agenteschat/i18n");
+    const i18next = (await import("i18next")).default;
+    const instance = i18next.createInstance();
+    void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+    const t = instance.t;
+    const download = "Couldn't download the agent browser: fetch failed";
+    expect(machineReasonText(t, { reason: download, code: "browser_download" })).toBe(
+      ptBR.machines.reasons.browser_download,
+    );
+    expect(machineReasonText(t, { reason: download, code: null })).toBe(download);
+    // A code this app has no words for yet: the runner's own.
+    expect(machineReasonText(t, { reason: download, code: "browser_new_thing" })).toBe(download);
+    expect(machineReasonText(t, null)).toBeNull();
   });
 
   test("folders: the name, and the ones an agent may use", () => {

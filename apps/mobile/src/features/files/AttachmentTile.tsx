@@ -3,12 +3,12 @@ import { documentStart, parseDelimited, patchCounts } from "@agenteschat/client/
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { Icon, type IconName, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useOrgId } from "../shared/hooks";
 import { MONO } from "../shared/parts";

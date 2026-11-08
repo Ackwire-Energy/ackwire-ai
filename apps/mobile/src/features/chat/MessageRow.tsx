@@ -44,7 +44,6 @@ import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -63,6 +62,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { CostlyProposalCard } from "../ai/CostlyProposalCard";
@@ -94,6 +94,9 @@ import { cacheContinued } from "./live";
 import {
   approvalIdOf,
   artifactsOf,
+  CHAT_TEXT_MAX_SCALE,
+  chatNameOf,
+  chatTimeOf,
   consultationsOf,
   hangsUnder,
   hidesBody,
@@ -337,6 +340,9 @@ export const MessageRow = memo(function MessageRow({
   // like anyone's.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
   const look = useRowLook();
+  // The name over the words and its time follow the person's Tamanho do texto, as the words do.
+  const nameSize = look.text ? chatNameOf(look.text) : undefined;
+  const timeSize = look.text ? chatTimeOf(look.text) : undefined;
   const onRight = mine && mineOnRight(look.style);
   const bubbled = look.style === "bubbles";
   const compact = look.style === "compact";
@@ -523,8 +529,9 @@ export const MessageRow = memo(function MessageRow({
         <Text
           variant="footnote"
           tone="ink2"
-          style={[styles.name, nameColor ? { color: nameColor } : undefined]}
+          style={[styles.name, nameSize, nameColor ? { color: nameColor } : undefined]}
           numberOfLines={1}
+          maxFontSizeMultiplier={nameSize ? CHAT_TEXT_MAX_SCALE : undefined}
         >
           {name}
         </Text>
@@ -578,14 +585,19 @@ export const MessageRow = memo(function MessageRow({
         </Text>
       ) : null}
       {inBubble || compact ? null : (
-        <Text variant="footnote" tone="faint">
+        <Text
+          variant="footnote"
+          tone="faint"
+          style={timeSize}
+          maxFontSizeMultiplier={timeSize ? CHAT_TEXT_MAX_SCALE : undefined}
+        >
           {when.time(m.createdAt)}
         </Text>
       )}
       {brainWait ? <AwayPill message={m} /> : null}
       {m.pinned ? <PinMark /> : null}
       {(receipt || seenBy) && !m.local && !inBubble ? (
-        <View style={compact ? undefined : styles.whoMark}>
+        <View style={compact ? undefined : [styles.whoMark, nameSize ? { height: nameSize.lineHeight } : null]}>
           <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
         </View>
       ) : null}

@@ -73,6 +73,7 @@ import { recordTaskFinished } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { maySql } from "./permissions";
+import { runnerUpdateWay } from "./runner-update";
 import type { SearchDeps } from "./search";
 import { autoThreadTitle, createThreadFromRange } from "./threads";
 import { createWikiPage } from "./wiki";
@@ -969,11 +970,7 @@ async function usableMachine(
     status.protocol < MISSION_WORKTREE_PROTOCOL ||
     (asked && asked !== "agent" && status.protocol < MISSION_PROTOCOL)
   ) {
-    throw new ConflictError(
-      `The runner on ${status.name} is too old for missions: run agentes-runner update`,
-      "mission.runner_outdated",
-      { computer: status.name },
-    );
+    throw missionUpdateRefusal(status, "is too old for missions");
   }
   if (asked && !available.includes(asked)) {
     throw new ConflictError(
@@ -1469,16 +1466,19 @@ export async function pauseStuck(
     reason === "repeated_failure"
       ? `"${detail.title ?? "a task"}" failed ${MISSION_STUCK.failures} times in a row`
       : `I was woken ${MISSION_STUCK.idleWakeups} times without the plan moving`;
-  await postMissionMessage(deps, row, `I paused the mission: ${why}. What should I do? Resume it to let me go on.`, {
-    missionStuck: { missionId: row.id, reason, ...detail },
+  const said = {
     bodyCode: reason === "repeated_failure" ? "mission_stuck_failure" : "mission_stuck_idle",
     bodyParams: {
       title: detail.title ?? "",
       count: String(reason === "repeated_failure" ? MISSION_STUCK.failures : MISSION_STUCK.idleWakeups),
     },
+  };
+  await postMissionMessage(deps, row, `I paused the mission: ${why}. What should I do? Resume it to let me go on.`, {
+    missionStuck: { missionId: row.id, reason, ...detail },
+    ...said,
   });
   await publishMissionEvent(deps, row, "paused", { code: "mission.paused_stuck", reason });
-  await notifyMissionEnded(deps, row, "mission_stopped", { type: "agent", id: row.agentId }, why).catch(() => {});
+  await notifyMissionEnded(deps, row, "mission_stopped", { type: "agent", id: row.agentId }, why, said).catch(() => {});
   if (row.ownerId) {
     await publishUserEvent(deps.pubsub, row.orgId, row.ownerId, {
       type: "mission.needs_you",
@@ -1621,6 +1621,20 @@ async function setStatus(
   return row;
 }
 
+/**
+ * A computer that runs no missions until it updates, with how it gets that update (`runnerUpdateWay`). The workspace's
+ * own computer updates by itself: its code says so to the person (`machine.updates_itself`), never to update it.
+ */
+const missionUpdateRefusal = (
+  computer: { name: string; kind?: string | null; executors?: { mode?: string } | null },
+  what: string,
+) =>
+  new ConflictError(
+    `The runner on ${computer.name} ${what}. ${runnerUpdateWay(computer)}`,
+    computer.kind === "managed" ? "machine.updates_itself" : "mission.runner_outdated",
+    { computer: computer.name },
+  );
+
 /** "Começar": only the owner starts a proposed mission; the main session proceeds. */
 export async function startMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
   const { mission, role, isAdmin } = await requireMission(deps, userId, orgId, missionId);
@@ -1628,11 +1642,7 @@ export async function startMission(deps: MissionDeps, userId: string, orgId: str
   // The mission's own copy of the project needs runner protocol 14 (ADR 0044).
   const machine = deps.hub && mission.machineId ? await deps.hub.status(mission.machineId).catch(() => null) : null;
   if (machine && machine.protocol < MISSION_WORKTREE_PROTOCOL) {
-    throw new ConflictError(
-      `The runner on ${machine.name} is too old for missions: run agentes-runner update`,
-      "mission.runner_outdated",
-      { computer: machine.name },
-    );
+    throw missionUpdateRefusal(machine, "is too old for missions");
   }
   let row = await setStatus(
     deps,
@@ -2325,11 +2335,7 @@ export async function setMissionMachine(
     machine.protocol < MISSION_WORKTREE_PROTOCOL ||
     !machineExecutors(machine).available.includes(mission.executor as MissionExecutor)
   ) {
-    throw new ConflictError(
-      `The runner on ${machine.name} can't run this mission: run agentes-runner update`,
-      "mission.runner_outdated",
-      { computer: machine.name },
-    );
+    throw missionUpdateRefusal(machine, "can't run this mission");
   }
   const moved = machine.id !== mission.machineId;
   // Items (or setup) still running or queued there would work in a copy that is going away: stopped first.

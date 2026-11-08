@@ -23,6 +23,7 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { showsAbout } from "@agenteschat/client/lib/about";
 import { keyRemovalText } from "@agenteschat/client/lib/ai-accounts";
 import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
@@ -41,6 +42,7 @@ import {
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
+  Alert,
   Button,
   Card,
   CardHeader,
@@ -63,7 +65,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AboutSection } from "@/components/AboutSettings";
 import { AccessMatrixSection } from "@/components/AccessLevels";
@@ -112,8 +114,13 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./sett
  * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
  * Members only see what they can open.
  */
-export function SettingsPage({
-  section = "general",
+export function SettingsPage(props: ComponentProps<typeof Settings>) {
+  // What this server offers decides the sections (`allowed`): the page waits for it, so none moves in afterwards.
+  return useAuthConfig().isPending ? null : <Settings {...props} />;
+}
+
+function Settings({
+  section,
   connected,
   outcome,
   review,
@@ -125,6 +132,7 @@ export function SettingsPage({
   agent,
   person,
 }: {
+  /** The section a link names; none (`/settings`): Geral for who opens it, else their first one. */
   section?: SettingsSection;
   connected?: string;
   /** Back from OAuth: what came in (`connected`, `reconnected`, `same_account`). */
@@ -148,8 +156,13 @@ export function SettingsPage({
   const { org } = useOrg();
   const server = useAuthConfig().data;
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
-  // A section this person can't open (a member's link to Geral): their first one, their account.
-  const current = visible.some((s) => s.id === section) ? section : (visible[0]?.id ?? "account");
+  // A section a link names that this person can't open: their first one, their account, saying why. Opening the
+  // settings with no section named has nothing to explain. Billing where no billing service runs, or Sobre on
+  // agentes.chat Cloud, isn't about their role.
+  const wanted = section ?? "general";
+  const current = visible.some((s) => s.id === wanted) ? wanted : (visible[0]?.id ?? "account");
+  const serverLacks = (section === "billing" && !server?.billingUrl) || (section === "about" && !showsAbout(server));
+  const refused = section && current !== section && !serverLacks ? section : null;
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
   const strip = useRef<HTMLDivElement>(null);
@@ -164,7 +177,7 @@ export function SettingsPage({
       <nav className="settings__nav" data-scroll-restoration-id="settings-nav" aria-label={t("settings.nav")}>
         <div className="settings__head">
           <h1 className="settings__title">{t("settings.title")}</h1>
-          <span className="settings__org">
+          <span className="settings__org ac-iconline">
             <OrgMark logo={org.logo} size={18} />
             <span>{org.name}</span>
           </span>
@@ -206,6 +219,7 @@ export function SettingsPage({
         </div>
       </nav>
       <div className="settings__body" data-scroll-restoration-id="settings-section">
+        {refused && <Alert tone="neutral">{t("settings.notOpen", { section: sectionName(refused) })}</Alert>}
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
           <PageHeader
             level={2}
@@ -469,6 +483,7 @@ function GeneralSection() {
         <Textarea
           ref={contextRef}
           rows={7}
+          maxLength={20_000}
           value={context}
           onChange={(e) => changeContext(e.target.value)}
           onBlur={flushContext}

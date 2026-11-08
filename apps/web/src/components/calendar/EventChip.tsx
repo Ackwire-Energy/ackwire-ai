@@ -1,6 +1,6 @@
 import type { RoutineTarget } from "@agenteschat/client";
 import { useChannels } from "@agenteschat/client";
-import type { CalItem } from "@agenteschat/client/lib/calendar";
+import { type CalItem, type RsvpStatus, shortDay } from "@agenteschat/client/lib/calendar";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { appearanceStyle, Button, cx, Icon, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -43,11 +43,7 @@ export function useCadence() {
 }
 
 /** "seg, 12 out". */
-export const dayLabel = (locale: string, d: Date) =>
-  new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" })
-    .format(d)
-    .replace(/\./g, "")
-    .replace(/ de /g, " ");
+export const dayLabel = shortDay;
 
 /**
  * One item on the calendar: a neutral card with a left color by source, the
@@ -139,12 +135,15 @@ export function ItemDetails({
   onEdit,
   onDelete,
   onCancel,
+  rsvp,
 }: {
   item: CalItem;
   onEdit?: () => void;
   onDelete?: () => void;
   /** A reminder this person may cancel. */
   onCancel?: () => void;
+  /** An event this person is invited to: their answer, and Vou or Não vou to give or change it. */
+  rsvp?: { status: RsvpStatus; answers: Map<string, RsvpStatus>; onRespond: (status: "accepted" | "declined") => void };
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -223,14 +222,21 @@ export function ItemDetails({
       {item.kind === "deadline" && <span className="small">{t("calendar.deadlineDetail")}</span>}
       {item.people.length > 0 && (
         <ul className="cal-details__people">
-          {item.people.map((p) => (
-            <li key={`${p.type}:${p.id}`} className="actor-label">
-              {actors.avatar(p)}
-              <span>{actors.name(p)}</span>
-            </li>
-          ))}
+          {item.people.map((p) => {
+            const answer = p.type === "person" ? rsvp?.answers.get(p.id) : undefined;
+            return (
+              <li key={`${p.type}:${p.id}`} className="actor-label">
+                {actors.avatar(p)}
+                <span>{actors.name(p)}</span>
+                {answer && answer !== "needs_action" && (
+                  <span className="small muted">{t(`calendar.rsvp.${answer}`)}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
+      {rsvp && <span className="small">{t(`calendar.rsvp.mine.${rsvp.status}`)}</span>}
       <div className="cal-details__actions">
         {item.kind === "deadline" && item.issueNumber !== undefined && (
           <Link
@@ -259,6 +265,16 @@ export function ItemDetails({
         {onDelete && (
           <Button size="sm" variant="ghost" icon="trash" onClick={onDelete}>
             {t("calendar.delete")}
+          </Button>
+        )}
+        {rsvp && rsvp.status !== "accepted" && (
+          <Button size="sm" icon="check" onClick={() => rsvp.onRespond("accepted")}>
+            {t("calendar.rsvp.accept")}
+          </Button>
+        )}
+        {rsvp && rsvp.status !== "declined" && (
+          <Button size="sm" variant="ghost" icon="close" onClick={() => rsvp.onRespond("declined")}>
+            {t("calendar.rsvp.decline")}
           </Button>
         )}
         {onEdit && (

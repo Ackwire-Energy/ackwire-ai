@@ -44,8 +44,11 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactDetail,
+  ArtifactFilters,
+  ArtifactPage,
   ArtifactVersion,
   AskToJoinResult,
   AuditPage,
@@ -99,6 +102,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  IdRef,
   ImportedFile,
   ImportedSource,
   ImportPlan,
@@ -227,6 +231,8 @@ import type {
   WikiTopRead,
   WikiVersion,
   WorkingRun,
+  WorkspaceActionCard,
+  WorkspaceActionCardView,
   WorkspaceLimits,
 } from "./types";
 
@@ -258,6 +264,23 @@ const threadQuery = (f: Partial<ThreadFilters>) => ({
   limit: f.limit,
 });
 
+const csv = (list: readonly string[] | undefined) => (list?.length ? list.join(",") : undefined);
+
+/** The Drive's filters as `GET …/artifacts` reads them. */
+const artifactQuery = (f: ArtifactFilters) => ({
+  q: f.q,
+  kind: f.kind,
+  kinds: csv(f.kinds),
+  channelId: f.channelId,
+  channelIds: csv(f.channelIds),
+  authorType: f.author?.type,
+  authorId: f.author?.id,
+  changed: f.changed && f.author ? "1" : undefined,
+  authors: csv(f.authors?.map((a) => `${a.type}:${a.id}`)),
+  who: f.who,
+  sort: f.sort && f.sort !== "recent" ? f.sort : undefined,
+});
+
 /**
  * The real backend: `/api/health` and `/api/app/*` (apps/server/src/routes/app).
  * The web app calls it with no options (same origin, its cookie). The phone app
@@ -286,6 +309,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       redo: (orgId, actionId) => request<AgentAction>(`${org(orgId)}/actions/${enc(actionId)}/redo`, { json: {} }),
       undoMessage: (orgId, messageId) =>
         request<UndoAllResult>(`${org(orgId)}/messages/${enc(messageId)}/actions/undo`, { json: {} }),
+    },
+    actionCards: {
+      get: (orgId, messageId) => request<WorkspaceActionCardView>(`${org(orgId)}/action-cards/${enc(messageId)}`),
+      decide: (orgId, messageId, decision) =>
+        request<{ card: WorkspaceActionCard }>(`${org(orgId)}/action-cards/${enc(messageId)}/${decision}`, {
+          json: {},
+        }),
     },
     agentForYou: {
       get: (orgId, agentId, limit) =>
@@ -759,6 +789,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           })
         ).mailboxes,
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      unarchive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/unarchive`, { json: {} }),
       purge: (orgId, agentId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
       former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,
@@ -923,6 +954,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       leave: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/leave`, { json: {} }),
       card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       messageCard: (orgId, messageId) => request<MessageCard>(`${org(orgId)}/messages/${enc(messageId)}/card`),
+      idRef: (orgId, id) => request<IdRef>(`${org(orgId)}/refs/${enc(id)}`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>
@@ -952,6 +984,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
+      archived: async (orgId) =>
+        (await request<{ channels: ArchivedChannel[] }>(`${org(orgId)}/archived-channels`)).channels,
       deleteChannel: (orgId, channelId, name) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/delete`, { json: { name } }),
       roster: async (orgId, channelId) =>
@@ -1256,18 +1290,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     artifacts: {
       list: async (orgId, filters = {}) =>
-        (
-          await request<{ artifacts: Artifact[] }>(`${org(orgId)}/artifacts`, {
-            query: {
-              q: filters.q,
-              kind: filters.kind,
-              channelId: filters.channelId,
-              authorType: filters.author?.type,
-              authorId: filters.author?.id,
-              changed: filters.changed && filters.author ? "1" : undefined,
-            },
-          })
-        ).artifacts,
+        (await request<ArtifactPage>(`${org(orgId)}/artifacts`, { query: artifactQuery(filters) })).artifacts,
+      page: (orgId, filters = {}, cursor) =>
+        request<ArtifactPage>(`${org(orgId)}/artifacts`, { query: { ...artifactQuery(filters), cursor } }),
       get: (orgId, id, version) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}`, { query: { version } }),
       keep: (orgId, id) => request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/keep`, { method: "POST" }),
@@ -1285,9 +1310,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
       choices: (orgId, id) => request<Choices>(`${org(orgId)}/choices/${enc(id)}`),
-      answerChoices: (orgId, id, picks, clientId) =>
+      answerChoices: (orgId, id, picks, clientId, others) =>
         request<{ choices: Choices; messageId: string }>(`${org(orgId)}/choices/${enc(id)}/answer`, {
-          json: { picks, clientId },
+          json: { picks, clientId, ...(others ? { others } : {}) },
         }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
@@ -1321,6 +1346,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       create: (orgId, input) => request<ArtifactDetail>(`${org(orgId)}/artifacts`, { json: input }),
       update: (orgId, id, input) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),
+      setSharing: (orgId, id, sharing) =>
+        request<Artifact>(`${org(orgId)}/artifacts/${enc(id)}/sharing`, { method: "PUT", json: sharing }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
       trash: async (orgId) => {
         // The server answers `{ files }`.
@@ -1625,6 +1652,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<CalendarEvent>(`${org(orgId)}/calendar/proposals/${enc(id)}/confirm`, { json: {} }),
       dismissProposal: (orgId, id) =>
         request<void>(`${org(orgId)}/calendar/proposals/${enc(id)}/dismiss`, { json: {} }),
+      respond: (orgId, id, status) =>
+        request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}/rsvp`, { json: { status } }),
       update: (orgId, id, patch, series) =>
         request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}`, {
           method: "PATCH",

@@ -402,13 +402,13 @@ describe("Drive and skills", () => {
     const out = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
     expect(out).toMatchObject({ isError: false });
     const left =
-      "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.";
+      "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner updates the agentes app there, or runs `agentes-runner update`.";
     expect(out.content).toContain(left);
     expect(vaultUpdateText({ name: "Box", kind: "managed" }, "use Vault keys")).toBe(
       "The computer Box needs an update to use Vault keys. It updates by itself, so try again later.",
     );
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
-      "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
+      "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner updates the agentes app there, or runs `agentes-runner update`.",
     );
     // What it could take is there: the next run sends the scripts alone, and says again what stayed behind.
     const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");

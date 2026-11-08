@@ -1,7 +1,7 @@
 import { useAgentGroups } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ListRow } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useOrgId } from "../shared/hooks";
 import { Tile } from "../shared/parts";
 

@@ -1,4 +1,13 @@
-import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe, useOverview } from "@agenteschat/client";
+import {
+  useAiAccounts,
+  useAuthConfig,
+  useCredentials,
+  useIssues,
+  useJoinRequests,
+  useMe,
+  useOverview,
+} from "@agenteschat/client";
+import { showsAbout } from "@agenteschat/client/lib/about";
 import {
   accountTitle,
   groupPlans,
@@ -10,7 +19,6 @@ import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -27,6 +35,7 @@ import {
   useTheme,
   WithPresence,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
@@ -81,6 +90,7 @@ export function MeScreen() {
   const waiting = requests.data?.length ?? 0;
   const proposals = useOverview(org.orgId).data?.proposalsWaitingForMe ?? 0;
   const push = usePushSwitch().on;
+  const about = showsAbout(useAuthConfig().data);
 
   const mine = meId ? dir.memberById.get(meId) : undefined;
   // How you appear (to yourself: hidden stays hidden), on your photo's corner (ADR 0084).
@@ -207,7 +217,7 @@ export function MeScreen() {
       value: isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language,
       href: "/me/language",
     },
-    { icon: "info", label: t("settings.section.about"), href: "/me/about" },
+    ...(about ? [{ icon: "info" as const, label: t("settings.section.about"), href: "/me/about" }] : []),
   ];
   return (
     // The page is white like Conversas; its screens sit on the grouped gray, as settings do.

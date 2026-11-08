@@ -308,6 +308,17 @@ describe("missions with executor agent (ADR 0029)", () => {
     expect(after.status).toBe("paused");
     const stuck = (await threadMessages(view.threadId)).find((m) => m.meta.missionStuck);
     expect(stuck?.meta).toMatchObject({ missionStuck: { reason: "repeated_failure", title: "Build" } });
+    // The inbox says why in each reader's language, as the chat does, never the server's English.
+    const [stopped] = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.kind, "mission_stopped"));
+    expect(stopped?.latest).toMatchObject({
+      meta: {
+        bodyCode: "mission_stuck_failure",
+        bodyParams: { title: "Build", count: String(MISSION_STUCK.failures) },
+      },
+    });
     // The first two failures woke the agent with their notices; the third didn't.
     const failures = (await threadMessages(view.threadId)).filter(
       (m) => (m.meta.machineTask as { status?: string } | undefined)?.status === "failed",

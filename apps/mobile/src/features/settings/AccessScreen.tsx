@@ -9,12 +9,12 @@ import {
   resourcesOf,
 } from "@agenteschat/client/lib/access-levels";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, InfoHint, Segmented, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { mayCreate } from "../new/logic";

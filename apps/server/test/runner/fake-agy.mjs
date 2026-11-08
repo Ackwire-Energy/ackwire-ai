@@ -1,7 +1,9 @@
 // A fake Antigravity CLI (`agy`) for runner tests. Each start appends its argv, cwd and the env that matters (its home,
 // the MCP run and token, keys that must stay out) to $FAKE_AGY_LOG (one JSON line). Signed in: `fake-auth.json` in
 // $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models (signed out: an error),
-// `acp --login` prints a Google sign-in link, reads the pasted code from stdin and signs in, `-p /usage` prints the
+// `acp --login` prints a Google sign-in link and, as Antigravity CLI 1.5.3 does, reads the pasted code only from its
+// terminal (none: "no controlling terminal", exit 1; a code with paste marks it never turned on is refused), then signs
+// in. `-p /usage` prints the
 // quotas, `-p /logout` signs out. `-p <prompt> --output-format stream-json` prints one turn: init (the conversation:
 // `--conversation`'s, or a new one when it doesn't know that one; its tools: our server's alone with `--agent`, else
 // the CLI's own and ours, or $FAKE_AGY_TOOLS), a text delta, a shell step (none with "BRIDGE_ONLY"), a call to our
@@ -51,15 +53,22 @@ if (args[0] === "models") {
 }
 if (args[0] === "acp" && args[1] === "--login") {
   process.stdout.write(
-    "Open this link to sign in:\nhttps://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1\nPaste the code: ",
+    "Open this link in a browser to log in with Google:\nhttps://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1\nThen paste the authorization code, or the full URL of the page you land on, and press Enter: ",
   );
+  if (!process.stdin.isTTY) {
+    process.stderr.write("Error: no controlling terminal; cannot complete interactive login\n");
+    process.exit(1);
+  }
   let code = "";
   process.stdin.setEncoding("utf8");
   for await (const chunk of process.stdin) {
     code += chunk;
-    if (code.includes("\n")) break;
+    if (/[\r\n]/.test(code)) break;
   }
-  if (!code.trim()) process.exit(1);
+  if (!code.trim() || code.includes("\x1b")) {
+    process.stdout.write("\r\nSign-in failed: invalid authorization code\r\n");
+    process.exit(1);
+  }
   mkdirSync(dir, { recursive: true });
   writeFileSync(auth, "{}");
   process.stdout.write("Signed in.\n");

@@ -14,7 +14,9 @@ export interface IconButtonProps {
   disabled?: boolean;
 }
 
-const SIZE = 40;
+/** Its side: a bar that holds more of them on one side than the other balances with an empty one this wide. */
+export const ICON_BUTTON_SIZE = 40;
+const SIZE = ICON_BUTTON_SIZE;
 
 /**
  * A 40-point icon button: transparent, or a floating glass circle (`plate`), round like the system's own

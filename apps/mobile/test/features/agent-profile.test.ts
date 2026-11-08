@@ -408,6 +408,23 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(parts).toContain("const level = planLevel(w.used);");
     expect(parts.match(/color=\{tone\}/g)).toHaveLength(2);
   });
+
+  test("an account's name wraps beside its plan's tag, and whose it is too, as on the web: never an ellipsis", async () => {
+    const parts = await Bun.file(new URL("../../src/features/usage/parts.tsx", import.meta.url).pathname).text();
+    const head = parts.slice(parts.indexOf("export function AccountHead("), parts.indexOf("function Tag("));
+    expect(head).toContain("{accountName(t, account)}");
+    expect(head).not.toContain("numberOfLines");
+    expect(parts).toMatch(/acctName: \{ flexDirection: "row", flexWrap: "wrap",/);
+  });
+
+  test("an agent's usage by account: the figures under the account, as on the web's phone width, never a narrow column", async () => {
+    const screen = await Bun.file(
+      new URL("../../src/features/usage/AgentUsageScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain("source: { gap: 6, paddingVertical: 12 },");
+    expect(screen).toContain('n: { alignItems: "flex-start" },');
+    expect(screen).not.toContain("maxWidth: 110");
+  });
 });
 
 describe("Perfil: agora, cada coisa uma vez", () => {

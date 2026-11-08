@@ -99,7 +99,7 @@ export {
   type BrainPortraitProps,
   type BrainPortraitState,
 } from "./components/Brain";
-export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
+export { Button, type ButtonProps, type ButtonVariant, SwapLabel } from "./components/Button";
 export { CardHorizon, horizonCrest, horizonHeight, horizonTones } from "./components/CardHorizon";
 export { type CardCut, CardMore, useCardCut } from "./components/CardMore";
 export { Carousel, type CarouselProps } from "./components/Carousel";
@@ -148,7 +148,14 @@ export {
   type DetailsDialogProps,
   DetailsSection,
 } from "./components/DetailsDialog";
-export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
+export {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  type DialogProps,
+  DialogSearchList,
+  useUnsavedInDialog,
+} from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export { drawEffort, EffortPixels, type EffortStep } from "./components/EffortPixels";
 export {
@@ -348,6 +355,7 @@ export {
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
+export { Tip, type TipProps } from "./components/Tip";
 export { Token, TokenList } from "./components/Token";
 export {
   ToolBlock,

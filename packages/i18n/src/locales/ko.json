@@ -32,6 +32,7 @@
     "code": "코드",
     "fullScreen": "전체 화면",
     "wrapLines": "줄 바꿈",
+    "raw": "원본",
     "table": "표",
     "chartItem": "항목",
     "chartShare": "비중",
@@ -44,6 +45,7 @@
     "today": "오늘",
     "yesterday": "어제",
     "loadFailed": "불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
+    "gone": "이제 여기에 없어요. 삭제되었거나 더 이상 접근할 수 없어요.",
     "notAllowed": "이 작업을 할 권한이 없어요.",
     "tooMany": "시도 횟수가 너무 많아요. 나중에 다시 시도해 주세요.",
     "offline": "오프라인 상태예요. 연결을 확인하고 다시 시도해 주세요.",
@@ -1491,6 +1493,9 @@
     "workingNow": "지금 작업 중",
     "available": "대기 중",
     "archived": "보관됨",
+    "restore": "복원",
+    "restoreAction": "{{name}} 복원",
+    "restored": "{{name}}이(가) 팀으로 돌아왔어요.",
     "emptyTitle": "에이전트 팀을 꾸려 보세요",
     "empty": "에이전트마다 역할이 있고, 같은 채널에서 사람과 함께 일해요.",
     "emptyViewerTitle": "에이전트 팀이 여기에 표시돼요",
@@ -1747,6 +1752,13 @@
     "generalName": "#general은 이름을 바꿀 수 없어요.",
     "archive": "채널 보관",
     "archived": "#{{channel}}을(를) 보관했어요. 대화는 유지돼요.",
+    "archivedTitle": "보관된 채널",
+    "archivedCount_other": "보관된 채널 {{count}}개",
+    "archivedNone": "복원할 보관된 채널이 없어요",
+    "archivedOn": "{{date}}에 보관됨",
+    "restore": "복원",
+    "restoreName": "#{{channel}} 복원",
+    "restored": "#{{channel}}이(가) 돌아왔어요.",
     "leave": "채널 나가기",
     "left": "#{{channel}}에서 나갔어요",
     "leaveTitle": "#{{channel}}에서 나갈까요?",
@@ -1904,7 +1916,7 @@
       "budgetHelp": "한도에 닿으면 다른 에이전트처럼 멈추고 알려 줘요.",
       "audience": "사용할 수 있는 사람",
       "audienceHelp": "대상이 아닌 사람에게는 사이드바에 {{name}}이(가) 보이지 않아요.",
-      "lock": "{{name}}은(는) 보관하거나 삭제할 수 없어요. 누군가 말을 걸기 전에는 아무것도 올리지 않아요.",
+      "lock": "{{name}}은(는) 보관하거나 삭제할 수 없어요. 말을 걸지 않아도 올리는 건 관리자에게 보내는 팀의 한 주뿐이에요.",
       "audit": "{{name}}이(가) 한 일 보기",
       "change": "바꾸기",
       "planHelp": "비용은 요금제 주인이 내요. 그 컴퓨터를 쓸 수 없으면 대화에서 알려 주고 API 키를 제안해요.",
@@ -2021,6 +2033,38 @@
       "open": "열기",
       "web": "사이트에서 열기",
       "notAllowed": "이 화면에 접근할 수 없어요"
+    },
+    "action": {
+      "title": "워크스페이스 변경",
+      "only": "이 변경을 할 수 있는 사람만 적용해요",
+      "ask": "권한 있는 사람에게 보내기",
+      "other": "워크스페이스 변경하기",
+      "create_role": "역할 <b>{{name}}</b> 만들기",
+      "update_role": "역할 <b>{{name}}</b> 변경",
+      "delete_role": "역할 <b>{{name}}</b> 영구 삭제",
+      "move_role": "역할 <b>{{name}}</b> 순서 바꾸기",
+      "set_member_roles": "<b>{{name}}</b>님의 역할 변경: {{change}}",
+      "set_channel_permissions": "<b>#{{channel}}</b>에서 {{who}}이(가) 할 수 있는 일 변경",
+      "set_my_status": "상태 설정: <b>{{what}}</b>",
+      "set_notifications_on": "<b>{{category}}</b> 알림 켜기",
+      "set_notifications_off": "<b>{{category}}</b> 알림 끄기",
+      "set_my_timezone": "시간대를 <b>{{timezone}}</b>(으)로 설정",
+      "set_my_timezone_workspace": "다시 워크스페이스 시간대 따르기",
+      "set_invitation_roles": "<b>{{email}}</b> 초대로 주는 역할 바꾸기: {{change}}",
+      "update_channel": "채널 <b>#{{channel}}</b> 변경",
+      "archive_channel": "<b>#{{channel}}</b> 보관",
+      "archive_channel_back": "<b>#{{channel}}</b> 되돌리기",
+      "channel_people": "<b>#{{channel}}</b>의 멤버 바꾸기: {{change}}",
+      "delete_channel": "채널 <b>#{{channel}}</b>을(를) 메시지와 파일까지 영구 삭제",
+      "revoke_invitation": "<b>{{email}}</b> 초대 취소",
+      "resend_invitation": "<b>{{email}}</b>에게 초대 다시 보내기",
+      "decide_join_request_approve": "<b>{{email}}</b>을(를) 워크스페이스에 들이기",
+      "decide_join_request_deny": "<b>{{email}}</b>의 참여 요청 거절",
+      "stop_work": "<b>{{agent}}</b>이(가) 하는 일 멈추기",
+      "continue_work": "<b>{{agent}}</b>이(가) 계속하게 하기",
+      "update_workspace": "워크스페이스 <b>{{name}}</b> 변경",
+      "set_action_check_on": "팀이 이미 한 일 확인 켜기",
+      "set_action_check_off": "팀이 이미 한 일 확인 끄기"
     }
   },
   "teamWeek": {
@@ -2567,7 +2611,8 @@
       "updated_status": "<b>#{{number}}</b>을(를) {{status}}(으)로 옮겼어요 · {{title}}",
       "updated_priority": "<b>#{{number}}</b>의 우선순위를 {{priority}}(으)로 설정했어요 · {{title}}",
       "assigned": "<b>#{{number}}</b>을(를) {{assignee}}에게 배정했어요 · {{title}}",
-      "assigned_self": "<b>#{{number}}</b>을(를) 직접 맡았어요 · {{title}}"
+      "assigned_self": "<b>#{{number}}</b>을(를) 직접 맡았어요 · {{title}}",
+      "files": "{{names}}을(를) 첨부했어요"
     },
     "memory": {
       "saved": "<b>메모리</b>에 저장했어요: {{text}}",
@@ -2611,6 +2656,35 @@
       "merged": "<b>{{repo}}</b>의 PR <b>#{{number}}</b>을 병합했어요",
       "merged_branch": "<b>{{repo}}</b>에 <b>{{ref}}</b>을 병합했어요"
     },
+    "workspace": {
+      "changed": "워크스페이스를 변경했어요",
+      "changed_create_role": "역할 <b>{{name}}</b>을(를) 만들었어요",
+      "changed_update_role": "역할 <b>{{name}}</b>을(를) 변경했어요",
+      "changed_delete_role": "역할 <b>{{name}}</b>을(를) 삭제했어요",
+      "changed_move_role": "역할 <b>{{name}}</b>의 순서를 바꿨어요",
+      "changed_set_member_roles": "<b>{{name}}</b>님의 역할을 변경했어요: {{change}}",
+      "changed_set_channel_permissions": "<b>#{{channel}}</b>에서 {{who}}이(가) 할 수 있는 일을 변경했어요",
+      "changed_set_my_status": "상태를 설정했어요: <b>{{what}}</b>",
+      "changed_set_notifications_on": "<b>{{category}}</b> 알림을 켰어요",
+      "changed_set_notifications_off": "<b>{{category}}</b> 알림을 껐어요",
+      "changed_set_my_timezone": "시간대를 <b>{{timezone}}</b>(으)로 설정했어요",
+      "changed_set_my_timezone_workspace": "시간대가 다시 워크스페이스를 따라요",
+      "changed_set_invitation_roles": "<b>{{email}}</b> 초대로 주는 역할을 바꿨어요: {{change}}",
+      "changed_update_channel": "채널 <b>#{{channel}}</b>을(를) 변경했어요",
+      "changed_archive_channel": "<b>#{{channel}}</b>을(를) 보관했어요",
+      "changed_archive_channel_back": "<b>#{{channel}}</b>을(를) 되돌렸어요",
+      "changed_channel_people": "<b>#{{channel}}</b>의 멤버를 바꿨어요: {{change}}",
+      "changed_delete_channel": "채널 <b>#{{channel}}</b>을(를) 삭제했어요",
+      "changed_revoke_invitation": "<b>{{email}}</b> 초대를 취소했어요",
+      "changed_resend_invitation": "<b>{{email}}</b>에게 초대를 다시 보냈어요",
+      "changed_decide_join_request_approve": "<b>{{email}}</b>을(를) 워크스페이스에 들였어요",
+      "changed_decide_join_request_deny": "<b>{{email}}</b>의 참여 요청을 거절했어요",
+      "changed_stop_work": "<b>{{agent}}</b>이(가) 하던 일을 멈췄어요",
+      "changed_continue_work": "<b>{{agent}}</b>이(가) 계속하게 했어요",
+      "changed_update_workspace": "워크스페이스 <b>{{name}}</b>을(를) 변경했어요",
+      "changed_set_action_check_on": "팀이 이미 한 일 확인을 켰어요",
+      "changed_set_action_check_off": "팀이 이미 한 일 확인을 껐어요"
+    },
     "other": "변경 사항을 적용했어요",
     "copyWebhook": "웹훅 주소 복사",
     "issueFields": {
@@ -2622,7 +2696,8 @@
       "labels": "라벨",
       "dueDate": "마감일",
       "githubUrl": "GitHub 링크",
-      "criteria": "기준"
+      "criteria": "기준",
+      "files": "첨부 파일"
     },
     "routineFields": {
       "name": "이름",
@@ -4260,6 +4335,8 @@
           "stepTwo": "Claude가 보여 주는 코드를 붙여넣으세요",
           "codeLabel": "Claude 코드",
           "notCode": "Claude 코드가 아닌 것 같아요.",
+          "stepTwoGoogle": "Google에 표시된 코드를 붙여넣으세요",
+          "codeLabelGoogle": "코드 또는 링크",
           "send": "{{computer}}(으)로 보내기",
           "sending": "{{computer}}(으)로 코드를 보내는 중…",
           "sent": "코드를 보냈어요. {{computer}}에서 로그인을 마무리하는 중이에요.",
@@ -4577,6 +4654,7 @@
         "too_many_tool_calls": "한 번의 실행에서 도구 사용 한도를 넘었어요.",
         "stuck": "막혀서 중지했어요.",
         "brain_interrupted": "AI가 끝내기 전에 멈췄어요.",
+        "brain_unavailable": "컴퓨터의 AI가 응답하지 못했어요. 컴퓨터를 확인하고 다시 요청해 주세요.",
         "empty_reply": "모델이 아무것도 반환하지 않았어요.",
         "model_refused": "모델이 답변을 거부했어요.",
         "agent_archived": "에이전트가 보관됐어요.",
@@ -5919,6 +5997,7 @@
         "done": "끝남",
         "canceled": "하지 않을 작업"
       },
+      "stageFull": "{{stage}}에는 이미 열이 {{max}}개 있어요. 한 단계의 최대치예요. 먼저 그중 하나를 삭제해 주세요.",
       "stageExplain": {
         "todo": "새 작업은 할 일의 첫 열에 들어와요.",
         "in_progress": "에이전트가 시작하면 작업이 진행 중의 첫 열로 가요.",
@@ -6020,6 +6099,8 @@
       "cancel": "취소",
       "create": "작업 만들기",
       "created": "작업 #{{number}}을(를) 만들었어요.",
+      "notStarted": "작업 #{{number}}을(를) 만들었지만 {{name}}이(가) 시작하지 않았어요.",
+      "askAgain": "다시 요청",
       "intro": "맡은 사람이나 에이전트가 진행 상황과 함께 보드에 표시돼요.",
       "criteriaFound_other": "완료 조건 {{count}}개",
       "agentStarts": "작업이 만들어지는 대로 {{name}}이(가) 시작해요. 민감한 작업은 승인을 요청해요.",
@@ -6063,6 +6144,7 @@
     "askButton": "{{name}}에게 맡기기",
     "askSection": "에이전트에게 맡기기",
     "asked": "요청을 보냈어요. {{name}}이(가) 작업 대화에서 일하고, 작업을 볼 수 있는 모든 사람이 그 대화를 따라볼 수 있어요.",
+    "notStarted": "{{name}}이(가) 시작하지 않았어요.",
     "activity": "활동",
     "noActivity": "아직 아무것도 없어요.",
     "discussion": "토론",
@@ -6108,7 +6190,8 @@
       "add": "파일 추가",
       "addHint": "또는 여기로 끌어다 놓기",
       "grid": "격자",
-      "empty": "아직 첨부 파일이 없어요. 여기로 파일을 끌어다 놓거나 스크린샷을 붙여 넣으세요.",
+      "emptyTitle": "이 작업의 파일은 여기에 모여요",
+      "empty": "여기로 파일을 끌어다 놓거나, 스크린샷을 붙여 넣거나, 작업 대화에서 보내세요.",
       "fromCreation": "만들 때 · {{when}}",
       "fromComment": "{{name}}의 댓글 · {{when}}",
       "linked": "{{name}}이(가) 연결함"
@@ -6137,6 +6220,8 @@
       "github_linked": "GitHub에 연결했습니다",
       "github_unlinked": "GitHub 링크를 삭제했습니다",
       "artifact_linked": "파일을 첨부했어요",
+      "files_attached": "{{names}}을(를) 첨부했어요",
+      "files_removed": "{{names}}을(를) 첨부 파일에서 뺐어요",
       "criterion_checked": "조건 \"{{text}}\"을(를) 체크했어요",
       "criterion_unchecked": "조건 \"{{text}}\"의 체크를 해제했어요",
       "agent_asked": "{{name}}에게 맡겼어요"
@@ -7810,6 +7895,19 @@
     "confirm": "확정하고 초대하기",
     "otherTime": "다른 시간",
     "confirmed": "일정을 만들고 초대를 보냈어요.",
+    "proposalDismissed": "제안을 넘겼어요",
+    "proposalWaits": "{{name}}님이 이 일정을 확정해요.",
+    "rsvp": {
+      "accept": "참석",
+      "decline": "불참",
+      "accepted": "참석",
+      "declined": "불참",
+      "mine": {
+        "needs_action": "이 일정에 초대받았어요.",
+        "accepted": "참석해요.",
+        "declined": "참석하지 않아요."
+      }
+    },
     "kind": {
       "event": "일정",
       "routine": "루틴",
@@ -9535,6 +9633,7 @@
     "title": "Drive",
     "subtitle": "사람과 에이전트가 만들거나 업로드한 모든 것.",
     "search": "파일 검색",
+    "loadMore": "더 불러오기",
     "kind": "유형",
     "filters": "필터",
     "allKinds": "모든 유형",
@@ -9618,6 +9717,7 @@
     "onlyDriveText": "아직 채널에 공유하지 않았어요.",
     "dm": "다이렉트 메시지",
     "dmWith": "{{name}}와(과)의 다이렉트 메시지",
+    "dmBetween": "{{names}} 사이의 다이렉트 메시지",
     "inDm": "다이렉트 메시지로 보냄",
     "inThread": "대화의 스레드에 있음",
     "audience": {
@@ -9625,7 +9725,8 @@
       "publicChannel": "공개 채널 #{{name}}에 있어서 워크스페이스의 모든 사람이 볼 수 있어요",
       "privateChannel": "#{{name}} 멤버와 관리자만 볼 수 있어요",
       "dm": "다이렉트 메시지에서 온 파일이라 나와 {{name}}만 볼 수 있어요",
-      "dmGone": "다이렉트 메시지에서 온 파일이라 그 대화에 있는 사람만 볼 수 있어요"
+      "dmGone": "다이렉트 메시지에서 온 파일이라 그 대화에 있는 사람만 볼 수 있어요",
+      "dmBetween": "다이렉트 메시지에서 온 파일이라 {{names}}만 볼 수 있어요"
     },
     "private": "비공개",
     "privateHint": "대화에 있는 사람만 이 파일을 볼 수 있어요. 채널에서는 관리자도 볼 수 있어요.",
@@ -9669,9 +9770,6 @@
     },
     "s3": "내 버킷",
     "s3Text": "S3, R2, MinIO 등 S3 호환 저장소.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "곧 지원 예정",
     "current": "사용 중",
     "usage": {
       "files": "파일 {{size}}",
@@ -10234,6 +10332,7 @@
     },
     "toolsCount_other": "도구 {{count}}개",
     "active": "활성",
+    "noToolsNow": "지금은 도구 없음",
     "notReviewed": "검토 대기 중",
     "toReview_other": "검토할 새 도구 {{count}}개",
     "usedBy_other": "에이전트 {{total}}명 중 {{count}}명",
@@ -10387,6 +10486,7 @@
   },
   "toolNames": {
     "order": "verb-last",
+    "catalog": "none",
     "verb": {
       "get": "조회",
       "list": "목록 조회",
@@ -11098,6 +11198,11 @@
       "subject": "제목에 포함",
       "text": "본문에 포함",
       "noMailbox": "먼저 커넥터에서 메일함을 연결하세요.",
+      "readsNone": "{{name}}은(는) 아직 어떤 메일함도 읽지 못해요.",
+      "cantRead": "{{name}}은(는) 이 메일함을 읽지 못해요.",
+      "connectorReadsNone": "{{name}}은(는) 아직 {{connector}}을(를) 읽지 못해요.",
+      "connectorCantRead": "{{name}}은(는) {{connector}}을(를) 읽지 못해요.",
+      "giveAccess": "접근 권한 주기",
       "openConnectors": "커넥터 열기",
       "when": "{{address}}에 이메일이 도착하면",
       "whenFolder": "{{address}}({{folder}})에 이메일이 도착하면",
@@ -11252,6 +11357,11 @@
       "hintZoomed": "드래그해 이동. Esc로 다시 맞춤",
       "hintTouch": "탭하거나 핀치해 확대",
       "hintZoomedTouch": "드래그해 이동. 탭하면 다시 맞춤"
+    },
+    "nav": {
+      "previous": "이전 이미지",
+      "next": "다음 이미지",
+      "place": "{{count}}개 중 {{index}}번째"
     }
   },
   "errors": {
@@ -11270,6 +11380,8 @@
       "checkAddress": "주소를 확인하고 다시 시도해 주세요.",
       "tooLong": "너무 길어요. 줄이고 다시 시도해 주세요.",
       "updateComputerApp": "컴퓨터의 앱이 너무 오래됐어요. 업데이트하고 다시 시도해 주세요.",
+      "computerUpdatesItself": "워크스페이스 컴퓨터가 이를 위해 스스로 업데이트돼요. 잠시 후 다시 시도하세요.",
+      "notInvited": "이 일정에 초대받지 않았어요.",
       "offHere": "여기서는 꺼져 있어요.",
       "notInConversation": "이 대화에 없어요.",
       "accountStart": "컴퓨터가 로그인을 시작하지 못했어요. 켜져 있는지 확인하고 다시 시도해 주세요.",
@@ -11312,6 +11424,7 @@
     },
     "issue": {
       "assigneeOutside": "이 사람은 이 작업을 볼 수 없어요. 먼저 볼 수 있는 사람에 추가하세요.",
+      "stageFull": "한 단계에는 열을 최대 {{max}}개까지 둘 수 있어요. 먼저 그 단계의 열을 하나 삭제해 주세요.",
       "deleteForbidden": "이 작업은 만든 사람이나 관리자만 삭제할 수 있어요.",
       "audienceEmpty": "볼 수 있는 사람을 선택하세요."
     },
@@ -11488,7 +11601,14 @@
       "fileNameRequired": "파일에 이름이 필요해요.",
       "notFound": "이 파일은 더 이상 없거나 접근 권한이 없어요.",
       "deleteForbidden": "만든 사람, 에이전트에게 요청한 사람, 에이전트 소유자 또는 관리자만 삭제할 수 있어요.",
-      "restoreForbidden": "삭제할 수 있는 사람만 복원할 수 있어요."
+      "restoreForbidden": "삭제할 수 있는 사람만 복원할 수 있어요.",
+      "versionNotFound": "이 버전의 파일은 없어요.",
+      "formatUnavailable": "이 파일은 그 형식으로 저장할 수 없어요.",
+      "sharingOpen": "워크스페이스 전체가 이미 이 파일을 볼 수 있어요.",
+      "sharingForbidden": "볼 수 있는 사람은 파일이 있는 대화의 사람만 바꿀 수 있어요.",
+      "sharingEmpty": "볼 수 있는 사람을 선택하세요.",
+      "sharingTooMany": "사람은 최대 {{max}}명, 역할은 최대 {{max}}개까지 선택할 수 있어요.",
+      "notInDrive": "이것은 대화 안에만 있어서 공유할 수 없어요."
     },
     "machine": {
       "forbidden": "관리자나 컴퓨터를 연결한 사람만 할 수 있어요.",
@@ -11600,6 +11720,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "이 컴퓨터의 시스템에서는 에이전트 브라우저가 실행되지 않아요.",
+      "browser_download": "에이전트 브라우저를 다운로드하지 못했어요. 이 컴퓨터의 연결을 확인해 주세요. 다음에 사용할 때 다시 시도해요.",
+      "browser_checksum": "에이전트 브라우저 다운로드가 손상되어 사용하지 않았어요. 다음에 사용할 때 다시 시도해요.",
+      "desktop_use_linux": "에이전트 화면의 앱은 에이전트 화면이 있는 Linux 컴퓨터에서 실행돼요.",
+      "desktop_use_own_user": "에이전트 화면의 앱을 쓰려면 이 컴퓨터에서 에이전트마다 자기 사용자로 일해야 해요(시스템 모드). 여기서는 모든 에이전트가 runner의 사용자로 일해요.",
+      "desktop_use_install": "에이전트 화면의 앱에 필요한 것을 이 컴퓨터에 설치해 주세요:",
+      "desktop_unavailable": "이 컴퓨터에서는 에이전트 화면을 실행할 수 없어요.",
+      "desktop_linux": "에이전트 화면은 Linux 컴퓨터에서만 실행돼요.",
+      "desktop_install": "이 컴퓨터에 에이전트 화면을 설치해 주세요:",
+      "not_as_root": "에이전트 화면과 터미널은 절대 root로 실행되지 않아요. runner를 일반 사용자로 실행해 주세요.",
+      "runner_bun_old": "Bun 1.3.5 이상에서 실행되는 runner가 필요해요. 이 컴퓨터의 runner를 업데이트해 주세요.",
+      "terminal_unsupported": "터미널은 Linux와 Mac 컴퓨터에서만 실행돼요."
+    },
     "egress": {
       "draining": "네트워크가 바뀌고 있어요. 컴퓨터의 열린 세션은 {{when}}에 다시 시작돼요.",
       "restart": "네트워크를 적용하려고 컴퓨터 세션을 다시 시작하고 있어요. 새 작업은 끝날 때까지 기다려요.",
@@ -12322,6 +12456,7 @@
       "techAction": "작업",
       "techTool": "도구",
       "techKind": "종류",
+      "techSaid": "받은 응답 내용",
       "techRun": "실행",
       "techId": "기록",
       "openConversation": "대화 열기",
@@ -12331,6 +12466,7 @@
     }
   },
   "settings": {
+    "notOpen": "이 워크스페이스에서 내 역할로는 {{section}}을(를) 열 수 없어요. 역할을 관리하는 사람이 열어 줄 수 있어요.",
     "nav": "설정 섹션",
     "group": {
       "you": "나",
@@ -12419,6 +12555,14 @@
         "openAt": "대화를 열면 이동할 위치",
         "openRead": "마지막으로 읽은 메시지",
         "openLatest": "가장 최근 메시지",
+        "textSize": "글자 크기",
+        "textSizeHelp": "메시지 글자예요. 모든 대화와 내 모든 기기에 적용돼요",
+        "textSizePhone": "휴대폰 설정의 글자 크기도 함께 적용돼요",
+        "textXs": "더 작게",
+        "textSm": "작게",
+        "textMd": "기본",
+        "textLg": "크게",
+        "textXl": "더 크게",
         "sample": {
           "ask": "몇 개 남았어요?",
           "answer": "14개 남았어요. 알릴까요?",
@@ -13046,7 +13190,11 @@
         "shell": "내부에서 다른 명령을 실행해요",
         "inline": "인라인으로 받은 코드를 실행해요",
         "global": "컴퓨터 전체에 설치해요",
-        "rules": "에이전트가 스스로 할 수 있는 범위를 벗어나요"
+        "rules": "에이전트가 스스로 할 수 있는 범위를 벗어나요",
+        "noAccess": "에이전트에게 여기에 대한 접근 권한이 없어요",
+        "policy": "이런 종류의 작업에서는 허용되지 않아요",
+        "credential": "키처럼 보이는 것을 보내요",
+        "repo": "그 저장소는 에이전트 목록에 없어요"
       },
       "gave": "입력",
       "answered": "답함",
@@ -13151,6 +13299,7 @@
         "runningRoutine": "루틴을 지금 실행했어요",
         "proposingTeam": "팀을 제안했어요",
         "proposingChange": "변경을 제안했어요",
+        "workingOnWorkspace": "워크스페이스에서 작업했어요",
         "updatingThread": "스레드를 업데이트했어요",
         "addingAgent": "에이전트를 채널에 추가했어요",
         "readingConversation": "대화를 읽었어요",
@@ -13259,6 +13408,7 @@
       "runningRoutine": "루틴을 지금 실행하는 중",
       "proposingTeam": "팀을 제안하는 중",
       "proposingChange": "변경을 제안하는 중",
+      "workingOnWorkspace": "워크스페이스에서 작업하는 중",
       "updatingThread": "스레드를 업데이트하는 중",
       "addingAgent": "에이전트를 채널에 추가하는 중",
       "readingConversation": "대화를 읽는 중",
@@ -13402,6 +13552,8 @@
       "action_update_skills": "스킬 업데이트",
       "action_approvals": "내 승인을 기다리는 요청",
       "action_open_page": "화면 열기",
+      "calendar_proposal": "일정 제안: {{title}}",
+      "action_workspace": "워크스페이스 변경을 제안했어요",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "team_proposal": "팀을 제안했어요: {{names}}",
       "settings_proposal": "{{names}}에 대한 변경을 제안했어요",
@@ -13609,6 +13761,38 @@
     "update_skill_from_source": {
       "label": "링크에서 스킬 업데이트",
       "description": "스킬을 설치한 곳에서 업데이트해요. 스크립트 변경은 사람을 기다려요."
+    },
+    "propose_remove_agents": {
+      "label": "에이전트 보관 또는 삭제 제안",
+      "description": "보관하거나 삭제할 에이전트 목록 카드를 게시해요. 권한 있는 사람이 적용해요."
+    },
+    "offer_answers": {
+      "label": "탭해서 답하는 질문하기",
+      "description": "탭해서 답하는 질문을 게시해요. 탭할 때마다 그 사람의 메시지가 돼요."
+    },
+    "propose_team": {
+      "label": "팀 제안",
+      "description": "여러 에이전트와 그 채널, 루틴, 스킬을 담은 카드를 게시해요. 만드는 건 사람이 해요."
+    },
+    "propose_settings_change": {
+      "label": "동료의 설정 제안",
+      "description": "동료의 새 모델, AI, 예산, 담당자, 공개 범위나 채널을 담은 카드를 게시해요. 적용은 사람이 해요."
+    },
+    "offer_approvals": {
+      "label": "승인 대기 항목 보기",
+      "description": "그 사람의 승인을 기다리는 항목을 카드 하나로 게시해요. 그 자리에서 하나씩 승인하거나 거절해요."
+    },
+    "propose_member_changes": {
+      "label": "사람 변경 제안",
+      "description": "소유자, 역할, 제거를 바꾸는 카드를 게시해요. 권한 있는 사람이 하나씩 적용해요."
+    },
+    "offer_open_page": {
+      "label": "화면 열기 제안",
+      "description": "결제, 역할, 에이전트 페이지처럼 앱의 화면을 여는 버튼이 있는 카드를 게시해요."
+    },
+    "set_team_week": {
+      "label": "팀의 한 주 카드 바꾸기",
+      "description": "그 사람의 다이렉트 메시지에 오는 주간 팀의 한 주 카드를 멈추거나, 다시 시작하거나, 시간을 옮겨요."
     },
     "propose_agent": {
       "label": "에이전트 제안",
@@ -15267,6 +15451,85 @@
     "receipt": "볼 수 있는 사람: {{who}}",
     "limited": "제한된 접근",
     "rolesToo": "이 페이지에 이미 있는 역할은 계속 볼 수 있습니다."
+  },
+  "share": {
+    "button": "공유",
+    "title": "{{name}} 공유",
+    "conversation": "대화만",
+    "people": "선택한 사람과 역할",
+    "everyone": "워크스페이스 전체",
+    "whereDm": "{{name}}와(과)의 다이렉트 메시지",
+    "whereDmGone": "다이렉트 메시지",
+    "whereDmBetween": "{{names}} 사이의 다이렉트 메시지",
+    "whereChannel": "#{{name}} 멤버",
+    "add": "사람 또는 역할 추가",
+    "addSearch": "사람과 역할 검색",
+    "noResults": "그 이름을 가진 사람이 없어요",
+    "groupPeople": "사람",
+    "groupRoles": "역할",
+    "access": "접근할 수 있는 사람",
+    "you": "{{name}} (나)",
+    "agent": "에이전트",
+    "role": "역할",
+    "remove": "{{name}} 빼기",
+    "admins": "관리자는 항상 볼 수 있어요.",
+    "copyLink": "링크 복사",
+    "copied": "링크를 복사했어요.",
+    "done": "완료",
+    "onlyHere": "이 대화에 없는 사람은 링크를 열 수 없어요.",
+    "choosePeople": "사람 선택",
+    "readOnly": "볼 수 있는 사람은 대화에 있는 사람만 바꿀 수 있어요.",
+    "open": "워크스페이스 전체가 이 파일을 볼 수 있어요.",
+    "savedEveryone": "이제 워크스페이스 전체가 파일을 볼 수 있어요.",
+    "savedPeople": "이제 선택한 사람들이 파일을 볼 수 있어요.",
+    "savedConversation": "이제 대화에 있는 사람만 파일을 볼 수 있어요.",
+    "undo": "실행 취소",
+    "fileRef": "파일 {{title}}",
+    "fileRefNone": "접근할 수 없는 파일",
+    "also": "{{text}}. {{who}}와(과)도 공유했어요.",
+    "someOnlyHere": "이 링크 중 일부는 파일이 있는 대화의 사람만 열 수 있어요."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "이 링크를 열려면 로그인하세요",
+      "text": "로그인하면 바로 여기로 돌아와요."
+    },
+    "file": {
+      "title": "이 파일은 볼 수 없어요",
+      "text": "삭제되었거나, 내가 없는 대화에서만 공유된 파일일 수 있어요. 보낸 사람에게 파일의 공유 버튼으로 나와 공유해 달라고 요청하세요."
+    },
+    "link": {
+      "title": "이 링크는 사용할 수 없어요",
+      "text": "만료되었거나, 이미 사용되었거나, 내가 없는 곳으로 가는 링크일 수 있어요. 보낸 사람에게 새 링크를 요청하세요."
+    },
+    "version": {
+      "title": "이 버전의 파일은 없어요",
+      "text": "링크가 파일에 없는 버전을 가리켜요."
+    },
+    "format": {
+      "title": "이 파일은 그 형식으로 받을 수 없어요",
+      "text": "링크가 이 파일을 저장할 수 없는 형식을 가리켜요."
+    },
+    "busy": {
+      "title": "연속으로 너무 많이 시도했어요",
+      "text": "잠시 기다린 뒤 다시 시도하세요."
+    },
+    "server": {
+      "title": "저희 쪽에서 문제가 생겼어요",
+      "text": "내가 잘못한 게 아니에요. 잠시 후 다시 시도하세요."
+    },
+    "other": {
+      "title": "이 링크가 열리지 않았어요",
+      "text": "주소가 불완전하거나 더 이상 쓸 수 없어요. 보낸 사람에게 새 주소를 요청하세요."
+    },
+    "action": {
+      "signIn": "로그인",
+      "open": "agentes.chat 열기",
+      "latest": "최신 버전 열기",
+      "file": "파일 열기",
+      "retry": "다시 시도"
+    },
+    "errorId": "오류 코드: {{id}}"
   },
   "teamTemplates": {
     "lead": "{{org}}를 위한 팀, 에이전트마다 자기 채널이 있어요. 만들기 전에 조정할 수 있어요.",

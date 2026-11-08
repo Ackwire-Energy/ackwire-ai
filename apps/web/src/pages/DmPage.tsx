@@ -2,9 +2,10 @@ import type { DmTarget } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
 import { audienceNotice, canTalk, seesDetails } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
+import { isGone } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
-import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, BrainIcon, Button, EmptyState, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -63,10 +64,18 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   }, [rightHand, me.user.id, org.id]);
 
   if (dm.isError) {
+    // An old link to an archived agent, or to someone who left: gone, said as the agent's and channel's pages say it.
+    const toAgent = "agentId" in target;
     return (
       <main className="shell__main">
         <div className="page page--mid">
-          <ErrorState error={dm.error} onRetry={() => void dm.refetch()} />
+          {isGone(dm.error) ? (
+            <EmptyState icon={toAgent ? "agent" : "person"}>
+              {toAgent ? t("agent.notFound") : t("errors.said.notInWorkspace")}
+            </EmptyState>
+          ) : (
+            <ErrorState error={dm.error} onRetry={() => void dm.refetch()} />
+          )}
         </div>
       </main>
     );

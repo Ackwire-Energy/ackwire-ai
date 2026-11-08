@@ -7,6 +7,7 @@ import { POSTGRES_MARK } from "./databases";
 import { capitalize, joinNames, lowerFirst, shortTarget } from "./format";
 import { workDuration } from "./long-work";
 import { MAIL_BRANDS } from "./mail";
+import { catalogLabel, toolKey } from "./tool-labels";
 
 /**
  * Whether a finished reply shows what the agent did ("Usou 4 ferramentas"): only for a person who turned it on in this
@@ -16,6 +17,12 @@ export const showsActivity = (org: Pick<OrgSummary, "showActivity"> | null | und
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
+
+/** A tool in "Usou a ferramenta …": the catalog's words, else its own name in words, without the app it starts with. */
+function toolWords(t: TFunction, tool: string) {
+  const worded = catalogLabel(t, tool);
+  return worded ? lowerFirst(worded) : toolLabel(toolKey(tool).key || tool);
+}
 
 /** One thing the agent did (a tool call), for the work summary: what it did, in which service. */
 export interface WorkItem extends Activity {
@@ -30,11 +37,11 @@ export interface WorkItem extends Activity {
   output?: LiveOutput[];
   /** Grey words after its phrase (`toolHint`): the built-in's label or the connector tool's own name. */
   hint?: string | null;
-  /** Why it failed: the first line of the tool's error. */
+  /** Why it failed: the first line of the tool's error, in its own words (its open view shows it). */
   why?: string | null;
   /** It failed because its arguments were refused: the tool never ran. */
   slip?: boolean;
-  /** A refused command: the refusal's code, which `toolWhy` says in the person's words. */
+  /** A refused command or a call the Tool Gateway refused: the refusal's code, which `toolWhy` says in words. */
   refusal?: string | null;
   /** No result: it never ran (it waited on a person, or the run stopped first). */
   held?: boolean;
@@ -63,9 +70,18 @@ export function autoApprovedWords(t: TFunction, a: AutoApproved): string {
   return t(a.reads ? "chat.work.autoApprovedReads" : "chat.work.autoApproved", { name: a.by });
 }
 
-/** A line's grey words: none beside code, who approved it for good where a rule did, else its hint. */
-export const toolLineHint = (t: TFunction, l: Pick<ToolLine, "code" | "hint" | "autoApproved">) =>
-  l.code ? null : l.autoApproved ? autoApprovedWords(t, l.autoApproved) : l.hint;
+/**
+ * A line's grey words: none beside code, who approved it for good where a rule did, else its hint, a connector
+ * tool's name by the catalog's words where it has them ("Buscar issues", not "search issues").
+ */
+export const toolLineHint = (t: TFunction, l: Pick<ToolLine, "code" | "hint" | "autoApproved" | "kind">) =>
+  l.code
+    ? null
+    : l.autoApproved
+      ? autoApprovedWords(t, l.autoApproved)
+      : l.kind === "consulting" && l.hint
+        ? (catalogLabel(t, l.hint) ?? l.hint)
+        : l.hint;
 
 /** What the agent said before a model call's tools (`model_call` step: `narration`, `turn`). */
 export interface WorkNarration {
@@ -213,6 +229,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
     const failed = result?.data.isError === true || check?.refused === true;
     const why = !failed ? null : check?.refused ? check.why : firstLine(content);
+    const refusal = check?.code ?? (failed ? gatewayRefusal(result?.data.data) : null);
     const held = !result || Boolean(check?.request);
     const autoApproved = autoApprovedOf(result?.data.autoApproved);
     const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
@@ -246,7 +263,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       count: 1,
       hint: toolHint(name, a, detail),
       why,
-      ...(check?.code ? { refusal: check.code } : {}),
+      ...(refusal ? { refusal } : {}),
       ...(held ? { held: true } : {}),
       ...(autoApproved ? { autoApproved } : {}),
       // A permission check opens on the whole command it checked (recorded masked), not on its JSON.
@@ -323,9 +340,9 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
   };
 }
 
-/** "Consultou o Himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
+/** "Consultou o Himetrica", "Atualizou o plano", and for a tool with no words of its own "Usou a ferramenta enviar e-mail". */
 export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool">) {
-  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolLabel(s.tool) });
+  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolWords(t, s.tool) });
 }
 
 /**
@@ -413,11 +430,20 @@ const plainWhy = (text: string) => {
 };
 
 /**
- * Why a line failed, for people: a refused command's reason in their words (`chat.work.refusal.<code>`), else
- * the first sentence of what the tool said.
+ * Why a line failed, under it, for people: a refusal's reason in their words (`chat.work.refusal.<code>`), else
+ * nothing. What the tool said is its own text (often English, a connector's JSON): the line's open view shows it.
  */
-export const toolWhy = (t: TFunction, l: { why?: string | null; refusal?: string | null }) =>
-  l.refusal ? t(`chat.work.refusal.${l.refusal}`, { defaultValue: l.why ?? "" }) || null : (l.why ?? null);
+export function toolWhy(t: TFunction, l: { why?: string | null; refusal?: string | null }): string | null {
+  if (!l.refusal) return null;
+  const say = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return say(`chat.work.refusal.${l.refusal}`, { defaultValue: "" }) || null;
+}
+
+/** The Tool Gateway's own refusal of a call (`tool_result` step `data.refusal`): a word `toolWhy` says. */
+const gatewayRefusal = (data: unknown) => {
+  const refusal = (data as { refusal?: unknown } | null | undefined)?.refusal;
+  return typeof refusal === "string" && refusal ? refusal : null;
+};
 
 /** A permission check's answer (`permission_prompt`): refused and why, or waiting on a person (its request). */
 function checkAnswer(content: string) {
@@ -689,7 +715,7 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
   if (l.state === "fail" && l.kind === "runningCommand") return t("chat.work.refused", { app: appLabel(l) });
   if (l.state === "fail" && l.kind === "runningCommandAny") return t("chat.work.refusedAny");
   if (l.state === "fail") return t("chat.work.erred", { activity: verb });
-  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolLabel(l.tool) });
+  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolWords(t, l.tool) });
 }
 
 /** A turn quicker than this shows nothing new: its step line says the agent's own words only past it. */

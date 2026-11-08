@@ -246,26 +246,38 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Zatwierdzenia",
-    summary: "Nic wrażliwego nie dzieje się bez człowieka.",
+    summary: "Wrażliwe działania czekają na człowieka, raz albo na stałe.",
     sections: [
       {
         id: "what",
         heading: "Co wymaga zatwierdzenia",
         blocks: [
-          "Gdy agent chce scalić zmiany, wdrożyć, wycofać wdrożenie, wysłać coś na zewnątrz albo usunąć dane, najpierw pyta, bez względu na to, jaki ma dostęp. Prośba pojawia się w **Zatwierdzenia** i na kanale, z dokładnym działaniem i powodem.",
+          "Gdy agent chce scalić zmiany, wdrożyć, wycofać wdrożenie, wysłać coś na zewnątrz albo usunąć dane, najpierw pyta, bez względu na to, jaki ma dostęp. Prośba pojawia się w **Zatwierdzenia** i w rozmowie, z dokładnym działaniem i powodem.",
         ],
       },
       {
-        id: "exact",
-        heading: "Jedno zatwierdzenie, jedno działanie",
+        id: "always",
+        heading: "Raz albo zawsze",
         blocks: [
-          "Każde zatwierdzenie obejmuje jedno konkretne działanie, z jego wartościami. Jeśli agent cokolwiek zmieni, musi zapytać ponownie.",
+          "Zatwierdzenie obejmuje jedno konkretne działanie, z jego wartościami. Jeśli agent cokolwiek zmieni, pyta ponownie.",
+          "**Zawsze zatwierdzaj** pozwala agentowi od teraz robić ten rodzaj działań z dowolnymi wartościami, bez pytania. Przy prośbie z rutyny **Zawsze w tej rutynie** robi to samo tylko dla tej rutyny. Żadna z tych opcji nie pojawia się przy scalaniu, wdrażaniu, wycofywaniu i podobnych. Aby to cofnąć, przejdź do **Narzędzia i dostęp** na stronie agenta albo do ustawień rutyny.",
         ],
       },
       {
         id: "who",
         heading: "Kto zatwierdza",
-        blocks: ["Prośby agenta zatwierdza jego właściciel. Gdy agent nie ma właściciela, robią to administratorzy."],
+        blocks: [
+          {
+            list: [
+              "Właściciel agenta, w jego prośbach.",
+              "Każdy, czyja rola ma **Zatwierdzanie działań agentów**, we wszystkich agentach.",
+              "Osoby, które agent wskaże, prosząc, zamiast właściciela.",
+              "Ktoś, kto zastępuje inną osobę w **Kto zatwierdza za mnie**, w tym, o co ta osoba jest proszona. Scalanie, wdrażanie i inne ryzykowne działania tylko wtedy, gdy to jest włączone.",
+            ],
+          },
+          "Działanie we własnej skrzynce pocztowej kogoś czeka tylko na tę osobę. Nowy dostęp dla agenta czeka na tych, którzy zarządzają agentami.",
+          "Lodi, twoja prawa ręka, może też zatwierdzać za ciebie nowych agentów proponowanych przez innych agentów oraz zmiany modelu, budżetu i kanałów agenta, tylko gdy prośba wyszła od ciebie. Kto cię zastępuje i co zatwierdza Lodi, wybierasz w **Ustawienia\u00a0›\u00a0Ty\u00a0›\u00a0Zatwierdzenia**.",
+        ],
       },
       {
         id: "refusing",

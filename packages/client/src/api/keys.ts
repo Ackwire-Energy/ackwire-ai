@@ -32,6 +32,7 @@ export const keys = {
   formerAgents: (orgId: string) => ["org", orgId, "agents", "former"] as const,
   /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
   agentProposal: (orgId: string, messageId: string) => ["org", orgId, "agent-proposal", messageId] as const,
+  actionCard: (orgId: string, messageId: string) => ["org", orgId, "action-card", messageId] as const,
   teamTemplates: (orgId: string, locale: string) => ["org", orgId, "team-templates", locale] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
@@ -39,8 +40,11 @@ export const keys = {
   aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  /** Under `channels`: archiving one, or bringing one back, refreshes both. */
+  archivedChannels: (orgId: string) => ["org", orgId, "channels", "archived"] as const,
   channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   messageCard: (orgId: string, messageId: string) => ["org", orgId, "message", messageId, "card"] as const,
+  idRef: (orgId: string, id: string) => ["org", orgId, "ref", id] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   channelPermissions: (orgId: string, channelId: string) =>

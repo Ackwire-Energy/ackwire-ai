@@ -224,6 +224,7 @@ export function MenuRow({
   trailing,
   danger,
   expanded,
+  disabled,
 }: {
   icon: IconName;
   children: ReactNode;
@@ -231,6 +232,8 @@ export function MenuRow({
   trailing?: ReactNode;
   danger?: boolean;
   expanded?: boolean;
+  /** While what it does is running. */
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -238,6 +241,7 @@ export function MenuRow({
       className="dk-mi"
       data-danger={danger || undefined}
       aria-expanded={expanded}
+      disabled={disabled}
       onClick={onClick}
     >
       <Icon name={icon} size={16} />

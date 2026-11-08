@@ -1,4 +1,5 @@
 import type { AuthConfig, OrgSummary } from "@agenteschat/client";
+import { showsAbout } from "@agenteschat/client/lib/about";
 import { can } from "@agenteschat/client/lib/permissions";
 import type { IconName } from "@agenteschat/ui";
 
@@ -46,8 +47,9 @@ export const SETTINGS_SECTIONS: {
   { id: "approvals", icon: "approve", group: "you", allowed: () => true },
   // AI apps (ADR 0119): each person connects their own, in this workspace.
   { id: "apps", icon: "link", group: "you", allowed: () => true },
-  // AGPL-3.0's legal notices and the license's required attribution: for everyone, on every server, never hidden.
-  { id: "about", icon: "info", group: "you", allowed: () => true },
+  // AGPL-3.0's legal notices and the license's required attribution: for everyone on a self-hosted server, never
+  // hidden there; none on agentes.chat Cloud (`showsAbout`).
+  { id: "about", icon: "info", group: "you", allowed: (_o, server) => showsAbout(server) },
   // The workspace's sections are for who runs it: a member keeps only their own (above) and what they use themselves
   // (the people, where a member who may not invite suggests someone (ADR 0090), connectors, computers, AI accounts).
   { id: "general", icon: "settings", group: "org", allowed: (o) => can(o, "configure") },

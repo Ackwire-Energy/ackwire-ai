@@ -2,7 +2,9 @@ import { and, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, type AgentActionParams, actWithUndo } from "./agent-actions";
 import { issueDiff, issueSnapshot } from "./agent-undo";
 import { currentHandles } from "./agents";
+import { type ArtifactDeps, fileRefOf, shareArtifact } from "./artifacts";
 import { canTalkTo, speakerFor } from "./audience";
+import { UUID } from "./authority";
 import { callableAgents, notCallableText } from "./brakes";
 import {
   askAgentToImplement,
@@ -21,9 +23,13 @@ import {
   updateIssue,
   type WorkActor,
 } from "./issues";
+import { fileIdsOf, getMessage } from "./messages";
 import { can, getMembership, listMembers } from "./organizations";
-import { chosenAudience, visibleToField } from "./requester";
+import { chosenAudience, personBehindCall, visibleToField } from "./requester";
 import { isRightHand, rightHandAway, rightHandReader } from "./right-hand";
+import { replyThreadOf } from "./runs";
+import { type Audience, audienceOfConversation } from "./task-access";
+import { ensureTaskConversation } from "./task-conversation";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 
@@ -34,6 +40,13 @@ const GITHUB_URL_FIELD = {
   maxLength: 500,
   description: 'Link of the GitHub issue or PR this is about; "" removes it',
 };
+
+const filesField = (description: string) => ({
+  type: "array",
+  items: { type: "string", minLength: 36, maxLength: 36 },
+  maxItems: 10,
+  description,
+});
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const actorOf = (ctx: ToolContext): IssueActor => ({
@@ -76,6 +89,16 @@ const line = (i: IssueView, names: Map<string, string>) =>
 /** One issue's line with its assignee's name. */
 const lineOf = async (deps: IssueDeps, ctx: ToolContext, i: IssueView) => line(i, await assigneeNames(deps, ctx, [i]));
 
+/**
+ * An issue just given to another agent: the assignment wakes nobody (only `askAgentToImplement` starts the assignee's
+ * work), so the agent reads how to hand the job over before it tells anyone the task is being worked on. "" otherwise.
+ */
+async function handOverLine(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
+  if (i.assignee?.type !== "agent" || i.assignee.id === ctx.agentId) return "";
+  const name = (await assigneeNames(deps, ctx, [i])).get(i.assignee.id) ?? "that agent";
+  return `\nAssigning doesn't tell ${name} or start its work: to have it work on #${i.number} now, hand it the job with tell_agent (say it's task #${i.number}); otherwise say the task waits in its list.`;
+}
+
 async function describeIssue(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
   const criteria = i.criteria.map((c, k) => `${k + 1}. [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   return [
@@ -93,9 +116,14 @@ async function describeIssue(deps: IssueDeps, ctx: ToolContext, i: IssueView) {
 }
 
 /** Resolves `issue` as an id or a number (`131`, `#131`). */
-async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
+/** An issue's number (#131) or id, as `getIssue` takes it. */
+const issueKey = (ref: string) => {
   const n = /^#?(\d+)$/.exec(ref.trim());
-  return getIssue(deps.db, actorOf(ctx), ctx.orgId, n ? { number: Number(n[1]) } : { id: ref.trim() });
+  return n ? { number: Number(n[1]) } : { id: ref.trim() };
+};
+
+async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
+  return getIssue(deps.db, actorOf(ctx), ctx.orgId, issueKey(ref));
 }
 
 /**
@@ -145,6 +173,14 @@ async function issueChange(
   if (diff.fields.includes("priority")) params.priority = i.priority;
   if (diff.fields.includes("dueDate")) params.dueDate = i.dueDate;
   if (diff.fields.includes("labels")) params.labels = i.labels;
+  if (diff.fields.includes("files")) {
+    const had = (before.files ?? []) as string[];
+    params.files = fileTitles(
+      i,
+      i.artifacts.map((f) => f.id).filter((id) => !had.includes(id)),
+      title !== "",
+    );
+  }
   if (diff.fields.includes("assignee")) {
     params.assigneeType = assignee?.type ?? null;
     params.assigneeId = assignee?.id ?? null;
@@ -228,6 +264,119 @@ async function handTask(deps: IssueDeps, ctx: ToolContext, person: string, i: Is
   };
 }
 
+/** `files` as given (each once), or null when left out. */
+const givenFiles = (input: Record<string, unknown>) =>
+  Array.isArray(input.files) ? [...new Set(input.files.map(String))].slice(0, 10) : null;
+
+/**
+ * The files on the message the run answers: a task made from it takes them unless the agent says otherwise. A run that
+ * goes on from the agent's own reply (Continuar) answers what that reply answered, never the agent's own files.
+ */
+async function requestFiles(ctx: ToolContext) {
+  let id = ctx.triggerMessageId;
+  for (let hop = 0; id && hop < 5; hop++) {
+    const message = await getMessage(ctx.db, ctx.orgId, id);
+    if (message?.authorAgentId !== ctx.agentId || !message.agentRunId) return fileIdsOf(message?.meta).slice(0, 10);
+    const [stopped] = await ctx.db
+      .select({ trigger: schema.agentRuns.triggerMessageId })
+      .from(schema.agentRuns)
+      .where(and(eq(schema.agentRuns.orgId, ctx.orgId), eq(schema.agentRuns.id, message.agentRunId)));
+    id = stopped?.trigger ?? "";
+  }
+  return [];
+}
+
+type Brought = { brought: string[]; refused: string[] };
+
+/**
+ * Files for a task, each brought into `at`, a conversation whoever sees the task reads, by `shareArtifact`'s rule
+ * (`post_message`'s): as it is when it's open there already, a copy from a DM or a private channel the person who asked
+ * shares with the agent, none otherwise. `asIs`, when given: only files already where the task's readers read them
+ * come, never a copy. Before the call's transaction, never inside it: a copy's bytes go through the storage resolver,
+ * whose own handle would wait on it. Returns the ids to link and why the others didn't come.
+ */
+async function bringFiles(
+  deps: ArtifactDeps,
+  ctx: ToolContext,
+  at: { channelId: string; threadId: string | null },
+  ids: string[],
+  asIs?: (id: string) => Promise<boolean>,
+): Promise<Brought> {
+  const out: Brought = { brought: [], refused: [] };
+  if (ids.length === 0) return out;
+  const actor = { type: "agent" as const, agentId: ctx.agentId, ...at, runId: ctx.runId };
+  const requesterUserId = await personBehindCall(ctx);
+  for (const id of ids) {
+    try {
+      if (asIs && !(await asIs(id))) {
+        out.refused.push(
+          `${id} isn't where everyone who sees this task opens it, and this task takes no copy: say they can add the file on the task (Anexos).`,
+        );
+        continue;
+      }
+      out.brought.push((await shareArtifact(deps, actor, ctx.orgId, id, { requesterUserId })).artifact.id);
+    } catch (error) {
+      out.refused.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether everyone `readers` names opens this file where it lives, and `shareArtifact` takes it into `channelId` as it
+ * is: one in the Drive or a public channel, or for people who each read it, one already in `channelId`. True for no
+ * such file: `shareArtifact` refuses it.
+ */
+async function readsAsIs(deps: ArtifactDeps, orgId: string, id: string, readers: Audience, channelId: string) {
+  const [file] = UUID.test(id)
+    ? await deps.db
+        .select({
+          channelId: schema.artifacts.channelId,
+          kind: schema.channels.kind,
+          visibility: schema.channels.visibility,
+        })
+        .from(schema.artifacts)
+        .leftJoin(schema.channels, eq(schema.channels.id, schema.artifacts.channelId))
+        .where(and(eq(schema.artifacts.orgId, orgId), eq(schema.artifacts.id, id), isNull(schema.artifacts.deletedAt)))
+    : [];
+  if (!file?.channelId || (file.kind === "channel" && file.visibility === "public")) return true;
+  if (readers.mode === "everyone" || file.channelId !== channelId) return false;
+  const read = await Promise.all(readers.userIds.map((userId) => fileRefOf(deps.db, userId, orgId, id)));
+  return read.every(Boolean);
+}
+
+/** A conversation no person reads (a routine's room, the agents' DM): a task made there is the workspace's (`createIssue`). */
+async function nobodyReads(deps: ArtifactDeps, channelId: string) {
+  const [c] = await deps.db
+    .select({ kind: schema.channels.kind, visibility: schema.channels.visibility })
+    .from(schema.channels)
+    .where(eq(schema.channels.id, channelId));
+  if (!c || c.kind === "task" || (c.kind === "channel" && c.visibility === "public")) return false;
+  return (await audienceOfConversation(deps.db, channelId)).mode === "everyone";
+}
+
+/** `bringFiles` into an existing task's own conversation, which whoever sees the task reads. */
+async function bringToTask(deps: ArtifactDeps, ctx: ToolContext, issueId: string, ids: string[]): Promise<Brought> {
+  if (ids.length === 0) return { brought: [], refused: [] };
+  const at = await ensureTaskConversation(deps.db, issueId);
+  return bringFiles(deps, ctx, { channelId: at.channelId, threadId: at.rootId }, ids);
+}
+
+/** What the result says of the files: their names (what to call them), and what didn't come. */
+function filesNote(i: IssueView, files: Brought) {
+  const names = i.artifacts.filter((f) => files.brought.includes(f.id)).map((f) => `"${f.title}"`);
+  return [
+    names.length
+      ? `\nAttached ${names.join(", ")}: it shows on the task (Anexos). Call a file by its name, never its id.`
+      : "",
+    files.refused.length ? `\nNot attached: ${files.refused.join(" ")}` : "",
+  ].join("");
+}
+
+/** The names of these files of the task, for a receipt; none where the task isn't named. */
+const fileTitles = (i: IssueView, ids: string[], nameable: boolean) =>
+  nameable ? i.artifacts.filter((f) => ids.includes(f.id)).map((f) => f.title) : [];
+
 /** What the agent tells the person after making a task: they change it on the task, in one click. */
 function whoSees(i: IssueView, nameable: boolean) {
   const { mode, channelId, userIds } = i.audience;
@@ -245,9 +394,10 @@ function whoSees(i: IssueView, nameable: boolean) {
  * Issue tools through the Tool Gateway: `list_issues` (`issues:read`),
  * `create_issue`, `update_issue`, `comment_issue` (`issues:write`). Agents
  * report progress on an issue they were asked to implement with
- * `comment_issue` and link their PR with `update_issue`.
+ * `comment_issue` and link their PR with `update_issue`. Each writer attaches
+ * files (`files`, `bringFiles`); a new task takes the request's own.
  */
-export function createIssueToolSource(deps: IssueDeps): ToolSource {
+export function createIssueToolSource(deps: ArtifactDeps): ToolSource {
   const issueRef = { type: "string", minLength: 1, maxLength: 64, description: "Issue id or number (#131)" };
   const tools: ToolDefinition[] = [
     {
@@ -303,6 +453,9 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           due_date: { type: "string", maxLength: 10, description: "Due date as YYYY-MM-DD" },
           github_url: GITHUB_URL_FIELD,
           visible_to: visibleToField,
+          files: filesField(
+            "File ids to attach; in text, name files, never ids. Left out: the files on the message you answer go too; [] for none.",
+          ),
         },
         required: ["title"],
         additionalProperties: false,
@@ -317,6 +470,23 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             if (refused) return { content: refused, isError: true };
           }
           const audience = await chosenAudience(ctx, input.visible_to);
+          // Into this conversation, whose readers a task made here has. One whose audience was chosen (a person
+          // assigned sees it too) or made where no person reads (the workspace's) takes only files all its readers
+          // open already, never a copy.
+          const readers: Audience | null = audience
+            ? audience.mode === "people" && assignee?.type === "person"
+              ? { mode: "people", userIds: [...new Set([...audience.userIds, assignee.id])] }
+              : audience
+            : (await nobodyReads(deps, ctx.channelId))
+              ? { mode: "everyone" }
+              : null;
+          const files = await bringFiles(
+            deps,
+            ctx,
+            { channelId: ctx.channelId, threadId: replyThreadOf(ctx) },
+            givenFiles(input) ?? (await requestFiles(ctx)),
+            readers ? (id) => readsAsIs(deps, ctx.orgId, id, readers, ctx.channelId) : undefined,
+          );
           const i = await actWithUndo(
             ctx,
             (db) =>
@@ -330,13 +500,20 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
                 ...(str(input.due_date) ? { dueDate: str(input.due_date) } : {}),
                 ...(str(input.github_url) ? { githubUrl: str(input.github_url) } : {}),
                 ...(audience ? { audience } : {}),
+                linkFileIds: files.brought,
               }),
             async (created, db) => {
               const title = (await nameableIn(db, ctx.channelId, created)) ? created.title : "";
+              const names = fileTitles(created, files.brought, title !== "");
               return {
                 kind: "issue.created",
                 target: { type: "issue", id: created.id, number: created.number, title },
-                params: { number: created.number, title, audience: created.audience.mode },
+                params: {
+                  number: created.number,
+                  title,
+                  audience: created.audience.mode,
+                  ...(names.length ? { files: names } : {}),
+                },
                 after: issueSnapshot(created),
               };
             },
@@ -349,12 +526,12 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
               )
             : null;
           return {
-            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}${
+            content: `Created ${await lineOf(deps, ctx, i)}\n${whoSees(i, nameable)}${filesNote(i, files)}${
               handed instanceof Error
                 ? `\nIts agent couldn't start on it: ${handed.message} Don't make it again: tell them why; they can start it from the task.`
                 : handed
                   ? "\nIts agent started on it in the task's own conversation, where the person follows it from the task's chip on your reply. What comes of it reaches you here by itself: tell them in a line who has it, without promising a time, and don't check on it."
-                  : ""
+                  : await handOverLine(deps, ctx, i)
             }`,
             data: {
               issue: { id: i.id, number: i.number },
@@ -369,7 +546,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: UPDATE_ISSUE_TOOL,
       description:
-        "Change an issue's status, priority, title, description, assignee, labels or due date, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own. No permission needed: the person sees the change with Undo.",
+        "Change an issue's status, priority, title, description, assignee, labels or due date, check acceptance criteria you met, attach files or link a pull request to it. Linking a PR moves the issue to review on its own. No permission needed: the person sees the change with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -400,19 +577,32 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             maxItems: 50,
             description: "Acceptance criteria now met, by their number (1, 2…) as list_issues shows them.",
           },
+          files: filesField("File ids to attach."),
         },
         required: ["issue"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
         try {
+          // The right hand changes a task for the person in their DM, one they see, as they could (ADR 0137 §13).
+          if (await rightHandAway(ctx)) return ONLY_IN_DM;
+          const reader = await rightHandReader(ctx);
           const url = str(input.pull_request_url);
           const number = typeof input.pull_request_number === "number" ? input.pull_request_number : undefined;
           const fromUrl = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? Number.NaN);
           const prNumber = number ?? (Number.isFinite(fromUrl) ? fromUrl : undefined);
           const assignee = str(input.assignee) ? await assigneeOf(deps, ctx, str(input.assignee)) : undefined;
+          if (reader) {
+            await getIssue(deps.db, { type: "person", userId: reader }, ctx.orgId, issueKey(str(input.issue)));
+            const refused = assignee !== undefined && (await rightHandTaskRefusal(deps, ctx, reader, assignee, null));
+            if (refused) return { content: refused, isError: true };
+          }
           const due = typeof input.due_date === "string" ? input.due_date.trim() : undefined;
           let before: Record<string, unknown> = {};
+          const asked = givenFiles(input) ?? [];
+          const files = asked.length
+            ? await bringToTask(deps, ctx, (await find(deps, ctx, str(input.issue))).id, asked)
+            : { brought: [], refused: [] };
           const latest = await actWithUndo(
             ctx,
             async (db) => {
@@ -420,6 +610,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
               const current = await find(d, ctx, str(input.issue));
               before = issueSnapshot(current);
               const i = await updateIssue(d, actorOf(ctx), ctx.orgId, current.id, {
+                ...(files.brought.length ? { addFiles: files.brought } : {}),
                 status: (input.status as IssueStatus | undefined) ?? undefined,
                 priority: (input.priority as IssuePriority | undefined) ?? undefined,
                 title: str(input.title) || undefined,
@@ -440,8 +631,9 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             },
             (i, db) => issueChange({ ...deps, db }, ctx, before, i),
           );
+          const reassigned = (before.assignee as { id?: string } | null | undefined)?.id !== latest.assignee?.id;
           return {
-            content: `Updated ${await lineOf(deps, ctx, latest)}`,
+            content: `Updated ${await lineOf(deps, ctx, latest)}${filesNote(latest, files)}${reassigned ? await handOverLine(deps, ctx, latest) : ""}`,
             data: { issue: { id: latest.id, number: latest.number } },
           };
         } catch (error) {
@@ -455,16 +647,25 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       scope: "issues:write",
       inputSchema: {
         type: "object",
-        properties: { issue: issueRef, text: { type: "string", minLength: 1, maxLength: 20000 } },
+        properties: {
+          issue: issueRef,
+          text: { type: "string", minLength: 1, maxLength: 20000 },
+          files: filesField("File ids to attach."),
+        },
         required: ["issue", "text"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
         try {
           const current = await find(deps, ctx, str(input.issue));
-          await commentIssue(deps, actorOf(ctx), ctx.orgId, current.id, str(input.text));
+          const files = await bringToTask(deps, ctx, current.id, givenFiles(input) ?? []);
+          await commentIssue(deps, actorOf(ctx), ctx.orgId, current.id, str(input.text), {
+            linkFileIds: files.brought,
+          });
+          const note =
+            files.brought.length || files.refused.length ? filesNote(await find(deps, ctx, current.id), files) : "";
           return {
-            content: `Commented on #${current.number}.`,
+            content: `Commented on #${current.number}.${note}`,
             data: { issue: { id: current.id, number: current.number } },
           };
         } catch (error) {

@@ -16,7 +16,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { titleOfSlug, toggleTask, wikiImportOf } from "@agenteschat/client/lib/wiki";
 import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -40,6 +39,7 @@ import {
   useReducedMotion,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { StarCard, StarStrip } from "../constellation/Constellation";
 import { aroundStar, wikiMap } from "../constellation/logic";

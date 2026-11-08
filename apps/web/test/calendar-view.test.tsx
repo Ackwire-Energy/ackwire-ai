@@ -98,6 +98,34 @@ describe("Calendário: views, moves and series", () => {
     expect(screen().getByRole("button", { name: "Revisão trimestral, 15:00–16:00" })).toBeTruthy();
   });
 
+  test("an invitation: Vou and Não vou in its details, then what I answered and who else said what", async () => {
+    let id = "";
+    const { state } = await go(async (api) => {
+      const event = await api.calendar.create(ORG_ID, {
+        title: "Planejamento",
+        start: at(15).toISOString(),
+        end: at(16).toISOString(),
+        recurrence: "none",
+        participants: [
+          { type: "person", id: "u-walter" },
+          { type: "person", id: "u-joao" },
+        ],
+      });
+      id = event.id;
+    });
+    await click(screen().getByRole("button", { name: "Planejamento, 15:00–16:00" }));
+    await settle(3);
+    const details = () => screen().getByRole("region", { name: "Planejamento" });
+    expect(details().textContent).toContain("Você está entre os convidados deste evento.");
+    await click(within(details()).getByRole("button", { name: "Vou" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "calendar.respond")?.args).toEqual([ORG_ID, id, "accepted"]);
+    expect(details().textContent).toContain("Você vai.");
+    // The answer can change.
+    expect(within(details()).getByRole("button", { name: "Não vou" })).toBeTruthy();
+    expect(within(details()).queryByRole("button", { name: "Vou" })).toBeNull();
+  });
+
   test("a link whose day doesn't exist opens on today's week", async () => {
     for (const day of ["2026-13-45", "2026-02-30", "garbage", "20261028"]) {
       await renderApp(`/org/${ORG_ID}/calendar?open=x&day=${day}`, { api: createFakeApi(seedState()) });
@@ -264,6 +292,37 @@ describe("Calendário: views, moves and series", () => {
     await settle(2);
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByText("Nada marcado. Arraste para criar ou aperte N")).toBeTruthy();
+  });
+
+  test("the all-day lane's gutter is a mark named Dia todo, never words that wrap in the hours' 44px column", async () => {
+    await go((api) =>
+      api.calendar.create(ORG_ID, {
+        title: "Feriado",
+        start: at(0).toISOString(),
+        end: at(23, 59).toISOString(),
+        allDay: true,
+        recurrence: "none",
+        participants: [],
+      }),
+    );
+    const gutter = document.querySelector(".cal-week__bars:not(.cal-week__bars--routines) > .cal-week__gutter");
+    expect(gutter?.textContent?.trim()).toBe("");
+    expect(within(gutter as HTMLElement).getByRole("img", { name: "Dia todo" })).toBeTruthy();
+  });
+
+  test("on a phone it opens on the day, not on a week of seven columns too narrow to read", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      query === "(max-width: 640px)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      await go();
+      expect(screen().getByRole("radio", { name: "Dia" }).getAttribute("aria-checked")).toBe("true");
+      expect(document.querySelectorAll(".cal-week__col")).toHaveLength(1);
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 });
 

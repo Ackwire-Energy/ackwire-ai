@@ -89,6 +89,9 @@
   "common.wrapLines": {
     "value": "Wrap lines"
   },
+  "common.raw": {
+    "value": "Raw"
+  },
   "common.table": {
     "value": "Table"
   },
@@ -124,6 +127,9 @@
   },
   "common.loadFailed": {
     "value": "Couldn't load this. Check your connection and try again."
+  },
+  "common.gone": {
+    "value": "This isn't here anymore. It was deleted, or you no longer have access."
   },
   "common.notAllowed": {
     "value": "You don't have permission for this."
@@ -3791,6 +3797,15 @@
   "team.archived": {
     "value": "Archived"
   },
+  "team.restore": {
+    "value": "Restore"
+  },
+  "team.restoreAction": {
+    "value": "Restore {{name}}"
+  },
+  "team.restored": {
+    "value": "{{name}} is back on the team."
+  },
   "team.emptyTitle": {
     "value": "Build your team of agents"
   },
@@ -4442,6 +4457,30 @@
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
   },
+  "channel.archivedTitle": {
+    "value": "Archived channels"
+  },
+  "channel.archivedCount": {
+    "value": {
+      "one": "{{count}} archived channel",
+      "other": "{{count}} archived channels"
+    }
+  },
+  "channel.archivedNone": {
+    "value": "No archived channels to restore"
+  },
+  "channel.archivedOn": {
+    "value": "Archived {{date}}"
+  },
+  "channel.restore": {
+    "value": "Restore"
+  },
+  "channel.restoreName": {
+    "value": "Restore #{{channel}}"
+  },
+  "channel.restored": {
+    "value": "#{{channel}} is back."
+  },
   "channel.leave": {
     "value": "Leave channel"
   },
@@ -4875,7 +4914,7 @@
     "value": "Outside it, a person doesn't see {{name}} in the sidebar."
   },
   "rightHand.settings.lock": {
-    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+    "value": "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins."
   },
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
@@ -5188,6 +5227,96 @@
   },
   "rightHand.open.notAllowed": {
     "value": "You don't have access to this screen"
+  },
+  "rightHand.action.title": {
+    "value": "Change in the workspace"
+  },
+  "rightHand.action.only": {
+    "value": "Only someone who may make this change applies it"
+  },
+  "rightHand.action.ask": {
+    "value": "Send to whoever may"
+  },
+  "rightHand.action.other": {
+    "value": "Make a change in the workspace"
+  },
+  "rightHand.action.create_role": {
+    "value": "Create the role <b>{{name}}</b>"
+  },
+  "rightHand.action.update_role": {
+    "value": "Change the role <b>{{name}}</b>"
+  },
+  "rightHand.action.delete_role": {
+    "value": "Delete the role <b>{{name}}</b> for good"
+  },
+  "rightHand.action.move_role": {
+    "value": "Move the role <b>{{name}}</b>"
+  },
+  "rightHand.action.set_member_roles": {
+    "value": "Change the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "rightHand.action.set_channel_permissions": {
+    "value": "Change what {{who}} may do in <b>#{{channel}}</b>"
+  },
+  "rightHand.action.set_my_status": {
+    "value": "Set your status: <b>{{what}}</b>"
+  },
+  "rightHand.action.set_notifications_on": {
+    "value": "Turn on your notifications for <b>{{category}}</b>"
+  },
+  "rightHand.action.set_notifications_off": {
+    "value": "Turn off your notifications for <b>{{category}}</b>"
+  },
+  "rightHand.action.set_my_timezone": {
+    "value": "Set your time zone to <b>{{timezone}}</b>"
+  },
+  "rightHand.action.set_my_timezone_workspace": {
+    "value": "Follow the workspace's time zone again"
+  },
+  "rightHand.action.set_invitation_roles": {
+    "value": "Change the roles the invitation of <b>{{email}}</b> gives: {{change}}"
+  },
+  "rightHand.action.update_channel": {
+    "value": "Change the channel <b>#{{channel}}</b>"
+  },
+  "rightHand.action.archive_channel": {
+    "value": "Archive <b>#{{channel}}</b>"
+  },
+  "rightHand.action.archive_channel_back": {
+    "value": "Bring <b>#{{channel}}</b> back"
+  },
+  "rightHand.action.channel_people": {
+    "value": "Change who is in <b>#{{channel}}</b>: {{change}}"
+  },
+  "rightHand.action.delete_channel": {
+    "value": "Delete the channel <b>#{{channel}}</b> for good, with its messages and files"
+  },
+  "rightHand.action.revoke_invitation": {
+    "value": "Cancel the invitation of <b>{{email}}</b>"
+  },
+  "rightHand.action.resend_invitation": {
+    "value": "Send the invitation to <b>{{email}}</b> again"
+  },
+  "rightHand.action.decide_join_request_approve": {
+    "value": "Let <b>{{email}}</b> into the workspace"
+  },
+  "rightHand.action.decide_join_request_deny": {
+    "value": "Turn down the request of <b>{{email}}</b> to join"
+  },
+  "rightHand.action.stop_work": {
+    "value": "Stop what <b>{{agent}}</b> is doing"
+  },
+  "rightHand.action.continue_work": {
+    "value": "Let <b>{{agent}}</b> go on"
+  },
+  "rightHand.action.update_workspace": {
+    "value": "Change the workspace <b>{{name}}</b>"
+  },
+  "rightHand.action.set_action_check_on": {
+    "value": "Turn on the check of what the team already did"
+  },
+  "rightHand.action.set_action_check_off": {
+    "value": "Turn off the check of what the team already did"
   },
   "teamWeek.title": {
     "value": "Team week"
@@ -6460,6 +6589,9 @@
   "agentActions.issue.assigned_self": {
     "value": "Took <b>#{{number}}</b> myself · {{title}}"
   },
+  "agentActions.issue.files": {
+    "value": "Attached {{names}}"
+  },
   "agentActions.memory.saved": {
     "value": "Saved to <b>memory</b>: {{text}}"
   },
@@ -6538,6 +6670,87 @@
   "agentActions.pr.merged_branch": {
     "value": "Merged <b>{{ref}}</b> in <b>{{repo}}</b>"
   },
+  "agentActions.workspace.changed": {
+    "value": "Made a change in the workspace"
+  },
+  "agentActions.workspace.changed_create_role": {
+    "value": "Created the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_update_role": {
+    "value": "Changed the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_delete_role": {
+    "value": "Deleted the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_move_role": {
+    "value": "Moved the role <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_set_member_roles": {
+    "value": "Changed the roles of <b>{{name}}</b>: {{change}}"
+  },
+  "agentActions.workspace.changed_set_channel_permissions": {
+    "value": "Changed what {{who}} may do in <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_status": {
+    "value": "Set your status: <b>{{what}}</b>"
+  },
+  "agentActions.workspace.changed_set_notifications_on": {
+    "value": "Turned on your notifications for <b>{{category}}</b>"
+  },
+  "agentActions.workspace.changed_set_notifications_off": {
+    "value": "Turned off your notifications for <b>{{category}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_timezone": {
+    "value": "Set your time zone to <b>{{timezone}}</b>"
+  },
+  "agentActions.workspace.changed_set_my_timezone_workspace": {
+    "value": "Your time zone follows the workspace's again"
+  },
+  "agentActions.workspace.changed_set_invitation_roles": {
+    "value": "Changed the roles the invitation of <b>{{email}}</b> gives: {{change}}"
+  },
+  "agentActions.workspace.changed_update_channel": {
+    "value": "Changed the channel <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_archive_channel": {
+    "value": "Archived <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_archive_channel_back": {
+    "value": "Brought <b>#{{channel}}</b> back"
+  },
+  "agentActions.workspace.changed_channel_people": {
+    "value": "Changed who is in <b>#{{channel}}</b>: {{change}}"
+  },
+  "agentActions.workspace.changed_delete_channel": {
+    "value": "Deleted the channel <b>#{{channel}}</b>"
+  },
+  "agentActions.workspace.changed_revoke_invitation": {
+    "value": "Canceled the invitation of <b>{{email}}</b>"
+  },
+  "agentActions.workspace.changed_resend_invitation": {
+    "value": "Sent the invitation to <b>{{email}}</b> again"
+  },
+  "agentActions.workspace.changed_decide_join_request_approve": {
+    "value": "Let <b>{{email}}</b> into the workspace"
+  },
+  "agentActions.workspace.changed_decide_join_request_deny": {
+    "value": "Turned down the request of <b>{{email}}</b> to join"
+  },
+  "agentActions.workspace.changed_stop_work": {
+    "value": "Stopped what <b>{{agent}}</b> was doing"
+  },
+  "agentActions.workspace.changed_continue_work": {
+    "value": "Let <b>{{agent}}</b> go on"
+  },
+  "agentActions.workspace.changed_update_workspace": {
+    "value": "Changed the workspace <b>{{name}}</b>"
+  },
+  "agentActions.workspace.changed_set_action_check_on": {
+    "value": "Turned on the check of what the team already did"
+  },
+  "agentActions.workspace.changed_set_action_check_off": {
+    "value": "Turned off the check of what the team already did"
+  },
   "agentActions.other": {
     "value": "Made a change"
   },
@@ -6570,6 +6783,9 @@
   },
   "agentActions.issueFields.criteria": {
     "value": "the criteria"
+  },
+  "agentActions.issueFields.files": {
+    "value": "the attachments"
   },
   "agentActions.routineFields.name": {
     "value": "the name"
@@ -10836,6 +11052,12 @@
   "agentPage.work.brain.add.notCode": {
     "value": "That doesn't look like Claude's code."
   },
+  "agentPage.work.brain.add.stepTwoGoogle": {
+    "value": "Paste the code Google shows"
+  },
+  "agentPage.work.brain.add.codeLabelGoogle": {
+    "value": "Code or link"
+  },
   "agentPage.work.brain.add.send": {
     "value": "Send to {{computer}}"
   },
@@ -11690,6 +11912,9 @@
   },
   "agentPage.activity.errors.brain_interrupted": {
     "value": "The AI stopped before finishing."
+  },
+  "agentPage.activity.errors.brain_unavailable": {
+    "value": "The AI on its computer couldn't answer. Check the computer and ask again."
   },
   "agentPage.activity.errors.empty_reply": {
     "value": "The model returned nothing."
@@ -14816,6 +15041,9 @@
   "issues.columns.stageHint.canceled": {
     "value": "Won't be done"
   },
+  "issues.columns.stageFull": {
+    "value": "{{stage}} already has {{max}} columns, the most a stage holds. Delete one there first."
+  },
   "issues.columns.stageExplain.todo": {
     "value": "New tasks land in the first column of To do."
   },
@@ -15075,6 +15303,12 @@
   "issues.form.created": {
     "value": "Task #{{number}} created."
   },
+  "issues.form.notStarted": {
+    "value": "Task #{{number}} created, but {{name}} didn't start."
+  },
+  "issues.form.askAgain": {
+    "value": "Ask again"
+  },
   "issues.form.intro": {
     "value": "Whoever takes it, a person or an agent, shows on the board with its progress."
   },
@@ -15199,6 +15433,9 @@
   "issues.asked": {
     "value": "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along."
   },
+  "issues.notStarted": {
+    "value": "{{name}} didn't start."
+  },
   "issues.activity": {
     "value": "Activity"
   },
@@ -15319,8 +15556,11 @@
   "issues.files.grid": {
     "value": "Grid"
   },
+  "issues.files.emptyTitle": {
+    "value": "This task's files live here"
+  },
   "issues.files.empty": {
-    "value": "No attachments yet. Drop files here or paste a screenshot."
+    "value": "Drop files here, paste a screenshot or send them in the task's conversation."
   },
   "issues.files.fromCreation": {
     "value": "At creation · {{when}}"
@@ -15393,6 +15633,12 @@
   },
   "issues.event.artifact_linked": {
     "value": "attached a file"
+  },
+  "issues.event.files_attached": {
+    "value": "attached {{names}}"
+  },
+  "issues.event.files_removed": {
+    "value": "removed {{names}} from the attachments"
   },
   "issues.event.criterion_checked": {
     "value": "checked the criterion \"{{text}}\""
@@ -19699,6 +19945,33 @@
   },
   "calendar.confirmed": {
     "value": "Event created and invitations sent."
+  },
+  "calendar.proposalDismissed": {
+    "value": "Proposal dismissed"
+  },
+  "calendar.proposalWaits": {
+    "value": "{{name}} confirms this event."
+  },
+  "calendar.rsvp.accept": {
+    "value": "Going"
+  },
+  "calendar.rsvp.decline": {
+    "value": "Not going"
+  },
+  "calendar.rsvp.accepted": {
+    "value": "going"
+  },
+  "calendar.rsvp.declined": {
+    "value": "not going"
+  },
+  "calendar.rsvp.mine.needs_action": {
+    "value": "You're invited to this event."
+  },
+  "calendar.rsvp.mine.accepted": {
+    "value": "You're going."
+  },
+  "calendar.rsvp.mine.declined": {
+    "value": "You're not going."
   },
   "calendar.kind.event": {
     "value": "Event"
@@ -24249,6 +24522,9 @@
   "drive.search": {
     "value": "Search files"
   },
+  "drive.loadMore": {
+    "value": "Load more"
+  },
   "drive.kind": {
     "value": "Type"
   },
@@ -24489,6 +24765,9 @@
   "drive.dmWith": {
     "value": "Direct message with {{name}}"
   },
+  "drive.dmBetween": {
+    "value": "Direct message between {{names}}"
+  },
   "drive.inDm": {
     "value": "Sent in a direct message"
   },
@@ -24509,6 +24788,9 @@
   },
   "drive.audience.dmGone": {
     "value": "Only the people in that conversation can see it: it came from a direct message"
+  },
+  "drive.audience.dmBetween": {
+    "value": "Only {{names}} can see it: it came from a direct message"
   },
   "drive.private": {
     "value": "Private"
@@ -24626,15 +24908,6 @@
   },
   "storage.s3Text": {
     "value": "S3, R2, MinIO and others compatible with S3."
-  },
-  "storage.gdrive": {
-    "value": "Google Drive"
-  },
-  "storage.onedrive": {
-    "value": "OneDrive"
-  },
-  "storage.soon": {
-    "value": "Coming soon"
   },
   "storage.current": {
     "value": "In use"
@@ -25747,6 +26020,9 @@
   "connectors.active": {
     "value": "Active"
   },
+  "connectors.noToolsNow": {
+    "value": "No tools right now"
+  },
   "connectors.notReviewed": {
     "value": "Waiting for review"
   },
@@ -26181,6 +26457,9 @@
   },
   "toolNames.order": {
     "value": "modifiers-first"
+  },
+  "toolNames.catalog": {
+    "value": "en"
   },
   "toolNames.verb.get": {
     "value": "Get"
@@ -28018,6 +28297,21 @@
   "mail.routine.noMailbox": {
     "value": "Connect a mailbox in Connectors first."
   },
+  "mail.routine.readsNone": {
+    "value": "{{name}} can't read any mailbox yet."
+  },
+  "mail.routine.cantRead": {
+    "value": "{{name}} can't read this mailbox."
+  },
+  "mail.routine.connectorReadsNone": {
+    "value": "{{name}} can't read {{connector}} yet."
+  },
+  "mail.routine.connectorCantRead": {
+    "value": "{{name}} can't read {{connector}}."
+  },
+  "mail.routine.giveAccess": {
+    "value": "Give access"
+  },
   "mail.routine.openConnectors": {
     "value": "Open Connectors"
   },
@@ -28399,6 +28693,15 @@
   "files.zoom.hintZoomedTouch": {
     "value": "Drag to move around. Tap to fit it back"
   },
+  "files.nav.previous": {
+    "value": "Previous image"
+  },
+  "files.nav.next": {
+    "value": "Next image"
+  },
+  "files.nav.place": {
+    "value": "{{index}} of {{count}}"
+  },
   "errors.said.gone": {
     "value": "This isn't here anymore. Refresh the page and try again."
   },
@@ -28440,6 +28743,12 @@
   },
   "errors.said.updateComputerApp": {
     "value": "The computer's app is too old for this. Update it and try again."
+  },
+  "errors.said.computerUpdatesItself": {
+    "value": "The workspace's computer updates itself for this. Try again in a little while."
+  },
+  "errors.said.notInvited": {
+    "value": "You're not invited to this event."
   },
   "errors.said.offHere": {
     "value": "This is turned off here."
@@ -28554,6 +28863,9 @@
   },
   "errors.issue.assigneeOutside": {
     "value": "This person can't see this task. Add them to who sees it first."
+  },
+  "errors.issue.stageFull": {
+    "value": "A stage holds at most {{max}} columns. Delete one of its columns first."
   },
   "errors.issue.deleteForbidden": {
     "value": "Only who created this task or an administrator can delete it."
@@ -28978,6 +29290,27 @@
   "errors.artifact.restoreForbidden": {
     "value": "Only who could delete it can restore it."
   },
+  "errors.artifact.versionNotFound": {
+    "value": "This version of the file doesn't exist."
+  },
+  "errors.artifact.formatUnavailable": {
+    "value": "This file can't be saved in that format."
+  },
+  "errors.artifact.sharingOpen": {
+    "value": "Everyone in the workspace sees this file already."
+  },
+  "errors.artifact.sharingForbidden": {
+    "value": "Only who's in the file's conversation changes who sees it."
+  },
+  "errors.artifact.sharingEmpty": {
+    "value": "Choose who sees it."
+  },
+  "errors.artifact.sharingTooMany": {
+    "value": "Choose at most {{max}} people and {{max}} roles."
+  },
+  "errors.artifact.notInDrive": {
+    "value": "This lives only in its conversation, so it can't be shared."
+  },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
   },
@@ -29238,6 +29571,42 @@
   },
   "errors.vault.source.tooManyItems": {
     "value": "The Vault is full. Remove items before syncing more."
+  },
+  "machines.reasons.browser_unsupported": {
+    "value": "The agent browser doesn't run on this computer's system."
+  },
+  "machines.reasons.browser_download": {
+    "value": "Couldn't download the agent browser. Check this computer's connection, and it tries again on its next use."
+  },
+  "machines.reasons.browser_checksum": {
+    "value": "The agent browser's download came damaged, so it wasn't used. It tries again on its next use."
+  },
+  "machines.reasons.desktop_use_linux": {
+    "value": "Desktop use runs on Linux computers with the agents' desktops."
+  },
+  "machines.reasons.desktop_use_own_user": {
+    "value": "Desktop use needs each agent to work as its own user on this computer (system mode). Here every agent works as the runner's user."
+  },
+  "machines.reasons.desktop_use_install": {
+    "value": "Install what desktop use needs on this computer:"
+  },
+  "machines.reasons.desktop_unavailable": {
+    "value": "The agents' desktops can't run on this computer."
+  },
+  "machines.reasons.desktop_linux": {
+    "value": "The agents' desktops run on Linux computers only."
+  },
+  "machines.reasons.desktop_install": {
+    "value": "Install the agents' desktops on this computer:"
+  },
+  "machines.reasons.not_as_root": {
+    "value": "The agents' desktops and terminals never run as root. Run the runner as a normal user."
+  },
+  "machines.reasons.runner_bun_old": {
+    "value": "This needs the runner on Bun 1.3.5 or newer. Update the runner on this computer."
+  },
+  "machines.reasons.terminal_unsupported": {
+    "value": "Terminals run on Linux and Mac computers only."
   },
   "machines.egress.draining": {
     "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
@@ -31074,6 +31443,9 @@
   "audit.panel.techKind": {
     "value": "Kind"
   },
+  "audit.panel.techSaid": {
+    "value": "What it answered"
+  },
   "audit.panel.techRun": {
     "value": "Run"
   },
@@ -31091,6 +31463,9 @@
   },
   "audit.panel.copied": {
     "value": "Record copied"
+  },
+  "settings.notOpen": {
+    "value": "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you."
   },
   "settings.nav": {
     "value": "Settings sections"
@@ -31325,6 +31700,30 @@
   },
   "settings.account.chat.openLatest": {
     "value": "Latest message"
+  },
+  "settings.account.chat.textSize": {
+    "value": "Text size"
+  },
+  "settings.account.chat.textSizeHelp": {
+    "value": "Of messages, in every conversation and on all your devices"
+  },
+  "settings.account.chat.textSizePhone": {
+    "value": "Your phone's own text size setting applies too"
+  },
+  "settings.account.chat.textXs": {
+    "value": "Smaller"
+  },
+  "settings.account.chat.textSm": {
+    "value": "Small"
+  },
+  "settings.account.chat.textMd": {
+    "value": "Default"
+  },
+  "settings.account.chat.textLg": {
+    "value": "Large"
+  },
+  "settings.account.chat.textXl": {
+    "value": "Larger"
   },
   "settings.account.chat.sample.ask": {
     "value": "How many are left?"
@@ -32909,6 +33308,18 @@
   "chat.work.refusal.rules": {
     "value": "Outside what agents may do on their own"
   },
+  "chat.work.refusal.noAccess": {
+    "value": "The agent doesn't have access to this"
+  },
+  "chat.work.refusal.policy": {
+    "value": "Not allowed in this kind of work"
+  },
+  "chat.work.refusal.credential": {
+    "value": "It sends what looks like a key"
+  },
+  "chat.work.refusal.repo": {
+    "value": "That repository isn't on the agent's list"
+  },
   "chat.work.gave": {
     "value": "given"
   },
@@ -33214,6 +33625,9 @@
   },
   "chat.work.step.proposingChange": {
     "value": "Proposed a change"
+  },
+  "chat.work.step.workingOnWorkspace": {
+    "value": "Worked on the workspace"
   },
   "chat.work.step.updatingThread": {
     "value": "Updated a thread"
@@ -33529,6 +33943,9 @@
   },
   "chat.activity.proposingChange": {
     "value": "proposing a change"
+  },
+  "chat.activity.workingOnWorkspace": {
+    "value": "working on the workspace"
   },
   "chat.activity.updatingThread": {
     "value": "updating a thread"
@@ -33938,6 +34355,12 @@
   "chat.body.action_open_page": {
     "value": "Open a screen"
   },
+  "chat.body.calendar_proposal": {
+    "value": "Event proposal: {{title}}"
+  },
+  "chat.body.action_workspace": {
+    "value": "Proposed a change in the workspace"
+  },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
   },
@@ -34285,6 +34708,54 @@
   },
   "builtinTools.update_skill_from_source.description": {
     "value": "Updates skills from where they were installed. Changes to scripts wait for a person."
+  },
+  "builtinTools.propose_remove_agents.label": {
+    "value": "Propose archiving or deleting agents"
+  },
+  "builtinTools.propose_remove_agents.description": {
+    "value": "Posts one card listing the agents to archive or delete. A person who may applies it."
+  },
+  "builtinTools.offer_answers.label": {
+    "value": "Ask with answers to tap"
+  },
+  "builtinTools.offer_answers.description": {
+    "value": "Posts a question with answers the person taps. Each tap is their own message."
+  },
+  "builtinTools.propose_team.label": {
+    "value": "Propose a team"
+  },
+  "builtinTools.propose_team.description": {
+    "value": "Posts one card with several agents, their channels, routines and skills. A person creates it."
+  },
+  "builtinTools.propose_settings_change.label": {
+    "value": "Propose a teammate's settings"
+  },
+  "builtinTools.propose_settings_change.description": {
+    "value": "Posts a card with a teammate's new model, AI, budget, owner, audience or channels. A person applies it."
+  },
+  "builtinTools.offer_approvals.label": {
+    "value": "Show what waits for approval"
+  },
+  "builtinTools.offer_approvals.description": {
+    "value": "Posts one card with the approvals waiting for the person, who approves or refuses each there."
+  },
+  "builtinTools.propose_member_changes.label": {
+    "value": "Propose changes to people"
+  },
+  "builtinTools.propose_member_changes.description": {
+    "value": "Posts one card with owners, roles or removals to change. A person who may applies each one."
+  },
+  "builtinTools.offer_open_page.label": {
+    "value": "Offer to open a screen"
+  },
+  "builtinTools.offer_open_page.description": {
+    "value": "Posts a card whose button opens a screen of the app, such as billing, roles or an agent's page."
+  },
+  "builtinTools.set_team_week.label": {
+    "value": "Change the Team week card"
+  },
+  "builtinTools.set_team_week.description": {
+    "value": "Stops, starts again or moves the weekly Team week card in the person's DM."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"
@@ -38247,6 +38718,177 @@
   },
   "whoSees.rolesToo": {
     "value": "The roles already on this page keep seeing it."
+  },
+  "share.button": {
+    "value": "Share"
+  },
+  "share.title": {
+    "value": "Share {{name}}"
+  },
+  "share.conversation": {
+    "value": "Only the conversation"
+  },
+  "share.people": {
+    "value": "People and roles you choose"
+  },
+  "share.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "share.whereDm": {
+    "value": "The DM with {{name}}"
+  },
+  "share.whereDmGone": {
+    "value": "A DM"
+  },
+  "share.whereDmBetween": {
+    "value": "The DM between {{names}}"
+  },
+  "share.whereChannel": {
+    "value": "Members of #{{name}}"
+  },
+  "share.add": {
+    "value": "Add a person or a role"
+  },
+  "share.addSearch": {
+    "value": "Search people and roles"
+  },
+  "share.noResults": {
+    "value": "Nobody with that name"
+  },
+  "share.groupPeople": {
+    "value": "People"
+  },
+  "share.groupRoles": {
+    "value": "Roles"
+  },
+  "share.access": {
+    "value": "Who has access"
+  },
+  "share.you": {
+    "value": "{{name}} (you)"
+  },
+  "share.agent": {
+    "value": "Agent"
+  },
+  "share.role": {
+    "value": "Role"
+  },
+  "share.remove": {
+    "value": "Remove {{name}}"
+  },
+  "share.admins": {
+    "value": "Administrators always see it."
+  },
+  "share.copyLink": {
+    "value": "Copy link"
+  },
+  "share.copied": {
+    "value": "Link copied."
+  },
+  "share.done": {
+    "value": "Done"
+  },
+  "share.onlyHere": {
+    "value": "People outside this conversation won't open the link."
+  },
+  "share.choosePeople": {
+    "value": "Choose people"
+  },
+  "share.readOnly": {
+    "value": "Only who's in the conversation changes who sees it."
+  },
+  "share.open": {
+    "value": "Everyone in the workspace sees this file."
+  },
+  "share.savedEveryone": {
+    "value": "Everyone in the workspace sees the file now."
+  },
+  "share.savedPeople": {
+    "value": "The people you chose see the file now."
+  },
+  "share.savedConversation": {
+    "value": "Only the conversation sees the file now."
+  },
+  "share.undo": {
+    "value": "Undo"
+  },
+  "share.fileRef": {
+    "value": "File {{title}}"
+  },
+  "share.fileRefNone": {
+    "value": "File without access"
+  },
+  "share.also": {
+    "value": "{{text}}. Also shared with {{who}}."
+  },
+  "share.someOnlyHere": {
+    "value": "Some of these links open only for who's in the file's conversation."
+  },
+  "linkErrors.signIn.title": {
+    "value": "Sign in to open this link"
+  },
+  "linkErrors.signIn.text": {
+    "value": "Once you're in, you come right back here."
+  },
+  "linkErrors.file.title": {
+    "value": "This file isn't available to you"
+  },
+  "linkErrors.file.text": {
+    "value": "It may have been deleted, or be shared only in a conversation you're not in. Ask whoever sent it to share it with you from the file's Share button."
+  },
+  "linkErrors.link.title": {
+    "value": "This link isn't available to you"
+  },
+  "linkErrors.link.text": {
+    "value": "It may have expired, been used already, or lead to a place you're not in. Ask whoever sent it for a new one."
+  },
+  "linkErrors.version.title": {
+    "value": "This version of the file doesn't exist"
+  },
+  "linkErrors.version.text": {
+    "value": "The link asks for a version the file doesn't have."
+  },
+  "linkErrors.format.title": {
+    "value": "This file doesn't come in that format"
+  },
+  "linkErrors.format.text": {
+    "value": "The link asks for a format this file can't be saved in."
+  },
+  "linkErrors.busy.title": {
+    "value": "Too many tries in a row"
+  },
+  "linkErrors.busy.text": {
+    "value": "Wait a moment and try again."
+  },
+  "linkErrors.server.title": {
+    "value": "Something failed on our side"
+  },
+  "linkErrors.server.text": {
+    "value": "It wasn't anything you did. Try again in a moment."
+  },
+  "linkErrors.other.title": {
+    "value": "This link didn't open"
+  },
+  "linkErrors.other.text": {
+    "value": "The address is incomplete or no longer works. Ask whoever sent it for a new one."
+  },
+  "linkErrors.action.signIn": {
+    "value": "Sign in"
+  },
+  "linkErrors.action.open": {
+    "value": "Open agentes.chat"
+  },
+  "linkErrors.action.latest": {
+    "value": "Open the latest version"
+  },
+  "linkErrors.action.file": {
+    "value": "Open the file"
+  },
+  "linkErrors.action.retry": {
+    "value": "Try again"
+  },
+  "linkErrors.errorId": {
+    "value": "Error code: {{id}}"
   },
   "teamTemplates.lead": {
     "value": "A team for {{org}}, each agent in its own channel. You can adjust it before creating."

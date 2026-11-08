@@ -318,6 +318,27 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
 }
 
 /**
+ * What the open conversation says about lists shown elsewhere too: a file saved, changed or deleted there (its cards,
+ * the open viewer, the Drive; a deleted one's cards say so, from the conversation read again), and an agent changing its
+ * memory there (its memory list). Returns whether the event was one of these.
+ */
+export function applyConversationEvent(qc: QueryClient, orgId: string, event: ChannelEvent): boolean {
+  const type: string = event.type;
+  if (type === "artifact.created" || type === "artifact.updated" || type === "artifact.deleted") {
+    void qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
+    const channelId = (event as { channelId?: unknown }).channelId;
+    if (type === "artifact.deleted" && typeof channelId === "string")
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+    return true;
+  }
+  if (event.type === "memory.updated") {
+    void qc.invalidateQueries({ queryKey: keys.memory(orgId, event.agentId) });
+    return true;
+  }
+  return false;
+}
+
+/**
  * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
@@ -331,8 +352,10 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
  * channel's roster, the roles, `me`, the agents, the
  * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
  * when someone left). `agents.changed` and `channels.changed` (the team, or the channels and who is in them) read
- * again every list that shows them, open or cached, whoever changed them and however. Returns whether the
- * event was one of these.
+ * again every list that shows them, open or cached, whoever changed them and however, and so do `artifacts.changed`
+ * (the Drive), `wiki.page.updated`, `calendar.changed` (with my own `calendar.invited` and `calendar.proposal`),
+ * `routines.changed` and `memory.changed` (what agents learned on their own). Returns whether the event was one of
+ * these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "agents.changed") {
@@ -366,6 +389,8 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       keys.agents(orgId),
       keys.routines(orgId),
       keys.channels(orgId),
+      // Under `invitations`: the ones sent (one accepted leaves them) and the requests to join.
+      keys.invitations(orgId),
     ])
       void qc.invalidateQueries({ queryKey: key });
     // A person's name, handle or photo: each channel's members column (`roster`) names them.
@@ -443,9 +468,33 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     return true;
   }
-  // A routine's run was queued, started or ended: its runs, its line in Rotinas and its webhook's calls follow.
-  if (event.type === "routine.runs") {
+  // A routine's run was queued, started or ended, or a routine was made, changed or deleted: Rotinas follows.
+  if (event.type === "routine.runs" || event.type === "routines.changed") {
     void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+    return true;
+  }
+  // The Drive's lists and its trash; a file's own content follows its conversation (`applyConversationEvent`).
+  if (event.type === "artifacts.changed") {
+    readList(qc, `${orgId}:drive`, {
+      predicate: ({ queryKey: k }) =>
+        k[0] === "org" && k[1] === orgId && k[2] === "artifacts" && (k[3] === "list" || k[3] === "trash"),
+    });
+    return true;
+  }
+  if (event.type === "wiki.page.updated") {
+    readList(qc, `${orgId}:wiki`, { queryKey: keys.wiki(orgId) });
+    return true;
+  }
+  // Someone changed it, I was invited, or an agent proposes me an event.
+  if (event.type === "calendar.changed" || event.type === "calendar.invited" || event.type === "calendar.proposal") {
+    readList(qc, `${orgId}:calendar`, { queryKey: keys.calendar(orgId) });
+    return true;
+  }
+  // What agents learned on their own: every agent's memory list (the event names none).
+  if (event.type === "memory.changed") {
+    readList(qc, `${orgId}:memory`, {
+      predicate: ({ queryKey: k }) => k[0] === "org" && k[1] === orgId && k[2] === "agent" && k[4] === "memory",
+    });
     return true;
   }
   return false;

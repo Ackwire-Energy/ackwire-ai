@@ -12,10 +12,10 @@ import { useApi } from "@/api/context";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
-import { copyText, type MenuEntry } from "@/lib/context-menu";
+import type { MenuEntry } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
-import { artifactLink } from "./ArtifactViewer";
 import { fileSaver } from "./fileSaver";
+import { useFileShare } from "./ShareDialog";
 
 type Target = Pick<Artifact, "id" | "title">;
 
@@ -160,14 +160,15 @@ export function useArtifactDownload() {
 
 /**
  * A file's actions, for its "…" (viewer header, Drive rows) and its right click (Drive cards and rows): open and
- * download when given, link, its conversation, versions, move to the trash.
+ * download when given, Compartilhar, its link (through the share dialog while only its conversation sees it), its
+ * conversation, versions, move to the trash. The caller renders `dialog`.
  */
 export function useArtifactEntries() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const toast = useToast();
   const navigate = useNavigate();
   const downloads = useArtifactDownload();
+  const share = useFileShare();
   const placeEntry = (artifact: Artifact): MenuEntry[] => {
     const place = artifactPlace(artifact);
     if (!place) return [];
@@ -182,7 +183,7 @@ export function useArtifactEntries() {
       },
     ];
   };
-  return (artifact: Artifact, { onOpen, onVersions, onDelete, download }: ArtifactMenuOptions): MenuEntry[] => [
+  const build = (artifact: Artifact, { onOpen, onVersions, onDelete, download }: ArtifactMenuOptions): MenuEntry[] => [
     ...(onOpen
       ? ([
           { kind: "item", id: "open", label: t("artifacts.openFile"), icon: "external", run: () => onOpen() },
@@ -199,15 +200,17 @@ export function useArtifactEntries() {
           },
         ] satisfies MenuEntry[])
       : []),
+    ...(artifact.inDrive !== false
+      ? ([
+          { kind: "item", id: "share", label: t("share.button"), icon: "personAdd", run: () => share.open(artifact) },
+        ] satisfies MenuEntry[])
+      : []),
     {
       kind: "item",
       id: "copy-link",
       label: t("artifacts.copyLink"),
       icon: "link",
-      run: () =>
-        void copyText(artifactLink(window.location.origin, org.id, artifact.id), () =>
-          toast.show(t("artifacts.linkCopied")),
-        ),
+      run: () => share.copyLink(artifact),
     },
     ...placeEntry(artifact),
     ...(onVersions
@@ -222,6 +225,7 @@ export function useArtifactEntries() {
         ] satisfies MenuEntry[])
       : []),
   ];
+  return Object.assign(build, { dialog: share.dialog });
 }
 
 export interface ArtifactMenuOptions {
@@ -247,18 +251,28 @@ export function ArtifactMoreMenu({
   const entries = useArtifactEntries();
   const label = t("artifacts.more", { title: artifact.title });
   return (
-    <Menu
-      align="end"
-      label={label}
-      trigger={
-        plain ? (
-          <Button iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
-        ) : (
-          <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
-        )
-      }
-    >
-      <MenuEntries entries={entries(artifact, options)} />
-    </Menu>
+    <>
+      <Menu
+        align="end"
+        label={label}
+        trigger={
+          plain ? (
+            <Button iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="more"
+              aria-label={label}
+              title={t("artifacts.moreShort")}
+            />
+          )
+        }
+      >
+        <MenuEntries entries={entries(artifact, options)} />
+      </Menu>
+      {entries.dialog}
+    </>
   );
 }

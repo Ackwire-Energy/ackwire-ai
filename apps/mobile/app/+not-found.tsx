@@ -1,8 +1,9 @@
-import { Redirect, router } from "expo-router";
+import { Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useSession } from "@/providers/session";
 import { Button, EmptyState, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 
 /**
  * A link to something the app doesn't have (or no longer has). Signed out, it goes to the sign-in, as the

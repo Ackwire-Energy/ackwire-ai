@@ -1,4 +1,6 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
+import { formatJson, highlightCode } from "@agenteschat/client/lib/code";
+import { isJsonFile } from "@agenteschat/client/lib/files";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
@@ -6,10 +8,11 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-import { Button, IconButton, Text, ToastHost } from "@/ui";
+import { Button, ICON_BUTTON_SIZE, IconButton, Text, ToastHost, useToast } from "@/ui";
+import { CodeText, RawToggle } from "../chat/CodeCard";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { goBack, MONO } from "../shared/parts";
+import { copyText, goBack, MONO } from "../shared/parts";
 import { useFileActions } from "./actions";
 import { type FileInfo, fileInfo } from "./logic";
 import { FileTile, useFileLine } from "./MessageFiles";
@@ -19,7 +22,7 @@ import { VideoPlayer } from "./VideoPlayer";
 /**
  * A file opened from a message: Markdown and text drawn by the
  * app, PDF in a web view (iOS draws PDFs natively there), a video in our player, anything else as its card. Top: close, the
- * name and "Documento · 4 KB · Theo". Bottom: Ver no Drive and Compartilhar.
+ * name and "Documento · 4 KB · Theo". Bottom: Enviar and Compartilhar; Ver no Drive in the "…".
  */
 export function DocumentViewer({ id, version }: { id: string; version?: number }) {
   return (
@@ -39,18 +42,27 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const query = useArtifact(orgId, id, version);
   const detail = query.data;
   const actions = useFileActions(detail);
+  const toast = useToast();
   const info = detail ? fileInfo(detail) : null;
+  const textual = info?.view === "markdown" || info?.view === "text";
+  // The page's own text, read once for the page and for Copiar texto.
+  const text = useFileText(detail, textual);
   const close = () => goBack();
+  const copy = () => {
+    if (text.data === undefined) return;
+    void copyText(text.data).then((ok) =>
+      toast(ok ? { title: t("contextMenu.textCopied"), icon: "copy" } : { title: t("mobile.app.failed"), icon: "x" }),
+    );
+  };
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
-  const shows = info
-    ? info.view === "markdown" || info.view === "text" || info.view === "video" || info.view === "image" || pdf
-    : false;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <IconButton icon="x" plate label={t("mobile.common.close")} onPress={close} />
+        {/* Copiar texto's twin on this side: the title stays centred on the screen. */}
+        {textual ? <View style={styles.balance} /> : null}
         <View style={styles.title}>
           <Text variant="subhead" style={styles.bold} numberOfLines={1}>
             {info?.name ?? ""}
@@ -59,6 +71,15 @@ function Viewer({ id, version }: { id: string; version?: number }) {
             {info && detail ? line(info, [dir.nameOf(detail.createdBy)]) : ""}
           </Text>
         </View>
+        {textual ? (
+          <IconButton
+            icon="copy"
+            plate
+            label={t("contextMenu.copyText")}
+            onPress={copy}
+            disabled={text.data === undefined}
+          />
+        ) : null}
         <IconButton
           icon="more"
           plate
@@ -80,7 +101,7 @@ function Viewer({ id, version }: { id: string; version?: number }) {
             <ActivityIndicator color={c.faint} />
           </Center>
         ) : info.view === "markdown" || info.view === "text" ? (
-          <TextPage detail={detail} markdown={info.view === "markdown"} />
+          <TextPage detail={detail} markdown={info.view === "markdown"} json={isJsonFile(info.name, info.mime)} />
         ) : pdf ? (
           <PdfPage detail={detail} />
         ) : info.view === "video" ? (
@@ -93,21 +114,28 @@ function Viewer({ id, version }: { id: string; version?: number }) {
       </View>
 
       <View style={[styles.bar, { paddingBottom: insets.bottom + 12, borderTopColor: c.line2, backgroundColor: c.bg }]}>
-        {shows ? (
-          <View style={styles.half}>
-            <Button variant="secondary" wide icon="drive" label={t("mobile.files.drive")} onPress={actions.drive} />
-          </View>
-        ) : null}
         <View style={styles.half}>
           <Button
-            variant="primary"
+            variant="secondary"
             wide
             icon="share"
-            label={t("mobile.files.share")}
+            label={t("mobile.files.send")}
             disabled={!detail || actions.busy !== null}
             onPress={actions.share}
           />
         </View>
+        {detail?.inDrive !== false ? (
+          <View style={styles.half}>
+            <Button
+              variant="primary"
+              wide
+              icon="person"
+              label={t("share.button")}
+              disabled={!detail}
+              onPress={actions.shareSheet}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -117,23 +145,39 @@ function Center({ children }: { children: React.ReactNode }) {
   return <View style={styles.center}>{children}</View>;
 }
 
-/** Markdown with the messages' renderer, plain text in mono, on a raised page. */
-function TextPage({ detail, markdown }: { detail: ArtifactDetail; markdown: boolean }) {
-  const { t } = useTranslation();
+/** A Markdown or text file's text, loaded once per version. */
+function useFileText(detail: ArtifactDetail | undefined, enabled: boolean) {
   const api = useApi();
   const orgId = useOrgId();
-  const c = useColors();
-  const text = useQuery({
-    queryKey: ["org", orgId, "artifacts", "text", detail.id, detail.shownVersion] as const,
-    queryFn: () => fileText(api, orgId, detail),
+  return useQuery({
+    queryKey: ["org", orgId, "artifacts", "text", detail?.id, detail?.shownVersion] as const,
+    queryFn: () => fileText(api, orgId, detail as ArtifactDetail),
+    enabled: enabled && detail !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
   });
+}
+
+/**
+ * Markdown with the messages' renderer, plain text in mono, on a raised page. JSON formatted and colored as a code
+ * block reads it, the text as written one press away ("Original").
+ */
+function TextPage({ detail, markdown, json }: { detail: ArtifactDetail; markdown: boolean; json: boolean }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const text = useFileText(detail, true);
+  const formatted = useMemo(() => (json && text.data !== undefined ? formatJson(text.data) : null), [json, text.data]);
+  const [raw, setRaw] = useState(false);
   return (
     <View style={[styles.page, { backgroundColor: c.raised }]}>
       {text.data !== undefined ? (
         <ScrollView contentContainerStyle={styles.pageInner}>
           {markdown ? (
             <MessageText body={text.data} />
+          ) : formatted !== null ? (
+            <View style={styles.json}>
+              {formatted !== text.data.trim() ? <RawToggle on={raw} onPress={() => setRaw((r) => !r)} /> : null}
+              <CodeText lines={highlightCode(raw ? text.data : formatted, "json")} wrap />
+            </View>
           ) : (
             <RNText selectable style={[styles.mono, { color: c.ink2 }]}>
               {text.data}
@@ -265,6 +309,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
   title: { flex: 1, minWidth: 0, alignItems: "center" },
+  balance: { width: ICON_BUTTON_SIZE },
   bold: { fontWeight: "600" },
   body: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 6 },
@@ -272,6 +317,7 @@ const styles = StyleSheet.create({
   clip: { overflow: "hidden" },
   pageInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
+  json: { gap: 10, alignItems: "flex-start" },
   web: { flex: 1, backgroundColor: "transparent" },
   video: { backgroundColor: "#000", borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },
   picture: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },

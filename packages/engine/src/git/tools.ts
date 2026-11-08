@@ -288,7 +288,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             required: ["repo", "branch", "title"],
             additionalProperties: false,
           },
-          describe: (input) => ({ title: `Abrir PR em ${str(input.repo)}: ${str(input.title)}` }),
+          describe: (input) => ({ title: `Open a pull request in ${str(input.repo)}: ${str(input.title)}` }),
           async execute(input, c) {
             try {
               const repo = parseRepo(str(input.repo));

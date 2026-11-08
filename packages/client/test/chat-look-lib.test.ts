@@ -1,5 +1,19 @@
 import { expect, test } from "bun:test";
-import { chatLookOf, firstUnreadId, mineOnRight, opensAtLastRead } from "../src/lib/chat-look";
+import {
+  CHAT_TEXT_SIZES,
+  chatLookOf,
+  firstUnreadId,
+  mineOnRight,
+  opensAtLastRead,
+  textSizeOf,
+} from "../src/lib/chat-look";
+
+test("Tamanho do texto: five steps, smallest first, the middle one until the person picks", () => {
+  expect(CHAT_TEXT_SIZES).toEqual(["xs", "sm", "md", "lg", "xl"]);
+  expect(textSizeOf(undefined)).toBe("md");
+  expect(textSizeOf({ dmStyle: "left" })).toBe("md");
+  expect(textSizeOf({ textSize: "xs" })).toBe("xs");
+});
 
 const said = (id: string, author: { type: "person" | "agent"; id: string }, createdAt: string) => ({
   id,

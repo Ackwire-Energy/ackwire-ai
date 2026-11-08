@@ -241,7 +241,7 @@ function BySource({
               key={s.key}
               style={[styles.source, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
             >
-              <View style={styles.grow}>
+              <View>
                 {s.account ? (
                   <AccountHead account={s.account} extra={when} />
                 ) : (
@@ -297,8 +297,8 @@ const styles = StyleSheet.create({
   sentence: { fontWeight: "500", lineHeight: 26 },
   legend: { flexDirection: "row", flexWrap: "wrap", rowGap: 4, columnGap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  // The line under the name wraps: the mark and the numbers stay on the name's line instead of the block's middle.
-  source: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 12 },
+  // The figures under the account, as wide as the row: beside it, a narrow column squeezed them and the name.
+  source: { gap: 6, paddingVertical: 12 },
   acct: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   key: {
     width: 30,
@@ -309,5 +309,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  n: { alignItems: "flex-end", maxWidth: 110 },
+  n: { alignItems: "flex-start" },
 });

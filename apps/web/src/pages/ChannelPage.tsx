@@ -90,7 +90,7 @@ import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
-import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { canTalk, unavailableNotice } from "@agenteschat/client/lib/audience";
 import { accessInput, accessOf, accessValid, type ChannelAccess } from "@agenteschat/client/lib/channel-access";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
@@ -241,6 +241,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { AgentSidebar } from "@/components/agents/AgentSidebar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { ImageSet } from "@/components/artifacts/ArtifactViewer";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
 import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/browser/BrowserCard";
@@ -372,6 +373,7 @@ import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
+import { typingInField } from "@/lib/keys";
 import { lookOf } from "@/lib/look";
 import { threadSearch, useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
@@ -834,6 +836,8 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      // An Esc in another field (the search, a card's answer) is that field's: the composer stops agents on its own.
+      if (typingInField(e.target)) return;
       // An Esc from a panel is that panel's, and one from the conversation beside a thread isn't the thread's.
       const inPanel = e.target instanceof Element && Boolean(e.target.closest(".thread-panel"));
       if (!stopTarget || inPanel !== Boolean(chrome?.panel)) return;
@@ -860,6 +864,8 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      // The composer's Esc lets go of the reply first; another field's (the search, a card's answer) is that field's.
+      if (typingInField(e.target) && !(e.target as Element).closest('[id^="composer-"]')) return;
       e.preventDefault();
       setQuote(null);
     };
@@ -3282,21 +3288,14 @@ function LiveNotices({ channelId }: { channelId: string }) {
   if (!notices?.length) return null;
   return (
     <>
-      {notices.map((n) => {
-        const agent = dir.agentById.get(n.agentId);
-        const known =
-          n.code === "channel.agents_denied"
-            ? t("channel.perms.agentsDenied")
-            : agent
-              ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)
-              : "";
-        return (
-          <p key={n.key} className="channel__notice ac-iconline" role="status">
-            <Icon name="lock" size={16} />
-            <span>{known || n.text}</span>
-          </p>
-        );
-      })}
+      {notices.map((n) => (
+        <p key={n.key} className="channel__notice ac-iconline" role="status">
+          <Icon name="lock" size={16} />
+          <span>
+            {unavailableNotice(t, n, dir.agentById.get(n.agentId), (id) => dir.memberById.get(id)?.name, dir.roleName)}
+          </span>
+        </p>
+      ))}
     </>
   );
 }
@@ -4586,11 +4585,13 @@ export const TimelineMessage = memo(function TimelineMessage({
               <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
             )}
             {artifacts.length > 0 && (
-              <div className="artifact-cards">
-                {artifacts.map((r) => (
-                  <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
-                ))}
-              </div>
+              <ImageSet refs={artifacts}>
+                <div className="artifact-cards">
+                  {artifacts.map((r) => (
+                    <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
+                  ))}
+                </div>
+              </ImageSet>
             )}
             {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
             {keptSteps?.length && seenLive ? (

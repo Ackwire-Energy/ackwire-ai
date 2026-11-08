@@ -67,6 +67,7 @@
     "copied": "已复制",
     "fullScreen": "全屏",
     "wrap": "自动换行",
+    "raw": "原始数据",
     "more": "查看全部 {{count}} 行",
     "gone": "此代码已不再打开。"
   },
@@ -953,19 +954,21 @@
       "file": "文件"
     },
     "more": "更多选项",
-    "share": "分享",
+    "send": "发送",
     "savePhotos": "保存到相册",
     "drive": "在 Drive 中查看",
     "saved": "已保存到相册",
     "photosDenied": "无法访问相册",
     "photosDeniedSub": "请在设置中允许访问，以保存图片。",
-    "shareFailed": "无法分享文件。",
+    "shareFailed": "无法发送这个文件。",
     "saveFailed": "无法保存图片。",
     "loadFailed": "无法打开文件。",
     "openImage": "打开图片",
     "imageOf": "第 {{index}} 张图片，共 {{count}} 张",
     "place": "{{index}}/{{count}}",
-    "noPreview": "此文件无法在应用中打开。请分享到其他应用打开。",
+    "previous": "上一张图片",
+    "next": "下一张图片",
+    "noPreview": "这个文件无法在应用里打开。请发送到其他应用打开。",
     "video": {
       "play": "播放",
       "pause": "暂停",
@@ -1497,6 +1500,7 @@
     "everyoneFailed": "无法更改所有人的访问权限，请重试。",
     "disconnectFailed": "无法断开 {{name}}，请重试。",
     "needsReconnect": "{{name}} 账号已失效。在有人重新连接之前，智能体无法使用它。",
+    "noTools": "无法读取{{name}}的工具。在工具中重新读取之前，智能体用不了它们。",
     "accountTitle": "此账号",
     "renameFailed": "无法重命名，请重试。",
     "whoTitle": "谁在使用，权限多大",
@@ -1621,7 +1625,7 @@
   },
   "crash": {
     "title": "此页面出了点问题",
-    "subtitle": "应用在显示这些内容时出错了。请重试。如果问题持续出现，请把下面的文字发给我们。",
+    "subtitle": "应用在显示这些内容时出错了。请重试。",
     "retry": "重试"
   },
   "notFound": {

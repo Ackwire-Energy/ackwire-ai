@@ -66,8 +66,8 @@ export function useUserEvents() {
       // it, "Computador desconectado"), paused, renamed, removed, its agents moved; an agent switched computers.
       applyMachineEvent(qc, orgId, event);
       applyComputerEvent(qc, orgId, event);
-      // The workspace's standing (the suspended screen comes and goes), its own computer on its way, and the groups
-      // of agents (Agentes' sections).
+      // The workspace's standing (the suspended screen comes and goes), its own computer on its way, the groups of
+      // agents (Agentes' sections), and the lists anyone may have open (Drive, Wiki, calendar, routines, memory).
       applyWorkspaceEvent(qc, orgId, event);
       // Dashboards and widgets (ADR 0135): a board changed, a widget updated, failed or was removed.
       applyDashboardEvent(qc, orgId, event);
@@ -98,6 +98,15 @@ export function useUserEvents() {
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // Boards and widgets that changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.dashboards(orgId) });
+      // The Drive, the Wiki, the calendar, the routines and the invitations someone changed meanwhile.
+      for (const key of [
+        keys.artifacts(orgId),
+        keys.wiki(orgId),
+        keys.calendar(orgId),
+        keys.routines(orgId),
+        keys.invitations(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
     });
     return () => {
       offUser();

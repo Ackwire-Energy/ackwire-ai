@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { CustomServer, CustomTool, ToolAccess, ToolDecision } from "../api/types";
 import { humanize } from "./custom-tools";
+import { catalogLabel, toolKey } from "./tool-labels";
 
 /**
  * The connector tool review: every tool
@@ -167,14 +168,16 @@ function noun(t: TFunction, word: string): [string, string, string] | null {
 }
 
 /**
- * A readable name: the verb in the person's language, then the words. When
- * every word is known, they're ordered as the language wants
- * ("Ver orçamento da campanha" / "Get campaign budget"); otherwise the words
- * stay as the server wrote them.
+ * A readable name: the catalog's words for the tools agents use most (`tool-labels.ts`), else the verb in the
+ * person's language, then the words. When every word is known, they're ordered as the language wants
+ * ("Ver orçamento da campanha" / "Get campaign budget"); otherwise the words stay as the server wrote them. A name
+ * with no verb reads as words, without the app it starts with: the app shows beside it.
  */
 export function toolName(t: TFunction, parts: { verb: string | null; words: string[] }, name: string) {
+  const worded = catalogLabel(t, name);
+  if (worded) return worded;
   const ws = parts.words;
-  if (!parts.verb) return humanize(name);
+  if (!parts.verb) return humanize(toolKey(name).key || name);
   const verb = tt(t)(`toolNames.verb.${parts.verb}`, { defaultValue: humanize(parts.verb) });
   if (ws.length === 0) return verb;
   const many = MANY.has(parts.verb);

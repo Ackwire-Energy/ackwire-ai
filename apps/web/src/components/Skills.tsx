@@ -75,6 +75,7 @@ import {
   TabPanel,
   Tabs,
   Textarea,
+  useUnsavedInDialog,
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -82,6 +83,7 @@ import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
@@ -395,6 +397,7 @@ export function InstallSkillDialog({
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: "", description: "", body: "" });
+  const unsaved = useEdited(open, form);
   const [error, setError] = useState<string | null>(null);
   /** A link the workspace's GitHub couldn't read either, and whether GitHub is connected. */
   const [hidden, setHidden] = useState<ReturnType<typeof hiddenRepoOf>>(null);
@@ -507,7 +510,13 @@ export function InstallSkillDialog({
   const mayConnect = can(org, "manage_connectors") && Boolean(github);
   const said = hidden ? hiddenRepoText(t, hidden, mayConnect) : null;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={t("skills.install")} closeLabel={t("common.close")}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("skills.install")}
+      closeLabel={t("common.close")}
+      unsaved={unsaved}
+    >
       {browsing ? (
         <ConnectedRepos
           onBack={() => setBrowsing(false)}
@@ -1238,6 +1247,7 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
     body: skill.body,
     defaultForNewAgents: skill.defaultForNewAgents,
   });
+  useUnsavedInDialog(useEdited(true, form));
   return (
     <form
       className="stack-4"

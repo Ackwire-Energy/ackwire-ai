@@ -504,7 +504,47 @@
       "resultOk": "Gelukt",
       "resultFailed": "Mislukt",
       "resultRefused": "Geweigerd",
-      "resultRunning": "Draait"
+      "resultRunning": "Draait",
+      "said": {
+        "read": "las {{path}}",
+        "wrote": "schreef {{path}}",
+        "looked": "bekeek {{path}}",
+        "sent": "stuurde {{path}}",
+        "thinking": "denkt met {{brain}}",
+        "task": "{{what}}",
+        "taskStarted": "gestart: {{what}}",
+        "taskFinished": "klaar: {{what}}",
+        "taskCanceled": "geannuleerd: {{what}}",
+        "taskInterrupted": "onderbroken: {{what}}",
+        "taskTimedOut": "gestopt op de tijdslimiet: {{what}}",
+        "taskFailed": "mislukt (exit {{exit}}): {{what}}",
+        "taskNotStarted": "niet gestart: {{what}}",
+        "executor": {
+          "codex": "taak van Codex",
+          "claude": "taak van Claude Code"
+        },
+        "paused": "gepauzeerd",
+        "pausedUntil": "gepauzeerd tot {{until}}",
+        "resumed": "hervat",
+        "connected": "gekoppeld aan {{org}}",
+        "disconnected": "ontkoppeld",
+        "disconnectedFrom": "ontkoppeld van {{org}}",
+        "accessAsked": "vroeg om {{path}}",
+        "accessNotNow": "nu niet: {{path}}",
+        "accessExpired": "verzoek verlopen: {{path}}",
+        "toolOn": "zette {{tool}} aan",
+        "toolOff": "zette {{tool}} uit",
+        "tools": {
+          "commands": "de opdrachten",
+          "browser": "de browser",
+          "desktop": "de schermen van de agents",
+          "terminal": "de terminal"
+        },
+        "folderAllowed": "stond {{path}} toe voor {{agents}}",
+        "folderAgents": "{{path}} nu voor {{agents}}",
+        "folderRemoved": "verwijderde {{path}}",
+        "noAgent": "geen agent"
+      }
     },
     "advanced": {
       "title": "Geavanceerd",

@@ -54,13 +54,21 @@ export interface MachineExecutors {
   /** Google's Antigravity CLI (protocol 44, ADR 0143), and the models it lists. */
   antigravity?: { version: string; models?: { id: string; label?: string }[] };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
-  browser?: { available: boolean; version?: string; chrome?: string; reason?: string; chromeMissing?: true };
+  browser?: {
+    available: boolean;
+    version?: string;
+    chrome?: string;
+    reason?: string;
+    /** `reason` as a code the apps word (protocol frames from older runners have none). */
+    code?: string;
+    chromeMissing?: true;
+  };
   /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
-  desktop?: { available: boolean; reason?: string; width?: number; height?: number };
+  desktop?: { available: boolean; reason?: string; code?: string; width?: number; height?: number };
   /** `hello.terminal` (ADR 0058): whether people can open a terminal there; absent = not reported. */
-  terminal?: { available: boolean; reason?: string };
+  terminal?: { available: boolean; reason?: string; code?: string };
   /** `hello.desktopUse` (ADR 0062): whether agents can use their desktops there; absent = not reported. */
-  desktopUse?: { available: boolean; reason?: string };
+  desktopUse?: { available: boolean; reason?: string; code?: string };
   /** `hello.mode` (ADR 0058 §10): each agent works as its own OS user; absent = all as the runner's user. */
   mode?: "system";
   /** `hello.claudeLoginMethods` (protocol 50): what a new Claude sign-in for all agents can use there; absent: older. */

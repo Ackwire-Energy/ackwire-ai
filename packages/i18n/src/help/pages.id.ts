@@ -248,26 +248,38 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Persetujuan",
-    summary: "Tidak ada hal sensitif yang terjadi tanpa orang.",
+    summary: "Tindakan sensitif menunggu seseorang, sekali atau untuk seterusnya.",
     sections: [
       {
         id: "what",
         heading: "Apa yang meminta izin dulu",
         blocks: [
-          "Saat agen ingin melakukan merge, deploy, rollback, mengirim sesuatu ke luar, atau menghapus data, agen meminta izin dulu, apa pun akses yang dimilikinya. Permintaannya muncul di **Persetujuan** dan di kanal, dengan tindakan persisnya dan alasannya.",
+          "Saat agen ingin melakukan merge, deploy, rollback, mengirim sesuatu ke luar, atau menghapus data, agen meminta izin dulu, apa pun akses yang dimilikinya. Permintaannya muncul di **Persetujuan** dan di percakapan, dengan tindakan persisnya dan alasannya.",
         ],
       },
       {
-        id: "exact",
-        heading: "Satu persetujuan, satu tindakan",
+        id: "always",
+        heading: "Sekali, atau selalu",
         blocks: [
-          "Tiap persetujuan berlaku untuk satu tindakan persis, dengan nilai-nilainya. Kalau agen mengubah apa pun, agen harus meminta lagi.",
+          "Menyetujui berlaku untuk satu tindakan persis, dengan nilai-nilainya. Kalau agen mengubah apa pun, agen meminta lagi.",
+          "**Selalu setujui** membuat agen boleh melakukan jenis tindakan itu mulai sekarang, dengan nilai apa pun, tanpa meminta. Pada permintaan rutinitas, **Selalu di rutinitas ini** melakukan hal yang sama hanya untuk rutinitas itu. Keduanya tidak pernah ditawarkan untuk merge, deploy, rollback, dan sejenisnya. Untuk membatalkannya, buka **Alat dan akses** di halaman agen, atau pengaturan rutinitas.",
         ],
       },
       {
         id: "who",
         heading: "Siapa yang menyetujui",
-        blocks: ["Pemilik agen menyetujui permintaannya. Untuk agen tanpa pemilik, admin yang menyetujui."],
+        blocks: [
+          {
+            list: [
+              "Pemilik agen, untuk permintaannya.",
+              "Siapa pun yang perannya punya **Setujui tindakan agen**, untuk semua agen.",
+              "Orang yang disebut agen saat meminta, menggantikan pemiliknya.",
+              "Orang yang menggantikan seseorang di **Siapa yang menyetujui untukku**, untuk apa yang diminta dari orang itu. Merge, deploy, dan tindakan berisiko lainnya hanya kalau itu dinyalakan.",
+            ],
+          },
+          "Tindakan di kotak surat milik seseorang hanya menunggu orang itu. Akses baru untuk agen menunggu orang yang mengelola agen.",
+          "Lodi, tangan kananmu, juga bisa menyetujui untukmu agen baru yang diusulkan agen lain dan perubahan model, anggaran, serta kanal sebuah agen, hanya kalau kamu yang memintanya. Siapa yang menggantikanmu dan apa yang disetujui Lodi dipilih di **Pengaturan\u00a0›\u00a0Kamu\u00a0›\u00a0Persetujuan**.",
+        ],
       },
       {
         id: "refusing",

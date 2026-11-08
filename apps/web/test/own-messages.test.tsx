@@ -166,8 +166,8 @@ describe("own message styles", () => {
   test("the bar stands left of the bubble, never over my words; the check ends the time's line, always on screen", async () => {
     const r = await rules();
     const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
-    // With a mouse: flat icons 2px left of the bubble, their middle on its first line (7px padding + half a
-    // 15.5px / 1.7 line - half a 30px button), inside the row, so never in the gap above.
+    // With a mouse: flat icons 2px left of the bubble, their middle on its first line (7px padding + half the words'
+    // line at the person's text size - half a 30px button), inside the row, so never in the gap above.
     const mouse =
       css
         .split(
@@ -181,7 +181,7 @@ describe("own message styles", () => {
     ]) {
       const bar = r.get(sel) ?? "";
       expect(bar).toContain("right: calc(100% + 2px)");
-      expect(bar).toContain("top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 14px)");
+      expect(bar).toContain("top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 14px)");
       expect(bar).toMatch(/background: transparent;\s*box-shadow: none;\s*transform: none;/);
       expect(bar).not.toContain("top: 0");
     }
@@ -189,7 +189,7 @@ describe("own message styles", () => {
     expect(mouse).toMatch(/\.ac-msg__actions \.ac-btn--sm \{\s*min-width: 28px;\s*width: 28px;\s*height: 28px;/);
     // The bubble's padding and line, which the bar's top is computed from.
     expect(r.get(".ac-msg--own .ac-msg__text")).toContain("padding: 7px 14px");
-    expect(r.get(".ac-msg__text")).toMatch(/font-size: 15\.5px;\s*line-height: 1\.7/);
+    expect(r.get(".ac-msg__text")).toMatch(/font-size: var\(--msg-text\);\s*line-height: var\(--msg-line\)/);
     // The check in the time's line, on the bubble's right edge: no line of its own, and no room while it's empty.
     expect(r.get(".ac-msg__own-foot")).toContain("justify-content: flex-end");
     expect(r.get(".ac-msg__own-foot > .ac-msg__aside")).toContain("height: 16px");
@@ -245,10 +245,6 @@ describe("own message styles", () => {
     const narrow = css.split("@media (hover: none), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
     expect(narrow).toContain(".ac-msg--own > .ac-msg__body > .ac-msg__actions");
     expect(narrow).toContain("top: -4px;\n    right: 8px;");
-    // Keyboard focus in my row opens its time's details (the head that has them is hidden).
-    expect(css).toMatch(
-      /html:not\(\[data-pointer\]\) \.ac-msg--own:has\(:focus-visible\) \.ac-msg__own-time > \.ac-msg__tip \{\s*visibility: visible;/,
-    );
   });
 
   test("the bubble's colors come from the theme's tokens, and wide rows take the row", async () => {

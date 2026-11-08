@@ -1106,6 +1106,7 @@ function NewAgentFlow({
           <Textarea
             className="newag__textarea"
             rows={9}
+            maxLength={50_000}
             aria-label={t("newAgent.instructions")}
             placeholder={t("newAgent.instructionsPlaceholder")}
             value={instructions}

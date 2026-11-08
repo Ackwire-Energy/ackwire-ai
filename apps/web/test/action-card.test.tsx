@@ -5,7 +5,7 @@ setupDom();
 
 import type { Agent, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -664,6 +664,18 @@ describe("an agent's card to install or update a skill", () => {
     ]);
   });
 
+  test("done for everyone once the library has it, a member who doesn't manage agents too", async () => {
+    const state = seedState();
+    meWithRole(state, []);
+    const link = "https://github.com/acme/skills/tree/main/pr-review";
+    state.messages.push(offer("c-have", "install_skill", { url: link, why: "Revisa PRs." }));
+    await open(state);
+    const row = cardRow("Instalada");
+    expect(row.querySelector(".rq-done")).not.toBeNull();
+    expect(row.textContent).toContain(`Instalada: ${link}`);
+    expect(within(row).queryByRole("button", { name: "Instalar" })).toBeNull();
+  });
+
   test("an update waiting on its scripts: Revisar opens the skill, where it is applied", async () => {
     const state = seedState();
     const api = createFakeApi(state);
@@ -680,5 +692,63 @@ describe("an agent's card to install or update a skill", () => {
     expect(sheet.textContent).toContain("A atualização do link muda arquivos que rodam: scripts/lint.sh");
     await click(within(sheet).getByRole("button", { name: "Aplicar atualização" }), 8);
     expect(state.calls.some((c) => c.method === "skills.approveUpdate")).toBe(true);
+  });
+});
+
+describe("an agent's event proposal", () => {
+  const proposalCard = (status: "pending" | "confirmed" | "dismissed", requesterUserId = "u-walter"): Message => ({
+    id: "m-cal",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent", id: ADA_ID },
+    body: "Event proposal: Revisão do PR",
+    mentionedAgentIds: [],
+    agentRunId: "r-cal",
+    meta: {
+      bodyCode: "calendar_proposal",
+      bodyParams: { title: "Revisão do PR" },
+      calendarProposalId: "p-cal",
+      calendarProposal: {
+        id: "p-cal",
+        agentId: ADA_ID,
+        requesterUserId,
+        title: "Revisão do PR",
+        start: new Date(NOW.getTime() + 86_400_000).toISOString(),
+        end: new Date(NOW.getTime() + 86_400_000 + 1_800_000).toISOString(),
+        participants: [{ type: "person", id: "u-joao" }],
+        note: null,
+        status,
+      },
+    },
+    createdAt: NOW.toISOString(),
+  });
+
+  test("a card in the conversation: Confirmar e convidar makes the event; then it says what was decided", async () => {
+    const state = seedState();
+    state.messages.push(proposalCard("pending"));
+    const api = createFakeApi(state);
+    const confirmed: string[] = [];
+    api.calendar.confirmProposal = async (_org, id) => {
+      confirmed.push(id);
+      return {} as never;
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const row = cardRow("Revisão do PR");
+    expect(row.textContent).toContain("João");
+    await click(within(row).getByRole("button", { name: "Confirmar e convidar" }));
+    expect(confirmed).toEqual(["p-cal"]);
+    expect(cardRow("Revisão do PR").textContent).toContain("Evento criado");
+    expect(within(cardRow("Revisão do PR")).queryByRole("button", { name: "Confirmar e convidar" })).toBeNull();
+  });
+
+  test("someone else's, for a member: it says who confirms, with no buttons", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    state.messages.push(proposalCard("pending", "u-joao"));
+    await open(state);
+    const row = cardRow("Revisão do PR");
+    expect(row.textContent).toContain("João confirma");
+    expect(within(row).queryByRole("button", { name: "Confirmar e convidar" })).toBeNull();
   });
 });

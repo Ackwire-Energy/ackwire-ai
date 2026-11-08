@@ -248,27 +248,37 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   approvals: {
     title: "Approvazioni",
-    summary: "Niente di delicato succede senza una persona.",
+    summary: "Le azioni delicate aspettano una persona, una volta o per sempre.",
     sections: [
       {
         id: "what",
         heading: "Cosa chiede prima",
         blocks: [
-          "Quando un agente vuole fare un merge, un deploy, un rollback, mandare qualcosa all’esterno o eliminare dati, chiede prima, qualunque accesso abbia. La richiesta compare in **Approvazioni** e nel canale, con l’azione esatta e il motivo.",
+          "Quando un agente vuole fare un merge, un deploy, un rollback, mandare qualcosa all’esterno o eliminare dati, chiede prima, qualunque accesso abbia. La richiesta compare in **Approvazioni** e nella conversazione, con l’azione esatta e il motivo.",
         ],
       },
       {
-        id: "exact",
-        heading: "Un’approvazione, un’azione",
+        id: "always",
+        heading: "Una volta, o sempre",
         blocks: [
-          "Ogni approvazione copre un’azione esatta, con i suoi valori. Se l’agente cambia qualcosa, deve chiedere di nuovo.",
+          "Approvare copre un’azione esatta, con i suoi valori. Se l’agente cambia qualcosa, chiede di nuovo.",
+          "**Approva sempre** lascia che l’agente faccia quel tipo di azione da ora in poi, con qualsiasi valore, senza chiedere. Nella richiesta di una routine, **Sempre in questa routine** fa lo stesso solo per quella routine. Nessuno dei due compare per merge, deploy, rollback e simili. Per annullare, vai in **Strumenti e accesso** nella pagina dell’agente, o nelle impostazioni della routine.",
         ],
       },
       {
         id: "who",
         heading: "Chi approva",
         blocks: [
-          "Il proprietario dell’agente approva le sue richieste. Per un agente senza proprietario, lo fanno gli admin.",
+          {
+            list: [
+              "Il proprietario dell’agente, per le sue richieste.",
+              "Chiunque abbia un ruolo con **Approvare le azioni degli agenti**, per tutti gli agenti.",
+              "Le persone che l’agente nomina quando chiede, al posto del proprietario.",
+              "Chi copre qualcuno in **Chi approva per me**, per ciò che viene chiesto a quella persona. Merge, deploy e altre azioni a rischio solo quando è attivo.",
+            ],
+          },
+          "Un’azione nella casella di posta di qualcuno aspetta solo quella persona. Un nuovo accesso per un agente aspetta chi gestisce gli agenti.",
+          "Lodi, il tuo braccio destro, può anche approvare per te i nuovi agenti proposti da altri agenti e le modifiche a modello, budget e canali di un agente, solo quando l’hai chiesto tu. Chi ti copre e cosa approva Lodi si scelgono in **Impostazioni\u00a0›\u00a0Tu\u00a0›\u00a0Approvazioni**.",
         ],
       },
       {

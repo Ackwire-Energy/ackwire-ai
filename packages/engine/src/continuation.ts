@@ -146,7 +146,7 @@ export async function continuationVerdict(
      */
     tried: string[];
     runKind: TurnKind;
-    /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
+    /** Agents and people its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
     /**
      * Asks the same call whether the turn taught something worth keeping (ADR 0120) and hands the answer here: no
@@ -181,7 +181,7 @@ export async function continuationVerdict(
             untried:
               "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. Also when it said it or the team lacks an access, a login or an account, or asked people for one or who has it, without first looking in the workspace (`tried` has no search_context, find_agent, ask_agent or tell_agent): a teammate or an earlier conversation may hold it. Also when it said it couldn't, stopped, or only offered in passing ('one option would be…', 'only if you want'), because a step needs the person (a sign-in, a QR code scanned with their phone, a code sent to them, a captcha, an approval, a permission, their consent to their own account) instead of doing everything up to it and handing that step over, while `means` can hand it over: a step that needs the person is never a blocker. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
             continue:
-              "It said it will do more itself (next, later, after a build), or stopped midway, and nothing it set up brings it back. A reply that asks the person whether to do something ('want me to…?', 'quer que eu faça?') is not this: it waits for their answer. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
+              "It said it will do more itself (next, later, after a build), or stopped midway, and nothing it set up brings it back. A reply that asks the person whether to do something ('want me to…?', 'quer que eu faça?') is not this: it waits for their answer. Also when `unreached` is set and the reply hands work or a question to an agent it names, or says it told a person it names (that mention reached nobody); merely naming one is not that.",
             ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need, or `request` asked what is missing or left to do and the list answers it: that is done. A way to do the request itself, even worded 'only if you want', is never optional extra work.",
             secret:
               "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
@@ -331,8 +331,9 @@ export interface TurnEnd {
   /** Addressed directly, it wrote nothing (or only the silence word). */
   unanswered: boolean;
   /**
-   * Its answer names agents outside the conversation (`unreachedNote`, "" none): the mention reached nobody. Judged:
-   * a hand-off by that mention goes on with this note, a mention that only names them ends as judged.
+   * Its answer names agents or people outside the conversation (`unreachedNote`, "" none): the mention reached nobody.
+   * Judged: a hand-off or a message by that mention goes on with this note, a mention that only names them ends as
+   * judged.
    */
   unreached: string;
   /** What is judged ("" skips the judgment: nothing to read, or an agents' DM run that owes no answer). */

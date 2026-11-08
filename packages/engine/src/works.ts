@@ -579,13 +579,13 @@ async function localeOf(db: Executor, userId: string | null) {
 
 /** The anchor's words when the safety net moved the run (stored as the fallback; the apps word `work_auto_moved`). */
 export const autoMovedText = (locale: string, minutes: number) =>
-  locale === "en"
+  locale !== "pt-BR"
     ? `This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about ${minutes} min.`
     : `Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~${minutes} min.`;
 
 /** The update the server posts for a silent work (stored as the fallback; the apps word `work_auto_update`). */
 export const autoUpdateText = (locale: string, minutes: number) =>
-  locale === "en" ? `Still on it (${minutes} min).` : `Ainda trabalhando nisso (${minutes} min).`;
+  locale !== "pt-BR" ? `Still on it (${minutes} min).` : `Ainda trabalhando nisso (${minutes} min).`;
 
 async function scheduleCheckIn(tx: Executor, work: Pick<WorkRow, "id" | "orgId" | "updateSeq" | "nextUpdateAt">) {
   if (!work.nextUpdateAt) return;
@@ -875,7 +875,7 @@ export async function endWork(
         author: { type: "agent", agentId: work.agentId, runId: run.id, hop: run.hop },
         body: [
           endText(locale, status, minutes, by?.name),
-          last ? `${locale === "en" ? "Last update" : "Último update"}: ${last}` : "",
+          last ? `${locale !== "pt-BR" ? "Last update" : "Último update"}: ${last}` : "",
         ]
           .filter(Boolean)
           .join("\n\n"),
@@ -912,7 +912,7 @@ export async function endWork(
 }
 
 const endText = (locale: string, status: "done" | "failed" | "canceled", minutes: number, by?: string) =>
-  locale === "en"
+  locale !== "pt-BR"
     ? status === "done"
       ? `Done (${minutes} min).`
       : status === "failed"

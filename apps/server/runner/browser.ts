@@ -1661,7 +1661,7 @@ export class BrowserManager {
   private ready: Promise<string> | null = null;
   /** Each agent's session while it opens: commands that come meanwhile get the same one (one queue, one Chrome). */
   private readonly opening = new Map<string, Promise<Session>>();
-  private failure: { reason: string; at: number } | null = null;
+  private failure: { reason: string; code: string; at: number } | null = null;
   private closed = false;
   /** Every `closeAll` still running; a new session starts only after them. */
   private closing: Promise<void> = Promise.resolve();
@@ -1696,13 +1696,15 @@ export class BrowserManager {
       return {
         available: false,
         reason: `The agent browser doesn't run on this system (${process.platform} ${process.arch})`,
+        code: "browser_unsupported",
       };
     }
     const exe = this.chrome();
     const chrome = exe
       ? { chrome: version ? `${chromeName(exe)} ${version}` : chromeName(exe) }
       : { chromeMissing: true as const };
-    if (recent) return { available: false, version: AGENT_BROWSER_VERSION, reason: recent.reason, ...chrome };
+    if (recent)
+      return { available: false, version: AGENT_BROWSER_VERSION, reason: recent.reason, code: recent.code, ...chrome };
     return { available: true, version: AGENT_BROWSER_VERSION, ...chrome };
   }
 
@@ -1780,7 +1782,10 @@ export class BrowserManager {
     }
     const target = agentBrowserTarget();
     if (!target) {
-      throw this.fail(`The agent browser doesn't run on this system (${process.platform} ${process.arch})`);
+      throw this.fail(
+        `The agent browser doesn't run on this system (${process.platform} ${process.arch})`,
+        "browser_unsupported",
+      );
     }
     const file = this.downloadedPath();
     const want = AGENT_BROWSER_SHA256[target];
@@ -1808,10 +1813,12 @@ export class BrowserManager {
     } catch (err) {
       throw this.fail(
         `Couldn't download the agent browser: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
+        "browser_download",
       );
     }
     const got = createHash("sha256").update(bytes).digest("hex");
-    if (got !== want) throw this.fail("The agent browser download didn't match its checksum, so it was not used");
+    if (got !== want)
+      throw this.fail("The agent browser download didn't match its checksum, so it was not used", "browser_checksum");
     await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
     const tmp = `${file}.${process.pid}.tmp`;
     await writeFile(tmp, bytes, { mode: 0o755 });
@@ -1833,8 +1840,9 @@ export class BrowserManager {
     );
   }
 
-  private fail(reason: string) {
-    this.failure = { reason: reason.slice(0, BROWSER_LIMITS.message), at: this.now() };
+  /** `code`: the reason as the apps word it (`machines.reasons.<code>`); `reason` is its English. */
+  private fail(reason: string, code: string) {
+    this.failure = { reason: reason.slice(0, BROWSER_LIMITS.message), code, at: this.now() };
     return new RunnerError("browser_unavailable", this.failure.reason);
   }
 

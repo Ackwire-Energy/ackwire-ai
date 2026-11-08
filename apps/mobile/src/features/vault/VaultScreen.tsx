@@ -1,6 +1,5 @@
 import { useVault, type VaultConnection, type VaultItem, type VaultOverview } from "@agenteschat/client";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -18,6 +17,7 @@ import {
   Segmented,
   Text,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
 import { FirstUse } from "../shared/FirstUse";

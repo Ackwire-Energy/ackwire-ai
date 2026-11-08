@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
+import { toolActivity } from "./activity";
 import { previewOf } from "./consultations";
+import { joinNames, lowerFirst } from "./format";
 import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { RIGHT_HAND_PLAN_LINES } from "./no-ai";
@@ -8,6 +10,7 @@ import { usageWhen } from "./plan-usage";
 import { weekDay } from "./team-week";
 import { closedNoteText, usageWaitOf, usageWindowText } from "./usage-pause";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
+import { stepLabel } from "./work";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
 const USAGE_NOTES = new Set([
@@ -56,11 +59,13 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const note = `_${t("chat.body.interrupted", { defaultValue: "Interrupted by a server restart. Ask again to continue." })}_`;
     return interrupted.text ? `${interrupted.text}\n\n${note}` : note;
   }
-  // A computer brain stopped mid-turn after its tools ran: what it wrote, then which tools it used.
+  // A computer brain stopped mid-turn after its tools ran: what it wrote, then what its tools did, in words.
   const cut = m.brainInterrupted as { brain?: unknown; text?: unknown; tools?: unknown } | undefined;
   if (cut && typeof cut === "object" && typeof cut.text === "string") {
     const brain = brainName(typeof cut.brain === "string" ? cut.brain : null);
-    const tools = Array.isArray(cut.tools) ? cut.tools.filter((x) => typeof x === "string").join(", ") : "";
+    const names = Array.isArray(cut.tools) ? cut.tools.filter((x): x is string => typeof x === "string") : [];
+    const done = names.map((tool) => lowerFirst(stepLabel(t, { ...toolActivity(tool), tool }), locale));
+    const tools = joinNames([...new Set(done)], t);
     const note = `_${t("chat.body.brain_interrupted", {
       brain,
       tools,

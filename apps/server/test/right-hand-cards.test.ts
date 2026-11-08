@@ -114,3 +114,48 @@ test("an approval decided from the right hand's card, and people changed from it
   expect(back.status).toBe(204);
   expect(await viaRows(orgId, lodiId)).toEqual(["approval.approved", "member.role_changed"]);
 });
+
+test("a card of a workspace change: read, refused, sent to whoever may, applied as them and undone, through the routes", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const ownerId = ((await (await owner("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const { orgId } = await seedOrg(owner);
+  const nina = await joinByInvitation(t, owner, orgId, "nina@example.com");
+  const ninaId = ((await (await nina("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const card = {
+    kind: "workspace_action",
+    forUserId: ninaId,
+    params: {
+      action: "create_role",
+      input: { name: "Marketing", permissions: ["talk_to_agents", "edit_wiki"] },
+      words: { name: "Marketing" },
+      needs: "manage_roles",
+      why: "Cargo de marketing",
+    },
+    state: "pending",
+    decidedByUserId: null,
+    decidedAt: null,
+  };
+  const { messageId } = await lodiCard(orgId, ninaId, card);
+  const url = `/api/app/organizations/${orgId}/action-cards/${messageId}`;
+  const roles = async () =>
+    (await t.db.select().from(schema.orgRoles).where(eq(schema.orgRoles.orgId, orgId))).map((r) => r.name);
+
+  expect(((await (await nina(url)).json()) as { card: { state: string } }).card.state).toBe("pending");
+  // The owner can't read her DM, and her own click is refused by the roles screen's check.
+  expect((await owner(url)).status).toBe(403);
+  expect((await nina(`${url}/apply`, { json: {} })).status).toBe(403);
+  expect(await roles()).not.toContain("Marketing");
+  expect((await nina(`${url}/ask`, { json: {} })).status).toBe(200);
+  const applied = await owner(`${url}/apply`, { json: {} });
+  expect(applied.status).toBe(200);
+  expect(((await applied.json()) as { card: { state: string; decidedByUserId: string } }).card).toMatchObject({
+    state: "applied",
+    decidedByUserId: ownerId,
+  });
+  expect(await roles()).toContain("Marketing");
+  expect((await owner(`${url}/apply`, { json: {} })).status).toBe(409);
+  const [receipt] = await t.db.select().from(schema.agentActions).where(eq(schema.agentActions.messageId, messageId));
+  expect((await owner(`/api/app/organizations/${orgId}/actions/${receipt?.id}/undo`, { json: {} })).status).toBe(200);
+  expect(await roles()).not.toContain("Marketing");
+});

@@ -15,11 +15,11 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { EventPillAction, EventPillText, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { AskDone, AskWaiting } from "../chat/asks";
 import { TeamTemplatesSheet } from "../right-hand/TeamCard";
 import { useDirectory, useMeId } from "../shared/hooks";

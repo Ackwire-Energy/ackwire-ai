@@ -3,10 +3,12 @@
  * `rules.js` on them. No dev server. Fails on an offender that isn't in `baseline.json`.
  *
  *   GEOMETRY_OUT=<states dir> bun test --preload ./scripts/geometry/capture.ts apps/web packages/ui
- *   bun run check:geometry <states dir> [--report <file>] [--update]
+ *   bun run check:geometry <states dir> [--report <file>] [--update] [--text-size xs,xl]
  *
- * `--update` rewrites the baseline: after fixing offenders, or to accept one the rules got wrong. Chromium comes from
- * CHROME_BIN, or a Chrome found on the machine, over plain DevTools Protocol: the check needs no browser library.
+ * `--update` rewrites the baseline: after fixing offenders, or to accept one the rules got wrong. `--text-size` lays a
+ * screen with messages out again at those steps of Tamanho do texto (`html[data-text-size]`), the only screens it
+ * changes. Chromium comes from CHROME_BIN, or a Chrome found on the machine, over plain DevTools Protocol: the check
+ * needs no browser library.
  */
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -333,7 +335,8 @@ async function main() {
   const flag = (name: string) => args.includes(name);
   const value = (name: string) => (flag(name) ? args[args.indexOf(name) + 1] : undefined);
   const dir = args[0];
-  if (!dir) throw new Error("Usage: check.ts <states dir> [--report <file>] [--update]");
+  if (!dir) throw new Error("Usage: check.ts <states dir> [--report <file>] [--update] [--text-size xs,xl]");
+  const textSizes = value("--text-size")?.split(",").filter(Boolean) ?? [];
 
   const out = mkdtempSync(join(tmpdir(), "geometry-"));
   const browsers = await Promise.all(
@@ -358,7 +361,14 @@ async function main() {
           const { screen } = JSON.parse(raw.slice(4, cut)) as { screen: string };
           await tab.run(`geometry.load(${JSON.stringify(raw.slice(cut + 4))})`);
           for (const width of WIDTHS) {
-            for (const finding of await findingsAt(tab, width)) hits.push({ width, screen, finding });
+            for (const size of ["", ...(raw.includes("ac-msg") ? textSizes : [])]) {
+              await tab.run(
+                size
+                  ? `document.documentElement.dataset.textSize = ${JSON.stringify(size)}`
+                  : "delete document.documentElement.dataset.textSize",
+              );
+              for (const finding of await findingsAt(tab, width)) hits.push({ width, screen, finding });
+            }
           }
         }
       }),

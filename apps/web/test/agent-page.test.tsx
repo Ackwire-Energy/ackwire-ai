@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { PlanUsage, Run } from "@agenteschat/client";
+import type { LearnedSkill, PlanUsage, Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   agentSearch,
@@ -158,6 +158,37 @@ describe("agent page: what it does", () => {
     // Under the field, only the character count; beside it, no note.
     expect(how.querySelector(".newag__ta-meta")?.children).toHaveLength(1);
     expect(document.querySelector(".newag__note")).toBeNull();
+  });
+
+  test("someone who can't edit reads the instructions drawn as Markdown, never its marks", async () => {
+    const state = asMember();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada)
+      ada.instructions = [
+        "## Papel",
+        "Revisa PRs, **sempre** com teste.",
+        "Responde em português.",
+        "",
+        "- Investiga primeiro",
+        "- Abre PRs pequenos",
+        "",
+        // The worst case a pasted file brings: an unbroken address, another script, an emoji.
+        `Docs: https://example.com/${"a".repeat(240)} · 日本語のメモ 🙂`,
+      ].join("\n");
+    await go("?tab=instructions", state);
+    const how = screen().getByRole("region", { name: "Como a Ada trabalha" });
+    expect(within(how).queryByRole("textbox")).toBeNull();
+    expect(how.textContent).not.toMatch(/##|\*\*|- Investiga/);
+    expect([...how.querySelectorAll("strong")].map((b) => b.textContent)).toContain("sempre");
+    expect([...how.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Investiga primeiro",
+      "Abre PRs pequenos",
+    ]);
+    // Its own lines stay lines, as written.
+    expect(how.querySelector(".md p:not(.md__h)")?.textContent).toBe(
+      "Revisa PRs, sempre com teste.\nResponde em português.",
+    );
+    expect(how.textContent).toContain("日本語のメモ 🙂");
   });
 
   test("the start of its instructions in whole sentences, never a full stop before the ellipsis", async () => {
@@ -476,6 +507,8 @@ describe("agent page: inline editing and the save bar", () => {
   test("changes add up in one bar: count, names, Ver (old → new, Desfazer), Alterado on the card, Descartar", async () => {
     await go("?tab=instructions");
     const box = screen().getByRole("textbox", { name: "Instruções" });
+    // The server's cap: typing stops there, never a refusal after saving.
+    expect(box.getAttribute("maxlength")).toBe("50000");
     await type(box, "Instruções de Ada.\nAbre PRs pequenos.");
     const card = box.closest("section") as HTMLElement;
     expect(card.getAttribute("data-changed")).toBe("true");
@@ -776,6 +809,48 @@ describe("agent page: memory and proposals", () => {
     expect(row.textContent).toContain("Não verificado");
     await click(within(row).getByRole("button", { name: "Esquecer" }));
     expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
+  });
+
+  test("Dar a outros agentes opens that skill in Skills, only for who may open Skills", async () => {
+    const made: LearnedSkill = {
+      id: "sk-made",
+      name: "relatorio-semanal",
+      description: "Monta o relatório da semana",
+      version: 1,
+      source: "manual",
+      sourceUrl: null,
+      defaultForNewAgents: false,
+      metadata: {},
+      origin: "agent",
+      ownerAgentId: ADA_ID,
+      locked: false,
+      useCount: 2,
+      lastUsedAt: null,
+      body: "# Relatório",
+      archived: false,
+      canChange: true,
+      canRevert: false,
+      createdAt: "2026-11-01T12:00:00.000Z",
+      updatedAt: "2026-11-01T12:00:00.000Z",
+    };
+    const open = async (state: ReturnType<typeof seedState>) => {
+      const api = createFakeApi(state);
+      api.skills.learned = async () => [made];
+      await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=memory`, { api });
+      await settle(8);
+      await click(
+        within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
+      );
+    };
+    await open(seedState());
+    expect(screen().getByRole("link", { name: "Dar a outros agentes" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/skills?skill=sk-made`,
+    );
+    cleanup();
+    // Ada's owner, a member: Travar is theirs, but Skills is for who manages agents.
+    await open(asOwner());
+    expect(screen().getByRole("button", { name: "Travar" })).toBeTruthy();
+    expect(screen().queryByRole("link", { name: "Dar a outros agentes" })).toBeNull();
   });
 
   test("its own how-tos sit under how it works: the plain summary first, the technical text folded", async () => {

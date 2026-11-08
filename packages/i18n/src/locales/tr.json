@@ -32,6 +32,7 @@
     "code": "Kod",
     "fullScreen": "Tam ekran",
     "wrapLines": "Satırları kaydır",
+    "raw": "Ham",
     "table": "Tablo",
     "chartItem": "Öğe",
     "chartShare": "Pay",
@@ -44,6 +45,7 @@
     "today": "Bugün",
     "yesterday": "Dün",
     "loadFailed": "Bu yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+    "gone": "Bu artık burada değil. Silindi ya da artık erişiminiz yok.",
     "notAllowed": "Bunun için izniniz yok.",
     "tooMany": "Çok fazla deneme yapıldı. Daha sonra tekrar deneyin.",
     "offline": "Çevrimdışısınız. Bağlantınızı kontrol edip tekrar deneyin.",
@@ -1542,6 +1544,9 @@
     "workingNow": "Şu anda çalışıyor",
     "available": "Müsait",
     "archived": "Arşivlenenler",
+    "restore": "Geri getir",
+    "restoreAction": "{{name}} ajanını geri getir",
+    "restored": "{{name}} ekibe geri döndü.",
     "emptyTitle": "Ajan ekibinizi kurun",
     "empty": "Her ajanın bir rolü vardır ve kişilerle aynı kanallarda birlikte çalışır.",
     "emptyViewerTitle": "Ajan ekibiniz burada görünür",
@@ -1809,6 +1814,14 @@
     "generalName": "#general adını korur.",
     "archive": "Kanalı arşivle",
     "archived": "#{{channel}} arşivlendi. Sohbet korunur.",
+    "archivedTitle": "Arşivlenen kanallar",
+    "archivedCount_one": "{{count}} arşivlenen kanal",
+    "archivedCount_other": "{{count}} arşivlenen kanal",
+    "archivedNone": "Geri getirilecek arşivlenmiş kanal yok",
+    "archivedOn": "{{date}} tarihinde arşivlendi",
+    "restore": "Geri getir",
+    "restoreName": "#{{channel}} kanalını geri getir",
+    "restored": "#{{channel}} geri geldi.",
     "leave": "Kanaldan ayrıl",
     "left": "#{{channel}} kanalından ayrıldınız",
     "leaveTitle": "#{{channel}} kanalından ayrılınsın mı?",
@@ -1978,7 +1991,7 @@
       "budgetHelp": "Sınıra ulaşınca her ajan gibi durur ve haber verir.",
       "audience": "Kimler kullanabilir",
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
-      "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
+      "lock": "{{name}} arşivlenemez ve silinemez. Kimse onunla konuşmadan paylaştığı tek şey, yöneticilere giden Ekibin haftası.",
       "audit": "{{name}} neler yaptı, gör",
       "change": "Değiştir",
       "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
@@ -2099,6 +2112,38 @@
       "open": "Aç",
       "web": "Sitede aç",
       "notAllowed": "Bu ekrana erişiminiz yok"
+    },
+    "action": {
+      "title": "Çalışma alanında değişiklik",
+      "only": "Bu değişikliği yalnızca yapmaya yetkisi olan uygular",
+      "ask": "Yetkisi olana gönder",
+      "other": "Çalışma alanında değişiklik yap",
+      "create_role": "<b>{{name}}</b> rolünü oluştur",
+      "update_role": "<b>{{name}}</b> rolünü değiştir",
+      "delete_role": "<b>{{name}}</b> rolünü kalıcı olarak sil",
+      "move_role": "<b>{{name}}</b> rolünün yerini değiştir",
+      "set_member_roles": "<b>{{name}}</b> kişisinin rollerini değiştir: {{change}}",
+      "set_channel_permissions": "{{who}} için <b>#{{channel}}</b> kanalındaki izinleri değiştir",
+      "set_my_status": "Durumunu ayarla: <b>{{what}}</b>",
+      "set_notifications_on": "<b>{{category}}</b> bildirimlerini aç",
+      "set_notifications_off": "<b>{{category}}</b> bildirimlerini kapat",
+      "set_my_timezone": "Saat dilimini <b>{{timezone}}</b> yap",
+      "set_my_timezone_workspace": "Yeniden çalışma alanının saat dilimini izle",
+      "set_invitation_roles": "<b>{{email}}</b> davetinin verdiği rolleri değiştir: {{change}}",
+      "update_channel": "<b>#{{channel}}</b> kanalını değiştir",
+      "archive_channel": "<b>#{{channel}}</b> kanalını arşivle",
+      "archive_channel_back": "<b>#{{channel}}</b> kanalını geri getir",
+      "channel_people": "<b>#{{channel}}</b> kanalında kimlerin olduğunu değiştir: {{change}}",
+      "delete_channel": "<b>#{{channel}}</b> kanalını mesajları ve dosyalarıyla birlikte kalıcı olarak sil",
+      "revoke_invitation": "<b>{{email}}</b> davetini iptal et",
+      "resend_invitation": "<b>{{email}}</b> adresine daveti yeniden gönder",
+      "decide_join_request_approve": "<b>{{email}}</b> adresini çalışma alanına al",
+      "decide_join_request_deny": "<b>{{email}}</b> adresinin katılma isteğini reddet",
+      "stop_work": "<b>{{agent}}</b> ajanının yaptığı işi durdur",
+      "continue_work": "<b>{{agent}}</b> ajanının devam etmesine izin ver",
+      "update_workspace": "<b>{{name}}</b> çalışma alanını değiştir",
+      "set_action_check_on": "Ekibin zaten yaptıklarının kontrolünü aç",
+      "set_action_check_off": "Ekibin zaten yaptıklarının kontrolünü kapat"
     }
   },
   "teamWeek": {
@@ -2661,7 +2706,8 @@
       "updated_status": "<b>#{{number}}</b> görevini {{status}} durumuna taşıdım · {{title}}",
       "updated_priority": "<b>#{{number}}</b> görevinin önceliğini {{priority}} yaptım · {{title}}",
       "assigned": "<b>#{{number}}</b> görevini {{assignee}} kişisine atadım · {{title}}",
-      "assigned_self": "<b>#{{number}}</b> görevini kendim üstlendim · {{title}}"
+      "assigned_self": "<b>#{{number}}</b> görevini kendim üstlendim · {{title}}",
+      "files": "{{names}} ekledim"
     },
     "memory": {
       "saved": "<b>Belleğe</b> kaydettim: {{text}}",
@@ -2705,6 +2751,35 @@
       "merged": "<b>{{repo}}</b> içindeki <b>#{{number}}</b> PR'ını birleştirdim",
       "merged_branch": "<b>{{ref}}</b> dalını <b>{{repo}}</b> içine birleştirdim"
     },
+    "workspace": {
+      "changed": "Çalışma alanında bir değişiklik yaptım",
+      "changed_create_role": "<b>{{name}}</b> rolünü oluşturdum",
+      "changed_update_role": "<b>{{name}}</b> rolünü değiştirdim",
+      "changed_delete_role": "<b>{{name}}</b> rolünü sildim",
+      "changed_move_role": "<b>{{name}}</b> rolünün yerini değiştirdim",
+      "changed_set_member_roles": "<b>{{name}}</b> kişisinin rollerini değiştirdim: {{change}}",
+      "changed_set_channel_permissions": "{{who}} için <b>#{{channel}}</b> kanalındaki izinleri değiştirdim",
+      "changed_set_my_status": "Durumunu ayarladım: <b>{{what}}</b>",
+      "changed_set_notifications_on": "<b>{{category}}</b> bildirimlerini açtım",
+      "changed_set_notifications_off": "<b>{{category}}</b> bildirimlerini kapattım",
+      "changed_set_my_timezone": "Saat dilimini <b>{{timezone}}</b> yaptım",
+      "changed_set_my_timezone_workspace": "Saat dilimin yeniden çalışma alanınınkini izliyor",
+      "changed_set_invitation_roles": "<b>{{email}}</b> davetinin verdiği rolleri değiştirdim: {{change}}",
+      "changed_update_channel": "<b>#{{channel}}</b> kanalını değiştirdim",
+      "changed_archive_channel": "<b>#{{channel}}</b> kanalını arşivledim",
+      "changed_archive_channel_back": "<b>#{{channel}}</b> kanalını geri getirdim",
+      "changed_channel_people": "<b>#{{channel}}</b> kanalında kimlerin olduğunu değiştirdim: {{change}}",
+      "changed_delete_channel": "<b>#{{channel}}</b> kanalını sildim",
+      "changed_revoke_invitation": "<b>{{email}}</b> davetini iptal ettim",
+      "changed_resend_invitation": "<b>{{email}}</b> adresine daveti yeniden gönderdim",
+      "changed_decide_join_request_approve": "<b>{{email}}</b> adresini çalışma alanına aldım",
+      "changed_decide_join_request_deny": "<b>{{email}}</b> adresinin katılma isteğini reddettim",
+      "changed_stop_work": "<b>{{agent}}</b> ajanının yaptığı işi durdurdum",
+      "changed_continue_work": "<b>{{agent}}</b> ajanının devam etmesine izin verdim",
+      "changed_update_workspace": "<b>{{name}}</b> çalışma alanını değiştirdim",
+      "changed_set_action_check_on": "Ekibin zaten yaptıklarının kontrolünü açtım",
+      "changed_set_action_check_off": "Ekibin zaten yaptıklarının kontrolünü kapattım"
+    },
     "other": "Bir değişiklik yaptım",
     "copyWebhook": "Webhook adresini kopyala",
     "issueFields": {
@@ -2716,7 +2791,8 @@
       "labels": "etiketleri",
       "dueDate": "bitiş tarihini",
       "githubUrl": "GitHub bağlantısını",
-      "criteria": "kriterleri"
+      "criteria": "kriterleri",
+      "files": "ekleri"
     },
     "routineFields": {
       "name": "adı",
@@ -4412,6 +4488,8 @@
           "stepTwo": "Claude'un gösterdiği kodu yapıştırın",
           "codeLabel": "Claude kodu",
           "notCode": "Bu bir Claude kodu gibi görünmüyor.",
+          "stepTwoGoogle": "Google'ın gösterdiği kodu yapıştır",
+          "codeLabelGoogle": "Kod veya bağlantı",
           "send": "{{computer}} bilgisayarına gönder",
           "sending": "Kod {{computer}} bilgisayarına gönderiliyor…",
           "sent": "Kod gönderildi. Giriş {{computer}} üzerinde tamamlanıyor.",
@@ -4746,6 +4824,7 @@
         "too_many_tool_calls": "Tek bir çalıştırmadaki araç sınırını aştı.",
         "stuck": "Takıldığı için durdu.",
         "brain_interrupted": "Yapay zeka bitirmeden durdu.",
+        "brain_unavailable": "Bilgisayarındaki yapay zeka yanıt veremedi. Bilgisayarı kontrol edip yeniden isteyin.",
         "empty_reply": "Model hiçbir şey döndürmedi.",
         "model_refused": "Model yanıt vermeyi reddetti.",
         "agent_archived": "Ajan arşivlendi.",
@@ -6112,6 +6191,7 @@
         "done": "Bitti",
         "canceled": "Yapılmayacak"
       },
+      "stageFull": "{{stage}} zaten {{max}} sütuna sahip, bir aşamanın alabileceği en fazla bu. Önce oradan birini silin.",
       "stageExplain": {
         "todo": "Yeni görevler Yapılacak aşamasının ilk sütununa gelir.",
         "in_progress": "Bir ajan başladığında görev Devam ediyor aşamasının ilk sütununa geçer.",
@@ -6217,6 +6297,8 @@
       "cancel": "İptal",
       "create": "Görev oluştur",
       "created": "Görev #{{number}} oluşturuldu.",
+      "notStarted": "Görev #{{number}} oluşturuldu ama {{name}} başlamadı.",
+      "askAgain": "Tekrar iste",
       "intro": "Onu alan, kişi ya da ajan, ilerlemesiyle birlikte panoda görünür.",
       "criteriaFound_one": "{{count}} kabul kriteri",
       "criteriaFound_other": "{{count}} kabul kriteri",
@@ -6262,6 +6344,7 @@
     "askButton": "{{name}} ajanına sor",
     "askSection": "Bir ajana sorun",
     "asked": "İstek gönderildi. {{name}}, görevi gören herkesin takip ettiği görev sohbetinde çalışıyor.",
+    "notStarted": "{{name}} başlamadı.",
     "activity": "Etkinlik",
     "noActivity": "Henüz bir şey yok.",
     "discussion": "Tartışma",
@@ -6309,7 +6392,8 @@
       "add": "Dosya ekle",
       "addHint": "ya da buraya sürükleyin",
       "grid": "Izgara",
-      "empty": "Henüz ek yok. Dosyaları buraya sürükleyin ya da bir ekran görüntüsü yapıştırın.",
+      "emptyTitle": "Görevin dosyaları burada toplanır",
+      "empty": "Dosyaları buraya sürükleyin, bir ekran görüntüsü yapıştırın ya da görevin sohbetinde gönderin.",
       "fromCreation": "Oluşturulurken · {{when}}",
       "fromComment": "{{name}} yorumu · {{when}}",
       "linked": "{{name}} bağladı"
@@ -6338,6 +6422,8 @@
       "github_linked": "GitHub'a bağladı",
       "github_unlinked": "GitHub bağlantısını kaldırdı",
       "artifact_linked": "bir dosya ekledi",
+      "files_attached": "{{names}} ekledi",
+      "files_removed": "{{names}} eklerden çıkardı",
       "criterion_checked": "\"{{text}}\" kriterini işaretledi",
       "criterion_unchecked": "\"{{text}}\" kriterinin işaretini kaldırdı",
       "agent_asked": "{{name}} ajanından yapmasını istedi"
@@ -8101,6 +8187,19 @@
     "confirm": "Onayla ve davet et",
     "otherTime": "Başka bir zaman",
     "confirmed": "Etkinlik oluşturuldu ve davetler gönderildi.",
+    "proposalDismissed": "Öneri reddedildi",
+    "proposalWaits": "Bu etkinliği {{name}} onaylıyor.",
+    "rsvp": {
+      "accept": "Katılacağım",
+      "decline": "Katılmayacağım",
+      "accepted": "katılacak",
+      "declined": "katılmayacak",
+      "mine": {
+        "needs_action": "Bu etkinliğin davetlileri arasındasınız.",
+        "accepted": "Katılacaksınız.",
+        "declined": "Katılmayacaksınız."
+      }
+    },
     "kind": {
       "event": "Etkinlik",
       "routine": "Rutin",
@@ -9906,6 +10005,7 @@
     "title": "Drive",
     "subtitle": "Kişilerin ve ajanların oluşturduğu veya yüklediği her şey.",
     "search": "Dosyalarda ara",
+    "loadMore": "Daha fazla yükle",
     "kind": "Tür",
     "filters": "Filtreler",
     "allKinds": "Tüm türler",
@@ -9992,6 +10092,7 @@
     "onlyDriveText": "Henüz bir kanalda paylaşılmadı.",
     "dm": "Doğrudan mesaj",
     "dmWith": "{{name}} ile doğrudan mesaj",
+    "dmBetween": "{{names}} arasındaki doğrudan mesaj",
     "inDm": "Doğrudan mesajla gönderildi",
     "inThread": "Konuşmanın bir ileti dizisinde",
     "audience": {
@@ -9999,7 +10100,8 @@
       "publicChannel": "Çalışma alanındaki herkes görebilir: herkese açık #{{name}} kanalında",
       "privateChannel": "Yalnızca #{{name}} üyeleri ve yöneticiler görebilir",
       "dm": "Yalnızca siz ve {{name}} görebilirsiniz: bir doğrudan mesajdan geldi",
-      "dmGone": "Yalnızca o konuşmadaki kişiler görebilir: bir doğrudan mesajdan geldi"
+      "dmGone": "Yalnızca o konuşmadaki kişiler görebilir: bir doğrudan mesajdan geldi",
+      "dmBetween": "Yalnızca {{names}} görebilir: bir doğrudan mesajdan geldi"
     },
     "private": "Özel",
     "privateHint": "Bu dosyaları yalnızca konuşmadaki kişiler görür. Bir kanalda yöneticiler de görür.",
@@ -10046,9 +10148,6 @@
     },
     "s3": "Kendi bucket'ınız",
     "s3Text": "S3, R2, MinIO ve S3 uyumlu diğerleri.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Yakında",
     "current": "Kullanımda",
     "usage": {
       "files": "{{size}} dosya",
@@ -10612,6 +10711,7 @@
     "toolsCount_one": "{{count}} araç",
     "toolsCount_other": "{{count}} araç",
     "active": "Etkin",
+    "noToolsNow": "Şu an araç yok",
     "notReviewed": "İnceleme bekliyor",
     "toReview_one": "İncelenecek {{count}} yeni araç",
     "toReview_other": "İncelenecek {{count}} yeni araç",
@@ -10771,6 +10871,7 @@
   },
   "toolNames": {
     "order": "modifiers-first",
+    "catalog": "none",
     "verb": {
       "get": "Getir",
       "list": "Listele",
@@ -11508,6 +11609,11 @@
       "subject": "Konu şunu içeriyor",
       "text": "Metin şunu içeriyor",
       "noMailbox": "Önce Bağlayıcılar bölümünden bir posta kutusu bağlayın.",
+      "readsNone": "{{name}} henüz hiçbir posta kutusunu okumuyor.",
+      "cantRead": "{{name}} bu posta kutusunu okumuyor.",
+      "connectorReadsNone": "{{name}} henüz {{connector}} okumuyor.",
+      "connectorCantRead": "{{name}} {{connector}} okumuyor.",
+      "giveAccess": "Erişim ver",
       "openConnectors": "Bağlayıcıları aç",
       "when": "{{address}} adresine bir e-posta geldiğinde",
       "whenFolder": "{{address}} adresine ({{folder}}) bir e-posta geldiğinde",
@@ -11667,6 +11773,11 @@
       "hintZoomed": "Gezinmek için sürükleyin. Esc yeniden sığdırır",
       "hintTouch": "Yakınlaştırmak için dokunun veya iki parmakla sıkıştırın",
       "hintZoomedTouch": "Gezinmek için sürükleyin. Yeniden sığdırmak için dokunun"
+    },
+    "nav": {
+      "previous": "Önceki görsel",
+      "next": "Sonraki görsel",
+      "place": "{{index}} / {{count}}"
     }
   },
   "errors": {
@@ -11685,6 +11796,8 @@
       "checkAddress": "Adresi kontrol edip tekrar deneyin.",
       "tooLong": "Bu çok uzun. Kısaltıp tekrar deneyin.",
       "updateComputerApp": "Bilgisayardaki uygulama bunun için çok eski. Güncelleyip tekrar deneyin.",
+      "computerUpdatesItself": "Çalışma alanının bilgisayarı bunun için kendini güncelliyor. Birazdan tekrar deneyin.",
+      "notInvited": "Bu etkinliğin davetlileri arasında değilsiniz.",
       "offHere": "Bu, burada kapalı.",
       "notInConversation": "Bu sohbette değil.",
       "accountStart": "Bilgisayar girişi başlatamadı. Açık olduğunu kontrol edip tekrar deneyin.",
@@ -11727,6 +11840,7 @@
     },
     "issue": {
       "assigneeOutside": "Bu kişi bu görevi göremiyor. Önce onu Kimler görüyor listesine ekleyin.",
+      "stageFull": "Bir aşama en fazla {{max}} sütun alır. Önce sütunlarından birini silin.",
       "deleteForbidden": "Bu görevi yalnızca oluşturan kişi veya bir yönetici silebilir.",
       "audienceEmpty": "Kimlerin göreceğini seçin."
     },
@@ -11903,7 +12017,14 @@
       "fileNameRequired": "Dosyanın bir adı olmalı.",
       "notFound": "Bu dosya artık yok ya da erişiminiz yok.",
       "deleteForbidden": "Bunu yalnızca oluşturan kişi, ajandan isteyen kişi, ajanın sahibi veya bir yönetici silebilir.",
-      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir."
+      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir.",
+      "versionNotFound": "Dosyanın bu sürümü yok.",
+      "formatUnavailable": "Bu dosya o biçimde kaydedilemez.",
+      "sharingOpen": "Tüm çalışma alanı bu dosyayı zaten görüyor.",
+      "sharingForbidden": "Kimin göreceğini yalnızca dosyanın sohbetindekiler değiştirebilir.",
+      "sharingEmpty": "Kimin göreceğini seçin.",
+      "sharingTooMany": "En fazla {{max}} kişi ve {{max}} rol seçin.",
+      "notInDrive": "Bu yalnızca kendi sohbetinde yaşıyor, bu yüzden paylaşılamaz."
     },
     "machine": {
       "forbidden": "Bunu yalnızca bir yönetici veya bilgisayarı bağlayan kişi yapabilir.",
@@ -12016,6 +12137,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Ajanların tarayıcısı bu bilgisayarın sisteminde çalışmıyor.",
+      "browser_download": "Ajanların tarayıcısı indirilemedi. Bu bilgisayarın bağlantısını kontrol edin, bir sonraki kullanımda yeniden denenir.",
+      "browser_checksum": "Ajanların tarayıcısının indirmesi bozuk geldi, bu yüzden kullanılmadı. Bir sonraki kullanımda yeniden denenir.",
+      "desktop_use_linux": "Ajanların ekranlarındaki uygulamalar, ajan ekranları olan Linux bilgisayarlarda çalışır.",
+      "desktop_use_own_user": "Ajanların ekranlarındaki uygulamalar için her ajanın bu bilgisayarda kendi kullanıcısıyla çalışması gerekir (sistem modu). Burada tüm ajanlar runner kullanıcısıyla çalışıyor.",
+      "desktop_use_install": "Ajanların ekranlarındaki uygulamaların ihtiyaç duyduklarını bu bilgisayara kurun:",
+      "desktop_unavailable": "Ajanların ekranları bu bilgisayarda çalışamaz.",
+      "desktop_linux": "Ajanların ekranları yalnızca Linux bilgisayarlarda çalışır.",
+      "desktop_install": "Ajanların ekranlarını bu bilgisayara kurun:",
+      "not_as_root": "Ajanların ekranları ve terminalleri asla root olarak çalışmaz. Runner'ı normal bir kullanıcıyla çalıştırın.",
+      "runner_bun_old": "Bunun için runner'ın Bun 1.3.5 veya daha yeni sürümde çalışması gerekir. Bu bilgisayardaki runner'ı güncelleyin.",
+      "terminal_unsupported": "Terminaller yalnızca Linux ve Mac bilgisayarlarda çalışır."
+    },
     "egress": {
       "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
       "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
@@ -12754,6 +12889,7 @@
       "techAction": "İşlem",
       "techTool": "Araç",
       "techKind": "Tür",
+      "techSaid": "Verdiği yanıt",
       "techRun": "Çalıştırma",
       "techId": "Kayıt",
       "openConversation": "Sohbeti aç",
@@ -12763,6 +12899,7 @@
     }
   },
   "settings": {
+    "notOpen": "Bu çalışma alanındaki rolünüz {{section}} bölümünü açmıyor. Rolleri yöneten kişi sizin için açabilir.",
     "nav": "Ayarlar bölümleri",
     "group": {
       "you": "Siz",
@@ -12851,6 +12988,14 @@
         "openAt": "Bir sohbet açtığımda beni şuraya götür",
         "openRead": "Son okunan mesaj",
         "openLatest": "En yeni mesaj",
+        "textSize": "Metin boyutu",
+        "textSizeHelp": "Mesajların, tüm sohbetlerde ve tüm cihazlarınızda",
+        "textSizePhone": "Telefonunuzun ayarlarındaki metin boyutu da geçerlidir",
+        "textXs": "Daha küçük",
+        "textSm": "Küçük",
+        "textMd": "Varsayılan",
+        "textLg": "Büyük",
+        "textXl": "Daha büyük",
         "sample": {
           "ask": "Kaç tane kaldı?",
           "answer": "14 kaldı. Haber vereyim mi?",
@@ -13495,7 +13640,11 @@
         "shell": "İçinde başka komutlar çalıştırıyor",
         "inline": "Satır içinde verilen kodu çalıştırıyor",
         "global": "Tüm bilgisayara kurulum yapıyor",
-        "rules": "Ajanların kendi başına yapabileceklerinin dışında"
+        "rules": "Ajanların kendi başına yapabileceklerinin dışında",
+        "noAccess": "Ajanın buna erişimi yok",
+        "policy": "Bu tür işlerde izin verilmiyor",
+        "credential": "Anahtara benzeyen bir şey gönderiyor",
+        "repo": "Bu depo ajanın listesinde değil"
       },
       "gave": "verildi",
       "answered": "yanıtlandı",
@@ -13600,6 +13749,7 @@
         "runningRoutine": "Bir rutini şimdi çalıştırdı",
         "proposingTeam": "Bir ekip önerdi",
         "proposingChange": "Bir değişiklik önerdi",
+        "workingOnWorkspace": "Çalışma alanında çalıştı",
         "updatingThread": "Bir ileti dizisini güncelledi",
         "addingAgent": "Bir kanala ajan ekledi",
         "readingConversation": "Sohbeti okudu",
@@ -13708,6 +13858,7 @@
       "runningRoutine": "bir rutini şimdi çalıştırıyor",
       "proposingTeam": "bir ekip öneriyor",
       "proposingChange": "bir değişiklik öneriyor",
+      "workingOnWorkspace": "çalışma alanında çalışıyor",
       "updatingThread": "bir ileti dizisini güncelliyor",
       "addingAgent": "bir kanala ajan ekliyor",
       "readingConversation": "sohbeti okuyor",
@@ -13852,6 +14003,8 @@
       "action_update_skills": "Becerileri güncelle",
       "action_approvals": "Sizi bekleyen onaylar",
       "action_open_page": "Bir ekran aç",
+      "calendar_proposal": "Etkinlik önerisi: {{title}}",
+      "action_workspace": "Çalışma alanında bir değişiklik önerdi",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "team_proposal": "Bir ekip önerdi: {{names}}",
       "settings_proposal": "{{names}} için bir değişiklik önerdi",
@@ -14062,6 +14215,38 @@
     "update_skill_from_source": {
       "label": "Becerileri bağlantılarından güncelle",
       "description": "Becerileri yüklendikleri yerden günceller. Betik değişiklikleri bir kişiyi bekler."
+    },
+    "propose_remove_agents": {
+      "label": "Ajanları arşivlemeyi veya silmeyi öner",
+      "description": "Arşivlenecek veya silinecek ajanları listeleyen bir kart paylaşır. Yetkili bir kişi uygular."
+    },
+    "offer_answers": {
+      "label": "Dokunularak yanıtlanacak bir soru sor",
+      "description": "Kişinin dokunarak yanıtlayacağı bir soru paylaşır. Her dokunuş kendi mesajı olur."
+    },
+    "propose_team": {
+      "label": "Bir ekip öner",
+      "description": "Birkaç ajanı, kanallarını, rutinlerini ve becerilerini içeren bir kart paylaşır. Bir kişi oluşturur."
+    },
+    "propose_settings_change": {
+      "label": "Bir ekip arkadaşının ayarlarını öner",
+      "description": "Bir ekip arkadaşının yeni modelini, yapay zekasını, bütçesini, sorumlusunu, kitlesini veya kanallarını içeren bir kart paylaşır. Bir kişi uygular."
+    },
+    "offer_approvals": {
+      "label": "Onay bekleyenleri göster",
+      "description": "Kişinin onayını bekleyenleri tek bir kartta paylaşır. Kişi her birini orada onaylar veya reddeder."
+    },
+    "propose_member_changes": {
+      "label": "Kişilerde değişiklik öner",
+      "description": "Değiştirilecek sahipleri, rolleri veya çıkarmaları içeren bir kart paylaşır. Yetkili bir kişi her birini uygular."
+    },
+    "offer_open_page": {
+      "label": "Bir ekran açmayı öner",
+      "description": "Düğmesi faturalandırma, roller veya bir ajanın sayfası gibi uygulamanın bir ekranını açan bir kart paylaşır."
+    },
+    "set_team_week": {
+      "label": "Ekibin haftası kartını değiştir",
+      "description": "Kişinin doğrudan mesajındaki haftalık Ekibin haftası kartını durdurur, yeniden başlatır veya zamanını değiştirir."
     },
     "propose_agent": {
       "label": "Ajan öner",
@@ -15751,6 +15936,85 @@
     "receipt": "Kimler görüyor: {{who}}",
     "limited": "sınırlı erişim",
     "rolesToo": "Bu sayfada zaten olan roller onu görmeye devam eder."
+  },
+  "share": {
+    "button": "Paylaş",
+    "title": "{{name}} paylaş",
+    "conversation": "Yalnızca sohbet",
+    "people": "Seçtiğiniz kişiler ve roller",
+    "everyone": "Tüm çalışma alanı",
+    "whereDm": "{{name}} ile doğrudan mesaj",
+    "whereDmGone": "Bir doğrudan mesaj",
+    "whereDmBetween": "{{names}} arasındaki doğrudan mesaj",
+    "whereChannel": "#{{name}} üyeleri",
+    "add": "Kişi veya rol ekle",
+    "addSearch": "Kişi ve rol ara",
+    "noResults": "Bu adda kimse yok",
+    "groupPeople": "Kişiler",
+    "groupRoles": "Roller",
+    "access": "Kimlerin erişimi var",
+    "you": "{{name}} (siz)",
+    "agent": "Ajan",
+    "role": "Rol",
+    "remove": "{{name}} kişisini çıkar",
+    "admins": "Yöneticiler her zaman görür.",
+    "copyLink": "Bağlantıyı kopyala",
+    "copied": "Bağlantı kopyalandı.",
+    "done": "Bitti",
+    "onlyHere": "Bu sohbette olmayanlar bağlantıyı açamaz.",
+    "choosePeople": "Kişi seç",
+    "readOnly": "Kimin göreceğini yalnızca sohbettekiler değiştirebilir.",
+    "open": "Tüm çalışma alanı bu dosyayı görüyor.",
+    "savedEveryone": "Artık tüm çalışma alanı dosyayı görüyor.",
+    "savedPeople": "Artık seçtiğiniz kişiler dosyayı görüyor.",
+    "savedConversation": "Artık dosyayı yalnızca sohbet görüyor.",
+    "undo": "Geri al",
+    "fileRef": "Dosya {{title}}",
+    "fileRefNone": "Erişim olmayan dosya",
+    "also": "{{text}}. {{who}} ile de paylaşıldı.",
+    "someOnlyHere": "Bu bağlantılardan bazılarını yalnızca dosyanın sohbetindekiler açabilir."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Bu bağlantıyı açmak için giriş yapın",
+      "text": "Giriş yaptıktan sonra doğrudan buraya dönersiniz."
+    },
+    "file": {
+      "title": "Bu dosya size açık değil",
+      "text": "Silinmiş ya da yalnızca içinde olmadığınız bir sohbette paylaşılmış olabilir. Gönderen kişiden dosyanın Paylaş düğmesiyle sizinle paylaşmasını isteyin."
+    },
+    "link": {
+      "title": "Bu bağlantı size açık değil",
+      "text": "Süresi dolmuş, zaten kullanılmış ya da içinde olmadığınız bir yere çıkıyor olabilir. Gönderen kişiden yenisini isteyin."
+    },
+    "version": {
+      "title": "Dosyanın bu sürümü yok",
+      "text": "Bağlantı, dosyada olmayan bir sürümü istiyor."
+    },
+    "format": {
+      "title": "Bu dosya o biçimde yok",
+      "text": "Bağlantı, bu dosyanın kaydedilemeyeceği bir biçimi istiyor."
+    },
+    "busy": {
+      "title": "Arka arkaya çok fazla deneme",
+      "text": "Biraz bekleyip yeniden deneyin."
+    },
+    "server": {
+      "title": "Bizim tarafımızda bir sorun oldu",
+      "text": "Sizin yaptığınız bir şey değildi. Biraz sonra yeniden deneyin."
+    },
+    "other": {
+      "title": "Bu bağlantı açılmadı",
+      "text": "Adres eksik ya da artık çalışmıyor. Gönderen kişiden yenisini isteyin."
+    },
+    "action": {
+      "signIn": "Giriş yap",
+      "open": "agentes.chat'i aç",
+      "latest": "En yeni sürümü aç",
+      "file": "Dosyayı aç",
+      "retry": "Yeniden dene"
+    },
+    "errorId": "Hata kodu: {{id}}"
   },
   "teamTemplates": {
     "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",

@@ -1,6 +1,6 @@
 import { everyoneWord, isEveryoneWord } from "@agenteschat/client/lib/everyone";
 import { linkPill } from "@agenteschat/client/lib/link-pills";
-import { parseMessageLink } from "@agenteschat/client/lib/message-links";
+import { parseFileLink, parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,17 +8,33 @@ import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } fro
 import { ScrollView as GestureScrollView } from "react-native-gesture-handler";
 import { serverUrl } from "@/lib/server";
 import { Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { withAlpha } from "@/ui/palette";
+import { variantStyle } from "@/ui/Text";
 import { openPage } from "../ai/parts";
+import { ownLinkHref } from "../links/app-links";
 import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
+import { FileRefText } from "./FileRefText";
+import { IdRefText } from "./IdRefText";
 import { LinkPillText } from "./LinkPillText";
-import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
+import {
+  type Block,
+  CHAT_TEXT_MAX_SCALE,
+  chatCellOf,
+  chatCodeOf,
+  type Inline,
+  mentionTint,
+  tableColumnWidths,
+  tableHidden,
+} from "./logic";
+import { useRowLook } from "./look";
 import { MessageRefText } from "./MessageRefText";
 
 /**
- * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, @mentions, #channels), inside a Text. `channelRefs`: the
+ * Inline marks of a message (bold, italic, `code`, links, a message's or a file's link as its pill, an internal id as
+ * what it names, @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
 export function Spans({
@@ -42,6 +58,9 @@ export function Spans({
   const { i18n } = useTranslation();
   const { agents, memberByHandle } = useDirectory();
   const { scheme } = useTheme();
+  // In a conversation, the size of code in its card (`chatCodeOf`), so inline and fenced code agree at every step.
+  const sized = useRowLook().text;
+  const codeSize = sized ? { fontSize: chatCodeOf(sized).fontSize } : undefined;
   return (
     <>
       {inline.map((s, i) => {
@@ -61,26 +80,46 @@ export function Spans({
             );
           case "code":
             return (
-              <RNText key={key} style={[styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }]}>
+              <RNText key={key} style={[styles.inlineCode, codeSize, { backgroundColor: c.sunken, color: c.ink2 }]}>
                 {s.text}
               </RNText>
             );
           case "link": {
-            // A message here: its pill, opening it in the app.
+            // A message or a file here: its pill, opening it in the app.
             const message = parseMessageLink(s.href, [serverUrl()]);
             if (message) return <MessageRefText key={key} link={message} />;
+            const file = parseFileLink(s.href, [serverUrl()]);
+            if (file) return <FileRefText key={key} link={file} />;
             // An address as written, whatever way: the words of a link written with its own stay.
             const pill = !live && s.text === s.href ? linkPill(s.href) : null;
             if (pill) return <LinkPillText key={key} href={s.href} pill={pill} />;
-            // Opens in the in-app browser; a press on a link wins over the row's long press.
+            // A page of this server opens its screen here; any other site the in-app browser. A press on a link wins
+            // over the row's long press.
+            const own = ownLinkHref(s.href, serverUrl());
             return (
-              <RNText key={key} accessibilityRole="link" onPress={() => openPage(s.href)} style={styles.link}>
+              <RNText
+                key={key}
+                accessibilityRole="link"
+                onPress={() => (own ? router.push(own as never) : openPage(s.href))}
+                style={styles.link}
+              >
                 {s.text}
               </RNText>
             );
           }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
+          case "id": {
+            const shown = (
+              <RNText
+                key={key}
+                style={s.code ? [styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }] : undefined}
+              >
+                {s.text}
+              </RNText>
+            );
+            return live ? shown : <IdRefText key={key} id={s.id} shown={shown} />;
+          }
           case "mention": {
             const handle = s.text.slice(1);
             const all = everyone && isEveryoneWord(handle);
@@ -144,11 +183,18 @@ export function Table({
     scroller.current?.flashScrollIndicators();
   }, [hidden.right]);
   const fadeTo = surface ?? c.bg;
+  // In a conversation the cells follow the person's Tamanho do texto, as the words around the table do.
+  const sized = useRowLook().text;
   const words = (inline: Inline[], col: number, head: boolean) => (
     <Text
       variant={head ? "label" : "subhead"}
       tone={head ? "muted" : "ink"}
-      style={[styles.cellText, { textAlign: align[col] ?? "left" }]}
+      style={[
+        styles.cellText,
+        sized ? chatCellOf(variantStyle(head ? "label" : "subhead"), sized) : null,
+        { textAlign: align[col] ?? "left" },
+      ]}
+      maxFontSizeMultiplier={sized ? CHAT_TEXT_MAX_SCALE : undefined}
     >
       <Spans inline={inline} />
     </Text>

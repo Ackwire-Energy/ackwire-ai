@@ -14,12 +14,13 @@ import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-reques
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { usePlanHold } from "../ai/parts";
 import { Page } from "../me/parts";
 import { useColors, useMeId } from "../shared/hooks";

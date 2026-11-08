@@ -92,15 +92,15 @@ describe("Aprovar sempre in words", () => {
     o && "defaultValue" in o ? o.defaultValue : key) as unknown as TFunction;
 
   test("an action's slug without its articles, its app after it; the tool itself when it wraps none", () => {
-    expect(actionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (Github)");
+    expect(actionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (GitHub)");
     // A slug leads with its verb, even when its last word could be one too.
     expect(actionName(t, "LINKEDIN_PUBLISH_POST")).toBe("Publish post (Linkedin)");
     expect(approveAlwaysWords(t, { approveAlways: { tool: "X", actions: ["GITHUB_ADD_A_LABEL", "SLACK_X"] } })).toBe(
-      "Add label (Github), X (Slack)",
+      "Add label (GitHub), X (Slack)",
     );
     expect(approveAlwaysWords(t, { approveAlways: { tool: "close_ticket", actions: [] } })).toBe("Close ticket");
     expect(approveAlwaysWords(t, { approveAlways: null })).toBe("");
-    expect(ownActionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (Github)");
+    expect(ownActionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (GitHub)");
     expect(ownActionName(t, "close_ticket")).toBe("Close ticket");
     expect(approvalRuleWords(t, { tool: "close_ticket", action: "", toolLabel: "Fechar chamado" })).toBe(
       "Fechar chamado",
@@ -202,11 +202,13 @@ describe("an approval's title", () => {
   const comment = { tool: "add_issue_comment", params: {}, email: null, connector: "github" };
 
   test("a server title that is only the tool's name reads as the tool in words, bare or after the connector", () => {
-    expect(approvalTitle(pt, { ...comment, title: "GitHub: add_issue_comment" })).toBe(
-      "Adicionar comentários da issue",
-    );
-    expect(approvalTitle(pt, { ...comment, title: "add_issue_comment" })).toBe("Adicionar comentários da issue");
-    expect(approvalTitle(en, { ...comment, title: "GitHub: add_issue_comment" })).toBe("Add issue comments");
+    // A tool the catalog knows, by its words (`tool-labels.ts`).
+    expect(approvalTitle(pt, { ...comment, title: "GitHub: add_issue_comment" })).toBe("Comentar numa issue");
+    expect(approvalTitle(pt, { ...comment, title: "add_issue_comment" })).toBe("Comentar numa issue");
+    expect(approvalTitle(en, { ...comment, title: "GitHub: add_issue_comment" })).toBe("Comment on an issue");
+    // One it doesn't, built from its verb and nouns.
+    const other = { ...comment, tool: "add_issue_tags", title: "GitHub: add_issue_tags" };
+    expect(approvalTitle(pt, other)).toBe("Adicionar etiquetas da issue");
   });
 
   test("a catalog action says what it touches in the person's words", () => {
@@ -236,7 +238,7 @@ describe("an approval's title", () => {
     expect(title("slack_2_list_channels", "Slack (Acme): List channels", {}, "custom")).toBe("Listar canais");
     expect(
       title("crm_COMPOSIO_MULTI_EXECUTE_TOOL", "CRM: GITHUB_CREATE_AN_ISSUE, SLACK_LIST_CHANNELS", {}, "custom"),
-    ).toBe("Criar issue (Github), Listar canais (Slack)");
+    ).toBe("Criar issue (GitHub), Listar canais (Slack)");
   });
 
   test("a read that names an action reads as the read, never as doing it", () => {

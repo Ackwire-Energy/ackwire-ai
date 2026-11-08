@@ -16,6 +16,7 @@ import {
   useAgentGroups,
   useAgentStatuses,
   useAiAccounts,
+  useArchivedChannels,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -117,6 +118,7 @@ import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
+import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
@@ -221,6 +223,9 @@ export function Sidebar() {
   const [creatingChannel, setCreatingChannel] = useState<boolean | string>(false);
   // A new category: empty, or with the channel whose menu asked for it.
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
+  // Archived channels this person may bring back: "Canais arquivados" in Canais' + while there are some.
+  const archivedChannels = useArchivedChannels(orgId).data ?? [];
+  const [showArchived, setShowArchived] = useState(false);
   const [customizing, setCustomizing] = useState(false);
   const navigate = useNavigate();
   const onProposals = useRouterState({ select: (r) => r.location.pathname.endsWith("/proposals") });
@@ -479,6 +484,10 @@ export function Sidebar() {
   const newCategoryItem = can(org, "manage_channels")
     ? [item("new-category", t("channelCategories.newCategory"), "layers", () => setNewCategory({}))]
     : [];
+  const archivedItem =
+    archivedChannels.length > 0
+      ? [item("archived-channels", t("channel.archivedTitle"), "archive", () => setShowArchived(true))]
+      : [];
   const createAgentItem = can(org, "create_agents")
     ? [
         item(
@@ -529,7 +538,7 @@ export function Sidebar() {
         onNewCategory={(withChannel) => setNewCategory(withChannel ? { withChannel } : {})}
         onPrefetch={prefetch}
         headProps={sectionMenu("channels")}
-        addEntries={[...newChannelItem, ...newCategoryItem]}
+        addEntries={[...newChannelItem, ...newCategoryItem, ...archivedItem]}
         pinned={pins.channels}
       />
     ),
@@ -796,6 +805,7 @@ export function Sidebar() {
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
+      <ArchivedChannelsDialog open={showArchived} onClose={() => setShowArchived(false)} />
       <NewChannelDialog
         open={creatingChannel !== false}
         onOpenChange={(open) => setCreatingChannel(open)}
@@ -1254,8 +1264,9 @@ function SidebarChannels({
 
   // A pinned row stays put: it doesn't drag, and nothing drops on it.
   const row = (c: Channel, top = false) => {
-    // Discord's marks: something new lights the row (a pill on its left edge, the name in full ink); only a mention
-    // of me gets a number. Muted, it rests dim whatever comes, but a mention still shows.
+    // Discord's marks: something new lights the row (a pill on its left edge, the name in full ink) with how many
+    // messages wait, in a quiet count; only a mention of me gets the red one. Muted, it rests dim whatever comes, but a
+    // mention still shows.
     const unread = looksUnread(c);
     const mentions = c.mentionCount ?? 0;
     const link = (
@@ -1290,11 +1301,10 @@ function SidebarChannels({
         <span className="sidebar__item-label">{c.name}</span>
         {mentions > 0 ? (
           <UnreadCount count={mentions} mentions />
+        ) : unread ? (
+          <UnreadCount count={c.unreadCount ?? 0} quiet />
         ) : (
-          <>
-            {unread && <span className="ac-visually-hidden">{t("shell.unreadMark")}</span>}
-            {top && <PinnedMark />}
-          </>
+          top && <PinnedMark />
         )}
       </Link>
     );
@@ -1775,17 +1785,29 @@ function PersonRow({
   );
 }
 
-/** The number on a row: unread messages of a DM, or mentions of me in a channel (`mentions`), as Discord counts. */
-function UnreadCount({ count, mentions = false }: { count: number; mentions?: boolean }) {
+/**
+ * The number on a row: in red what calls on me (a DM's unread messages, mentions of me in a channel), as Discord
+ * counts; a channel's other unread messages in the kit's neutral count (`quiet`).
+ */
+function UnreadCount({
+  count,
+  mentions = false,
+  quiet = false,
+}: {
+  count: number;
+  mentions?: boolean;
+  quiet?: boolean;
+}) {
   const { t } = useTranslation();
-  return (
-    <CountBadge
-      className="sidebar__unread"
-      role="img"
-      aria-label={t(mentions ? "shell.unreadMentions" : "shell.unread", { count })}
-    >
-      {badgeCount(count)}
-    </CountBadge>
+  const props = {
+    role: "img",
+    "aria-label": t(mentions ? "shell.unreadMentions" : "shell.unread", { count }),
+    children: badgeCount(count),
+  };
+  return quiet ? (
+    <CountChip className="sidebar__unread sidebar__unread--quiet" {...props} />
+  ) : (
+    <CountBadge className="sidebar__unread" {...props} />
   );
 }
 

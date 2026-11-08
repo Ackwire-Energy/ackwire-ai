@@ -1,5 +1,4 @@
 import { useIssueColumns, useIssues } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Fragment, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +16,7 @@ import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } fr
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, Filters, IconButton, Text, useReducedMotion } from "@/ui";
+import { router } from "@/ui/navigation";
 import { mayCreate } from "../new/logic";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useOrgId, usePullRefresh } from "../shared/hooks";

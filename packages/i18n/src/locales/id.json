@@ -32,6 +32,7 @@
     "code": "Kode",
     "fullScreen": "Layar penuh",
     "wrapLines": "Bungkus baris",
+    "raw": "Asli",
     "table": "Tabel",
     "chartItem": "Item",
     "chartShare": "Porsi",
@@ -44,6 +45,7 @@
     "today": "Hari ini",
     "yesterday": "Kemarin",
     "loadFailed": "Tidak bisa memuat ini. Periksa koneksimu dan coba lagi.",
+    "gone": "Ini sudah tidak ada di sini. Sudah dihapus, atau kamu tidak punya akses lagi.",
     "notAllowed": "Kamu tidak punya izin untuk ini.",
     "tooMany": "Terlalu banyak percobaan. Coba lagi nanti.",
     "offline": "Kamu sedang offline. Periksa koneksimu dan coba lagi.",
@@ -1491,6 +1493,9 @@
     "workingNow": "Sedang bekerja",
     "available": "Tersedia",
     "archived": "Diarsipkan",
+    "restore": "Pulihkan",
+    "restoreAction": "Pulihkan {{name}}",
+    "restored": "{{name}} kembali ke tim.",
     "emptyTitle": "Bangun tim agenmu",
     "empty": "Setiap agen punya peran dan bekerja bersama orang-orang, di kanal yang sama.",
     "emptyViewerTitle": "Tim agenmu muncul di sini",
@@ -1747,6 +1752,13 @@
     "generalName": "#general tetap dengan namanya.",
     "archive": "Arsipkan kanal",
     "archived": "#{{channel}} diarsipkan. Percakapannya tetap disimpan.",
+    "archivedTitle": "Kanal yang diarsipkan",
+    "archivedCount_other": "{{count}} kanal diarsipkan",
+    "archivedNone": "Tidak ada kanal diarsipkan untuk dipulihkan",
+    "archivedOn": "Diarsipkan {{date}}",
+    "restore": "Pulihkan",
+    "restoreName": "Pulihkan #{{channel}}",
+    "restored": "#{{channel}} kembali.",
     "leave": "Keluar dari kanal",
     "left": "Kamu keluar dari #{{channel}}",
     "leaveTitle": "Keluar dari #{{channel}}?",
@@ -1904,7 +1916,7 @@
       "budgetHelp": "Saat mencapai batas, ia berhenti dan memberi tahu, seperti agen lain.",
       "audience": "Siapa yang bisa memakai",
       "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
-      "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Ia tidak memposting apa pun kalau tak ada yang mengajaknya bicara.",
+      "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Tanpa diajak bicara, ia hanya memposting Minggu tim, untuk admin.",
       "audit": "Lihat apa yang dilakukan {{name}}",
       "change": "Ubah",
       "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",
@@ -2021,6 +2033,38 @@
       "open": "Buka",
       "web": "Buka di situs",
       "notAllowed": "Kamu tidak punya akses ke layar ini"
+    },
+    "action": {
+      "title": "Perubahan di ruang kerja",
+      "only": "Hanya yang boleh membuat perubahan ini yang menerapkannya",
+      "ask": "Kirim ke yang berwenang",
+      "other": "Buat perubahan di ruang kerja",
+      "create_role": "Buat peran <b>{{name}}</b>",
+      "update_role": "Ubah peran <b>{{name}}</b>",
+      "delete_role": "Hapus peran <b>{{name}}</b> selamanya",
+      "move_role": "Pindahkan peran <b>{{name}}</b>",
+      "set_member_roles": "Ubah peran yang dimiliki <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Ubah apa yang boleh dilakukan {{who}} di <b>#{{channel}}</b>",
+      "set_my_status": "Atur statusmu: <b>{{what}}</b>",
+      "set_notifications_on": "Nyalakan notifikasimu untuk <b>{{category}}</b>",
+      "set_notifications_off": "Matikan notifikasimu untuk <b>{{category}}</b>",
+      "set_my_timezone": "Atur zona waktumu ke <b>{{timezone}}</b>",
+      "set_my_timezone_workspace": "Kembali ikuti zona waktu ruang kerja",
+      "set_invitation_roles": "Ubah peran yang diberikan undangan <b>{{email}}</b>: {{change}}",
+      "update_channel": "Ubah kanal <b>#{{channel}}</b>",
+      "archive_channel": "Arsipkan <b>#{{channel}}</b>",
+      "archive_channel_back": "Kembalikan <b>#{{channel}}</b>",
+      "channel_people": "Ubah siapa yang ada di <b>#{{channel}}</b>: {{change}}",
+      "delete_channel": "Hapus kanal <b>#{{channel}}</b> selamanya, beserta pesan dan filenya",
+      "revoke_invitation": "Batalkan undangan <b>{{email}}</b>",
+      "resend_invitation": "Kirim ulang undangan ke <b>{{email}}</b>",
+      "decide_join_request_approve": "Izinkan <b>{{email}}</b> masuk ke ruang kerja",
+      "decide_join_request_deny": "Tolak permintaan <b>{{email}}</b> untuk bergabung",
+      "stop_work": "Hentikan yang sedang dikerjakan <b>{{agent}}</b>",
+      "continue_work": "Biarkan <b>{{agent}}</b> lanjut",
+      "update_workspace": "Ubah ruang kerja <b>{{name}}</b>",
+      "set_action_check_on": "Nyalakan pemeriksaan atas apa yang sudah dilakukan tim",
+      "set_action_check_off": "Matikan pemeriksaan atas apa yang sudah dilakukan tim"
     }
   },
   "teamWeek": {
@@ -2580,7 +2624,8 @@
       "updated_status": "Memindahkan <b>#{{number}}</b> ke {{status}} · {{title}}",
       "updated_priority": "Mengatur prioritas <b>#{{number}}</b> ke {{priority}} · {{title}}",
       "assigned": "Menugaskan <b>#{{number}}</b> ke {{assignee}} · {{title}}",
-      "assigned_self": "Mengambil <b>#{{number}}</b> sendiri · {{title}}"
+      "assigned_self": "Mengambil <b>#{{number}}</b> sendiri · {{title}}",
+      "files": "Melampirkan {{names}}"
     },
     "memory": {
       "saved": "Disimpan ke <b>memori</b>: {{text}}",
@@ -2624,6 +2669,35 @@
       "merged": "Merge PR <b>#{{number}}</b> di <b>{{repo}}</b>",
       "merged_branch": "Merge <b>{{ref}}</b> di <b>{{repo}}</b>"
     },
+    "workspace": {
+      "changed": "Membuat perubahan di ruang kerja",
+      "changed_create_role": "Membuat peran <b>{{name}}</b>",
+      "changed_update_role": "Mengubah peran <b>{{name}}</b>",
+      "changed_delete_role": "Menghapus peran <b>{{name}}</b>",
+      "changed_move_role": "Memindahkan peran <b>{{name}}</b>",
+      "changed_set_member_roles": "Mengubah peran yang dimiliki <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Mengubah apa yang boleh dilakukan {{who}} di <b>#{{channel}}</b>",
+      "changed_set_my_status": "Mengatur statusmu: <b>{{what}}</b>",
+      "changed_set_notifications_on": "Menyalakan notifikasimu untuk <b>{{category}}</b>",
+      "changed_set_notifications_off": "Mematikan notifikasimu untuk <b>{{category}}</b>",
+      "changed_set_my_timezone": "Mengatur zona waktumu ke <b>{{timezone}}</b>",
+      "changed_set_my_timezone_workspace": "Zona waktumu kembali mengikuti ruang kerja",
+      "changed_set_invitation_roles": "Mengubah peran yang diberikan undangan <b>{{email}}</b>: {{change}}",
+      "changed_update_channel": "Mengubah kanal <b>#{{channel}}</b>",
+      "changed_archive_channel": "Mengarsipkan <b>#{{channel}}</b>",
+      "changed_archive_channel_back": "Mengembalikan <b>#{{channel}}</b>",
+      "changed_channel_people": "Mengubah siapa yang ada di <b>#{{channel}}</b>: {{change}}",
+      "changed_delete_channel": "Menghapus kanal <b>#{{channel}}</b>",
+      "changed_revoke_invitation": "Membatalkan undangan <b>{{email}}</b>",
+      "changed_resend_invitation": "Mengirim ulang undangan ke <b>{{email}}</b>",
+      "changed_decide_join_request_approve": "Mengizinkan <b>{{email}}</b> masuk ke ruang kerja",
+      "changed_decide_join_request_deny": "Menolak permintaan <b>{{email}}</b> untuk bergabung",
+      "changed_stop_work": "Menghentikan yang sedang dikerjakan <b>{{agent}}</b>",
+      "changed_continue_work": "Membiarkan <b>{{agent}}</b> lanjut",
+      "changed_update_workspace": "Mengubah ruang kerja <b>{{name}}</b>",
+      "changed_set_action_check_on": "Menyalakan pemeriksaan atas apa yang sudah dilakukan tim",
+      "changed_set_action_check_off": "Mematikan pemeriksaan atas apa yang sudah dilakukan tim"
+    },
     "other": "Membuat perubahan",
     "copyWebhook": "Salin alamat webhook",
     "issueFields": {
@@ -2635,7 +2709,8 @@
       "labels": "label",
       "dueDate": "tenggat",
       "githubUrl": "tautan GitHub",
-      "criteria": "kriteria"
+      "criteria": "kriteria",
+      "files": "lampiran"
     },
     "routineFields": {
       "name": "nama",
@@ -4277,6 +4352,8 @@
           "stepTwo": "Tempel kode yang ditampilkan Claude",
           "codeLabel": "Kode Claude",
           "notCode": "Itu sepertinya bukan kode Claude.",
+          "stepTwoGoogle": "Tempel kode yang ditampilkan Google",
+          "codeLabelGoogle": "Kode atau tautan",
           "send": "Kirim ke {{computer}}",
           "sending": "Mengirim kode ke {{computer}}…",
           "sent": "Kode terkirim. Menyelesaikan proses masuk di {{computer}}.",
@@ -4594,6 +4671,7 @@
         "too_many_tool_calls": "Melewati batas alat untuk satu proses.",
         "stuck": "Berhenti karena macet.",
         "brain_interrupted": "AI berhenti sebelum selesai.",
+        "brain_unavailable": "AI di komputernya tidak bisa menjawab. Periksa komputernya lalu minta lagi.",
         "empty_reply": "Model tidak mengembalikan apa pun.",
         "model_refused": "Model menolak menjawab.",
         "agent_archived": "Agen sudah diarsipkan.",
@@ -5950,6 +6028,7 @@
         "done": "Sudah selesai",
         "canceled": "Tidak akan dikerjakan"
       },
+      "stageFull": "{{stage}} sudah punya {{max}} kolom, batas untuk satu tahap. Hapus salah satunya dulu.",
       "stageExplain": {
         "todo": "Tugas baru masuk ke kolom pertama Akan dikerjakan.",
         "in_progress": "Saat agen mulai, tugas pindah ke kolom pertama Sedang dikerjakan.",
@@ -6056,6 +6135,8 @@
       "cancel": "Batal",
       "create": "Buat tugas",
       "created": "Tugas #{{number}} dibuat.",
+      "notStarted": "Tugas #{{number}} dibuat, tapi {{name}} belum mulai.",
+      "askAgain": "Minta lagi",
       "intro": "Siapa pun yang mengambilnya, orang atau agen, tampil di papan beserta progresnya.",
       "criteriaFound_other": "{{count}} kriteria penerimaan",
       "agentStarts": "{{name}} langsung mulai begitu tugas dibuat. Apa pun yang sensitif akan meminta persetujuanmu.",
@@ -6103,6 +6184,7 @@
     "askSection": "Minta ke agen",
     "asked": "Permintaan terkirim. {{name}} bekerja di percakapan tugas, yang diikuti semua orang yang melihat tugas ini.",
     "asked_female": "Permintaan terkirim. {{name}} bekerja di percakapan tugas, yang diikuti semua orang yang melihat tugas ini.",
+    "notStarted": "{{name}} belum mulai.",
     "activity": "Aktivitas",
     "noActivity": "Belum ada apa-apa.",
     "discussion": "Diskusi",
@@ -6148,7 +6230,8 @@
       "add": "Tambah file",
       "addHint": "atau seret ke sini",
       "grid": "Kisi",
-      "empty": "Belum ada lampiran. Seret file ke sini atau tempel tangkapan layar.",
+      "emptyTitle": "File tugas ini ada di sini",
+      "empty": "Seret file ke sini, tempel tangkapan layar, atau kirim di percakapan tugas.",
       "fromCreation": "Saat dibuat · {{when}}",
       "fromComment": "Komentar {{name}} · {{when}}",
       "linked": "Ditautkan oleh {{name}}"
@@ -6177,6 +6260,8 @@
       "github_linked": "menautkannya ke GitHub",
       "github_unlinked": "menghapus tautan GitHub",
       "artifact_linked": "melampirkan file",
+      "files_attached": "melampirkan {{names}}",
+      "files_removed": "menghapus {{names}} dari lampiran",
       "criterion_checked": "mencentang kriteria \"{{text}}\"",
       "criterion_unchecked": "menghapus centang kriteria \"{{text}}\"",
       "agent_asked": "meminta {{name}} mengerjakannya"
@@ -7865,6 +7950,19 @@
     "confirm": "Konfirmasi dan undang",
     "otherTime": "Waktu lain",
     "confirmed": "Acara dibuat dan undangan terkirim.",
+    "proposalDismissed": "Usulan ditolak",
+    "proposalWaits": "{{name}} mengonfirmasi acara ini.",
+    "rsvp": {
+      "accept": "Hadir",
+      "decline": "Tidak hadir",
+      "accepted": "hadir",
+      "declined": "tidak hadir",
+      "mine": {
+        "needs_action": "Kamu termasuk yang diundang ke acara ini.",
+        "accepted": "Kamu hadir.",
+        "declined": "Kamu tidak hadir."
+      }
+    },
     "kind": {
       "event": "Acara",
       "routine": "Rutinitas",
@@ -9595,6 +9693,7 @@
     "title": "Drive",
     "subtitle": "Semua yang dibuat atau diunggah orang dan agen.",
     "search": "Cari file",
+    "loadMore": "Muat lebih banyak",
     "kind": "Jenis",
     "filters": "Filter",
     "allKinds": "Semua jenis",
@@ -9678,6 +9777,7 @@
     "onlyDriveText": "Belum dibagikan di kanal.",
     "dm": "Pesan langsung",
     "dmWith": "Pesan langsung dengan {{name}}",
+    "dmBetween": "Pesan langsung antara {{names}}",
     "inDm": "Dikirim lewat pesan langsung",
     "inThread": "Di utas percakapan",
     "audience": {
@@ -9685,7 +9785,8 @@
       "publicChannel": "Semua orang di ruang kerja bisa melihatnya: file ini ada di kanal publik #{{name}}",
       "privateChannel": "Hanya anggota #{{name}} dan admin yang bisa melihatnya",
       "dm": "Hanya kamu dan {{name}} yang bisa melihatnya: file ini berasal dari pesan langsung",
-      "dmGone": "Hanya orang di percakapan itu yang bisa melihatnya: file ini berasal dari pesan langsung"
+      "dmGone": "Hanya orang di percakapan itu yang bisa melihatnya: file ini berasal dari pesan langsung",
+      "dmBetween": "Hanya {{names}} yang bisa melihatnya: file ini berasal dari pesan langsung"
     },
     "private": "Privat",
     "privateHint": "Hanya orang di percakapan yang bisa melihat file ini. Di channel, admin juga bisa.",
@@ -9729,9 +9830,6 @@
     },
     "s3": "Bucket milikmu sendiri",
     "s3Text": "S3, R2, MinIO, dan lainnya yang kompatibel dengan S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Segera hadir",
     "current": "Sedang dipakai",
     "usage": {
       "files": "{{size}} file",
@@ -10294,6 +10392,7 @@
     },
     "toolsCount_other": "{{count}} alat",
     "active": "Aktif",
+    "noToolsNow": "Tanpa alat untuk saat ini",
     "notReviewed": "Menunggu ditinjau",
     "toReview_other": "{{count}} alat baru untuk ditinjau",
     "usedBy_other": "{{count}} dari {{total}} agen",
@@ -10447,6 +10546,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Lihat",
       "list": "Daftar",
@@ -11158,6 +11258,11 @@
       "subject": "Subjek berisi",
       "text": "Isi berisi",
       "noMailbox": "Hubungkan kotak surat di Konektor dulu.",
+      "readsNone": "{{name}} belum membaca kotak surat mana pun.",
+      "cantRead": "{{name}} tidak membaca kotak surat ini.",
+      "connectorReadsNone": "{{name}} belum membaca {{connector}}.",
+      "connectorCantRead": "{{name}} tidak membaca {{connector}}.",
+      "giveAccess": "Beri akses",
       "openConnectors": "Buka Konektor",
       "when": "Saat email masuk ke {{address}}",
       "whenFolder": "Saat email masuk ke {{address}} ({{folder}})",
@@ -11312,6 +11417,11 @@
       "hintZoomed": "Seret untuk menggeser. Esc menyesuaikan lagi",
       "hintTouch": "Ketuk atau cubit untuk memperbesar",
       "hintZoomedTouch": "Seret untuk menggeser. Ketuk untuk menyesuaikan lagi"
+    },
+    "nav": {
+      "previous": "Gambar sebelumnya",
+      "next": "Gambar berikutnya",
+      "place": "{{index}} dari {{count}}"
     }
   },
   "errors": {
@@ -11330,6 +11440,8 @@
       "checkAddress": "Periksa alamatnya dan coba lagi.",
       "tooLong": "Itu terlalu panjang. Persingkat dan coba lagi.",
       "updateComputerApp": "Aplikasi di komputer terlalu lama untuk ini. Perbarui dan coba lagi.",
+      "computerUpdatesItself": "Komputer ruang kerja memperbarui dirinya sendiri untuk ini. Coba lagi sebentar lagi.",
+      "notInvited": "Kamu tidak termasuk yang diundang ke acara ini.",
       "offHere": "Ini dimatikan di sini.",
       "notInConversation": "Tidak ada di percakapan ini.",
       "accountStart": "Komputer tidak bisa memulai proses masuk. Pastikan komputer menyala dan coba lagi.",
@@ -11372,6 +11484,7 @@
     },
     "issue": {
       "assigneeOutside": "Orang ini tidak bisa melihat tugas ini. Tambahkan dulu ke Siapa yang melihat.",
+      "stageFull": "Satu tahap paling banyak punya {{max}} kolom. Hapus dulu salah satu kolomnya.",
       "deleteForbidden": "Hanya pembuat tugas ini atau administrator yang bisa menghapusnya.",
       "audienceEmpty": "Pilih siapa yang melihat."
     },
@@ -11548,7 +11661,14 @@
       "fileNameRequired": "File harus punya nama.",
       "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
       "deleteForbidden": "Hanya pembuatnya, orang yang meminta ke agen, pemilik agen, atau Admin yang bisa menghapus ini.",
-      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya."
+      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya.",
+      "versionNotFound": "Versi file ini tidak ada.",
+      "formatUnavailable": "File ini tidak bisa disimpan dalam format itu.",
+      "sharingOpen": "Seluruh ruang kerja sudah bisa melihat file ini.",
+      "sharingForbidden": "Hanya yang ada di percakapan file ini yang bisa mengubah siapa yang melihatnya.",
+      "sharingEmpty": "Pilih siapa yang melihat.",
+      "sharingTooMany": "Pilih paling banyak {{max}} orang dan {{max}} peran.",
+      "notInDrive": "Ini hanya ada di percakapannya, jadi tidak bisa dibagikan."
     },
     "machine": {
       "forbidden": "Hanya Admin, atau orang yang menghubungkan komputer, yang bisa melakukan itu.",
@@ -11660,6 +11780,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Browser agen tidak berjalan di sistem komputer ini.",
+      "browser_download": "Browser agen tidak bisa diunduh. Periksa koneksi komputer ini, dan akan dicoba lagi saat dipakai berikutnya.",
+      "browser_checksum": "Unduhan browser agen rusak, jadi tidak dipakai. Akan dicoba lagi saat dipakai berikutnya.",
+      "desktop_use_linux": "Aplikasi di layar agen berjalan di komputer Linux yang punya layar agen.",
+      "desktop_use_own_user": "Aplikasi di layar agen butuh setiap agen bekerja sebagai penggunanya sendiri di komputer ini (mode sistem). Di sini semua agen bekerja sebagai pengguna runner.",
+      "desktop_use_install": "Pasang di komputer ini yang dibutuhkan aplikasi di layar agen:",
+      "desktop_unavailable": "Layar agen tidak bisa berjalan di komputer ini.",
+      "desktop_linux": "Layar agen hanya berjalan di komputer Linux.",
+      "desktop_install": "Pasang layar agen di komputer ini:",
+      "not_as_root": "Layar dan terminal agen tidak pernah berjalan sebagai root. Jalankan runner sebagai pengguna biasa.",
+      "runner_bun_old": "Ini butuh runner di Bun 1.3.5 atau yang lebih baru. Perbarui runner di komputer ini.",
+      "terminal_unsupported": "Terminal hanya berjalan di komputer Linux dan Mac."
+    },
     "egress": {
       "draining": "Jaringan sedang berubah. Sesi komputer yang terbuka akan dimulai ulang pukul {{when}}.",
       "restart": "Sesi komputer sedang dimulai ulang untuk menerapkan jaringan. Pekerjaan baru menunggu sampai selesai.",
@@ -12384,6 +12518,7 @@
       "techAction": "Tindakan",
       "techTool": "Alat",
       "techKind": "Jenis",
+      "techSaid": "Yang dijawabnya",
       "techRun": "Proses",
       "techId": "Catatan",
       "openConversation": "Buka percakapan",
@@ -12393,6 +12528,7 @@
     }
   },
   "settings": {
+    "notOpen": "Peranmu di ruang kerja ini tidak membuka {{section}}. Orang yang mengelola peran bisa membukanya untukmu.",
     "nav": "Bagian pengaturan",
     "group": {
       "you": "Kamu",
@@ -12481,6 +12617,14 @@
         "openAt": "Saat membuka percakapan, bawa aku ke",
         "openRead": "Pesan terakhir yang dibaca",
         "openLatest": "Pesan terbaru",
+        "textSize": "Ukuran teks",
+        "textSizeHelp": "Untuk pesan, di semua percakapan dan di semua perangkatmu",
+        "textSizePhone": "Ukuran teks di pengaturan ponselmu juga berlaku",
+        "textXs": "Lebih kecil",
+        "textSm": "Kecil",
+        "textMd": "Bawaan",
+        "textLg": "Besar",
+        "textXl": "Lebih besar",
         "sample": {
           "ask": "Berapa yang tersisa?",
           "answer": "Tersisa 14. Perlu kuberi tahu?",
@@ -13108,7 +13252,11 @@
         "shell": "Menjalankan perintah lain di dalamnya",
         "inline": "Menjalankan kode yang ditulis langsung",
         "global": "Memasang untuk seluruh komputer",
-        "rules": "Di luar yang boleh dilakukan agen sendiri"
+        "rules": "Di luar yang boleh dilakukan agen sendiri",
+        "noAccess": "Agen tidak punya akses ke ini",
+        "policy": "Tidak diizinkan dalam jenis pekerjaan ini",
+        "credential": "Mengirim sesuatu yang tampak seperti kunci",
+        "repo": "Repositori itu tidak ada di daftar agen"
       },
       "gave": "diberikan",
       "answered": "dijawab",
@@ -13213,6 +13361,7 @@
         "runningRoutine": "Menjalankan rutinitas sekarang",
         "proposingTeam": "Mengusulkan tim",
         "proposingChange": "Mengusulkan perubahan",
+        "workingOnWorkspace": "Bekerja di ruang kerja",
         "updatingThread": "Memperbarui utas",
         "addingAgent": "Menambahkan agen ke kanal",
         "readingConversation": "Membaca percakapan",
@@ -13321,6 +13470,7 @@
       "runningRoutine": "menjalankan rutinitas sekarang",
       "proposingTeam": "mengusulkan tim",
       "proposingChange": "mengusulkan perubahan",
+      "workingOnWorkspace": "bekerja di ruang kerja",
       "updatingThread": "memperbarui utas",
       "addingAgent": "menambahkan agen ke kanal",
       "readingConversation": "membaca percakapan",
@@ -13464,6 +13614,8 @@
       "action_update_skills": "Perbarui skill",
       "action_approvals": "Persetujuan yang menunggumu",
       "action_open_page": "Buka layar",
+      "calendar_proposal": "Usulan acara: {{title}}",
+      "action_workspace": "Mengusulkan perubahan di ruang kerja",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "team_proposal": "Mengusulkan tim: {{names}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
@@ -13671,6 +13823,38 @@
     "update_skill_from_source": {
       "label": "Perbarui skill dari tautannya",
       "description": "Memperbarui skill dari tempat skill dipasang. Perubahan skrip menunggu seseorang."
+    },
+    "propose_remove_agents": {
+      "label": "Usulkan mengarsipkan atau menghapus agen",
+      "description": "Memposting kartu berisi agen yang akan diarsipkan atau dihapus. Orang yang berwenang menerapkannya."
+    },
+    "offer_answers": {
+      "label": "Bertanya dengan jawaban untuk diketuk",
+      "description": "Memposting pertanyaan dengan jawaban yang diketuk orangnya. Setiap ketukan menjadi pesannya sendiri."
+    },
+    "propose_team": {
+      "label": "Usulkan sebuah tim",
+      "description": "Memposting kartu berisi beberapa agen, kanal, rutinitas, dan skill mereka. Seseorang yang membuatnya."
+    },
+    "propose_settings_change": {
+      "label": "Usulkan pengaturan rekan",
+      "description": "Memposting kartu berisi model, AI, anggaran, penanggung jawab, audiens, atau kanal baru seorang rekan. Seseorang yang menerapkannya."
+    },
+    "offer_approvals": {
+      "label": "Tampilkan yang menunggu persetujuan",
+      "description": "Memposting kartu berisi persetujuan yang menunggu orang itu, yang menyetujui atau menolak masing-masing di sana."
+    },
+    "propose_member_changes": {
+      "label": "Usulkan perubahan orang",
+      "description": "Memposting kartu berisi pemilik, peran, atau penghapusan yang akan diubah. Orang yang berwenang menerapkan masing-masing."
+    },
+    "offer_open_page": {
+      "label": "Tawarkan membuka sebuah layar",
+      "description": "Memposting kartu yang tombolnya membuka layar aplikasi, seperti tagihan, peran, atau halaman agen."
+    },
+    "set_team_week": {
+      "label": "Ubah kartu Minggu tim",
+      "description": "Menghentikan, memulai lagi, atau memindahkan kartu mingguan Minggu tim di pesan langsung orang itu."
     },
     "propose_agent": {
       "label": "Usulkan agen",
@@ -15377,6 +15561,85 @@
     "receipt": "Siapa yang melihat: {{who}}",
     "limited": "akses terbatas",
     "rolesToo": "Peran yang sudah ada di halaman ini tetap melihatnya."
+  },
+  "share": {
+    "button": "Bagikan",
+    "title": "Bagikan {{name}}",
+    "conversation": "Hanya percakapan",
+    "people": "Orang dan peran yang kamu pilih",
+    "everyone": "Seluruh ruang kerja",
+    "whereDm": "Pesan langsung dengan {{name}}",
+    "whereDmGone": "Sebuah pesan langsung",
+    "whereDmBetween": "Pesan langsung antara {{names}}",
+    "whereChannel": "Anggota #{{name}}",
+    "add": "Tambahkan orang atau peran",
+    "addSearch": "Cari orang dan peran",
+    "noResults": "Tidak ada orang dengan nama itu",
+    "groupPeople": "Orang",
+    "groupRoles": "Peran",
+    "access": "Siapa yang punya akses",
+    "you": "{{name}} (kamu)",
+    "agent": "Agen",
+    "role": "Peran",
+    "remove": "Keluarkan {{name}}",
+    "admins": "Administrator selalu bisa melihat.",
+    "copyLink": "Salin tautan",
+    "copied": "Tautan disalin.",
+    "done": "Selesai",
+    "onlyHere": "Orang di luar percakapan ini tidak akan bisa membuka tautannya.",
+    "choosePeople": "Pilih orang",
+    "readOnly": "Hanya yang ada di percakapan yang bisa mengubah siapa yang melihat.",
+    "open": "Seluruh ruang kerja bisa melihat file ini.",
+    "savedEveryone": "Sekarang seluruh ruang kerja bisa melihat file ini.",
+    "savedPeople": "Sekarang orang yang kamu pilih bisa melihat file ini.",
+    "savedConversation": "Sekarang hanya percakapan yang bisa melihat file ini.",
+    "undo": "Urungkan",
+    "fileRef": "File {{title}}",
+    "fileRefNone": "File tanpa akses",
+    "also": "{{text}}. Juga dibagikan dengan {{who}}.",
+    "someOnlyHere": "Beberapa tautan ini hanya bisa dibuka oleh yang ada di percakapan file."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Masuk untuk membuka tautan ini",
+      "text": "Setelah masuk, kamu langsung kembali ke sini."
+    },
+    "file": {
+      "title": "File ini tidak tersedia untukmu",
+      "text": "File ini mungkin sudah dihapus, atau hanya dibagikan di percakapan yang tidak kamu ikuti. Minta pengirimnya membagikannya denganmu lewat tombol Bagikan pada file."
+    },
+    "link": {
+      "title": "Tautan ini tidak tersedia untukmu",
+      "text": "Tautan ini mungkin sudah kedaluwarsa, sudah dipakai, atau mengarah ke tempat yang tidak kamu ikuti. Minta tautan baru kepada pengirimnya."
+    },
+    "version": {
+      "title": "Versi file ini tidak ada",
+      "text": "Tautan meminta versi yang tidak dimiliki file ini."
+    },
+    "format": {
+      "title": "File ini tidak tersedia dalam format itu",
+      "text": "Tautan meminta format yang tidak bisa dipakai untuk menyimpan file ini."
+    },
+    "busy": {
+      "title": "Terlalu banyak percobaan berturut-turut",
+      "text": "Tunggu sebentar lalu coba lagi."
+    },
+    "server": {
+      "title": "Ada yang gagal di pihak kami",
+      "text": "Ini bukan karena apa yang kamu lakukan. Coba lagi sebentar lagi."
+    },
+    "other": {
+      "title": "Tautan ini tidak terbuka",
+      "text": "Alamatnya tidak lengkap atau sudah tidak berlaku. Minta yang baru kepada pengirimnya."
+    },
+    "action": {
+      "signIn": "Masuk",
+      "open": "Buka agentes.chat",
+      "latest": "Buka versi terbaru",
+      "file": "Buka file",
+      "retry": "Coba lagi"
+    },
+    "errorId": "Kode kesalahan: {{id}}"
   },
   "teamTemplates": {
     "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",

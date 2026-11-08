@@ -58,6 +58,9 @@ import type { Measurable } from "./ask-store";
 import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import {
   awayRun,
+  CHAT_TEXT_MAX_SCALE,
+  chatNameOf,
+  chatTimeOf,
   type LineDrawn,
   type LineWords,
   leavingWords,
@@ -265,8 +268,13 @@ export const TurnRow = memo(function TurnRow({
                 <Text
                   variant="footnote"
                   tone="ink2"
-                  style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
+                  style={[
+                    styles.name,
+                    look.text ? chatNameOf(look.text) : undefined,
+                    bubbled ? { color: nameInk(color, scheme === "dark") } : undefined,
+                  ]}
                   numberOfLines={1}
+                  maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
                 >
                   {agent?.name ?? ""}
                 </Text>
@@ -275,7 +283,12 @@ export const TurnRow = memo(function TurnRow({
               `RunClock`); "parado" once stopped. */}
               <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
                 {live ? (
-                  <Text variant="footnote" tone="faint">
+                  <Text
+                    variant="footnote"
+                    tone="faint"
+                    style={look.text ? chatTimeOf(look.text) : undefined}
+                    maxFontSizeMultiplier={look.text ? CHAT_TEXT_MAX_SCALE : undefined}
+                  >
                     {when.time(new Date(since ?? mountedAt).toISOString())}
                   </Text>
                 ) : (

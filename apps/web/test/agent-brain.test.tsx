@@ -1646,6 +1646,33 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(document.body.textContent).toContain("A Ada agora pensa com DeepSeek V4.1 Flash pelo OpenCode Go.");
   });
 
+  test("an OpenCode key on OpenCode's CLI: after the computer's free models, OpenCode Go's, DeepSeek V4.1 Flash too", async () => {
+    const free = { kind: "opencode" as const, available: true, defaultModel: null };
+    const { state } = await onPlan(
+      "zen",
+      {
+        brain: "opencode",
+        effectiveModel: "opencode/big-pickle",
+        options: [{ ...free, models: [{ value: "opencode/big-pickle", label: "Big Pickle", free: true }] }],
+      },
+      { kind: "opencode", label: "OpenCode", keyHint: "Q7f2" },
+    );
+    const d = await brainDialog();
+    const trigger = within(d).getByRole("combobox", { name: "Modelo" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const list = screen().getByRole("listbox");
+    // The computer listed its CLI's models with no key: the free tier. The key's Go models follow, by maker.
+    expect(within(list).getAllByRole("option")[1]?.textContent).toContain("Big Pickle");
+    const deepseek = within(within(list).getByRole("group", { name: "DeepSeek" })).getAllByRole("option");
+    expect(deepseek.map((o) => o.querySelector(".ac-menu__desc")?.textContent ?? null)).toEqual([null, "Econômico"]);
+    expect(deepseek[1]?.textContent).toContain("DeepSeek V4.1 Flash");
+    await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "opencode", model: "opencode-go/deepseek-v4.1-flash" });
+  });
+
   test("a coding plan is a card of its own: its keys alone under Conta, its models; another card starts on its own", async () => {
     await onPlan("opencode", {
       model: "deepseek-v4.1-flash",

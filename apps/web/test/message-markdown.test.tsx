@@ -222,6 +222,58 @@ describe("streaming words", () => {
   });
 });
 
+describe("```json fences", () => {
+  beforeAll(() => createI18n("pt-BR"));
+  const RAW = '{"key":"infra-incident-ledger","timezone":"America/Sao_Paulo","reads":[1,2]}';
+  const PRETTY = [
+    "{",
+    '  "key": "infra-incident-ledger",',
+    '  "timezone": "America/Sao_Paulo",',
+    '  "reads": [',
+    "    1,",
+    "    2",
+    "  ]",
+    "}",
+  ].join("\n");
+
+  test("a JSON block reads formatted and wrapped; Original shows it as written; copy takes what shows", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => void copied.push(text) },
+    });
+    const el = body(`O registro:\n\n\`\`\`json\n${RAW}\n\`\`\``);
+    const card = el.querySelector(".code-card") as HTMLElement;
+    const code = () => card.querySelector(".code-card__code") as HTMLElement;
+    expect(code().textContent).toBe(PRETTY);
+    expect(code().dataset.wrap).toBe("true");
+    // A wrapped line goes on under its own indent; keys apart from the strings.
+    const line = code().querySelectorAll<HTMLElement>(".code-line")[1];
+    expect(line?.style.getPropertyValue("--hang")).toBe("2ch");
+    expect(line?.querySelector(".code-tok--property")?.textContent).toBe('"key"');
+    // The copy button reads "Copiado" for a moment after a copy: found by its place, not its name.
+    const copy = card.querySelector(".code-card__copy") as HTMLElement;
+    expect(copy.getAttribute("aria-label")).toBe("Copiar");
+    await act(async () => fireEvent.click(copy));
+    const original = within(card).getByRole("button", { name: "Original" });
+    await act(async () => fireEvent.click(original));
+    expect(original.getAttribute("aria-pressed")).toBe("true");
+    expect(code().textContent).toBe(RAW);
+    expect(code().dataset.wrap).toBeUndefined();
+    await act(async () => fireEvent.click(copy));
+    expect(copied).toEqual([PRETTY, RAW]);
+  });
+
+  test("JSON already formatted, or a block that isn't JSON, has no Original to switch to", () => {
+    const el = body(`\`\`\`json\n${PRETTY}\n\`\`\`\n\n\`\`\`json\n{nope\n\`\`\``);
+    const [pretty, broken] = Array.from(el.querySelectorAll<HTMLElement>(".code-card")) as [HTMLElement, HTMLElement];
+    expect(pretty.querySelector("button[aria-pressed]")).toBeNull();
+    expect((pretty.querySelector(".code-card__code") as HTMLElement).dataset.wrap).toBe("true");
+    expect(broken.querySelector("button[aria-pressed]")).toBeNull();
+    expect(broken.querySelector(".code-card__code")?.textContent).toBe("{nope");
+  });
+});
+
 describe("```mermaid fences", () => {
   /** The sources the page asked to draw (the fake stands in for mermaid, which needs a browser's layout). */
   const asked: string[] = [];

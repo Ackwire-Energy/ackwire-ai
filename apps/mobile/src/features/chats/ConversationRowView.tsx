@@ -1,9 +1,11 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
+import { TAB_BADGE } from "@/lib/nav";
 import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { workTitle } from "../agents/work";
 import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";
@@ -13,7 +15,7 @@ import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { usePresenceOf } from "../status/hooks";
-import { type ConversationRow, type LastLine, threadRowLines } from "./logic";
+import { type ConversationRow, type LastLine, rowBadge, threadRowLines } from "./logic";
 import type { AgentRowState } from "./now";
 
 /** The avatar column. */
@@ -135,7 +137,9 @@ export const ConversationRowView = memo(function ConversationRowView({
         .filter(Boolean)
         .join(" · ")
     : null;
-  const badge = lines ? lines.badge : r.unread;
+  const own = rowBadge(r);
+  const badge = lines ? lines.badge : own.count;
+  const mention = !lines && own.mention;
 
   let line: ReactNode;
   let label: string;
@@ -254,6 +258,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label,
     r.at ? when.short(r.at) : null,
     r.unread > 0 ? t("mobile.chats.unreadLabel", { count: r.unread }) : null,
+    mention ? t("shell.unreadMentions", { count: badge }) : null,
     pinned ? t("sidebarPins.pinned") : null,
     lines?.kind === "mission" && badge > 0
       ? t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count: badge })
@@ -291,7 +296,16 @@ export const ConversationRowView = memo(function ConversationRowView({
         ) : null
       }
       sub={line}
-      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
+      trailing={
+        badge > 0 ? (
+          <Count
+            value={badge}
+            max={99}
+            inverted
+            {...(mention ? { fill: TAB_BADGE.background, color: TAB_BADGE.text } : {})}
+          />
+        ) : null
+      }
     />
   );
   if (!peeks || !peekHref) return row(open);

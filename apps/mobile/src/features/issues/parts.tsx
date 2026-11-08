@@ -6,12 +6,12 @@ import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
 import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { stepPhrase } from "@agenteschat/client/lib/work";
 import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
-import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
 import { SocialMark } from "@/ui/auth/SocialMarks";
+import { router } from "@/ui/navigation";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   talk: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   overlap: { marginLeft: -4 },
   step: { flex: 1, minWidth: 0 },
-  meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
+  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 6 },
   track: { flexDirection: "row", alignItems: "center", gap: 8 },
   cells: { flex: 1, flexDirection: "row", gap: 2 },
   cell: { flex: 1, height: 7 },

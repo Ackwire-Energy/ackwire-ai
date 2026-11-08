@@ -69,6 +69,7 @@
     "copied": "Gekopieerd",
     "fullScreen": "Volledig scherm",
     "wrap": "Regels afbreken",
+    "raw": "Origineel",
     "more": "Alle {{count}} regels bekijken",
     "gone": "Deze code is niet meer open."
   },
@@ -1027,19 +1028,21 @@
       "file": "Bestand"
     },
     "more": "Meer opties",
-    "share": "Delen",
+    "send": "Versturen",
     "savePhotos": "Bewaren in Foto's",
     "drive": "Bekijken in Drive",
     "saved": "Bewaard in Foto's",
     "photosDenied": "Geen toegang tot Foto's",
     "photosDeniedSub": "Sta het toe in Instellingen om afbeeldingen te bewaren.",
-    "shareFailed": "Het bestand kon niet worden gedeeld.",
+    "shareFailed": "Het bestand kon niet worden verstuurd.",
     "saveFailed": "De afbeelding kon niet worden bewaard.",
     "loadFailed": "Het bestand kon niet worden geopend.",
     "openImage": "Afbeelding openen",
     "imageOf": "Afbeelding {{index}} van {{count}}",
     "place": "{{index}} van {{count}}",
-    "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen.",
+    "previous": "Vorige afbeelding",
+    "next": "Volgende afbeelding",
+    "noPreview": "Dit bestand opent niet in de app. Stuur het naar een andere app om het te openen.",
     "video": {
       "play": "Afspelen",
       "pause": "Pauzeren",
@@ -1589,6 +1592,7 @@
     "everyoneFailed": "De toegang van iedereen kon niet worden gewijzigd. Probeer het opnieuw.",
     "disconnectFailed": "{{name}} kon niet worden losgekoppeld. Probeer het opnieuw.",
     "needsReconnect": "Het account van {{name}} werkt niet meer. Agents kunnen het niet gebruiken tot iemand het opnieuw verbindt.",
+    "noTools": "De tools van {{name}} konden niet worden gelezen. Agents hebben ze pas weer als ze opnieuw worden gelezen, in Tools.",
     "accountTitle": "Dit account",
     "renameFailed": "Naam wijzigen lukte niet. Probeer het opnieuw.",
     "whoTitle": "Wie het gebruikt en hoe ver",
@@ -1717,7 +1721,7 @@
   },
   "crash": {
     "title": "Er ging iets mis op dit scherm",
-    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw. Gebeurt het vaker, stuur ons dan de tekst hieronder.",
+    "subtitle": "De app liep tegen een fout aan bij het tonen hiervan. Probeer het opnieuw.",
     "retry": "Opnieuw proberen"
   },
   "notFound": {

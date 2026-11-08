@@ -8,11 +8,11 @@ import {
   workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import type { OrgState } from "@/providers/org";
+import { router } from "@/ui/navigation";
 import { Button } from "../Button";
 import { Text } from "../Text";
 import { useToast } from "../Toast";

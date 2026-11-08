@@ -1,13 +1,13 @@
 import { and, asc, eq, inArray, isNotNull, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import type { PlanModel } from "@agenteschat/providers/plans";
-import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
+import { approvalCardThreads, approvalOriginOf, notifiedIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
 import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
-import { previewMediaKind, previewMeta, readableBody } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { isQuietNotice } from "./notices";
 import {
   dropRunFailure,
@@ -455,7 +455,7 @@ export async function resolveSecretRequestNotifications(deps: NotificationDeps, 
 // ── Approvals ─────────────────────────────────────────────────────────────────
 
 /**
- * A sensitive action waits: everyone who may decide it, with the agent's why (short, in `text`) and,
+ * A sensitive action waits: whoever is told (`notifiedIds`), with the agent's why (short, in `text`) and,
  * asked while nobody watched, where it came from (`origin`: a routine, or no one): ADR 0053 §8.
  */
 /**
@@ -518,7 +518,8 @@ const approvalLatest = (approval: ApprovalRow) => ({
 
 /**
  * Out of the inbox once nothing on its card waits any more. Until then each person's entry describes the
- * card's oldest request still waiting that they may decide, and leaves the inbox of whoever has none left.
+ * card's oldest request still waiting that they are told about (`notifiedIds`), and leaves the inbox of whoever has
+ * none left.
  */
 export async function resolveApprovalNotifications(
   deps: NotificationDeps,
@@ -538,9 +539,9 @@ export async function resolveApprovalNotifications(
     )
     .orderBy(asc(approvals.createdAt));
   if (waiting.length === 0) return resolveNotifications(deps, approval.orgId, { groupKey });
-  const deciders = await Promise.all(waiting.map(async (a) => new Set(await approverIds(deps.db, a))));
+  const told = await Promise.all(waiting.map(async (a) => new Set(await notifiedIds(deps.db, a))));
   await retargetNotifications(deps, approval.orgId, groupKey, (userId) => {
-    const next = waiting.find((_, i) => deciders[i]?.has(userId));
+    const next = waiting.find((_, i) => told[i]?.has(userId));
     return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
   });
 }
@@ -562,20 +563,25 @@ export async function rerouteApprovals(deps: NotificationDeps, orgId: string, us
     );
   for (const row of rows) {
     await resolveApprovalNotifications(deps, row);
-    const holding = await deps.db
-      .select({ userId: notifications.userId })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.orgId, orgId),
-          eq(notifications.groupKey, approvalGroupKey(row)),
-          isNull(notifications.doneAt),
-        ),
-      );
-    const held = new Set(holding.map((h) => h.userId));
-    const newcomers = (await approverIds(deps.db, row)).filter((id) => !held.has(id));
-    if (newcomers.length > 0) await notifyApproval(deps, row, newcomers);
+    await notifyNewcomers(deps, row);
   }
+}
+
+/** Whoever is told about a waiting approval now (`notifiedIds`) and holds no item for its card yet gets one. */
+export async function notifyNewcomers(deps: NotificationDeps, row: ApprovalRow) {
+  const holding = await deps.db
+    .select({ userId: notifications.userId })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.orgId, row.orgId),
+        eq(notifications.groupKey, approvalGroupKey(row)),
+        isNull(notifications.doneAt),
+      ),
+    );
+  const held = new Set(holding.map((h) => h.userId));
+  const newcomers = (await notifiedIds(deps.db, row)).filter((id) => !held.has(id));
+  if (newcomers.length > 0) await notifyApproval(deps, row, newcomers);
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────
@@ -744,6 +750,8 @@ export async function notifyMissionEnded(
   kind: "mission_finished" | "mission_stopped",
   actor: NotificationActor | null,
   text?: string | null,
+  /** `text` is the server's English: the apps word it by its code, as the chat's message (`previewMeta`). */
+  written?: PreviewMeta,
 ) {
   const parts = await deps.db
     .select({ userId: missionParticipants.userId })
@@ -764,6 +772,7 @@ export async function notifyMissionEnded(
     latest: {
       title: mission.title,
       ...(text ? { text: notificationSnippet(text) } : {}),
+      ...(text && written ? { meta: written } : {}),
       ...(mission.planTotal > 0 ? { steps: { done: mission.planDone, total: mission.planTotal } } : {}),
     },
   });

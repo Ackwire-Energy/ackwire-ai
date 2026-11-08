@@ -4,6 +4,7 @@ import {
   AGENT_STYLES,
   CHAT_OPEN_AT,
   CHAT_STYLES,
+  CHAT_TEXT_SIZES,
   CHAT_TONES,
   ONBOARDING_STEPS,
   STANDING_STATES,
@@ -68,6 +69,10 @@ export const ChatPrefs = z
     channelTone: z.enum(CHAT_TONES).optional(),
     dmTone: z.enum(CHAT_TONES).optional(),
     openAt: z.enum(CHAT_OPEN_AT).optional(),
+    textSize: z
+      .enum(CHAT_TEXT_SIZES)
+      .optional()
+      .openapi({ description: "Tamanho do texto of the messages, smallest first; absent: `md`." }),
   })
   .openapi("ChatPrefs");
 
@@ -532,7 +537,20 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent", "repository"]),
+      type: z.enum([
+        "issue",
+        "memory",
+        "routine",
+        "channel",
+        "wiki_page",
+        "thread",
+        "skill",
+        "agent",
+        "repository",
+        "role",
+        "person",
+        "workspace",
+      ]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),

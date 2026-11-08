@@ -1,10 +1,10 @@
 import { useCreateDashboard, useMembers } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupedFooter, GroupedHeader, Locked, useTheme, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";

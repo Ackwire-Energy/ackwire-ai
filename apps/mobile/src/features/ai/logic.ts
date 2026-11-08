@@ -146,12 +146,13 @@ export interface ModelRow {
  */
 export function modelRows(
   t: TFunction,
-  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options">,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options"> & Partial<Pick<AgentBrain, "account" | "accounts">>,
   plan: CodingPlan | undefined,
 ): ModelRow[] {
   const option = view.options.find((o) => o.kind === view.brain);
   const chosen = brainModelChoice(view.brain, plan, view.effectiveModel ?? option?.defaultModel ?? "");
-  const models = brainModelChoices(plan, option?.models ?? []);
+  const provider = view.accounts?.find((a) => a.id === view.account)?.provider;
+  const models = brainModelChoices(plan, option?.models ?? [], provider);
   const cursorSays = view.brain === "cursor" && models.some((m) => m.inPlan);
   const rows: Omit<ModelRow, "checked">[] = [
     { value: AUTO, label: t("brain.auto.label"), sub: t("brain.auto.hint") },

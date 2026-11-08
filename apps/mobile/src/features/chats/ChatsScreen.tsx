@@ -1,15 +1,16 @@
-import { keys, useChannelCategories, useChannels } from "@agenteschat/client";
+import { keys, useArchivedChannels, useChannelCategories, useChannels } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, RefreshControl, StyleSheet } from "react-native";
 import { usePush } from "@/providers/push";
 import { GroupedRow, LargeTitleScreen, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";
@@ -91,6 +92,7 @@ function Home() {
   const categories = useChannelCategories(orgId);
   // An administrator reads every channel (ADR 0151): the ones they aren't in wait at the end of the home.
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
+  const archived = useArchivedChannels(orgId).data?.length ?? 0;
   const menus = useCategoryMenus();
   const [waitOpen, setWaitOpen] = useState(false);
 
@@ -239,6 +241,12 @@ function Home() {
             <GroupedRow key={o.id} icon="lock" label={`#${o.name}`} onPress={() => router.push(chatHref(o.id))} />
           ))}
         </CollapsibleSection>
+      ) : null}
+      {archived > 0 && !failed && !list.loading ? (
+        <SeeAllRow
+          label={t("channel.archivedCount", { count: archived })}
+          onPress={() => router.push("/archived-channels")}
+        />
       ) : null}
     </LargeTitleScreen>
   );

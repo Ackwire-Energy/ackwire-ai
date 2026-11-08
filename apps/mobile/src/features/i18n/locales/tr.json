@@ -69,6 +69,7 @@
     "copied": "Kopyalandı",
     "fullScreen": "Tam ekran",
     "wrap": "Satırları kaydır",
+    "raw": "Ham",
     "more": "{{count}} satırın tümünü gör",
     "gone": "Bu kod artık açık değil."
   },
@@ -1027,19 +1028,21 @@
       "file": "Dosya"
     },
     "more": "Diğer seçenekler",
-    "share": "Paylaş",
+    "send": "Gönder",
     "savePhotos": "Fotoğraflar'a kaydet",
     "drive": "Drive'da görüntüle",
     "saved": "Fotoğraflar'a kaydedildi",
     "photosDenied": "Fotoğraflar'a erişim yok",
     "photosDeniedSub": "Görselleri kaydetmek için Ayarlar'dan izin verin.",
-    "shareFailed": "Dosya paylaşılamadı.",
+    "shareFailed": "Dosya gönderilemedi.",
     "saveFailed": "Görsel kaydedilemedi.",
     "loadFailed": "Dosya açılamadı.",
     "openImage": "Görseli aç",
     "imageOf": "Görsel {{index}} / {{count}}",
     "place": "{{index}} / {{count}}",
-    "noPreview": "Bu dosya uygulamada açılmıyor. Başka bir uygulamada açmak için paylaşın.",
+    "previous": "Önceki görsel",
+    "next": "Sonraki görsel",
+    "noPreview": "Bu dosya uygulamada açılmıyor. Açmak için başka bir uygulamaya gönderin.",
     "video": {
       "play": "Oynat",
       "pause": "Duraklat",
@@ -1589,6 +1592,7 @@
     "everyoneFailed": "Herkesin erişimi değiştirilemedi. Tekrar deneyin.",
     "disconnectFailed": "{{name}} bağlantısı kesilemedi. Tekrar deneyin.",
     "needsReconnect": "{{name}} hesabı çalışmayı bıraktı. Biri yeniden bağlayana kadar ajanlar onu kullanamaz.",
+    "noTools": "{{name}} araçları okunamadı. Araçlar bölümünde yeniden okunana kadar ajanlar bunları kullanamaz.",
     "accountTitle": "Bu hesap",
     "renameFailed": "Yeniden adlandırılamadı. Tekrar deneyin.",
     "whoTitle": "Kim, ne kadar kullanıyor",
@@ -1717,7 +1721,7 @@
   },
   "crash": {
     "title": "Bu ekranda bir şeyler ters gitti",
-    "subtitle": "Uygulama bunu gösterirken bir hatayla karşılaştı. Tekrar deneyin. Devam ederse aşağıdaki metni bize gönderin.",
+    "subtitle": "Uygulama bunu gösterirken bir hatayla karşılaştı. Tekrar deneyin.",
     "retry": "Tekrar deneyin"
   },
   "notFound": {

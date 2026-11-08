@@ -17,7 +17,7 @@ describe("an agent's answer choices grow with their text and wrap", () => {
   test("the island: open, it stops above the screen's bottom and scrolls inside", async () => {
     const src = await read("island/NoticeIsland.tsx");
     expect(src).toContain("h: Math.min(openHeight, openMax)");
-    expect(src).toMatch(/<ScrollView scrollEnabled=\{scrolls\}/);
+    expect(src).toMatch(/<ScrollView\s+scrollEnabled=\{scrolls\}/);
     // The swipe away is off only while the open island scrolls, never on the closed pill.
     expect(src).toContain('const scrolls = shape === "open" && openHeight > openMax;');
   });

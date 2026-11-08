@@ -245,26 +245,38 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
   },
   approvals: {
     title: "Approvals",
-    summary: "Nothing sensitive happens without a person.",
+    summary: "Sensitive actions wait for a person, once or for good.",
     sections: [
       {
         id: "what",
         heading: "What asks first",
         blocks: [
-          "When an agent wants to merge, deploy, roll back, send something outside or delete data, it asks first, whatever access it has. The request shows up in **Approvals** and in the channel, with the exact action and why.",
+          "When an agent wants to merge, deploy, roll back, send something outside or delete data, it asks first, whatever access it has. The request shows up in **Approvals** and in the conversation, with the exact action and why.",
         ],
       },
       {
-        id: "exact",
-        heading: "One approval, one action",
+        id: "always",
+        heading: "Once, or always",
         blocks: [
-          "Each approval covers one exact action, with its values. If the agent changes anything, it has to ask again.",
+          "Approving covers one exact action, with its values. If the agent changes anything, it asks again.",
+          "**Always approve** lets the agent do that kind of action from now on, with any values, without asking. On a routine's request, **Always in this routine** does the same for that routine only. Neither is offered for merge, deploy, roll back and the like. To undo it, go to **Tools and access** on the agent's page, or to the routine's settings.",
         ],
       },
       {
         id: "who",
         heading: "Who approves",
-        blocks: ["The agent's owner approves its requests. For an agent without an owner, the admins do."],
+        blocks: [
+          {
+            list: [
+              "The agent's owner, for its requests.",
+              "Anyone whose role has **Approve agents' actions**, for every agent.",
+              "The people an agent names when it asks, in place of its owner.",
+              "Whoever covers someone in **Who approves for me**, for what is asked of that person. Merge, deploy and other risky actions only when that's turned on.",
+            ],
+          },
+          "An action in someone's own mailbox waits for that person alone. New access for an agent waits for those who manage agents.",
+          "Lodi, your right hand, can also approve for you the new agents other agents propose and changes to an agent's model, budget and channels, only when you asked for them. Who covers you and what Lodi approves are chosen in **Settings\u00a0›\u00a0You\u00a0›\u00a0Approvals**.",
+        ],
       },
       {
         id: "refusing",

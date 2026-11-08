@@ -1544,12 +1544,44 @@ export function NotificationsPage() {
     onDraft: (n, text) => setDrafts((d) => ({ ...d, [n.id]: text })),
   };
 
-  // J/K (and arrows) move, E done, R reply, Enter opens, Escape closes the composer.
+  // J/K (and arrows) move, E done, R reply, Enter opens, Escape closes the composer; Atalhos' rows press the same keys.
   const keyState = useRef({ items, cur, replying, handlers });
   keyState.current = { items, cur, replying, handlers };
+  /** A key on `here` (or the current item); false when it means nothing there. */
+  const pressKey = useCallback((key: string, here: HTMLElement | null, newTab = false) => {
+    const { items: all, cur: current, handlers: h } = keyState.current;
+    const at = here ?? (current ? element(current) : null);
+    if (key === "j" || key === "k" || key === "arrowdown" || key === "arrowup") {
+      const rows = [...document.querySelectorAll<HTMLElement>(".nt [data-n]")];
+      const i = at ? rows.indexOf(at) : -1;
+      const down = key === "j" || key === "arrowdown";
+      const next = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (down ? 1 : -1)))];
+      if (next?.dataset.n) {
+        setCur(next.dataset.n);
+        next.focus({ preventScroll: true });
+        next.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      }
+      return true;
+    }
+    const n = all.find((x) => x.id === at?.dataset.n);
+    if (!n) return false;
+    if (key === "e") h.onDone(n);
+    else if (key === "r") h.onReply(n);
+    else if (key === "enter") {
+      if (newTab) h.onOpenNew(n);
+      else h.onOpen(n);
+    } else return false;
+    return true;
+  }, []);
+  // Atalhos' Mover moved the cursor: the row takes the focus the closing menu would give back to its button.
+  const movedByMenu = useRef(false);
+  const menuPress = (key: string) => {
+    movedByMenu.current = key === "j";
+    pressKey(key, null);
+  };
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      const { items: all, cur: current, replying: open, handlers: h } = keyState.current;
+      const { cur: current, replying: open, handlers: h } = keyState.current;
       const target = e.target instanceof Element ? e.target : null;
       if (e.key === "Escape" && open) {
         h.onCancel();
@@ -1560,38 +1592,15 @@ export function NotificationsPage() {
       const newTab = e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.altKey;
       if ((e.metaKey || e.ctrlKey || e.altKey) && !newTab) return;
       if (target?.closest("button") && (e.key === "Enter" || e.key === " ")) return;
-      const rows = [...document.querySelectorAll<HTMLElement>(".nt [data-n]")];
       const here = target?.closest<HTMLElement>("[data-n]") ?? (current ? element(current) : null);
       const key = e.key.toLowerCase();
-      if (key === "j" || key === "k" || ((e.key === "ArrowDown" || e.key === "ArrowUp") && here)) {
-        e.preventDefault();
-        const i = here ? rows.indexOf(here) : -1;
-        const down = key === "j" || e.key === "ArrowDown";
-        const next = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (down ? 1 : -1)))];
-        if (next?.dataset.n) {
-          setCur(next.dataset.n);
-          next.focus({ preventScroll: true });
-          next.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
-        }
-        return;
-      }
-      const n = all.find((x) => x.id === here?.dataset.n);
-      if (!n) return;
-      if (key === "e") {
-        e.preventDefault();
-        h.onDone(n);
-      } else if (key === "r") {
-        e.preventDefault();
-        h.onReply(n);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (newTab) h.onOpenNew(n);
-        else h.onOpen(n);
-      }
+      // Arrows move only from an item; J and K from anywhere on the page.
+      if ((key === "arrowdown" || key === "arrowup") && !here) return;
+      if (pressKey(key, here, newTab)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [pressKey]);
 
   const stateOf = (n: AppNotification): RowState => ({
     cur: cur === n.id,
@@ -1614,6 +1623,8 @@ export function NotificationsPage() {
         .filter(Boolean)
         .join(" · ");
   const calmLook = lookOf(dir.agents[0]) ?? true;
+  // What the keys act on: Atalhos' rows other than moving wait for one.
+  const onCur = cur !== null && items.some((x) => x.id === cur);
 
   return (
     <div className="page page--list nt">
@@ -1626,6 +1637,11 @@ export function NotificationsPage() {
             <Menu
               align="end"
               label={t("notifications.keys.title")}
+              onClosed={() => {
+                const moved = movedByMenu.current ? keyState.current.cur : null;
+                if (moved) element(moved)?.focus({ preventScroll: true });
+                movedByMenu.current = false;
+              }}
               trigger={
                 <Button variant="ghost" className="nt-keys-btn">
                   {t("notifications.keys.title")}
@@ -1633,16 +1649,16 @@ export function NotificationsPage() {
               }
             >
               <MenuHeading>{t("notifications.keys.title")}</MenuHeading>
-              <MenuItem hint="J · K" onSelect={() => {}}>
+              <MenuItem hint="J · K" disabled={items.length === 0} onSelect={() => menuPress("j")}>
                 {t("notifications.keys.move")}
               </MenuItem>
-              <MenuItem hint="E" onSelect={() => {}}>
+              <MenuItem hint="E" disabled={!onCur} onSelect={() => menuPress("e")}>
                 {t("notifications.keys.done")}
               </MenuItem>
-              <MenuItem hint="R" onSelect={() => {}}>
+              <MenuItem hint="R" disabled={!onCur} onSelect={() => menuPress("r")}>
                 {t("notifications.keys.reply")}
               </MenuItem>
-              <MenuItem hint="↵" onSelect={() => {}}>
+              <MenuItem hint="↵" disabled={!onCur} onSelect={() => menuPress("enter")}>
                 {t("notifications.keys.open")}
               </MenuItem>
             </Menu>

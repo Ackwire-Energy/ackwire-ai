@@ -67,6 +67,7 @@
     "copied": "Disalin",
     "fullScreen": "Layar penuh",
     "wrap": "Bungkus baris",
+    "raw": "Asli",
     "more": "Lihat semua {{count}} baris",
     "gone": "Kode ini sudah tidak terbuka."
   },
@@ -953,19 +954,21 @@
       "file": "File"
     },
     "more": "Opsi lainnya",
-    "share": "Bagikan",
+    "send": "Kirim",
     "savePhotos": "Simpan ke Foto",
     "drive": "Lihat di Drive",
     "saved": "Tersimpan di Foto",
     "photosDenied": "Tidak ada akses ke Foto",
     "photosDeniedSub": "Izinkan di Pengaturan untuk menyimpan gambar.",
-    "shareFailed": "Tidak bisa membagikan file.",
+    "shareFailed": "File tidak bisa dikirim.",
     "saveFailed": "Tidak bisa menyimpan gambar.",
     "loadFailed": "Tidak bisa membuka file.",
     "openImage": "Buka gambar",
     "imageOf": "Gambar {{index}} dari {{count}}",
     "place": "{{index}} dari {{count}}",
-    "noPreview": "File ini tidak bisa dibuka di aplikasi. Bagikan untuk membukanya di aplikasi lain.",
+    "previous": "Gambar sebelumnya",
+    "next": "Gambar berikutnya",
+    "noPreview": "File ini tidak bisa dibuka di aplikasi. Kirim ke aplikasi lain untuk membukanya.",
     "video": {
       "play": "Putar",
       "pause": "Jeda",
@@ -1497,6 +1500,7 @@
     "everyoneFailed": "Tidak bisa mengubah akses semua orang. Coba lagi.",
     "disconnectFailed": "Tidak bisa memutus {{name}}. Coba lagi.",
     "needsReconnect": "Akun {{name}} berhenti berfungsi. Agen tidak bisa memakainya sampai ada yang menghubungkannya lagi.",
+    "noTools": "Alat dari {{name}} tidak bisa dibaca. Agen tidak bisa memakainya sampai dibaca lagi, di Alat.",
     "accountTitle": "Akun ini",
     "renameFailed": "Tidak bisa mengganti nama. Coba lagi.",
     "whoTitle": "Siapa yang memakainya dan sejauh mana",
@@ -1621,7 +1625,7 @@
   },
   "crash": {
     "title": "Ada yang salah di layar ini",
-    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi. Jika terus terjadi, kirimkan teks di bawah ke kami.",
+    "subtitle": "Aplikasi mengalami galat saat menampilkan ini. Coba lagi.",
     "retry": "Coba lagi"
   },
   "notFound": {

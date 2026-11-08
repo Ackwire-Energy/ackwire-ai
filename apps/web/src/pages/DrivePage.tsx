@@ -1,8 +1,7 @@
 import type { Artifact, ArtifactFilters, ArtifactKind } from "@agenteschat/client";
 import { useArtifacts, useChannels } from "@agenteschat/client";
-import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { ARTIFACT_KINDS, KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import {
-  byWho,
   DRIVE_GROUPS,
   DRIVE_SORTS,
   type DriveGroup,
@@ -12,10 +11,11 @@ import {
   type DriveWho,
   driveSections,
   isDriveView,
+  onlyItsConversation,
   PRIVATE_SECTION,
   rangeOf,
-  sortArtifacts,
 } from "@agenteschat/client/lib/drive";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
@@ -40,6 +40,7 @@ import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { useFileShare } from "@/components/artifacts/ShareDialog";
 import { UploadButton, useDriveUpload } from "@/components/artifacts/Upload";
 import { DriveDetails } from "@/components/drive/DriveDetails";
 import { DriveCard, DriveRow, type ItemProps } from "@/components/drive/DriveItems";
@@ -54,12 +55,11 @@ import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./drive.css";
+import { typingInField } from "@/lib/keys";
 
 /** Authors shown on a channel's group header. */
 const STACK_MAX = 5;
 
-const typing = (el: Element | null) =>
-  el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 /** A menu, listbox or dialog is open: Esc and shortcuts are theirs. */
 const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]'));
 
@@ -69,7 +69,7 @@ const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="li
  * panel, multi-select with a floating bar, drop to upload and the trash.
  */
 export function DrivePage({ open }: { open?: { id: string; version?: number } }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const look = useRightHandLook();
   const uploads = can(org, "upload_files");
@@ -79,6 +79,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const channels = useChannels(org.id);
   const toast = useToast();
   const downloads = useArtifactDownload();
+  const share = useFileShare();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [q, setQ] = useState("");
@@ -106,22 +107,22 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const [uploadsHidden, setUploadsHidden] = useState(false);
 
   const search = useDeferredValue(q.trim());
-  // One value of a filter goes to the server; several are matched here.
-  const baseFilters = useMemo<ArtifactFilters>(() => {
+  // Every filter and the order go to the server, so each looks at all the files, not the pages loaded.
+  const filters = useMemo<ArtifactFilters>(() => {
     const f: ArtifactFilters = {};
     if (search) f.q = search;
-    if (channelIds.length === 1) f.channelId = channelIds[0];
-    const [type, id] = (authors.length === 1 ? (authors[0] ?? "") : "").split(":");
-    if ((type === "agent" || type === "person") && id) f.author = { type, id };
+    if (kinds.length > 0) f.kinds = kinds;
+    if (channelIds.length > 0) f.channelIds = channelIds;
+    const picked = authors.flatMap((key) => {
+      const [type, id] = key.split(":");
+      return (type === "agent" || type === "person") && id ? [{ type, id } as const] : [];
+    });
+    if (picked.length > 0) f.authors = picked;
+    if (who !== "all") f.who = who;
+    if (sort !== "recent") f.sort = sort;
     return f;
-  }, [search, channelIds, authors]);
-  const filters = useMemo<ArtifactFilters>(() => {
-    const k = kinds.length === 1 ? kinds[0] : undefined;
-    return k && isArtifactKind(k) ? { ...baseFilters, kind: k } : baseFilters;
-  }, [baseFilters, kinds]);
+  }, [search, kinds, channelIds, authors, who, sort]);
   const list = useArtifacts(org.id, filters);
-  // Without the kind: the counts on the kind chips (the same query when no single kind is picked).
-  const base = useArtifacts(org.id, baseFilters);
 
   const remover = useDeleteArtifact((ids) => {
     setSelected((s) => new Set([...s].filter((id) => !ids.includes(id))));
@@ -148,28 +149,21 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     a.audience.kind === "channel"
       ? `#${a.audience.name}`
       : a.audience.kind === "dm"
-        ? a.audience.with
-          ? t("drive.dmWith", { name: authorName(a.audience.with) })
-          : t("drive.dm")
+        ? a.audience.between
+          ? t("drive.dmBetween", { names: joinNames(a.audience.between.map(authorName), t) })
+          : a.audience.with
+            ? t("drive.dmWith", { name: authorName(a.audience.with) })
+            : t("drive.dm")
         : t("artifacts.noChannel");
 
-  /** The client-side filters (who made it, several channels or authors). */
-  const matches = (a: Artifact) =>
-    byWho(a, who) &&
-    (channelIds.length < 2 || (a.channelId !== null && channelIds.includes(a.channelId))) &&
-    (authors.length < 2 ||
-      authors.some(
-        (x) => x === `${a.createdBy.type}:${a.createdBy.id}` || x === `${a.updatedBy.type}:${a.updatedBy.id}`,
-      ));
-  const rows = sortArtifacts(
-    (list.data ?? []).filter((a) => matches(a) && (kinds.length < 2 || kinds.includes(a.kind))),
-    sort,
-    i18n.language,
-  );
+  const rows = list.artifacts ?? [];
   const sections = driveSections(rows, group);
   const shown = sections.flatMap((s) => s.items);
-  const counts = new Map<ArtifactKind, number>();
-  for (const a of base.data ?? []) if (matches(a)) counts.set(a.kind, (counts.get(a.kind) ?? 0) + 1);
+  const counts = new Map(Object.entries(list.counts ?? {}) as [ArtifactKind, number][]);
+  // All the files these filters find, beyond the pages loaded (an older server sends no counts).
+  const total = list.counts
+    ? [...counts].reduce((n, [k, c]) => (kinds.length === 0 || kinds.includes(k) ? n + c : n), 0)
+    : rows.length;
 
   const filtered = Boolean(search) || kinds.length > 0 || channelIds.length > 0 || authors.length > 0 || who !== "all";
   const clearFilters = () => {
@@ -219,12 +213,12 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
       if (s.trashOpen || layerOpen()) return;
       const active = document.activeElement;
       if (e.key === "Escape") {
-        if (typing(active)) return;
+        if (typingInField(active)) return;
         // The details dialog closes itself on Esc; here Esc clears the selection.
         if (s.selected.size > 0) setSelected(new Set());
         return;
       }
-      if (typing(active) || e.altKey) return;
+      if (typingInField(active) || e.altKey) return;
       if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         searchRef.current?.focus();
@@ -244,7 +238,11 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     await navigator.clipboard?.writeText(
       picked.map((a) => artifactLink(window.location.origin, org.id, a.id)).join("\n"),
     );
-    toast.show(t("drive.linksCopied", { count: picked.length }));
+    // The share dialog's rule, for many at once: say which links only their conversation opens, with the way to share.
+    const closed = picked.find(onlyItsConversation);
+    if (closed) {
+      toast.show(t("share.someOnlyHere"), "info", { label: t("share.button"), run: () => share.open(closed) });
+    } else toast.show(t("drive.linksCopied", { count: picked.length }));
   };
   const deletable = picked.filter((a) => a.canDelete);
 
@@ -372,6 +370,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
 
         {trashOpen && <DriveTrash />}
         {remover.dialog}
+        {share.dialog}
 
         {!trashOpen && (
           <>
@@ -548,7 +547,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
 
             {filtered && list.isSuccess && rows.length > 0 && (
               <div className="drive-summary">
-                <span>{t("drive.count", { count: rows.length })}</span>
+                <span>{t("drive.count", { count: total })}</span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -639,6 +638,14 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                     </ul>
                   </section>
                 ))}
+              </div>
+            )}
+
+            {list.hasNextPage && rows.length > 0 && (
+              <div className="drive-more">
+                <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
+                  {t("drive.loadMore")}
+                </Button>
               </div>
             )}
 

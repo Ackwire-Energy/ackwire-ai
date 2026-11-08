@@ -501,7 +501,8 @@ function lineDetail(t: TFunction, l: ToolLine): ReactNode | undefined {
       </>
     );
   if (printed) return <Plate rows={[{ text: printed, danger: l.state === "fail" }]} />;
-  const answer = l.result ?? toolWhy(t, l);
+  // What the tool answered, its own words when it failed: only in the open view, never under the line.
+  const answer = l.result ?? toolWhy(t, l) ?? l.why;
   if (!l.input && !answer) return undefined;
   return (
     <Plate

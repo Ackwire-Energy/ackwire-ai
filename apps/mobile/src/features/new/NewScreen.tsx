@@ -1,5 +1,5 @@
 import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BackHandler, Keyboard, StyleSheet, type TextInputInstance, View } from "react-native";
@@ -17,6 +17,7 @@ import {
   useReducedMotion,
   useTheme,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { busyAgents } from "../agents/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useMeId } from "../shared/hooks";

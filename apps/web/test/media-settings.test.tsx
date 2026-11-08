@@ -68,6 +68,19 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     );
   });
 
+  test("a press on a switch line's words toggles it, as a press on a line that opens something opens it", async () => {
+    const { state } = await go();
+    const words = [...document.querySelectorAll(".settings-row__label")].find((e) => e.textContent === "GIFs");
+    if (!words) throw new Error("no GIFs line");
+    await click(words);
+    expect(lastSettings(state)).toEqual({ gifs: false });
+    // A line whose control is a choice of several stays as it was: its words pick nothing.
+    const rating = [...document.querySelectorAll(".settings-row__label")].find((e) =>
+      e.closest(".settings-row")?.querySelector('[role="radio"]'),
+    );
+    expect(rating?.closest("label")).toBeNull();
+  });
+
   test("members don't open it: the workspace's switches are for who configures it", async () => {
     const { state } = await go(asMember());
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });

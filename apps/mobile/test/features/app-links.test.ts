@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { APP_PAGES, appPagePath } from "@agenteschat/client/lib/app-pages";
 import { APP_LINK_PATHS, APP_LINK_WEB_QUERIES } from "../../../server/src/app-links";
 import { APP_LINK_PATTERNS } from "../../app.config";
 import {
   appLinkFromUrl,
   linkWorkspace,
+  ownLinkHref,
   resolveLink,
   SETTINGS_SCREENS,
   WEB_ONLY_QUERIES,
@@ -34,6 +36,14 @@ describe("web addresses → the app's screens", () => {
     expect(linkOf(`${W}/org/${O}/dm/person/u1`)).toEqual({ org: O, person: "u1" });
     expect(linkOf(`${W}/org/${O}/threads/t1?m=m3`)).toEqual({ org: O, thread: "t1", m: "m3" });
     expect(linkOf(`${W}/org/${O}/threads?open=t2`)).toEqual({ org: O, thread: "t2" });
+  });
+
+  test("a file's link (the share dialog's Copiar link) opens the file itself, at its version when named", () => {
+    const to = (path: string) => (linkOf(`${W}/org/${O}${path}`) as { to?: string }).to;
+    expect(to("/drive?artifact=a1")).toBe("/file/a1");
+    expect(to("/drive?artifact=a1&v=3")).toBe("/file/a1?v=3");
+    expect(to("/drive?artifact=a1&v=x")).toBe("/file/a1");
+    expect(to("/drive?artifact=..%2Fsettings")).toBe("/drive");
   });
 
   test("a conversation with a thread in its panel opens that thread's screen, at its message", () => {
@@ -74,6 +84,33 @@ describe("web addresses → the app's screens", () => {
     expect(to("/settings/computers")).toBe("/settings/computers");
     expect(to("/settings/computers/k1")).toBe("/settings/computers/k1");
     expect(to("/settings/account")).toBe("/me/account");
+    expect(to("/settings/approvals")).toBe("/me/approvals");
+    expect(to("/settings/right_hand")).toBe("/settings/right-hand");
+    expect(to("/settings/roles")).toBe("/settings/roles");
+    expect(to("/settings/vault")).toBe("/settings/vault");
+    expect(to("/settings/about")).toBe("/me/about");
+    expect(to("/task-manager")).toBe("/task-manager");
+    expect(to("/task-manager?task=r1")).toBe("/task-manager/r1");
+  });
+
+  test("an Abrir card opens the app's own screen wherever the app has the page, the website only where it hasn't", () => {
+    const ids = { agentId: "a1", channelId: "c1" };
+    for (const [id, page] of Object.entries(APP_PAGES)) {
+      const link = appLinkFromUrl(`${W}/org/${O}${appPagePath(page.web, ids)}`);
+      expect([id, page.phone !== null]).toEqual([id, link !== null && "href" in link]);
+    }
+  });
+
+  test("a link in a message to a page of this server opens the app's screen; any other site stays a web page", () => {
+    expect(ownLinkHref(`${W}/org/${O}/settings/roles`, W)).toBe(
+      `/link?org=${O}&web=${encodeURIComponent(`/org/${O}/settings/roles`)}&to=${encodeURIComponent("/settings/roles")}`,
+    );
+    expect(ownLinkHref(`${W}/org/${O}/routines?open=r1`, `${W}/`)).toContain(
+      `to=${encodeURIComponent("/routines/r1")}`,
+    );
+    expect(ownLinkHref(`${W}/org/${O}/settings/billing`, W)).toBeNull();
+    expect(ownLinkHref(`https://example.com/org/${O}/settings/roles`, W)).toBeNull();
+    expect(ownLinkHref("not a link", W)).toBeNull();
   });
 
   test("invitations, password resets and sign-ups keep their own paths", () => {
@@ -114,11 +151,11 @@ describe("web addresses → the app's screens", () => {
       const link = appLinkFromUrl(sample(pattern));
       expect([pattern, link && "href" in link]).toEqual([pattern, true]);
     }
-    // Settings sections one by one (billing, roles, voice stay the website's, on Android too), all the app has.
-    expect(APP_LINK_PATHS.filter((p) => /^\/org\/\*\/settings\/[a-z]+$/.test(p)).map((p) => p.split("/")[4])).toEqual(
+    // Settings sections one by one (billing and voice stay the website's, on Android too), all the app has.
+    expect(APP_LINK_PATHS.filter((p) => /^\/org\/\*\/settings\/[a-z_]+$/.test(p)).map((p) => p.split("/")[4])).toEqual(
       Object.keys(SETTINGS_SCREENS),
     );
-    expect(APP_LINK_PATHS.some((p) => /settings\/(\*|billing|roles|voice)/.test(p))).toBe(false);
+    expect(APP_LINK_PATHS.some((p) => /settings\/(\*|billing|voice)/.test(p))).toBe(false);
     expect(WEB_ONLY_QUERIES).toEqual(APP_LINK_WEB_QUERIES);
   });
 });

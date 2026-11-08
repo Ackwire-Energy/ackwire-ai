@@ -58,6 +58,7 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
+import { CalendarProposalCardView } from "@/components/calendar/ProposalCard";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
@@ -68,6 +69,7 @@ import {
   MemberChangesCardView,
   OpenPageCardView,
   SettingsProposalCardView,
+  WorkspaceActionCardView,
 } from "@/components/RightHandCards";
 import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
@@ -118,6 +120,15 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "approvals") return <ApprovalsCardView message={message} card={card} />;
   if (card.kind === "member_changes") return <MemberChangesCardView message={message} card={card} />;
   if (card.kind === "open_page") return <OpenPageCardView card={card} />;
+  if (card.kind === "workspace_action")
+    return (
+      <WorkspaceActionCardView
+        where={{ messageId: message.id, channelId: message.channelId }}
+        agentId={message.author.id ?? null}
+        card={card}
+        actions={message.actions}
+      />
+    );
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
   if (card.kind === "person_limit") return <PersonLimitCardView message={message} card={card} />;
@@ -127,6 +138,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "update_skills") return <UpdateSkillsCardView message={message} card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   if (card.kind === "team_week") return <TeamWeekCardView message={message} card={card} />;
+  if (card.kind === "calendar_proposal") return <CalendarProposalCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
@@ -243,7 +255,7 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const may = can(org, "manage_agents");
-  const skills = useSkills(org.id, may);
+  const skills = useSkills(org.id);
   const [open, setOpen] = useState(false);
   const title = t("actionCard.install_skill.title");
   if (installSkillDone(card, skills.data ?? [])) {

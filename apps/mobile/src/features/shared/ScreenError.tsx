@@ -11,7 +11,7 @@ import { MONO } from "./parts";
 /**
  * A screen that broke while drawing (an error thrown in render or in an effect), in place of the app closing:
  * what happened in two lines, "Tentar de novo" (draws it again), and the error's own words, small and
- * selectable, for whoever reports it. Errors outside drawing (a tap's handler) still end the app.
+ * selectable. Errors outside drawing (a tap's handler) still end the app.
  */
 export function ScreenError({ error, retry }: ErrorBoundaryProps) {
   const { t } = useTranslation();

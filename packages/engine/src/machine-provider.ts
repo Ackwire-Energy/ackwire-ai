@@ -20,6 +20,7 @@ import {
 import { ARTIFACT_LIMITS } from "./artifacts";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
+import { runnerUpdateWay } from "./runner-update";
 
 /** Provider id of connected machines; their computer id is the machine id. */
 export const MACHINE_PROVIDER_ID = "machine";
@@ -215,7 +216,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       const status = await hub.status(id);
       if (status && status.protocol < SECRETS_PROTOCOL) {
         throw new Error(
-          `The runner on the computer ${status.name} is too old to keep secrets. Tell the person: its owner should update it with \`agentes-runner update\`.`,
+          `The runner on the computer ${status.name} is too old to keep secrets. ${runnerUpdateWay(status)}`,
         );
       }
       if (
@@ -224,7 +225,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
         (request.action === "keypair" || request.action === "deliver" || request.action === "activate")
       ) {
         throw new Error(
-          `The runner on the computer ${status.name} is too old for safe secret delivery. Its owner should update it with \`agentes-runner update\`.`,
+          `The runner on the computer ${status.name} is too old for safe secret delivery. ${runnerUpdateWay(status)}`,
         );
       }
       try {
@@ -271,15 +272,14 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
 }
 
 /** What a computer too old for `pull` answers for a file past what a `write` carries. */
-export const pullUpdateText = (status: Pick<MachineStatus, "name" | "kind">) =>
+export const pullUpdateText = (status: Pick<MachineStatus, "name" | "kind" | "executors">) =>
   vaultUpdateText(status, `receive files over ${MB(MAX_INLINE_FILE_BYTES)}`);
 
-/**
- * What a computer too old for the Vault answers (ADR 0144): its owner updates the runner, or the workspace's own
- * computer updates by itself (its runner refuses `agentes-runner update`).
- */
-export const vaultUpdateText = (status: { name: string; kind?: MachineStatus["kind"] }, what: string) =>
-  `The computer ${status.name} needs an update to ${what}. ${status.kind === "managed" ? "It updates by itself, so try again later." : "Its owner can run `agentes-runner update`."}`;
+/** What a computer too old for the Vault answers (ADR 0144), with how it gets its update (`runnerUpdateWay`). */
+export const vaultUpdateText = (
+  status: { name: string; kind?: MachineStatus["kind"]; executors?: { mode?: string } | null },
+  what: string,
+) => `The computer ${status.name} needs an update to ${what}. ${runnerUpdateWay(status)}`;
 
 /** A one-use key on the agent's computer (ADR 0144, protocol 45): a Vault value is sealed to it, never sent bare. */
 export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };

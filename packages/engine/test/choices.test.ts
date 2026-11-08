@@ -122,9 +122,53 @@ test("a claim whose message never went out (a crash in between) stops holding th
 test("a pick must name one option of each question", async () => {
   f = await setup({ blockTools: true, reply: agent });
   const row = await asked();
-  for (const picks of [[], [2], [0, 1], [-1], [0.5]])
+  for (const picks of [[], [2], [0, 1], [-1], [0.5], [3]])
     await expect(answerChoices(deps(), f.owner.id, f.org.id, row.id, { picks })).rejects.toThrow(ValidationError);
+  // "Outra resposta" (the pick past the last option) needs its words, and not too many.
+  for (const others of [[""], ["   "], [null], ["x".repeat(1001)]])
+    await expect(answerChoices(deps(), f.owner.id, f.org.id, row.id, { picks: [2], others })).rejects.toThrow(
+      ValidationError,
+    );
   expect((await getChoices(f.artifactDeps, f.owner.id, f.org.id, row.id)).answer).toBeNull();
+});
+
+test("Outra resposta: what the person wrote reaches the agent in place of an option, and the card shows it", async () => {
+  f = await setup({ blockTools: true, reply: agent });
+  const row = await asked();
+  const { message, choices } = await answerChoices(deps(), f.owner.id, f.org.id, row.id, {
+    picks: [2],
+    others: ["  Só depois da reunião de sexta  "],
+  });
+  expect(message.body).toBe("@dev Como sigo com o deploy? Só depois da reunião de sexta");
+  expect(message.meta.choiceReply).toEqual({ id: row.id, title: "Deploy", others: ["Só depois da reunião de sexta"] });
+  expect(choices.answer).toMatchObject({ picks: [2], others: ["Só depois da reunião de sexta"] });
+  // Anyone opening the card later reads it too.
+  const later = await getChoices(f.artifactDeps, f.owner.id, f.org.id, row.id);
+  expect(later.answer?.others).toEqual(["Só depois da reunião de sexta"]);
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, message.id));
+  expect(run?.agentId).toBe(f.agent.id);
+});
+
+test("an option an agent wrote that only says other goes: every question takes a written answer of its own", () => {
+  const card = validateContent({
+    kind: "choices",
+    questions: [
+      { question: "Qual cor?", options: [{ label: "Azul" }, { label: "Verde" }, { label: "Outra" }] },
+      { question: "Quem?", options: [{ label: "Ana" }, { label: "Other (write it)", description: "Diga quem" }] },
+      { question: "Onde?", options: [{ label: "Outra cidade" }, { label: "Aqui" }] },
+    ],
+  });
+  expect(card).toEqual({
+    kind: "choices",
+    questions: [
+      { question: "Qual cor?", options: [{ label: "Azul" }, { label: "Verde" }] },
+      { question: "Quem?", options: [{ label: "Ana" }] },
+      { question: "Onde?", options: [{ label: "Outra cidade" }, { label: "Aqui" }] },
+    ],
+  });
+  expect(choiceReplyText([{ question: "Qual cor?", options: [{ label: "Azul" }] }], [1], ["Vermelho"])).toBe(
+    "Qual cor? Vermelho",
+  );
 });
 
 test("several questions reach the agent one per line; a bad card is refused", () => {

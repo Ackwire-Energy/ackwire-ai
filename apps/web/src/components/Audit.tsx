@@ -18,10 +18,12 @@ import {
   auditSentence,
   auditStr,
   auditSubLine,
+  auditToolSaid,
   auditValueText,
   auditWhere,
   TOOL_CALL,
 } from "@agenteschat/client/lib/audit";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { dayLabel, formatTime, whenAt } from "@agenteschat/client/lib/format";
 import {
   Button,
@@ -215,7 +217,7 @@ const MARK_ICON: Record<AuditMark, ChipProps["icon"]> = {
 function OutcomeChip({ row }: { row: AuditRow }) {
   const { t } = useTranslation();
   const look = auditOutcome(t, row);
-  if (!look) return <span />;
+  if (!look) return null;
   const tone = look.mood === "done" || look.mood === "waiting" ? look.mood : undefined;
   const mood = look.mood === "refused" || look.mood === "failed" ? `audit-chip--${look.mood}` : undefined;
   return (
@@ -281,6 +283,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
   const input = isCall ? (row.details.input as Record<string, unknown> | undefined) : undefined;
   const changeDetails = isCall ? undefined : auditDetailEntries(row.details);
   const reasonKey = auditReasonKey(row);
+  const said = auditToolSaid(row);
 
   return (
     <SidePanel className="audit-panel" label={t("audit.panel.label")} onClose={onClose}>
@@ -290,7 +293,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
         </span>
         <div className="thread-head__text">
           <h1 className="channel__title thread-title">
-            <span className="thread-title__text">{auditHint(row) ?? auditPhrase(t, row)}</span>
+            <span className="thread-title__text">{auditHint(t, row) ?? auditPhrase(t, row)}</span>
           </h1>
           <span className="channel__topic thread-head__meta">
             <span className="thread-head__where">{name}</span>
@@ -374,6 +377,12 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
                 <dd>{auditStr(row.details.kind)}</dd>
               </>
             )}
+            {said && (
+              <>
+                <dt>{t("audit.panel.techSaid")}</dt>
+                <dd>{said}</dd>
+              </>
+            )}
             {row.runId && (
               <>
                 <dt>{t("audit.panel.techRun")}</dt>
@@ -414,7 +423,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
     <dl className="audit-kv">
       {entries.map(([k, v]) => (
         <div key={k}>
-          <dt>{k}</dt>
+          <dt>{humanize(k)}</dt>
           <dd>
             {v === AUDIT_HIDDEN ? (
               <span className="audit-kv__hidden">

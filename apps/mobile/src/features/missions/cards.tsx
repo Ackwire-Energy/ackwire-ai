@@ -14,7 +14,6 @@ import {
 } from "@agenteschat/client";
 import { plainInline } from "@agenteschat/client/lib/markdown";
 import { lastLines } from "@agenteschat/client/lib/missions";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import {
@@ -30,6 +29,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { FoldedBody } from "../chat/FoldedBody";
 import { useCardTop } from "../chat/look";
 import { AgentFace } from "../shared/Face";

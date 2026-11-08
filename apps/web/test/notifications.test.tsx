@@ -321,6 +321,31 @@ describe("Notificações", () => {
     expect(document.body.textContent).toContain("Ada recebeu sua resposta");
   });
 
+  test("Atalhos: each row does what its key does, on the notification the keys are on", async () => {
+    const { state } = await go();
+    const openKeys = async () => {
+      const trigger = screen().getByRole("button", { name: "Atalhos" });
+      trigger.focus();
+      await act(async () => {
+        fireEvent.keyDown(trigger, { key: "Enter" });
+        fireEvent.keyUp(trigger, { key: "Enter" });
+      });
+      await settle(2);
+      return within(screen().getByRole("menu"));
+    };
+    // Nothing is current yet: only moving does something.
+    let menu = await openKeys();
+    expect(menu.getByRole("menuitem", { name: /Marcar como feita/ }).getAttribute("aria-disabled")).toBe("true");
+    await click(menu.getByRole("menuitem", { name: /Mover entre as notificações/ }));
+    menu = await openKeys();
+    await click(menu.getByRole("menuitem", { name: /Mover entre as notificações/ }));
+    expect((document.querySelector(".nt [data-n].is-cur") as HTMLElement | null)?.dataset.n).toBe("n-thread");
+    menu = await openKeys();
+    await click(menu.getByRole("menuitem", { name: /Marcar como feita/ }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "notifications.done")?.args[1]).toBe("n-thread");
+  });
+
   test("keys: J moves, E marks done; Lembrar depois snoozes until a local time", async () => {
     const { state } = await go();
     await key(window, "j");

@@ -16,6 +16,8 @@ import type {
   ArtifactAuthor,
   ArtifactContent,
   ArtifactDetail,
+  ArtifactFilters,
+  ArtifactKind,
   ArtifactVersion,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -169,13 +171,20 @@ export function createMockArtifacts(
     if (!s) throw new MockNotFoundError("Arquivo não encontrado.");
     return s;
   };
-  const view = async (orgId: string, s: Stored): Promise<Artifact> => ({
-    canDelete: true,
-    ...clone(s.meta),
-    canEdit: editable(s.meta.kind),
-    untrusted: s.meta.kind === "html" || s.meta.kind === "file",
-    audience: await audienceOf(orgId, s.meta.channelId),
-  });
+  const view = async (orgId: string, s: Stored): Promise<Artifact> => {
+    const audience = await audienceOf(orgId, s.meta.channelId);
+    return {
+      canDelete: true,
+      sharing: { mode: "conversation", userIds: [], roleIds: [] },
+      ...clone(s.meta),
+      canEdit: editable(s.meta.kind),
+      untrusted: s.meta.kind === "html" || s.meta.kind === "file",
+      audience,
+      // As the server: whoever reads it where it lives may share what not everyone sees (the fake's viewer is there).
+      canShare:
+        s.meta.inDrive !== false && (audience.kind === "dm" || (audience.kind === "channel" && audience.private)),
+    };
+  };
   const detail = async (orgId: string, s: Stored, version?: number): Promise<ArtifactDetail> => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
     if (!v) throw new MockNotFoundError("Versão não encontrada.");
@@ -186,22 +195,48 @@ export function createMockArtifacts(
     return { ...(await view(orgId, s)), shownVersion: v.version, content, versioned };
   };
   const me = async (): Promise<ArtifactAuthor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
+  /** Like the server's `listArtifacts`: the Drive's filters (`kinds` too unless `allKinds`), in its order. */
+  const listed = async (orgId: string, filters: ArtifactFilters, allKinds = false) => {
+    const q = filters.q?.trim().toLowerCase();
+    const same = (a: ArtifactAuthor, b: ArtifactAuthor | undefined) => a.type === b?.type && a.id === b.id;
+    const shown = (await store(orgId))
+      .filter((s) => !s.deletedAt)
+      .filter((s) => allKinds || !filters.kind || s.meta.kind === filters.kind)
+      .filter((s) => allKinds || !filters.kinds?.length || filters.kinds.includes(s.meta.kind))
+      .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
+      .filter((s) => !filters.channelIds?.length || filters.channelIds.includes(s.meta.channelId ?? ""))
+      .filter((s) => !filters.author || s.versions.some((v) => same(v.author, filters.author)))
+      .filter(
+        (s) =>
+          !filters.authors?.length ||
+          filters.authors.some((a) => same(a, s.meta.createdBy) || same(a, s.meta.updatedBy)),
+      )
+      .filter((s) => !filters.who || s.meta.createdBy.type === (filters.who === "agents" ? "agent" : "person"))
+      .filter((s) => !q || s.meta.title.toLowerCase().includes(q));
+    const order = ["document", "table", "diff", "diagram", "html", "file"];
+    const newest = (a: Artifact, b: Artifact) => b.updatedAt.localeCompare(a.updatedAt);
+    return (await Promise.all(shown.map((s) => view(orgId, s)))).sort(
+      filters.sort === "name"
+        ? (a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()) || newest(a, b)
+        : filters.sort === "kind"
+          ? (a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || newest(a, b)
+          : newest,
+    );
+  };
+  /** The server's page size. */
+  const PAGE = 100;
   return {
-    list: async (orgId, filters = {}) => {
-      const q = filters.q?.trim().toLowerCase();
-      const shown = (await store(orgId))
-        .filter((s) => !s.deletedAt)
-        .filter((s) => !filters.kind || s.meta.kind === filters.kind)
-        .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
-        .filter(
-          (s) =>
-            !filters.author ||
-            s.versions.some((v) => v.author.type === filters.author?.type && v.author.id === filters.author.id),
-        )
-        .filter((s) => !q || s.meta.title.toLowerCase().includes(q));
-      return (await Promise.all(shown.map((s) => view(orgId, s)))).sort((a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt),
-      );
+    list: async (orgId, filters = {}) => (await listed(orgId, filters)).slice(0, PAGE),
+    page: async (orgId, filters = {}, cursor) => {
+      const all = await listed(orgId, filters);
+      const at = Number(cursor ?? 0);
+      const counts: Partial<Record<ArtifactKind, number>> = {};
+      if (!cursor) for (const a of await listed(orgId, filters, true)) counts[a.kind] = (counts[a.kind] ?? 0) + 1;
+      return {
+        artifacts: all.slice(at, at + PAGE),
+        nextCursor: at + PAGE < all.length ? String(at + PAGE) : null,
+        ...(cursor ? {} : { counts }),
+      };
     },
     get: async (orgId, id, version) => detail(orgId, await find(orgId, id), version),
     keep: async (orgId, id) => {
@@ -222,10 +257,26 @@ export function createMockArtifacts(
     poll: async (_orgId, id) => openPoll(id),
     vote: async (_orgId, id) => openPoll(id),
     choices: async (_orgId, id) => ({ id, answer: null }),
-    answerChoices: async (_orgId, id, picks) => ({
-      choices: { id, answer: { userId: "me", picks, messageId: null, at: new Date().toISOString() } },
+    answerChoices: async (_orgId, id, picks, _clientId, others) => ({
+      choices: {
+        id,
+        answer: { userId: "me", picks, messageId: null, at: new Date().toISOString(), ...(others ? { others } : {}) },
+      },
       messageId: mockId("msg"),
     }),
+    setSharing: async (orgId, id, sharing) => {
+      record("artifacts.setSharing", orgId, id, sharing);
+      const s = await find(orgId, id);
+      const listed = [...(sharing.userIds ?? []), ...(sharing.roleIds ?? [])];
+      if (sharing.mode === "people" && listed.length === 0) {
+        throw new ApiError(400, "artifact.sharing_empty", "Choose who sees it");
+      }
+      s.meta.sharing =
+        sharing.mode === "people"
+          ? { mode: "people", userIds: sharing.userIds ?? [], roleIds: sharing.roleIds ?? [] }
+          : { mode: sharing.mode, userIds: [], roleIds: [] };
+      return view(orgId, s);
+    },
     versions: async (orgId, id) =>
       (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {

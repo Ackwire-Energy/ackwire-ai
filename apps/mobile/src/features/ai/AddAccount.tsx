@@ -494,14 +494,14 @@ function AddAccountFlow({
           <Step
             n={2}
             divider
-            title={t("agentPage.work.brain.add.stepTwo")}
+            title={t("agentPage.work.brain.add.stepTwoGoogle")}
             side={read === "reconnecting" ? waiting : undefined}
           >
             {busy
               ? busyLine
               : pasteRow(
-                  t("agentPage.work.brain.add.codeLabel"),
-                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
                   false,
                   key.length > 0,
                 )}

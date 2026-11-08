@@ -58,7 +58,7 @@ export {
   useHeaderActionOptions,
 } from "./headerActions";
 export { Icon, type IconName, type IconProps } from "./Icon";
-export { IconButton, type IconButtonProps, usePlateEdge } from "./IconButton";
+export { ICON_BUTTON_SIZE, IconButton, type IconButtonProps, usePlateEdge } from "./IconButton";
 export { InfoHint, type InfoHintOptions } from "./InfoHint";
 export { ICON_NAMES } from "./icons.data";
 export { LargeTitleScreen, type LargeTitleScreenProps } from "./LargeTitleScreen";

@@ -1,9 +1,49 @@
 import { Dialog as RDialog } from "radix-ui";
-import { Children, type CSSProperties, type ReactNode, type RefObject, useEffect, useRef } from "react";
+import {
+  Children,
+  type CSSProperties,
+  createContext,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cx } from "../cx";
 import { focusHeld, lastTabbable } from "../device";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
+
+/** What a form inside a dialog says of its unsaved writing (`useUnsavedInDialog`), by the form. */
+export const UnsavedContext = createContext<((form: object, unsaved: boolean) => void) | null>(null);
+
+/**
+ * The forms inside a dialog that hold unsaved writing (`useUnsavedInDialog`): read when a press outside or Esc comes,
+ * so a keystroke redraws nothing.
+ */
+export function useUnsavedForms() {
+  const forms = useRef(new Set<object>());
+  const report = useCallback((form: object, unsaved: boolean) => {
+    if (unsaved) forms.current.add(form);
+    else forms.current.delete(form);
+  }, []);
+  return { report, held: () => forms.current.size > 0 };
+}
+
+/**
+ * A form inside a `Dialog` or `DetailsDialog` (a step of a flow, an editor in the details) holds unsaved writing: the
+ * dialog stays open on a press outside or Esc, as with its own `unsaved`.
+ */
+export function useUnsavedInDialog(unsaved: boolean) {
+  const report = useContext(UnsavedContext);
+  const [form] = useState(() => ({}));
+  useEffect(() => {
+    report?.(form, unsaved);
+    return () => report?.(form, false);
+  }, [report, form, unsaved]);
+}
 
 export interface DialogProps {
   open: boolean;
@@ -40,6 +80,11 @@ export interface DialogProps {
    * `closeLabel` unused.
    */
   bare?: boolean;
+  /**
+   * It holds what the person wrote and hasn't saved: a press outside or Esc leaves it open, only its own buttons and ×
+   * close it (a side panel keeps a filled field the same way).
+   */
+  unsaved?: boolean;
 }
 
 /**
@@ -62,6 +107,7 @@ export function Dialog({
   actions,
   initialFocus,
   bare = false,
+  unsaved = false,
 }: DialogProps) {
   // Controlled dialogs have no Radix Trigger to return focus to, so remember
   // what had focus when it opened and give focus back on close.
@@ -82,6 +128,8 @@ export function Dialog({
     document.addEventListener("pointerdown", pressed, true);
     return () => document.removeEventListener("pointerdown", pressed, true);
   }, [open]);
+  const forms = useUnsavedForms();
+  const keep = () => unsaved || forms.held();
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
@@ -89,7 +137,10 @@ export function Dialog({
         <RDialog.Content
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
-          onEscapeKeyDown={onEscapeKeyDown}
+          onEscapeKeyDown={(e) => {
+            onEscapeKeyDown?.(e);
+            if (keep()) e.preventDefault();
+          }}
           // Focus starts on `initialFocus` or the dialog itself (the event's target), never on its first control, the
           // head's ×: opened from a link or by itself, a ring would sit on × with nothing pressed. Tab reaches × first;
           // a field that takes the focus on its own (autoFocus) keeps it, since Radix asks only when nothing inside
@@ -108,7 +159,7 @@ export function Dialog({
             last.focus();
           }}
           onPointerDownOutside={(e) => {
-            if (onToast.current) e.preventDefault();
+            if (onToast.current || keep()) e.preventDefault();
           }}
           // React passes a portal's events up the component tree: a form sent in a dialog opened from another
           // dialog's form would send that form too.
@@ -165,7 +216,7 @@ export function Dialog({
             ) : (
               <RDialog.Description className="ac-dialog__desc">{description}</RDialog.Description>
             ))}
-          {children}
+          <UnsavedContext.Provider value={forms.report}>{children}</UnsavedContext.Provider>
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

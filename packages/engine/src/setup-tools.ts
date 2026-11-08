@@ -21,6 +21,7 @@ import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorListing, type ServerCatalog } from "./connectors/listing";
 import { MCP_PRESETS, presetForServer } from "./connectors/presets";
+import { cardPlace, NO_PERSON_READS } from "./consultations";
 import { ownWords } from "./context/learn";
 import { decideProposal, proposeSettings, type SettingsProposalCard } from "./context/proposals";
 import type { ContextDeps } from "./context/summaries";
@@ -32,7 +33,6 @@ import { personBehindCall } from "./requester";
 import { isRightHand } from "./right-hand";
 import { queueRightHandLook } from "./right-hand-approvals";
 import { bodyCode } from "./run-tools";
-import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { deletes, type WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
@@ -41,6 +41,14 @@ import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
+import {
+  actNow,
+  changesThisRun,
+  MAX_ACTIONS_PER_RUN,
+  type ServerLinks,
+  workspaceAction,
+  workspaceActionTool,
+} from "./workspace-actions";
 
 const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
@@ -99,6 +107,11 @@ export const APP_PAGES = {
   wiki: "Wiki",
   issues: "Issues",
   calendar: "Calendar",
+  vault: "The Vault: saved passwords and contact details, password managers, who may use each",
+  ai_apps: "AI apps signed in to their account and their personal tokens (Settings › AI apps)",
+  approval_settings: "Who approves for them while away, and whether you may approve for them (Settings › Approvals)",
+  media: "GIFs and stickers for the workspace (Settings)",
+  voice: "Voice messages and the speech key (Settings)",
   agent: "An agent's page (instructions, memory, access, its own delete): needs `agent`",
   channel: "A channel (its settings, members, archiving): needs `channel`",
 } as const;
@@ -114,6 +127,8 @@ const PAGE_PERMISSION: Partial<Record<AppPage, RolePermission | "manage_owners">
   storage: "configure",
   right_hand: "manage_agents",
   import: "create_agents",
+  media: "configure",
+  voice: "configure",
 };
 
 /** What one run may make: enough for a request, never a flood (also all a prompt injection gets). */
@@ -256,14 +271,17 @@ export function mcpAddress(raw: string): string | null {
 }
 
 /**
- * Whether the person behind the run may do it themselves, and else whether someone who may can open this
- * conversation (so the card is still of use): what the tool tells the agent to say.
+ * Whether the person behind the run may do it themselves, and else whether someone who may can open the
+ * conversation the card goes to (so the card is still of use): what the tool tells the agent to say.
  */
-export async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission) {
+export async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission, channelId: string) {
   const membership = userId ? await getMembership(ctx.db, userId, ctx.orgId) : null;
   if (can(membership, permission)) return "person" as const;
-  return (await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId, permission)) ? ("admin_here" as const) : null;
+  return (await deciderCanOpen(ctx.db, ctx.orgId, channelId, permission)) ? ("admin_here" as const) : null;
 }
+
+/** A card with no place (`cardPlace`): nobody would see it. */
+export const NOBODY_READS: ToolOutput = { content: NO_PERSON_READS, isError: true };
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
@@ -337,6 +355,8 @@ export function createSetupToolSource(deps: {
   context?: ContextDeps;
   /** What this server connects, so a card never offers a service it can't (none: the whole catalog). */
   catalog?: ServerCatalog;
+  /** The server's address and secret, for the invitations the right hand's actions send. */
+  server?: ServerLinks;
 }): ToolSource {
   const tools: ToolDefinition[] = [
     {
@@ -388,6 +408,8 @@ export function createSetupToolSource(deps: {
             const self = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
             if (self) targets = [{ id: self.id, handle: self.handle, name: self.name }];
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx, true);
           if (full) return full;
           const card: ActionCard = {
@@ -403,8 +425,7 @@ export function createSetupToolSource(deps: {
           const names = targets.map((a) => a.name).join(", ");
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Connect ${what ? STEPS[what] : "an AI"}${names ? ` for ${names}` : ""}: ${why}`,
             meta: { ...bodyCode(CONNECT_AI_CARD), actionCard: card },
@@ -618,11 +639,13 @@ export function createSetupToolSource(deps: {
         try {
           const why = str(input.why).trim();
           if (!why) return { content: "Say in `why` why this agent: one short line.", isError: true };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           // The right hand's card goes to whoever may create agents when the person who asked can't ("Pedir a um admin").
           const rightHand = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
-          if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId))) {
+          if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, at.channelId))) {
             return {
               content:
                 "Nothing was posted: nobody who may create agents can open this conversation, so nobody could decide the card. Tell the person that an admin or owner creates agents: they can ask one, or ask you again in a public channel.",
@@ -630,7 +653,7 @@ export function createSetupToolSource(deps: {
             };
           }
           const forUserId = await personBehindCall(ctx);
-          const place = { orgId: ctx.orgId, channelId: ctx.channelId, personId: forUserId };
+          const place = { orgId: ctx.orgId, channelId: at.channelId, personId: forUserId };
           const draft = {
             ...(await checkAgentDraft({ db: ctx.db, context: deps.context }, place, input)),
             ai: await suggestAgentAi({ db: ctx.db, gateway: deps.ai?.gateway }, ctx.orgId, forUserId),
@@ -651,8 +674,7 @@ export function createSetupToolSource(deps: {
           };
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Proposed a new agent, ${draft.name}: ${why}`,
             meta: { ...bodyCode(AGENT_PROPOSAL_CARD, { name: draft.name }), actionCard: card },
@@ -721,6 +743,8 @@ export function createSetupToolSource(deps: {
             else targets.push({ agentId: row.id, lines: [{ field, to: true }] });
           }
           if (targets.length === 0) return { content: `Nothing to propose: ${left.join("; ")}.`, isError: true };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const { proposals, skipped } = await proposeSettings(
@@ -736,8 +760,7 @@ export function createSetupToolSource(deps: {
           const who = proposals.map((p) => named.rows.find((r) => r.id === p.agentId)?.name ?? "").join(", ");
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Proposed ${field === "delete" ? "deleting" : "archiving"} ${who}: ${reason}`,
             meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
@@ -822,8 +845,10 @@ export function createSetupToolSource(deps: {
               isError: true,
             };
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const forUserId = await personBehindCall(ctx);
-          const acts = await whoActs(ctx, forUserId, "manage_connectors");
+          const acts = await whoActs(ctx, forUserId, "manage_connectors", at.channelId);
           if (!acts) {
             return {
               content:
@@ -841,8 +866,7 @@ export function createSetupToolSource(deps: {
           const name = known?.label ?? (url ? new URL(url).host : null);
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Connect ${name ?? "an MCP server"}: ${why}`,
             meta: { ...(name ? bodyCode(CONNECT_APP_CARD, { name }) : bodyCode(ADD_MCP_CARD)), actionCard: card },
@@ -893,7 +917,9 @@ export function createSetupToolSource(deps: {
           if (bad.length > 0) return { content: `Not an email address: ${bad.join(", ")}.`, isError: true };
           const forUserId = await personBehindCall(ctx);
           if (!forUserId) return { content: "Only a person's request can lead to invitations.", isError: true };
-          const acts = await whoActs(ctx, forUserId, "invite_people");
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
+          const acts = await whoActs(ctx, forUserId, "invite_people", at.channelId);
           if (!acts) {
             return {
               content:
@@ -906,8 +932,7 @@ export function createSetupToolSource(deps: {
           const card: InviteCard = { kind: "invite_people", forUserId, params: { emails, why } };
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
-            channelId: ctx.channelId,
-            threadId: replyThreadOf(ctx),
+            ...at,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
             body: `Invite ${emails.join(", ")}: ${why}`,
             meta: { ...bodyCode(INVITE_CARD), actionCard: card },
@@ -926,7 +951,12 @@ export function createSetupToolSource(deps: {
   // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
   // for the person who asked (ADR 0139), never its own.
   const all = [...tools, settingsTool(deps)];
-  const rightHand = [...all, ...rightHandCards(deps), ...teamTools({ ...deps, cardsLeft, hopOf })];
+  const rightHand = [
+    ...all,
+    ...rightHandCards(deps),
+    ...teamTools({ ...deps, cardsLeft, hopOf }),
+    workspaceActionTool({ ...deps, cardsLeft, hopOf }),
+  ];
   return {
     name: "setup",
     // Only the right hand starts the rest of the app with cards (ADR 0137).
@@ -934,17 +964,17 @@ export function createSetupToolSource(deps: {
   };
 }
 
-/** Posts an agent's card in this conversation (its reply's thread) and announces it. */
+/** Posts an agent's card where it goes (`cardPlace`) and announces it. */
 async function postCard(
   deps: { pubsub?: PubSub },
   ctx: ToolContext,
+  at: { channelId: string; threadId: string | null },
   body: string,
   meta: Record<string, unknown>,
 ): Promise<string> {
   const message = await insertMessage(ctx.db, {
     orgId: ctx.orgId,
-    channelId: ctx.channelId,
-    threadId: replyThreadOf(ctx),
+    ...at,
     author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
     body,
     meta,
@@ -1003,6 +1033,8 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             .filter((a) => a.canDecide && (only.size === 0 || only.has(a.agentId)))
             .slice(0, MAX_ROWS_PER_CARD);
           if (waiting.length === 0) return { content: "Nothing waits for their decision: no card was posted." };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const card: ApprovalsCard = {
@@ -1012,7 +1044,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           };
           // No titles in the body: in a channel everyone reads it (and its notifications), while each viewer's card
           // shows only the approvals they may see.
-          const messageId = await postCard(deps, ctx, `Approvals waiting: ${waiting.length}`, {
+          const messageId = await postCard(deps, ctx, at, `Approvals waiting: ${waiting.length}`, {
             ...bodyCode(APPROVALS_CARD),
             actionCard: card,
           });
@@ -1028,7 +1060,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     {
       name: PROPOSE_MEMBER_CHANGES_TOOL,
       description:
-        "Propose changing people in the workspace with one card in this conversation, a row per change: making someone an owner or not (owners only), giving or taking roles, or removing them from the workspace (with the confirmation the members screen shows). Whoever may applies each row from the card as themselves. Inviting is offer_invites. Nothing changes until someone clicks: never say it is done.",
+        "Change people in the workspace, a row per change: making someone an owner or not (owners only), giving or taking roles, or removing them from the workspace. Roles the person who asked may give, asked in their own words, apply at once with Undo; the rest is one card whoever may applies row by row as themselves (removal with the members screen's confirmation). Inviting is offer_invites. The result says what changed: never say more is done.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
@@ -1062,7 +1094,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           const changes = (Array.isArray(input.changes) ? input.changes : []) as Record<string, unknown>[];
           const rows: MemberChangeRow[] = [];
           for (const change of changes) {
-            const found = await findMember(ctx, str(change.person));
+            const found = await findMember(ctx, str(change.person), { includeBlocked: true });
             if (found.length !== 1)
               return {
                 content: found.length
@@ -1085,6 +1117,30 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           }
           if (rows.length === 0)
             return { content: "Say what changes: owner, add_roles, remove_roles or remove.", isError: true };
+          // Roles they may give, asked in their own words, apply at once with Undo (ADR 0137 amendment of
+          // 2026-11-07); ownership and removal stay on the card, with the members screen's own confirmation.
+          const applied: string[] = [];
+          const giving = workspaceAction("set_member_roles");
+          if (giving && (await ownWords(ctx)) === forUserId) {
+            for (const r of [...rows]) {
+              if (!("addRoleIds" in r)) continue;
+              // The turn's cap on changes made at once (`workspace_action`'s too): the rest waits on the card.
+              if ((await changesThisRun(ctx)) >= MAX_ACTIONS_PER_RUN) break;
+              const done = await actNow(deps, ctx, forUserId, giving, {
+                userId: r.userId,
+                name: r.name,
+                add: r.addRoleIds,
+                remove: r.removeRoleIds,
+              }).catch(() => null);
+              if (!done || "refused" in done) continue;
+              applied.push(`${r.name} (${done.words.change})`);
+              rows.splice(rows.indexOf(r), 1);
+            }
+          }
+          const now = applied.length ? `Applied at once, with Undo under your reply: ${applied.join("; ")}.` : "";
+          if (rows.length === 0) return { content: `${now} Say it is done.` };
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const kept = rows.slice(0, MAX_ROWS_PER_CARD);
@@ -1094,7 +1150,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             params: { rows: kept, why: str(input.why).trim() },
           };
           const who = [...new Set(kept.map((r) => r.name))].join(", ");
-          const messageId = await postCard(deps, ctx, `Proposed a change to ${who}: ${card.params.why}`, {
+          const messageId = await postCard(deps, ctx, at, `Proposed a change to ${who}: ${card.params.why}`, {
             ...bodyCode(MEMBER_CHANGES_CARD, { names: who }),
             actionCard: card,
           });
@@ -1103,7 +1159,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             "role" in r ? membership?.role === "owner" : can(membership, "manage_members"),
           );
           return {
-            content: `Posted the card for ${who}.${may ? " They apply each row there." : " Some rows need someone with more rights (an owner for ownership, an admin for the rest): say so."} Nothing has changed yet.`,
+            content: `${now ? `${now} ` : ""}Posted the card for ${who}.${may ? " They apply each row there." : " Some rows need someone with more rights (an owner for ownership, an admin for the rest): say so."} ${now ? "Nothing on it has changed yet." : "Nothing has changed yet."}`,
             data: { actionCard: { messageId } },
           };
         } catch (error) {
@@ -1114,7 +1170,7 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     {
       name: OFFER_OPEN_PAGE_TOOL,
       description:
-        "Open one of the app's screens for this person with a card whose button takes them there: billing, deleting the workspace or their account, their password, API keys, roles, the audit log, routines, Drive, wiki, issues, an agent's page, a channel's settings and the rest. Use it for anything they ask that your other cards don't do: the screen asks for what it always does (an email code and the typed name to delete, Stripe to pay, our dialog for a key) and checks who may. Never take a key, password or token in the chat.",
+        "Open one of the app's screens for this person with a card whose button takes them there: billing, deleting the workspace or their account, their password, API keys, the audit log and the rest. Use it for what needs that screen's own dialog or what workspace_action and your other cards don't do, or when they ask to see a screen: it asks for what it always does (an email code and the typed name to delete, Stripe to pay, our dialog for a key) and checks who may. Never take a key, password or token in the chat.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
@@ -1151,11 +1207,13 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             if (!channel) return { content: `They see no channel #${name}.`, isError: true };
             params.channelId = channel.id;
           }
+          const at = await cardPlace(ctx);
+          if (!at) return NOBODY_READS;
           const full = await cardsLeft(ctx);
           if (full) return full;
           const forUserId = await personBehindCall(ctx);
           const card: OpenPageCard = { kind: "open_page", forUserId, params };
-          const messageId = await postCard(deps, ctx, `Open ${page}: ${params.why}`, {
+          const messageId = await postCard(deps, ctx, at, `Open ${page}: ${params.why}`, {
             ...bodyCode(OPEN_PAGE_CARD),
             actionCard: card,
           });
@@ -1224,7 +1282,7 @@ interface SettingsChangeInput {
   budget_usd?: unknown;
   budget_default?: unknown;
   owner?: unknown;
-  who_talks?: { everyone?: unknown; roles?: unknown };
+  who_talks?: { everyone?: unknown; roles?: unknown; people?: unknown };
   join?: unknown;
   leave?: unknown;
   replies?: unknown;
@@ -1255,7 +1313,8 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   }
   if (change.who_talks) {
     const roles = names(change.who_talks.roles);
-    if (change.who_talks.everyone === true || roles.length === 0)
+    const named = names(change.who_talks.people);
+    if (change.who_talks.everyone === true || roles.length + named.length === 0)
       lines.push({ field: "audience", to: { mode: "everyone", userIds: [], roleIds: [] } });
     else {
       const rows = await ctx.db
@@ -1264,10 +1323,17 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
         .where(and(eq(orgRoles.orgId, ctx.orgId), eq(orgRoles.kind, "custom")));
       const picked = roles.map((r) => rows.find((x) => x.name.toLowerCase() === r.toLowerCase()));
       if (picked.some((r) => !r)) return `Roles here: ${rows.map((r) => r.name).join(", ")}.`;
+      const people: { userId: string; name: string }[] = [];
+      for (const who of named) {
+        const found = await findMember(ctx, who);
+        if (found.length !== 1 || !found[0])
+          return found.length ? `Several people match "${who}": ask which one.` : `No one called "${who}" here.`;
+        people.push(found[0]);
+      }
       lines.push({
         field: "audience",
-        to: { mode: "people", userIds: [], roleIds: picked.map((r) => r?.id ?? "") },
-        label: { to: picked.map((r) => r?.name).join(", ") },
+        to: { mode: "people", userIds: people.map((p) => p.userId), roleIds: picked.map((r) => r?.id ?? "") },
+        label: { to: [...picked.map((r) => r?.name), ...people.map((p) => p.name)].join(", ") },
       });
     }
   }
@@ -1379,9 +1445,11 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
                 properties: {
                   everyone: { type: "boolean" },
                   roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+                  people: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
                 },
                 additionalProperties: false,
-                description: "Everyone, or only people with these roles (by name).",
+                description:
+                  "Everyone, or only people with these roles (by name) and these people (@handle, email or name).",
               },
               join: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
               leave: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
@@ -1449,6 +1517,8 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
           if (typeof lines === "string") return { content: lines, isError: true };
           targets.push({ agentId: named.rowOf(change.agent)?.id ?? "", lines });
         }
+        const at = await cardPlace(ctx);
+        if (!at) return NOBODY_READS;
         const full = await cardsLeft(ctx);
         if (full) return full;
         const atOnce = (await ownWords(ctx)) === forUserId;
@@ -1473,8 +1543,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
         );
         const message = await insertMessage(ctx.db, {
           orgId: ctx.orgId,
-          channelId: ctx.channelId,
-          threadId: replyThreadOf(ctx),
+          ...at,
           author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
           body: `Proposed a change to ${who}: ${str(input.reason).trim()}`,
           meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },

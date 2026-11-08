@@ -1,8 +1,9 @@
 import { useChannels, useDms } from "@agenteschat/client";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect } from "react";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
+import { router } from "@/ui/navigation";
 import { useLaunched } from "../launch/launched";
 import { inConversation, startHref, withPlace } from "./logic";
 

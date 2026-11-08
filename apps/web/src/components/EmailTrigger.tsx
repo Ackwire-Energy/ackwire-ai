@@ -1,5 +1,7 @@
 import type { MailAccount, MailFolder, Routine, RoutineEmailFilter } from "@agenteschat/client";
-import { useMailAccounts, useMailFolders } from "@agenteschat/client";
+import { useAgentMail, useMailAccounts, useMailFolders } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { mailboxReader, triggerChoices } from "@agenteschat/client/lib/routines";
 import { Field, Icon, Input, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -7,6 +9,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 
 /**
  * "Quando chegar um email" (ADR 0038): which mailbox, which folder (the inbox
@@ -38,19 +41,30 @@ export function cleanFilter(filter: RoutineEmailFilter): RoutineEmailFilter {
 export function EmailTriggerFields({
   value,
   onChange,
+  agentId,
 }: {
   value: EmailTriggerDraft;
   onChange: (value: EmailTriggerDraft) => void;
+  /** The routine's agent: only the mailboxes it reads are offered (the server refuses the others). */
+  agentId: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const accounts = useMailAccounts(org.id);
   const list = accounts.data ?? [];
+  const reads = useAgentMail(org.id, agentId, Boolean(agentId) && list.length > 0);
+  const { options, cantRead } = triggerChoices(
+    list,
+    agentId && reads.data ? mailboxReader(reads.data) : undefined,
+    value.accountId,
+  );
+  const waiting = Boolean(agentId) && list.length > 0 && reads.isPending;
   const folders = useMailFolders(org.id, value.accountId || null);
-  // The first mailbox, and its inbox, until the person picks.
+  // The first mailbox the agent reads, and its inbox, until the person picks.
+  const first = waiting ? undefined : options[0];
   useEffect(() => {
-    if (!value.accountId && list[0]) onChange({ ...value, accountId: list[0].id, folder: "" });
-  }, [value, list, onChange]);
+    if (!value.accountId && first) onChange({ ...value, accountId: first.id, folder: "" });
+  }, [value, first, onChange]);
   useEffect(() => {
     if (value.accountId && !value.folder && (folders.data || folders.isError))
       onChange({ ...value, folder: inboxOf(folders.data) });
@@ -84,6 +98,13 @@ export function EmailTriggerFields({
         },
       ];
   const setFilter = (filter: RoutineEmailFilter) => onChange({ ...value, filter });
+  const access = cantRead && agentId && (
+    <AgentAccessNote
+      agentId={agentId}
+      words={options.length === 0 ? "mail.routine.readsNone" : "mail.routine.cantRead"}
+    />
+  );
+  if (options.length === 0 && access) return access;
   return (
     <div className="routine-email">
       <div className="grid-fields">
@@ -91,7 +112,7 @@ export function EmailTriggerFields({
           <Select
             value={value.accountId || undefined}
             onValueChange={(accountId) => onChange({ ...value, accountId, folder: "" })}
-            options={list.map((a) => ({ value: a.id, label: a.address }))}
+            options={options.map((a) => ({ value: a.id, label: a.address }))}
           />
         </Field>
         <Field label={t("mail.routine.folder")} id="nr-folder">
@@ -102,6 +123,7 @@ export function EmailTriggerFields({
           />
         </Field>
       </div>
+      {access}
       <span className="ac-eyebrow">{t("mail.routine.filters")}</span>
       <AddressList
         id="nr-mail-from"
@@ -125,6 +147,44 @@ export function EmailTriggerFields({
         </Field>
       </div>
     </div>
+  );
+}
+
+/**
+ * The routine's agent can't read what its trigger needs (none of the mailboxes, the picked one, a connection): the
+ * cause, and its access, where who connected it gives the agent access.
+ */
+export function AgentAccessNote({
+  agentId,
+  words,
+  values,
+}: {
+  agentId: string;
+  words:
+    | "mail.routine.readsNone"
+    | "mail.routine.cantRead"
+    | "mail.routine.connectorReadsNone"
+    | "mail.routine.connectorCantRead";
+  values?: Record<string, string>;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const name = useDirectory(org.id).agentById.get(agentId)?.name ?? "";
+  return (
+    <p className="newag__note ac-iconline">
+      <Icon name="lock" size={16} />
+      <span>
+        {t(words, { ...agentGrammar(name), ...values })}{" "}
+        <Link
+          className="ac-link"
+          to="/org/$orgId/agents/$agentId"
+          params={{ orgId: org.id, agentId }}
+          search={{ tab: "access" }}
+        >
+          {t("mail.routine.giveAccess")}
+        </Link>
+      </span>
+    </p>
   );
 }
 

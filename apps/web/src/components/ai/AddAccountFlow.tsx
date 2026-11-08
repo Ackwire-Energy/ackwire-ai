@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/machines";
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
-import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote } from "@agenteschat/ui";
+import { AffixInput, Button, cx, Icon, InfoHint, Locked, ProviderLogo, SettingNote, SwapLabel } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -663,12 +663,17 @@ function AddAccountFlow({
       )}
       <Button
         size="sm"
-        icon={linkCopied ? "check" : "copy"}
         loading={starting && copyingLink}
         disabled={!ready || loading || (starting && !copyingLink)}
         onClick={copyLink}
       >
-        {linkCopied ? t("common.copied") : t("agentPage.work.brain.add.copyLink")}
+        <SwapLabel
+          icon="copy"
+          altIcon="check"
+          label={t("agentPage.work.brain.add.copyLink")}
+          alt={t("common.copied")}
+          showAlt={linkCopied}
+        />
       </Button>
     </span>
   );
@@ -681,8 +686,8 @@ function AddAccountFlow({
       <b>{label}</b>
       <span className="agp-addacct__code">
         <output aria-label={label}>{code}</output>
-        <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
-          {copied ? t("common.copied") : t("common.copy")}
+        <Button size="sm" onClick={() => void copy()}>
+          <SwapLabel icon="copy" altIcon="check" label={t("common.copy")} alt={t("common.copied")} showAlt={copied} />
         </Button>
       </span>
       <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>
@@ -760,13 +765,13 @@ function AddAccountFlow({
         {login && opened && (
           <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
             <label htmlFor={codeId}>
-              <b>{t("agentPage.work.brain.add.stepTwo")}</b>
+              <b>{t("agentPage.work.brain.add.stepTwoGoogle")}</b>
             </label>
             {busy
               ? busyLine
               : pasteRow(
-                  t("agentPage.work.brain.add.codeLabel"),
-                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
+                  t("agentPage.work.brain.add.codeLabelGoogle"),
                   false,
                   key.length > 0,
                 )}

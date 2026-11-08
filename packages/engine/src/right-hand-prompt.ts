@@ -120,9 +120,12 @@ export async function rightHandPrompt(
           ),
         )
     : [];
-  const channelName = new Map(open.map((c) => [c.id, c.name]));
+  // In a channel others read the reply: only the channels everyone may see are named there.
+  const named = input.inDm ? open : open.filter((c) => c.visibility === "public");
+  const channelName = new Map(named.map((c) => [c.id, c.name]));
+  const seatsOf = (agentId: string) => seats.filter((s) => s.agentId === agentId);
   const channelsOf = (agentId: string) =>
-    seats.filter((s) => s.agentId === agentId).map((s) => `#${channelName.get(s.channelId)}`);
+    seatsOf(agentId).flatMap((s) => (channelName.has(s.channelId) ? [`#${channelName.get(s.channelId)}`] : []));
   const ai = deps.ai ? { db, ...deps.ai } : null;
   const [anyAi, aiStates] = ai
     ? await Promise.all([
@@ -140,8 +143,8 @@ export async function rightHandPrompt(
   const name = person[0]?.name ?? "this person";
   const owner = membership?.role === "owner";
 
-  // Money only for who may see usage (ADR 0063); anyone else reads how much of it is used.
-  const money = can(membership, "view_usage");
+  // Money only for who may see usage (ADR 0063), and only in their DM; anyone else reads how much of it is used.
+  const money = can(membership, "view_usage") && input.inDm;
   const agentLines = seen.map((a) => {
     const b = budgets.get(a.id);
     const used = b && b.budgetNanoUsd > 0 ? Math.round((b.spentNanoUsd / b.budgetNanoUsd) * 100) : 0;
@@ -149,7 +152,7 @@ export async function rightHandPrompt(
     return [
       `- @${a.handle} (${a.name})${a.role ? `, ${a.role}` : ""}`,
       `model ${a.model}${aiStates?.get(a.id)?.state === "no_ai" ? " (no AI: it can't answer)" : ""}`,
-      where.length ? `in ${where.join(", ")}` : "in no channel",
+      where.length ? `in ${where.join(", ")}` : seatsOf(a.id).length ? "in private channels only" : "in no channel",
       b
         ? money
           ? `budget ${usd(b.budgetNanoUsd)}/month${b.isDefault ? " (the default)" : ""}, ${used}% used`
@@ -186,7 +189,7 @@ export async function rightHandPrompt(
   ].filter(Boolean);
   // What the team's agents lack, which no row of the first-run checklist shows.
   const teamThings = [
-    seen.some((a) => channelsOf(a.id).length === 0)
+    seen.some((a) => seatsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",
     seen.some((a) => {
@@ -234,10 +237,10 @@ export async function rightHandPrompt(
         .slice(0, SNAPSHOT_MAX)
         .map((p) => `${p.name}${p.handle ? ` (@${p.handle})` : ""}${p.role === "owner" ? ", owner" : ""}`)
         .join("; ")}.`,
-      open.length
-        ? `Channels they see: ${open.map((c) => `#${c.name} (${seats.filter((s) => s.channelId === c.id).length} members)`).join(", ")}.`
+      named.length
+        ? `${input.inDm ? "Channels they see" : "Public channels"}: ${named.map((c) => `#${c.name} (${seats.filter((s) => s.channelId === c.id).length} members)`).join(", ")}.`
         : "",
-      apps.length ? `Apps connected: ${apps.map((a) => a.label).join(", ")}.` : "",
+      apps.length && input.inDm ? `Apps connected: ${apps.map((a) => a.label).join(", ")}.` : "",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -253,8 +256,8 @@ export async function rightHandPrompt(
       "- One new agent: propose_agent, with first_task when there is something to try it on.",
       "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode, name, look or who it reports to: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
-      "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). People's ownership, roles or removal: propose_member_changes.",
-      "- Anything else the app does (billing, deleting the workspace or their account, a password, API keys, roles, routines, the task manager, Drive, wiki, an agent's page, a channel's settings): offer_open_page.",
+      "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). Someone's ownership, roles or removal: propose_member_changes.",
+      "- Anything else the app lets them do (roles, channels, invitations, their own settings, the workspace, stopping work): workspace_action, find it first, and never say you can't before it does. Billing, deleting the workspace or their account, a password or keys: offer_open_page.",
       "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
       "- Admins get your weekly 'Semana da equipe' card here (Fridays at 17h); anyone may get it daily instead. To stop, resend, move it or make it daily: set_team_week.",
     ].join("\n"),

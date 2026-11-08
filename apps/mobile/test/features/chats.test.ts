@@ -15,6 +15,8 @@ import {
   missionWaitingItems,
   openQuestions,
   parseCollapsed,
+  rowBadge,
+  rowName,
   rowPlace,
   rowsOfKind,
   THREAD_SECTIONS,
@@ -634,6 +636,24 @@ describe("unread marks, as on the web", () => {
       ["ruido", 0, 2],
     ]);
     expect(unreadConversationCount({ channels, dms: [] })).toBe(1);
+  });
+
+  test("a group conversation shows its number: mentions of me in red (even muted), else how many wait", () => {
+    const channels = [
+      channel("c1", "geral", true, { unreadCount: 4, mentionCount: 1 }),
+      channel("c2", "lojas", true, { unreadCount: 9, mentionCount: 0 }),
+      channel("c3", "ruido", true, { unreadCount: 9, mentionCount: 2, muted: true }),
+      channel("c4", "quieto", true, { unreadCount: 5, mentionCount: 0, muted: true }),
+    ];
+    const rows = buildConversations({ channels, dms: [dm("d1", "Atlas", 3, 1)], threads: [] });
+    const byName = Object.fromEntries(rows.map((r) => [rowName(r), rowBadge(r)]));
+    expect(byName).toEqual({
+      geral: { count: 1, mention: true },
+      lojas: { count: 9, mention: false },
+      ruido: { count: 2, mention: true },
+      quieto: { count: 0, mention: false },
+      Atlas: { count: 3, mention: false },
+    });
   });
 
   test("the app icon's number: DM messages and mentions of me, DMs the home hides left out", () => {

@@ -55,6 +55,7 @@ export function PromptForm({
   icon,
   initial = "",
   allowEmpty = false,
+  maxLength,
   children,
   onSubmit,
 }: {
@@ -66,6 +67,8 @@ export function PromptForm({
   icon?: IconName;
   initial?: string;
   allowEmpty?: boolean;
+  /** The most characters the answer takes (the server's own limit). */
+  maxLength?: number;
   /** Extra rows between the text and the button (who does it, where). */
   children?: ReactNode;
   /** May return a promise: the button waits for it. */
@@ -91,7 +94,14 @@ export function PromptForm({
         </Text>
       ) : null}
       <Locked when={busy} style={styles.fields}>
-        <TextArea value={text} onChangeText={setText} placeholder={placeholder} accessibilityLabel={title} autoFocus />
+        <TextArea
+          value={text}
+          onChangeText={setText}
+          placeholder={placeholder}
+          accessibilityLabel={title}
+          autoFocus
+          {...(maxLength ? { maxLength } : {})}
+        />
         {children}
       </Locked>
       <Button

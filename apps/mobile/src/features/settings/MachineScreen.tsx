@@ -30,6 +30,7 @@ import {
   hostDescKey,
   isPaused,
   MACHINE_TOOLS,
+  machineReasonText,
   sharedFolderFacts,
   sharedFolderOf,
   toolOnCommand,
@@ -38,7 +39,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { countryFlagSvg } from "@agenteschat/ui/brand/flags";
 import { useQueries } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -58,6 +58,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -605,7 +606,7 @@ function BrowserSection({ machine: m, onTurnOff }: { machine: Machine; onTurnOff
       ) : null}
       {switchedOn && !ready && m.browser?.reason ? (
         <>
-          <GroupedFooter>{m.browser.reason}</GroupedFooter>
+          <GroupedFooter>{machineReasonText(t, m.browser)}</GroupedFooter>
           {command ? (
             <>
               <Gap />
@@ -685,8 +686,8 @@ function DesktopUseSection({ machine: m }: { machine: Machine }) {
   const off = use.available && !(m.access?.tools.desktop && m.access.tools.commands);
   // A Mac or Windows has nothing to install for it: said in the app's words, not the runner's English.
   const linux = m.os === "linux";
-  const reason = use.available ? null : linux ? use.reason : t("desktop.use.linuxOnly");
-  const command = linux ? commandInReason(reason) : null;
+  const reason = use.available ? null : linux ? machineReasonText(t, use) : t("desktop.use.linuxOnly");
+  const command = linux && !use.available ? commandInReason(use.reason) : null;
   return (
     <>
       <GroupedHeader>{t("desktop.use.title")}</GroupedHeader>

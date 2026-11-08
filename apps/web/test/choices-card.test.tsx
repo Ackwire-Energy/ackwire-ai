@@ -68,3 +68,54 @@ test("someone answering first is no failure: no 'try again'; another error still
   expect(toasts).toHaveLength(1);
   expect(toasts[0]).toContain("Não deu para mandar sua escolha");
 });
+
+test("Outra resposta: the last row opens a field; Enter sends what was written, and the card shows it", async () => {
+  const sent: unknown[] = [];
+  const one = [{ question: "Qual cor?", options: [{ label: "Azul" }, { label: "Verde" }] }];
+  const api = createFakeApi();
+  api.artifacts.get = async (_orgId, id) =>
+    ({
+      id,
+      title: "Teste do cartão",
+      kind: "choices",
+      createdBy: { type: "agent", id: ADA_ID },
+      shownVersion: 1,
+      content: { kind: "choices", questions: one },
+    }) as unknown as ArtifactDetail;
+  const answer = api.artifacts.answerChoices;
+  api.artifacts.answerChoices = (...args) => {
+    sent.push(args.slice(2));
+    return answer(...args);
+  };
+  await renderPage(<ChoicesCard id="card-1" />, { api, org: true });
+  await settle(6);
+  const rows = [...document.querySelectorAll(".choices__option")];
+  expect(rows.map((r) => r.textContent)).toEqual(["AAzul", "BVerde", "COutra resposta"]);
+  await act(async () => fireEvent.click(rows[2] as HTMLElement));
+  await settle(2);
+  // Opening it sends nothing: the person writes first.
+  expect(sent).toEqual([]);
+  const field = document.querySelector(".choices__write textarea") as HTMLTextAreaElement;
+  expect(document.activeElement).toBe(field);
+  await act(async () => fireEvent.change(field, { target: { value: "  Um vermelho bem escuro  " } }));
+  await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+  await settle(6);
+  expect(sent).toHaveLength(1);
+  expect((sent[0] as unknown[])[0]).toEqual([2]);
+  expect((sent[0] as unknown[])[2]).toEqual(["Um vermelho bem escuro"]);
+  const picked = document.querySelector(".choices__picked") as HTMLElement;
+  expect(picked.textContent).toBe("CUm vermelho bem escuro");
+});
+
+test("Outra resposta by its letter key; Cancelar closes the field and sends nothing", async () => {
+  await card();
+  (document.querySelector(".choices__option") as HTMLElement).focus();
+  await key("c");
+  const field = document.querySelector(".choices__write textarea") as HTMLTextAreaElement;
+  expect(field).toBeTruthy();
+  const cancel = [...document.querySelectorAll(".choices__write button")].find((b) => b.textContent === "Cancelar");
+  await act(async () => fireEvent.click(cancel as HTMLElement));
+  await settle(2);
+  expect(document.querySelector(".choices__write")).toBeNull();
+  expect(document.querySelector(".choices__picked")).toBeNull();
+});

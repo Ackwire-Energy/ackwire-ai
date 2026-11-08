@@ -32,6 +32,8 @@ const ARROW_STEP = 0.1;
 const GESTURES = ["gesturestart", "gesturechange", "gestureend"];
 /** The floating zoom bar's height and its gap above the stage's bottom edge: the lens pane stays clear of it. */
 const BAR_ROOM = 52;
+/** A finger moving a fitted picture this far sideways lets go onto the next or previous one. */
+const SWIPE_MIN = 48;
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const middle = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -41,9 +43,18 @@ const middle = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2
  * (mouse only, switchable), a click to zoom in at the pointer and back, the wheel or a pinch around the cursor, a
  * drag or two fingers on a trackpad to move, − / % / + / Ajustar / 100% on a bar floating over the picture (shown on
  * hover, on focus and while zoomed), and the keys + − 0 1, the arrows and Esc (back to fitted, then the dialog
- * closes).
+ * closes). With `onSwipe`, a finger drags a fitted picture sideways to the next or previous one. No `src` yet: the
+ * stage waits for it.
  */
-export function ImageZoom({ src, alt }: { src: string; alt: string }) {
+export function ImageZoom({
+  src,
+  alt,
+  onSwipe,
+}: {
+  src: string | null;
+  alt: string;
+  onSwipe?: ((dir: 1 | -1) => void) | undefined;
+}) {
   const { t, i18n } = useTranslation();
   const hintId = useId();
   const stageRef = useRef<HTMLDivElement>(null);
@@ -54,12 +65,19 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   const [animate, setAnimate] = useState(false);
   const [pointer, setPointer] = useState<Point | null>(null);
   const [dragging, setDragging] = useState(false);
+  /** How far a finger has dragged the fitted picture sideways (`onSwipe`). */
+  const [swipe, setSwipe] = useState(0);
   const [lensOn, setLensOn] = useState(() => storage.get(STORAGE_KEYS.imageLens) !== "0");
   const hover = useMatchMedia(HOVER);
   const pointers = useRef(new Map<number, Point>());
-  const gesture = useRef<{ start: Point; view: ZoomView; moved: boolean; pinch?: { d: number; mid: Point } } | null>(
-    null,
-  );
+  const gesture = useRef<{
+    start: Point;
+    view: ZoomView;
+    moved: boolean;
+    pinch?: { d: number; mid: Point };
+    /** The finger left of a pinch: it moves a zoomed picture, never swipes to another one. */
+    pinched?: boolean;
+  } | null>(null);
   const zoomedInAt = useRef(0);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -210,6 +228,8 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
         moved: true,
         pinch: { d: distance(all[0], all[1]), mid: middle(all[0], all[1]) },
       };
+      // The first finger's sideways pull ends here: the pinch zooms the picture where it really is.
+      setSwipe(0);
     }
     setAnimate(false);
   };
@@ -232,7 +252,9 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
       g.moved = true;
       if (isZoomed(g.view, img, stage)) setDragging(true);
     }
-    if (g.moved && isZoomed(g.view, img, stage)) setView(panBy(g.view, p.x - g.start.x, p.y - g.start.y, img, stage));
+    if (!g.moved) return;
+    if (isZoomed(g.view, img, stage)) setView(panBy(g.view, p.x - g.start.x, p.y - g.start.y, img, stage));
+    else if (onSwipe && e.pointerType !== "mouse" && !g.pinched) setSwipe(p.x - g.start.x);
   };
 
   const onPointerEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -240,13 +262,32 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
     const g = gesture.current;
     const left = [...pointers.current.values()];
     if (left[0]) {
-      // One finger of a pinch lifted: the other carries on as a drag.
-      if (viewRef.current) gesture.current = { start: left[0], view: viewRef.current, moved: true };
+      // One finger of a pinch lifted: the other carries on as a drag, still the pinch's (it never swipes).
+      if (viewRef.current) gesture.current = { start: left[0], view: viewRef.current, moved: true, pinched: true };
       return;
     }
     gesture.current = null;
     setDragging(false);
     const v = viewRef.current;
+    // A finger dragged the fitted picture: onto the next or previous one when it went far enough sideways, else back.
+    if (
+      g?.moved &&
+      !g.pinch &&
+      !g.pinched &&
+      onSwipe &&
+      e.pointerType !== "mouse" &&
+      img &&
+      stage &&
+      !isZoomed(g.view, img, stage)
+    ) {
+      setAnimate(true);
+      setSwipe(0);
+      const p = local(e);
+      const dx = p.x - g.start.x;
+      if (e.type === "pointerup" && Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(p.y - g.start.y))
+        onSwipe(dx < 0 ? 1 : -1);
+      return;
+    }
     if (e.type !== "pointerup" || !g || g.moved || !v || !img || !stage) return;
     if (isZoomed(v, img, stage)) {
       if (e.timeStamp - zoomedInAt.current > DOUBLE_CLICK_MS) go(fitView(img, stage), true);
@@ -296,26 +337,33 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
         onPointerCancel={onPointerEnd}
         onPointerLeave={() => setPointer(null)}
       >
-        <img
-          className="izoom__img"
-          src={src}
-          alt={alt}
-          draggable={false}
-          decoding="async"
-          data-animate={animate || undefined}
-          style={
-            view && img
-              ? { width: img.w, height: img.h, transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }
-              : { visibility: "hidden" }
-          }
-          onLoad={(e) => {
-            const el = e.currentTarget;
-            // An SVG without a size of its own takes the stage's.
-            const st = stageRef.current;
-            setImg({ w: el.naturalWidth || st?.clientWidth || 1, h: el.naturalHeight || st?.clientHeight || 1 });
-          }}
-          onError={() => setBroken(true)}
-        />
+        {src && (
+          <img
+            className="izoom__img"
+            src={src}
+            alt={alt}
+            draggable={false}
+            decoding="async"
+            data-animate={animate || undefined}
+            data-ready={Boolean(view && img) || undefined}
+            style={
+              view && img
+                ? {
+                    width: img.w,
+                    height: img.h,
+                    transform: `translate(${view.x + swipe}px, ${view.y}px) scale(${view.scale})`,
+                  }
+                : { visibility: "hidden" }
+            }
+            onLoad={(e) => {
+              const el = e.currentTarget;
+              // An SVG without a size of its own takes the stage's.
+              const st = stageRef.current;
+              setImg({ w: el.naturalWidth || st?.clientWidth || 1, h: el.naturalHeight || st?.clientHeight || 1 });
+            }}
+            onError={() => setBroken(true)}
+          />
+        )}
         {!img && (
           <span className="izoom__status row small muted" role="status">
             {broken ? (
@@ -328,7 +376,7 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
             )}
           </span>
         )}
-        {lens && box && (
+        {lens && box && src && (
           <>
             <span
               className="izoom__lens"

@@ -400,8 +400,17 @@ test("jobs and the activity log: each request is a job while it runs and a line 
   });
   expect(page.entries).toEqual([expect.objectContaining({ summary: "read notes.txt", kind: "file", result: "ok" })]);
   expect(page.more).toBe(true);
-  const all = await c.data<{ entries: { summary: string }[] }>({ type: "activity", agentId: AGENT.id });
+  const all = await c.data<{ entries: { summary: string; said?: unknown }[] }>({
+    type: "activity",
+    agentId: AGENT.id,
+  });
   expect(all.entries.map((e) => e.summary)).toEqual(["read notes.txt", "wrote notes.txt"]);
+  // Beside its English, what each line is, for the app to say in the person's language.
+  expect(all.entries.map((e) => e.said)).toEqual([
+    { key: "read", path: "notes.txt" },
+    { key: "wrote", path: "notes.txt" },
+  ]);
+  expect(started[0]).toMatchObject({ job: { said: { key: "wrote", path: "notes.txt" } } });
   expect(readFileSync(path.join(home, "activity.jsonl"), "utf8")).not.toContain(TOKEN);
   // Commands are off on a new app pairing: refused, and the log says so.
   s.frame({

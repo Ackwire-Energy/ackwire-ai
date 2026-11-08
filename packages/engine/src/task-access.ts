@@ -124,3 +124,31 @@ export async function admitTaskAgents(
   for (const r of rows) caches.scopes.deletePrefix(`${orgId}:${r.agent_id}:visible`);
   return rows.map((r) => r.agent_id);
 }
+
+/** A column of `artifacts` by its table's name: drizzle writes a bare one in a one-table query, which a subquery takes as its own. */
+export const artifactCol = (name: string) => sql.raw(`"artifacts"."${name}"`);
+
+/**
+ * Whether a file's sharing (ADR 0157) shows it to `userId` past its conversation, as a condition over `artifacts`: the
+ * whole workspace, or a list that names them, holds a role of theirs, or them as an administrator. The workspace
+ * membership is the caller's check. `userId` may be a column.
+ */
+export function fileSharedSql(userId: SQL) {
+  const c = artifactCol;
+  return sql<boolean>`(${c("share")} = 'everyone' or (${c("share")} = 'people' and (${userId} = any(${c("share_user_ids")})
+    or ${maySql(c("org_id"), userId, "administrator")}
+    or exists (select 1 from organization_member_roles sr where sr.org_id = ${c("org_id")} and sr.user_id = ${userId}
+      and sr.role_id = any(${c("share_role_ids")})))))`;
+}
+
+/**
+ * Whether `userId` reads a file at all, where it lives (`channelReaderSql`, or a public channel) or through its
+ * sharing, as a condition over `artifacts`. Mirrors `personCanRead` in `artifacts.ts`.
+ */
+export function fileSeenSql(userId: SQL) {
+  const c = artifactCol;
+  return sql<boolean>`(${c("channel_id")} is null or ${fileSharedSql(userId)}
+    or ${channelReaderSql(c("channel_id"), userId)}
+    or exists (select 1 from ${channels} pc where pc.id = ${c("channel_id")} and pc.kind = 'channel'
+      and pc.visibility = 'public'))`;
+}

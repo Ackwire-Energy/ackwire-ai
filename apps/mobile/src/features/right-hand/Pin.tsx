@@ -1,9 +1,9 @@
 import { rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { rightHandSeen } from "@/lib/storage";
 import { Count, Text } from "@/ui";
+import { router } from "@/ui/navigation";
 import type { ConversationRow } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";

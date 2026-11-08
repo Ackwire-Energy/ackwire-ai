@@ -12,10 +12,11 @@ import {
   toolsAt,
 } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
-import { humanize } from "@agenteschat/client/lib/custom-tools";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
+import { labelIsName } from "@agenteschat/client/lib/tool-labels";
+import { partsOf, toolName } from "@agenteschat/client/lib/tool-review";
 import {
   type AgentAppearance,
   Button,
@@ -103,15 +104,17 @@ export function ResourceIcon({
   );
 }
 
-/** "Get file contents" for `github_get_file_contents`; a server's own label for custom tools; built-ins translated. */
+/**
+ * A tool in words, "Ler arquivo" for `github_get_file_contents` (`toolName`: the catalog, else its verb and nouns); a
+ * custom tool's label when someone named it; built-ins translated.
+ */
 export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
-  if (r.custom) return tool.label;
   if (r.kind === "builtin") return builtinToolText(t, tool).label;
-  const prefix = r.connector ? `${r.connector}_` : "";
+  if (r.custom && !labelIsName(tool.label, tool.name)) return tool.label;
+  const prefix = r.connector && !r.custom ? `${r.connector}_` : "";
   // A numbered connection's tools (`linear_2_create_issue`) lose the number too.
-  return prefix && tool.name.startsWith(prefix)
-    ? humanize(tool.name.slice(prefix.length).replace(/^\d+_/, ""))
-    : tool.label;
+  const own = prefix && tool.name.startsWith(prefix) ? tool.name.slice(prefix.length).replace(/^\d+_/, "") : tool.name;
+  return toolName(t, partsOf(own), own);
 }
 
 /**
@@ -328,7 +331,7 @@ export function AccessMatrixSection() {
                   const name = resourceName(t, r, items);
                   return (
                     <th key={r.id} scope="col">
-                      <span className="level-matrix__head">
+                      <span className="level-matrix__head ac-iconline">
                         <ResourceIcon resource={r} items={items} name={name} />
                         {name}
                       </span>
@@ -344,7 +347,7 @@ export function AccessMatrixSection() {
                 return (
                   <tr key={a.id}>
                     <th scope="row">
-                      <span className="level-matrix__agent">
+                      <span className="level-matrix__agent ac-iconline">
                         <AgentAvatar agentId={a.id} name={a.name} size="sm" />
                         <span>
                           {a.name}

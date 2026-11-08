@@ -1,13 +1,13 @@
 import { opensDetails } from "@agenteschat/client/lib/audience";
 import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
-import { router } from "expo-router";
 import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import type { AgentLookInput } from "@/agent/looks";
 import { type AgentMode, agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
+import { router } from "@/ui/navigation";
 import { usePresenceOf } from "../status/hooks";
 import { useDirectory } from "./hooks";
 import { agentLook } from "./logic";

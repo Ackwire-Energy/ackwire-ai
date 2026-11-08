@@ -32,6 +32,7 @@
     "code": "コード",
     "fullScreen": "全画面",
     "wrapLines": "行を折り返す",
+    "raw": "生データ",
     "table": "表",
     "chartItem": "項目",
     "chartShare": "割合",
@@ -44,6 +45,7 @@
     "today": "今日",
     "yesterday": "昨日",
     "loadFailed": "読み込めませんでした。接続を確認して、もう一度お試しください。",
+    "gone": "これはもうここにありません。削除されたか、アクセスできなくなりました。",
     "notAllowed": "この操作の権限がありません。",
     "tooMany": "試行回数が多すぎます。しばらくしてからお試しください。",
     "offline": "オフラインです。接続を確認して、もう一度お試しください。",
@@ -1491,6 +1493,9 @@
     "workingNow": "作業中",
     "available": "対応可能",
     "archived": "アーカイブ済み",
+    "restore": "元に戻す",
+    "restoreAction": "{{name}}を元に戻す",
+    "restored": "{{name}}がチームに戻りました。",
     "emptyTitle": "エージェントのチームを作りましょう",
     "empty": "エージェントはそれぞれ役割を持ち、同じチャンネルで人と一緒に働きます。",
     "emptyViewerTitle": "エージェントのチームはここに表示されます",
@@ -1747,6 +1752,13 @@
     "generalName": "#generalの名前は変更できません。",
     "archive": "チャンネルをアーカイブ",
     "archived": "#{{channel}}をアーカイブしました。会話は残ります。",
+    "archivedTitle": "アーカイブしたチャンネル",
+    "archivedCount_other": "アーカイブしたチャンネル {{count}} 件",
+    "archivedNone": "元に戻せるアーカイブ済みのチャンネルはありません",
+    "archivedOn": "{{date}}にアーカイブ",
+    "restore": "元に戻す",
+    "restoreName": "#{{channel}}を元に戻す",
+    "restored": "#{{channel}}が戻りました。",
     "leave": "チャンネルから退出",
     "left": "#{{channel}}から退出しました",
     "leaveTitle": "#{{channel}}から退出しますか？",
@@ -1904,7 +1916,7 @@
       "budgetHelp": "上限に達すると、ほかのエージェントと同じく止まって知らせます。",
       "audience": "使える人",
       "audienceHelp": "対象外の人には、サイドバーに{{name}}が表示されません。",
-      "lock": "{{name}}はアーカイブも削除もできません。誰かが話しかけない限り、何も投稿しません。",
+      "lock": "{{name}}はアーカイブも削除もできません。話しかけられなくても投稿するのは、管理者向けのチームの1週間だけです。",
       "audit": "{{name}}がしたことを見る",
       "change": "変更",
       "planHelp": "料金はプランの持ち主が払います。そのコンピューターが使えないときは、会話でそう伝え、APIキーを提案します。",
@@ -2021,6 +2033,38 @@
       "open": "開く",
       "web": "サイトで開く",
       "notAllowed": "この画面へのアクセス権がありません"
+    },
+    "action": {
+      "title": "ワークスペースの変更",
+      "only": "この変更ができる人だけが適用できます",
+      "ask": "権限のある人に送る",
+      "other": "ワークスペースを変更する",
+      "create_role": "ロール<b>{{name}}</b>を作成",
+      "update_role": "ロール<b>{{name}}</b>を変更",
+      "delete_role": "ロール<b>{{name}}</b>を完全に削除",
+      "move_role": "ロール<b>{{name}}</b>の順番を変える",
+      "set_member_roles": "<b>{{name}}</b>のロールを変更: {{change}}",
+      "set_channel_permissions": "<b>#{{channel}}</b>で{{who}}ができることを変更",
+      "set_my_status": "ステータスを設定: <b>{{what}}</b>",
+      "set_notifications_on": "<b>{{category}}</b>の通知をオンにする",
+      "set_notifications_off": "<b>{{category}}</b>の通知をオフにする",
+      "set_my_timezone": "タイムゾーンを<b>{{timezone}}</b>にする",
+      "set_my_timezone_workspace": "ワークスペースのタイムゾーンに合わせる",
+      "set_invitation_roles": "<b>{{email}}</b>への招待で付与するロールを変更: {{change}}",
+      "update_channel": "チャンネル<b>#{{channel}}</b>を変更",
+      "archive_channel": "<b>#{{channel}}</b>をアーカイブ",
+      "archive_channel_back": "<b>#{{channel}}</b>を元に戻す",
+      "channel_people": "<b>#{{channel}}</b>のメンバーを変更: {{change}}",
+      "delete_channel": "チャンネル<b>#{{channel}}</b>をメッセージとファイルごと完全に削除",
+      "revoke_invitation": "<b>{{email}}</b>への招待を取り消す",
+      "resend_invitation": "<b>{{email}}</b>に招待を再送",
+      "decide_join_request_approve": "<b>{{email}}</b>をワークスペースに入れる",
+      "decide_join_request_deny": "<b>{{email}}</b>の参加リクエストを断る",
+      "stop_work": "<b>{{agent}}</b>の作業を止める",
+      "continue_work": "<b>{{agent}}</b>に続けさせる",
+      "update_workspace": "ワークスペース<b>{{name}}</b>を変更",
+      "set_action_check_on": "チームの過去の対応の確認をオンにする",
+      "set_action_check_off": "チームの過去の対応の確認をオフにする"
     }
   },
   "teamWeek": {
@@ -2569,7 +2613,8 @@
       "updated_status": "<b>#{{number}}</b>を{{status}}に移動しました · {{title}}",
       "updated_priority": "<b>#{{number}}</b>の優先度を{{priority}}にしました · {{title}}",
       "assigned": "<b>#{{number}}</b>を{{assignee}}に割り当てました · {{title}}",
-      "assigned_self": "<b>#{{number}}</b>を自分で引き受けました · {{title}}"
+      "assigned_self": "<b>#{{number}}</b>を自分で引き受けました · {{title}}",
+      "files": "{{names}}を添付しました"
     },
     "memory": {
       "saved": "<b>メモリ</b>に保存しました: {{text}}",
@@ -2613,6 +2658,35 @@
       "merged": "<b>{{repo}}</b>のPR <b>#{{number}}</b>をマージしました",
       "merged_branch": "<b>{{repo}}</b>に<b>{{ref}}</b>をマージしました"
     },
+    "workspace": {
+      "changed": "ワークスペースを変更しました",
+      "changed_create_role": "ロール<b>{{name}}</b>を作成しました",
+      "changed_update_role": "ロール<b>{{name}}</b>を変更しました",
+      "changed_delete_role": "ロール<b>{{name}}</b>を削除しました",
+      "changed_move_role": "ロール<b>{{name}}</b>の順番を変えました",
+      "changed_set_member_roles": "<b>{{name}}</b>のロールを変更しました: {{change}}",
+      "changed_set_channel_permissions": "<b>#{{channel}}</b>で{{who}}ができることを変更しました",
+      "changed_set_my_status": "ステータスを設定しました: <b>{{what}}</b>",
+      "changed_set_notifications_on": "<b>{{category}}</b>の通知をオンにしました",
+      "changed_set_notifications_off": "<b>{{category}}</b>の通知をオフにしました",
+      "changed_set_my_timezone": "タイムゾーンを<b>{{timezone}}</b>にしました",
+      "changed_set_my_timezone_workspace": "タイムゾーンをワークスペースに合わせる設定に戻しました",
+      "changed_set_invitation_roles": "<b>{{email}}</b>への招待で付与するロールを変更しました: {{change}}",
+      "changed_update_channel": "チャンネル<b>#{{channel}}</b>を変更しました",
+      "changed_archive_channel": "<b>#{{channel}}</b>をアーカイブしました",
+      "changed_archive_channel_back": "<b>#{{channel}}</b>を元に戻しました",
+      "changed_channel_people": "<b>#{{channel}}</b>のメンバーを変更しました: {{change}}",
+      "changed_delete_channel": "チャンネル<b>#{{channel}}</b>を削除しました",
+      "changed_revoke_invitation": "<b>{{email}}</b>への招待を取り消しました",
+      "changed_resend_invitation": "<b>{{email}}</b>に招待を再送しました",
+      "changed_decide_join_request_approve": "<b>{{email}}</b>をワークスペースに入れました",
+      "changed_decide_join_request_deny": "<b>{{email}}</b>の参加リクエストを断りました",
+      "changed_stop_work": "<b>{{agent}}</b>の作業を止めました",
+      "changed_continue_work": "<b>{{agent}}</b>に続けさせました",
+      "changed_update_workspace": "ワークスペース<b>{{name}}</b>を変更しました",
+      "changed_set_action_check_on": "チームの過去の対応の確認をオンにしました",
+      "changed_set_action_check_off": "チームの過去の対応の確認をオフにしました"
+    },
     "other": "変更を加えました",
     "copyWebhook": "Webhook のアドレスをコピー",
     "issueFields": {
@@ -2624,7 +2698,8 @@
       "labels": "ラベル",
       "dueDate": "期日",
       "githubUrl": "GitHub リンク",
-      "criteria": "完了条件"
+      "criteria": "完了条件",
+      "files": "添付ファイル"
     },
     "routineFields": {
       "name": "名前",
@@ -4262,6 +4337,8 @@
           "stepTwo": "Claudeに表示されたコードを貼り付けてください",
           "codeLabel": "Claudeのコード",
           "notCode": "Claudeのコードではないようです。",
+          "stepTwoGoogle": "Google に表示されたコードを貼り付けてください",
+          "codeLabelGoogle": "コードまたはリンク",
           "send": "{{computer}}に送信",
           "sending": "{{computer}}にコードを送信しています…",
           "sent": "コードを送信しました。{{computer}}でログインを完了しています。",
@@ -4579,6 +4656,7 @@
         "too_many_tool_calls": "1回の実行でのツール使用上限を超えました。",
         "stuck": "行き詰まったため停止しました。",
         "brain_interrupted": "AIが完了前に停止しました。",
+        "brain_unavailable": "コンピューターのAIが応答できませんでした。コンピューターを確認して、もう一度頼んでください。",
         "empty_reply": "モデルから何も返ってきませんでした。",
         "model_refused": "モデルが回答を拒否しました。",
         "agent_archived": "エージェントがアーカイブされました。",
@@ -5922,6 +6000,7 @@
         "done": "終わった",
         "canceled": "やらない"
       },
+      "stageFull": "{{stage}}にはすでに{{max}}列あり、これが1つのステージの上限です。先にそこから1列削除してください。",
       "stageExplain": {
         "todo": "新しいタスクは「未着手」の最初の列に入ります。",
         "in_progress": "エージェントが始めると、タスクは「進行中」の最初の列に移ります。",
@@ -6023,6 +6102,8 @@
       "cancel": "キャンセル",
       "create": "タスクを作成",
       "created": "タスク #{{number}}を作成しました。",
+      "notStarted": "タスク #{{number}}を作成しましたが、{{name}} は始めていません。",
+      "askAgain": "もう一度頼む",
       "intro": "担当する人やエージェントは、進捗とともにボードに表示されます。",
       "criteriaFound_other": "受け入れ条件{{count}}件",
       "agentStarts": "タスクが作成されると、{{name}}がすぐに始めます。重要な操作はあなたの承認を求めます。",
@@ -6066,6 +6147,7 @@
     "askButton": "{{name}}に頼む",
     "askSection": "エージェントに頼む",
     "asked": "依頼を送りました。{{name}} はタスクの会話で作業します。タスクを見られる人は全員その会話を追えます。",
+    "notStarted": "{{name}} は始めていません。",
     "activity": "アクティビティ",
     "noActivity": "まだ何もありません。",
     "discussion": "ディスカッション",
@@ -6111,7 +6193,8 @@
       "add": "ファイルを追加",
       "addHint": "またはここにドロップ",
       "grid": "グリッド",
-      "empty": "まだ添付ファイルはありません。ここにファイルをドロップするか、スクリーンショットを貼り付けてください。",
+      "emptyTitle": "このタスクのファイルはここに集まります",
+      "empty": "ここにファイルをドロップするか、スクリーンショットを貼り付けるか、タスクの会話で送ってください。",
       "fromCreation": "作成時 · {{when}}",
       "fromComment": "{{name}}のコメント · {{when}}",
       "linked": "{{name}}がリンク"
@@ -6140,6 +6223,8 @@
       "github_linked": "GitHub にリンクしました",
       "github_unlinked": "GitHub リンクを削除しました",
       "artifact_linked": "ファイルを添付しました",
+      "files_attached": "{{names}}を添付しました",
+      "files_removed": "{{names}}を添付ファイルから外しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",
       "agent_asked": "{{name}}に作業を頼みました"
@@ -7816,6 +7901,19 @@
     "confirm": "確定して招待",
     "otherTime": "別の日時",
     "confirmed": "予定を作成し、招待を送信しました。",
+    "proposalDismissed": "提案を見送りました",
+    "proposalWaits": "{{name}}さんがこの予定を確定します。",
+    "rsvp": {
+      "accept": "参加する",
+      "decline": "参加しない",
+      "accepted": "参加",
+      "declined": "不参加",
+      "mine": {
+        "needs_action": "この予定に招待されています。",
+        "accepted": "参加します。",
+        "declined": "参加しません。"
+      }
+    },
     "kind": {
       "event": "予定",
       "routine": "ルーティン",
@@ -9541,6 +9639,7 @@
     "title": "Drive",
     "subtitle": "人とエージェントが作成・アップロードしたすべてのもの。",
     "search": "ファイルを検索",
+    "loadMore": "さらに読み込む",
     "kind": "種類",
     "filters": "フィルター",
     "allKinds": "すべての種類",
@@ -9624,6 +9723,7 @@
     "onlyDriveText": "まだチャンネルで共有されていません。",
     "dm": "ダイレクトメッセージ",
     "dmWith": "{{name}}とのダイレクトメッセージ",
+    "dmBetween": "{{names}}の間のダイレクトメッセージ",
     "inDm": "ダイレクトメッセージで送信",
     "inThread": "会話のスレッド内",
     "audience": {
@@ -9631,7 +9731,8 @@
       "publicChannel": "ワークスペースの全員が見られます（公開チャンネル #{{name}} にあります）",
       "privateChannel": "#{{name}}のメンバーと管理者だけが見られます",
       "dm": "あなたと{{name}}だけが見られます（ダイレクトメッセージから共有されました）",
-      "dmGone": "その会話の参加者だけが見られます（ダイレクトメッセージから共有されました）"
+      "dmGone": "その会話の参加者だけが見られます（ダイレクトメッセージから共有されました）",
+      "dmBetween": "{{names}}だけが見られます（ダイレクトメッセージから共有されました）"
     },
     "private": "非公開",
     "privateHint": "これらのファイルは会話の参加者だけが見られます。チャンネルでは管理者も見られます。",
@@ -9675,9 +9776,6 @@
     },
     "s3": "独自のバケット",
     "s3Text": "S3、R2、MinIOなど、S3互換のストレージ。",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "近日公開",
     "current": "使用中",
     "usage": {
       "files": "ファイル{{size}}",
@@ -10240,6 +10338,7 @@
     },
     "toolsCount_other": "{{count}}個のツール",
     "active": "有効",
+    "noToolsNow": "今はツールなし",
     "notReviewed": "確認待ち",
     "toReview_other": "確認が必要な新しいツールが{{count}}個",
     "usedBy_other": "{{total}}体中{{count}}体のエージェント",
@@ -10393,6 +10492,7 @@
   },
   "toolNames": {
     "order": "verb-last",
+    "catalog": "none",
     "verb": {
       "get": "取得",
       "list": "一覧",
@@ -11104,6 +11204,11 @@
       "subject": "件名に含む",
       "text": "本文に含む",
       "noMailbox": "先にコネクタでメールボックスを接続してください。",
+      "readsNone": "{{name}}はまだどのメールボックスも読めません。",
+      "cantRead": "{{name}}はこのメールボックスを読めません。",
+      "connectorReadsNone": "{{name}}はまだ{{connector}}を読めません。",
+      "connectorCantRead": "{{name}}は{{connector}}を読めません。",
+      "giveAccess": "アクセスを許可",
       "openConnectors": "コネクタを開く",
       "when": "{{address}}にメールが届いたとき",
       "whenFolder": "{{address}}（{{folder}}）にメールが届いたとき",
@@ -11258,6 +11363,11 @@
       "hintZoomed": "ドラッグで移動。Esc で全体表示に戻る",
       "hintTouch": "タップまたはピンチで拡大",
       "hintZoomedTouch": "ドラッグで移動。タップで全体表示に戻る"
+    },
+    "nav": {
+      "previous": "前の画像",
+      "next": "次の画像",
+      "place": "{{index}}/{{count}}"
     }
   },
   "errors": {
@@ -11276,6 +11386,8 @@
       "checkAddress": "アドレスを確認して、もう一度お試しください。",
       "tooLong": "長すぎます。短くして、もう一度お試しください。",
       "updateComputerApp": "コンピューターのアプリが古すぎます。更新して、もう一度お試しください。",
+      "computerUpdatesItself": "ワークスペースのコンピューターはこのために自動で更新されます。少ししてからもう一度お試しください。",
+      "notInvited": "この予定には招待されていません。",
       "offHere": "ここではオフになっています。",
       "notInConversation": "この会話にいません。",
       "accountStart": "コンピューターがログインを開始できませんでした。電源が入っているか確認して、もう一度お試しください。",
@@ -11318,6 +11430,7 @@
     },
     "issue": {
       "assigneeOutside": "この人はこのタスクを見ることができません。先に閲覧できる人に追加してください。",
+      "stageFull": "1つのステージに置ける列は{{max}}列までです。先にその列を1つ削除してください。",
       "deleteForbidden": "このタスクを削除できるのは作成者か管理者だけです。",
       "audienceEmpty": "閲覧できる人を選んでください。"
     },
@@ -11494,7 +11607,14 @@
       "fileNameRequired": "ファイルには名前が必要です。",
       "notFound": "このファイルは存在しないか、アクセス権がありません。",
       "deleteForbidden": "削除できるのは、作成した人、エージェントに依頼した人、エージェントのオーナー、または管理者だけです。",
-      "restoreForbidden": "復元できるのは、削除できる人だけです。"
+      "restoreForbidden": "復元できるのは、削除できる人だけです。",
+      "versionNotFound": "このバージョンのファイルはありません。",
+      "formatUnavailable": "このファイルはその形式では保存できません。",
+      "sharingOpen": "ワークスペース全体がすでにこのファイルを見られます。",
+      "sharingForbidden": "閲覧できる人を変えられるのは、ファイルの会話にいる人だけです。",
+      "sharingEmpty": "閲覧できる人を選んでください。",
+      "sharingTooMany": "選べるのは最大{{max}}人と{{max}}個のロールです。",
+      "notInDrive": "これは会話の中だけにあるため、共有できません。"
     },
     "machine": {
       "forbidden": "それができるのは、管理者かコンピューターを接続した人だけです。",
@@ -11606,6 +11726,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "このコンピューターのシステムでは、エージェントのブラウザは動きません。",
+      "browser_download": "エージェントのブラウザをダウンロードできませんでした。このコンピューターの接続を確認してください。次に使うときにもう一度試します。",
+      "browser_checksum": "エージェントのブラウザのダウンロードが破損していたため、使いませんでした。次に使うときにもう一度試します。",
+      "desktop_use_linux": "エージェントの画面のアプリは、エージェントの画面があるLinuxのコンピューターで動きます。",
+      "desktop_use_own_user": "エージェントの画面のアプリには、このコンピューターで各エージェントが自分のユーザーとして動くこと(システムモード)が必要です。ここではすべてのエージェントがrunnerのユーザーとして動いています。",
+      "desktop_use_install": "エージェントの画面のアプリに必要なものを、このコンピューターにインストールしてください:",
+      "desktop_unavailable": "このコンピューターではエージェントの画面を動かせません。",
+      "desktop_linux": "エージェントの画面が動くのはLinuxのコンピューターだけです。",
+      "desktop_install": "このコンピューターにエージェントの画面をインストールしてください:",
+      "not_as_root": "エージェントの画面とターミナルがrootで動くことはありません。runnerを通常のユーザーで動かしてください。",
+      "runner_bun_old": "これにはBun 1.3.5以降で動くrunnerが必要です。このコンピューターのrunnerを更新してください。",
+      "terminal_unsupported": "ターミナルが動くのはLinuxとMacのコンピューターだけです。"
+    },
     "egress": {
       "draining": "ネットワークが変わります。コンピューターの開いているセッションは{{when}}に再起動します。",
       "restart": "ネットワークを反映するため、コンピューターのセッションを再起動しています。新しい作業は完了まで待機します。",
@@ -12330,6 +12464,7 @@
       "techAction": "操作",
       "techTool": "ツール",
       "techKind": "種類",
+      "techSaid": "返ってきた内容",
       "techRun": "実行",
       "techId": "記録",
       "openConversation": "会話を開く",
@@ -12339,6 +12474,7 @@
     }
   },
   "settings": {
+    "notOpen": "このワークスペースでのあなたのロールでは{{section}}を開けません。ロールを管理している人が開けるようにできます。",
     "nav": "設定のセクション",
     "group": {
       "you": "あなた",
@@ -12427,6 +12563,14 @@
         "openAt": "会話を開いたときの移動先",
         "openRead": "最後に読んだメッセージ",
         "openLatest": "最新のメッセージ",
+        "textSize": "文字サイズ",
+        "textSizeHelp": "メッセージの文字。すべての会話とあなたのすべてのデバイスに反映されます",
+        "textSizePhone": "スマートフォンの設定の文字サイズも反映されます",
+        "textXs": "最小",
+        "textSm": "小",
+        "textMd": "標準",
+        "textLg": "大",
+        "textXl": "最大",
         "sample": {
           "ask": "あと何件ですか？",
           "answer": "あと14件です。知らせますか？",
@@ -13054,7 +13198,11 @@
         "shell": "内部で別のコマンドを実行します",
         "inline": "インラインで渡されたコードを実行します",
         "global": "コンピューター全体にインストールします",
-        "rules": "エージェントが自分で行える範囲外です"
+        "rules": "エージェントが自分で行える範囲外です",
+        "noAccess": "エージェントにはこれへのアクセス権がありません",
+        "policy": "この種類の作業では許可されていません",
+        "credential": "キーのように見えるものを送ります",
+        "repo": "そのリポジトリはエージェントのリストにありません"
       },
       "gave": "提供",
       "answered": "回答",
@@ -13159,6 +13307,7 @@
         "runningRoutine": "ルーティンを今すぐ実行しました",
         "proposingTeam": "チームを提案しました",
         "proposingChange": "変更を提案しました",
+        "workingOnWorkspace": "ワークスペースで作業しました",
         "updatingThread": "スレッドを更新しました",
         "addingAgent": "エージェントをチャンネルに追加しました",
         "readingConversation": "会話を読みました",
@@ -13267,6 +13416,7 @@
       "runningRoutine": "ルーティンを今すぐ実行中",
       "proposingTeam": "チームを提案中",
       "proposingChange": "変更を提案中",
+      "workingOnWorkspace": "ワークスペースで作業中",
       "updatingThread": "スレッドを更新中",
       "addingAgent": "エージェントをチャンネルに追加中",
       "readingConversation": "会話を読み中",
@@ -13410,6 +13560,8 @@
       "action_update_skills": "スキルを更新",
       "action_approvals": "あなたの承認待ち",
       "action_open_page": "画面を開く",
+      "calendar_proposal": "予定の提案: {{title}}",
+      "action_workspace": "ワークスペースの変更を提案しました",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "team_proposal": "チームを提案しました：{{names}}",
       "settings_proposal": "{{names}}への変更を提案しました",
@@ -13617,6 +13769,38 @@
     "update_skill_from_source": {
       "label": "スキルをリンクから更新",
       "description": "スキルをインストール元から更新します。スクリプトの変更は人の確認を待ちます。"
+    },
+    "propose_remove_agents": {
+      "label": "エージェントのアーカイブまたは削除を提案",
+      "description": "アーカイブまたは削除するエージェントのカードを1枚投稿します。権限のある人が適用します。"
+    },
+    "offer_answers": {
+      "label": "タップで答えられる質問をする",
+      "description": "タップで答えられる質問を投稿します。タップするたびに、その人のメッセージになります。"
+    },
+    "propose_team": {
+      "label": "チームを提案",
+      "description": "複数のエージェントとそのチャンネル、ルーティン、スキルをまとめたカードを1枚投稿します。作成するのは人です。"
+    },
+    "propose_settings_change": {
+      "label": "メンバーの設定を提案",
+      "description": "メンバーの新しいモデル、AI、予算、担当者、公開範囲、チャンネルを示すカードを投稿します。適用するのは人です。"
+    },
+    "offer_approvals": {
+      "label": "承認待ちのものを表示",
+      "description": "その人の承認を待っているものをカード1枚にまとめて投稿します。その場で1つずつ承認か却下ができます。"
+    },
+    "propose_member_changes": {
+      "label": "メンバーの変更を提案",
+      "description": "オーナー、ロール、削除の変更をまとめたカードを1枚投稿します。権限のある人が1つずつ適用します。"
+    },
+    "offer_open_page": {
+      "label": "画面を開くことを提案",
+      "description": "請求、ロール、エージェントのページなど、アプリの画面を開くボタン付きのカードを投稿します。"
+    },
+    "set_team_week": {
+      "label": "チームの1週間のカードを変更",
+      "description": "その人のダイレクトメッセージに届く週ごとのチームの1週間カードを止める、再開する、または日時を変えます。"
     },
     "propose_agent": {
       "label": "エージェントを提案",
@@ -15275,6 +15459,85 @@
     "receipt": "閲覧できる人：{{who}}",
     "limited": "アクセス制限あり",
     "rolesToo": "このページにすでに設定されているロールは引き続き閲覧できます。"
+  },
+  "share": {
+    "button": "共有",
+    "title": "{{name}}を共有",
+    "conversation": "会話のみ",
+    "people": "選んだ人とロール",
+    "everyone": "ワークスペース全体",
+    "whereDm": "{{name}}とのダイレクトメッセージ",
+    "whereDmGone": "ダイレクトメッセージ",
+    "whereDmBetween": "{{names}}の間のダイレクトメッセージ",
+    "whereChannel": "#{{name}}のメンバー",
+    "add": "人またはロールを追加",
+    "addSearch": "人とロールを検索",
+    "noResults": "その名前の人はいません",
+    "groupPeople": "人",
+    "groupRoles": "ロール",
+    "access": "アクセスできる人",
+    "you": "{{name}}（あなた）",
+    "agent": "エージェント",
+    "role": "ロール",
+    "remove": "{{name}}を外す",
+    "admins": "管理者は常に閲覧できます。",
+    "copyLink": "リンクをコピー",
+    "copied": "リンクをコピーしました。",
+    "done": "完了",
+    "onlyHere": "この会話にいない人はリンクを開けません。",
+    "choosePeople": "人を選ぶ",
+    "readOnly": "閲覧できる人を変えられるのは、会話にいる人だけです。",
+    "open": "ワークスペース全体がこのファイルを見られます。",
+    "savedEveryone": "ワークスペース全体がファイルを見られるようになりました。",
+    "savedPeople": "選んだ人がファイルを見られるようになりました。",
+    "savedConversation": "会話にいる人だけがファイルを見られるようになりました。",
+    "undo": "元に戻す",
+    "fileRef": "ファイル {{title}}",
+    "fileRefNone": "アクセスできないファイル",
+    "also": "{{text}}。{{who}}とも共有しています。",
+    "someOnlyHere": "これらのリンクの一部は、ファイルの会話にいる人しか開けません。"
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "このリンクを開くにはログインしてください",
+      "text": "ログインすると、すぐにここに戻ります。"
+    },
+    "file": {
+      "title": "このファイルはあなたには公開されていません",
+      "text": "削除されたか、あなたが参加していない会話でだけ共有されている可能性があります。送った人に、ファイルの共有ボタンからあなたと共有してもらってください。"
+    },
+    "link": {
+      "title": "このリンクはあなたには公開されていません",
+      "text": "期限切れ、使用済み、またはあなたが参加していない場所へのリンクの可能性があります。送った人に新しいリンクをもらってください。"
+    },
+    "version": {
+      "title": "このバージョンのファイルはありません",
+      "text": "リンクは、ファイルにないバージョンを指しています。"
+    },
+    "format": {
+      "title": "このファイルはその形式では保存できません",
+      "text": "リンクは、このファイルを保存できない形式を指しています。"
+    },
+    "busy": {
+      "title": "続けて試した回数が多すぎます",
+      "text": "少し待ってから、もう一度試してください。"
+    },
+    "server": {
+      "title": "こちら側で問題が起きました",
+      "text": "あなたの操作が原因ではありません。少ししてからもう一度試してください。"
+    },
+    "other": {
+      "title": "このリンクは開けませんでした",
+      "text": "アドレスが不完全か、もう使えません。送った人に新しいものをもらってください。"
+    },
+    "action": {
+      "signIn": "ログイン",
+      "open": "agentes.chat を開く",
+      "latest": "最新のバージョンを開く",
+      "file": "ファイルを開く",
+      "retry": "もう一度試す"
+    },
+    "errorId": "エラーコード：{{id}}"
   },
   "teamTemplates": {
     "lead": "{{org}}のチーム。エージェントはそれぞれ自分のチャンネルにいます。作成前に調整できます。",

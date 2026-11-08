@@ -115,6 +115,19 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, off, editableFields({ admin: false, owner: false }))).toBeNull();
   });
 
+  test("someone who can't edit reads the instructions drawn as Markdown, as the chat does, never its marks", () => {
+    const src = readFileSync(
+      join(import.meta.dir, "..", "..", "src", "features", "agents", "AgentEditScreen.tsx"),
+      "utf8",
+    );
+    const readOnly = src.slice(
+      src.indexOf('fields.has("instructions") ?'),
+      src.indexOf("</GroupedList>", src.indexOf('fields.has("instructions") ?')),
+    );
+    expect(readOnly).toContain("<MessageText body={agent.instructions} />");
+    expect(readOnly).not.toContain("{agent.instructions ||");
+  });
+
   test("Editar hints the role the way Criar agente does, not with a one-word example", () => {
     const src = (f: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "agents", f), "utf8");
     for (const screen of ["AgentEditScreen.tsx", "NewAgentScreen.tsx"]) {

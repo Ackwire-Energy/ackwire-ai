@@ -1,5 +1,4 @@
 import { useMission, useMissionDecisions, useMissionReviews, useThreadInfo, useThreadTasks } from "@agenteschat/client";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
@@ -19,6 +18,7 @@ import {
   Text,
   useReducedMotion,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";

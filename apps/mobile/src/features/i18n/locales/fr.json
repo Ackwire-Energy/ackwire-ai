@@ -71,6 +71,7 @@
     "copied": "Copié",
     "fullScreen": "Plein écran",
     "wrap": "Retour à la ligne",
+    "raw": "Brut",
     "more": "Voir les {{count}} lignes",
     "gone": "Ce code n'est plus ouvert."
   },
@@ -1101,19 +1102,21 @@
       "file": "Fichier"
     },
     "more": "Plus d'options",
-    "share": "Partager",
+    "send": "Envoyer",
     "savePhotos": "Enregistrer dans Photos",
     "drive": "Voir dans Drive",
     "saved": "Enregistré dans Photos",
     "photosDenied": "Pas d'accès à Photos",
     "photosDeniedSub": "Autorisez-le dans les Réglages pour enregistrer des images.",
-    "shareFailed": "Impossible de partager le fichier.",
+    "shareFailed": "Impossible d'envoyer le fichier.",
     "saveFailed": "Impossible d'enregistrer l'image.",
     "loadFailed": "Impossible d'ouvrir le fichier.",
     "openImage": "Ouvrir l'image",
     "imageOf": "Image {{index}} sur {{count}}",
     "place": "{{index}} sur {{count}}",
-    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app.",
+    "previous": "Image précédente",
+    "next": "Image suivante",
+    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Envoyez-le vers une autre app pour l'ouvrir.",
     "video": {
       "play": "Lire",
       "pause": "Pause",
@@ -1681,6 +1684,7 @@
     "everyoneFailed": "Impossible de modifier l'accès de tout le monde. Réessayez.",
     "disconnectFailed": "Impossible de déconnecter {{name}}. Réessayez.",
     "needsReconnect": "Le compte {{name}} ne fonctionne plus. Les agents ne peuvent pas l'utiliser tant que quelqu'un ne l'a pas reconnecté.",
+    "noTools": "Les outils de {{name}} n’ont pas pu être lus. Les agents s’en passent jusqu’à une nouvelle lecture, dans Outils.",
     "accountTitle": "Ce compte",
     "renameFailed": "Impossible de le renommer. Réessayez.",
     "whoTitle": "Qui l'utilise et jusqu'où",
@@ -1813,7 +1817,7 @@
   },
   "crash": {
     "title": "Un problème est survenu sur cet écran",
-    "subtitle": "L'app a rencontré une erreur en affichant ceci. Réessayez. Si ça continue, envoyez-nous le texte ci-dessous.",
+    "subtitle": "L'app a rencontré une erreur en affichant ceci. Réessayez.",
     "retry": "Réessayer"
   },
   "notFound": {

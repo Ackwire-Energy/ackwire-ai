@@ -151,7 +151,10 @@ export const Machine = z
         available: z.boolean(),
         version: z.string().nullable(),
         chrome: z.string().nullable(),
-        reason: z.string().nullable().openapi({ description: "Why it can't run yet, from the runner." }),
+        reason: z.string().nullable().openapi({ description: "Why it can't run yet, from the runner (English)." }),
+        code: z.string().nullable().openapi({
+          description: "That reason as a code the apps word (`browser_download`…); null from older runners.",
+        }),
       })
       .nullable()
       .openapi({
@@ -162,6 +165,9 @@ export const Machine = z
       .object({
         available: z.boolean(),
         reason: z.string().nullable().openapi({ description: "Why it can't, from the runner (what to install)." }),
+        code: z.string().nullable().openapi({
+          description: "That reason as a code the apps word (`desktop_use_install`…); null from older runners.",
+        }),
       })
       .nullable()
       .openapi({

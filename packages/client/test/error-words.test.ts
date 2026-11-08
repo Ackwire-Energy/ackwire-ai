@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ptBR, resources } from "@agenteschat/i18n";
+import { en as enStrings, ptBR, resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import { ApiError, createFileRequester, createRequester, invitationQuery, NetworkError } from "../src/index";
 import { authErrorText, errorText, hasWordsFor, noAnswer, sendWaits, signInRefusalText } from "../src/lib/errors";
@@ -160,6 +160,36 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
   });
 
+  test("a field the server's validator refused reads by its kind in every language, never the validator's English", () => {
+    const lang = (lng: string) => {
+      const instance = i18next.createInstance();
+      void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+      return instance.t;
+    };
+    const refused = (message: string, params?: Record<string, unknown>) =>
+      new ApiError(400, "invalid_request", message, params);
+    const long = refused("context: Too big: expected string to have <=20000 characters", {
+      field: "context",
+      issue: "too_long",
+      max: 20000,
+    });
+    expect(errorText(lang("en"), long)).toBe(enStrings.errors.said.tooLong);
+    expect(errorText(lang("pt-BR"), long)).toBe(ptBR.errors.said.tooLong);
+    expect(errorText(lang("en"), refused("name: Too small", { field: "name", issue: "missing" }))).toBe(
+      enStrings.errors.said.fillIn,
+    );
+    expect(errorText(lang("en"), refused("ids: Too big", { field: "ids", issue: "too_many", max: 50 }))).toBe(
+      enStrings.errors.said.tooMany,
+    );
+    expect(errorText(lang("en"), refused("x: Invalid input", { field: "x", issue: "invalid" }))).toBe(
+      enStrings.errors.said.input,
+    );
+    // A refusal the server wrote for people, with no field named, keeps its words in English.
+    expect(errorText(lang("en"), refused("That column does not exist"))).toBe("That column does not exist");
+    // Something gone says so plainly in English too: the server's "Agent not found" says nothing to do.
+    expect(errorText(lang("en"), new ApiError(404, "not_found", "Agent not found"))).toBe(enStrings.errors.said.gone);
+  });
+
   test("Better Auth's refusals a person meets on sign-up say what happened, never the plain line", () => {
     const instance = i18next.createInstance();
     void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
@@ -244,6 +274,21 @@ test("a computer that can't connect Claude this way is said in the person's lang
   expect(errorText(said, refusal)).toBe("errors.machine.accountMethodUnsupported");
 });
 
+test("an agent that doesn't answer this person says whom it answers, in the person's words", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const only = new ApiError(403, "audience.only", "Ada only replies to Walter and Ana.", {
+    agentName: "Ada",
+    names: ["Walter", "Ana"],
+  });
+  expect(errorText(instance.t, only)).toBe("A Ada só responde a Walter e Ana.");
+  const nobody = new ApiError(403, "audience.nobody", "Theo isn't replying to anyone right now.", {
+    agentName: "Theo",
+    names: [],
+  });
+  expect(errorText(instance.t, nobody)).toBe("O Theo não está respondendo a ninguém agora.");
+});
+
 test("the right hand refused a place: its own line, never ask an admin", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");
@@ -260,6 +305,11 @@ const PLAIN_LINE = new Set([
   "account.invalid_kind",
   "account.invalid_label",
   "account.invalid_plan",
+  // A workspace change's card offers Apply, Dismiss and Send on only to whom may (`mayApplyCard`).
+  "action_card.not_allowed",
+  "action_card.not_requester",
+  "action_card.unknown",
+  "action_card.yours",
   // Every "Responde a" picker and drag offers only what `mayReportTo` allows, the server's own rules.
   "agent.reports_to",
   "agent_proposal.yours",

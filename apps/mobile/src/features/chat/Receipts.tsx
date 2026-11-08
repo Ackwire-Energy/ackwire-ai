@@ -6,12 +6,14 @@ import {
   useAgentActions,
   useApi,
 } from "@agenteschat/client";
+import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   actionErrorKey,
   actionTextKey,
   actionTextValues,
   formatTimeLeft,
   hookToCopy,
+  receiptFiles,
   routineOwnActions,
 } from "@agenteschat/client/lib/actions";
 import { ownActionName } from "@agenteschat/client/lib/approval-words";
@@ -19,13 +21,13 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { handedTasksOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { ACT_ROW, LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -54,7 +56,11 @@ import {
 export function Receipts({ message: m }: { message: Message }) {
   // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
   const handed = new Set(handedTasksOf(m.meta).map((h) => h.issueId));
-  const list = (m.actions ?? []).filter((a) => !(a.kind === "issue.created" && handed.has(a.target.id)));
+  // A workspace change's card says what was applied and has its own Undo.
+  const onCard = actionCardOf(m.meta)?.kind === "workspace_action";
+  const list = (m.actions ?? []).filter(
+    (a) => !(a.kind === "issue.created" && handed.has(a.target.id)) && !(onCard && a.kind === "workspace.changed"),
+  );
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
   if (layout === "none") return null;
@@ -278,10 +284,23 @@ function CopyHook({ action: a }: { action: AgentAction }) {
 /** What a receipt offers under its sentence. */
 const HandyLines = ({ action }: { action: AgentAction }) => (
   <>
+    <FilesLine action={action} />
     <WhoSeesLine action={action} />
     <CopyHook action={action} />
   </>
 );
+
+/** Under a task change that brought files: which ones went with it. */
+function FilesLine({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const files = receiptFiles(a);
+  if (files.length === 0) return null;
+  return (
+    <Text variant="footnote" tone="muted" style={styles.undoneBy}>
+      {t("agentActions.issue.files", { names: joinNames(files, t) })}
+    </Text>
+  );
+}
 
 /** Under a task the agent made: who sees it, and the way to change it (ADR 0151). */
 function WhoSeesLine({ action: a }: { action: AgentAction }) {

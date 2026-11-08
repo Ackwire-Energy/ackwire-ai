@@ -1,10 +1,10 @@
 import { type Artifact, useArtifact } from "@agenteschat/client";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import { CHROME_MAX_SCALE, Icon, type IconName, PressScale, systemText, Text, useTheme, weights } from "@/ui";
+import { router } from "@/ui/navigation";
 import { encodeFileList } from "../files/logic";
 import { useRemoteFile } from "../files/source";
 import { Face } from "../shared/Face";

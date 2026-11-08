@@ -494,9 +494,10 @@ html:not([data-pointer]) .ac-link:focus-visible {
   gap: var(--form-gap);
   min-width: 0;
 }
-/* A paragraph among fields takes the form's gap, not its browser margins on top. */
-:where(.ac-form, .ac-field, .ac-dialog__body) > p {
-  margin: 0;
+/* A paragraph or a list among fields or in a card takes the stack's gap, not its browser margins on top (13px more on
+   each side of a small note). A class with margins of its own keeps them. */
+:where(.ac-form, .ac-field, .ac-dialog__body, .ac-card, .ac-details__section) > :where(p, ul, ol) {
+  margin-block: 0;
 }
 .ac-form__actions {
   display: flex;
@@ -1066,6 +1067,40 @@ textarea.ac-input {
   /* The avatar column and its gap: how far a body stands in from its row. */
   --msg-lead: calc(36px + var(--space-3));
 }
+/*
+ * Tamanho do texto (`textSize`, packages/client/src/lib/chat-look.ts), the same in every look: a message's words
+ * (`--msg-text`) on their reading line (`--msg-line`), and the tighter line (`--msg-line-tight`) of the name over them,
+ * which Bolhas and Compacta also give their words. The page carries the person's step (`html[data-text-size]`), a
+ * preview its own. The words' and lines' ratios are the ones before the setting, at a smaller default; the gaps
+ * between parts and turns stay the same at every step.
+ */
+:root,
+[data-text-size="md"] {
+  --msg-text: 14px;
+  --msg-line: 24px;
+  --msg-line-tight: 20px;
+}
+/* 18px at the least: a reader's face (`.ac-avatar--xs`) and Compacta's face stand on that line. */
+[data-text-size="xs"] {
+  --msg-text: 12px;
+  --msg-line: 20px;
+  --msg-line-tight: 18px;
+}
+[data-text-size="sm"] {
+  --msg-text: 13px;
+  --msg-line: 22px;
+  --msg-line-tight: 19px;
+}
+[data-text-size="lg"] {
+  --msg-text: 16px;
+  --msg-line: 27px;
+  --msg-line-tight: 23px;
+}
+[data-text-size="xl"] {
+  --msg-text: 18px;
+  --msg-line: 31px;
+  --msg-line-tight: 26px;
+}
 /* Message: a fixed avatar column at the top, the text column beside it. Its side padding is set through
    `--msg-inline`, which the action bar also reads to stand left of the receipt's check. */
 .ac-msg {
@@ -1162,7 +1197,7 @@ textarea.ac-input {
   display: flex;
   justify-content: center;
 }
-/* No height of its own: the time's 26px line would stand under a shorter row's one line and open its gap. */
+/* No height of its own: the time's line, the words', would stand under a shorter row's one line and open its gap. */
 .ac-msg__gutter {
   height: 0;
 }
@@ -1177,9 +1212,10 @@ textarea.ac-input {
   width: 36px;
   height: 36px;
 }
+/* On the words' first line, whatever their size. */
 .ac-msg__gutter-time {
-  font-size: 11px;
-  line-height: 26px;
+  font-size: max(11px, calc(var(--msg-text) - 3px));
+  line-height: var(--msg-line);
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1220,17 +1256,17 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   margin-top: calc(var(--msg-part-gap) / 2);
 }
 /*
- * Name and time on a 20px line whose box starts at the face's top: capitals flush with the face's edge read as a face
- * hanging under the name, so the name sits a little in, as the text beside a picture does. Turns are told apart by
- * space, name and face only.
+ * Name and time on a line (20px by default) whose box starts at the face's top: capitals flush with the face's edge
+ * read as a face hanging under the name, so the name sits a little in, as the text beside a picture does. Turns are
+ * told apart by space, name and face only. The name is the words' size, its weight sets it apart.
  */
 .ac-msg__head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
-  font-size: 14.5px;
-  line-height: 20px;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line-tight);
 }
 .ac-msg__author {
   font-weight: 650;
@@ -1240,24 +1276,14 @@ html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   align-self: center;
 }
 .ac-msg__time {
-  font-size: 12px;
+  font-size: max(11px, calc(var(--msg-text) - 2px));
   color: var(--faint);
 }
-.ac-msg__meta {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
-}
 /*
- * Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header. Focus counts
+ * Details behind the time (date, model, tokens): a tip (`Tip`) on hover or focus, never in the header. Focus counts
  * for the keys only (`data-pointer`): a panel or a dialog closing with Esc hands the focus back by script, which a
  * browser calls :focus-visible after any key.
  */
-.ac-msg__time--details,
-.ac-msg__gutter-time {
-  position: relative;
-}
 .ac-msg__time--details {
   cursor: default;
   border-radius: var(--radius-cut);
@@ -1266,11 +1292,34 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ac-msg__tip {
-  position: absolute;
+/*
+ * A tip (`Tip`): on the floating layer, in <body> and fixed to the window where `placeTip` puts it, so nothing that
+ * clips or scrolls cuts it and no row's bar covers it. As wide as its words, wrapping only where the window is
+ * narrower, with the floating layers' room on both sides; a word longer than that (a mailbox) breaks inside it.
+ */
+.ac-tip {
+  position: fixed;
+  top: 0;
   left: 0;
-  bottom: calc(100% + 6px);
-  z-index: var(--z-sticky);
+  z-index: var(--z-floating);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-tip {
+    animation: ac-tip-in 120ms ease both;
+  }
+}
+@keyframes ac-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+.ac-msg__tip {
   padding: var(--space-1) var(--space-2);
   background: var(--surface-raised);
   color: var(--ink);
@@ -1281,32 +1330,11 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   line-height: 16px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
 }
-.ac-msg__time--details:hover .ac-msg__tip,
-html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
-.ac-msg__gutter-time:hover .ac-msg__tip,
-.ac-msg__own-time:hover .ac-msg__tip {
-  visibility: visible;
-  opacity: 1;
-}
-@media (prefers-reduced-motion: no-preference) {
+/* Wider than a phone, long details (a model's full name, a mailbox) wrap at a reading width, not across the chat. */
+@media (min-width: 641px) {
   .ac-msg__tip {
-    transform: translateY(2px);
-    transition:
-      opacity 120ms ease,
-      transform 120ms ease,
-      visibility 0s linear 120ms;
-  }
-  .ac-msg__time--details:hover .ac-msg__tip,
-  html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
-  .ac-msg__gutter-time:hover .ac-msg__tip,
-  .ac-msg__own-time:hover .ac-msg__tip {
-    transform: none;
-    transition-delay: 250ms, 250ms, 0s;
+    max-width: 420px;
   }
 }
 /* A person-facing state on the header line ("enviando…"): icon + word, muted */
@@ -1338,10 +1366,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* Inline code on a plate (mono only for code). */
+/* Inline code on a plate (mono only for code), a step under the words: the mono face runs wide. */
 .ac-msg__text code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 0.84em;
   background: var(--plate);
   color: var(--ink2);
   padding: 2px 6px;
@@ -2058,6 +2086,9 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 }
 .ac-menu__item {
   display: flex;
+  /* A long menu scrolls in its flex column: a row keeps its own height, or one with a description line would shrink
+     to the row minimum and lie over the next. */
+  flex-shrink: 0;
   align-items: flex-start;
   gap: var(--space-2);
   width: 100%;
@@ -3064,9 +3095,11 @@ html:not([data-pointer]) .ac-row:focus-visible {
   /* Over a modal dialog too, which turns the page's own off. */
   pointer-events: auto;
 }
+/* A name or a title in it (a setor someone named) breaks a word longer than the toast instead of running past it. */
 .ac-toast__text {
   flex: 1;
   min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Progress bars */
@@ -3442,11 +3475,13 @@ html:not([data-pointer]) .ac-back:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Selectable list item in a side list */
+/* Selectable list item in a side list. What people and agents wrote in it (a version's note, a proposal's title) breaks
+   a word longer than its line instead of running past the card ("alerta15:15:57,link/ts"). */
 .ac-navcard {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  overflow-wrap: break-word;
   text-align: left;
   padding: var(--space-3);
   font: inherit;
@@ -3904,10 +3939,10 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
   /* A body stacked as a column (cards) has no floats: there it keeps the right end. */
   align-self: flex-end;
   margin-left: 8px;
-  font-size: 15.5px;
-  line-height: 1.7;
-  /* Browsers without the lh unit: the text's 26.35px line. */
-  translate: 0 calc(13.175px - var(--cap-mid) - 50%);
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
+  /* Browsers without the lh unit: the same, from the text's line. */
+  translate: 0 calc(var(--msg-line) / 2 - var(--cap-mid) - 50%);
 }
 @supports (top: 1lh) {
   .ac-msg__aside--floating {
@@ -4410,6 +4445,25 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--primary.ac-btn--loading .ac-btn__spinner {
   color: var(--on-action);
 }
+/*
+ * Words that take turns (`SwapLabel`), each with its icon: stacked in one cell the wider one sizes, the unseen one
+ * keeping its width. The one shown sits in the cell's middle with its icon at the button's gap, so the room the other
+ * keeps splits between both ends instead of opening between the icon and its words.
+ */
+.ac-swap {
+  display: inline-grid;
+  gap: inherit;
+}
+.ac-swap > * {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: inherit;
+}
+.ac-swap > [aria-hidden="true"] {
+  visibility: hidden;
+}
 .ac-btn--loading:disabled {
   cursor: progress;
   border-color: var(--line-strong);
@@ -4833,7 +4887,7 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
  * keeps the same padding to the ink at both ends, and the icon's middle on its words' capitals' middle. Unset (a button
  * folded to its icon, say), the box places it.
  */
-:where(.ac-btn > .ac-icon:first-child) {
+:where(.ac-btn > .ac-icon:first-child, .ac-btn > .ac-swap > * > .ac-icon:first-child) {
   margin-inline-start: calc(-1 * var(--lead-air));
   translate: 0 calc(-1 * var(--lead-rise));
 }
@@ -5845,10 +5899,13 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
-/* Reading: 15.5px / 1.7 in the ink color, across the whole column (a code block or a table scrolls in its own box). */
+/*
+ * Reading: the person's Tamanho do texto (14px on a 24px line by default) in the ink color, across the whole column
+ * (a code block or a table scrolls in its own box).
+ */
 .ac-msg__text {
-  font-size: 15.5px;
-  line-height: 1.7;
+  font-size: var(--msg-text);
+  line-height: var(--msg-line);
   color: var(--ink);
 }
 
@@ -5977,17 +6034,12 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 }
 /* Under the run's last bubble: its time (its details on hover), or "enviando…" in its place on the same line. */
 .ac-msg__own-time {
-  position: relative;
   min-height: 16px;
   font-size: 11px;
   line-height: 16px;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-.ac-msg__own-time > .ac-msg__tip {
-  left: auto;
-  right: 0;
 }
 /*
  * The receipt's mark (agents saw it, answered it; a DM's "Vista por" face) ends the time's line, its right on the
@@ -6019,13 +6071,13 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
  * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
  * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
- * 15.5px / 1.7 line, minus half a 28px button (square, as every icon button). 84px wide, so the row's 96px left padding
+ * words' line, minus half a 28px button (square, as every icon button). 84px wide, so the row's 96px left padding
  * holds them at any width.
  */
 @media not ((hover: none) or (pointer: coarse)) {
   .ac-msg--own > .ac-msg__body > .ac-msg__actions,
   .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 14px);
+    top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 14px);
     right: calc(100% + 2px);
     flex-direction: row-reverse;
     padding: 0;
@@ -6061,11 +6113,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
     position: absolute;
     inset: -14px -10px;
   }
-}
-/* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
-html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
-  visibility: visible;
-  opacity: 1;
 }
 /*
  * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
@@ -9253,14 +9300,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-msg__actions {
     right: 8px;
   }
-  /* The time's details and a note's reason: on a tap, not only on hover. */
-  .ac-msg__time--details:focus .ac-msg__tip {
-    visibility: visible;
-    opacity: 1;
-  }
-  .ac-msg__note:focus .ac-msg__note-tip {
-    display: block;
-  }
   .ac-emoji__cell:hover {
     transform: none;
   }
@@ -9333,17 +9372,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   max-width: calc(100vw - 24px);
 }
 @media (max-width: 640px) {
-  /* The time sits mid-row: anchor its tooltip to the message row instead, so it never runs past the screen. */
-  .ac-msg__time--details,
-  .ac-msg__gutter-time {
-    position: static;
-  }
-  .ac-msg__tip {
-    left: 12px;
-    width: max-content;
-    max-width: calc(100% - 24px);
-    white-space: normal;
-  }
   .ac-suggest {
     width: calc(100vw - 24px);
   }
@@ -9911,8 +9939,8 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
 .ac-setnote + .ac-setnote {
   margin-top: 8px;
 }
-/* In a stack (a form, a field, a dialog's body) the stack's gap is the room above it, as for any paragraph there. */
-:is(.ac-form, .ac-field, .ac-dialog__body) > .ac-setnote {
+/* In a stack (a form, a field, a dialog's body, a card) the stack's gap is the room above it, as for any paragraph there. */
+:is(.ac-form, .ac-field, .ac-dialog__body, .ac-card) > .ac-setnote {
   margin: 0;
 }
 .ac-setnote .ac-icon {
@@ -10174,7 +10202,6 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 }
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
 .ac-msg__note {
-  position: relative;
   font-size: 12px;
   color: var(--faint);
   border-bottom: 1px dotted var(--line2);
@@ -10186,38 +10213,22 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   border-radius: 4px;
 }
 .ac-msg__note-tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  z-index: var(--z-sticky);
-  width: max-content;
   max-width: min(260px, 70vw);
   border-radius: 12px;
   padding: 7px 11px;
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--ink2);
-  display: none;
-}
-.ac-msg__note:hover .ac-msg__note-tip,
-html:not([data-pointer]) .ac-msg__note:focus-visible .ac-msg__note-tip {
-  display: block;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ac-msg__note:hover .ac-msg__note-tip,
-  .ac-msg__note:focus .ac-msg__note-tip {
+  .ac-msg__note-tip {
     animation: ac-note-tip-in 0.18s var(--spring) both;
   }
 }
 @keyframes ac-note-tip-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%);
+    transform: translateY(6px) scale(0.97);
   }
 }
 

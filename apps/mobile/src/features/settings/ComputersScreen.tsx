@@ -14,7 +14,6 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { computerKind, computerState, installCommand, machineTitle } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
-import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -31,6 +30,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
 import { SetupWait } from "../computer/SetupWait";
 import { computerIcon } from "../outages/logic";

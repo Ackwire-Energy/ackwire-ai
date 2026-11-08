@@ -3,6 +3,7 @@
 import type { ChatPrefs } from "../lib/chat-look";
 import type { RoleId } from "../lib/new-agent";
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { Permission } from "../lib/permissions";
 import type { AudienceChoice } from "../lib/who-sees";
 
 /** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
@@ -102,6 +103,8 @@ export interface AuthConfig {
   workspaceComputer?: boolean;
   /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
   billingUrl?: string | null;
+  /** One of agentes.chat's own servers (`Instance.cloud`); absent: a self-hosted server too old to say. */
+  cloud?: boolean;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
   /** Where the app reports its own errors (a Sentry-compatible server, ADR 0104); null or absent: nowhere. */
@@ -1103,6 +1106,32 @@ export interface MessageCard {
   author: string;
 }
 
+/** An archived channel the viewer may bring back (`GET …/archived-channels`). */
+export interface ArchivedChannel {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  archivedAt: string;
+}
+
+/**
+ * What an internal id written in a text names (`chat.idRef`), as its pill shows it: a file, a task, or a message (a
+ * run's id: its reply; a background work's: its card). Only what the viewer may see; anything else is a 404 and the
+ * text stays as written.
+ */
+export type IdRef =
+  | {
+      kind: "file";
+      id: string;
+      title: string;
+      artifactKind: string;
+      fileName: string | null;
+      contentType: string | null;
+    }
+  | { kind: "task"; id: string; number: number; title: string }
+  | { kind: "message"; message: MessageCard };
+
 export interface ChannelCard {
   id: string;
   name: string;
@@ -1492,6 +1521,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
     } & AgentProposalDecision)
+  /** An agent's event proposal was confirmed or dismissed: its card (`meta.calendarProposal`) as it is now. */
+  | {
+      type: "calendar.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      proposal: CalendarProposal;
+    }
   /** The right hand's team card changed (ADR 0137 §10): the whole card. */
   | {
       type: "team.proposal.updated";
@@ -1499,6 +1536,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       card: TeamProposalCard;
+    }
+  /** A right hand's card of a workspace change was applied, dismissed or sent to whoever may: the whole card. */
+  | {
+      type: "action_card.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: WorkspaceActionCard;
     }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now. */
   | {
@@ -1927,6 +1972,8 @@ export interface Connection {
   revokedAt: string | null;
   /** OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`). Older servers leave it out. */
   reconnectAdds?: string[];
+  /** `needs_reconnect`: its sign-in stopped working, no tools until Reconectar. Older servers leave it out. */
+  status?: "active" | "needs_reconnect";
 }
 
 /** An installation of our GitHub App bound to the organization (repository access for git and PRs). */
@@ -2779,12 +2826,53 @@ export const AGENT_ACTION_KINDS = [
   "skill.updated",
   "agent.settings_changed",
   "pr.merged",
+  "workspace.changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
+/**
+ * The right hand's catalog actions this build can word (`workspace.changed` receipts, its cards): the engine's
+ * `WORKSPACE_ACTIONS` (a test keeps them the same). A newer server's action reads the plain sentence.
+ */
+export const WORKSPACE_ACTION_IDS = [
+  "create_role",
+  "update_role",
+  "delete_role",
+  "move_role",
+  "set_member_roles",
+  "set_channel_permissions",
+  "set_my_status",
+  "set_notifications",
+  "set_my_timezone",
+  "update_channel",
+  "archive_channel",
+  "channel_people",
+  "delete_channel",
+  "revoke_invitation",
+  "resend_invitation",
+  "set_invitation_roles",
+  "decide_join_request",
+  "stop_work",
+  "continue_work",
+  "update_workspace",
+  "set_action_check",
+] as const;
+
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent" | "repository";
+  type:
+    | "issue"
+    | "memory"
+    | "routine"
+    | "channel"
+    | "wiki_page"
+    | "thread"
+    | "skill"
+    | "agent"
+    | "repository"
+    | "role"
+    | "person"
+    | "workspace";
   id: string;
   /** Issues. */
   number?: number;
@@ -2863,6 +2951,41 @@ export interface AgentForYou {
   items: AgentForYouItem[];
   /** Items since the first day of this month. */
   monthCount: number;
+}
+
+/**
+ * The right hand's card of a workspace change (`workspace_action`): an action of its catalog (`create_role`…) for whoever
+ * may make it, applied as them. Its receipt, with Desfazer, lands on the card's message.
+ */
+export interface WorkspaceActionCard {
+  kind: "workspace_action";
+  forUserId: string;
+  params: {
+    /** The sentence: `rightHand.action.{action}` with `words`; done, `agentActions.workspace.changed_{action}`. */
+    action: string;
+    input: Record<string, unknown>;
+    words: Record<string, string>;
+    /** The key its screen asks for (the server checks it again); null: anyone. */
+    needs: Permission | null;
+    why: string;
+    /** The person it was for tried and the screen's own rule refused them: they send it on, not apply it. */
+    refused?: boolean;
+    /** It changes whoever applies it (their own status…): only the person it was for may. */
+    self?: boolean;
+  };
+  state: "pending" | "applied" | "dismissed";
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  /** Sent to whoever may ("Pedir a quem pode"). */
+  askedAt?: string | null;
+}
+
+/** `GET …/action-cards/{messageId}`: the card where it is, for its conversation or the inbox it was sent to. */
+export interface WorkspaceActionCardView {
+  messageId: string;
+  channelId: string;
+  threadId: string | null;
+  card: WorkspaceActionCard;
 }
 
 /** `POST …/messages/{messageId}/actions/undo` (Desfazer tudo). */
@@ -3144,16 +3267,25 @@ export type ArtifactContent =
   | { kind: "choices"; questions: ChoiceQuestion[] }
   | ArtifactFileContent;
 
-/** One question of a choice card (ADR 0124): its options show as A, B, C… */
+/** One question of a choice card (ADR 0124): its options show as A, B, C…, then "Outra resposta". */
 export interface ChoiceQuestion {
   question: string;
   options: { label: string; description?: string }[];
 }
 
-/** A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order. */
+/**
+ * A choice card's answer, once someone picked (`choices.updated`): the option of each question, in order; one past a
+ * question's last option is a written answer, its text in `others` at that place.
+ */
 export interface Choices {
   id: string;
-  answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+  answer: {
+    userId: string;
+    picks: number[];
+    messageId: string | null;
+    at: string;
+    others?: (string | null)[];
+  } | null;
 }
 
 /** Who set a block's value last; `drawn`: the server picked it among that many options. */
@@ -3212,14 +3344,34 @@ export interface Artifact {
   inDrive?: boolean;
   /** Who can see it, from the conversation it came from (ADR 0111). */
   audience: ArtifactAudience;
+  /** Who sees it on top of that conversation (ADR 0157); absent from an older server. */
+  sharing?: ArtifactSharing;
+  /** I may change `sharing`: it lives in a conversation not everyone reads, and I read it there. */
+  canShare?: boolean;
+}
+
+/**
+ * Who sees a file past where it lives (ADR 0157): nobody more (`conversation`), the people and roles listed and
+ * administrators (`people`), or the whole workspace (`everyone`).
+ */
+export interface ArtifactSharing {
+  mode: "conversation" | "people" | "everyone";
+  userIds: string[];
+  roleIds: string[];
 }
 
 export type ArtifactAudience =
   | { kind: "workspace" }
-  /** A public channel's files: anyone in the workspace may open them. */
-  | { kind: "channel"; name: string; private: boolean }
-  /** `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open). */
-  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
+  /**
+   * A public channel's files: anyone in the workspace may open them. `outside`: I don't read the channel, the file was
+   * shared with me (ADR 0157), so there's no way into it.
+   */
+  | { kind: "channel"; name: string; private: boolean; outside?: true }
+  /**
+   * `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open).
+   * `between`: I'm not in it, the file was shared with me (ADR 0157): its sides, no `with`, no way into it.
+   */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true; between?: ArtifactAuthor[] };
 
 /** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
 export interface TrashedArtifact extends Artifact {
@@ -3255,12 +3407,31 @@ export interface ArtifactRef {
 }
 
 export interface ArtifactFilters {
+  /** Words in the title, the text or the conversation's name. */
   q?: string;
   kind?: ArtifactKind;
+  /** Any of these kinds. */
+  kinds?: ArtifactKind[];
   channelId?: string;
+  /** In any of these conversations. */
+  channelIds?: string[];
   author?: ArtifactAuthor;
   /** `author` made or changed it (any version), not only made it. */
   changed?: boolean;
+  /** Made or last changed by any of them. */
+  authors?: ArtifactAuthor[];
+  /** Made by an agent or by a person. */
+  who?: "agents" | "people";
+  /** Newest update first (default), by name, or by kind. */
+  sort?: "recent" | "name" | "kind";
+}
+
+/** A page of the Drive: the next one starts at `nextCursor`; the first also counts the files per kind. */
+export interface ArtifactPage {
+  artifacts: Artifact[];
+  nextCursor: string | null;
+  /** First page only (older servers leave it out): how many files each kind has for the filters, kinds left out. */
+  counts?: Partial<Record<ArtifactKind, number>>;
 }
 
 /** Channel event: an artifact was created or got a new version. */
@@ -3806,6 +3977,8 @@ export type CalendarEventPatch = Partial<
 export interface CalendarProposal {
   id: string;
   agentId: string;
+  /** Who asked: they confirm it (or who configures the workspace). Absent on an older server. */
+  requesterUserId?: string;
   title: string;
   start: string;
   end: string;
@@ -4169,7 +4342,7 @@ export interface Machine {
    * ADR 0062 (protocol 21): whether agents can use their own desktops there (only where each agent is its own OS
    * user); `reason`, in the runner's words, says what is missing. Null or absent when its runner doesn't say.
    */
-  desktopUse?: { available: boolean; reason: string | null } | null;
+  desktopUse?: { available: boolean; reason: string | null; code?: string | null } | null;
   /**
    * ADR 0115: its workspace disk (free GB, share in use) and the shared folder's size (GB, measured hourly), as its
    * runner last said; null or absent for people who don't manage it, or when its runner doesn't say.
@@ -4226,8 +4399,10 @@ export interface MachineBrowser {
   available: boolean;
   version: string | null;
   chrome: string | null;
-  /** Why it can't run yet, in the runner's words. */
+  /** Why it can't run yet, in the runner's words (English). */
   reason: string | null;
+  /** That reason as a code the apps word (`machineReasonText`); absent from older servers, null from older runners. */
+  code?: string | null;
 }
 
 /**
@@ -6107,6 +6282,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `change_request`: the proposal to decide. */
   proposalId?: string;
+  /** `change_request` of a right hand's card of a workspace change (`messageId`): the action. */
+  action?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */

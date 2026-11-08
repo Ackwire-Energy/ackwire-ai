@@ -234,6 +234,8 @@ test("info: Linux, the runner on Bun 1.3.5 or newer, and the packages (installed
     "sudo apt install --no-install-recommends tigervnc-standalone-server xauth dbus-x11",
   );
   expect(missing.reason).toContain("(missing: tigervnc-standalone-server, dbus-x11)");
+  expect(missing.code).toBe("desktop_install");
+  expect(ask({ platform: "darwin" }).code).toBe("desktop_linux");
   expect(missing.reason?.length).toBeLessThanOrEqual(500);
   expect(ask({ uid: 0 }).reason).toContain("never run as root");
 });

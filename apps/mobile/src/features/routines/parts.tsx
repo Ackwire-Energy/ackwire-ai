@@ -1,4 +1,5 @@
 import type { Routine } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   pausedFix,
   type RoutineFix,
@@ -8,11 +9,12 @@ import {
   usageContinueBlock,
   usageContinueOffered,
 } from "@agenteschat/client/lib/routine-view";
-import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, LineIcon, PixelOrbit, Text } from "@/ui";
+import { router } from "@/ui/navigation";
+import { Note } from "../ai/parts";
 import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
@@ -263,4 +265,36 @@ const styles = StyleSheet.create({
   when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
   runs: { flexDirection: "row", alignItems: "center", gap: 10 },
   bold: { fontWeight: "600" },
+});
+
+/**
+ * The routine's agent can't read what its trigger needs (none of the mailboxes, the picked one, a connection), as the
+ * web's: the cause, and its profile, where who connected it gives the agent access.
+ */
+export function AgentAccessNote({
+  agentId,
+  words,
+  values,
+}: {
+  agentId: string;
+  words: string;
+  values?: Record<string, string>;
+}) {
+  const { t } = useTranslation();
+  const name = useDirectory().agentById.get(agentId)?.name ?? "";
+  return (
+    <View style={accessStyles.note}>
+      <Note icon="lock">{t(words, { ...agentGrammar(name), ...values })}</Note>
+      <Button
+        variant="secondary"
+        size="sm"
+        label={t("mail.routine.giveAccess")}
+        onPress={() => router.push(`/agent/${agentId}` as never)}
+      />
+    </View>
+  );
+}
+
+const accessStyles = StyleSheet.create({
+  note: { gap: 8, paddingHorizontal: 16, paddingTop: 12, alignItems: "flex-start" },
 });

@@ -1,11 +1,13 @@
 import { useAnswerChoices, useArtifact, useChoices } from "@agenteschat/client";
 import {
   answeredFirst,
+  CHOICE_OTHER_MAX,
   type ChoiceDraft,
   choiceLetter,
   choiceSummary,
   emptyDraft,
   moveStep,
+  otherChoice,
   pickChoice,
 } from "@agenteschat/client/lib/choices";
 import { useState } from "react";
@@ -14,11 +16,14 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Icon, Sky, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { PromptForm } from "../shared/PromptForm";
 import { tapHaptic } from "../shared/parts";
+import { useSheetIfAny } from "../shared/SheetHost";
 
 /**
  * An agent asks the person to pick (ADR 0124): big rows lettered A, B, C…, one question at a time. A tap answers at
- * once, as the person's own message to the agent; then the card shows what was picked to everyone.
+ * once, as the person's own message to the agent; then the card shows what was picked to everyone. The last row,
+ * "Outra resposta", opens a sheet to write the answer instead, as the ask card's does.
  */
 export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const { t } = useTranslation();
@@ -26,6 +31,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const orgId = useOrgId();
   const dir = useDirectory();
   const toast = useToast();
+  // Outside a conversation (a task's activity) there is no sheet to write in: the options alone.
+  const sheet = useSheetIfAny();
   const artifact = useArtifact(orgId, id, version);
   const query = useChoices(orgId, id);
   const answer = useAnswerChoices(orgId, id);
@@ -68,20 +75,20 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
           </Text>
         </View>
         <View style={styles.options}>
-          {choiceSummary(questions, answered.picks).map((s) => (
+          {choiceSummary(questions, answered.picks, answered.others).map((s) => (
             <View key={s.question} style={styles.summary}>
               {questions.length > 1 ? (
                 <Text variant="footnote" tone="muted">
                   {s.question}
                 </Text>
               ) : null}
-              <View style={styles.row}>
+              <View style={styles.picked}>
                 <View style={[styles.letter, { backgroundColor: c.ink, borderColor: c.ink }]}>
                   <Text variant="caption" style={[styles.bold, { color: c.raised }]}>
                     {s.letter}
                   </Text>
                 </View>
-                <Text variant="body" style={[styles.flex, styles.bold]}>
+                <Text variant="body" style={[styles.flex, styles.bold, styles.said]}>
                   {s.label}
                 </Text>
               </View>
@@ -108,10 +115,11 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const d = draft ?? emptyDraft(questions);
   const q = questions[d.step];
   if (!q) return null;
-  const pick = (option: number) => {
+  const other = otherChoice(q);
+  const pick = (option: number, written?: string) => {
     if (answer.isPending) return;
     tapHaptic();
-    const next = pickChoice(d, option);
+    const next = pickChoice(d, option, written);
     setDraft(next.draft);
     if (next.send)
       answer.mutate(next.send, {
@@ -185,6 +193,56 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             </Pressable>
           );
         })}
+        {sheet ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: d.picks[d.step] === other, disabled: answer.isPending }}
+            accessibilityLabel={`${choiceLetter(other)}. ${t("ask.otherAnswer")}`}
+            disabled={answer.isPending}
+            onPress={() =>
+              sheet.open(
+                <PromptForm
+                  title={q.question}
+                  placeholder={t("mobile.chat.question.placeholder")}
+                  submitLabel={t("mobile.app.send")}
+                  initial={d.others[d.step] ?? ""}
+                  maxLength={CHOICE_OTHER_MAX}
+                  onSubmit={(text) => {
+                    sheet.close();
+                    pick(other, text.trim());
+                  }}
+                />,
+              )
+            }
+            style={({ pressed }) => [styles.option, { borderColor: c.line2 }, pressed && { backgroundColor: c.line }]}
+          >
+            <View
+              style={[
+                styles.letter,
+                { borderColor: c.line2 },
+                d.picks[d.step] === other && { backgroundColor: c.ink, borderColor: c.ink },
+              ]}
+            >
+              <Text
+                variant="caption"
+                tone={d.picks[d.step] === other ? undefined : "muted"}
+                style={[styles.bold, d.picks[d.step] === other && { color: c.raised }]}
+              >
+                {choiceLetter(other)}
+              </Text>
+            </View>
+            <View style={styles.flex}>
+              <Text variant="body" style={styles.bold}>
+                {t("ask.otherAnswer")}
+              </Text>
+              {d.others[d.step] ? (
+                <Text variant="footnote" tone="muted">
+                  {d.others[d.step]}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        ) : null}
       </View>
       {questions.length > 1 ? (
         <View style={[styles.foot, { borderTopColor: c.line2 }]}>
@@ -270,6 +328,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
   },
   summary: { gap: 4 },
+  // A long written answer wraps under the letter's top; one line sits on its middle.
+  picked: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  said: { paddingTop: 2 },
   closed: { flexDirection: "row", flexWrap: "wrap", columnGap: 8, paddingVertical: 6 },
   foot: {
     flexDirection: "row",

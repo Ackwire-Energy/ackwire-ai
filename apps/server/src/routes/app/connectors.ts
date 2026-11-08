@@ -85,6 +85,10 @@ const Connection = z
       description:
         "OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`): reconnecting adds them.",
     }),
+    status: z.enum(["active", "needs_reconnect"]).openapi({
+      description:
+        "`needs_reconnect`: its sign-in stopped working (a refresh refused, a 401): no tools until reconnected.",
+    }),
   })
   .openapi("ConnectorConnection");
 

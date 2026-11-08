@@ -3,7 +3,6 @@ import { useNotificationAction, useNotificationReply } from "@agenteschat/client
 import { type IslandItem, islandLead, noticeLine } from "@agenteschat/client/lib/island";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { replyTarget, waitingCardOf } from "@agenteschat/client/lib/notifications";
-import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,14 +22,14 @@ import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, with
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { setIslandLive } from "@/lib/push";
-import { serverUrl } from "@/lib/server";
 import { useRealtime } from "@/providers/realtime";
 import { haptics, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import { router } from "@/ui/navigation";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
-import { openPage } from "../ai/parts";
 import { isDashboardNotice } from "../dashboards/logic";
 import { notificationHref, notificationWebPath } from "../links/logic";
+import { openWebPath } from "../links/open-web";
 import { Face } from "../shared/Face";
 import { useOrgId } from "../shared/hooks";
 import { island } from "./island";
@@ -193,7 +192,13 @@ export function NoticeIsland() {
           <Animated.View pointerEvents={shape === "none" ? "none" : "auto"} style={[styles.island, box]}>
             <Animated.View style={[styles.fill, inner]}>
               {shape === "open" ? (
-                <ScrollView scrollEnabled={scrolls} bounces={false} showsVerticalScrollIndicator={scrolls}>
+                <ScrollView
+                  scrollEnabled={scrolls}
+                  bounces={false}
+                  showsVerticalScrollIndicator={scrolls}
+                  // A reply's send takes the first tap, with the keyboard up.
+                  keyboardShouldPersistTaps="handled"
+                >
                   <View
                     style={{ width: size.w, paddingTop: clear }}
                     onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
@@ -329,7 +334,7 @@ function useOpenNotice(n: AppNotification, onOpened: () => void) {
     onOpened();
     // An approval opens in its sheet (held to approve there); the rest, where it happened.
     if (href) router.push(href);
-    else if (web) openPage(`${serverUrl()}${web}`);
+    else if (web) openWebPath(web);
   };
   return { canOpen: Boolean(href || web), open };
 }

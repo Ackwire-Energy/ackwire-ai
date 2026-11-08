@@ -46,6 +46,7 @@ import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
 import { inChannelRun, waitsOnUsage, workKeepsThread, workTakesPersonMessage } from "./run-scope";
 import { computerWaitSql, KEPT_ON_HOLD, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
+import { accountInUse } from "./standing";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { admitTaskAgents, taskReaderSql } from "./task-access";
@@ -491,16 +492,54 @@ export async function unreachedAgents(
 }
 
 /**
- * What the agent reads about its mentions that reached nobody (`unreachedAgents`): who, and how to reach them if it
- * meant to (a mention may only name an agent). `canAdd`: a channel, where `add_agent_to_channel` brings an agent in
- * with the rights of the person behind the run; a DM keeps its participants. In the past tense: the line stays under
- * the message, also after the agent joins.
+ * The people an agent's text @mentions who hear nothing of it: members it names by handle, or by a full name
+ * (`withNamedMentions` drops that @ of someone outside), who don't read `channelId` (a mention notifies only them,
+ * `insertMessageWithRuns`: its members, an administrator in a channel, a task's reader in its conversation). Their
+ * handles, lower case; never a blocked account or one waiting for its deletion.
  */
-export function unreachedNote(handles: string[], where: string, canAdd: boolean): string {
-  if (handles.length === 0) return "";
+export async function unreachedPeople(
+  db: Executor,
+  input: { orgId: string; channelId: string; body: string },
+): Promise<string[]> {
+  if (!input.body.includes("@")) return [];
+  const handles = parseMentionHandles(input.body);
+  const rows = rowsOf<{ handle: string }>(
+    await db.execute(sql`select om.handle from ${schema.organizationMembers} om
+      join ${schema.users} on ${schema.users.id} = om.user_id
+      join ${channels} c on c.id = ${input.channelId}::uuid
+      where om.org_id = ${input.orgId}::uuid and om.handle is not null and ${accountInUse}
+        and (om.handle = any(${`{${handles.join(",")}}`}::text[])
+          or (strpos(${schema.users.name}, ' ') > 0 and strpos(lower(${input.body}::text), lower('@' || ${schema.users.name})) > 0))
+        and not exists (select 1 from ${channelMembers} cm where cm.channel_id = c.id and cm.user_id = om.user_id)
+        and not (c.kind = 'channel' and ${maySql(sql`om.org_id`, sql`om.user_id`, "administrator")})
+        and not (c.kind = 'task' and ${taskReaderSql(sql`c.id`, sql`om.user_id`)})`),
+  );
+  return rows.map((r) => r.handle).sort();
+}
+
+/**
+ * What the agent reads about its mentions that reached nobody (`unreachedAgents`, `unreachedPeople`): who, and how to
+ * reach them if it meant to. `canAdd`: a channel, where `add_agent_to_channel` brings an agent in with the rights of
+ * the person behind the run; a DM keeps its participants. `routine`: a routine's run, whose DMs go to its creator only.
+ * In the past tense: the line stays under the message, also after they join.
+ */
+export function unreachedNote(
+  handles: string[],
+  where: string,
+  canAdd: boolean,
+  people: string[] = [],
+  routine = false,
+): string {
+  const named = (list: string[]) => list.map((h) => `@${h}`).join(", ");
   const one = handles.length === 1;
   const it = one ? "it" : "them";
-  return `${handles.map((h) => `@${h}`).join(", ")} ${one ? "wasn't" : "weren't"} in ${where}, so your mention didn't reach ${it}. If you meant ${it} to act or answer, use tell_agent or ask_agent${canAdd ? `, or add ${it} to ${where} with add_agent_to_channel (it works with the rights of the person you work for)` : ""}.`;
+  const agents = handles.length
+    ? `${named(handles)} ${one ? "wasn't" : "weren't"} in ${where}, so your mention didn't reach ${it}. If you meant ${it} to act or answer, use tell_agent or ask_agent${canAdd ? `, or add ${it} to ${where} with add_agent_to_channel (it works with the rights of the person you work for)` : ""}.`
+    : "";
+  const persons = people.length
+    ? `${named(people)} ${people.length === 1 ? "wasn't" : "weren't"} in ${where}, so your mention didn't notify them. If they should see it, ${routine ? "post it where they read with post_message" : "tell them with send_dm"}.`
+    : "";
+  return [agents, persons].filter(Boolean).join(" ");
 }
 
 /** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */
@@ -1535,6 +1574,12 @@ const fileNameOf = (meta: Record<string, unknown>) => {
   const title = (meta.artifacts as { title?: unknown }[] | undefined)?.[0]?.title;
   return typeof title === "string" ? title : "";
 };
+
+/** The ids of the files on a message (`meta.artifacts`), in order. */
+export const fileIdsOf = (meta: Record<string, unknown> | undefined): string[] =>
+  (Array.isArray(meta?.artifacts) ? (meta.artifacts as { id?: unknown }[]) : []).flatMap((f) =>
+    typeof f?.id === "string" ? [f.id] : [],
+  );
 
 /** Files for a message: the person's own uploads or files of this channel, not deleted. */
 async function attachmentRefsFor(db: Database, userId: string, orgId: string, channelId: string, ids: string[]) {

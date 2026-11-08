@@ -14,6 +14,7 @@ import {
   useIssueColumns,
   useTaskUnread,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { githubLinkLabel, isGithubLink } from "@agenteschat/client/lib/github-link";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -28,7 +29,6 @@ import {
 } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -57,6 +57,7 @@ import {
   useToast,
 } from "@/ui";
 import { SocialMark } from "@/ui/auth/SocialMarks";
+import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
@@ -92,6 +93,7 @@ import {
   workLines,
 } from "./logic";
 import { GithubChip, StateChip, useColumnLabel, useStepText } from "./parts";
+import { useStartAgent } from "./useStartAgent";
 
 /**
  * One task (called "tarefa" in the app): where it came from, the big title, its state, priority
@@ -476,7 +478,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
                     {
                       onSuccess: () =>
                         toast({ title: t("issues.work.resumed", agentGrammar(name)), agentId: w.agentId }),
-                      onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                      onError: (error) => toast({ title: errorText(t, error), icon: "x" }),
                     },
                   )
                 }
@@ -804,6 +806,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const meId = useMeId();
   const { org } = useOrg();
   const action = useIssueAction(orgId);
+  const start = useStartAgent();
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
   const toast = useToast();
@@ -823,14 +826,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const assign = (who: Actor | null) => {
     if (who?.type === "agent") {
       sheet.close();
-      action.mutate(
-        { type: "ask", id: i.id, agentId: who.id },
-        {
-          onSuccess: () => toast({ title: t("mobile.issues.changed"), agentId: who.id }),
-          // Couldn't ask (not in a shared channel…): it stays assigned to the agent, as on the web.
-          onError: () => action.mutate({ type: "update", id: i.id, patch: { assignee: who } }, { onError: failed }),
-        },
-      );
+      start.run(i, who.id, { done: t("mobile.issues.changed") });
     } else update({ type: "update", id: i.id, patch: { assignee: who } });
   };
   const whoSees = useWhoSeesLabel();

@@ -1,4 +1,12 @@
-import { agentWorkForViewer, redoAgentAction, undoAgentAction, undoMessageActions } from "@agenteschat/engine";
+import {
+  agentWorkForViewer,
+  askWorkspaceAction,
+  decideWorkspaceAction,
+  getWorkspaceActionCard,
+  redoAgentAction,
+  undoAgentAction,
+  undoMessageActions,
+} from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 import { AgentAction } from "./schemas";
@@ -33,6 +41,32 @@ const ForYouItem = z
     }),
   ])
   .openapi("AgentForYouItem");
+
+const WorkspaceActionCard = z
+  .object({
+    kind: z.literal("workspace_action"),
+    forUserId: z.string(),
+    params: z.object({
+      action: z.string().openapi({ description: "The catalog action (`create_role`…): `rightHand.action.{action}`." }),
+      input: z.record(z.string(), z.unknown()),
+      words: z.record(z.string(), z.string()).openapi({ description: "Values for its sentence." }),
+      needs: z.string().nullable().openapi({ description: "The key its screen asks for; null: anyone." }),
+      why: z.string(),
+      refused: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Its screen refused the person it was for: they send it on (`ask`)." }),
+      self: z
+        .boolean()
+        .optional()
+        .openapi({ description: "It changes whoever applies it (their status…): only the person it was for may." }),
+    }),
+    state: z.enum(["pending", "applied", "dismissed"]),
+    decidedByUserId: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    askedAt: z.string().nullable().optional(),
+  })
+  .openapi("WorkspaceActionCard");
 
 /**
  * Act with undo (ADR 0037 round 2): the receipts under an agent's reply.
@@ -104,6 +138,71 @@ export function actionRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
       return c.json(await undoMessageActions(undoDeps, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  const CardParams = OrgParams.extend({ messageId: z.uuid() });
+  // What the screens' own routes pass: a channel deleted from a card stops its missions and mail triggers too.
+  const cardDeps = {
+    db,
+    pubsub: deps.adapters.pubsub,
+    server: { publicUrl: deps.config.PUBLIC_URL, secret: deps.config.AGENTES_SECRET },
+    hub: deps.extras?.sandbox?.machines?.hub ?? null,
+    mail: deps.adapters.mail,
+  };
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/action-cards/{messageId}",
+      tags,
+      security,
+      summary: "A right hand's card of a workspace change, as it is now",
+      description: "For whoever reads its conversation, or whom it was sent to and may make the change.",
+      request: { params: CardParams },
+      responses: {
+        200: json(
+          z.object({
+            messageId: z.uuid(),
+            channelId: z.uuid(),
+            threadId: z.uuid().nullable(),
+            card: WorkspaceActionCard,
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await getWorkspaceActionCard(db, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/action-cards/{messageId}/{decision}",
+      tags,
+      security,
+      summary: "Apply, dismiss or send to whoever may a right hand's card of a workspace change",
+      description:
+        "`apply` makes the change as you, with the permissions its screen checks, and puts its receipt (with Undo) on " +
+        "the card; `dismiss` is for the person it was for or anyone who may; `ask` sends it to whoever may (the person " +
+        "it was for, when they can't). 409 `action_card.decided` once decided.",
+      request: {
+        params: CardParams.extend({ decision: z.enum(["apply", "dismiss", "ask"]) }),
+        body: body(z.object({})),
+      },
+      responses: { 200: json(z.object({ card: WorkspaceActionCard })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId, decision } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const card =
+        decision === "ask"
+          ? await askWorkspaceAction(cardDeps, userId, orgId, messageId)
+          : await decideWorkspaceAction(cardDeps, userId, orgId, messageId, decision);
+      return c.json({ card }, 200);
     },
   );
 

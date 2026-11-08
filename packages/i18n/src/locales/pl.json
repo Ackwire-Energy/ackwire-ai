@@ -32,6 +32,7 @@
     "code": "Kod",
     "fullScreen": "Pełny ekran",
     "wrapLines": "Zawijaj wiersze",
+    "raw": "Oryginał",
     "table": "Tabela",
     "chartItem": "Element",
     "chartShare": "Udział",
@@ -44,6 +45,7 @@
     "today": "Dzisiaj",
     "yesterday": "Wczoraj",
     "loadFailed": "Nie udało się tego wczytać. Sprawdź połączenie i spróbuj ponownie.",
+    "gone": "Tego już tu nie ma. Zostało usunięte albo nie masz już dostępu.",
     "notAllowed": "Nie masz do tego uprawnień.",
     "tooMany": "Zbyt wiele prób. Spróbuj później.",
     "offline": "Jesteś offline. Sprawdź połączenie i spróbuj ponownie.",
@@ -1644,6 +1646,11 @@
     "workingNow": "Pracuje teraz",
     "available": "Dostępny",
     "archived": "Zarchiwizowany",
+    "restore": "Przywróć",
+    "restoreAction": "Przywróć agenta {{name}}",
+    "restoreAction_female": "Przywróć agentkę {{name}}",
+    "restored": "{{name}} wrócił do zespołu.",
+    "restored_female": "{{name}} wróciła do zespołu.",
     "emptyTitle": "Zbuduj swój zespół agentów",
     "empty": "Każdy agent ma swoją rolę i pracuje razem z ludźmi, na tych samych kanałach.",
     "emptyViewerTitle": "Tu pojawi się twój zespół agentów",
@@ -1933,6 +1940,16 @@
     "generalName": "#general zachowuje swoją nazwę.",
     "archive": "Zarchiwizuj kanał",
     "archived": "Zarchiwizowano #{{channel}}. Rozmowa zostaje zachowana.",
+    "archivedTitle": "Zarchiwizowane kanały",
+    "archivedCount_one": "{{count}} zarchiwizowany kanał",
+    "archivedCount_few": "{{count}} zarchiwizowane kanały",
+    "archivedCount_many": "{{count}} zarchiwizowanych kanałów",
+    "archivedCount_other": "{{count}} zarchiwizowanego kanału",
+    "archivedNone": "Brak zarchiwizowanych kanałów do przywrócenia",
+    "archivedOn": "Zarchiwizowano {{date}}",
+    "restore": "Przywróć",
+    "restoreName": "Przywróć #{{channel}}",
+    "restored": "#{{channel}} wrócił.",
     "leave": "Opuść kanał",
     "left": "Opuszczono #{{channel}}",
     "leaveTitle": "Opuścić #{{channel}}?",
@@ -2137,7 +2154,7 @@
       "budgetHelp": "Gdy dojdzie do limitu, zatrzymuje się i daje znać, jak każdy agent.",
       "audience": "Kto może korzystać",
       "audienceHelp": "Osoba spoza tej grupy nie widzi {{name}} na pasku bocznym.",
-      "lock": "{{name}} nie da się zarchiwizować ani usunąć. Nic nie publikuje, dopóki nikt do niego nie napisze.",
+      "lock": "{{name}} nie da się zarchiwizować ani usunąć. Bez pytania publikuje tylko Tydzień zespołu, dla adminów.",
       "audit": "Zobacz, co zrobił {{name}}",
       "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
@@ -2266,6 +2283,38 @@
       "open": "Otwórz",
       "web": "Otwórz w witrynie",
       "notAllowed": "Nie masz dostępu do tego ekranu"
+    },
+    "action": {
+      "title": "Zmiana w przestrzeni roboczej",
+      "only": "Zastosować ją może tylko ktoś, kto może wprowadzić tę zmianę",
+      "ask": "Wyślij do kogoś uprawnionego",
+      "other": "Wprowadź zmianę w przestrzeni roboczej",
+      "create_role": "Utwórz rolę <b>{{name}}</b>",
+      "update_role": "Zmień rolę <b>{{name}}</b>",
+      "delete_role": "Usuń rolę <b>{{name}}</b> na zawsze",
+      "move_role": "Przesuń rolę <b>{{name}}</b>",
+      "set_member_roles": "Zmień role osoby <b>{{name}}</b>: {{change}}",
+      "set_channel_permissions": "Zmień, co {{who}} może robić w <b>#{{channel}}</b>",
+      "set_my_status": "Ustaw swój status: <b>{{what}}</b>",
+      "set_notifications_on": "Włącz swoje powiadomienia: <b>{{category}}</b>",
+      "set_notifications_off": "Wyłącz swoje powiadomienia: <b>{{category}}</b>",
+      "set_my_timezone": "Ustaw swoją strefę czasową na <b>{{timezone}}</b>",
+      "set_my_timezone_workspace": "Znów używaj strefy czasowej przestrzeni roboczej",
+      "set_invitation_roles": "Zmień role, które daje zaproszenie dla <b>{{email}}</b>: {{change}}",
+      "update_channel": "Zmień kanał <b>#{{channel}}</b>",
+      "archive_channel": "Zarchiwizuj <b>#{{channel}}</b>",
+      "archive_channel_back": "Przywróć <b>#{{channel}}</b>",
+      "channel_people": "Zmień, kto jest w <b>#{{channel}}</b>: {{change}}",
+      "delete_channel": "Usuń na zawsze kanał <b>#{{channel}}</b> razem z wiadomościami i plikami",
+      "revoke_invitation": "Anuluj zaproszenie dla <b>{{email}}</b>",
+      "resend_invitation": "Wyślij ponownie zaproszenie do <b>{{email}}</b>",
+      "decide_join_request_approve": "Wpuść <b>{{email}}</b> do przestrzeni roboczej",
+      "decide_join_request_deny": "Odrzuć prośbę <b>{{email}}</b> o dołączenie",
+      "stop_work": "Zatrzymaj to, co robi <b>{{agent}}</b>",
+      "continue_work": "Pozwól <b>{{agent}}</b> kontynuować",
+      "update_workspace": "Zmień przestrzeń roboczą <b>{{name}}</b>",
+      "set_action_check_on": "Włącz sprawdzanie, co zespół już zrobił",
+      "set_action_check_off": "Wyłącz sprawdzanie, co zespół już zrobił"
     }
   },
   "teamWeek": {
@@ -2860,7 +2909,8 @@
       "updated_status": "Przeniesiono <b>#{{number}}</b> do: {{status}} · {{title}}",
       "updated_priority": "Ustawiono priorytet <b>#{{number}}</b> na {{priority}} · {{title}}",
       "assigned": "Przypisano <b>#{{number}}</b> do: {{assignee}} · {{title}}",
-      "assigned_self": "Biorę <b>#{{number}}</b> na siebie · {{title}}"
+      "assigned_self": "Biorę <b>#{{number}}</b> na siebie · {{title}}",
+      "files": "Załączono {{names}}"
     },
     "memory": {
       "saved": "Zapisano w <b>pamięci</b>: {{text}}",
@@ -2904,6 +2954,35 @@
       "merged": "Scalono PR <b>#{{number}}</b> w <b>{{repo}}</b>",
       "merged_branch": "Scalono <b>{{ref}}</b> w <b>{{repo}}</b>"
     },
+    "workspace": {
+      "changed": "Wprowadzono zmianę w przestrzeni roboczej",
+      "changed_create_role": "Utworzono rolę <b>{{name}}</b>",
+      "changed_update_role": "Zmieniono rolę <b>{{name}}</b>",
+      "changed_delete_role": "Usunięto rolę <b>{{name}}</b>",
+      "changed_move_role": "Przesunięto rolę <b>{{name}}</b>",
+      "changed_set_member_roles": "Zmieniono role osoby <b>{{name}}</b>: {{change}}",
+      "changed_set_channel_permissions": "Zmieniono, co {{who}} może robić w <b>#{{channel}}</b>",
+      "changed_set_my_status": "Ustawiono twój status: <b>{{what}}</b>",
+      "changed_set_notifications_on": "Włączono twoje powiadomienia: <b>{{category}}</b>",
+      "changed_set_notifications_off": "Wyłączono twoje powiadomienia: <b>{{category}}</b>",
+      "changed_set_my_timezone": "Ustawiono twoją strefę czasową na <b>{{timezone}}</b>",
+      "changed_set_my_timezone_workspace": "Twoja strefa czasowa znów jest zgodna z przestrzenią roboczą",
+      "changed_set_invitation_roles": "Zmieniono role, które daje zaproszenie dla <b>{{email}}</b>: {{change}}",
+      "changed_update_channel": "Zmieniono kanał <b>#{{channel}}</b>",
+      "changed_archive_channel": "Zarchiwizowano <b>#{{channel}}</b>",
+      "changed_archive_channel_back": "Przywrócono <b>#{{channel}}</b>",
+      "changed_channel_people": "Zmieniono, kto jest w <b>#{{channel}}</b>: {{change}}",
+      "changed_delete_channel": "Usunięto kanał <b>#{{channel}}</b>",
+      "changed_revoke_invitation": "Anulowano zaproszenie dla <b>{{email}}</b>",
+      "changed_resend_invitation": "Ponownie wysłano zaproszenie do <b>{{email}}</b>",
+      "changed_decide_join_request_approve": "Wpuszczono <b>{{email}}</b> do przestrzeni roboczej",
+      "changed_decide_join_request_deny": "Odrzucono prośbę <b>{{email}}</b> o dołączenie",
+      "changed_stop_work": "Zatrzymano to, co robił <b>{{agent}}</b>",
+      "changed_continue_work": "Pozwolono <b>{{agent}}</b> kontynuować",
+      "changed_update_workspace": "Zmieniono przestrzeń roboczą <b>{{name}}</b>",
+      "changed_set_action_check_on": "Włączono sprawdzanie, co zespół już zrobił",
+      "changed_set_action_check_off": "Wyłączono sprawdzanie, co zespół już zrobił"
+    },
     "other": "Wprowadzono zmianę",
     "copyWebhook": "Kopiuj adres webhooka",
     "issueFields": {
@@ -2915,7 +2994,8 @@
       "labels": "etykiety",
       "dueDate": "termin",
       "githubUrl": "link do GitHub",
-      "criteria": "kryteria"
+      "criteria": "kryteria",
+      "files": "załączniki"
     },
     "routineFields": {
       "name": "nazwę",
@@ -4751,6 +4831,8 @@
           "stepTwo": "Wklej kod, który pokazuje Claude",
           "codeLabel": "Kod Claude",
           "notCode": "To nie wygląda na kod Claude.",
+          "stepTwoGoogle": "Wklej kod, który pokazuje Google",
+          "codeLabelGoogle": "Kod lub link",
           "send": "Wyślij na {{computer}}",
           "sending": "Wysyłanie kodu na {{computer}}…",
           "sent": "Kod wysłany. Kończenie logowania na komputerze {{computer}}.",
@@ -5131,6 +5213,7 @@
         "too_many_tool_calls": "Przekroczono limit narzędzi w jednym uruchomieniu.",
         "stuck": "Zatrzymano, bo się zawiesiło.",
         "brain_interrupted": "AI przerwało przed zakończeniem.",
+        "brain_unavailable": "AI na jego komputerze nie mogło odpowiedzieć. Sprawdź komputer i poproś jeszcze raz.",
         "empty_reply": "Model nic nie zwrócił.",
         "model_refused": "Model odmówił odpowiedzi.",
         "agent_archived": "Agent został zarchiwizowany.",
@@ -6570,6 +6653,7 @@
         "done": "Zakończone",
         "canceled": "Nie będzie robione"
       },
+      "stageFull": "{{stage}} ma już {{max}} kolumn, tyle mieści jeden etap. Najpierw usuń tam jedną z nich.",
       "stageExplain": {
         "todo": "Nowe zadania trafiają do pierwszej kolumny etapu Do zrobienia.",
         "in_progress": "Gdy agent zaczyna, zadanie trafia do pierwszej kolumny etapu W toku.",
@@ -6683,6 +6767,9 @@
       "cancel": "Anuluj",
       "create": "Utwórz zadanie",
       "created": "Utworzono zadanie #{{number}}.",
+      "notStarted": "Utworzono zadanie #{{number}}, ale {{name}} nie zaczął.",
+      "notStarted_female": "Utworzono zadanie #{{number}}, ale {{name}} nie zaczęła.",
+      "askAgain": "Poproś ponownie",
       "intro": "Kto je weźmie, człowiek czy agent, pojawi się na tablicy razem z postępem.",
       "criteriaFound_one": "{{count}} kryterium akceptacji",
       "criteriaFound_few": "{{count}} kryteria akceptacji",
@@ -6732,6 +6819,8 @@
     "askButton": "Poproś: {{name}}",
     "askSection": "Poproś agenta",
     "asked": "Prośba wysłana. {{name}} pracuje w rozmowie o zadaniu, którą śledzą wszyscy, którzy widzą zadanie.",
+    "notStarted": "{{name}} nie zaczął.",
+    "notStarted_female": "{{name}} nie zaczęła.",
     "activity": "Aktywność",
     "noActivity": "Jeszcze nic.",
     "discussion": "Dyskusja",
@@ -6783,7 +6872,8 @@
       "add": "Dodaj pliki",
       "addHint": "albo przeciągnij je tutaj",
       "grid": "Siatka",
-      "empty": "Jeszcze nie ma załączników. Przeciągnij tu pliki albo wklej zrzut ekranu.",
+      "emptyTitle": "Tu trafiają pliki zadania",
+      "empty": "Przeciągnij tu pliki, wklej zrzut ekranu albo wyślij je w rozmowie zadania.",
       "fromCreation": "Przy tworzeniu · {{when}}",
       "fromComment": "Komentarz: {{name}} · {{when}}",
       "linked": "Połączone przez: {{name}}"
@@ -6812,6 +6902,8 @@
       "github_linked": "połączono z GitHub",
       "github_unlinked": "usunięto link do GitHub",
       "artifact_linked": "załączył(a) plik",
+      "files_attached": "załączył(a) {{names}}",
+      "files_removed": "usunął(ęła) {{names}} z załączników",
       "criterion_checked": "zaznaczył(a) kryterium „{{text}}”",
       "criterion_unchecked": "odznaczył(a) kryterium „{{text}}”",
       "agent_asked": "poprosił(a) o wykonanie: {{name}}"
@@ -8755,6 +8847,19 @@
     "confirm": "Potwierdź i zaproś",
     "otherTime": "Inny termin",
     "confirmed": "Utworzono wydarzenie i wysłano zaproszenia.",
+    "proposalDismissed": "Propozycja odrzucona",
+    "proposalWaits": "{{name}} potwierdza to wydarzenie.",
+    "rsvp": {
+      "accept": "Będę",
+      "decline": "Nie będę",
+      "accepted": "będzie",
+      "declined": "nie będzie",
+      "mine": {
+        "needs_action": "Jesteś wśród zaproszonych na to wydarzenie.",
+        "accepted": "Będziesz.",
+        "declined": "Nie będziesz."
+      }
+    },
     "kind": {
       "event": "Wydarzenie",
       "routine": "Rutyna",
@@ -10748,6 +10853,7 @@
     "title": "Drive",
     "subtitle": "Wszystko, co stworzyli lub przesłali ludzie i agenci.",
     "search": "Szukaj plików",
+    "loadMore": "Wczytaj więcej",
     "kind": "Typ",
     "filters": "Filtry",
     "allKinds": "Wszystkie typy",
@@ -10840,6 +10946,7 @@
     "onlyDriveText": "Jeszcze nie udostępniono na kanale.",
     "dm": "Wiadomość bezpośrednia",
     "dmWith": "Wiadomość bezpośrednia z: {{name}}",
+    "dmBetween": "Wiadomość bezpośrednia między: {{names}}",
     "inDm": "Wysłano w wiadomości bezpośredniej",
     "inThread": "W wątku rozmowy",
     "audience": {
@@ -10847,7 +10954,8 @@
       "publicChannel": "Widzą go wszyscy w przestrzeni roboczej: jest na publicznym kanale #{{name}}",
       "privateChannel": "Widzą go tylko członkowie #{{name}} i administratorzy",
       "dm": "Widzisz go tylko ty i {{name}}: pochodzi z wiadomości bezpośredniej",
-      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej"
+      "dmGone": "Widzą go tylko osoby z tej rozmowy: pochodzi z wiadomości bezpośredniej",
+      "dmBetween": "Widzą go tylko {{names}}: pochodzi z wiadomości bezpośredniej"
     },
     "private": "Prywatne",
     "privateHint": "Te pliki widzą tylko osoby z rozmowy. W kanale także administratorzy.",
@@ -10900,9 +11008,6 @@
     },
     "s3": "Twój własny bucket",
     "s3Text": "S3, R2, MinIO i inne zgodne z S3.",
-    "gdrive": "Google Drive",
-    "onedrive": "OneDrive",
-    "soon": "Wkrótce",
     "current": "W użyciu",
     "usage": {
       "files": "{{size}} plików",
@@ -11476,6 +11581,7 @@
     "toolsCount_many": "{{count}} narzędzi",
     "toolsCount_other": "{{count}} narzędzia",
     "active": "Aktywny",
+    "noToolsNow": "Na razie bez narzędzi",
     "notReviewed": "Czeka na przegląd",
     "toReview_one": "{{count}} nowe narzędzie do przejrzenia",
     "toReview_few": "{{count}} nowe narzędzia do przejrzenia",
@@ -11647,6 +11753,7 @@
   },
   "toolNames": {
     "order": "head-first",
+    "catalog": "none",
     "verb": {
       "get": "Pobierz",
       "list": "Wyświetl",
@@ -12436,6 +12543,11 @@
       "subject": "Temat zawiera",
       "text": "Treść zawiera",
       "noMailbox": "Najpierw podłącz skrzynkę w Konektorach.",
+      "readsNone": "{{name}} nie czyta jeszcze żadnej skrzynki.",
+      "cantRead": "{{name}} nie czyta tej skrzynki.",
+      "connectorReadsNone": "{{name}} nie czyta jeszcze {{connector}}.",
+      "connectorCantRead": "{{name}} nie czyta {{connector}}.",
+      "giveAccess": "Daj dostęp",
       "openConnectors": "Otwórz Konektory",
       "when": "Gdy przyjdzie e-mail na {{address}}",
       "whenFolder": "Gdy przyjdzie e-mail na {{address}} ({{folder}})",
@@ -12605,6 +12717,11 @@
       "hintZoomed": "Przeciągnij, aby przesunąć. Esc dopasowuje z powrotem",
       "hintTouch": "Stuknij lub zsuń palce, aby powiększyć",
       "hintZoomedTouch": "Przeciągnij, aby przesunąć. Stuknij, aby dopasować z powrotem"
+    },
+    "nav": {
+      "previous": "Poprzedni obraz",
+      "next": "Następny obraz",
+      "place": "{{index}} z {{count}}"
     }
   },
   "errors": {
@@ -12623,6 +12740,8 @@
       "checkAddress": "Sprawdź adres i spróbuj ponownie.",
       "tooLong": "To za długie. Skróć i spróbuj ponownie.",
       "updateComputerApp": "Aplikacja na komputerze jest na to zbyt stara. Zaktualizuj ją i spróbuj ponownie.",
+      "computerUpdatesItself": "Komputer przestrzeni roboczej sam się do tego aktualizuje. Spróbuj ponownie za chwilę.",
+      "notInvited": "Nie ma cię wśród zaproszonych na to wydarzenie.",
       "offHere": "To jest tutaj wyłączone.",
       "notInConversation": "Nie ma w tej rozmowie.",
       "accountStart": "Komputer nie mógł rozpocząć logowania. Sprawdź, czy jest włączony, i spróbuj ponownie.",
@@ -12665,6 +12784,7 @@
     },
     "issue": {
       "assigneeOutside": "Ta osoba nie widzi tego zadania. Najpierw dodaj ją do Kto to widzi.",
+      "stageFull": "Etap mieści najwyżej {{max}} kolumn. Najpierw usuń jedną z jego kolumn.",
       "deleteForbidden": "Tylko osoba, która utworzyła to zadanie, lub administrator może je usunąć.",
       "audienceEmpty": "Wybierz, kto to widzi."
     },
@@ -12841,7 +12961,14 @@
       "fileNameRequired": "Plik musi mieć nazwę.",
       "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu.",
       "deleteForbidden": "Usunąć to może tylko osoba, która to utworzyła, osoba, która poprosiła agenta, właściciel agenta albo administrator.",
-      "restoreForbidden": "Przywrócić to może tylko osoba, która mogła to usunąć."
+      "restoreForbidden": "Przywrócić to może tylko osoba, która mogła to usunąć.",
+      "versionNotFound": "Ta wersja pliku nie istnieje.",
+      "formatUnavailable": "Tego pliku nie da się zapisać w tym formacie.",
+      "sharingOpen": "Cała przestrzeń robocza już widzi ten plik.",
+      "sharingForbidden": "Tylko osoby z rozmowy, w której jest plik, zmieniają, kto go widzi.",
+      "sharingEmpty": "Wybierz, kto to widzi.",
+      "sharingTooMany": "Wybierz najwyżej {{max}} osób i {{max}} ról.",
+      "notInDrive": "To istnieje tylko w swojej rozmowie, więc nie da się tego udostępnić."
     },
     "machine": {
       "forbidden": "Może to zrobić tylko administrator albo osoba, która podłączyła komputer.",
@@ -12956,6 +13083,20 @@
     }
   },
   "machines": {
+    "reasons": {
+      "browser_unsupported": "Przeglądarka agentów nie działa w systemie tego komputera.",
+      "browser_download": "Nie udało się pobrać przeglądarki agentów. Sprawdź połączenie tego komputera, a przy następnym użyciu spróbuje ponownie.",
+      "browser_checksum": "Pobrana przeglądarka agentów była uszkodzona, więc nie została użyta. Przy następnym użyciu spróbuje ponownie.",
+      "desktop_use_linux": "Aplikacje na ekranach agentów działają na komputerach z Linuksem, które mają ekrany agentów.",
+      "desktop_use_own_user": "Aplikacje na ekranach wymagają, by każdy agent pracował na tym komputerze jako własny użytkownik (tryb systemowy). Tutaj wszyscy agenci pracują jako użytkownik runnera.",
+      "desktop_use_install": "Zainstaluj na tym komputerze to, czego potrzebują aplikacje na ekranach:",
+      "desktop_unavailable": "Ekrany agentów nie mogą działać na tym komputerze.",
+      "desktop_linux": "Ekrany agentów działają tylko na komputerach z Linuksem.",
+      "desktop_install": "Zainstaluj na tym komputerze ekrany agentów:",
+      "not_as_root": "Ekrany i terminale agentów nigdy nie działają jako root. Uruchom runnera jako zwykły użytkownik.",
+      "runner_bun_old": "To wymaga runnera na Bun 1.3.5 lub nowszym. Zaktualizuj runnera na tym komputerze.",
+      "terminal_unsupported": "Terminale działają tylko na komputerach z Linuksem i Makach."
+    },
     "egress": {
       "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
       "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
@@ -13723,6 +13864,7 @@
       "techAction": "Akcja",
       "techTool": "Narzędzie",
       "techKind": "Rodzaj",
+      "techSaid": "Co odpowiedziało",
       "techRun": "Uruchomienie",
       "techId": "Wpis",
       "openConversation": "Otwórz rozmowę",
@@ -13732,6 +13874,7 @@
     }
   },
   "settings": {
+    "notOpen": "Twoja rola w tej przestrzeni roboczej nie otwiera sekcji {{section}}. Osoba zarządzająca rolami może ją dla ciebie otworzyć.",
     "nav": "Sekcje ustawień",
     "group": {
       "you": "Ty",
@@ -13820,6 +13963,14 @@
         "openAt": "Po otwarciu rozmowy przenieś mnie do",
         "openRead": "Ostatnia przeczytana wiadomość",
         "openLatest": "Najnowsza wiadomość",
+        "textSize": "Rozmiar tekstu",
+        "textSizeHelp": "Wiadomości, we wszystkich rozmowach i na wszystkich twoich urządzeniach",
+        "textSizePhone": "Rozmiar tekstu z ustawień telefonu też ma znaczenie",
+        "textXs": "Mniejszy",
+        "textSm": "Mały",
+        "textMd": "Domyślny",
+        "textLg": "Duży",
+        "textXl": "Większy",
         "sample": {
           "ask": "Ile jeszcze zostało?",
           "answer": "Zostało 14. Dać znać?",
@@ -14521,7 +14672,11 @@
         "shell": "Uruchamia w sobie inne polecenia",
         "inline": "Uruchamia kod podany w linii",
         "global": "Instaluje dla całego komputera",
-        "rules": "Poza tym, co agenci mogą robić samodzielnie"
+        "rules": "Poza tym, co agenci mogą robić samodzielnie",
+        "noAccess": "Agent nie ma do tego dostępu",
+        "policy": "Niedozwolone przy takiej pracy",
+        "credential": "Wysyła coś, co wygląda na klucz",
+        "repo": "Tego repozytorium nie ma na liście agenta"
       },
       "gave": "wejście",
       "answered": "wynik",
@@ -14626,6 +14781,7 @@
         "runningRoutine": "Uruchomiono rutynę teraz",
         "proposingTeam": "Zaproponowano zespół",
         "proposingChange": "Zaproponowano zmianę",
+        "workingOnWorkspace": "Praca w przestrzeni roboczej",
         "updatingThread": "Zaktualizowano wątek",
         "addingAgent": "Dodano agenta do kanału",
         "readingConversation": "Przeczytano rozmowę",
@@ -14734,6 +14890,7 @@
       "runningRoutine": "uruchamianie rutyny teraz",
       "proposingTeam": "proponowanie zespołu",
       "proposingChange": "proponowanie zmiany",
+      "workingOnWorkspace": "praca w przestrzeni roboczej",
       "updatingThread": "aktualizowanie wątku",
       "addingAgent": "dodawanie agenta do kanału",
       "readingConversation": "czytanie rozmowy",
@@ -14881,6 +15038,8 @@
       "action_update_skills": "Zaktualizuj umiejętności",
       "action_approvals": "Zatwierdzenia czekające na ciebie",
       "action_open_page": "Otwórz ekran",
+      "calendar_proposal": "Propozycja wydarzenia: {{title}}",
+      "action_workspace": "Zaproponowano zmianę w przestrzeni roboczej",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "team_proposal": "Zaproponował zespół: {{names}}",
       "settings_proposal": "Zaproponował zmianę dla: {{names}}",
@@ -15097,6 +15256,38 @@
     "update_skill_from_source": {
       "label": "Aktualizuj umiejętności z ich linków",
       "description": "Aktualizuje umiejętności z miejsca, z którego je zainstalowano. Zmiany w skryptach czekają na osobę."
+    },
+    "propose_remove_agents": {
+      "label": "Zaproponuj archiwizację lub usunięcie agentów",
+      "description": "Publikuje kartę z agentami do zarchiwizowania lub usunięcia. Stosuje ją osoba z uprawnieniami."
+    },
+    "offer_answers": {
+      "label": "Zapytaj z odpowiedziami do stuknięcia",
+      "description": "Publikuje pytanie z odpowiedziami, które dana osoba stuka. Każde stuknięcie to jej własna wiadomość."
+    },
+    "propose_team": {
+      "label": "Zaproponuj zespół",
+      "description": "Publikuje kartę z kilkoma agentami, ich kanałami, rutynami i umiejętnościami. Tworzy go człowiek."
+    },
+    "propose_settings_change": {
+      "label": "Zaproponuj ustawienia współpracownika",
+      "description": "Publikuje kartę z nowym modelem, AI, budżetem, opiekunem, odbiorcami lub kanałami współpracownika. Stosuje ją człowiek."
+    },
+    "offer_approvals": {
+      "label": "Pokaż, co czeka na zatwierdzenie",
+      "description": "Publikuje kartę z zatwierdzeniami, które czekają na tę osobę. Zatwierdza lub odrzuca każde na miejscu."
+    },
+    "propose_member_changes": {
+      "label": "Zaproponuj zmiany dotyczące osób",
+      "description": "Publikuje kartę z właścicielami, rolami lub usunięciami do zmiany. Każdą stosuje osoba z uprawnieniami."
+    },
+    "offer_open_page": {
+      "label": "Zaproponuj otwarcie ekranu",
+      "description": "Publikuje kartę z przyciskiem, który otwiera ekran aplikacji, na przykład płatności, role lub stronę agenta."
+    },
+    "set_team_week": {
+      "label": "Zmień kartę Tydzień zespołu",
+      "description": "Zatrzymuje, wznawia lub przenosi cotygodniową kartę Tydzień zespołu w wiadomości bezpośredniej tej osoby."
     },
     "propose_agent": {
       "label": "Zaproponuj agenta",
@@ -16915,6 +17106,85 @@
     "receipt": "Kto to widzi: {{who}}",
     "limited": "ograniczony dostęp",
     "rolesToo": "Role, które są już na tej stronie, nadal ją widzą."
+  },
+  "share": {
+    "button": "Udostępnij",
+    "title": "Udostępnij {{name}}",
+    "conversation": "Tylko rozmowa",
+    "people": "Osoby i role, które wybierzesz",
+    "everyone": "Cała przestrzeń robocza",
+    "whereDm": "Wiadomość bezpośrednia z: {{name}}",
+    "whereDmGone": "Wiadomość bezpośrednia",
+    "whereDmBetween": "Wiadomość bezpośrednia między: {{names}}",
+    "whereChannel": "Członkowie #{{name}}",
+    "add": "Dodaj osobę lub rolę",
+    "addSearch": "Szukaj osób i ról",
+    "noResults": "Nikt o takim imieniu",
+    "groupPeople": "Osoby",
+    "groupRoles": "Role",
+    "access": "Kto ma dostęp",
+    "you": "{{name}} (ty)",
+    "agent": "Agent",
+    "role": "Rola",
+    "remove": "Usuń: {{name}}",
+    "admins": "Administratorzy zawsze to widzą.",
+    "copyLink": "Kopiuj link",
+    "copied": "Skopiowano link.",
+    "done": "Gotowe",
+    "onlyHere": "Osoby spoza tej rozmowy nie otworzą linku.",
+    "choosePeople": "Wybierz osoby",
+    "readOnly": "Tylko osoby z rozmowy zmieniają, kto to widzi.",
+    "open": "Cała przestrzeń robocza widzi ten plik.",
+    "savedEveryone": "Teraz cała przestrzeń robocza widzi plik.",
+    "savedPeople": "Teraz wybrane osoby widzą plik.",
+    "savedConversation": "Teraz plik widzi tylko rozmowa.",
+    "undo": "Cofnij",
+    "fileRef": "Plik {{title}}",
+    "fileRefNone": "Plik bez dostępu",
+    "also": "{{text}}. Udostępniono też: {{who}}.",
+    "someOnlyHere": "Niektóre z tych linków otworzą tylko osoby z rozmowy, w której jest plik."
+  },
+  "linkErrors": {
+    "signIn": {
+      "title": "Zaloguj się, aby otworzyć ten link",
+      "text": "Po zalogowaniu wrócisz prosto tutaj."
+    },
+    "file": {
+      "title": "Ten plik nie jest dla ciebie dostępny",
+      "text": "Mógł zostać usunięty albo jest udostępniony tylko w rozmowie, w której cię nie ma. Poproś osobę, która go wysłała, żeby udostępniła ci go przyciskiem Udostępnij przy pliku."
+    },
+    "link": {
+      "title": "Ten link nie jest dla ciebie dostępny",
+      "text": "Mógł wygasnąć, zostać już użyty albo prowadzi do miejsca, w którym cię nie ma. Poproś osobę, która go wysłała, o nowy."
+    },
+    "version": {
+      "title": "Ta wersja pliku nie istnieje",
+      "text": "Link prosi o wersję, której plik nie ma."
+    },
+    "format": {
+      "title": "Ten plik nie jest dostępny w tym formacie",
+      "text": "Link prosi o format, w którym tego pliku nie da się zapisać."
+    },
+    "busy": {
+      "title": "Za dużo prób z rzędu",
+      "text": "Poczekaj chwilę i spróbuj ponownie."
+    },
+    "server": {
+      "title": "Coś poszło nie tak po naszej stronie",
+      "text": "To nie twoja wina. Spróbuj ponownie za chwilę."
+    },
+    "other": {
+      "title": "Ten link się nie otworzył",
+      "text": "Adres jest niepełny albo już nie działa. Poproś osobę, która go wysłała, o nowy."
+    },
+    "action": {
+      "signIn": "Zaloguj się",
+      "open": "Otwórz agentes.chat",
+      "latest": "Otwórz najnowszą wersję",
+      "file": "Otwórz plik",
+      "retry": "Spróbuj ponownie"
+    },
+    "errorId": "Kod błędu: {{id}}"
   },
   "teamTemplates": {
     "lead": "Zespół dla {{org}}, każdy agent na własnym kanale. Możesz go dostosować przed utworzeniem.",
