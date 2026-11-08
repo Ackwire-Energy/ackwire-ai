@@ -1,0 +1,24 @@
+import { describe, expect, test } from "bun:test";
+import { setupDom } from "../testing/dom";
+
+setupDom();
+
+import { render } from "@testing-library/react";
+import { GroupHeading } from "../src";
+
+describe("GroupHeading", () => {
+  test("a heading with its count and an aside at its end; an h3 under another heading", () => {
+    const { container } = render(
+      <>
+        <GroupHeading title="Decididos há pouco" count={3} aside={<a href="#historico">Ver histórico</a>} />
+        <GroupHeading title="Hoje" level={3} />
+      </>,
+    );
+    const [first, second] = [...container.querySelectorAll(".ac-grouphead")];
+    expect(first?.querySelector("h2.ac-grouphead__title")?.firstChild?.textContent).toBe("Decididos há pouco");
+    expect(first?.querySelector(".ac-grouphead__title > .ac-grouphead__count")?.textContent).toBe("3");
+    expect(first?.querySelector(".ac-grouphead__aside > a")?.textContent).toBe("Ver histórico");
+    expect(second?.querySelector("h3.ac-grouphead__title")?.textContent).toBe("Hoje");
+    expect(second?.querySelector(".ac-grouphead__count, .ac-grouphead__aside")).toBeNull();
+  });
+});

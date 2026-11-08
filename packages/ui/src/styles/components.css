@@ -8822,6 +8822,43 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 
 /*
+ * A list group's heading (GroupHeading): one 20px line whose words start on the list's outer edge, 8 over its rows and
+ * 16 under the toolbar (the page's gap). A stack of groups (`.ac-groups`) puts 24 between them.
+ */
+.ac-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 20px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.ac-grouphead__title {
+  display: inline-flex;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+.ac-grouphead__count {
+  font-weight: 500;
+  color: var(--faint);
+}
+.ac-grouphead__aside {
+  margin-left: auto;
+}
+.ac-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/*
  * List toolbars: Toolbar + SearchField + FilterChip / FilterToggle. One
  * shape from the control ruler: a list's row is compact (`--tool-h` 32, r10;
  * 40 r12 on touch), the field background and hairline; pressed or set =

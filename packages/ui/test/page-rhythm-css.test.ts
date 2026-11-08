@@ -68,3 +68,15 @@ describe("cards and rows", () => {
     expect(body(".ac-list__row")).toContain("padding: var(--row-py) var(--space-4);");
   });
 });
+
+describe("one group heading", () => {
+  test("one 20px line on the list's outer edge, 8 over its rows; groups 24 apart", () => {
+    const head = body(".ac-grouphead");
+    expect(head).toContain("margin: 0 0 8px;");
+    expect(head).toContain("padding: 0;");
+    expect(head).toContain("line-height: 20px;");
+    expect(head).toContain("min-height: 20px;");
+    expect(body(".ac-grouphead__aside")).toContain("margin-left: auto;");
+    expect(body(".ac-groups")).toContain("gap: 24px;");
+  });
+});
