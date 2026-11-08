@@ -212,3 +212,48 @@ export const onceAt = (rule: RecurrenceRule) =>
 /** When a proposed agent's routine runs, as the web says it; a schedule no rule holds, as the agent wrote it. */
 export const proposedRoutineWhen = (t: TFunction, locale: string, r: ProposedRoutine, now = new Date()) =>
   r.rule ? ruleSentence(t, locale, fromApiRule(r.rule, toYmd(now)), now) : r.schedule;
+
+/**
+ * The common "when"s the form offers as rows (Repetição, Dia, Horário), each picked from the system's list: the rule
+ * reads as one of them, or as `custom` (every 2 weeks, several days or times, an end), which only the phrase says.
+ */
+export type RulePreset = "once" | "daily" | "business" | "weekly" | "monthly" | "custom";
+export const COMMON_RULES: Exclude<RulePreset, "custom">[] = ["once", "daily", "business", "weekly", "monthly"];
+
+export function presetOf(rule: RecurrenceRule): RulePreset {
+  if (rule.freq === "once") return "once";
+  if ((rule.interval || 1) !== 1 || rule.until || rule.count || rule.times.length !== 1) return "custom";
+  if (rule.freq === "daily")
+    return isBusiness(rule.byWeekday) ? "business" : rule.byWeekday?.length ? "custom" : "daily";
+  if (rule.freq === "weekly") return rule.byWeekday?.length === 1 ? "weekly" : "custom";
+  if (rule.freq === "monthly")
+    return !rule.byWeekday?.length && rule.byMonthDay?.length === 1 && rule.bySetPos === undefined
+      ? "monthly"
+      : "custom";
+  return "custom";
+}
+
+/** The rule as a preset, keeping its time, zone and start; the day it falls on comes from what it had, or its start. */
+export function withPreset(rule: RecurrenceRule, preset: Exclude<RulePreset, "custom">): RecurrenceRule {
+  const { byWeekday, byMonthDay, bySetPos: _pos, until: _until, count: _count, ...rest } = rule;
+  const base: RecurrenceRule = { ...rest, interval: 1, times: [rule.times[0] ?? "09:00"] };
+  switch (preset) {
+    case "once":
+      return { ...base, freq: "once" };
+    case "daily":
+      return { ...base, freq: "daily" };
+    case "business":
+      return { ...base, freq: "daily", byWeekday: [...BUSINESS_DAYS] };
+    case "weekly":
+      return { ...base, freq: "weekly", byWeekday: [byWeekday?.[0] ?? weekdayOfYmd(rule.start)] };
+    case "monthly":
+      return { ...base, freq: "monthly", byMonthDay: [byMonthDay?.[0] ?? Number(rule.start.slice(8, 10))] };
+  }
+}
+
+/** The times the Horário row offers: every half hour of the day. */
+export const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${pad(Math.floor(i / 2))}:${i % 2 ? "30" : "00"}`);
+
+/** The days a one-off may fall on from the Dia row: today and the next 13, as `YYYY-MM-DD`. */
+export const nextDays = (from = new Date(), count = 14) =>
+  Array.from({ length: count }, (_, i) => toYmd(new Date(from.getFullYear(), from.getMonth(), from.getDate() + i)));

@@ -4,6 +4,7 @@ import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, View } from "r
 import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
+import { showChoices } from "@/ui/ChoiceHost";
 import { useColors } from "../shared/hooks";
 import { copyText, type HeaderWordAction, MONO, PushedHeader, successHaptic } from "../shared/parts";
 
@@ -69,6 +70,8 @@ export function Gap() {
 export interface ActionChoice {
   label: string;
   destructive?: boolean;
+  /** The one in use: checked in Android's list (iOS's action sheet draws no checks). */
+  checked?: boolean;
   onPress: () => void;
 }
 
@@ -86,6 +89,8 @@ export function chooseAction(title: string, options: ActionChoice[], cancel: str
       (i) => options[i]?.onPress(),
     );
   } else {
+    // Any number of options as a list over the screen; the dialog below only where no host is mounted.
+    if (showChoices({ title, options, cancel })) return;
     const buttons = options.map((o) => ({
       text: o.label,
       style: o.destructive ? ("destructive" as const) : undefined,

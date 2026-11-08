@@ -24,6 +24,7 @@ import {
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
+import { SheetHeader } from "../new/parts";
 import { goBack, PushedHeader } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
 import {
@@ -330,6 +331,11 @@ interface ZoneListProps {
   value: string | null;
   withWorkspace?: boolean;
   onPick: (zone: string | null) => void;
+  /**
+   * Shown in a sheet of its own (the first run, which sits outside the navigator): its own bar with × instead of the
+   * pushed screen's native bar, which would retitle the screen under the sheet.
+   */
+  onClose?: () => void;
 }
 
 /**
@@ -355,6 +361,7 @@ function ZonePicker({
   value,
   withWorkspace = false,
   onPick,
+  onClose,
   orgZone,
   people,
 }: ZoneListProps & {
@@ -389,7 +396,13 @@ function ZonePicker({
 
   return (
     <View style={[styles.fill, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={title} solid={false} grouped />
+      {onClose ? (
+        <View style={styles.sheetBar}>
+          <SheetHeader title={title} onPress={onClose} />
+        </View>
+      ) : (
+        <PushedHeader title={title} solid={false} grouped />
+      )}
       <FlatList
         data={rows}
         keyExtractor={(r) => ("header" in r ? `h:${r.header}` : r.zone)}
@@ -470,6 +483,8 @@ function ZoneRow({
 }
 
 const styles = StyleSheet.create({
+  // The sheet's own bar (the first run): on the 16 margin, clear of the grabber.
+  sheetBar: { paddingHorizontal: 16, paddingTop: 14 },
   fill: { flex: 1 },
   photo: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 14 },
   semibold: { fontWeight: "600" },

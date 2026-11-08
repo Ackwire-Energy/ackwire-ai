@@ -31,7 +31,6 @@ import {
   skillSourceKey,
   stepAt,
   storageKey,
-  tileStates,
   toS3Input,
   visibleSections,
   withIdea,
@@ -180,58 +179,6 @@ describe("the workspace's page: one short value per row", () => {
 });
 
 describe("Geral", () => {
-  test("each area's line, as the web's tiles", async () => {
-    const t = await translator("pt-BR");
-    expect(
-      tileStates(t, "pt-BR", {
-        overview: { people: 3, agents: 2, budgetUsedPercent: 42 },
-        usesApi: true,
-        invitations: 1,
-        connectors: ["GitHub", "Slack", "Linear", "Sentry"],
-        skills: 5,
-        computers: { count: 2, online: 1 },
-        keys: { manages: true, live: 2, platform: false },
-        storage: { kind: "agentes", edition: "selfhost" },
-      }),
-    ).toEqual({
-      members: "3 membros · 1 convite esperando",
-      access: "2 agentes",
-      usage: "42% do orçamento usado este mês",
-      connectors: "4 conectados · GitHub, Slack, Linear",
-      skills: "5 skills",
-      computers: "1 de 2 ligados",
-      keys: "2 chaves",
-      storage: "Este servidor",
-    });
-  });
-
-  test("the empty states, a member's plans, and nothing while an area loads", async () => {
-    const t = await translator("pt-BR");
-    expect(
-      tileStates(t, "pt-BR", {
-        connectors: [],
-        computers: { count: 0, online: 0 },
-        keys: { manages: false, plans: 0 },
-        storage: { kind: "s3", edition: "cloud" },
-      }),
-    ).toEqual({
-      connectors: "Nenhum app conectado ainda",
-      computers: "Nenhum computador ainda",
-      keys: "Nenhum plano ainda",
-      storage: "Seu próprio bucket",
-    });
-    expect(tileStates(t, "pt-BR", { keys: { manages: true, live: 0, platform: true } })).toEqual({
-      keys: "Usando a chave deste servidor",
-    });
-    expect(tileStates(t, "pt-BR", {})).toEqual({});
-    // A workspace on plans alone (ADR 0063 §5): Uso says no 0% budget.
-    expect(
-      tileStates(t, "pt-BR", { overview: { people: 3, agents: 2, budgetUsedPercent: 0 }, usesApi: false }),
-    ).toEqual({ members: "3 membros", access: "2 agentes" });
-    const en = await translator("en");
-    expect(tileStates(en, "en", { computers: { count: 3, online: 2 } }).computers).toBe("2 of 3 on");
-  });
-
   test("the context's ideas: the ones still missing, and one started on a paragraph of its own", () => {
     const ideas = ["Para quem", "O que importa agora", "O que nunca fazer"];
     expect(missingIdeas("", ideas)).toEqual(ideas);

@@ -15,7 +15,16 @@ import { useLocalSearchParams } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  LayoutAnimationConfig,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -230,6 +239,7 @@ function Gallery() {
                           key={item.id}
                           item={item}
                           review={admin && item.pending > 0}
+                          fresh={item.id === connected}
                           onPress={() => openItem(item)}
                         />
                       ))}
@@ -406,9 +416,33 @@ function WaitLine({
  * tools couldn't be read, or a server's new or unclear tools), the amber wait mark instead (the line under the row
  * says why, its screen too).
  */
-function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review: boolean; onPress: () => void }) {
+function ConnectedTile({
+  item,
+  review,
+  fresh = false,
+  onPress,
+}: {
+  item: ConnectedItem;
+  review: boolean;
+  /** Just connected (back from its sign-in): it lands in the row once. */
+  fresh?: boolean;
+  onPress: () => void;
+}) {
   const { t } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
+  // The rare moment of the gallery: what you just connected settles into the row (from 0.9 and half seen, ease-out).
+  // No tap of its own: the way back from the sign-in already buzzed (`OAuthReturn`), one per connection. Reduced
+  // motion: it is simply there.
+  const land = useSharedValue(fresh && !reduced ? 0 : 1);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the tile first shows
+  useEffect(() => {
+    if (fresh) land.set(withTiming(1, { duration: 360, easing: LAND }));
+  }, []);
+  const landed = useAnimatedStyle(() => ({
+    opacity: 0.5 + land.get() * 0.5,
+    transform: [{ translateY: (1 - land.get()) * 6 }, { scale: 0.9 + land.get() * 0.1 }],
+  }));
   const name = itemName(t, item);
   const why = item.needsReconnect
     ? t("connectors.composio.needsReconnect")
@@ -420,14 +454,14 @@ function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review:
   const waiting = why !== null;
   return (
     <MiniTile onPress={onPress} label={why ? `${name}, ${why}` : t("mobile.connectors.connectedCheck", { name })}>
-      <View>
+      <Animated.View style={landed}>
         <ConnectorIcon def={item.def} image={item.image} label={name} size={48} check={!waiting} />
         {waiting ? (
           <View style={[styles.waitBadge, { backgroundColor: c.amber, borderColor: c.bg }]}>
             <Icon name="wait" size={12} color={c.bg} />
           </View>
         ) : null}
-      </View>
+      </Animated.View>
       <Text variant="caption" tone="muted" numberOfLines={1}>
         {name}
       </Text>
@@ -435,6 +469,8 @@ function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review:
   );
 }
 
+/** A strong ease-out: what lands starts fast and settles. */
+const LAND = Easing.bezier(0.23, 1, 0.32, 1);
 const TILE_IN = FadeIn.duration(160);
 const TILE_OUT = FadeOut.duration(120);
 const TILE_SLIDE = LinearTransition.duration(220);

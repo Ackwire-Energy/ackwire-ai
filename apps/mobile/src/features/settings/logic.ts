@@ -154,48 +154,6 @@ export interface TileFacts {
   storage?: { kind: "agentes" | "s3"; edition: "cloud" | "selfhost" } | undefined;
 }
 
-/** Each area's line under its name on the workspace's page, as the web's tiles (`settings.tileState.*`). */
-export function tileStates(t: TFunction, locale: string, f: TileFacts): Partial<Record<SettingsSection, string>> {
-  const out: Partial<Record<SettingsSection, string>> = {};
-  const pending = f.invitations ?? 0;
-  if (f.overview) {
-    out.members = [
-      t("settings.tileState.members", { count: f.overview.people }),
-      pending > 0 ? t("settings.tileState.invitations", { count: pending }) : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    out.access = t("settings.tileState.agents", { count: f.overview.agents });
-    if (f.usesApi)
-      out.usage = t("settings.tileState.usage", { percent: formatPercent(locale, f.overview.budgetUsedPercent) });
-  }
-  if (f.connectors) {
-    const names = f.connectors.slice(0, 3).join(", ");
-    out.connectors =
-      f.connectors.length === 0
-        ? t("settings.tileState.noConnectors")
-        : `${t("settings.tileState.connectors", { count: f.connectors.length })} · ${names}`;
-  }
-  if (f.skills !== undefined) out.skills = t("settings.tileState.skills", { count: f.skills });
-  if (f.computers)
-    out.computers =
-      f.computers.count === 0
-        ? t("settings.tileState.noComputers")
-        : t("settings.tileState.computers", { count: f.computers.count, online: f.computers.online });
-  if (f.keys)
-    out.keys = f.keys.manages
-      ? f.keys.live > 0
-        ? t("settings.tileState.keys", { count: f.keys.live })
-        : f.keys.platform
-          ? t("settings.tileState.platformKey")
-          : t("settings.tileState.noKeys")
-      : f.keys.plans > 0
-        ? t("settings.tileState.plans", { count: f.keys.plans })
-        : t("settings.tileState.noPlans");
-  if (f.storage) out.storage = t(storageKey(f.storage.kind, f.storage.edition));
-  return out;
-}
-
 /**
  * One value per row on the workspace's page, short, in faint ("5", "2", "1 de 2", "40%"): a count or a state, never
  * a sentence (that is the area's own screen). Absent while it loads or where there is nothing to count.

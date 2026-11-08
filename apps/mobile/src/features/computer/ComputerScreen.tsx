@@ -3,6 +3,7 @@ import {
   browserOnlyWhy,
   controlledBy,
   handoffScreen,
+  screenSteps,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
 import { cantShow, cantShowLine, liveSubLine } from "@agenteschat/client/lib/agent-computer";
@@ -31,6 +32,7 @@ import { SheetHostProvider } from "../shared/SheetHost";
 import { AgentScreen } from "./AgentScreen";
 import { Cover } from "./Cover";
 import { DockText } from "./EdgeDock";
+import { LiveTrail } from "./LiveTrail";
 import { offersSwitch, type PhoneStage, phoneStage, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
@@ -237,7 +239,10 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       );
     } else {
       sub = since ? t("agentComputer.sub.offline", { time: since }) : t("machines.offline");
+      // What it did last (it may go on without the computer): its steps under the box, to see how far it got.
+      const steps = screenSteps(run?.work);
       body = (
+        <>
         <Cover
           art={<ComputerPortrait kind={computerKind(machine.os)} state="offline" size={96} />}
           text={t("agentComputer.state.offline", { computer })}
@@ -248,6 +253,8 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
             ) : null
           }
         />
+        {steps.length > 0 ? <LiveTrail steps={steps} color={agentLook(agent).color} now={now} /> : null}
+        </>
       );
     }
   } else if (stage === "joining") {

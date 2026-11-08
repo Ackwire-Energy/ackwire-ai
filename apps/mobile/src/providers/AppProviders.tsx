@@ -12,6 +12,7 @@ import { authClient } from "@/lib/auth";
 import { outboxStoreFor } from "@/lib/outbox";
 import { useServer } from "@/lib/server";
 import { snapshotStoreFor } from "@/lib/snapshot";
+import { ChoiceHost } from "@/ui/ChoiceHost";
 import { hintTouches } from "@/ui/hints";
 import { ToastHost } from "@/ui/Toast";
 import { ThemeProvider } from "@/ui/theme";
@@ -82,7 +83,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
                     <OrgProvider>
                       <RealtimeProvider>
                         <PushProvider>
-                          <ToastHost>{children}</ToastHost>
+                          <ToastHost>
+                            {children}
+                            {/* Choices longer than Android's dialog (three buttons), once for the whole app. */}
+                            <ChoiceHost />
+                          </ToastHost>
                         </PushProvider>
                       </RealtimeProvider>
                     </OrgProvider>

@@ -311,11 +311,10 @@ export function AppearancePage() {
 }
 
 /**
- * Idioma: each language by its own name, the one in use checked. Someone who never picked sees the phone's language
- * checked and keeps following it (ADR 0122). Signed out, the pick waits on the phone for the next sign-in.
+ * The language in use and how to change it, for the Idioma page and Você's row (the system's list, in place): someone
+ * who never picked follows the phone's. Signed out, the pick waits on the phone for the next sign-in (ADR 0122).
  */
-export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
-  const { t } = useTranslation();
+export function useLanguageChoice(signedIn = true) {
   const api = useApi();
   const [choice, setChoice] = useState<AppLocale>(() => {
     const { stored } = readLocaleState();
@@ -328,6 +327,16 @@ export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
     // Not heard: kept as pending, so the next start sends it.
     if (signedIn) void api.account.updateMe({ locale: next, auto: false }).catch(() => rememberLocale(next, true));
   };
+  return { choice, pick };
+}
+
+/**
+ * Idioma: each language by its own name, the one in use checked. Someone who never picked sees the phone's language
+ * checked and keeps following it (ADR 0122). Signed out, the pick waits on the phone for the next sign-in.
+ */
+export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
+  const { t } = useTranslation();
+  const { choice, pick } = useLanguageChoice(signedIn);
   return (
     <Page title={t("mobile.me.language")}>
       <View style={styles.gap} />

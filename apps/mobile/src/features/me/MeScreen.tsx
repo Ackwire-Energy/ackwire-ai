@@ -1,11 +1,12 @@
 import { useAuthConfig, useIssues, useMe, useOverview } from "@agenteschat/client";
 import { showsAbout } from "@agenteschat/client/lib/about";
-import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
+import { isAppLocale, localeInfo, readyLocales } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
 import { useHeaderHeight } from "expo-router/react-navigation";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Platform, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import { Alert, StyleSheet, View } from "react-native";
+import Animated, { Easing, FadeIn, FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { type SoundChoice, setSoundChoice, useSoundChoice } from "@/lib/sounds";
@@ -37,7 +38,7 @@ import { useMyPerson, usePresenceOf } from "../status/hooks";
 import { personLine } from "../status/logic";
 import { openStatus } from "../status/StatusScreen";
 import { openIssuesWithMe, workspacesBeyond } from "./logic";
-import { usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
+import { useLanguageChoice, usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
 import { useWorkspacesAcross } from "./WorkspacesPages";
 
 /** Opens a screen over this page with the platform's push (back comes here). */
@@ -49,6 +50,12 @@ const AGENTS_SHOWN = 3;
 const PHOTO = 96;
 /** How far the photo hangs below the sky. */
 const PHOTO_OVERLAP = 48;
+/** Your agents on the sky's horizon beside your photo: two on each side, unframed (the 24 size). */
+const HORIZON = 4;
+const HORIZON_FACE = 24;
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** They rise onto the horizon once a session (the first Você opened), then simply stand there. */
+let horizonArrived = false;
 
 /**
  * Você, pushed from your avatar, as the phone's own settings: the bar reads "Você" with Editar on the right; the
@@ -84,6 +91,7 @@ export function MeScreen() {
   const name = me.data?.user.name ?? "";
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
   const sounds = useSoundChoice();
+  const language = useLanguageChoice();
   const styleLabel = useSoundLabel();
   const startLabel = useStartLabel();
   const withMe = openIssuesWithMe(issues.data, meId);
@@ -105,29 +113,42 @@ export function MeScreen() {
   const soundValue = sounds === "off" ? t("mobile.me.soundsOff") : styleLabel(sounds);
   const themeValue = t(`mobile.theme.${theme.preference}`);
 
-  // On iOS the row's value changes in place through the system's choice; Android's dialog holds three buttons at
-  // most, so there the row keeps opening its screen.
+  // Sons, Aparência and Idioma change in their row through the system's list (an action sheet on iOS, the app's list
+  // on Android, the one in use checked there), never a screen of their own for one pick.
   const pickSound = () => {
-    if (Platform.OS !== "ios") return open("/me/sounds");
     const choices: SoundChoice[] = ["tactile", "sky", "pixel", "off"];
     chooseAction(
       t("mobile.me.sounds"),
       choices.map((choice) => ({
         label: choice === "off" ? t("mobile.me.soundsOff") : styleLabel(choice),
+        checked: sounds === choice,
         onPress: () => setSoundChoice(choice),
       })),
       t("mobile.common.cancel"),
     );
   };
   const pickTheme = () => {
-    if (Platform.OS !== "ios") return open("/me/appearance");
     const choices: ThemePreference[] = ["system", "light", "dark"];
     chooseAction(
       t("mobile.me.appearance"),
-      choices.map((choice) => ({ label: t(`mobile.theme.${choice}`), onPress: () => theme.setPreference(choice) })),
+      choices.map((choice) => ({
+        label: t(`mobile.theme.${choice}`),
+        checked: theme.preference === choice,
+        onPress: () => theme.setPreference(choice),
+      })),
       t("mobile.common.cancel"),
     );
   };
+  const pickLanguage = () =>
+    chooseAction(
+      t("mobile.me.language"),
+      readyLocales().map((l) => ({
+        label: l.native,
+        checked: language.choice === l.code,
+        onPress: () => language.pick(l.code),
+      })),
+      t("mobile.common.cancel"),
+    );
   const confirmSignOut = () =>
     Alert.alert(t("mobile.me.signOutConfirm"), t("mobile.me.signOutConfirmText"), [
       { text: t("mobile.common.cancel"), style: "cancel" },
@@ -161,6 +182,7 @@ export function MeScreen() {
         {/* The workspace's sky as a band under the clear bar; your photo hangs from its bottom edge. */}
         <View style={[styles.band, { height: insets.top + 62 + PHOTO_OVERLAP }]}>
           <WorkspaceSky fade={0.4} style={StyleSheet.absoluteFill} />
+          <HorizonTeam ids={myAgents.slice(0, HORIZON).map((a) => a.id)} />
         </View>
         <View style={styles.cover}>
           <WithPresence size={PHOTO + 6} presence={myPresence} ring={c.grouped}>
@@ -357,8 +379,8 @@ export function MeScreen() {
               icon="globe"
               label={t("mobile.me.language")}
               value={isAppLocale(i18n.language) ? localeInfo(i18n.language).native : i18n.language}
-              chevron
-              onPress={() => open("/me/language")}
+              menu
+              onPress={pickLanguage}
             />
             {about ? (
               <GroupedRow
@@ -398,6 +420,55 @@ function StatusRow() {
   return <GroupedRow icon="smile" label={label} chevron onPress={openStatus} />;
 }
 
+/**
+ * Your agents standing on the sky's horizon, either side of your photo, alive (blinking, looking around, the one at
+ * work running): the page is yours and so are they. The first time Você opens in a session they rise onto it in one
+ * wave (the nearest first), a rare moment; after that they are just there. Reduced motion: a fade, no rise.
+ */
+function HorizonTeam({ ids }: { ids: string[] }) {
+  const { reducedMotion } = useTheme();
+  const presence = usePresenceOf();
+  const [rise] = useState(() => !horizonArrived);
+  useEffect(() => {
+    horizonArrived = true;
+  }, []);
+  if (ids.length === 0) return null;
+  // Alternate sides from the photo outward: 0 and 1 nearest, 2 and 3 beyond them.
+  const left = ids.filter((_, i) => i % 2 === 0).reverse();
+  const right = ids.filter((_, i) => i % 2 === 1);
+  const enter = (i: number) =>
+    !rise
+      ? undefined
+      : reducedMotion
+        ? FadeIn.duration(200)
+        : FadeInUp.duration(420)
+            .delay(160 + i * 60)
+            .easing(EASE_OUT)
+            .withInitialValues({ opacity: 0, transform: [{ translateY: 10 }] });
+  const face = (id: string) => (
+    <Animated.View key={id} entering={enter(ids.indexOf(id))}>
+      <AgentFace
+        agentId={id}
+        size={HORIZON_FACE}
+        framed={false}
+        mode={presence.agent(id)?.presence === "busy" ? "run" : "idle"}
+      />
+    </Animated.View>
+  );
+  return (
+    <View
+      style={styles.horizon}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View style={[styles.side, styles.sideLeft]}>{left.map(face)}</View>
+      <View style={styles.photoGap} />
+      <View style={styles.side}>{right.map(face)}</View>
+    </View>
+  );
+}
+
 /** One of your agents: its face in its sky at 36, its name, what it does now (its orbit turning) or its role. */
 function AgentRow({ agentId, name, role }: { agentId: string; name: string; role: string | null | undefined }) {
   const dir = useDirectory();
@@ -431,6 +502,18 @@ function WorkingLine({ color, text }: { color: Parameters<typeof PixelOrbit>[0][
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   band: { overflow: "hidden" },
+  // The team stands on the band's bottom edge (the horizon), the photo's width (and its ring) kept clear between them.
+  horizon: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  side: { flex: 1, flexDirection: "row", gap: 16 },
+  sideLeft: { justifyContent: "flex-end" },
+  photoGap: { width: PHOTO + 6 + 40 },
   cover: { alignItems: "center", gap: 6, marginTop: -PHOTO_OVERLAP, paddingHorizontal: 16 },
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 999, borderWidth: 3 },
