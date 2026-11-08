@@ -22,6 +22,7 @@ import {
   markNotificationRead,
   NotFoundError,
   notificationCounts,
+  notificationCountsByOrg,
   notificationSnippet,
   notify,
   notifyMessage,
@@ -126,6 +127,8 @@ test("mentions, DMs, filters and counts; the actor never hears their own action"
   // "@ana" is the author herself.
   expect((await inbox(f.owner.id)).items).toEqual([]);
   expect(await notificationCounts(deps(), bia.id, f.org.id)).toEqual({ unread: 2, waiting: 0 });
+  // Every workspace she reads in one call: the apps' list of workspaces across servers (ADR 0154).
+  expect(await notificationCountsByOrg(deps(), bia.id)).toEqual([{ orgId: f.org.id, unread: 2, waiting: 0 }]);
 });
 
 test("an agent's answer reaches the person who asked, merged per conversation; reading it there resolves it", async () => {

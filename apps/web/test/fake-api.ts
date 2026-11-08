@@ -1428,6 +1428,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.deletionError) throw state.deletionError;
         state.me = null;
       },
+      unread: async () =>
+        state.me ? { organizations: state.me.organizations.map((o) => ({ orgId: o.id, unread: 0, waiting: 0 })) } : null,
       phoneSignIn: async () => {
         log("account.phoneSignIn");
         return {

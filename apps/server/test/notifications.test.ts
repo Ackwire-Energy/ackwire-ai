@@ -146,6 +146,11 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   expect(read.status).toBe(200);
   expect(((await read.json()) as Item).readAt).not.toBeNull();
   expect(await (await api("/notifications/count")).json()).toEqual({ unread: 2, waiting: 0 });
+  // Every workspace's counts in one call, for the apps' list across servers (ADR 0154); signed out, refused.
+  expect(await (await owner("/api/app/me/unread")).json()).toEqual({
+    organizations: [{ orgId, unread: 2, waiting: 0 }],
+  });
+  expect((await browser(t)("/api/app/me/unread")).status).toBe(401);
   expect(
     ((await (await api(`/notifications/${id}/read`, { json: { read: false } })).json()) as Item).readAt,
   ).toBeNull();
