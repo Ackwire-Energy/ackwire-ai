@@ -221,6 +221,7 @@ import {
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
+import { PLACE_KEPT_MS } from "./message-place";
 import {
   getMessage,
   insertMessage,
@@ -1839,6 +1840,22 @@ async function executeRunInner(
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
   const outsideMemo: OutsideMemo = {};
+  /**
+   * Where the reply it is writing first showed words (`createDeltaPublisher`), since it last posted: the message it
+   * posts next takes that place, so what people sent while it wrote stays below it, as the apps drew it live.
+   */
+  const place: ShownPlace = { at: null, channelId: run.channelId, threadId: null };
+  /** That place for a message posted now in `threadId`, once (the next words open a new one); none past `PLACE_KEPT_MS`. */
+  const takePlace = (threadId: string | null) => {
+    const { at } = place;
+    place.at = null;
+    return at !== null &&
+      place.channelId === run.channelId &&
+      place.threadId === threadId &&
+      Date.now() - at < PLACE_KEPT_MS
+      ? new Date(at)
+      : undefined;
+  };
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -1848,6 +1865,8 @@ async function executeRunInner(
     createdAt?: Date,
     note = false,
   ) => {
+    // What it wrote ends the reply its words showed for: it takes their place. A line the server writes doesn't.
+    const placed = note ? undefined : takePlace(threadId);
     const tagged = report && !note ? { routine: report } : {};
     // What a run a routine's reading feeds writes holds no credential it may have read (ADR 0053 §3); one a person
     // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
@@ -1945,7 +1964,7 @@ async function executeRunInner(
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
         ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
       },
-      createdAt,
+      createdAt ?? placed,
     );
     await linkRunChecks(
       tx,
@@ -2832,12 +2851,15 @@ async function executeRunInner(
     const questionId = Bun.randomUUIDv7();
     const toolUseId = `continuation:${questionId}`;
     t.pending = { calls: [{ toolUseId, name: ASK_USER_TOOL, questionId, bridged: true }] };
+    // The card is the reply its words showed for: it takes their place.
+    const at = takePlace(replyThreadId);
     const pause = await db.transaction(async (tx) => {
-      const posted = await postPauseCards(tx, run, {
-        approvals: [],
-        questions: [{ id: questionId, toolUseId, text, choices: null }],
-        secretRequestIds: [],
-      });
+      const posted = await postPauseCards(
+        tx,
+        run,
+        { approvals: [], questions: [{ id: questionId, toolUseId, text, choices: null }], secretRequestIds: [] },
+        at,
+      );
       t.postedUpTo = t.messages.length;
       t.postedCount += posted.messages.length;
       await saveTranscript(tx, t);
@@ -3942,6 +3964,7 @@ async function executeRunInner(
         quiet: run.background,
         scrub: isRightHand(agent),
         stretches: plan.kind === "claude_code",
+        place,
       });
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
       // message at once. Computer brains run tools inside their turn, so they read it at the next step.
@@ -4551,6 +4574,8 @@ async function executeRunInner(
         // Suspend: post what the agent said (`pauseLead`), one card per approval and each question, then wait.
         transcript.pending = { calls };
         const t = transcript;
+        // What it says and its cards end the reply its words showed for: they take its place, in that order.
+        const at = takePlace(replyThreadId);
         const posted = await db.transaction(async (tx) => {
           // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
           // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
@@ -4558,13 +4583,14 @@ async function executeRunInner(
           const text = stripSentinel(turnText);
           const spoken = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
           const said = repeatsLastPost(spoken) ? "" : spoken;
-          const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
+          const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t)), at) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
-          const pause = await postPauseCards(tx, run, {
-            approvals: waiting,
-            questions: asks,
-            secretRequestIds: secretAsks,
-          });
+          const pause = await postPauseCards(
+            tx,
+            run,
+            { approvals: waiting, questions: asks, secretRequestIds: secretAsks },
+            at && lead ? new Date(at.getTime() + 1) : at,
+          );
           t.postedUpTo = t.messages.length;
           t.postedCount += (lead ? 1 : 0) + pause.messages.length;
           await saveTranscript(tx, t);
@@ -5477,6 +5503,13 @@ function postAgentMessage(
 /** Model text this long is read as the answer: what it writes before a tool call ("I need the inbox id") is shorter. */
 const WORKING_TEXT_MAX = 280;
 
+/** When a run's reply first showed words (ms), and where: the message it posts next takes that place (`takePlace`). */
+interface ShownPlace {
+  at: number | null;
+  channelId: string;
+  threadId: string | null;
+}
+
 /**
  * Batches stream deltas so a fast model doesn't send one pub/sub message per
  * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
@@ -5508,6 +5541,8 @@ function createDeltaPublisher(
      * Code alone does: the others leave our bridge's calls out, and text after one would pass for the stretch before it.
      */
     stretches?: boolean;
+    /** The run's: set when its words first show here, read by every delta (`agent.delta.shownAt`). */
+    place?: ShownPlace;
   },
 ) {
   let started = false;
@@ -5561,6 +5596,18 @@ function createDeltaPublisher(
     let at = shown.length;
     let rest = visible.slice(at);
     shown = visible;
+    const { place } = first;
+    if (
+      rest &&
+      place &&
+      (place.at === null || place.channelId !== where.channelId || place.threadId !== where.threadId)
+    ) {
+      place.at = Date.now();
+      place.channelId = where.channelId;
+      place.threadId = where.threadId;
+    }
+    const shownAt = place?.at != null ? new Date(place.at).toISOString() : undefined;
+    if (shownAt) live.shownAt = shownAt;
     if (shown) {
       live.text = shown;
       liveTurns.set(run.id, live);
@@ -5579,6 +5626,7 @@ function createDeltaPublisher(
         turn: first.turn,
         at,
         ...(first.stretches ? { from: live.from } : {}),
+        ...(shownAt ? { shownAt } : {}),
       };
       at += text.length;
       pending = pending.then(() => publishChannelEvent(pubsub, evt));

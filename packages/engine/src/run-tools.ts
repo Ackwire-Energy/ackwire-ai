@@ -779,9 +779,15 @@ export function runMessageMeta(
  * posts them where it reports (`brief.deliverTo`), never in its room. Each approval card carries the agent's
  * `why` and where it came from (`origin`); a consulted agent's approvals, questions and secret requests go to
  * whoever asked (ADR 0034), and its question and secret rows with them: answered from there, they resume it.
+ * `at`: the place of the reply they end where the run replies (its first words, `PLACE_KEPT_MS`), in order from it.
  * Runs inside the caller's transaction; nothing is published here (`publishPauseCards`).
  */
-export async function postPauseCards(tx: Executor, run: AgentRun, requests: PauseRequests): Promise<PostedPause> {
+export async function postPauseCards(
+  tx: Executor,
+  run: AgentRun,
+  requests: PauseRequests,
+  at?: Date,
+): Promise<PostedPause> {
   const out: PostedPause = { messages: [], approvals: [], questions: [], secrets: [], withReceipts: [] };
   if (requests.approvals.length + requests.questions.length + requests.secretRequestIds.length === 0) return out;
   const trigger = await runTriggerOf(tx, run);
@@ -800,6 +806,10 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
     body: string,
     meta: Record<string, unknown>,
   ): Promise<Message> => {
+    const placed =
+      at && !brief && to.channelId === home.channelId && to.threadId === home.threadId
+        ? new Date(at.getTime() + out.messages.length)
+        : undefined;
     const message = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: to.channelId,
@@ -807,6 +817,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
       body,
       meta: { ...meta, ...extra },
+      ...(placed ? { createdAt: placed } : {}),
     });
     // Act with undo (ADR 0037): what the run changed so far rides on its first message (its receipts).
     if ((await linkRunActions(tx, run.orgId, run.id, message.id)) > 0) out.withReceipts.push(message.id);

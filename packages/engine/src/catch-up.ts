@@ -1,6 +1,7 @@
-import { and, asc, desc, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, desc, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
 import { ago } from "./context";
 import { cutText } from "./format";
+import { landedAfterSql } from "./message-place";
 import { stripSentinel } from "./reply-policy";
 import { type AgentRun, replyThreadOf } from "./runs";
 
@@ -67,7 +68,7 @@ export async function catchUpText(
         eq(messages.orgId, run.orgId),
         eq(messages.channelId, run.channelId),
         threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
-        gt(messages.createdAt, trigger.createdAt),
+        landedAfterSql(messages, trigger.createdAt),
         sql`${messages.id} <> ${run.triggerMessageId}::uuid`,
         sql`not (${messages.id} = any(${`{${run.pendingMessageIds.join(",")}}`}::uuid[]))`,
         isNull(messages.deletedAt),
@@ -125,7 +126,7 @@ export async function writtenSince(
         eq(messages.orgId, orgId),
         eq(messages.channelId, where.channelId),
         where.threadId ? eq(messages.threadId, where.threadId) : isNull(messages.threadId),
-        gt(messages.createdAt, where.after),
+        landedAfterSql(messages, where.after),
         isNull(messages.deletedAt),
         sql`${messages.meta}->'usageWait' is null and ${messages.meta}->'notice' is null`,
       ),

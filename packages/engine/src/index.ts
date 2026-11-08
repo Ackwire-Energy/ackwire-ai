@@ -171,6 +171,7 @@ export * from "./media-tools";
 export * from "./member-status";
 export * from "./message-links";
 export * from "./message-memories";
+export * from "./message-place";
 export * from "./message-preview";
 export * from "./messages";
 export * from "./mission-brief";
