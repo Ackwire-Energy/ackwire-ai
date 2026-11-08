@@ -257,8 +257,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   );
 }
 
-/** An option's letter in its 24 tile, centred as an initial is (`initialText`). */
-const LETTER_TEXT = initialText(MEDIA_ROW.row.face, 12);
+/** An option's letter in its 24 tile inside its 1-point border: centred in the 22 left, as an initial is. */
+const LETTER_TEXT = initialText(MEDIA_ROW.row.face - 2, 12);
 
 /** An option's letter, its row's face: filled once it is the pick. */
 function Letter({ letter, on }: { letter: string; on: boolean }) {
