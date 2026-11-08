@@ -1244,7 +1244,7 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 12px;
-  padding: 10px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .connector-row__name {
@@ -1260,7 +1260,7 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: 10px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
   cursor: pointer;
 }
@@ -3459,7 +3459,7 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 /* A MediaRow: the tile, the name and its level on one line, what it covers under them; long tool lists stay at two
    lines. */
 .level-row {
-  padding: 10px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .level-row:first-child {
@@ -9218,7 +9218,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 6px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .agent-secrets__row:first-child {
@@ -12537,7 +12537,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: center;
-  padding: 10px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .sidebar-setup__row:first-child {

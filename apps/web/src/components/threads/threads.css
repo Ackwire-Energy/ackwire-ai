@@ -433,7 +433,7 @@ html:not([data-pointer]) .thread-context__link:focus-visible {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   gap: 9px;
-  padding: 6px 12px;
+  padding: var(--row-py) 12px;
   border-radius: 10px;
   font-size: 13px;
   color: var(--ink2);

@@ -309,7 +309,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .roles-person__text {
@@ -351,7 +351,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 10px 4px;
+  padding: var(--row-py) 4px;
   border-top: 1px solid var(--line);
   cursor: pointer;
 }

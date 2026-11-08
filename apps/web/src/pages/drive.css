@@ -621,7 +621,7 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   container-type: inline-size;
 }
 .drive-trash__row {
-  padding: 10px 12px;
+  padding: var(--row-py) 12px;
   border-top: 1px solid var(--line);
 }
 .drive-trash__row:first-child {
