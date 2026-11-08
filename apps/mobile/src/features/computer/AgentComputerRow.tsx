@@ -13,7 +13,7 @@ import { useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, GroupedFooter, GroupedHeader, useToast } from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, PressScale, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useDirectory, useNow } from "../shared/hooks";
 import { phoneEntryButton } from "./logic";

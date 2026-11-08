@@ -26,6 +26,11 @@ export interface VoiceSend {
   createdAt: string;
   /** The server it was recorded on: it goes there, with that server's session, whichever is open (ADR 0154). */
   server?: string;
+  /** Why the last try didn't go (an HTTP status or the network's error), kept with the recording to tell it apart. */
+  lastError?: string;
+  tries?: number;
+  /** The server took it: what's left is its own (the words, then the message). */
+  accepted?: boolean;
 }
 
 export type VoiceRefusal = "limit" | "refused";
@@ -36,6 +41,10 @@ let queue: VoiceSend[] | null = null;
 let attempts = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
+/** The cache the bubbles live in, once a flush ran (a failed try redraws its bubble there). */
+let bubbles: QueryClient | null = null;
+/** A flush asked for while one runs (a new recording): run once more when it ends, so nothing waits for the timer. */
+let again = false;
 
 function read(): VoiceSend[] {
   if (queue) return queue;
@@ -58,6 +67,9 @@ function write() {
 }
 
 /** The bubble until the real message arrives: my audio, not playable yet, no words. */
+/** Tries before the bubble says it didn't go (the first miss is often a blip the next try fixes). */
+const FAILED_AFTER = 2;
+
 export const localVoiceMessage = (item: VoiceSend): Message => ({
   id: `local-${item.clientId}`,
   channelId: item.channelId,
@@ -66,9 +78,16 @@ export const localVoiceMessage = (item: VoiceSend): Message => ({
   body: "",
   mentionedAgentIds: [],
   agentRunId: null,
-  meta: { voice: { clipId: `local:${item.clientId}`, durationMs: item.durationMs, peaks: item.peaks } },
+  meta: {
+    voice: { clipId: `local:${item.clientId}`, durationMs: item.durationMs, peaks: item.peaks },
+    // Why it didn't go yet, under "Não foi enviada" once it failed: a sender is never left guessing.
+    ...(item.lastError ? { sendError: item.lastError } : {}),
+    // The server has it (it answered 202): it posts the message once the words are made out, which can take a moment;
+    // the bubble stops saying "Enviando…" meanwhile (the recording is safe there).
+    ...(item.accepted ? { voiceAccepted: true } : {}),
+  },
   clientId: item.clientId,
-  local: "pending",
+  local: (item.tries ?? 0) >= FAILED_AFTER ? "failed" : "pending",
   createdAt: item.createdAt,
 });
 
@@ -90,6 +109,16 @@ export function removeBubble(qc: QueryClient, item: Pick<VoiceSend, "orgId" | "c
   }
 }
 
+/** Keeps why a try failed with the recording, and how many tries it took so far; its bubble says so. */
+function note(item: VoiceSend, why: string) {
+  queue = read().map((q) =>
+    q.clientId === item.clientId ? { ...q, lastError: why.slice(0, 200), tries: (q.tries ?? 0) + 1 } : q,
+  );
+  write();
+  const now = queue.find((q) => q.clientId === item.clientId);
+  if (now && bubbles) showBubble(bubbles, now);
+}
+
 function forget(item: VoiceSend) {
   queue = read().filter((q) => q.clientId !== item.clientId);
   write();
@@ -101,10 +130,14 @@ function forget(item: VoiceSend) {
 
 async function upload(item: VoiceSend) {
   const form = new FormData();
+  // The app's fetch is Expo's, whose FormData takes a part that has `bytes()` (its filename and type from `name` and
+  // `type`) and refuses React Native's `{ uri }` part: with one, every upload threw "Unsupported FormDataPart
+  // implementation" and the recording waited on "Enviando…" for good.
+  const recording = new File(folder(), item.file);
   form.append("file", {
-    uri: new File(folder(), item.file).uri,
     name: "voice.m4a",
     type: "audio/mp4",
+    bytes: () => recording.bytes(),
   } as unknown as Blob);
   form.append("durationMs", String(item.durationMs));
   form.append("peaks", JSON.stringify(item.peaks));
@@ -122,32 +155,86 @@ async function upload(item: VoiceSend) {
     const body = (await res.json().catch(() => null)) as { code?: string } | null;
     if (body?.code === "voice_limit" || body?.code === "voice.limit") return "limit" as const;
   }
-  return uploadVerdict(res.status);
+  const verdict = uploadVerdict(res.status);
+  if (verdict === "retry") note(item, `HTTP ${res.status}`);
+  return verdict;
 }
 
-/** Sends what waits, oldest first, and stops at the first that can't go now. */
+/** Where an item's order matters: its conversation on its server (two conversations never wait on each other). */
+const laneOf = (item: VoiceSend) => `${item.server ?? ""}|${item.orgId}|${item.channelId}|${item.threadId ?? ""}`;
+
+/**
+ * Sends what waits. Each conversation on each server is its own lane, sent oldest first and side by side with the
+ * others: one that can't go now holds back only the ones after it in its lane, which must keep their order. (A
+ * recording for a server out of reach, such as a team's own one behind a private network, used to hold back every
+ * recording queued after it on every server, the network's timeout included: they all sat on "Enviando…".)
+ */
 export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefusal) => void) {
-  if (flushing) return;
+  if (flushing) {
+    again = true;
+    return;
+  }
   flushing = true;
+  again = false;
+  bubbles = qc;
   if (timer) clearTimeout(timer);
   timer = null;
+  const lanes = new Map<string, VoiceSend[]>();
+  for (const item of read()) {
+    const lane = laneOf(item);
+    lanes.set(lane, [...(lanes.get(lane) ?? []), item]);
+  }
+  let held = false;
   try {
-    for (const item of [...read()]) {
-      const verdict = await upload(item).catch(() => "retry" as const);
-      if (verdict === "retry") {
-        timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
-        attempts++;
-        return;
-      }
-      attempts = 0;
-      forget(item);
-      if (verdict === "done") continue;
-      removeBubble(qc, item);
-      onRefused(verdict === "limit" ? "limit" : "refused");
-    }
+    await Promise.all(
+      [...lanes.values()].map(async (items) => {
+        for (const item of items) {
+          const verdict = await upload(item).catch((error: unknown) => {
+            note(item, error instanceof Error ? error.message : String(error));
+            return "retry" as const;
+          });
+          if (verdict === "retry") {
+            held = true;
+            return;
+          }
+          forget(item);
+          if (verdict === "done") {
+            showBubble(qc, { ...item, accepted: true, lastError: undefined, tries: 0 });
+            continue;
+          }
+          removeBubble(qc, item);
+          onRefused(verdict === "limit" ? "limit" : "refused");
+        }
+      }),
+    );
   } finally {
     flushing = false;
   }
+  if (again) {
+    void flushVoice(qc, onRefused);
+    return;
+  }
+  if (held) {
+    timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
+    attempts++;
+  } else {
+    attempts = 0;
+  }
+}
+
+/** "Tentar de novo" on a voice note that didn't go: back to "Enviando…" and tried now, not at the next timer. */
+export function retryVoice(
+  qc: QueryClient,
+  clientId: string | null | undefined,
+  onRefused: (reason: VoiceRefusal) => void,
+) {
+  if (!clientId) return;
+  queue = read().map((q) => (q.clientId === clientId ? { ...q, tries: 0 } : q));
+  write();
+  const item = queue.find((q) => q.clientId === clientId);
+  if (item) showBubble(qc, item);
+  attempts = 0;
+  void flushVoice(qc, onRefused);
 }
 
 /** Takes a finished recording: moved to the app's documents and queued. */

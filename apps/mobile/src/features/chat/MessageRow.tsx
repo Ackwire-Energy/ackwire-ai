@@ -453,7 +453,8 @@ export const MessageRow = memo(function MessageRow({
         </View>
       ) : null}
       {readOnly ? null : <Reactions message={m} meId={meId} end={onRight} />}
-      {m.local === "pending" || (m.local === "failed" && offline) ? (
+      {m.local === "pending" && meta?.voiceAccepted === true ? null : m.local === "pending" ||
+        (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
         // A 16-point caption: 14 of slop gives the retry its 44-point target.
@@ -466,6 +467,12 @@ export const MessageRow = memo(function MessageRow({
           <Text variant="caption" tone="danger" style={onRight ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
+          {/* Why, as it came: a voice note that never left says what stopped it instead of waiting in silence. */}
+          {typeof meta?.sendError === "string" ? (
+            <Text variant="caption" tone="faint" numberOfLines={2} style={onRight ? styles.meStatus : undefined}>
+              {meta.sendError}
+            </Text>
+          ) : null}
         </Pressable>
       ) : null}
     </>

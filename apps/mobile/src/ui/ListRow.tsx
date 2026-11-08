@@ -57,6 +57,8 @@ export interface ListRowProps extends Omit<PressableProps, "style" | "children">
   background?: string;
   /** A chevron on the right, centered on the row: the row opens a screen of its own. */
   chevron?: boolean;
+  /** Pinned on top: a small pin before the time, so what the person pinned reads as pinned. */
+  pinned?: boolean;
 }
 
 /**
@@ -79,6 +81,7 @@ export function ListRow({
   unread = false,
   background,
   chevron = false,
+  pinned = false,
   ...press
 }: ListRowProps) {
   const { colors: c } = useTheme();
@@ -107,8 +110,9 @@ export function ListRow({
           ) : (
             <View style={styles.shrink}>{title}</View>
           )}
-          {time ? (
-            <View style={[styles.time, { minHeight: titleLine }]}>
+          {time || pinned ? (
+            <View style={[styles.time, styles.timeRow, { minHeight: titleLine }]}>
+              {pinned ? <Icon name="pin" size={12} color={c.faint} /> : null}
               <Text
                 variant={TIME_VARIANT}
                 tone={unread ? "ink2" : "faint"}
@@ -162,5 +166,6 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   unreadName: { fontWeight: weights.bold },
   time: { flexShrink: 0, marginLeft: "auto", justifyContent: "center" },
+  timeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   unreadTime: { fontWeight: weights.medium },
 });

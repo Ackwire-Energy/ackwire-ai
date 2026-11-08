@@ -72,6 +72,7 @@ import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -142,6 +143,7 @@ import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
 import { AgentTasksButton, useDmAgentTasks } from "../task-manager/AgentTasksButton";
 import { agentTasksHref, tasksBadge } from "../task-manager/logic";
+import { retryVoice, type VoiceRefusal } from "../voice/outbox";
 import { useVoiceComposer } from "../voice/useVoiceComposer";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { AttachmentStrip, MAX_PENDING, type PendingFile } from "./AttachmentStrip";
@@ -947,10 +949,22 @@ function Chat({
     setQuote(null);
     return localMeta(quote, dir.nameOf(quote.author), files);
   };
+  const qc = useQueryClient();
+  const voiceRefused = useCallback(
+    (reason: VoiceRefusal) => toast({ title: t(reason === "limit" ? "voice.limit" : "voice.notSent"), icon: "x" }),
+    [t, toast],
+  );
   // Rows keep the same callback (so a streaming reply doesn't re-render every message).
   const retryRef = useRef(retry);
   retryRef.current = retry;
-  const onRetry = useCallback((m: Message) => retryRef.current(m), []);
+  const onRetry = useCallback(
+    (m: Message) => {
+      // A voice note waits in its own outbox: tried again there, now.
+      if (voiceOf(m.meta) && m.local) retryVoice(qc, m.clientId, voiceRefused);
+      else retryRef.current(m);
+    },
+    [qc, voiceRefused],
+  );
   // "Tentar de novo" under a message no agent could answer: the agent answers that same message again; only when it
   // can't, the same words go again, here (the web's `resend`).
   const sendRef = useRef(send);

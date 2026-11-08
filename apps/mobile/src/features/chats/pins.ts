@@ -13,6 +13,8 @@ import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
  */
 export function usePins(): {
   pins: SidebarPins;
+  /** The person chose these pins (false: day one's default, the agents they made, nothing they did). */
+  chosen: boolean;
   isPinned: (kind: PinKind, id: string) => boolean;
   toggle: (kind: PinKind, id: string) => void;
 } {
@@ -40,6 +42,7 @@ export function usePins(): {
   const pins = pinsOf(view, dayOne);
   return {
     pins,
+    chosen: view.pins != null,
     isPinned: (kind, id) => pins[kind].includes(id),
     toggle: (kind, id) => {
       if (!togglePin(pins, kind, id)) {
@@ -48,7 +51,11 @@ export function usePins(): {
       }
       setView((now) => {
         const from = pinsOf(now, dayOne);
-        return { ...now, pins: togglePin(from, kind, id) ?? from };
+        const next = togglePin(from, kind, id) ?? from;
+        // What the person pins goes on top of its section, so the pin shows where it lands (it went last, among the
+        // agents pinned by default, and nothing seemed to change).
+        const pinning = !from[kind].includes(id) && next[kind].includes(id);
+        return { ...now, pins: pinning ? { ...next, [kind]: [id, ...next[kind].filter((x) => x !== id)] } : next };
       });
     },
   };
