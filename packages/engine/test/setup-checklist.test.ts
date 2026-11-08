@@ -6,7 +6,7 @@ import { createTestDatabase } from "@agenteschat/db/testing";
 import { agentView, confirmSetupStep, createAgent, createOrganization, NotFoundError, newSetup, setupOf } from "../src";
 import { addMember, addUser } from "./fixtures";
 
-// A new agent's setup checklist (ADR 0153 §2): every new agent starts with one, whichever way it was made; its owner
+// A new agent's setup checklist (ADR 0155 §2): every new agent starts with one, whichever way it was made; its owner
 // or whoever manages agents confirms its steps; agents made before it keep none.
 
 let close: (() => Promise<void>) | undefined;
@@ -59,7 +59,7 @@ describe("setup checklist", () => {
     expect(agentView(odd).setup).toEqual({ role: null, done: ["who", "how"] });
   });
 
-  test("a new workspace's right hand starts its first-run checklist (ADR 0153 §6)", async () => {
+  test("a new workspace's right hand starts its first-run checklist (ADR 0155 §6)", async () => {
     const w = await workspace();
     const [lodi] = await w.db
       .select({ setup: schema.agents.setup })

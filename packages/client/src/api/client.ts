@@ -642,7 +642,7 @@ export interface ApiClient {
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
-    /** Confirms a step of a new agent's setup checklist (ADR 0153 §2): its owner or whoever manages agents. */
+    /** Confirms a step of a new agent's setup checklist (ADR 0155 §2): its owner or whoever manages agents. */
     confirmSetup(orgId: string, agentId: string, step: SetupStep): Promise<Agent>;
     /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
     mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;

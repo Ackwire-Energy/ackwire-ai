@@ -702,7 +702,7 @@ export function TeamTemplatesSheet({
   onClose: () => void;
   /** "Nenhum desses": back to writing what they do. */
   onNone: () => void;
-  /** The business the first run's row 1 saved (ADR 0153 §6): its template opens picked. */
+  /** The business the first run's row 1 saved (ADR 0155 §6): its template opens picked. */
   initial?: string | undefined;
 }) {
   const { t, i18n } = useTranslation();

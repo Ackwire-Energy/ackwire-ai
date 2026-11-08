@@ -25,7 +25,7 @@ import { useSendAnswer } from "./TeamCard";
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected, as on the web: its greeting, then, for the workspace's owners, the first-run checklist (ADR
- * 0153 §6). Anyone else gets one card at a time (`introCards`): a waiting pill with "Connect" (tinted) while there is
+ * 0155 §6). Anyone else gets one card at a time (`introCards`): a waiting pill with "Connect" (tinted) while there is
  * no AI, then how agents talk to them (ADR 0147); the owner gets that question once the checklist is complete. With
  * no card left, a line to build the team with it, at any time. On the person's first visit (`waveFrom`, when its wave
  * started), its waving sticker under the greeting, drawn as a sticker message is and decorative.

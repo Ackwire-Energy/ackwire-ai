@@ -678,7 +678,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
 
 /**
  * "Modelos de time": the templates by business type, one picked (`initial`: the business row 1 saved), and "Criar o
- * time" makes it at once (ADR 0153 §6). Under the list, the other ways in: an import, or one agent from scratch.
+ * time" makes it at once (ADR 0155 §6). Under the list, the other ways in: an import, or one agent from scratch.
  */
 export function TeamTemplatesDialog({
   open,

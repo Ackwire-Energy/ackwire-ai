@@ -283,7 +283,7 @@ describe("Início", () => {
     expect(state.calls).toContainEqual({ method: "notifications.read", args: [ORG_ID, "n-approval", true] });
   });
 
-  test("while Lodi's first-run checklist has a row left: one line back to it, never a second list (ADR 0153 §6)", async () => {
+  test("while Lodi's first-run checklist has a row left: one line back to it, never a second list (ADR 0155 §6)", async () => {
     const state = withRightHand(seedState({ agents: [] }), { setup: { role: null, done: [] } });
     state.members = state.members.filter((m) => m.userId === "u-walter");
     state.connections = [];

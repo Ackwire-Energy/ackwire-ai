@@ -111,7 +111,7 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const introLeadKey = (held: boolean, hasTeam: boolean) =>
   held && !hasTeam ? ("rightHand.intro.heldLead" as const) : ("rightHand.intro.lead" as const);
 
-/** Where the first-run checklist stands for this person (ADR 0153 §6): `none` when it isn't theirs. */
+/** Where the first-run checklist stands for this person (ADR 0155 §6): `none` when it isn't theirs. */
 export type FirstRunState = "none" | "open" | "complete";
 
 /**
@@ -132,7 +132,7 @@ export const offersTeamSetup = (s: {
 }) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0 && s.checklist !== "open";
 
 /**
- * The cards under the right hand's greeting at the top of its DM besides the first-run checklist (ADR 0137, ADR 0153
+ * The cards under the right hand's greeting at the top of its DM besides the first-run checklist (ADR 0137, ADR 0155
  * §6), one question at a time. The owner's checklist has the setup in its rows: while it is open nothing else asks,
  * and once complete, how the person wants agents to talk to them (ADR 0147) until they pick. Anyone else: Connect AI
  * while there is none, then that question. On a billing hold neither: an AI comes after the plan.

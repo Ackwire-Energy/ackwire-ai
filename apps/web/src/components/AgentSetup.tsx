@@ -91,7 +91,7 @@ import { useVisibleChannels } from "@/pages/agent/pieces";
 import "./agent-setup.css";
 
 /*
- * A new agent's setup checklist (ADR 0153 §2): the top of its chat, drawn by the app and never stored, in its voice.
+ * A new agent's setup checklist (ADR 0155 §2): the top of its chat, drawn by the app and never stored, in its voice.
  * Five steps (think, apps, channels, who talks to it, how it works); each button opens a small dialog with the
  * suggestion marked, nothing changes without confirming. Only who may set the agent up sees it: who manages agents
  * all the steps, its owner the ones they may change. Its profile shows the same card while something is left.
@@ -330,7 +330,7 @@ export interface SetupCardRow {
 }
 
 /**
- * A checklist card's drawing, the one for a new agent (ADR 0153 §2) and the right hand's first run (§6): the head and
+ * A checklist card's drawing, the one for a new agent (ADR 0155 §2) and the right hand's first run (§6): the head and
  * its count, the segmented bar, the rows, a foot of asks. The data and dialogs are its users'.
  */
 export function SetupCardView({

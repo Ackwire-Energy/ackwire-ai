@@ -3823,7 +3823,7 @@ export const ptBR = {
     seeAll: "Ver tudo",
     action: { review: "Revisar", answer: "Responder", open: "Abrir" },
     calm: { title: "Tudo em dia", text: "Seus agentes avisam aqui quando precisarem de você." },
-    /** One line back to the right hand's first-run checklist while a row is left (ADR 0153 §6). */
+    /** One line back to the right hand's first-run checklist while a row is left (ADR 0155 §6). */
     firstRun: "Continue de onde parou · {{done}} de {{total}}",
   },
   notifications: {
@@ -5148,7 +5148,7 @@ export const ptBR = {
       app: "Enviado por um app de IA",
     },
   },
-  /** A new agent's setup checklist at the top of its chat, in its voice (ADR 0153 §2). */
+  /** A new agent's setup checklist at the top of its chat, in its voice (ADR 0155 §2). */
   agentSetup: {
     greeting: "Oi, {{person}}. Eu sou o {{name}}.",
     greeting_female: "Oi, {{person}}. Eu sou a {{name}}.",
@@ -5258,7 +5258,7 @@ export const ptBR = {
       b: "Por onde a gente começa?",
     },
     /**
-     * The right hand's first run (ADR 0153 §6): its checklist card for the workspace's owners, one row per thing to set
+     * The right hand's first run (ADR 0155 §6): its checklist card for the workspace's owners, one row per thing to set
      * up, read done from the data; `{{org}}`: the workspace.
      */
     firstRun: {

@@ -2143,7 +2143,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           createdAt: NOW.toISOString(),
           audience: input.audience ?? { mode: "everyone", userIds: [] },
           ...(input.appearance ? { appearance: input.appearance } : {}),
-          // As the backend: every new agent starts with its setup checklist (ADR 0153 §2), who and how done.
+          // As the backend: every new agent starts with its setup checklist (ADR 0155 §2), who and how done.
           setup: { role: input.setup?.role ?? null, done: ["who", "how"] },
         };
         state.agents.push(agent);
@@ -2222,7 +2222,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.teamTemplates", orgId, locale);
         return state.teamTemplates ?? [];
       },
-      // As the server: the template's team is made at once (ADR 0153 §6).
+      // As the server: the template's team is made at once (ADR 0155 §6).
       applyTeamTemplate: async (orgId, templateId, locale) => {
         log("agents.applyTeamTemplate", orgId, templateId, locale);
         const template = state.teamTemplates?.find((x) => x.id === templateId);

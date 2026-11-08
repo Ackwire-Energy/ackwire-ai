@@ -210,7 +210,7 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   }
 }
 
-/* The right hand's first run while a row is left (ADR 0153 §6): one line back to its checklist. */
+/* The right hand's first run while a row is left (ADR 0155 §6): one line back to its checklist. */
 .home-continue {
   display: flex;
   align-items: center;

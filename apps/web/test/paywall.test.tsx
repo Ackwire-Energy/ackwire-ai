@@ -279,7 +279,7 @@ describe("Lodi's DM on a hold", () => {
     expect(text).toContain("Crio os agentes, conecto os apps e convido as pessoas.");
   });
 
-  test("rows 1 and 2 open; the AI row leads to the plan; apps and people wait for it; no asks (ADR 0153 §6)", async () => {
+  test("rows 1 and 2 open; the AI row leads to the plan; apps and people wait for it; no asks (ADR 0155 §6)", async () => {
     await open(lodi(), dm);
     expect(within(row("Me conte o que a Acme faz.")).getByRole("button", { name: "Contar" })).toBeTruthy();
     expect(within(row("Monte o time.")).getByRole("button", { name: "Ver o time" })).toBeTruthy();

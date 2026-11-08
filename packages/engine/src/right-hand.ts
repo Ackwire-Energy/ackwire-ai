@@ -141,7 +141,7 @@ export async function ensureRightHand(db: Executor, orgId: string): Promise<stri
       brainModel: AUTO_MODEL,
       brainEffort: AUTO_MODEL,
       appearance: { ...RIGHT_HAND_DEFAULTS.appearance },
-      // A workspace with no agent yet opens on its first-run checklist (ADR 0153 §6).
+      // A workspace with no agent yet opens on its first-run checklist (ADR 0155 §6).
       ...(other ? {} : { setup: FIRST_RUN_SETUP }),
     })
     .onConflictDoNothing()

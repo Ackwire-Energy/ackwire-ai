@@ -8,7 +8,7 @@ import { errorText } from "./errors";
  * under its questions (each one the person's own message), and what the team card counts and lists.
  */
 
-/** What the business does, the first run's row 1 (ADR 0153 §6): `other` asks for a sentence. */
+/** What the business does, the first run's row 1 (ADR 0155 §6): `other` asks for a sentence. */
 export const BUSINESS_TYPES = ["agency", "store", "clinic", "software", "support", "services", "other"] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
 /** Every business type but `other` is a team template's id too (the server's `TEAM_TEMPLATES`). */

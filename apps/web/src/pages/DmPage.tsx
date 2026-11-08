@@ -55,7 +55,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const name = agent?.name ?? person?.name ?? "";
   const rightHand = isRightHand(agent);
   const thinks = useAgentThinks(agent);
-  // A new agent's setup checklist (ADR 0153 §2) for whoever sets it up: its greeting and the checklist on top.
+  // A new agent's setup checklist (ADR 0155 §2) for whoever sets it up: its greeting and the checklist on top.
   const setup = useSetupSteps(agent).length > 0;
   // Its DM is open, from its row or any other way in: its row's "Novo" goes.
   useEffect(() => {

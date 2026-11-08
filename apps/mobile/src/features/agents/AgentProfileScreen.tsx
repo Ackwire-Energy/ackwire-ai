@@ -713,7 +713,7 @@ function Profile({ id }: { id: string }) {
           {agent ? <LetMeTalkButton agent={agent} /> : null}
         </View>
 
-        {/* A new agent's checklist (ADR 0153 §2), while something is left. */}
+        {/* A new agent's checklist (ADR 0155 §2), while something is left. */}
         {agent && !rightHand ? (
           <View style={styles.setup}>
             <AgentSetupCard agent={agent} place="profile" />

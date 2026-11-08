@@ -360,7 +360,7 @@ function NewAgentForm({
         role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
         instructions,
         model: thinks.model,
-        // Its setup checklist suggests from the ready-made role it started from (ADR 0153 §2).
+        // Its setup checklist suggests from the ready-made role it started from (ADR 0155 §2).
         setup: { role: role && role !== "custom" ? role : null },
         ownerUserId: meId ?? null,
         audience: { mode: "everyone", userIds: [] },

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { type SetupRowFacts, setupRow, setupSteps } from "@agenteschat/client/lib/setup-checklist";
 import { agent, translator } from "./fixtures";
 
-// A new agent's setup checklist on the phone (ADR 0153 §2): the web's words and rules, its own screens.
+// A new agent's setup checklist on the phone (ADR 0155 §2): the web's words and rules, its own screens.
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 

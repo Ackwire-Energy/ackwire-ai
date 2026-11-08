@@ -91,7 +91,7 @@ export function HomePage() {
     .filter((a) => listsAgent(org, a) && canTalk(a))
     .sort((a, b) => (lastTalk.get(b.id) ?? "").localeCompare(lastTalk.get(a.id) ?? ""));
 
-  // The right hand's first-run checklist (ADR 0153 §6), while a row is left: one line back to it, never a second list.
+  // The right hand's first-run checklist (ADR 0155 §6), while a row is left: one line back to it, never a second list.
   const lodi = dir.agents.find(isRightHand);
   const firstRun = useFirstRun(lodi, null);
   const showSteps = firstRun.ready && firstRun.state === "open";

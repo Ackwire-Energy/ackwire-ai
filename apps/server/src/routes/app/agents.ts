@@ -928,7 +928,7 @@ export function agentRoutes(deps: AppDeps) {
               .optional()
               .openapi({
                 description:
-                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0153 §2). Every new agent gets the checklist; without it, no role.",
+                  "The ready-made role it starts from (`support`), for its setup checklist's suggestions (ADR 0155 §2). Every new agent gets the checklist; without it, no role.",
               }),
           }),
         ),
@@ -1262,7 +1262,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: 'Create a template\'s team at once ("Criar o time")',
       description:
-        "No model call, so it works on a billing hold too: the team is made, and its card in your DM with the right hand reads created, with Undo for a day (ADR 0153 §6). `state` is `pending` with the card's error when a step failed.",
+        "No model call, so it works on a billing hold too: the team is made, and its card in your DM with the right hand reads created, with Undo for a day (ADR 0155 §6). `state` is `pending` with the card's error when a step failed.",
       request: {
         params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
         body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
@@ -1504,7 +1504,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Confirm a step of a new agent's setup checklist",
       description:
-        "Its owner or whoever manages agents chose (or skipped) one step of the checklist at the top of its chat (ADR 0153 §2). Confirming twice changes nothing; an agent with no checklist keeps none.",
+        "Its owner or whoever manages agents chose (or skipped) one step of the checklist at the top of its chat (ADR 0155 §2). Confirming twice changes nothing; an agent with no checklist keeps none.",
       request: { params: AgentParams.extend({ step: SetupStep }) },
       responses: { 200: json(Agent), ...errors },
     }),

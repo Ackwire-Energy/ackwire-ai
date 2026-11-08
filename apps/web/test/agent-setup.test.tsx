@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/** A new agent's setup checklist (ADR 0153 §2): the top of its DM, in its voice, for whoever sets it up. */
+/** A new agent's setup checklist (ADR 0155 §2): the top of its DM, in its voice, for whoever sets it up. */
 
 afterEach(() => {
   cleanup();

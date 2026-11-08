@@ -34,7 +34,7 @@ import { openSetupStep } from "./SetupStepScreen";
 import { useAgentChannels } from "./useAgentChannels";
 
 /*
- * A new agent's setup checklist on the phone (ADR 0153 §2), as on the web: the top of its DM, drawn by the app and
+ * A new agent's setup checklist on the phone (ADR 0155 §2), as on the web: the top of its DM, drawn by the app and
  * never stored, in its voice. Five steps (think, apps, channels, who talks to it, how it works); each button opens a
  * screen of its own with the suggestion marked (managing is a pushed screen), think opens Connect AI. Only who may set
  * the agent up sees it: who manages agents all the steps, its owner the ones they may change. Its screen shows the
@@ -247,7 +247,7 @@ export interface SetupCardRow {
 }
 
 /**
- * A checklist card's drawing on the phone, a new agent's (ADR 0153 §2) and the right hand's first run (§6): the head
+ * A checklist card's drawing on the phone, a new agent's (ADR 0155 §2) and the right hand's first run (§6): the head
  * and its count, the segmented bar, the rows, a foot of asks.
  */
 export function SetupCardView({

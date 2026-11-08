@@ -39,7 +39,7 @@ export function OverviewTab() {
   return (
     <>
       <ReadOnlyNote />
-      {/* A new agent's checklist (ADR 0153 §2), while something is left. */}
+      {/* A new agent's checklist (ADR 0155 §2), while something is left. */}
       <AgentSetupCard agent={agent} place="profile" />
       <div className="agp-overview">
         {(approvals > 0 || pending.length > 0) && (

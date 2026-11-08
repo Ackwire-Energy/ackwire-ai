@@ -207,7 +207,7 @@ export async function listTeamTemplates(
 }
 
 /**
- * "Criar o time" from a template (`POST …/team-templates/{id}/use`, ADR 0153 §6): the template's team, made at once as
+ * "Criar o time" from a template (`POST …/team-templates/{id}/use`, ADR 0155 §6): the template's team, made at once as
  * the right hand's card in the person's DM with it, which then reads created with Desfazer. No model call and no
  * question after, so it works on a billing hold too. A step that fails leaves the card open with its reason, as
  * `createTeam` does for any team card.

@@ -4,7 +4,7 @@ import { NotFoundError } from "./errors";
 import { can, requirePermission } from "./organizations";
 
 /*
- * A new agent's setup checklist (ADR 0153 §2): the top of its chat lists what it still needs (an AI, apps, channels,
+ * A new agent's setup checklist (ADR 0155 §2): the top of its chat lists what it still needs (an AI, apps, channels,
  * who talks to it, how it works). The apps draw it; this keeps the role it started from (for the suggestions) and the
  * steps a person confirmed. A step is also done when the agent's data says so, which the apps read themselves.
  */
@@ -13,7 +13,7 @@ const { agents } = schema;
 
 export const SETUP_STEPS = ["ai", "apps", "where", "who", "how"] as const;
 /**
- * The right hand's first run (ADR 0153 §6): what the workspace does, the team, an AI, apps and people. Its rows read
+ * The right hand's first run (ADR 0155 §6): what the workspace does, the team, an AI, apps and people. Its rows read
  * done from the workspace's data; only "Agora não" on apps and people is stored.
  */
 export const FIRST_RUN_STEPS = ["about", "team", "ai", "apps", "people"] as const;

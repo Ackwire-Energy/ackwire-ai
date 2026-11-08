@@ -8,7 +8,7 @@ import { createFakeApi, type FakeState, LODI_ID, ORG_ID, seedDm, seedState, with
 import { renderApp, screen, settle } from "./render";
 
 /*
- * The right hand's first run (ADR 0153 §6): one checklist card under its greeting, for the workspace's owners, each
+ * The right hand's first run (ADR 0155 §6): one checklist card under its greeting, for the workspace's owners, each
  * row from the workspace's data, none needing a model.
  */
 

@@ -1,4 +1,4 @@
-# 0153. Easy agent creation: two steps, then a setup checklist in the agent's chat
+# 0155. Easy agent creation: two steps, then a setup checklist in the agent's chat
 
 - Status: §2 accepted (the checklist, merged with the first run of ADR 0137 §10). §1, §3, §4 and §5 proposed, not built: their code stays on `feat/agent-easy-create`.
 - Date: 2026-11-05
