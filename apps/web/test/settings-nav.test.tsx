@@ -168,6 +168,8 @@ describe("finding the settings", () => {
     await go("settings/about", seedState({ authConfig: { cloud: true } }));
     expect(nav().queryByRole("link", { name: "Sobre o agentes.chat" })).toBeNull();
     expect(screen().getByRole("heading", { level: 2, name: "Sua conta" })).toBeTruthy();
+    // The Cloud has no Sobre for anyone: nothing to say about the person's role.
+    expect(screen().queryByText(/não abre com o seu papel/)).toBeNull();
     expect(license()).toBeNull();
     expect(await inPalette()).toBe(false);
   });
