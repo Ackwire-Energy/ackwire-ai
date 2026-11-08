@@ -1,23 +1,46 @@
 import type { DeletionProofInput } from "@agenteschat/client";
 import { authClient, authedFetch } from "@/lib/auth";
-import { SIGN_OUT_WAIT_MS, unregisterPush } from "@/lib/push";
-import { serverUrl } from "@/lib/server";
-import { clearStoredValues } from "@/lib/storage";
+import { outboxStoreFor } from "@/lib/outbox";
+import { SIGN_OUT_WAIT_MS, unregisterPush, unregisterPushOn } from "@/lib/push";
+import { markSignedOut, orgValueName, serverUrl, setServer, signedInServers } from "@/lib/server";
+import { serverAfter } from "@/lib/server-choice";
+import { snapshotStoreFor } from "@/lib/snapshot";
+import { clearStoredValues, writeValue } from "@/lib/storage";
 import { type DeleteAccountResult, readDeleteResponse } from "./result";
 
 export type { DeleteAccountResult };
 
 /**
- * Signs out: removes this phone from pushes, ends the session (the Expo plugin clears its stored cookie
- * and session before asking the server) and forgets the app's remembered values. The session gate then
- * shows sign-in.
+ * Signs out of the current server (ADR 0154): only that one. The app moves to the next server still signed in; with
+ * none left it forgets the app's remembered values too, and the session gate shows sign-in.
  */
 export async function signOut(): Promise<void> {
-  await unregisterPush({ optOut: false });
-  await authClient()
+  const server = serverUrl();
+  const next = serverAfter(signedInServers(), server);
+  await signOutOf(server, next === null);
+  if (next) await setServer(next);
+}
+
+/**
+ * Signs out of one server: it stops pushing to this phone, its session ends (the Expo plugin clears its stored cookie
+ * and session before asking the server), and what the phone kept of it goes (its remembered workspace, its saved
+ * chats, its waiting messages). `last`: no server is left, so the phone's own remembered values go as well.
+ */
+export async function signOutOf(server: string, last = false): Promise<void> {
+  if (last) await unregisterPush({ optOut: false });
+  else await unregisterPushOn(server);
+  await authClient(server)
     .signOut({ fetchOptions: { timeout: SIGN_OUT_WAIT_MS } })
     .catch(() => {});
-  await clearStoredValues();
+  await forgetServer(server, last);
+}
+
+async function forgetServer(server: string, last: boolean) {
+  markSignedOut(server);
+  await writeValue(orgValueName(server), null);
+  await snapshotStoreFor(server).remove();
+  outboxStoreFor(server).write("[]");
+  if (last) await clearStoredValues();
 }
 
 /**
@@ -34,10 +57,14 @@ export async function deleteAccount(proof: DeletionProofInput = {}): Promise<Del
   if (!res) return { ok: false, reason: "failed", status: 0 };
   const result = await readDeleteResponse(res);
   if (result.ok) {
-    await authClient()
+    // The account is gone from this server; the others stay signed in (ADR 0154).
+    const server = serverUrl();
+    const next = serverAfter(signedInServers(), server);
+    await authClient(server)
       .signOut()
       .catch(() => {});
-    await clearStoredValues();
+    await forgetServer(server, next === null);
+    if (next) await setServer(next);
   }
   return result;
 }
