@@ -1234,6 +1234,13 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-github__field {
   margin-top: 12px;
 }
+/* In the aside, as small as the selects above it: one height down the stack. */
+.issue-aside .issue-github__field .ac-input {
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
+}
 .issue-github__chip {
   max-width: 100%;
   color: var(--ink);
@@ -1448,26 +1455,32 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
-  /* No number column: the number reads in the title's words, so a long title wraps under it, and who works on it
-     takes the line under, from the row's start. */
+  /* No number column: the number reads as the title's first word, so a long title wraps under it, and the title's
+     chips and who works on it share the line under, from the row's start. */
   .issue-list__row {
-    display: block;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
   }
   .issue-list__num {
-    margin-right: 6px;
+    display: none;
   }
   .issue-list__title {
-    display: inline;
+    display: contents;
   }
   .issue-list__title b {
+    flex: 1 0 100%;
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .issue-list__row .issue-list__title > :not(b) {
-    margin-left: 6px;
-  }
-  .issue-list__who {
-    margin-top: 6px;
+  .issue-list__title b::before {
+    content: attr(data-num);
+    margin-right: 6px;
+    font-size: 12.5px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
   }
   .issue-list__who:empty,
   .issue-list__due {

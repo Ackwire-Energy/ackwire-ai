@@ -917,7 +917,7 @@ function IssueRows({
             >
               <span className="issue-list__num tabular">#{i.number}</span>
               <span className="issue-list__title">
-                <b>{i.title}</b>
+                <b data-num={`#${i.number}`}>{i.title}</b>
                 <TaskMentions issue={i} />
                 {fields.priority && <PriorityChip issue={i} />}
                 {fields.pullRequest && i.githubUrl && <GithubChip url={i.githubUrl} />}
