@@ -132,7 +132,11 @@
     "cloud": "Inloggen bij agentes.chat",
     "create": "Nieuw hier?",
     "createLink": "Een account aanmaken",
-    "own": "Je eigen server gebruiken"
+    "own": "Je eigen server gebruiken",
+    "addTitle": "Een werkruimte toevoegen",
+    "addLead": "Die je al hebt blijven hier, elk met een eigen aanmelding.",
+    "addCloud": "Een werkruimte maken bij agentes.chat",
+    "addOwn": "De server van je team gebruiken"
   },
   "own": {
     "title": "Je eigen server",
@@ -271,7 +275,12 @@
     "removeTitle": "{{host}} uit deze app verwijderen?",
     "removeBody": "De server en je account daar blijven zoals ze zijn.",
     "removeAgents": "Agents van de werkruimtes ervan werken niet meer op deze {{device}}.",
-    "removed": "{{host}} is uit deze app verwijderd"
+    "removed": "{{host}} is uit deze app verwijderd",
+    "workspaces_one": "{{count}} werkruimte",
+    "workspaces_other": "{{count}} werkruimtes",
+    "signedOut": "Niet ingelogd",
+    "newsOne": "1 nieuwe melding",
+    "newsMany": "{{n}} nieuwe meldingen"
   },
   "server": {
     "title": "agentes.chat op deze {{device}}",

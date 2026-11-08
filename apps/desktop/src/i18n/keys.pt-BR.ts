@@ -142,6 +142,10 @@ export const desktopPtBR = {
     create: "Primeira vez?",
     createLink: "Criar uma conta",
     own: "Usar o seu próprio servidor",
+    addTitle: "Adicionar um workspace",
+    addLead: "Os que você já tem continuam aqui, cada um com o seu login.",
+    addCloud: "Criar um workspace no agentes.chat",
+    addOwn: "Usar o servidor da sua equipe",
   },
   own: {
     title: "O seu próprio servidor",
@@ -292,6 +296,11 @@ export const desktopPtBR = {
     removeBody: "O servidor e a sua conta lá continuam como estão.",
     removeAgents: "Os agentes dos workspaces dele param de trabalhar neste {{device}}.",
     removed: "{{host}} saiu deste app",
+    workspaces_one: "{{count}} workspace",
+    workspaces_other: "{{count}} workspaces",
+    signedOut: "Sem login",
+    newsOne: "1 notificação nova",
+    newsMany: "{{n}} notificações novas",
   },
   /** The server here ("Rodar o agentes.chat neste computador"): Preferências › Servidores, the popover, the tray. */
   server: {

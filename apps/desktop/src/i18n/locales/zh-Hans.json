@@ -130,7 +130,11 @@
     "cloud": "登录 agentes.chat",
     "create": "第一次来？",
     "createLink": "创建账号",
-    "own": "使用你自己的服务器"
+    "own": "使用你自己的服务器",
+    "addTitle": "添加工作区",
+    "addLead": "你已有的工作区都保留在这里，各自保持登录。",
+    "addCloud": "在 agentes.chat 创建工作区",
+    "addOwn": "使用你团队的服务器"
   },
   "own": {
     "title": "你自己的服务器",
@@ -269,7 +273,11 @@
     "removeTitle": "从此应用中移除 {{host}}？",
     "removeBody": "服务器和你在那里的账号都保持不变。",
     "removeAgents": "它的工作区中的智能体将停止在这台 {{device}} 上工作。",
-    "removed": "{{host}} 已从此应用中移除"
+    "removed": "{{host}} 已从此应用中移除",
+    "workspaces_other": "{{count}} 个工作区",
+    "signedOut": "未登录",
+    "newsOne": "1 条新通知",
+    "newsMany": "{{n}} 条新通知"
   },
   "server": {
     "title": "这台 {{device}} 上的 agentes.chat",

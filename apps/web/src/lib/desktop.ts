@@ -3,6 +3,7 @@ import { noticeLine } from "@agenteschat/client/lib/island";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import type { i18n as I18n, TFunction } from "i18next";
 import { useEffect } from "react";
+import type { DesktopServerWorkspaces } from "./workspaces";
 
 /**
  * The site inside the agentes.chat desktop app (ADR 0036, ADR 0066): the app's main window loads it and
@@ -209,7 +210,17 @@ export const thisMac = {
   otherServer: () => invoke<unknown>({ kind: "servers" }),
   /** The folder where the server the app runs here keeps its files, in Finder or the file manager. */
   revealFiles: () => invoke<unknown>({ kind: "files" }),
+  /** The other servers' workspaces, as the app read them with each one's session (ADR 0154). */
+  workspaces: () => invoke<{ servers: DesktopServerWorkspaces[] }>({ kind: "workspaces" }).then((r) => r.servers),
+  /** The window goes to a workspace of another server of the app's list, already signed in there. */
+  openWorkspace: (server: string, orgId: string) => invoke<unknown>({ kind: "openWorkspace", server, orgId }),
+  /** The app's own window to add a workspace: a new one on agentes.chat, or the team's server. */
+  addWorkspace: () => invoke<unknown>({ kind: "addWorkspace" }),
 };
+
+/** The app lists every server's workspaces (`workspaces` in `window.__agentesDesktop`, ADR 0154); older apps don't. */
+export const desktopListsWorkspaces = () =>
+  inDesktopApp() && (window as { __agentesDesktop?: { workspaces?: unknown } }).__agentesDesktop?.workspaces === true;
 
 /** The app takes `otherServer` (`servers` in `window.__agentesDesktop`); older apps refuse it. */
 export const desktopPicksServer = () =>

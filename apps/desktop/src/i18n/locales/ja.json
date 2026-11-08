@@ -130,7 +130,11 @@
     "cloud": "agentes.chatにログイン",
     "create": "はじめてですか？",
     "createLink": "アカウントを作成",
-    "own": "自分のサーバーを使う"
+    "own": "自分のサーバーを使う",
+    "addTitle": "ワークスペースを追加",
+    "addLead": "今あるワークスペースはそれぞれのログインのまま残ります。",
+    "addCloud": "agentes.chatでワークスペースを作成",
+    "addOwn": "チームのサーバーを使う"
   },
   "own": {
     "title": "自分のサーバー",
@@ -269,7 +273,11 @@
     "removeTitle": "このアプリから{{host}}を削除しますか？",
     "removeBody": "サーバーとそこにあるアカウントはそのまま残ります。",
     "removeAgents": "そのワークスペースのエージェントは、この{{device}}で作業しなくなります。",
-    "removed": "{{host}}をこのアプリから削除しました"
+    "removed": "{{host}}をこのアプリから削除しました",
+    "workspaces_other": "{{count}}個のワークスペース",
+    "signedOut": "ログインしていません",
+    "newsOne": "新しい通知が1件",
+    "newsMany": "新しい通知が{{n}}件"
   },
   "server": {
     "title": "この{{device}}のagentes.chat",

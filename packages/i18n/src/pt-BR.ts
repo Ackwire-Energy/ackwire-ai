@@ -1356,6 +1356,9 @@ export const ptBR = {
     /** Beside a workspace's name, only when another of the person's has the same name. */
     createdOn: "Criado em {{date}}",
     newWorkspace: "Novo workspace",
+    addWorkspace: "Adicionar workspace",
+    addWorkspaceHint: "Um novo no agentes.chat, ou o servidor da sua equipe",
+    yourServer: "Seu servidor",
     wiki: "Wiki",
     settings: "Configurações",
     workspaceMenu: "Menu do workspace",

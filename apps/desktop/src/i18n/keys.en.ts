@@ -134,6 +134,11 @@ export const desktopEn = {
     create: "New here?",
     createLink: "Create an account",
     own: "Use your own server",
+    /** The welcome window opened by the site's "Add workspace" (ADR 0154). */
+    addTitle: "Add a workspace",
+    addLead: "The ones you have stay here, each with its own sign-in.",
+    addCloud: "Create a workspace on agentes.chat",
+    addOwn: "Use your team's server",
   },
   own: {
     title: "Your own server",
@@ -281,6 +286,13 @@ export const desktopEn = {
     removeBody: "The server and your account there stay as they are.",
     removeAgents: "Agents of its workspaces stop working on this {{device}}.",
     removed: "{{host}} left this app",
+    /** Under each server: its workspaces, as the app reads them with its sign-in (ADR 0154). */
+    workspaces_one: "{{count}} workspace",
+    workspaces_other: "{{count}} workspaces",
+    signedOut: "Not signed in",
+    /** The system's notification for a server not open in the window: "Oficina · agentes.exemplo.com.br". */
+    newsOne: "1 new notification",
+    newsMany: "{{n}} new notifications",
   },
   server: {
     title: "agentes.chat on this {{device}}",

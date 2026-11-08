@@ -93,12 +93,13 @@ pub fn is_loopback(origin: &str) -> bool {
     origin.starts_with("http://")
 }
 
-/// What may follow a chosen server's origin: its sign-in or sign-up page, or a link's one-time sign-in
-/// (`/desktop/handover#token=`) or owner claim (`/owner#claim=`), whose secrets the page takes out at once.
+/// What may follow a chosen server's origin: its sign-in or sign-up page, a new workspace (`/onboarding`, the
+/// welcome window's "Add a workspace", ADR 0154), or a link's one-time sign-in (`/desktop/handover#token=`) or owner
+/// claim (`/owner#claim=`), whose secrets the page takes out at once.
 pub fn page_path(page: &str) -> bool {
     let secret = |s: &str| (20..=200).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     match page {
-        "/login" | "/signup" => true,
+        "/login" | "/signup" | "/onboarding" => true,
         _ => page
             .strip_prefix("/desktop/handover#token=")
             .or_else(|| page.strip_prefix("/owner#claim="))
@@ -281,6 +282,7 @@ mod tests {
         let token = "Ab0-_".repeat(8);
         assert!(page_path("/login"));
         assert!(page_path("/signup"));
+        assert!(page_path("/onboarding"));
         assert!(page_path(&format!("/desktop/handover#token={token}")));
         assert!(page_path(&format!("/owner#claim={token}")));
         assert!(!page_path("/desktop/handover#token=short"));
