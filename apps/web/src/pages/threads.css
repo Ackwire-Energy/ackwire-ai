@@ -270,6 +270,13 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
   .thread-row__actions {
     display: flex;
   }
+  /* No hover on touch: the checkbox a tap on the face reaches shows in its place. */
+  .thread-row__check {
+    opacity: 1;
+  }
+  .thread-row__face {
+    opacity: 0;
+  }
   .thread-row__quick {
     display: none;
   }
