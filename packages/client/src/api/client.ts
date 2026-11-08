@@ -64,6 +64,7 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -795,8 +796,10 @@ export interface ApiClient {
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
-    /** "Desfazer" right after archiving. */
+    /** An archived channel back as it was (its creator or who manages channels). */
     unarchive(orgId: string, channelId: string): Promise<void>;
+    /** The archived channels the viewer may bring back, the latest first. */
+    archived(orgId: string): Promise<ArchivedChannel[]>;
     /** Owners and admins, never #general: the channel and what it held go for good. `name`: typed to confirm. */
     deleteChannel(orgId: string, channelId: string, name: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */

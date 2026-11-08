@@ -155,3 +155,36 @@ describe("#channel links in messages", () => {
     await act(async () => fireEvent.pointerDown(document.body));
   });
 });
+
+describe("an archived #channel", () => {
+  test("its card offers Restaurar to who may bring it back, which opens it again", async () => {
+    const state = withMessage("veja #lancamento", { channelRefs: { lancamento: "ch-old" } });
+    state.archivedChannels = [
+      { id: "ch-old", name: "lancamento", topic: "", visibility: "public", archivedAt: "2026-11-01T12:00:00.000Z" },
+    ];
+    const api = createFakeApi(state);
+    const card = api.chat.card;
+    api.chat.card = async (orgId, channelId) =>
+      channelId === "ch-old"
+        ? {
+            id: "ch-old",
+            name: "lancamento",
+            topic: "",
+            visibility: "public",
+            isMember: true,
+            archived: true,
+            people: 1,
+            agents: 0,
+          }
+        : card(orgId, channelId);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
+    await settle(8);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Canal #lancamento, arquivado" })));
+    await settle(6);
+    const sheet = screen().getByRole("dialog", { name: "Sobre #lancamento" });
+    await act(async () => fireEvent.click(within(sheet).getByRole("button", { name: "Restaurar" })));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "chat.unarchive")?.args).toEqual([ORG_ID, "ch-old"]);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/ch-old`);
+  });
+});

@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import {
   and,
   type Database,
+  desc,
   type Executor,
   eq,
   inArray,
@@ -975,6 +976,45 @@ async function closeChannel(db: Database, orgId: string, channelId: string, opti
   caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
   await publishChannelsChanged(options.pubsub, orgId);
+}
+
+/**
+ * The archived channels a person may bring back (`unarchiveChannel`: their creator or who manages channels), the
+ * latest first: the way back once the archive's Desfazer is gone. A deleted one is being purged and never shows.
+ */
+export async function listArchivedChannels(db: Database, actorId: string, orgId: string) {
+  const membership = await requireActiveMembership(db, actorId, orgId);
+  // Who doesn't manage every channel manages only some of those they're in: the others are never read.
+  const theirs = can(membership, "manage_channels")
+    ? undefined
+    : sql`exists (select 1 from ${channelMembers} cm where cm.org_id = ${orgId}::uuid and cm.channel_id = ${channels.id}
+        and cm.user_id = ${actorId})`;
+  const rows = await db
+    .select()
+    .from(channels)
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        eq(channels.kind, "channel"),
+        isNotNull(channels.archivedAt),
+        isNull(channels.deletedAt),
+        theirs,
+      ),
+    )
+    .orderBy(desc(channels.archivedAt))
+    .limit(200);
+  const mine: { id: string; name: string; topic: string; visibility: "public" | "private"; archivedAt: string }[] = [];
+  for (const c of rows) {
+    if (isRoutineRoomKey(c.dmKey) || !c.archivedAt || !(await managesChannel(db, membership, actorId, c))) continue;
+    mine.push({
+      id: c.id,
+      name: c.name,
+      topic: c.topic,
+      visibility: c.visibility,
+      archivedAt: c.archivedAt.toISOString(),
+    });
+  }
+  return mine;
 }
 
 /** Brings an archived channel back as it was (creator or admin): "Refazer" after an agent's channel was undone. */

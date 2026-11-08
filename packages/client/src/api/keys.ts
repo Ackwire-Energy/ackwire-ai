@@ -39,6 +39,8 @@ export const keys = {
   aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  /** Under `channels`: archiving one, or bringing one back, refreshes both. */
+  archivedChannels: (orgId: string) => ["org", orgId, "channels", "archived"] as const,
   channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   messageCard: (orgId: string, messageId: string) => ["org", orgId, "message", messageId, "card"] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,

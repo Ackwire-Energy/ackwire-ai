@@ -5,6 +5,7 @@ import {
   createChannelCategory,
   deleteChannel,
   deleteChannelCategory,
+  listArchivedChannels,
   listChannelCategories,
   listChannelOverrides,
   listPins,
@@ -196,6 +197,37 @@ export function channelRoutes(deps: AppDeps) {
         c.req.valid("json").name,
       );
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/archived-channels",
+      tags,
+      security,
+      summary: "Archived channels the caller may bring back (their creator or who manages channels), the latest first",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            channels: z.array(
+              z.object({
+                id: z.uuid(),
+                name: z.string(),
+                topic: z.string(),
+                visibility: z.enum(["public", "private"]),
+                archivedAt: z.string(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ channels: await listArchivedChannels(db, c.get("user").id, orgId) }, 200);
     },
   );
 

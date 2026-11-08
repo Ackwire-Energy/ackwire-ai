@@ -1,4 +1,4 @@
-import { keys, useChannelCategories, useChannels } from "@agenteschat/client";
+import { keys, useArchivedChannels, useChannelCategories, useChannels } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
@@ -91,6 +91,7 @@ function Home() {
   const categories = useChannelCategories(orgId);
   // An administrator reads every channel (ADR 0151): the ones they aren't in wait at the end of the home.
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
+  const archived = useArchivedChannels(orgId).data?.length ?? 0;
   const menus = useCategoryMenus();
   const [waitOpen, setWaitOpen] = useState(false);
 
@@ -239,6 +240,12 @@ function Home() {
             <GroupedRow key={o.id} icon="lock" label={`#${o.name}`} onPress={() => router.push(chatHref(o.id))} />
           ))}
         </CollapsibleSection>
+      ) : null}
+      {archived > 0 && !failed && !list.loading ? (
+        <SeeAllRow
+          label={t("channel.archivedCount", { count: archived })}
+          onPress={() => router.push("/archived-channels")}
+        />
       ) : null}
     </LargeTitleScreen>
   );

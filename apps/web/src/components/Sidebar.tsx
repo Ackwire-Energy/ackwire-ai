@@ -16,6 +16,7 @@ import {
   useAgentGroups,
   useAgentStatuses,
   useAiAccounts,
+  useArchivedChannels,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -116,6 +117,7 @@ import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
+import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
@@ -220,6 +222,9 @@ export function Sidebar() {
   const [creatingChannel, setCreatingChannel] = useState<boolean | string>(false);
   // A new category: empty, or with the channel whose menu asked for it.
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
+  // Archived channels this person may bring back: "Canais arquivados" in Canais' + while there are some.
+  const archivedChannels = useArchivedChannels(orgId).data ?? [];
+  const [showArchived, setShowArchived] = useState(false);
   const [customizing, setCustomizing] = useState(false);
   const navigate = useNavigate();
   const onProposals = useRouterState({ select: (r) => r.location.pathname.endsWith("/proposals") });
@@ -478,6 +483,10 @@ export function Sidebar() {
   const newCategoryItem = can(org, "manage_channels")
     ? [item("new-category", t("channelCategories.newCategory"), "layers", () => setNewCategory({}))]
     : [];
+  const archivedItem =
+    archivedChannels.length > 0
+      ? [item("archived-channels", t("channel.archivedTitle"), "archive", () => setShowArchived(true))]
+      : [];
   const createAgentItem = can(org, "create_agents")
     ? [
         item(
@@ -528,7 +537,7 @@ export function Sidebar() {
         onNewCategory={(withChannel) => setNewCategory(withChannel ? { withChannel } : {})}
         onPrefetch={prefetch}
         headProps={sectionMenu("channels")}
-        addEntries={[...newChannelItem, ...newCategoryItem]}
+        addEntries={[...newChannelItem, ...newCategoryItem, ...archivedItem]}
         pinned={pins.channels}
       />
     ),
@@ -795,6 +804,7 @@ export function Sidebar() {
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
+      <ArchivedChannelsDialog open={showArchived} onClose={() => setShowArchived(false)} />
       <NewChannelDialog
         open={creatingChannel !== false}
         onOpenChange={(open) => setCreatingChannel(open)}

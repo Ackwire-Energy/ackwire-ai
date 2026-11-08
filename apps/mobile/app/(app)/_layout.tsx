@@ -116,6 +116,7 @@ function AppStack() {
       <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="who-sees" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-trash" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="archived-channels" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-agents" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />

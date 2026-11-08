@@ -29,3 +29,31 @@ test("deleting a channel: owners and admins, its name typed, never #general; gon
   // Its name is free again.
   expect((await owner(`${org}/channels`, { json: { name: "lancamento" } })).status).toBe(201);
 });
+
+test("archived channels: listed for who may bring each back, and back as they were", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const org = `/api/app/organizations/${orgId}`;
+  const made = (await (await member(`${org}/channels`, { json: { name: "lancamento" } })).json()) as { id: string };
+  const other = (await (await owner(`${org}/channels`, { json: { name: "financeiro" } })).json()) as { id: string };
+  expect((await member(`${org}/channels/${made.id}`, { method: "DELETE" })).status).toBe(204);
+  expect((await owner(`${org}/channels/${other.id}`, { method: "DELETE" })).status).toBe(204);
+  const archived = async (who: typeof owner) =>
+    ((await (await who(`${org}/archived-channels`)).json()) as { channels: { name: string }[] }).channels
+      .map((c) => c.name)
+      .sort();
+  // Its creator sees the one they made; an owner sees both.
+  expect(await archived(member)).toEqual(["lancamento"]);
+  expect(await archived(owner)).toEqual(["financeiro", "lancamento"]);
+
+  expect((await member(`${org}/channels/${made.id}/unarchive`, { json: {} })).status).toBe(204);
+  expect(await archived(member)).toEqual([]);
+  const list = (await (await member(`${org}/channels`)).json()) as { channels: { id: string }[] };
+  expect(list.channels.map((c) => c.id)).toContain(made.id);
+  // A channel deleted for good isn't offered.
+  expect((await owner(`${org}/channels/${other.id}/delete`, { json: { name: "financeiro" } })).status).toBe(204);
+  expect(await archived(owner)).toEqual([]);
+});

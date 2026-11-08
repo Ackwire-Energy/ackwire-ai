@@ -1,10 +1,11 @@
-import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
+import { useArchivedChannels, useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
 import { Button, Chip, Icon, movesByKeys, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FocusEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useRestoreChannel } from "@/components/entity-menus";
 import { useOrg } from "@/components/org-context";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 
@@ -113,6 +114,9 @@ function ChannelCardBody({ channelId, onDone }: { channelId: string; onDone: () 
   const navigate = useNavigate();
   const card = useChannelCard(org.id, channelId);
   const join = useJoinChannel(org.id, channelId);
+  // An archived one this person may bring back (their creator or who manages channels): Restaurar.
+  const restorable = useArchivedChannels(org.id, card.data?.archived === true).data?.some((x) => x.id === channelId);
+  const restore = useRestoreChannel();
   const c = card.data;
   if (!c) return <p className="small muted">{card.isError ? t("channelRefs.gone") : t("channelRefs.loading")}</p>;
   const openIt = () => {
@@ -128,6 +132,13 @@ function ChannelCardBody({ channelId, onDone }: { channelId: string; onDone: () 
       </div>
       {c.topic && <p className="channel-card__topic">{c.topic}</p>}
       <p className="small muted channel-card__facts">{channelCardFacts(t, c)}</p>
+      {c.archived && restorable && (
+        <div className="profile-card__actions">
+          <Button size="sm" icon="undo" disabled={restore.pending} onClick={() => restore.run(c, onDone)}>
+            {t("channel.restore")}
+          </Button>
+        </div>
+      )}
       {!c.archived && (
         <div className="profile-card__actions">
           {joinable(c) && (

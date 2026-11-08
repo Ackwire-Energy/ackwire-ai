@@ -4382,6 +4382,30 @@
   "channel.archived": {
     "value": "#{{channel}} archived. The conversation is kept."
   },
+  "channel.archivedTitle": {
+    "value": "Archived channels"
+  },
+  "channel.archivedCount": {
+    "value": {
+      "one": "{{count}} archived channel",
+      "other": "{{count}} archived channels"
+    }
+  },
+  "channel.archivedNone": {
+    "value": "No archived channels to restore"
+  },
+  "channel.archivedOn": {
+    "value": "Archived {{date}}"
+  },
+  "channel.restore": {
+    "value": "Restore"
+  },
+  "channel.restoreName": {
+    "value": "Restore #{{channel}}"
+  },
+  "channel.restored": {
+    "value": "#{{channel}} is back."
+  },
   "channel.leave": {
     "value": "Leave channel"
   },

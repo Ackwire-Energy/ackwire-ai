@@ -43,6 +43,7 @@ import type {
   ApprovalCovers,
   ApprovalRule,
   AppsList,
+  ArchivedChannel,
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
@@ -939,6 +940,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
+      archived: async (orgId) =>
+        (await request<{ channels: ArchivedChannel[] }>(`${org(orgId)}/archived-channels`)).channels,
       deleteChannel: (orgId, channelId, name) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/delete`, { json: { name } }),
       roster: async (orgId, channelId) =>

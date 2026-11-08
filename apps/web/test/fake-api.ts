@@ -17,6 +17,7 @@ import type {
   Approval,
   ApprovalCovers,
   ApprovalRule,
+  ArchivedChannel,
   AuditRow,
   AuthConfig,
   Availability,
@@ -218,6 +219,8 @@ export interface FakeState {
   agentGroups?: AgentGroup[];
   /** Agents no longer in the team (`agents.former`); a purge moves one here. */
   former?: FormerAgent[];
+  /** The archived channels the viewer may bring back (`chat.archived`). */
+  archivedChannels?: ArchivedChannel[];
   channels: Channel[];
   /** Sidebar categories (ADR 0080); absent: none. */
   channelCategories?: ChannelCategory[];
@@ -2857,7 +2860,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       unarchive: async (orgId, channelId) => {
         log("chat.unarchive", orgId, channelId);
+        state.archivedChannels = (state.archivedChannels ?? []).filter((c) => c.id !== channelId);
       },
+      archived: async () => state.archivedChannels ?? [],
       leave: async (orgId, channelId) => {
         log("chat.leave", orgId, channelId);
         const c = state.channels.find((x) => x.id === channelId);

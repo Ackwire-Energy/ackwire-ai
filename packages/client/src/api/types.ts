@@ -1067,6 +1067,15 @@ export interface MessageCard {
   author: string;
 }
 
+/** An archived channel the viewer may bring back (`GET …/archived-channels`). */
+export interface ArchivedChannel {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  archivedAt: string;
+}
+
 export interface ChannelCard {
   id: string;
   name: string;

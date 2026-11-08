@@ -2945,6 +2945,27 @@ export function useArchiveChannel(orgId: string) {
   });
 }
 
+/** The archived channels the viewer may bring back (`enabled`: only where they're offered). */
+export const useArchivedChannels = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.archivedChannels(orgId),
+    queryFn: () => api.chat.archived(orgId),
+    enabled,
+    staleTime: 60_000,
+  });
+};
+
+/** "Restaurar" an archived channel: back in everyone's list as it was. */
+export function useUnarchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.unarchive(orgId, channelId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
 /** "Sair do canal": it leaves my list, or stays in it to join again when it is public. */
 export function useLeaveChannel(orgId: string) {
   const api = useApi();
