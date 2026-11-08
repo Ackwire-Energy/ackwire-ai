@@ -39,6 +39,7 @@ import { EmailSteps } from "./EmailSteps";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
 import { InviteGone, InviteLoadFailed, InviteLoading } from "./InviteGone";
+import { arriveIn } from "./arrive";
 import { forgetInvite, keepAsk, rememberInvite, waitingAsk } from "./invite";
 import { AgentsThere, DidYouMean, LeaveButton, Said, useLeaveInvite } from "./invite-parts";
 import type { Asked } from "./invite-steps";
@@ -122,7 +123,7 @@ function Invitation({ token, mail, onAsked }: { token: string; mail?: string; on
       forgetInvite();
       await qc.invalidateQueries({ queryKey: keys.me });
       gate.choose(orgId);
-      router.replace("/");
+      void arriveIn(api, orgId);
     } catch (e) {
       const wrong = e instanceof ApiError && e.status === 403;
       setError(
@@ -314,7 +315,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
           onPress={() =>
             void qc.invalidateQueries({ queryKey: keys.me }).then(() => {
               gate.choose(orgId);
-              router.replace("/");
+              void arriveIn(api, orgId);
             })
           }
         />

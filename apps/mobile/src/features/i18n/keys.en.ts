@@ -1931,6 +1931,8 @@ export const featureKeysEn = {
     wrongAccount: "This invitation is for {{email}}.",
     otherAccount: "Use another account",
     failed: "Couldn't accept the invitation. Try again.",
+    /** An expired invitation: a new one asked of whoever invited you, by name. */
+    askNewOf: "Ask {{name}} for another",
     // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
     /** Asking through a link: three screens (the e-mail, its code, you), the step named over the title. */
     ask: {
@@ -1948,6 +1950,8 @@ export const featureKeysEn = {
       skip: "Skip",
       sharedBy: "{{name}} shared this link",
       waitLead: "You're in as soon as an admin approves. You can close the app: we'll let you know by email.",
+      /** Waiting, said as it happens: open, the app lets you in by itself; closed, the e-mail does. */
+      waitLeadOpen: "With the app open, you're in by yourself once they approve. Closed, we'll tell you by e-mail.",
       passwordLead: "Your password, and you're in.",
     },
   },
@@ -2011,6 +2015,8 @@ export const featureKeysEn = {
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
     anotherLead: "On agentes.chat. You stay in {{org}}; you can switch any time.",
+    /** The first run's name, suggested from a work address's domain. */
+    suggested: "From your {{domain}} e-mail, I suggested {{org}}.",
     create: "Create",
     shareMessage: "Join {{org}} on agentes.chat: {{url}}",
     failed: "Couldn't save. Try again.",

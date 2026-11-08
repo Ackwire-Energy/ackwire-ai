@@ -8,6 +8,7 @@ import {
   useMessages,
   useModelLabel,
   useSettings,
+  useUpdateSettings,
 } from "@agenteschat/client";
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { brainLine } from "@agenteschat/client/lib/brain";
@@ -28,11 +29,20 @@ import {
   firstRunRowState,
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
-import { answerAfter, firstTasks, teamStatus } from "@agenteschat/client/lib/team-plan";
+import {
+  answerAfter,
+  BUSINESS_TYPES,
+  type BusinessType,
+  firstTasks,
+  isTemplateBusiness,
+  teamStatus,
+} from "@agenteschat/client/lib/team-plan";
 import { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { useFailed } from "../routines/hooks";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
-import type { IconName } from "@/ui";
+import { Button, type IconName } from "@/ui";
 import { router } from "@/ui/navigation";
 import { SetupAsks, SetupCardView, useDoneSay } from "../agents/setup/SetupCard";
 import { openSetupStep } from "../agents/setup/SetupStepScreen";
@@ -40,7 +50,7 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { usePlanHold } from "../ai/parts";
 import { useOpenDm } from "../new/useOpenDm";
 import { useDirectory, useMeId } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
+import { successHaptic, tapHaptic } from "../shared/parts";
 import { TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /*
@@ -189,7 +199,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       desc: state === "plan" ? undefined : words.desc,
       dim: state === "afterPlan" || state === "card" || state === "plan",
       saying: said?.step === s ? said.text : null,
-      ...(words.action && state !== "plan"
+      // The first question is answered by the buttons under it (`AboutAnswers`), not a button of its own.
+      ...(words.action && state !== "plan" && !(s === "about" && next === "about")
         ? {
             action: {
               label: words.action,
@@ -241,7 +252,18 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         done={doneHere.length}
         total={steps.length}
         rows={shown.length > 0 ? shown : rows}
-        foot={asks.length > 0 ? <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} /> : null}
+        foot={
+          next === "about" && !done.has("about") && run.state !== "complete" ? (
+            <AboutAnswers
+              onOther={act.about}
+              onSaved={(business) => {
+                if (teamOpen.current) setTemplates(isTemplateBusiness(business) ? { initial: business } : {});
+              }}
+            />
+          ) : asks.length > 0 ? (
+            <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} />
+          ) : null
+        }
       />
       <TeamTemplatesSheet
         open={templates !== null}
@@ -252,3 +274,61 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     </>
   );
 }
+
+/**
+ * The first question, answered in place: the business types as buttons in two columns, as ready answers in a
+ * conversation (toca e manda). A type is saved as the workspace's context, which every agent reads (the same save as
+ * the step's own screen), and the team's templates open with that business picked; "Outra coisa" opens the screen to
+ * write it in a sentence.
+ */
+function AboutAnswers({ onOther, onSaved }: { onOther: () => void; onSaved: (business: BusinessType) => void }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const save = useUpdateSettings(orgId);
+  const failed = useFailed();
+  const [picked, setPicked] = useState<BusinessType | null>(null);
+  const answer = (business: BusinessType) => {
+    if (save.isPending) return;
+    tapHaptic();
+    if (business === "other") {
+      onOther();
+      return;
+    }
+    setPicked(business);
+    save.mutate(
+      { context: t(`teamPlan.business.${business}`) },
+      {
+        onSuccess: () => {
+          successHaptic();
+          onSaved(business);
+        },
+        onError: (e) => {
+          setPicked(null);
+          failed(e);
+        },
+      },
+    );
+  };
+  return (
+    <View style={styles.answers}>
+      {BUSINESS_TYPES.map((b) => (
+        <View key={b} style={styles.answer}>
+          <Button
+            variant="secondary"
+            wide
+            label={t(`teamPlan.business.${b}`)}
+            loading={save.isPending && picked === b}
+            disabled={save.isPending && picked !== b}
+            onPress={() => answer(b)}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  // Two columns of equal buttons, 8 apart, as ready answers under a question.
+  answers: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  answer: { flexBasis: "47%", flexGrow: 1 },
+});

@@ -26,11 +26,15 @@ export const mobilePtBR = {
     errors: {
       network: "Sem conexão. Confira a internet e tente de novo.",
       generic: "Algo deu errado. Tente de novo.",
+      /** No passo do e-mail, sem conexão: a busca tenta de novo sozinha, o e-mail fica. */
+      offlineRetry: "Sem internet agora. Eu continuo assim que voltar.",
     },
     flow: {
       /** The first question, alone: the keyboard is open under it from the start. */
       email: "Qual é o seu e-mail?",
       emailLead: "Para entrar ou criar sua conta.",
+      /** Novo por aqui: o nome e a senha numa tela. */
+      signUp: "Prazer. Como o time te chama?",
     },
     server: {
       line: "Servidor: {{host}} ·",
@@ -49,6 +53,12 @@ export const mobilePtBR = {
       footChoose: "Servidor e idioma",
       footServer: "Outro servidor",
       footLanguage: "Idioma",
+      /** A linha quieta do login, no agentes.chat: abre a câmera para o QR code do computador da equipe. */
+      footTeam: "Usa o servidor da sua equipe?",
+      footTeamAction: "Entrar por ele",
+      /** Num servidor da equipe: onde este login vai, e o jeito de trocar. */
+      footOn: "Entrando em {{host}}",
+      footSwitch: "Trocar",
       now: "Agora em {{host}}",
       invalid: "Confira o endereço, algo como agentes.suaequipe.ts.net.",
       unreachable: "Não conseguimos falar com {{host}}. Confira o endereço e a internet, e tente de novo.",
@@ -84,6 +94,8 @@ export const mobilePtBR = {
     },
     scan: {
       hint: "Aponte para o QR code do computador",
+      /** Embaixo da câmera: o endereço, para quem não tem código para escanear. */
+      typeAddress: "Digitar o endereço",
       notOurs: "Esse QR code não é de um servidor agentes.chat.",
       cameraTitle: "Usar a câmera",
       cameraText: "Ela só serve para ler o QR code.",

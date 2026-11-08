@@ -21,7 +21,7 @@ import { NameHint, Quiet } from "./AuthFlow";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
 import { rememberInvite } from "./invite";
-import { DidYouMean, ErrorLine, InviteTerms, LeaveButton, useLeaveInvite } from "./invite-parts";
+import { DidYouMean, ErrorLine, InviteCrew, InviteTerms, LeaveButton, useLeaveInvite } from "./invite-parts";
 import { type Asked, type AskStep, askAction, askBack, askProgress } from "./invite-steps";
 
 /**
@@ -422,6 +422,8 @@ export function LinkSteps({
       expression={expression}
       overlay={human.view}
       footer={step === "email" || step === "you" ? <InviteTerms /> : null}
+      // The team you're asking to join, on the sky, on the first step; the code and "you" keep the app's agent.
+      hero={step === "email" && (preview.agents?.length ?? 0) > 0 ? <InviteCrew agents={preview.agents ?? []} /> : undefined}
     >
       {body}
     </AuthScaffold>

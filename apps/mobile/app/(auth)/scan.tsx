@@ -3,7 +3,7 @@ import { skyHourOf, workspaceInk } from "@agenteschat/ui/sky/workspace";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, Linking, StyleSheet, View, type ViewStyle } from "react-native";
+import { AppState, Linking, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -183,6 +183,17 @@ export default function Scan() {
               {notOurs ? t("mobile.auth.scan.notOurs") : t("mobile.auth.scan.hint")}
             </Text>
           </Glass>
+          {/* The camera comes first (a team's computer shows the code); the address stays one tap away. */}
+          <Pressable
+            onPress={() => router.replace("/server")}
+            accessibilityRole="button"
+            hitSlop={12}
+            style={({ pressed }) => [styles.type, pressed && styles.pressed]}
+          >
+            <Text variant="subhead" style={styles.typeText}>
+              {t("mobile.auth.scan.typeAddress")}
+            </Text>
+          </Pressable>
         </Animated.View>
       )}
     </View>
@@ -213,6 +224,9 @@ const styles = StyleSheet.create({
   hint: { position: "absolute", left: 16, right: 16, alignItems: "center" },
   hintGlass: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, maxWidth: "100%" },
   hintText: { textAlign: "center" },
+  type: { marginTop: 16, minHeight: 44, justifyContent: "center" },
+  typeText: { color: "white", fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   card: { position: "absolute", left: 16, right: 16 },
   cardGlass: {
     borderRadius: 20,

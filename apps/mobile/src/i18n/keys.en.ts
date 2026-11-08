@@ -21,11 +21,15 @@ export const mobileEn = {
     errors: {
       network: "No connection. Check the internet and try again.",
       generic: "Something went wrong. Try again.",
+      /** On the e-mail step with no connection: the lookup tries again by itself, the e-mail stays. */
+      offlineRetry: "No internet right now. I'll go on as soon as it's back.",
     },
     flow: {
       /** The first question, alone: the keyboard is open under it from the start. */
       email: "What's your e-mail?",
       emailLead: "To sign in or create your account.",
+      /** New here: the name and the password on one screen. */
+      signUp: "Nice to meet you. What does the team call you?",
     },
     server: {
       line: "Server: {{host}} ·",
@@ -44,6 +48,12 @@ export const mobileEn = {
       footChoose: "Server and language",
       footServer: "Another server",
       footLanguage: "Language",
+      /** The quiet line under the sign-in, on the Cloud: it opens the camera for the team computer's QR code. */
+      footTeam: "Use your team's server?",
+      footTeamAction: "Sign in through it",
+      /** On a team's server: where this sign-in goes, and the way to another. */
+      footOn: "Signing in on {{host}}",
+      footSwitch: "Change",
       now: "Now on {{host}}",
       invalid: "Check the address, something like agentes.yourteam.ts.net.",
       unreachable: "We can't reach {{host}}. Check the address and your connection, and try again.",
@@ -79,6 +89,8 @@ export const mobileEn = {
     },
     scan: {
       hint: "Point at the QR code on the computer",
+      /** Under the camera: the address, for whoever has no code to scan. */
+      typeAddress: "Type the address",
       notOurs: "This QR code isn't from an agentes.chat server.",
       cameraTitle: "Use the camera",
       cameraText: "It's only used to read the QR code.",

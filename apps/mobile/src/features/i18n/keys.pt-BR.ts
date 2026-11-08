@@ -1890,6 +1890,8 @@ export const featureKeysPtBR = {
     wrongAccount: "Este convite é para {{email}}.",
     otherAccount: "Entrar com outra conta",
     failed: "Não deu para aceitar o convite. Tente de novo.",
+    /** Um convite vencido: um novo pedido a quem convidou, pelo nome. */
+    askNewOf: "Pedir outro a {{name}}",
     // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
     /** Asking through a link: three screens (the e-mail, its code, you), the step named over the title. */
     ask: {
@@ -1907,6 +1909,8 @@ export const featureKeysPtBR = {
       skip: "Pular",
       sharedBy: "{{name}} compartilhou este link",
       waitLead: "Você entra assim que um admin aprovar. Pode fechar o app: avisamos no seu e-mail.",
+      /** A espera, dita como acontece: aberto, o app deixa você entrar sozinho; fechado, o e-mail avisa. */
+      waitLeadOpen: "Com o app aberto, você entra sozinho quando aprovarem. Fechado, avisamos no seu e-mail.",
       passwordLead: "Sua senha, e você já entra.",
     },
   },
@@ -1970,6 +1974,8 @@ export const featureKeysPtBR = {
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "Como se chama o workspace novo?",
     anotherLead: "No agentes.chat. Você continua na {{org}}; dá para trocar a qualquer hora.",
+    /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
+    suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
     create: "Criar",
     shareMessage: "Entre na {{org}} no agentes.chat: {{url}}",
     failed: "Não deu para salvar. Tente de novo.",

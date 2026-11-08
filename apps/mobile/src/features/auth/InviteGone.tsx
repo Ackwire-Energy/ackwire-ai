@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { firstName } from "@/features/shared/logic";
 import { useOrgGate } from "@/providers/org";
-import { Button, Text, useTheme } from "@/ui";
+import { Button, PersonAvatar, Text, useTheme } from "@/ui";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
 import { router } from "@/ui/navigation";
 import { ErrorLine, LeaveButton } from "./invite-parts";
@@ -113,6 +113,8 @@ export function InviteGone({ token }: { token: string }) {
       subtitle={lead}
       stepKey={asked ? "asked" : "expired"}
       expression={asked ? "happy" : "closed"}
+      // Who invited you, on the sky, when known: the one the new invitation is asked of.
+      hero={dead.invitedBy ? <PersonAvatar name={dead.invitedBy} size={72} /> : undefined}
     >
       {emails ? (
         <>
@@ -120,7 +122,7 @@ export function InviteGone({ token }: { token: string }) {
           <Button
             variant="primary"
             wide
-            label={asked ? t("invite.askedNew") : t("invite.askNew")}
+            label={asked ? t("invite.askedNew") : by ? t("mobile.invite.askNewOf", { name: by }) : t("invite.askNew")}
             disabled={asked}
             loading={pending}
             onPress={() => void askNew()}

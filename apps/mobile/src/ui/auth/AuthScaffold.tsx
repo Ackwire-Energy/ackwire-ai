@@ -59,6 +59,11 @@ export interface AuthScaffoldProps {
    * and Pronto, so the keyboard walks the form instead of closing and reopening on each field.
    */
   toolbar?: boolean;
+  /**
+   * What stands on the sky's edge instead of the app's agent: an invitation's team (its first agents), so the people
+   * who'll work with you are seen before any field. Same overlap as the agent, so the title keeps its place.
+   */
+  hero?: ReactNode;
 }
 
 /**
@@ -80,6 +85,7 @@ export function AuthScaffold({
   sky = "normal",
   skyHost,
   toolbar = false,
+  hero,
 }: AuthScaffoldProps) {
   const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
@@ -110,12 +116,14 @@ export function AuthScaffold({
               <Sky color="sky" depth={0.9} fade={0.55} style={skyStyle} />
             )}
             <View style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", marginBottom: -AGENT_OVERLAP }}>
-              <AgentAvatar
-                agent={{ color: "sky", eyes: "round", id: "agentes" }}
-                size={AGENT}
-                mode={agentMode}
-                expression={expression}
-              />
+              {hero ?? (
+                <AgentAvatar
+                  agent={{ color: "sky", eyes: "round", id: "agentes" }}
+                  size={AGENT}
+                  mode={agentMode}
+                  expression={expression}
+                />
+              )}
             </View>
             {onBack ? (
               <View style={{ position: "absolute", top: insets.top + 8, left: 16 }}>

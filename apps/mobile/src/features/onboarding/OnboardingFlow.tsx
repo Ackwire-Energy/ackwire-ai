@@ -18,7 +18,7 @@ import { chatHref } from "../links/logic";
 import { openWebPath } from "../links/open-web";
 import { ZoneList } from "../me/AccountPage";
 import { chooseAction } from "../settings/parts";
-import { phoneTimezone, stepFailedText, zoneLabel } from "./logic";
+import { orgNameFromEmail, phoneTimezone, stepFailedText, zoneLabel } from "./logic";
 
 /**
  * The first run on the phone, signed in with no workspace to open yet: one question on the sign-in's own screen, the
@@ -44,10 +44,18 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
   const [zone, setZone] = useState<string | null>(phoneTimezone);
   const [pickingZone, setPickingZone] = useState(false);
   const orgName = name.trim();
+  // A work address names its company: the field starts with it, selected, so typing replaces it (`suggested`).
+  const [suggested, setSuggested] = useState<string | null>(null);
 
   // The address this sign-up was emailed a link to confirm (features/auth/confirmation.ts): the step says where it
   // went, until `me` says it's confirmed.
   const email = me.data?.user.email ?? "";
+  useEffect(() => {
+    if (another || created || name !== "" || suggested !== null || !email) return;
+    const guess = orgNameFromEmail(email);
+    setSuggested(guess ?? "");
+    if (guess) setName(guess);
+  }, [another, created, name, suggested, email]);
   const unconfirmed =
     email !== "" && confirmationSentTo() === email.toLowerCase() && me.data?.user.emailVerified !== true;
 
@@ -131,7 +139,13 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     <AuthScaffold
       sky="low"
       title={another ? t("mobile.onb.anotherTitle") : t("onboarding.workspace.title")}
-      subtitle={another ? t("mobile.onb.anotherLead", { org: another }) : t("onboarding.workspace.lead")}
+      subtitle={
+        another
+          ? t("mobile.onb.anotherLead", { org: another })
+          : suggested && name === suggested
+            ? t("mobile.onb.suggested", { domain: email.split("@")[1] ?? "", org: suggested })
+            : t("onboarding.workspace.lead")
+      }
       onBack={onLeave && !created ? onLeave : undefined}
       agentMode={pending ? "run" : "idle"}
       // Nothing destroys on screen: until a workspace is set up this is the only screen, so the way out of the account
@@ -161,6 +175,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
     >
       <Locked when={pending} keepKeyboard style={{ gap: 8 }}>
         <AuthField
+          // Mounted again once the suggestion lands, so its focus selects it (`selectTextOnFocus`).
+          key={suggested ? "suggested" : "empty"}
           value={name}
           onChangeText={(value) => {
             setName(value);
@@ -174,6 +190,8 @@ export function OnboardingFlow({ onLeave, another }: { onLeave?: () => void; ano
           returnKeyType="continue"
           enablesReturnKeyAutomatically
           onSubmitEditing={submit}
+          // The suggested name comes selected: one keystroke replaces it, the blue key keeps it.
+          selectTextOnFocus={Boolean(suggested)}
           autoFocus
         />
       </Locked>
