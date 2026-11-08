@@ -17,13 +17,25 @@ import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
+import {
+  Button,
+  fieldText,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  IconButton,
+  Locked,
+  Text,
+  useToast,
+} from "@/ui";
 import { CoverBarBackdrop, useCoverScroll } from "@/ui/cover";
 import { router } from "@/ui/navigation";
+import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
-import { errorHaptic, goBack, PushedHeader, successHaptic, Tile } from "../shared/parts";
+import { errorHaptic, goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import { AgentLevelList, DisconnectRow, WaitTile } from "./Access";
+import { AgentLevelList, DisconnectRow } from "./Access";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet } from "./ConnectSheet";
 import { GitHubAppGroup } from "./GitHubApp";
@@ -35,12 +47,13 @@ import { openTools } from "./ToolsScreen";
 export const openConnection = (id: string) => router.push(`/connectors/${id}`);
 
 /**
- * A connection, a screen pushed over Conectores, laid out as the phone's settings (groups on the grouped gray): its
- * icon with the check, its name and account; who uses it and how far (one row per agent, the level as its value),
- * what always asks as that group's footer; its tools (what waits on you first, in amber, then all of them, a screen
- * of their own); the account itself (Renomear, Reconectar, another account of an MCP server, each in a sheet); and
- * Desconectar, alone in red, after a confirmation. GitHub also lists its repositories through the agentes.chat app,
- * under who uses it. Connecting a new service stays in its sheet.
+ * A connection, a screen pushed over Conectores, laid out as the phone's settings (groups on the grouped gray): the
+ * bar reads its name, with "…" for renaming; its mark with the check, its name and its account under it; who uses
+ * it (one row per agent, the level as its value, changed in place), what always asks as that group's footer; its
+ * tools as one row (what waits on you under it, in amber; a screen of their own); the account (which, Reconectar,
+ * another account of an MCP server, each in a sheet); and Desconectar, alone in red, behind the system's
+ * confirmation. GitHub also lists its repositories through the agentes.chat app, under who uses it. Connecting a new
+ * service stays in its sheet.
  */
 export function ConnectionScreen({ id }: { id: string }) {
   return (
@@ -81,10 +94,26 @@ function Connection({ id }: { id: string }) {
             ? t(`connectors.category.${item.def.category}`)
             : "";
   const waiting = admin && item ? item.pending : 0;
+  const actions = item ? accountActions(item) : [];
+  // "…": renaming, the one thing about the account that isn't a step of its own.
+  const more =
+    admin && item && actions.includes("rename") ? (
+      <IconButton
+        icon="more"
+        label={t("connectors.rename")}
+        onPress={() =>
+          chooseAction(
+            name,
+            [{ label: t("connectors.rename"), onPress: () => sheet.open(<RenameSheet item={item} />) }],
+            t("common.cancel"),
+          )
+        }
+      />
+    ) : undefined;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader plate solid={false} />
+      <PushedHeader title={name} plate solid={false} {...(more ? { right: more } : {})} />
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -104,7 +133,7 @@ function Connection({ id }: { id: string }) {
             {name}
           </Text>
           {sub ? (
-            <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.center}>
+            <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.center}>
               {sub}
             </Text>
           ) : null}
@@ -137,19 +166,20 @@ function Connection({ id }: { id: string }) {
               <>
                 <GroupedHeader>{t("connectors.tools")}</GroupedHeader>
                 <GroupedList>
-                  {waiting > 0 ? (
-                    <GroupedRow
-                      key="waiting"
-                      leading={<WaitTile />}
-                      label={t("toolReview.decideTitle", { count: waiting })}
-                      chevron
-                      onPress={() => openTools(id)}
-                    />
-                  ) : null}
+                  {/* One row: how many, and what waits on you under it, in the waiting color. */}
                   <GroupedRow
-                    key="all"
-                    leading={<Tile icon="list" size={30} />}
+                    key="tools"
+                    icon="bolt"
                     label={t("connectors.tools")}
+                    {...(waiting > 0
+                      ? {
+                          below: (
+                            <Text variant="footnote" style={[styles.bold, { color: c.amber }]}>
+                              {t("mobile.connectors.toolsWait", { count: waiting })}
+                            </Text>
+                          ),
+                        }
+                      : {})}
                     value={String(item.tools)}
                     chevron
                     onPress={() => openTools(id)}
@@ -157,29 +187,18 @@ function Connection({ id }: { id: string }) {
                 </GroupedList>
                 <GroupedHeader>{t("mobile.connectors.accountTitle")}</GroupedHeader>
                 <GroupedList>
-                  {accountActions(item).map((action) =>
-                    action === "rename" ? (
-                      <GroupedRow
-                        key={action}
-                        label={t("connectors.rename")}
-                        value={item.label}
-                        chevron
-                        onPress={() => sheet.open(<RenameSheet item={item} />)}
-                      />
-                    ) : (
+                  {/* Which account, and that it is in: the one row with no step behind it. */}
+                  <GroupedRow
+                    key="which"
+                    label={item.account || item.label}
+                    sub={t("mobile.connectors.connectedState")}
+                  />
+                  {actions
+                    .filter((action) => action !== "rename")
+                    .map((action) => (
                       <GroupedRow
                         key={action}
                         label={t(action === "add" ? "connectors.detail.addAccount" : "connectors.detail.reconnect")}
-                        sub={t(
-                          item.custom && accountUnchecked([item.server])
-                            ? action === "add"
-                              ? "connectFlow.newAccountUnchecked"
-                              : "connectFlow.replaceUnchecked"
-                            : action === "add"
-                              ? "connectors.detail.accountsText"
-                              : "connectors.detail.replaceText",
-                        )}
-                        subLines={2}
                         chevron
                         onPress={() =>
                           sheet.open(
@@ -191,9 +210,11 @@ function Connection({ id }: { id: string }) {
                           )
                         }
                       />
-                    ),
-                  )}
+                    ))}
                 </GroupedList>
+                {item.custom && accountUnchecked([item.server]) ? (
+                  <GroupedFooter>{t("connectFlow.replaceUnchecked")}</GroupedFooter>
+                ) : null}
                 <View style={styles.gap} />
                 <DisconnectRow item={item} name={name} onDone={goBack} />
                 {item.viaComposio ? (
@@ -279,8 +300,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     ...fieldText("body"),
   },
-  head: { alignItems: "center", gap: 6, paddingHorizontal: 24, paddingBottom: 6 },
+  head: { alignItems: "center", gap: 8, paddingHorizontal: 24, paddingBottom: 6 },
   center: { textAlign: "center" },
+  bold: { fontWeight: "600" },
   loading: { marginTop: 24 },
   // The pushed screens' 16-point margin (the connectors list and the settings screens use it too).
   body: { paddingHorizontal: 16 },

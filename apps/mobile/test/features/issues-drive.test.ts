@@ -21,6 +21,7 @@ import {
   minutesSince,
   passesFilter,
   taskConversationHref,
+  taskListSections,
   waitsOnYou,
   workLines,
 } from "../../src/features/issues/logic";
@@ -543,5 +544,35 @@ describe("the Drive past what loaded", () => {
     const screen = readFileSync(join(import.meta.dir, "../../src/features/drive/DriveScreen.tsx"), "utf8");
     expect(screen).toContain("void list.fetchNextPage()");
     expect(screen).toContain("visible < total || list.hasNextPage");
+  });
+});
+
+describe("Tarefas as one list", () => {
+  test("for you first, then each open stage without what is above, then what was finished today", () => {
+    const agent = { type: "agent" as const, id: "a1" };
+    const me = { type: "person" as const, id: "me" };
+    const list = [
+      issue({ number: 1, status: "in_progress", assignee: agent, work: work("running") }),
+      issue({ number: 2, status: "in_progress", assignee: agent, work: work("waiting_input") }),
+      issue({ number: 3, status: "todo", assignee: me }),
+      issue({ number: 4, status: "in_review", assignee: agent }),
+      issue({ number: 5, status: "todo" }),
+      issue({ number: 6, status: "done", updatedAt: at(30, NOW) }),
+      issue({ number: 7, status: "done", updatedAt: new Date(2026, 9, 15, 10, 0).toISOString() }),
+      issue({ number: 8, status: "canceled" }),
+    ];
+    const shape = taskListSections(list, "me", NOW).map((s) => [s.key, s.items.map((i) => i.number)]);
+    expect(shape).toEqual([
+      // What waits on you comes before what is simply yours.
+      ["mine", [2, 3]],
+      ["in_progress", [1]],
+      ["in_review", [4]],
+      ["todo", [5]],
+      ["doneToday", [6]],
+    ]);
+    // Each task once, and nothing left as an empty section.
+    const doneOnly = [issue({ number: 9, status: "done", updatedAt: at(30, NOW) })];
+    expect(taskListSections(doneOnly, null, NOW).map((s) => s.key)).toEqual(["doneToday"]);
+    expect(taskListSections([], "me", NOW)).toEqual([]);
   });
 });

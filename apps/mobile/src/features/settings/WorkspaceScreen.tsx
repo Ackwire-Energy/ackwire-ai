@@ -18,85 +18,113 @@ import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
+import { Alert } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Text } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, haptics } from "@/ui";
 import { router } from "@/ui/navigation";
-import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
-import { SETTINGS_GROUPS, type SettingsEntry, tileStates, visibleSections } from "./logic";
+import { areaValues, SETTINGS_GROUPS, type SettingsEntry, type SettingsSection, visibleSections } from "./logic";
+import { Gap, SettingsPage } from "./parts";
+
+/** The rows whose group already says the rest get a shorter name (`mobile.settings.section.*`). */
+const SHORT: Partial<Record<SettingsSection, string>> = {
+  members: "mobile.settings.section.members",
+  roles: "mobile.settings.section.roles",
+  access: "mobile.settings.section.access",
+  connectors: "mobile.settings.section.connectors",
+  usage: "mobile.settings.section.usage",
+};
 
 /**
- * The workspace's settings, as the web's sections in its groups, on a page like Você: the workspace's sky with its
- * mark, its name and who you are there; then "Editar workspace" (its logo, name, zone and what every agent knows)
- * above "Membros e convites", and each area this person opens, with how it is now under its name.
+ * The workspace's settings, a screen pushed from Você on the grouped gray, as the phone's own settings: four groups,
+ * each thing once. Workspace: the workspace itself (its mark, its name, what Geral holds), its right hand by its
+ * face and name, GIFs. Pessoas, Agentes, Custos e dados: one neutral tile and one short value per row (a count or
+ * a state), the area's own screen says the rest. Owners get "Apagar <nome>" alone in red at the end, behind the
+ * system's alert (one firm haptic as it confirms), then the proof and the hold. Opened often, so nothing animates
+ * here beyond the rows' press highlight and the platform's push.
  */
 export function WorkspaceScreen() {
   const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const role = org?.role;
-  const areas = visibleSections(org).filter((s) => s.id !== "general");
-  const states = useAreaStates(areas);
-  const overview = useOverview(orgId).data;
+  const { org } = useOrg();
+  const areas = visibleSections(org);
+  const values = useAreaValues(areas);
   // The right hand's row goes by its name and face (admins may rename it).
   const rightHand = rightHandOf(useDirectory().agents);
-  const headline = [
-    role ? t(`mobile.me.role.${role}`) : null,
-    overview ? t("mobile.chat.people", { count: overview.people }) : null,
-    overview ? t("mobile.chat.agentsHere", { count: overview.agents }) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const name = org?.name ?? "";
+  const confirmDelete = () =>
+    Alert.alert(t("deleteOrg.title", { name }), t("mobile.settings.deleteAlert"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("mobile.settings.deleteAction"),
+        style: "destructive",
+        onPress: () => {
+          // One firm tap as the destructive step is taken, in the same moment the next screen comes.
+          haptics.medium();
+          router.push("/settings/delete");
+        },
+      },
+    ]);
   return (
-    <CoverPage face={<OrgAvatar logo={org?.logo} size={68} />} title={org?.name ?? ""} headline={headline}>
+    <SettingsPage title={t("settings.title")}>
       {SETTINGS_GROUPS.map((group) => {
         const rows = areas.filter((s) => s.group === group);
-        // The workspace itself heads its own group, above its people: for who configures it.
-        const own = group === "org" && can(org, "configure");
-        if (rows.length === 0 && !own) return null;
+        if (rows.length === 0) return null;
         return (
           <Fragment key={group}>
-            <PageSection title={t(`settings.group.${group}`)} />
-            {own ? (
-              <PageRow
-                icon="pen"
-                label={t("mobile.settings.edit")}
-                below={<Line text={t("settings.sectionText.general")} />}
-                onPress={() => router.push("/settings/general")}
-              />
-            ) : null}
-            {rows.map((s, i) => (
-              <PageRow
-                key={s.id}
-                icon={s.icon}
-                {...(s.id === "right_hand" && rightHand
-                  ? { leading: <AgentFace agentId={rightHand.id} size={TILE} live={false} /> }
-                  : {})}
-                label={s.id === "right_hand" && rightHand ? rightHand.name : t(`settings.section.${s.id}`)}
-                below={states[s.id] ? <Line text={states[s.id] ?? ""} /> : undefined}
-                divider={own || i > 0}
-                onPress={() => router.push(s.href as never)}
-              />
-            ))}
+            <GroupedHeader>{t(`mobile.settings.group.${group}`)}</GroupedHeader>
+            <GroupedList>
+              {rows.map((s) =>
+                s.id === "general" ? (
+                  <GroupedRow
+                    key={s.id}
+                    leading={<OrgAvatar logo={org?.logo} size={36} />}
+                    label={name}
+                    sub={t("mobile.settings.editSub")}
+                    chevron
+                    onPress={() => router.push(s.href as never)}
+                  />
+                ) : s.id === "right_hand" && rightHand ? (
+                  <GroupedRow
+                    key={s.id}
+                    leading={<AgentFace agentId={rightHand.id} size={36} live={false} />}
+                    label={rightHand.name}
+                    {...(rightHand.role ? { sub: rightHand.role } : {})}
+                    chevron
+                    onPress={() => router.push(s.href as never)}
+                  />
+                ) : (
+                  <GroupedRow
+                    key={s.id}
+                    icon={s.icon}
+                    label={t(SHORT[s.id] ?? `settings.section.${s.id}`)}
+                    {...(values[s.id] ? { value: values[s.id] } : {})}
+                    chevron
+                    onPress={() => router.push(s.href as never)}
+                  />
+                ),
+              )}
+            </GroupedList>
           </Fragment>
         );
       })}
-    </CoverPage>
+      {org?.role === "owner" ? (
+        <>
+          <Gap />
+          <Gap />
+          <GroupedList>
+            <GroupedRow label={t("mobile.settings.deleteName", { name })} danger onPress={confirmDelete} />
+          </GroupedList>
+          <GroupedFooter>{t("mobile.settings.deleteFoot")}</GroupedFooter>
+        </>
+      ) : null}
+    </SettingsPage>
   );
 }
 
-/** The quiet line under an area's name. */
-function Line({ text }: { text: string }) {
-  return (
-    <Text variant="footnote" tone="muted" numberOfLines={1}>
-      {text}
-    </Text>
-  );
-}
-
-/** How each area is now, as the web's tiles (`tileStates`): asked only for the areas shown. */
-function useAreaStates(areas: readonly SettingsEntry[]) {
+/** Each area's value, as the web's tiles count (`areaValues`): asked only for the areas shown. */
+function useAreaValues(areas: readonly SettingsEntry[]) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const shown = (id: string) => areas.some((s) => s.id === id);
@@ -113,7 +141,7 @@ function useAreaStates(areas: readonly SettingsEntry[]) {
   const edition = computerEdition(useComputerSetup(orgId, shown("storage")).data);
   const agents = useAgents(orgId).data ?? [];
   const aiStatus = useAiStatus(orgId).data;
-  return tileStates(t, i18n.language, {
+  return areaValues(t, i18n.language, {
     overview: overview.data,
     usesApi: overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent),
     invitations: invitations.data?.length,

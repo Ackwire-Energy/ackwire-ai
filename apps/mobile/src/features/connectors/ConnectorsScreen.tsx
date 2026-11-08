@@ -17,12 +17,12 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Dither } from "@/sky/Dither";
 import {
   Button,
   EmptyState,
   Filters,
   Icon,
+  IconButton,
   LineIcon,
   PressScale,
   SearchField,
@@ -40,8 +40,6 @@ import { openConnection } from "./ConnectionScreen";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
 import {
-  brandOf,
-  brandTones,
   CATEGORIES,
   connectionOf,
   galleryTiles,
@@ -52,14 +50,21 @@ import {
   suggestionsOf,
 } from "./logic";
 import { MailboxSheet } from "./MailboxSheet";
+import { openTools } from "./ToolsScreen";
+
+/** The catalog row's mark; the text column starts after it, where its hairline does. */
+const ROW_MARK = 36;
+const ROW_SIDE = 16;
+const ROW_GAP = 12;
 
 /**
- * Conectores on the phone: what is connected as a row of icons
- * with a check (and "Endereço" to connect any server by its address), three suggestions with a strip in the
- * brand's tone, then every service as even tiles in two columns, filtered by
- * category. A service not connected opens a sheet over the gallery with the flow in four steps: what agents could
- * do → connect → its tools → who uses it; a connection opens its own screen (who uses it, its tools,
- * disconnecting). A mailbox, of any kind, opens a sheet of who uses it.
+ * Conectores on the phone, the large title and the search of the system with "+" in the bar: what is connected as
+ * a row of marks with a check (Adicionar as the dashed tile at its end), what waits on the person as one amber line
+ * right under it, two suggestions as the app's cards with "Conectar" in words, then every service as a list (the
+ * mark at 36, the name, one line of what it is, "Conectar" at the end), filtered by category; what isn't open yet
+ * is left out rather than shown dead. A pasted address connects a server from the search itself. A service not
+ * connected opens a sheet over the gallery with the flow in steps; a connection opens its own screen; a mailbox, of
+ * any kind, opens a sheet of who uses it. A list people filter often: the rows don't each animate.
  */
 export function ConnectorsScreen() {
   return (
@@ -99,7 +104,7 @@ function Gallery() {
   const mcps = items.filter(isMcpItem);
   const connectedCount = items.length + mailboxes.length;
   const name = (d: ConnectorDef) => connectorName(t, d);
-  const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
+  const suggestions = useMemo(() => suggestionsOf(list, items, 2), [list, items]);
   const searching = q.trim().length > 0;
   const rest = useMemo(() => {
     const pool = searching ? list : list.filter((d) => !suggestions.includes(d));
@@ -107,8 +112,12 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
-  // What is already connected is in the row above; the grid shows it only to a search.
-  const tiles = galleryTiles(rest, items).filter((x) => searching || !x.connected);
+  // What is already connected is in the row above; the list shows it only to a search. What can't be connected
+  // yet isn't listed: a dead row teaches nothing.
+  const rows = galleryTiles(rest, items).filter((x) => x.opens && (searching || !x.connected));
+  // What waits on the person among the connected: a sign-in that stopped, tools that couldn't be read, tools to
+  // decide (admins).
+  const waiting = items.filter((i) => i.needsReconnect || i.toolsError || (admin && i.pending > 0));
   // Without Composio here, the services that connect only through it are left out: admins read why.
   const composioOff = admin ? composioOffText(t, list, SUGGESTED) : null;
   const open = (def: ConnectorDef) => {
@@ -151,6 +160,10 @@ function Gallery() {
   return (
     <PushedLargeTitle
       title={t("mobile.connectors.title")}
+      // Adding by an address lives in the bar, as every list's "+".
+      {...(admin
+        ? { right: <IconButton icon="plus" label={t("connectors.otherConnect")} onPress={openAddress} /> }
+        : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {composio.data && nearComposioLimit(composio.data) ? (
@@ -198,8 +211,6 @@ function Gallery() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
                     {/* A connection made or removed while the row is in sight fades, and the others slide over. */}
                     <LayoutAnimationConfig skipEntering>
-                      {/* Adding one opens the row: always in sight, never at the end of a sideways scroll. */}
-                      {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
                       {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
                       {mailboxes.map((a) => (
                         <MiniTile
@@ -222,8 +233,17 @@ function Gallery() {
                           onPress={() => openItem(item)}
                         />
                       ))}
+                      {/* Adding comes after what is there: the row reads what is connected first. */}
+                      {admin ? <AddTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
                     </LayoutAnimationConfig>
                   </ScrollView>
+                  {waiting.length > 0 ? (
+                    <WaitLine
+                      items={waiting}
+                      admin={admin}
+                      onOpen={(i) => (admin && i.pending > 0 ? openTools(i.id) : openItem(i))}
+                    />
+                  ) : null}
                 </>
               ) : null}
               {connectedCount === 0 ? <EmptyHint acts={admin} /> : null}
@@ -245,7 +265,7 @@ function Gallery() {
               </View>
             </>
           ) : null}
-          {searching ? null : <SectionHeader title={t("connectors.more")} count={tiles.length} />}
+          {searching ? null : <SectionHeader title={t("mobile.connectors.allServices")} count={rows.length} />}
           {cats.length > 1 ? (
             <View style={styles.filters}>
               <Filters
@@ -258,7 +278,7 @@ function Gallery() {
               />
             </View>
           ) : null}
-          {tiles.length === 0 ? (
+          {rows.length === 0 ? (
             <EmptyState
               size="inline"
               title={t("mobile.connectors.noResults")}
@@ -279,20 +299,18 @@ function Gallery() {
               }
             />
           ) : (
-            <View style={styles.grid}>
-              {tiles.map(({ def: d, connected: isConnected, opens, locked }) => (
-                <Tile
+            <View style={styles.list}>
+              {rows.map(({ def: d, connected: isConnected }, i) => (
+                <ServiceRow
                   key={d.id}
                   def={d}
                   name={name(d)}
-                  text={opens ? connectorDescription(t, d) : t("mobile.connectors.soon")}
+                  text={connectorDescription(t, d)}
                   connected={isConnected}
-                  locked={locked}
-                  onPress={opens ? open : undefined}
+                  divider={i > 0}
+                  onPress={() => open(d)}
                 />
               ))}
-              {/* An odd last tile keeps its column's width instead of growing across the row. */}
-              {tiles.length % 2 === 1 ? <View style={styles.tileSpacer} /> : null}
             </View>
           )}
           {composioOff ? (
@@ -338,9 +356,55 @@ function EmptyHint({ acts }: { acts: boolean }) {
 }
 
 /**
+ * What waits on the person, in one line under the connected row, in the waiting color: tools to decide ("2
+ * ferramentas precisam de você · Serviço T"), a sign-in that stopped, tools that couldn't be read. The first
+ * service names what, every one waiting is named after it. A tap opens where it is decided.
+ */
+function WaitLine({
+  items,
+  admin,
+  onOpen,
+}: {
+  items: ConnectedItem[];
+  admin: boolean;
+  onOpen: (item: ConnectedItem) => void;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const first = items[0];
+  if (!first) return null;
+  const what = first.needsReconnect
+    ? t("connectors.composio.needsReconnect")
+    : first.toolsError
+      ? t("connectors.noToolsNow")
+      : admin
+        ? t("mobile.connectors.waitLine", { count: first.pending })
+        : "";
+  const names = items.map((i) => itemName(t, i)).join(", ");
+  return (
+    <Pressable
+      onPress={() => onOpen(first)}
+      accessibilityRole="button"
+      accessibilityLabel={`${what} · ${names}`}
+      style={({ pressed }) => [styles.wait, pressed && styles.pressed]}
+    >
+      <LineIcon variant="small" name="wait" size={16} color={c.amber} />
+      <Text variant="small" numberOfLines={1} style={styles.grow}>
+        <Text variant="small" style={[styles.bold, { color: c.amber }]}>
+          {what}
+        </Text>
+        <Text variant="small" tone="muted">
+          {` · ${names}`}
+        </Text>
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
  * A connection in the row: its mark with the check, its name; when it waits on you (its sign-in stopped working, its
- * tools couldn't be read, or a server's new or unclear tools), the amber wait mark and its name in amber instead (its
- * screen says why first).
+ * tools couldn't be read, or a server's new or unclear tools), the amber wait mark instead (the line under the row
+ * says why, its screen too).
  */
 function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review: boolean; onPress: () => void }) {
   const { t } = useTranslation();
@@ -364,12 +428,7 @@ function ConnectedTile({ item, review, onPress }: { item: ConnectedItem; review:
           </View>
         ) : null}
       </View>
-      <Text
-        variant="caption"
-        tone="muted"
-        numberOfLines={1}
-        style={waiting ? [styles.bold, { color: c.amber }] : undefined}
-      >
+      <Text variant="caption" tone="muted" numberOfLines={1}>
         {name}
       </Text>
     </MiniTile>
@@ -429,22 +488,33 @@ function AddressRow({ url, onPress }: { url: string; onPress: () => void }) {
   );
 }
 
-function AddressTile({ onPress }: { onPress: () => void }) {
+/** The dashed tile at the end of the connected row: a server by its address. */
+function AddTile({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   return (
-    <MiniTile onPress={onPress} label={t("mobile.connectors.addMcp")}>
+    <MiniTile onPress={onPress} label={t("connectors.otherConnect")}>
       <View style={[styles.addTile, { borderColor: c.line2 }]}>
         <Icon name="plus" size={20} color={c.muted} />
       </View>
       <Text variant="caption" tone="muted" numberOfLines={1}>
-        {t("mobile.connectors.addMcp")}
+        {t("mobile.connectors.add")}
       </Text>
     </MiniTile>
   );
 }
 
-/** A suggestion: a strip of pixels in the brand's tone with its mark, the name and what it is. */
+/** "Conectar" in words at a row's or a card's end: the whole row is the button, this is where the eye lands. */
+function ConnectWord() {
+  const { t } = useTranslation();
+  return (
+    <Text variant="subhead" tone="ink2" style={styles.bold}>
+      {t("mobile.connectors.connect")}
+    </Text>
+  );
+}
+
+/** A suggestion: the app's card with the service's mark, its name, what it is and "Conectar" in words. */
 function Suggestion({
   mark,
   name,
@@ -456,78 +526,66 @@ function Suggestion({
   text: string;
   onPress: () => void;
 }) {
-  const c = useColors();
   const surface = useSurface();
-  const brand = brandOf(mark?.brandColor ?? null) ?? c.ink2;
   return (
-    <Pressable
+    <PressScale
+      haptic={false}
+      fill={false}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}. ${text}`}
-      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
+      style={[styles.card, surface]}
+      contentStyle={styles.cardIn}
     >
-      <View style={styles.band}>
-        <Dither
-          kind="sky"
-          tones={brandTones(c.raised, brand)}
-          pixel={3}
-          animated={false}
-          style={StyleSheet.absoluteFill}
-        />
-        <ConnectorIcon def={mark} label={name} size={44} />
-      </View>
-      <View style={styles.cardText}>
+      <ConnectorIcon def={mark} label={name} size={40} />
+      <View style={styles.grow}>
         <Text variant="body" numberOfLines={1} style={styles.bold}>
           {name}
         </Text>
-        <Text variant="small" tone="muted" numberOfLines={2}>
+        <Text variant="subhead" tone="muted" numberOfLines={2}>
           {text}
         </Text>
       </View>
-    </Pressable>
+      <ConnectWord />
+    </PressScale>
   );
 }
 
-function Tile({
+/** One service of the catalog: its mark at 36, its name, one line of what it is, "Conectar" (a check once it is). */
+function ServiceRow({
   def,
   name,
   text,
   connected,
-  locked,
+  divider,
   onPress,
 }: {
   def: ConnectorDef;
   name: string;
   text: string;
   connected: boolean;
-  locked: boolean;
-  onPress?: ((def: ConnectorDef) => void) | undefined;
+  divider: boolean;
+  onPress: () => void;
 }) {
   const c = useColors();
-  const surface = useSurface();
   return (
     <Pressable
-      onPress={onPress ? () => onPress(def) : undefined}
-      disabled={!onPress}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}. ${text}`}
-      style={({ pressed }) => [
-        styles.tile,
-        // Coming soon sits sunk in the page, not raised like what opens.
-        onPress ? surface : [styles.soon, { backgroundColor: c.sunken }],
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.service, pressed && { backgroundColor: c.sunken }]}
     >
-      <ConnectorIcon def={def} label={name} size={40} check={connected} />
-      <Text variant="body" numberOfLines={1} style={styles.bold}>
-        {name}
-      </Text>
-      <View style={styles.tileText}>
-        {locked ? <LineIcon variant="small" name="lock" size={13} color={c.muted} /> : null}
-        <Text variant="small" tone="muted" numberOfLines={2} style={styles.grow}>
+      {divider ? <View style={[styles.serviceLine, { backgroundColor: c.line2 }]} /> : null}
+      <ConnectorIcon def={def} label={name} size={ROW_MARK} check={connected} />
+      <View style={styles.grow}>
+        <Text variant="body" numberOfLines={1} style={styles.bold}>
+          {name}
+        </Text>
+        <Text variant="subhead" tone="muted" numberOfLines={1}>
           {text}
         </Text>
       </View>
+      {connected ? null : <ConnectWord />}
     </Pressable>
   );
 }
@@ -538,7 +596,7 @@ const styles = StyleSheet.create({
   usage: { paddingHorizontal: 16, paddingBottom: 8 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  row: { gap: 14, paddingHorizontal: 16, paddingBottom: 6 },
+  row: { gap: 16, paddingHorizontal: 16, paddingBottom: 6 },
   mini: { width: 64 },
   miniIn: { alignItems: "center", gap: 6 },
   addTile: {
@@ -550,6 +608,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // On the margin of 16, under the connected row: the icon on the line's first row of text.
+  wait: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginHorizontal: 16, marginTop: 6 },
   // A column: the team's faces on top, then the line, its text and "Pelo endereço" (in a row the faces
   // took a third of the width and the text wrapped into a narrow block).
   empty: {
@@ -565,31 +625,29 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   hintText: { gap: 2 },
-  suggestions: { gap: 10, paddingHorizontal: 16 },
-  filters: { paddingBottom: 2 },
+  suggestions: { gap: 12, paddingHorizontal: 16 },
+  filters: { paddingBottom: 4 },
   // The app's card with its cut corner (no hairline box), as every card standing on the page.
-  card: {
+  card: { borderRadius: 20, borderBottomLeftRadius: 6 },
+  cardIn: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
+  cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
+  pressed: { opacity: 0.85 },
+  list: { paddingTop: 4 },
+  service: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderRadius: 20,
-    borderBottomLeftRadius: 6,
-    overflow: "hidden",
+    gap: ROW_GAP,
+    paddingHorizontal: ROW_SIDE,
+    paddingVertical: 10,
+    minHeight: 60,
   },
-  pressed: { opacity: 0.85 },
-  soon: { opacity: 0.55 },
-  band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
-  cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
-  // The lock stays on the first line of a two-line description, not between its lines.
-  tileText: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
-  tile: {
-    width: "48%",
-    flexGrow: 1,
-    gap: 6,
-    padding: 14,
-    borderRadius: 20,
-    borderBottomLeftRadius: 6,
+  // The hairline starts where the text does.
+  serviceLine: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    left: ROW_SIDE + ROW_MARK + ROW_GAP,
+    height: StyleSheet.hairlineWidth,
   },
   waitBadge: {
     position: "absolute",
@@ -602,7 +660,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  address: { marginHorizontal: 16, marginTop: 8 },
+  address: { marginHorizontal: 16, marginTop: 8, flexDirection: "row", alignItems: "center", overflow: "hidden" },
   addressText: { paddingLeft: 16 },
-  tileSpacer: { width: "48%", flexGrow: 1 },
 });

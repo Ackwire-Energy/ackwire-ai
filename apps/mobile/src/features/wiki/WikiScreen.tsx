@@ -30,8 +30,8 @@ import {
   Icon,
   IconButton,
   LineIcon,
+  ListRow,
   Locked,
-  PressScale,
   Row,
   SearchField,
   SectionHeader,
@@ -45,11 +45,12 @@ import { StarCard, StarStrip } from "../constellation/Constellation";
 import { aroundStar, wikiMap } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
+import { chooseAction } from "../settings/parts";
 import { Face } from "../shared/Face";
 import { FirstUse, useEmptyLook } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
-import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
+import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { foldersIn, searchWiki, wikiHome } from "./logic";
 import { openWikiAgents, openWikiTrash, useWikiBulkDelete } from "./WikiBulk";
@@ -69,9 +70,10 @@ export const openWikiLink = (title: string, page: WikiPageSummary | undefined) =
   page ? openWikiPage(page.slug) : newWikiPage({ title });
 
 /**
- * The wiki, pushed from Você: the large title, the search, Fixadas as cards with relief,
- * Editadas recentemente (who, agent alive, and when), Pastas, the pages at the root and what the agents read most;
- * "Nova página" floats at the bottom. `folder`: the same screen for one folder (its folders and pages).
+ * The wiki, pushed from Você, as Tarefas and Rotinas: the large title and the search, "+" (Nova página) in the bar
+ * and "…" for the rest (who sees it, the map of the pages, choosing pages, the trash). One list, each page once:
+ * Fixadas, Pastas (with how many pages), Páginas; every row a tile of 52 with its text at 80, who changed it last and
+ * when. `folder`: the same screen for one folder (its folders and pages).
  */
 export function WikiScreen({ folder = "" }: { folder?: string }) {
   const { t, i18n } = useTranslation();
@@ -87,6 +89,8 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const reads = useWikiReads(orgId, folder === "");
   const graph = useWikiGraph(orgId, folder === "");
   const [picked, setPicked] = useState<string | null>(null);
+  // The map of the pages, asked for from "…": the home is the list, the map is there when wanted.
+  const [showMap, setShowMap] = useState(false);
   // Choosing pages to delete them or set their agents at once.
   const [selecting, setSelecting] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -116,18 +120,22 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   // The home and the search's results cross-fade as a search starts and ends, and fade in when they load.
   const reduced = useReducedMotion();
   const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
-  const pageRow = (p: WikiPageSummary, i: number, sub?: string) => {
+  // Who changed it last and when; a pinned page says what it is about instead.
+  const byLine = (p: WikiPageSummary) => `${dir.nameOf(p.updatedBy)} · ${when(p.updatedAt)}`;
+  const pageRow = (p: WikiPageSummary, i: number, sub: string, icon?: "pin") => {
     const on = chosen.has(p.id);
     return (
-      <Row
+      <ListRow
         key={p.id}
         divider={i > 0}
-        leading={<PageTile page={p} />}
+        leading={<PageTile page={p} icon={icon} />}
         title={p.title}
-        {...(sub ? { subtitle: sub } : {})}
+        sub={sub}
+        subLines={1}
         {...(selecting
           ? {
-              meta: <Icon name={on ? "checkc" : "circle"} size={20} color={on ? c.ink : c.faint} />,
+              trailing: <Icon name={on ? "checkc" : "circle"} size={22} color={on ? c.ink : c.faint} />,
+              accessibilityState: { selected: on },
               onPress: () => {
                 const next = new Set(chosen);
                 if (on) next.delete(p.id);
@@ -135,57 +143,75 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
                 setChosen(next);
               },
             }
-          : { chevron: true, onPress: () => openWikiPage(p.slug) })}
+          : { onPress: () => openWikiPage(p.slug) })}
       />
     );
   };
   const inThisFolder = folder ? pages.filter((p) => inFolder(p, folder)).length : 0;
+  // Each page once: a pinned page is under Fixadas only.
+  const pinnedIds = new Set((home?.pinned ?? []).map((p) => p.id));
+  const loose = (home?.pages ?? []).filter((p) => !pinnedIds.has(p.id));
   const choosable = search ? found : (home?.pages ?? []);
+  const hasMap = Boolean(map && star && !folder && map.stars.length > 1);
+  // "…": what the home no longer shows, each a line of the system's list.
+  const menu = [
+    ...(choosesAudience
+      ? [
+          {
+            label: folder ? t("wiki.audience") : t("wiki.audienceRootTitle"),
+            onPress: () =>
+              router.push({ pathname: "/wiki-audience", params: folder ? { folder } : { root: "1" } }),
+          },
+        ]
+      : []),
+    ...(hasMap ? [{ label: t("mobile.wiki.map"), onPress: () => setShowMap((v) => !v) }] : []),
+    ...(writes && pages.length > 0 ? [{ label: t("wiki.bulk.select"), onPress: () => setSelecting(true) }] : []),
+    ...(!folder && writes ? [{ label: t("wiki.trash.title"), onPress: openWikiTrash }] : []),
+    ...(folder && writes
+      ? [
+          {
+            label: t("wiki.bulk.deleteFolder", { folder }),
+            destructive: true,
+            onPress: () =>
+              bulkDelete.ask(
+                { folder },
+                inThisFolder,
+                t("wiki.bulk.deleteFolderTitle", { folder, count: inThisFolder }),
+                goBack,
+              ),
+          },
+        ]
+      : []),
+  ];
   return (
     <View style={styles.fill}>
       <PushedLargeTitle
         title={title}
-        bottomInset={96}
+        bottomInset={selecting ? 96 : 24}
         right={
-          writes && pages.length > 0 ? (
-            selecting ? (
-              <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={stopSelecting} />
-            ) : (
-              <View style={styles.headActs}>
-                {folder ? (
-                  <IconButton
-                    icon="trash"
-                    label={t("wiki.bulk.deleteFolder", { folder })}
-                    disabled={bulkDelete.pending}
-                    onPress={() =>
-                      bulkDelete.ask(
-                        { folder },
-                        inThisFolder,
-                        t("wiki.bulk.deleteFolderTitle", { folder, count: inThisFolder }),
-                        goBack,
-                      )
-                    }
-                  />
-                ) : null}
-                <IconButton icon="checks" label={t("wiki.bulk.select")} onPress={() => setSelecting(true)} />
-              </View>
-            )
+          selecting ? (
+            <Button variant="secondary" size="sm" label={t("common.cancel")} onPress={stopSelecting} />
+          ) : writes || menu.length > 0 ? (
+            <View style={styles.headActs}>
+              {writes ? (
+                <IconButton
+                  icon="plus"
+                  label={t("wiki.newPage")}
+                  onPress={() => newWikiPage(folder ? { folder } : {})}
+                />
+              ) : null}
+              {menu.length > 0 ? (
+                <IconButton
+                  icon="more"
+                  label={t("mobile.wiki.more")}
+                  disabled={bulkDelete.pending}
+                  onPress={() => chooseAction(title, menu, t("common.cancel"))}
+                />
+              ) : null}
+            </View>
           ) : undefined
         }
       >
-        {folder ? null : (
-          <Text variant="subhead" tone="muted" style={styles.lead}>
-            {t("wiki.subtitle")}
-          </Text>
-        )}
-        {choosesAudience && !selecting ? (
-          <Row
-            leading={<Tile icon="eye" />}
-            title={folder ? t("wiki.audience") : t("wiki.audienceRootTitle")}
-            chevron
-            onPress={() => router.push({ pathname: "/wiki-audience", params: folder ? { folder } : { root: "1" } })}
-          />
-        ) : null}
         <View style={styles.search}>
           <SearchField
             value={q}
@@ -224,7 +250,9 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
               title={chosen.size ? t("wiki.bulk.selected", { count: chosen.size }) : t("wiki.bulk.select")}
               count={choosable.length}
             />
-            <Locked when={bulkDelete.pending}>{choosable.map((p, i) => pageRow(p, i, p.folder || undefined))}</Locked>
+            <Locked when={bulkDelete.pending}>
+              {choosable.map((p, i) => pageRow(p, i, p.folder || byLine(p)))}
+            </Locked>
           </>
         ) : search ? (
           found.length === 0 ? (
@@ -240,12 +268,12 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           ) : (
             <Animated.View key="found" {...fade}>
               <SectionHeader title={t("wiki.results", { count: found.length })} />
-              {found.map((p, i) => pageRow(p, i, p.folder || undefined))}
+              {found.map((p, i) => pageRow(p, i, p.folder || byLine(p)))}
             </Animated.View>
           )
         ) : home ? (
           <Animated.View key="home" {...fade}>
-            {map && star && !folder && map.stars.length > 1 ? (
+            {showMap && hasMap && map && star ? (
               <StarCard
                 label={t("mobile.wiki.map")}
                 count={pages.length}
@@ -264,82 +292,29 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             {home.pinned.length > 0 ? (
               <>
                 <SectionHeader title={t("wiki.pinnedPages")} count={home.pinned.length} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pins}>
-                  {home.pinned.map((p) => (
-                    <PinCard key={p.id} page={p} by={`${dir.nameOf(p.updatedBy)} · ${when(p.updatedAt)}`} />
-                  ))}
-                </ScrollView>
-              </>
-            ) : null}
-            {home.recent.length > 0 ? (
-              <>
-                <SectionHeader title={t("wiki.recent")} />
-                {home.recent.map((p, i) => (
-                  <Row
-                    key={p.id}
-                    divider={i > 0}
-                    leading={<PageTile page={p} />}
-                    title={p.title}
-                    below={<ByLine who={p.updatedBy} text={when(p.updatedAt)} />}
-                    chevron
-                    onPress={() => openWikiPage(p.slug)}
-                  />
-                ))}
+                {home.pinned.map((p, i) => pageRow(p, i, p.excerpt || byLine(p), "pin"))}
               </>
             ) : null}
             {home.folders.length > 0 ? (
               <>
                 <SectionHeader title={t("wiki.folders")} count={home.folders.length} />
                 {home.folders.map((f, i) => (
-                  <Row
+                  <ListRow
                     key={f.path}
                     divider={i > 0}
-                    leading={<Tile icon="archive" />}
+                    leading={<Tile icon="archive" size={ROW_TILE} />}
                     title={f.name}
-                    meta={
-                      <Text variant="subhead" tone="faint">
-                        {t("wiki.pageCount", { count: f.count })}
-                      </Text>
-                    }
-                    chevron
+                    sub={t("wiki.pageCount", { count: f.count })}
+                    subLines={1}
                     onPress={() => router.push({ pathname: "/wiki", params: { folder: f.path } })}
                   />
                 ))}
               </>
             ) : null}
-            {home.pages.length > 0 ? (
+            {loose.length > 0 ? (
               <>
-                <SectionHeader title={folder ? t("wiki.tree") : t("wiki.root")} count={home.pages.length} />
-                {home.pages.map((p, i) => pageRow(p, i, p.excerpt))}
-              </>
-            ) : null}
-            {!folder && writes ? (
-              <Row
-                leading={<Tile icon="trash" />}
-                title={t("wiki.trash.title")}
-                subtitle={t("wiki.trash.text")}
-                chevron
-                onPress={openWikiTrash}
-              />
-            ) : null}
-            {!folder && (reads.data ?? []).length > 0 ? (
-              <>
-                <SectionHeader title={t("wiki.topReads")} />
-                {(reads.data ?? []).slice(0, 5).map((r, i) => (
-                  <Row
-                    key={r.slug}
-                    divider={i > 0}
-                    leading={<Tile icon="file" />}
-                    title={r.title}
-                    meta={
-                      <Text variant="subhead" tone="faint">
-                        {t("mobile.wiki.reads", { count: r.total })}
-                      </Text>
-                    }
-                    chevron
-                    onPress={() => openWikiPage(r.slug)}
-                  />
-                ))}
+                <SectionHeader title={t("wiki.tree")} count={loose.length} />
+                {loose.map((p, i) => pageRow(p, i, byLine(p)))}
               </>
             ) : null}
           </Animated.View>
@@ -380,67 +355,19 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             />
           </View>
         </View>
-      ) : writes && !(tree.isSuccess && pages.length === 0) ? (
-        <PressScale
-          accessibilityRole="button"
-          accessibilityLabel={t("wiki.newPage")}
-          onPress={() => newWikiPage(folder ? { folder } : {})}
-          sink
-          style={[styles.fab, { backgroundColor: c.ink, bottom: insets.bottom + 16 }]}
-          contentStyle={styles.fabIn}
-        >
-          <Icon name="plus" size={18} color={c.bg} />
-          <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
-            {t("wiki.newPage")}
-          </Text>
-        </PressScale>
       ) : null}
     </View>
   );
 }
+
+/** The rows' tile, in the 52 column of a list row (the text at 80). */
+const ROW_TILE = 52;
 
 const inFolder = (p: WikiPageSummary, folder: string) => p.folder === folder || p.folder.startsWith(`${folder}/`);
 
-/** A page's tile: a lock when only admins edit it. */
-function PageTile({ page }: { page: Pick<WikiPageSummary, "locked"> }) {
-  return <Tile icon={page.locked ? "lock" : "file"} />;
-}
-
-/** Who changed it last (an agent alive) and when, under a row's title. */
-function ByLine({ who, text }: { who: WikiPageSummary["updatedBy"]; text: string }) {
-  const dir = useDirectory();
-  return (
-    <View style={styles.byline}>
-      <Face who={who} size={16} />
-      <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.grow}>
-        {dir.nameOf(who)} · {text}
-      </Text>
-    </View>
-  );
-}
-
-/** A pinned page as a card with relief: title, the opening text, who and when. */
-function PinCard({ page, by }: { page: WikiPageSummary; by: string }) {
-  const surface = useSurface();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => openWikiPage(page.slug)}
-      style={({ pressed }) => [styles.pin, surface, pressed && styles.pressed]}
-    >
-      <Text variant="label" tone="ink" numberOfLines={1}>
-        {page.title}
-      </Text>
-      {page.excerpt ? (
-        <Text variant="footnote" tone="muted" numberOfLines={2}>
-          {page.excerpt}
-        </Text>
-      ) : null}
-      <Text variant="caption" tone="faint" numberOfLines={1}>
-        {by}
-      </Text>
-    </Pressable>
-  );
+/** A page's tile: a lock when only admins edit it, a pin under Fixadas. */
+function PageTile({ page, icon }: { page: Pick<WikiPageSummary, "locked">; icon?: "pin" | undefined }) {
+  return <Tile icon={page.locked ? "lock" : (icon ?? "file")} size={ROW_TILE} />;
 }
 
 interface MenuItem {
@@ -1063,29 +990,13 @@ const styles = StyleSheet.create({
   loading: { marginVertical: 24 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  pins: { gap: 10, paddingHorizontal: 16, paddingBottom: 4 },
-  pin: { width: 210, borderRadius: 20, padding: 14, gap: 4 },
   pressed: { opacity: 0.85 },
   pressedWord: { opacity: 0.6 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   top: { alignItems: "flex-start" },
-  // On the buttons' ruler (48, `Button` md), its icon as theirs (18); 16 in from the edge, as the page's sides.
-  fab: {
-    position: "absolute",
-    right: 16,
-    height: 48,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },
-  fabIn: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 20 },
-  fabText: { fontWeight: "600" },
   headActs: { flexDirection: "row", gap: 4 },
   pickBar: {
     position: "absolute",

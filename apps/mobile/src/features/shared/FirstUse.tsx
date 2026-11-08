@@ -33,7 +33,7 @@ export function FirstUse({
   acts,
   label,
   onPress,
-  icon = "plus",
+  icon,
   busy = false,
   size = "page",
   look,
@@ -43,6 +43,7 @@ export function FirstUse({
   acts: boolean;
   label?: string | undefined;
   onPress?: (() => void) | undefined;
+  /** The button's words stand alone (no icon by default): the button ruler's one primary, at its full 48 height. */
   icon?: IconName;
   busy?: boolean;
   size?: EmptyStateProps["size"];
@@ -61,7 +62,16 @@ export function FirstUse({
       subtitle={t(copy.text)}
       {...(acts && label && onPress
         ? {
-            action: <Button variant="primary" size="sm" icon={icon} label={label} loading={busy} onPress={onPress} />,
+            action: (
+              <Button
+                variant="primary"
+                size="md"
+                {...(icon ? { icon } : {})}
+                label={label}
+                loading={busy}
+                onPress={onPress}
+              />
+            ),
           }
         : {})}
     />

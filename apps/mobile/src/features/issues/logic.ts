@@ -131,6 +131,35 @@ export function issueSections(
   return out;
 }
 
+/** The list's sections on the phone, in order: what waits on you, what moves, what waits to start, done today. */
+export type TaskListKey = "mine" | "in_progress" | "in_review" | "todo" | "doneToday";
+
+/**
+ * Tarefas as one list (the board is the other view): "Para você" first (what waits on you, then what is yours), then
+ * each open stage without what is already above, then what was finished today; each task once, empty sections left
+ * out. In a section, what waits on someone comes first, then what moves, then the board's order.
+ */
+export function taskListSections(
+  list: Issue[],
+  meId: string | null,
+  now = new Date(),
+): { key: TaskListKey; items: Issue[] }[] {
+  const mine = list.filter((i) => passesFilter(i, "mine", meId));
+  const taken = new Set(mine.map((i) => i.id));
+  const rank = (a: Issue, b: Issue) => urgency(a) - urgency(b) || byBoard(a, b);
+  const stage = (status: IssueStatus) => list.filter((i) => i.status === status && !taken.has(i.id)).sort(rank);
+  const today = toYmd(now);
+  const doneToday = list.filter((i) => i.status === "done" && toYmd(new Date(i.updatedAt)) === today);
+  const out: { key: TaskListKey; items: Issue[] }[] = [
+    { key: "mine", items: mine.sort(rank) },
+    { key: "in_progress", items: stage("in_progress") },
+    { key: "in_review", items: stage("in_review") },
+    { key: "todo", items: stage("todo") },
+    { key: "doneToday", items: doneToday },
+  ];
+  return out.filter((s) => s.items.length > 0);
+}
+
 /** The board's columns on the phone, always these four, so a swipe lands in the same place. */
 export const BOARD_STAGES: readonly IssueStatus[] = ["in_progress", "in_review", "todo", "done"];
 

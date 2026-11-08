@@ -129,3 +129,22 @@ export function startHref(
   if (place.kind === "channel") return `/chat/${place.channelId}`;
   return place.kind === "last" ? place.place : null;
 }
+
+/**
+ * The workspaces beyond the one open, for Você's workspace row (ADR 0154): how many more there are, over the
+ * servers signed in to, and on how many other servers they sit (0: all on this one). A server that didn't answer
+ * counts as another server with nothing known of it, so the row still says there is more elsewhere.
+ */
+export function workspacesBeyond(
+  groups: readonly { current: boolean; orgs: readonly { id: string }[]; failed: boolean }[],
+  openOrgId: string | null,
+): { others: number; servers: number } {
+  let others = 0;
+  let servers = 0;
+  for (const g of groups) {
+    const here = g.orgs.filter((o) => !(g.current && o.id === openOrgId)).length;
+    others += here;
+    if (!g.current && (here > 0 || g.failed)) servers += 1;
+  }
+  return { others, servers };
+}

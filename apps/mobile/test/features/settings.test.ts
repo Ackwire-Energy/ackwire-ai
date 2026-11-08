@@ -8,6 +8,7 @@ import { changedByText, changesSinceLink, skillPendingViews, skillUpdateWords } 
 import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
   agentComputerPick,
+  areaValues,
   exportFileName,
   grantCommand,
   isGithubSkillLink,
@@ -78,20 +79,20 @@ const preparing = (): SetupView =>
   ) as SetupView;
 
 describe("the workspace's settings on the phone: who opens what (the web's sub-nav)", () => {
-  test("in the web's order and groups", () => {
+  test("in the phone's four groups, each thing once", () => {
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
-      "you:apps",
       "org:general",
       "org:right_hand",
-      "org:members",
-      "org:roles",
-      "org:vault",
-      "org:audit",
       "org:media",
+      "people:members",
+      "people:roles",
+      "people:audit",
       "agents:access",
       "agents:connectors",
-      "agents:skills",
       "agents:computers",
+      "agents:vault",
+      "agents:skills",
+      "agents:apps",
       "costs:usage",
       "costs:keys",
       "costs:storage",
@@ -116,23 +117,23 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
     // their own plans' meters, in percentages (ADR 0063).
     // The Vault is every member's (ADR 0144): their own items, and the team's shared with them.
-    expect(ids(["read", "post"])).toEqual(["apps", "members", "vault", "connectors", "computers", "usage", "keys"]);
+    expect(ids(["read", "post"])).toEqual(["members", "connectors", "computers", "vault", "apps", "usage", "keys"]);
     expect(ids(["read", "manage_agents"])).toEqual([
-      "apps",
       "right_hand",
       "members",
-      "vault",
       "access",
       "connectors",
-      "skills",
       "computers",
+      "vault",
+      "skills",
+      "apps",
       "usage",
       "keys",
     ]);
     expect(ids(["read", "configure"])).toEqual(expect.arrayContaining(["general", "media", "storage"]));
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["apps", "connectors", "usage"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["connectors", "apps", "usage"]);
   });
 
   test("each section opens a screen the app has", () => {
@@ -148,10 +149,33 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       .filter((f) => f.endsWith(".tsx"))
       .map((f) => `settings/${f.replace(/\\/g, "/").replace(/\.tsx$/, "")}`);
     expect(routes.length).toBeGreaterThan(10);
-    // The workspace's settings page wears the cover bar, like Você's; the screens it opens scroll under the bar.
-    expect(layout).toContain(`name="settings/index" options={{ ...pushed, ...coverBarOptions }}`);
-    for (const route of routes.filter((r) => r !== "settings/index"))
-      expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
+    // The workspace's settings page sits on the grouped gray like the screens it opens: all scroll under the bar.
+    for (const route of routes) expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
+  });
+});
+
+describe("the workspace's page: one short value per row", () => {
+  test("a count or a state, never a sentence; nothing while an area loads or has nothing to count", async () => {
+    const t = await translator("pt-BR");
+    expect(
+      areaValues(t, "pt-BR", {
+        overview: { people: 5, agents: 4, budgetUsedPercent: 40 },
+        usesApi: true,
+        connectors: ["Planilhas", "E-mail"],
+        skills: 0,
+        computers: { count: 2, online: 1 },
+        keys: { manages: false, plans: 2 },
+      }),
+    ).toEqual({ members: "5", access: "4", usage: "40%", connectors: "2", computers: "1 de 2", keys: "2" });
+    // On plans alone the budget says nothing; nothing connected, no computer: no value at all.
+    expect(
+      areaValues(t, "pt-BR", {
+        overview: { people: 1, agents: 0, budgetUsedPercent: 0 },
+        usesApi: false,
+        connectors: [],
+        computers: { count: 0, online: 0 },
+      }),
+    ).toEqual({ members: "1", access: "0" });
   });
 });
 
@@ -563,9 +587,8 @@ test("Sobre o agentes.chat in Você: on every self-hosted server, old ones too; 
   expect(showsAbout(undefined)).toBe(false);
   const me = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", "MeScreen.tsx"), "utf8");
   expect(me).toContain("const about = showsAbout(useAuthConfig().data);");
-  expect(me).toContain(
-    '...(about ? [{ icon: "info" as const, label: t("settings.section.about"), href: "/me/about" }] : [])',
-  );
+  expect(me).toContain("{about ? (");
+  expect(me).toContain('onPress={() => open("/me/about")}');
 });
 
 test("Auditoria's row screen: the call's title in words, and what the tool said only in the technical group", () => {

@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, FlatList, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { authClient } from "@/lib/auth";
-import { useOrg } from "@/providers/org";
+import { useOrg, useOrgMaybe } from "@/providers/org";
 import {
   fieldText,
   GroupedField,
@@ -325,30 +325,47 @@ export function ZonePage() {
   );
 }
 
-/**
- * A time zone chosen on a screen of its own (Conta's Fuso, a routine's "Fuso horário"): the search, "Usar o fuso do
- * workspace" (`withWorkspace`: a pick of null), then the suggested zones and every other.
- */
-export function ZoneList({
-  title,
-  value,
-  withWorkspace = false,
-  onPick,
-}: {
+interface ZoneListProps {
   title: string;
   value: string | null;
   withWorkspace?: boolean;
   onPick: (zone: string | null) => void;
+}
+
+/**
+ * A time zone chosen on a screen of its own (Conta's Fuso, a routine's "Fuso horário", the first run's "Fuso"): the
+ * search, "Usar o fuso do workspace" (`withWorkspace`: a pick of null), then the suggested zones and every other.
+ * Inside a workspace its zone and its people's are suggested too; before there is one (the first run), the phone's.
+ */
+export function ZoneList(props: ZoneListProps) {
+  const org = useOrgMaybe();
+  return org ? <WorkspaceZoneList {...props} orgId={org.orgId} /> : <ZonePicker {...props} orgZone={null} people="" />;
+}
+
+/** In a workspace: its own zone and its people's suggested first. */
+function WorkspaceZoneList({ orgId, ...props }: ZoneListProps & { orgId: string }) {
+  const settings = useSettings(orgId);
+  const dir = useDirectory();
+  const people = [...dir.memberById.values()].map((m) => m.timezone).join(",");
+  return <ZonePicker {...props} orgZone={settings.data?.timezone ?? null} people={people} />;
+}
+
+function ZonePicker({
+  title,
+  value,
+  withWorkspace = false,
+  onPick,
+  orgZone,
+  people,
+}: ZoneListProps & {
+  orgZone: string | null;
+  /** The people's zones, comma-separated (a stable dependency). */
+  people: string;
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const org = useOrg();
-  const settings = useSettings(org.orgId);
-  const dir = useDirectory();
   const [query, setQuery] = useState("");
-  const orgZone = settings.data?.timezone ?? null;
-  const people = [...dir.memberById.values()].map((m) => m.timezone).join(",");
   const options = useMemo(() => {
     const suggested = [value ?? "", browserTimezone() ?? "", orgZone ?? "", ...people.split(","), "UTC"].filter(
       Boolean,

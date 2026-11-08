@@ -69,7 +69,8 @@ function AppStack() {
   useSendWaiting(orgId, useConnection(), () => toast({ title: t("mobile.chat.notSent"), icon: "x" }));
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
-  const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
+  // A request reads as grouped facts (its white groups on the sheet's gray), as the system's own sheets do.
+  const approvalSheet = useFormSheetOptions([0.64, 1]);
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
@@ -190,8 +191,9 @@ function AppStack() {
       <Stack.Screen name="me/language" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/about" options={{ ...pushed, ...scrollUnder }} />
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
-      <Stack.Screen name="settings/index" options={{ ...pushed, ...coverBarOptions }} />
+      <Stack.Screen name="settings/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/right-hand" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />

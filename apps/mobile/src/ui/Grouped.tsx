@@ -9,8 +9,11 @@ import { ToggleSwitch } from "./Toggle";
 import { motion, useTheme } from "./theme";
 import { leadBox } from "./type-scale";
 
-/** The leading column of a row with a face or a mark: whatever leads is centered in it. */
-const LEAD = 32;
+/**
+ * The leading column of a row with a face or a mark: whatever leads is centered in it. As wide as a framed face (36,
+ * the smaller of the two framed sizes), so a face never spills into the gap before the text.
+ */
+const LEAD = 36;
 /** A row's icon tile; its corner is 30% of it, as every tile's. */
 const TILE = 28;
 
@@ -18,6 +21,18 @@ const TILE = 28;
 const ROW_IN = FadeIn.duration(motion.fast);
 const ROW_OUT = FadeOut.duration(motion.fast);
 const SLIDE = LinearTransition.duration(motion.base);
+
+/**
+ * Whether a row of the list has a leading column (an icon's tile, a face): read off the row itself, or off the row a
+ * swipe (`SwipeRow`) or an opaque view wraps, so a swipeable row keeps its hairline where the others start.
+ */
+function leads(props: unknown, depth = 0): boolean {
+  if (!props || typeof props !== "object" || depth > 2) return false;
+  const p = props as { icon?: unknown; leading?: unknown; children?: unknown };
+  if (p.icon || p.leading) return true;
+  const inner = isValidElement(p.children) ? p.children.props : null;
+  return inner ? leads(inner, depth + 1) : false;
+}
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
@@ -49,11 +64,7 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                   {
                     backgroundColor: c.line2,
                     // A tile and a face share one leading column, so the text and its hairline start at one place.
-                    marginLeft:
-                      (child.props as { icon?: unknown; leading?: unknown }).icon ||
-                      (child.props as { leading?: unknown }).leading
-                        ? 14 + LEAD + 12
-                        : 14,
+                    marginLeft: leads(child.props) ? 14 + LEAD + 12 : 14,
                   },
                 ]}
               />
@@ -114,6 +125,11 @@ export interface GroupedRowProps {
   value?: string;
   /** Drawn just before the value (a picked agent's face, a format's glyph). */
   valueLeading?: ReactNode;
+  /**
+   * The value changes in its row through the system's choice (an action list), not on a screen: the small up-down
+   * mark after the value, where a chevron would be.
+   */
+  menu?: boolean;
   /** A chevron: it opens a screen. */
   chevron?: boolean;
   /** Three dots: it opens a sheet of actions. */
@@ -162,6 +178,7 @@ function Row({
   value,
   valueLeading,
   chevron = false,
+  menu = false,
   more = false,
   checked,
   toggle,
@@ -213,7 +230,7 @@ function Row({
       ]}
     >
       {/* One column for whatever leads (an icon's tile, a 24 to 36 face, a mark): the text, and the hairline above,
-          start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
+          start at 62 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
         <View style={styles.lead}>
           <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
@@ -252,6 +269,11 @@ function Row({
           <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
             {value}
           </Text>
+        </View>
+      ) : null}
+      {menu ? (
+        <View style={onLine(14)}>
+          <Icon name="swap" size={14} color={c.faint} />
         </View>
       ) : null}
       {after}

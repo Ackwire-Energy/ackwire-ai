@@ -34,6 +34,7 @@ import { DockText } from "./EdgeDock";
 import { offersSwitch, type PhoneStage, phoneStage, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
+import { usePickComputer } from "./usePickComputer";
 
 /** How often the screen's state is asked while no page shows; the page has a stream of its own. */
 const POLL_MS = 5_000;
@@ -118,6 +119,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const machine = view.machine;
   const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
+  const pickComputer = usePickComputer(agentId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
   // What leaving hands back: the agent's browser or screen in this person's hands.
   const mine = f?.handoff && controlledBy(f.handoff, f.userId) ? f.handoff : null;
@@ -253,12 +255,13 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");
-    // The phone has no computer picker: who may choose one is told where.
+    // Who may choose one does it here, on the screen's own capsule, never sent to the website.
     body = (
       <Cover
-        icon="computerLinux"
+        art={<AgentFace agentId={agentId} size={44} framed={false} live={false} mode="rest" />}
         text={t("agentComputer.state.noComputer", g)}
-        help={manages ? t("agentComputer.phone.chooseOnWeb") : undefined}
+        {...(pickComputer ? { help: t("mobile.computer.pickHelp") } : {})}
+        action={pickComputer ? <DockText label={t("mobile.computer.pick")} onPress={pickComputer} /> : null}
       />
     );
   } else if (stage === "noScreen") {

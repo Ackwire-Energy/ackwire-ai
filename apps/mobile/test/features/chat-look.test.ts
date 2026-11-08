@@ -123,7 +123,7 @@ describe("the rows follow the same choice as the web", () => {
   });
 
   test("Você opens Conversa, which saves on the server", async () => {
-    expect(await read("me/MeScreen.tsx")).toContain('href: "/me/chat-look"');
+    expect(await read("me/MeScreen.tsx")).toContain('onPress={() => open("/me/chat-look")}');
     const page = await read("me/ChatLookPage.tsx");
     expect(page).toContain("useSetChatPrefs(orgId)");
     expect(page).toContain("save(dm ? { dmStyle: s } : { channelStyle: s })");
