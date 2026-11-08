@@ -274,7 +274,7 @@ describe("a file's link pasted in a message", () => {
     });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
-    const pill = screen().getByRole("button", { name: `Arquivo ${doc.title}` });
+    const pill = screen().getByRole("link", { name: `Arquivo ${doc.title}` });
     expect(pill.textContent).toBe(doc.title);
     expect(document.body.textContent).not.toContain("/api/app/organizations");
     await click(pill);

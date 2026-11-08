@@ -3458,33 +3458,22 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   font-weight: 600;
 }
-/* An internal id in a text, as what it names (IdRef): laid out as a known service's pill (.link-pill below), its words
-   wrapping like the ones around it and its icon in the padding, never ending a line alone. */
-.id-ref {
+/* A file's pill (FilePill: a file's link or its id) and what else an id names (IdRef: a task, the pill while it loads):
+   laid out as a known service's pill (.link-pill below), its words wrapping like the ones around it and its icon in the
+   padding, never ending a line alone. */
+.id-ref,
+.file-ref {
   position: relative;
   padding-left: calc(1em + 6px);
   overflow-wrap: break-word;
 }
-.id-ref > .ac-icon {
+.id-ref > .ac-icon,
+.file-ref > .ac-icon {
   position: absolute;
   top: 0.27em;
   left: 3px;
   width: 1em;
   height: 1em;
-}
-/* A file's link (FileRef): the #channel pill, its name wrapping like the words around it, led by the file's 14px icon in
-   its padding as LinkPill's logo is (below), so the icon never ends a line alone. At 0.3em its middle sits on the
-   capitals' middle within a pixel, measured both as the chat's button and as the link it is outside a viewer. */
-.file-ref {
-  position: relative;
-  padding-left: 20px;
-  white-space: normal;
-  overflow-wrap: break-word;
-}
-.file-ref > .ac-icon {
-  position: absolute;
-  top: 0.3em;
-  left: 3px;
 }
 /* A known service's address (LinkPill): the #channel pill, led by the service's logo. Its words wrap like the ones around
    it, so a long repository or title never pushes past a narrow bubble; `break-word`, not `anywhere`, which would let a

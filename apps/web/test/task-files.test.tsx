@@ -58,7 +58,7 @@ describe("an internal id in a text is the pill of what it names", () => {
     );
     await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
     await settle(8);
-    const file = within(row()).getByRole("link", { name: "Abrir print.png" });
+    const file = within(row()).getByRole("link", { name: "Arquivo print.png" });
     expect(file.textContent).toBe("print.png");
     const task = within(row()).getByRole("link", { name: "#131 Widget flutuante" });
     expect(task.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/131`);
@@ -74,7 +74,7 @@ describe("an internal id in a text is the pill of what it names", () => {
       api: createFakeApi(said(withRefs(), `O print \`${FILE}\` e o pedido \`${OTHER}\`.`)),
     });
     await settle(8);
-    expect(within(row()).getByRole("link", { name: "Abrir print.png" }).textContent).toBe("print.png");
+    expect(within(row()).getByRole("link", { name: "Arquivo print.png" }).textContent).toBe("print.png");
     expect(row().textContent).not.toContain(FILE);
     expect(row().querySelector("code")?.textContent).toBe(OTHER);
   });
@@ -97,7 +97,7 @@ describe("an internal id in a text is the pill of what it names", () => {
     await renderApp(`/org/${ORG_ID}/issues/131`, { api });
     await settle(8);
     const description = document.querySelector(".issue-description") ?? document.body;
-    expect(within(description as HTMLElement).getByRole("link", { name: "Abrir print.png" })).not.toBeNull();
+    expect(within(description as HTMLElement).getByRole("link", { name: "Arquivo print.png" })).not.toBeNull();
     expect(description.textContent).not.toContain(FILE);
   });
 });

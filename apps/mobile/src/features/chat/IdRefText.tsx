@@ -1,20 +1,20 @@
 import { useIdRef } from "@agenteschat/client";
-import { router } from "expo-router";
 import type { ReactElement } from "react";
-import { useTranslation } from "react-i18next";
 import { Text as RNText, StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Icon } from "@/ui";
+import { router } from "@/ui/navigation";
 import { useColors } from "../shared/hooks";
+import { FilePillText } from "./FileRefText";
 import { MessageRefText } from "./MessageRefText";
 
 /**
- * An internal id written in a text (the web's `IdRef`), as the pill of what it names for this reader: a file (opens it),
- * a task ("#13 title", opens it), a message (its link's pill). While it loads, a quiet pill, so the id never shows on
- * its way to its name; one that names nothing the reader sees stays as written (`shown`, a code span's when it was one).
+ * An internal id written in a text (the web's `IdRef`), as the pill of what it names for this reader: a file (its
+ * `FilePillText`, as a file's link shows it), a task ("#13 title", opens it), a message (its link's pill). While it
+ * loads, a quiet pill, so the id never shows on its way to its name; one that names nothing the reader sees stays as
+ * written (`shown`, a code span's when it was one).
  */
 export function IdRefText({ id, shown }: { id: string; shown: ReactElement }) {
-  const { t } = useTranslation();
   const c = useColors();
   const { orgId } = useOrg();
   const query = useIdRef(orgId, id);
@@ -35,17 +35,14 @@ export function IdRefText({ id, shown }: { id: string; shown: ReactElement }) {
       />
     );
   }
-  const file = ref.kind === "file";
+  if (ref.kind === "file") return <FilePillText orgId={orgId} id={ref.id} title={ref.title} />;
   return (
     <RNText
       accessibilityRole="link"
-      accessibilityLabel={file ? t("artifacts.open", { title: ref.title }) : undefined}
-      onPress={() =>
-        file ? router.push({ pathname: "/file/[id]", params: { id: ref.id } }) : router.push(`/issues/${ref.number}`)
-      }
+      onPress={() => router.push(`/issues/${ref.number}`)}
       style={[styles.ref, { backgroundColor: c.sunken, color: c.ink }]}
     >
-      <Icon name={file ? "doc" : "issue"} size={14} color={c.ink} /> {file ? ref.title : `#${ref.number} ${ref.title}`}
+      <Icon name="issue" size={14} color={c.ink} /> {`#${ref.number} ${ref.title}`}
     </RNText>
   );
 }
