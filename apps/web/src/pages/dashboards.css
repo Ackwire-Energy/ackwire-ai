@@ -524,13 +524,9 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
   line-height: 18px;
   color: var(--ink);
 }
-.nwc__stale > .ac-icon {
-  flex: none;
+/* Its icon on the first line of the words (`.ac-iconline`), which take the ActionRow's width. */
+.nwc__stale .ac-iconline > .ac-icon {
   color: var(--warn);
-}
-.nwc__stale > span {
-  flex: 1;
-  min-width: 0;
 }
 .nwc__stale .ac-btn {
   flex: none;

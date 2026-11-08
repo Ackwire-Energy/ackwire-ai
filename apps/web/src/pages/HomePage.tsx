@@ -117,15 +117,23 @@ export function HomePage() {
       />
 
       {showSteps && lodi && (
-        <Link className="home-continue" to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: lodi.id }}>
-          <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-          <span className="home-continue__text">
+        <Link
+          className="home-continue ac-mediarow ac-mediarow--row"
+          to="/org/$orgId/dm/agent/$agentId"
+          params={{ orgId: org.id, agentId: lodi.id }}
+        >
+          <span className="ac-mediarow__face">
+            <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
+          </span>
+          <span className="ac-mediarow__head">
             {t("home.firstRun", {
               done: firstRun.steps.filter((s) => firstRun.done.has(s)).length,
               total: firstRun.steps.length,
             })}
           </span>
-          <Icon name="chevronRight" size={16} />
+          <span className="ac-mediarow__end">
+            <Icon name="chevronRight" size={16} />
+          </span>
         </Link>
       )}
 

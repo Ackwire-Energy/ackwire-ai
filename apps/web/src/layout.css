@@ -1161,17 +1161,15 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   flex: 1;
   min-width: 0;
 }
-/* Canais arquivados: the rows alone, a channel's long name wrapping where it can't break. */
+/* Canais arquivados: the rows alone, each a MediaRow (the kit's `.ac-mediarow`): the channel's mark and name on one line
+   with Restaurar at its end, when it was archived under them. */
 .archived-channels {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.archived-channels .member-row {
+.archived-channels__row {
   padding-block: var(--space-2);
-}
-.archived-channels .list-col b {
-  overflow-wrap: anywhere;
 }
 .member-row__you {
   display: inline-flex;
@@ -3566,10 +3564,18 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   white-space: normal;
   overflow-wrap: break-word;
 }
-/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. */
+/* Sideways on a phone: the name column stops short of the screen's edge, so a level shows beside it. There an agent's
+   face goes over its name and role: beside them, in that column, it owned a column of three lines. */
 @media (max-width: 760px) {
   .level-matrix th:first-child {
     width: 45%;
+  }
+  .level-matrix__agent {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .level-matrix__agent > :first-child {
+    translate: none;
   }
 }
 .level-matrix__head .connector-icon {
@@ -7551,7 +7557,11 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 }
 
 /* Settings → Computadores: a MediaRow each, the portrait (drawn at whole pixels, 48 tall) and the name on one line,
-   what it is under them. */
+   what it is under them. A row's button (Usar o computador deste servidor, a tool's Desligar) goes under its words by
+   the list's width, not the window's. */
+.machine-list {
+  container-type: inline-size;
+}
 .machine-row {
   --mediarow-face: 48px;
 }
@@ -8011,6 +8021,27 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   justify-content: flex-end;
   gap: 2px;
   margin-right: 10px;
+}
+/* On a phone a profile's name and state take the row: beside the people, the count and the actions they were squeezed
+   to a letter a line. Those go on the line under them, the actions at its end. */
+@media (max-width: 640px) {
+  .pf-list {
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+  }
+  .pf-list > .machine-page__agent-row > .machine-page__agent {
+    grid-column: 1 / -1;
+  }
+  .pf-list .pf-stack {
+    justify-self: start;
+    padding: 0 8px 10px 14px;
+  }
+  .pf-list .pf-count {
+    padding-bottom: 10px;
+  }
+  .pf-list .pf-acts {
+    justify-self: end;
+    padding-bottom: 10px;
+  }
 }
 .machine-page__agent {
   flex: 1;

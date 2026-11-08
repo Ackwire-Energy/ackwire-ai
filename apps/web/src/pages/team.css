@@ -97,9 +97,11 @@
 .team-table__menu {
   width: 1%;
 }
+/* Its rows are MediaRows (the kit's `.ac-mediarow`): Restaurar and Apagar go under the name by the card's width. */
 .team-archived {
   gap: 0;
   padding: 8px;
+  container-type: inline-size;
 }
 .team-archived__head {
   display: flex;
@@ -112,8 +114,12 @@
   font-size: 14px;
   font-weight: 650;
 }
-.team-archived .member-row {
-  margin: 0;
+.team-archived__row {
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+.team-archived__row:hover {
+  background: var(--plate-soft);
 }
 
 /* A card in the org chart and on the map: a face, a name, a muted line. */

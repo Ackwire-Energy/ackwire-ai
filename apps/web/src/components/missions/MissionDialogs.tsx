@@ -265,28 +265,32 @@ export function NewMissionDialog({
               {blocked
                 .filter((a) => a.canManage)
                 .map((a) => (
-                  <li key={a.id} className="mi-blocked__row">
-                    <AgentAvatar agentId={a.id} name={a.name} size="xs" />
-                    <span className="mi-blocked__text">
+                  <li key={a.id} className="mi-blocked__row ac-mediarow ac-mediarow--row">
+                    <span className="ac-mediarow__face">
+                      <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                    </span>
+                    <span className="ac-mediarow__head">
                       <b>{a.name}</b>
-                      <span>
-                        {cloud && (a.reason ?? "no_computer") === "no_computer"
-                          ? waitWords
-                          : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
-                              computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
-                            })}
-                      </span>
+                    </span>
+                    <span className="ac-mediarow__body mi-blocked__text">
+                      {cloud && (a.reason ?? "no_computer") === "no_computer"
+                        ? waitWords
+                        : t(`missions.new.reason.${a.reason ?? "no_computer"}`, {
+                            computer: computerNameOf(t, org.name, a.machine?.name ?? ""),
+                          })}
                     </span>
                     {!cloud && (
-                      <Link
-                        className="ac-link mi-lnk"
-                        to="/org/$orgId/agents/$agentId"
-                        params={{ orgId: org.id, agentId: a.id }}
-                        search={{ tab: "settings", sec: "computer" }}
-                        onClick={() => onOpenChange(false)}
-                      >
-                        {t("missions.new.connect")}
-                      </Link>
+                      <span className="ac-mediarow__end">
+                        <Link
+                          className="ac-link mi-lnk"
+                          to="/org/$orgId/agents/$agentId"
+                          params={{ orgId: org.id, agentId: a.id }}
+                          search={{ tab: "settings", sec: "computer" }}
+                          onClick={() => onOpenChange(false)}
+                        >
+                          {t("missions.new.connect")}
+                        </Link>
+                      </span>
                     )}
                   </li>
                 ))}

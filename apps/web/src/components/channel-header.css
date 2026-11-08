@@ -166,10 +166,11 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
     height: 18px;
   }
   /* Threads, pins and the settings move to the members sheet's head (the cog stays when there's no sheet to open); the
-     search takes the whole screen. */
+     search takes the whole screen, from its icon, a DM's too (its field stands in the header itself). */
   .channel__acts > .channel__threads,
   .channel__acts > .channel__pin,
-  .channel__acts > .channel__search {
+  .channel__acts > .channel__search,
+  .channel__header > .channel__search {
     display: none;
   }
   .channel__acts:has(.channel__members-toggle) > .channel__cog {

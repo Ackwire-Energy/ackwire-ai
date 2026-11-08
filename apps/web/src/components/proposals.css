@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+/* Its rows' buttons (a member change's Aplicar) go under their words by the list's width: a thread is narrow too. */
 .proposal-rows {
   margin: 0;
   padding: 0;
@@ -11,6 +12,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  container-type: inline-size;
 }
 /* A MediaRow: the face, the name and its switch on one line, what changes under them. */
 .proposal-row {

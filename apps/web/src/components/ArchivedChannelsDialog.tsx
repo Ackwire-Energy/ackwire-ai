@@ -31,23 +31,27 @@ export function ArchivedChannelsDialog({ open, onClose }: { open: boolean; onClo
         ) : (
           <ul className="archived-channels" aria-label={t("channel.archivedTitle")}>
             {channels.map((c) => (
-              <li key={c.id} className="member-row">
-                <Icon name={c.visibility === "private" ? "lock" : "channel"} size={16} />
-                <span className="list-col">
-                  <b>#{c.name}</b>
-                  <span className="small muted">
-                    {t("channel.archivedOn", { date: formatShortDate(i18n.language, c.archivedAt) })}
-                  </span>
+              <li key={c.id} className="archived-channels__row ac-mediarow ac-mediarow--row">
+                <span className="ac-mediarow__face">
+                  <Icon name={c.visibility === "private" ? "lock" : "channel"} size={16} />
                 </span>
-                <Button
-                  size="sm"
-                  icon="undo"
-                  aria-label={t("channel.restoreName", { channel: c.name })}
-                  disabled={restore.pending}
-                  onClick={() => back(c)}
-                >
-                  {t("channel.restore")}
-                </Button>
+                <span className="ac-mediarow__head">
+                  <b>#{c.name}</b>
+                </span>
+                <span className="ac-mediarow__body small muted">
+                  {t("channel.archivedOn", { date: formatShortDate(i18n.language, c.archivedAt) })}
+                </span>
+                <span className="ac-mediarow__end">
+                  <Button
+                    size="sm"
+                    icon="undo"
+                    aria-label={t("channel.restoreName", { channel: c.name })}
+                    disabled={restore.pending}
+                    onClick={() => back(c)}
+                  >
+                    {t("channel.restore")}
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>
