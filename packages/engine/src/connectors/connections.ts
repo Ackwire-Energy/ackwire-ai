@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
-import { recordAudit } from "../audit";
+import { type AuditEntry, recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { forgetInstallationTokens } from "../git/github-app";
 import type { ResolveHost } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { CONNECTOR_ALL } from "../tools/scopes";
@@ -17,7 +18,7 @@ import { clientAuth, getOAuthClient, type McpOAuthDeps, probeMcpServer } from ".
 import { oauthReturnTo } from "./oauth-return";
 import { presetForServer } from "./presets";
 
-const { connectorConnections, oauthStates, agentScopes, agents, approvalRules } = schema;
+const { connectorConnections, oauthStates, agentScopes, agents, approvalRules, githubAppInstallations } = schema;
 
 export type ConnectorConnection = typeof connectorConnections.$inferSelect;
 
@@ -295,7 +296,11 @@ async function storeConnection(
     if (!previous) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
     caches.connections.delete(`${input.orgId}:active`);
     caches.scopes.deletePrefix(`${input.orgId}:`);
-    return { connection: row, outcome: previous ? "reconnected" : "connected" };
+    // Over GitHub through the app alone, an account is a first connection to people: never a "Reconectar".
+    return {
+      connection: row,
+      outcome: previous && previous.authType !== GITHUB_APP_AUTH ? "reconnected" : "connected",
+    };
   });
 }
 
@@ -404,6 +409,8 @@ export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, conne
 /**
  * Disconnects: the secret stays sealed but unused; agents lose the connection's scopes and its "Aprovar sempre" rules.
  * A service through Composio: Composio then drops the account (`composio`), best effort, never revoking it there.
+ * GitHub (ADR 0153): an account's connection in a workspace with GitHub App installations becomes GitHub through the
+ * app alone (same row, its secret cleared, grants and rules kept); GitHub through the app alone unbinds them all.
  */
 export async function revokeConnection(
   db: Database,
@@ -413,33 +420,149 @@ export async function revokeConnection(
   composio?: Pick<ComposioConnectors, "client"> | null,
 ) {
   await requirePermission(db, actorId, orgId, "manage_connectors");
-  const gone = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(connectorConnections)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(connectorConnections.id, connectionId),
-          eq(connectorConnections.orgId, orgId),
-          isNull(connectorConnections.revokedAt),
-        ),
-      )
-      .returning();
-    if (!row) throw new NotFoundError("Connection not found");
-    await tx.delete(agentScopes).where(eq(agentScopes.connectionId, connectionId));
-    await tx.delete(approvalRules).where(eq(approvalRules.connectionId, connectionId));
-    await recordAudit(tx, {
-      orgId,
-      actor: { type: "person", id: actorId },
-      action: "connector.disconnected",
-      target: { type: "connector", id: connectionId },
-      details: { connector: row.connector, label: row.label },
-    });
-    return row;
+  const actor = { type: "person" as const, id: actorId };
+  const { gone, unbound } = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(connectorConnections)
+      .where(and(eq(connectorConnections.id, connectionId), activeOf(orgId)))
+      .for("update");
+    if (!current) throw new NotFoundError("Connection not found");
+    const accounts = current.connector === "github" ? await installationAccounts(tx, orgId) : [];
+    if (accounts.length > 0 && current.authType !== GITHUB_APP_AUTH) {
+      await tx
+        .update(connectorConnections)
+        .set({ ...APP_ALONE, accountLabel: accounts.join(", "), updatedAt: new Date() })
+        .where(eq(connectorConnections.id, current.id));
+      await recordAudit(tx, {
+        orgId,
+        actor,
+        action: "connector.disconnected",
+        target: { type: "connector", id: connectionId },
+        details: { connector: current.connector, label: current.label, kept: GITHUB_APP_AUTH },
+      });
+      return { gone: null, unbound: [] };
+    }
+    const unbound =
+      current.authType === GITHUB_APP_AUTH
+        ? await tx
+            .delete(githubAppInstallations)
+            .where(eq(githubAppInstallations.orgId, orgId))
+            .returning({ id: githubAppInstallations.id, installationId: githubAppInstallations.installationId })
+        : [];
+    for (const i of unbound) {
+      await recordAudit(tx, {
+        orgId,
+        actor,
+        action: "github_app.removed",
+        target: { type: "github_app_installation", id: i.id },
+        details: { installationId: i.installationId },
+      });
+    }
+    return { gone: await dropConnection(tx, orgId, current, actor), unbound };
   });
+  for (const i of unbound) forgetInstallationTokens(i.installationId);
   caches.connections.delete(`${orgId}:active`);
   caches.scopes.deletePrefix(`${orgId}:`);
-  if (gone.composioAccountId && composio) await forgetComposioAccount(composio.client, gone.composioAccountId);
+  if (gone?.composioAccountId && composio) await forgetComposioAccount(composio.client, gone.composioAccountId);
+}
+
+/** Revokes a live connection in the caller's transaction: agents lose its scopes and its "Aprovar sempre" rules. */
+async function dropConnection(tx: Executor, orgId: string, row: ConnectorConnection, actor: AuditEntry["actor"]) {
+  await tx.update(connectorConnections).set({ revokedAt: new Date() }).where(eq(connectorConnections.id, row.id));
+  await tx.delete(agentScopes).where(eq(agentScopes.connectionId, row.id));
+  await tx.delete(approvalRules).where(eq(approvalRules.connectionId, row.id));
+  await recordAudit(tx, {
+    orgId,
+    actor,
+    action: "connector.disconnected",
+    target: { type: "connector", id: row.id },
+    details: { connector: row.connector, label: row.label },
+  });
+  return row;
+}
+
+/** `auth_type` of GitHub through the workspace's GitHub App installations alone (ADR 0153): no secret of its own. */
+export const GITHUB_APP_AUTH = "github_app";
+
+/** What a GitHub connection keeps of an account once only the app is left. */
+const APP_ALONE = {
+  authType: GITHUB_APP_AUTH,
+  secretCiphertext: null,
+  wrappedDataKey: null,
+  kekId: null,
+  tokenExpiresAt: null,
+  accountId: null,
+  oauthClientId: null,
+  resource: null,
+  oauthScopes: null,
+  refreshingUntil: null,
+};
+
+/** The GitHub accounts of the workspace's GitHub App installations, in the order they were bound. */
+async function installationAccounts(tx: Executor, orgId: string) {
+  const rows = await tx
+    .select({ login: githubAppInstallations.accountLogin })
+    .from(githubAppInstallations)
+    .where(eq(githubAppInstallations.orgId, orgId))
+    .orderBy(asc(githubAppInstallations.createdAt));
+  return rows.map((r) => r.login);
+}
+
+/**
+ * Keeps the workspace's GitHub connection in step with its GitHub App installations (ADR 0153), in the caller's
+ * transaction: with installations and no GitHub connection, the app alone is one, made by the person binding it
+ * (every agent's, like any first connection: grants, rules and the git proxy work as with an account's); a row of the
+ * app alone names their accounts, and ends with the last one, as disconnecting does. An account's own connection is
+ * left as it is: the app's tokens are used where it is installed anyway.
+ */
+export async function syncGitHubAppConnection(
+  tx: Executor,
+  orgId: string,
+  actor: AuditEntry["actor"],
+  oauthApps?: OAuthApps,
+) {
+  const accounts = await installationAccounts(tx, orgId);
+  const [current] = await tx
+    .select()
+    .from(connectorConnections)
+    .where(and(activeOf(orgId), eq(connectorConnections.connector, "github")))
+    .for("update");
+  const label = accounts.join(", ");
+  if (current && current.authType !== GITHUB_APP_AUTH) return;
+  if (current && accounts.length === 0) await dropConnection(tx, orgId, current, actor);
+  else if (current && current.accountLabel !== label) {
+    await tx
+      .update(connectorConnections)
+      .set({ accountLabel: label, updatedAt: new Date() })
+      .where(eq(connectorConnections.id, current.id));
+  } else if (!current && accounts.length > 0 && actor.type === "person" && actor.id) {
+    const def = connectorDefinition("github");
+    const [row] = await tx
+      .insert(connectorConnections)
+      .values({
+        orgId,
+        connector: def.id,
+        label: await freeLabel(tx, orgId, def.label),
+        toolPrefix: await freeToolPrefix(tx, orgId, def.id, oauthApps, def.id),
+        serverUrl: def.serverUrl,
+        authType: GITHUB_APP_AUTH,
+        accountLabel: label,
+        createdByUserId: actor.id,
+      })
+      .returning();
+    if (!row) throw new Error("connection insert returned nothing");
+    await recordAudit(tx, {
+      orgId,
+      actor,
+      action: "connector.connected",
+      target: { type: "connector", id: row.id },
+      details: { connector: def.id, label: row.label, auth: GITHUB_APP_AUTH },
+    });
+    await grantToEveryAgent(tx, orgId, actor.id, row);
+  } else return;
+  caches.connections.delete(`${orgId}:active`);
+  caches.scopes.deletePrefix(`${orgId}:`);
 }
 
 export async function activeConnections(db: Database, orgId: string) {

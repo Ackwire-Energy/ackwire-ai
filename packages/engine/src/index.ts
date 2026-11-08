@@ -122,6 +122,7 @@ export * from "./git/branches";
 export * from "./git/credential";
 export * from "./git/github-app";
 export * from "./git/github-app-installs";
+export * from "./git/github-app-settings";
 export * from "./git/inflate";
 export * from "./git/machine";
 export * from "./git/pack";

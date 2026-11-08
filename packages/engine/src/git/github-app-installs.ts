@@ -1,12 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { recordAudit } from "../audit";
-import { OAUTH_STATE_TTL_MS } from "../connectors/connections";
+import { type AuditEntry, recordAudit } from "../audit";
+import { OAUTH_STATE_TTL_MS, type OAuthApps, syncGitHubAppConnection } from "../connectors/connections";
+import { desktopReturnPath, isDesktopReturn, oauthReturnTo } from "../connectors/oauth-return";
 import { randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
-import { forgetInstallationTokens, type GitHubAppConfig, type GitHubHttp } from "./github-app";
+import {
+  forgetInstallationTokens,
+  type GitHubAppConfig,
+  type GitHubHttp,
+  installationStatus,
+  uninstallInstallation,
+} from "./github-app";
+import { forgetOrgRepositories } from "./repo-listing";
 
 const { githubAppInstallations, oauthStates } = schema;
 
@@ -18,14 +26,22 @@ export type GitHubAppInstallation = typeof githubAppInstallations.$inferSelect;
 export interface GitHubAppInstallDeps {
   db: Database;
   keyWrappers: KeyWrapper[];
+  /** The server's GitHub App now (env or Settings), read on every call. */
   app: GitHubAppConfig | null;
+  /** The connectors' OAuth apps: a first installation's GitHub connection takes the catalog's tool names. */
+  oauthApps?: OAuthApps;
   /** GitHub's REST API; the OAuth code exchange goes to `webUrl` (tests: fakes). */
   http?: GitHubHttp & { webUrl?: string };
   now?: () => Date;
 }
 
-export const githubAppCallbackUri = (publicUrl: string) =>
-  `${publicUrl.replace(/\/$/, "")}/api/app/github-app/callback`;
+/** GitHub's page of an installation, where its account's admins pick the repositories it reaches. */
+export const installationManageUrl = (
+  i: Pick<GitHubAppInstallation, "installationId" | "accountLogin" | "accountType">,
+) =>
+  i.accountType === "Organization"
+    ? `https://github.com/organizations/${encodeURIComponent(i.accountLogin)}/settings/installations/${i.installationId}`
+    : `https://github.com/settings/installations/${i.installationId}`;
 
 /** Public view of a binding. */
 export const githubAppInstallationView = (i: GitHubAppInstallation) => ({
@@ -35,6 +51,7 @@ export const githubAppInstallationView = (i: GitHubAppInstallation) => ({
   accountType: i.accountType,
   repositorySelection: i.repositorySelection,
   suspended: i.suspendedAt !== null,
+  manageUrl: installationManageUrl(i),
   createdAt: i.createdAt.toISOString(),
 });
 
@@ -44,7 +61,7 @@ const http = (deps: GitHubAppInstallDeps) => ({
   webUrl: deps.http?.webUrl ?? "https://github.com",
 });
 
-function installable(app: GitHubAppConfig | null): app is GitHubAppConfig & {
+export function githubAppInstallable(app: GitHubAppConfig | null): app is GitHubAppConfig & {
   slug: string;
   clientId: string;
   clientSecret: string;
@@ -52,10 +69,14 @@ function installable(app: GitHubAppConfig | null): app is GitHubAppConfig & {
   return Boolean(app?.slug && app.clientId && app.clientSecret);
 }
 
+const notConfigured = () =>
+  new ValidationError("The GitHub App is not configured on this server", "github_app.not_configured");
+
 /**
- * Starts installing the GitHub App for an organization (admins). Returns
- * GitHub's install URL; its `state` is random, single use, 10 minutes, bound
- * to this person and organization (only its hash is stored).
+ * Starts installing the GitHub App for an organization (admins). Returns GitHub's install URL; its `state` is random,
+ * single use, 10 minutes, bound to this person and organization (only its hash is stored). `returnTo`: a path on our
+ * site, or the phone app's `app:connectors` (the callback then hands the return to the app). The desktop app's window
+ * finishes in the browser, as it always did.
  */
 export async function startGitHubAppInstall(
   deps: GitHubAppInstallDeps,
@@ -64,8 +85,10 @@ export async function startGitHubAppInstall(
   options: { returnTo?: string } = {},
 ): Promise<{ installUrl: string; state: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
-  if (!installable(deps.app)) throw new ValidationError("The GitHub App is not configured on this server");
-  const returnTo = options.returnTo?.startsWith("/") && !options.returnTo.startsWith("//") ? options.returnTo : "/";
+  const app = deps.app;
+  if (!githubAppInstallable(app)) throw notConfigured();
+  const asked = oauthReturnTo(options.returnTo);
+  const returnTo = isDesktopReturn(asked) ? desktopReturnPath(asked) : asked;
   const state = randomToken(32);
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
@@ -84,7 +107,7 @@ export async function startGitHubAppInstall(
     returnTo,
     expiresAt: new Date((deps.now?.() ?? new Date()).getTime() + OAUTH_STATE_TTL_MS),
   });
-  const url = new URL(`${http(deps).webUrl}/apps/${encodeURIComponent(deps.app.slug)}/installations/new`);
+  const url = new URL(`${http(deps).webUrl}/apps/${encodeURIComponent(app.slug)}/installations/new`);
   url.searchParams.set("state", state);
   return { installUrl: url.toString(), state };
 }
@@ -117,19 +140,19 @@ async function userInstallations(h: ReturnType<typeof http>, token: string): Pro
 }
 
 /**
- * GitHub's redirect after installing (user authorization during installation
- * on): checks the state (exists, unused, not expired, same person, still an
- * admin), exchanges the code for the person's token and requires the
- * installation to be one they can see — so nobody can claim another
- * account's installation by its id. Then binds it to the organization;
- * an installation bound to another organization is refused.
+ * GitHub's redirect after installing (user authorization during installation on): checks the state (exists, unused,
+ * not expired, same person, still an admin), exchanges the code for the person's token and requires the installation
+ * to be one they can see — so nobody can claim another account's installation by its id. Then binds it to the
+ * organization, whose GitHub it becomes when it has no connection yet (ADR 0153); an installation bound to another
+ * organization is refused (`github_app.other_workspace`).
  */
 export async function completeGitHubAppInstall(
   deps: GitHubAppInstallDeps,
   user: { id: string },
   input: { state: string; code: string; installationId: number },
 ): Promise<{ installation: GitHubAppInstallation; returnTo: string }> {
-  if (!installable(deps.app)) throw new ValidationError("The GitHub App is not configured on this server");
+  const app = deps.app;
+  if (!githubAppInstallable(app)) throw notConfigured();
   const at = deps.now?.() ?? new Date();
   const [row] = await deps.db
     .select()
@@ -153,8 +176,8 @@ export async function completeGitHubAppInstall(
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
     body: new URLSearchParams({
-      client_id: deps.app.clientId,
-      client_secret: deps.app.clientSecret,
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
       code: input.code,
     }).toString(),
   });
@@ -173,6 +196,7 @@ export async function completeGitHubAppInstall(
     suspendedAt: seen.suspended_at ? new Date(seen.suspended_at) : null,
     updatedAt: at,
   };
+  const actor = { type: "person" as const, id: user.id };
   const installation = await deps.db.transaction(async (tx) => {
     const [existing] = await tx
       .select()
@@ -180,7 +204,10 @@ export async function completeGitHubAppInstall(
       .where(eq(githubAppInstallations.installationId, input.installationId))
       .for("update");
     if (existing && existing.orgId !== row.orgId) {
-      throw new ConflictError("This GitHub installation is already connected to another organization");
+      throw new ConflictError(
+        "This GitHub installation is already connected to another organization",
+        "github_app.other_workspace",
+      );
     }
     const [saved] = existing
       ? await tx
@@ -195,14 +222,16 @@ export async function completeGitHubAppInstall(
     if (!saved) throw new Error("installation not saved");
     await recordAudit(tx, {
       orgId: row.orgId,
-      actor: { type: "person", id: user.id },
+      actor,
       action: existing ? "github_app.updated" : "github_app.installed",
       target: { type: "github_app_installation", id: saved.id },
       details: { installationId: input.installationId, account: values.accountLogin },
     });
+    await syncGitHubAppConnection(tx, row.orgId, actor, deps.oauthApps);
     return saved;
   });
   forgetInstallationTokens(input.installationId);
+  forgetOrgRepositories(row.orgId);
   return { installation, returnTo: row.returnTo };
 }
 
@@ -215,22 +244,92 @@ export async function listGitHubAppInstallations(db: Database, actorId: string, 
     .orderBy(asc(githubAppInstallations.createdAt));
 }
 
-/** Unbinds an installation from the organization (admins). It stays installed on GitHub. */
-export async function removeGitHubAppInstallation(db: Database, actorId: string, orgId: string, id: string) {
-  await requirePermission(db, actorId, orgId, "manage_connectors");
-  const [removed] = await db
-    .delete(githubAppInstallations)
-    .where(and(eq(githubAppInstallations.id, id), eq(githubAppInstallations.orgId, orgId)))
-    .returning();
-  if (!removed) throw new NotFoundError("Installation not found");
-  forgetInstallationTokens(removed.installationId);
-  await recordAudit(db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "github_app.removed",
-    target: { type: "github_app_installation", id },
-    details: { installationId: removed.installationId, account: removed.accountLogin },
+/**
+ * Unbinds an installation (removed here, uninstalled on GitHub, or gone when reconciled); GitHub through the app alone
+ * ends with its workspace's last one. Its tokens and the workspace's repository listing are forgotten.
+ */
+async function unbind(db: Database, row: GitHubAppInstallation, actor: AuditEntry["actor"], action: string) {
+  await db.transaction(async (tx) => {
+    const [gone] = await tx
+      .delete(githubAppInstallations)
+      .where(eq(githubAppInstallations.id, row.id))
+      .returning({ id: githubAppInstallations.id });
+    if (!gone) return;
+    await recordAudit(tx, {
+      orgId: row.orgId,
+      actor,
+      action,
+      target: { type: "github_app_installation", id: row.id },
+      details: { installationId: row.installationId, account: row.accountLogin },
+    });
+    await syncGitHubAppConnection(tx, row.orgId, actor);
   });
+  forgetInstallationTokens(row.installationId);
+  forgetOrgRepositories(row.orgId);
+}
+
+/**
+ * Removes an installation from the organization (admins), and uninstalls the app from that GitHub account (ADR 0153,
+ * best effort: it is unbound here whatever GitHub answers). `uninstalled`: false when GitHub refused or didn't answer,
+ * so the person can uninstall it there.
+ */
+export async function removeGitHubAppInstallation(
+  deps: GitHubAppInstallDeps,
+  actorId: string,
+  orgId: string,
+  id: string,
+): Promise<{ uninstalled: boolean }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const [row] = await deps.db
+    .select()
+    .from(githubAppInstallations)
+    .where(and(eq(githubAppInstallations.id, id), eq(githubAppInstallations.orgId, orgId)));
+  if (!row) throw new NotFoundError("Installation not found");
+  const app = deps.app;
+  const outcome = app ? await uninstallInstallation(app, http(deps), row.installationId) : "refused";
+  await unbind(deps.db, row, { type: "person", id: actorId }, "github_app.removed");
+  return { uninstalled: outcome !== "refused" };
+}
+
+const reconciled = new Map<string, number>();
+const RECONCILE_MS = 60_000;
+
+/**
+ * Keeps an organization's bindings in step with GitHub without a webhook (ADR 0153): each installation is asked of
+ * GitHub, at most once a minute per organization. Uninstalled there: unbound, as `installation.deleted` does;
+ * otherwise its account, repository selection and suspension are refreshed. No answer leaves it as it is.
+ */
+export async function reconcileGitHubAppInstallations(deps: GitHubAppInstallDeps, orgId: string) {
+  const app = deps.app;
+  const now = (deps.now?.() ?? new Date()).getTime();
+  if (!app || now - (reconciled.get(orgId) ?? Number.NEGATIVE_INFINITY) < RECONCILE_MS) return;
+  reconciled.set(orgId, now);
+  const rows = await deps.db.select().from(githubAppInstallations).where(eq(githubAppInstallations.orgId, orgId));
+  const system = { type: "system" as const, id: null };
+  for (const row of rows) {
+    const facts = await installationStatus(app, http(deps), row.installationId);
+    if (facts === "gone") {
+      await unbind(deps.db, row, system, "github_app.uninstalled");
+      continue;
+    }
+    if (
+      !facts ||
+      (facts.accountLogin === row.accountLogin &&
+        facts.accountType === row.accountType &&
+        facts.repositorySelection === row.repositorySelection &&
+        (facts.suspendedAt === null) === (row.suspendedAt === null))
+    )
+      continue;
+    await deps.db.transaction(async (tx) => {
+      await tx
+        .update(githubAppInstallations)
+        .set({ ...facts, updatedAt: new Date(now) })
+        .where(eq(githubAppInstallations.id, row.id));
+      await syncGitHubAppConnection(tx, orgId, system);
+    });
+    forgetInstallationTokens(row.installationId);
+    forgetOrgRepositories(orgId);
+  }
 }
 
 // ── Webhook (`POST /api/github-app/webhook`) ────────────────────────────────
@@ -244,10 +343,9 @@ export function validGitHubAppSignature(secret: string, body: string, given: str
 }
 
 /**
- * Keeps bindings in step with GitHub: `installation` deleted → unbound;
- * suspend/unsuspend → `suspended_at`; `installation_repositories` →
- * repository selection. Installations nobody bound are ignored (they only
- * bind through the install flow). Returns what changed, for the response.
+ * Keeps bindings in step with GitHub: `installation` deleted → unbound (and GitHub through the app alone with its
+ * last one); suspend/unsuspend → `suspended_at`; `installation_repositories` → repository selection. Installations
+ * nobody bound are ignored (they only bind through the install flow). Returns what changed, for the response.
  */
 export async function handleGitHubAppWebhook(
   db: Database,
@@ -262,19 +360,18 @@ export async function handleGitHubAppWebhook(
   if (!bound) return "ignored";
   const action = payload.action;
   const where = eq(githubAppInstallations.id, bound.id);
+  const system = { type: "system" as const, id: null };
   const audit = (what: string) =>
     recordAudit(db, {
       orgId: bound.orgId,
-      actor: { type: "system", id: null },
+      actor: system,
       action: `github_app.${what}`,
       target: { type: "github_app_installation", id: bound.id },
       details: { installationId: id, account: bound.accountLogin },
     });
 
   if (event === "installation" && action === "deleted") {
-    await db.delete(githubAppInstallations).where(where);
-    forgetInstallationTokens(id);
-    await audit("uninstalled");
+    await unbind(db, bound, system, "github_app.uninstalled");
     return "removed";
   }
   if (event === "installation" && (action === "suspend" || action === "unsuspend")) {
@@ -283,6 +380,7 @@ export async function handleGitHubAppWebhook(
       .set({ suspendedAt: action === "suspend" ? now : null, updatedAt: now })
       .where(where);
     forgetInstallationTokens(id);
+    forgetOrgRepositories(bound.orgId);
     await audit(action === "suspend" ? "suspended" : "unsuspended");
     return action === "suspend" ? "suspended" : "unsuspended";
   }
@@ -292,6 +390,7 @@ export async function handleGitHubAppWebhook(
       await db.update(githubAppInstallations).set({ repositorySelection: selection, updatedAt: now }).where(where);
     }
     forgetInstallationTokens(id);
+    forgetOrgRepositories(bound.orgId);
     return "updated";
   }
   return "ignored";

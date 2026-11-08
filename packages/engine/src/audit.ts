@@ -31,3 +31,20 @@ export async function recordAudit(db: Executor, entry: AuditEntry) {
     outcome: entry.outcome ?? null,
   });
 }
+
+/**
+ * A change to one of the installation's own secrets (`instance_secrets`): every workspace works with it, so each
+ * workspace's log says who changed it.
+ */
+export async function auditEveryOrg(
+  tx: Executor,
+  secret: string,
+  actor: AuditEntry["actor"],
+  action: string,
+  details: Record<string, unknown>,
+) {
+  const orgs = await tx.select({ id: schema.organizations.id }).from(schema.organizations);
+  for (const org of orgs) {
+    await recordAudit(tx, { orgId: org.id, actor, action, target: { type: "instance_secret", id: secret }, details });
+  }
+}

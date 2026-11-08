@@ -22,7 +22,8 @@ export type KeyPurpose =
   | "invite-links"
   | "invitations"
   | "invitation-mail"
-  | "routine-hooks";
+  | "routine-hooks"
+  | "github-app-manifest";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));

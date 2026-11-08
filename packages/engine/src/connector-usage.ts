@@ -18,6 +18,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
+import { GITHUB_APP_AUTH } from "./connectors/connections";
 import { CUSTOM_PREFIX } from "./connectors/custom";
 import { MCP_PRESETS, mcpPreset, presetForServer } from "./connectors/presets";
 import { ValidationError } from "./errors";
@@ -300,7 +301,8 @@ async function accountCounts(db: Database, r: Range, byOrg: boolean) {
         added: added(cc.createdAt),
       })
       .from(cc)
-      .where(isNull(cc.revokedAt))
+      // GitHub through the app alone is no account: its installations are counted below.
+      .where(and(isNull(cc.revokedAt), ne(cc.authType, GITHUB_APP_AUTH)))
       .groupBy(sql`1`, sql`2`, sql`3`),
     db
       .select({ orgId: org(githubAppInstallations.orgId), accounts, added: added(githubAppInstallations.createdAt) })
