@@ -26,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { ACT_ROW, LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { ACT_LINE, LineIcon, ROW_CARD_INSET, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
@@ -146,11 +146,11 @@ function ReceiptList({
   if (!group) {
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
-      <View style={[styles.one, ACT_ROW.row, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      <View style={[styles.one, ACT_LINE.row, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <View style={styles.oneTx}>
           <LineIcon name={receiptIcon(a.kind)} size={15} color={c.muted} variant="small" />
         </View>
-        <View style={[ACT_ROW.text, styles.oneTx]}>
+        <View style={[ACT_LINE.text, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
           <OwnActions action={a} />
           {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}
@@ -185,9 +185,9 @@ function ReceiptList({
         ) : null}
       </View>
       {rows.map(({ a, v }) => (
-        <View key={a.id} style={[styles.it, ACT_ROW.row, { borderTopColor: c.line2 }]}>
+        <View key={a.id} style={[styles.it, ACT_LINE.row, { borderTopColor: c.line2 }]}>
           <LineIcon name={receiptIcon(a.kind)} size={13} color={c.muted} variant="footnote" />
-          <View style={ACT_ROW.text}>
+          <View style={ACT_LINE.text}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
             {a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}

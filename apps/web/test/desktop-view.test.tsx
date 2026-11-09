@@ -1757,7 +1757,7 @@ describe("the dialog's size (computer.css)", () => {
 
   test("the head's controls sit on the name's capitals in every state, as every dialog's close does", async () => {
     const text = await css();
-    const head = rule(text, ".cmp-dialog .ac-dialog__acts");
+    const head = rule(text, ".cmp-dialog :is(.ac-dialog__acts, .ac-dialog__close)");
     expect(head).toContain("align-self: flex-start");
     // The name's 24 px line round a 32 px control (40 on touch), lifted to its capitals' middle as the kit lifts a
     // one-line head's, whatever the line under the name says, or while it says nothing.
@@ -1766,13 +1766,13 @@ describe("the dialog's size (computer.css)", () => {
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
     expect(rule(kit, ".ac-dialog__title")).toContain("line-height: 24px");
-    expect(rule(kit, ".ac-dialog__title + .ac-dialog__acts")).toContain(
+    expect(rule(kit, ".ac-dialog__title + .ac-dialog__acts,\n.ac-actline:has(> .ac-dialog__title) + .ac-dialog__close")).toContain(
       "translate: 0 calc(-1 * var(--title-cap-mid, var(--cap-mid)))",
     );
     // The line under the name keeps its room while empty, so the name and the controls stay where they are.
     expect(rule(text, ".cmp-sub:empty::before")).toContain('content: "\\00a0"');
     // Full screen's bar is its own box: the controls in its middle, beside both lines (the kit's 24 + 18 px).
-    expect(rule(text, ".cmp-dialog.is-screen-only .ac-dialog__acts")).toContain(
+    expect(rule(text, ".cmp-dialog.is-screen-only :is(.ac-dialog__acts, .ac-dialog__close)")).toContain(
       "margin-top: calc((24px + 18px - var(--cmp-button)) / 2)",
     );
     expect(rule(kit, ".ac-dialog__sub")).toContain("line-height: 18px");

@@ -4618,20 +4618,24 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   margin-top: -36px;
   padding: 0 var(--dialog-pad) 4px;
 }
+/* Under its icon, not beside a close: the title keeps its own line's height. */
+.catalog-svc .ac-actline > .ac-dialog__title {
+  padding-block: 0;
+}
 /*
  * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
  * air up and down as it does sideways, so the row is its ink. 24px is the sheet's own inset, where its icon and words
  * start, and keeps the × under the sky's densest top rows, whose lightest pixels in dark come close to its own ink. On
  * the sky it takes the full ink: the muted one fades into a dark sky.
  */
-.catalog-svc .ac-dialog__acts {
+.catalog-svc .ac-dialog__close {
   position: absolute;
   top: var(--dialog-pad);
   right: var(--dialog-pad);
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
-.catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+.catalog-svc .ac-dialog__close > .ac-btn--glyph {
   margin-block: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
   color: var(--ink);
 }

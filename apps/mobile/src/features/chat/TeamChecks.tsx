@@ -2,7 +2,7 @@ import type { Message, TeamCheck } from "@agenteschat/client";
 import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { ACT_ROW, type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
+import { ACT_LINE, type IconName, LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
@@ -55,11 +55,11 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
     .join(" · ");
   const channelId = match.channelId;
   return (
-    <View style={[styles.one, ACT_ROW.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+    <View style={[styles.one, ACT_LINE.row, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
         <LineIcon name={ICONS[targetKind(target)]} size={15} color={colors.muted} variant="small" />
       </View>
-      <View style={[ACT_ROW.text, styles.tx]}>
+      <View style={[ACT_LINE.text, styles.tx]}>
         <Text variant="small" tone="ink2">
           {runs.map((r, i) =>
             r.bold ? (

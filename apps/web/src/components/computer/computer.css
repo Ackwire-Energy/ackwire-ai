@@ -168,7 +168,7 @@
  * the phone's sheet turns off.
  */
 /* The take-control head: its icon centred on the title and the line under it together. */
-.cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles) {
+.cmp-dialog .ac-dialog__lead:has(+ .ac-actline > .ac-dialog__titles) {
   align-self: center;
   translate: none;
 }
@@ -293,12 +293,17 @@
  * and as the face before the name does, in one place however the line under the name wraps, and while it is empty.
  * Full screen's bar keeps them in its middle, beside both lines.
  */
-.cmp-dialog .ac-dialog__acts {
+.cmp-dialog :is(.ac-dialog__acts, .ac-dialog__close) {
   align-self: flex-start;
+  height: auto;
   margin-top: calc((24px - var(--cmp-button)) / 2 - var(--title-cap-mid, var(--cap-mid)));
 }
-.cmp-dialog.is-screen-only .ac-dialog__acts {
+.cmp-dialog.is-screen-only :is(.ac-dialog__acts, .ac-dialog__close) {
   margin-top: calc((24px + 18px - var(--cmp-button)) / 2);
+}
+/* Actions that went under the name (a narrow sheet) stand 8 under its line, past the rise they take beside it. */
+.cmp-dialog .ac-dialog__head > .ac-actline {
+  row-gap: calc(var(--space-2) + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
 }
 /*
  * Full screen's arrows span 14.6 of their icon's 20 units: in the head's row it reaches out by the 2.7 units of air on

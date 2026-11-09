@@ -178,20 +178,23 @@ export function Dialog({
           {bare ? (
             <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
           ) : (
-            <div className="ac-dialog__head ac-actrow">
+            <div className="ac-dialog__head">
               {leading && <span className="ac-dialog__lead">{leading}</span>}
-              {subtitle === undefined ? (
-                <RDialog.Title className="ac-dialog__title ac-actrow__text">{title}</RDialog.Title>
-              ) : (
-                <span className="ac-dialog__titles ac-actrow__text">
+              {/* Actions that don't fit beside the title go under it, the × stays on the title's line. */}
+              <div className="ac-actline">
+                {subtitle === undefined ? (
                   <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
-                  <span className="ac-dialog__sub" aria-live="polite">
-                    {subtitle}
+                ) : (
+                  <span className="ac-dialog__titles">
+                    <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+                    <span className="ac-dialog__sub" aria-live="polite">
+                      {subtitle}
+                    </span>
                   </span>
-                </span>
-              )}
-              <span className="ac-dialog__acts ac-acts">
-                {actions}
+                )}
+                {actions && <span className="ac-dialog__acts ac-acts">{actions}</span>}
+              </div>
+              <span className="ac-dialog__close ac-acts">
                 <RDialog.Close asChild>
                   <Button
                     variant="ghost"

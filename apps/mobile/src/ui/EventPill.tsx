@@ -8,7 +8,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { ACT_TEXT_MIN } from "./ActRow";
+import { ACT_TEXT_MIN } from "./ActLine";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { LineIcon } from "./LineIcon";
