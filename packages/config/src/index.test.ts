@@ -97,6 +97,20 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, DATABASE_URL: "mysql://x" })).toThrow(/DATABASE_URL/);
   });
 
+  test("job slots: the quick ones leave agents' runs some, and they grow from where they start", () => {
+    const config = loadConfig(valid);
+    expect([
+      config.OUTBOX_MAX_IN_FLIGHT,
+      config.OUTBOX_QUICK_SLOTS,
+      config.OUTBOX_MAX_IN_FLIGHT_CEILING,
+      config.DATABASE_POOL_MAX,
+    ]).toEqual([48, 12, 64, 20]);
+    expect(() => loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "12" })).toThrow(/OUTBOX_QUICK_SLOTS must be below/);
+    expect(loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "4", OUTBOX_QUICK_SLOTS: "0" }).OUTBOX_QUICK_SLOTS).toBe(0);
+    expect(() => loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT: "120" })).toThrow(/CEILING can't be below/);
+    expect(loadConfig({ ...valid, OUTBOX_MAX_IN_FLIGHT_CEILING: "48" }).OUTBOX_MAX_IN_FLIGHT_CEILING).toBe(48);
+  });
+
   test("rejects malformed model ids", () => {
     expect(() => loadConfig({ ...valid, AGENT_DEFAULT_MODEL: "Claude Sonnet" })).toThrow(/AGENT_DEFAULT_MODEL/);
   });
