@@ -6,6 +6,7 @@ import { UUID } from "../authority";
 import { routineBriefOfRun } from "../background";
 import { requireChannelAccess } from "../channels";
 import { deliverNotice, publishDelivery } from "../delivery";
+import { eligibleChannelAgents } from "../dispatch";
 import { isAgentOnlyDm, openPersonAgentDm } from "../dms";
 import { ConflictError, NotFoundError } from "../errors";
 import { cutText } from "../format";
@@ -70,7 +71,8 @@ export function githubItemOfCall(tool: string, input: Record<string, unknown>, a
 
 /**
  * Keeps where the agent wrote on a GitHub item from: the run's conversation (a routine's run: where the routine
- * reports). The agent that opened it keeps it; one only written on goes to the agent that wrote last.
+ * reports). The agent that opened it keeps it; one only written on goes to the agent that wrote last. The run kept is
+ * the last one on a task: one GitHub woke to answer there has none, and a merge must still name the task.
  */
 export async function recordGitHubItem(ctx: ToolContext, item: GitHubItemRef) {
   const to = ctx.background ? (await routineBriefOfRun(ctx.db, ctx))?.deliverTo : undefined;
@@ -93,7 +95,8 @@ export async function recordGitHubItem(ctx: ToolContext, item: GitHubItemRef) {
         agentId: values.agentId,
         channelId: values.channelId,
         threadId: values.threadId,
-        runId: values.runId,
+        runId: sql`coalesce((select r.id from ${agentRuns} r where r.org_id = excluded.org_id and r.id = excluded.run_id
+          and r.issue_id is not null), ${githubItems.runId}, excluded.run_id)`,
         authored: sql`${githubItems.authored} or excluded.authored`,
         updatedAt: new Date(),
       },
@@ -335,6 +338,8 @@ export async function handleGitHubAppEvent(
     .from(channels)
     .where(and(eq(channels.orgId, orgId), eq(channels.id, target.channelId)));
   if (!agent || agent.archivedAt || !channel || channel.archivedAt) return "ignored";
+  // Taken out of that conversation since: never brought back there, as a mention isn't (`dispatchMentions`).
+  if ((await eligibleChannelAgents(db, orgId, target.channelId, [agent.id])).length === 0) return "ignored";
   // The job ran before (a worker lost it after writing): its notice is there already. Its retries come within minutes,
   // so a day back is plenty and keeps the read to the newest partitions.
   if (e.delivery) {
@@ -403,6 +408,8 @@ export async function handleGitHubAppEvent(
       body: forPeople(notice),
       wake: Boolean(behind) || closing,
       trigger: channel.kind === "dm" ? "dm" : "mention",
+      // GitHub text is outside content, a member's too (ADR 0117): the runs that read it post and learn as such.
+      readOutside: Boolean(e.body.trim()),
     }),
   );
   await publishDelivery(deps.pubsub, delivered);
@@ -413,7 +420,7 @@ export async function handleGitHubAppEvent(
  * "Pedir resposta" on a GitHub notice that woke nobody (`refs.outside`): a person who reads that conversation and may
  * talk to the agent asks it to answer, once. The notice changes in place (`refs.answeredBy`), and a new one with that
  * person behind it (`refs.answerFor`, `refs.personId`) wakes the agent. 409 `github_event.answered` when someone
- * already asked.
+ * already asked, `github_event.agent_not_here` when the agent was taken out of that conversation since.
  */
 export async function answerGitHubNotice(
   deps: { db: Database; pubsub?: PubSub },
@@ -435,6 +442,8 @@ export async function answerGitHubNotice(
   const { channel, membership } = await requireChannelAccess(db, userId, orgId, original.channelId);
   const agent = await getAgent(db, orgId, original.authorAgentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if ((await eligibleChannelAgents(db, orgId, original.channelId, [agent.id])).length === 0)
+    throw new ConflictError("The agent isn't in this conversation anymore", "github_event.agent_not_here");
   if (!canTalkTo(agent, userId, speakerOf(membership))) throw await audienceError(db, agent);
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const answered = JSON.stringify({ answeredBy: userId });
@@ -469,6 +478,7 @@ export async function answerGitHubNotice(
       notice: ask,
       body: forPeople(ask),
       trigger: channel.kind === "dm" ? "dm" : "mention",
+      readOutside: Boolean(ask.text.trim()),
     });
     return { marked, sent };
   });

@@ -422,7 +422,7 @@ export function githubAppRoutes(deps: AppDeps) {
       security,
       summary: "Ask the agent to answer what someone it doesn't answer wrote on GitHub, from its notice",
       description:
-        "The id is the notice's (`meta.notice.kind` `github_event` with `refs.outside`). Anyone who reads the conversation and may talk to the agent, once: the notice changes in place (`message.created` with the same id, `refs.answeredBy`), and a new notice with that person behind it wakes the agent. 409 `github_event.answered` when someone already asked; 403 `audience.*` when the agent doesn't answer this person.",
+        "The id is the notice's (`meta.notice.kind` `github_event` with `refs.outside`). Anyone who reads the conversation and may talk to the agent, once: the notice changes in place (`message.created` with the same id, `refs.answeredBy`), and a new notice with that person behind it wakes the agent. 409 `github_event.answered` when someone already asked, `github_event.agent_not_here` when the agent was taken out of the conversation since; 403 `audience.*` when the agent doesn't answer this person.",
       request: { params: OrgParams.extend({ messageId: z.uuid() }) },
       responses: { 204: noContent[204], ...errors },
     }),

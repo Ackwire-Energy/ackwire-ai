@@ -314,7 +314,7 @@ export const githubItems = pgTable(
       .references(() => channels.id, { onDelete: "cascade" }),
     /** Where the run's replies went: a thread's root, or null for the conversation's main timeline. */
     threadId: uuid(),
-    /** The run that last wrote on it (its task is the run's). */
+    /** The last run on a task that wrote on it, else the last that did: its task is what a merge or a close changes. */
     runId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
