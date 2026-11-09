@@ -118,7 +118,7 @@ export async function checkParkedRun(deps: ParkedDeps, runId: string, jobId?: st
   if (!judge || judge.name === "llm") return;
   const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
   if (run?.status !== "waiting_input" || run.background || run.workId) return;
-  if (await checkedElsewhere(db, run.id, jobId)) return;
+  if (await checkedElsewhere(db, run.id, jobId, !computerWaitOf(run))) return;
   const [trigger, agent] = await Promise.all([
     getMessage(db, run.orgId, run.triggerMessageId),
     getAgentCached(db, run.orgId, run.agentId),
@@ -129,16 +129,18 @@ export async function checkParkedRun(deps: ParkedDeps, runId: string, jobId?: st
 }
 
 /**
- * Its own resume is due or running (its claim runs the same check), or an earlier check of it runs right now: this one
- * stands down instead of asking the judge twice. Due and running jobs only, which their partial indexes keep few.
+ * Its own resume is due or running (`resumes`: its claim runs the same check, or brings the answer it waited on), or an
+ * earlier check of it runs right now: this one stands down instead of asking the judge twice. A computer wait's resume
+ * is only its next ask for room, which checks nothing. Due and running jobs only, which their partial indexes keep few.
  */
-async function checkedElsewhere(db: Executor, runId: string, jobId: string | undefined) {
+async function checkedElsewhere(db: Executor, runId: string, jobId: string | undefined, resumes: boolean) {
   const [row] = rowsOf<{ busy: boolean }>(
     await db.execute(sql`select (exists (select 1 from ${outbox} o where o.status = 'processing'
         and o.payload->>'runId' = ${runId}
-        and (o.kind = 'agent_run.execute' or (o.kind = ${EARLY_CHECK_JOB} and o.id < ${jobId ?? null}::uuid)))
-      or exists (select 1 from ${outbox} o where o.status = 'pending' and o.next_attempt_at <= now()
-        and o.kind = 'agent_run.execute' and o.payload->>'runId' = ${runId})) as busy`),
+        and ((${resumes}::boolean and o.kind = 'agent_run.execute')
+          or (o.kind = ${EARLY_CHECK_JOB} and o.id < ${jobId ?? null}::uuid)))
+      or (${resumes}::boolean and exists (select 1 from ${outbox} o where o.status = 'pending'
+        and o.next_attempt_at <= now() and o.kind = 'agent_run.execute' and o.payload->>'runId' = ${runId}))) as busy`),
   );
   return row?.busy === true;
 }

@@ -441,26 +441,21 @@ describe("release_waiting_agent: an agent that handled the ask lets the one wait
     expect((await runsOf(f, f.agent.id))[0]?.status).toBe("running");
   });
 
-  test("a run that went on and now waits on something else isn't ended by a check judged on its old wait", async () => {
-    const { asked, dev, ada } = await waitingBeside("plan");
-    await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
-    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.agentId, ada.id));
+  /** Ada answered bia's ask in the thread under it and her run ended; `meanwhile` runs while the check is judged. */
+  async function handledBeside(wait: "plan" | "queued", meanwhile?: (devRunId: string) => Promise<unknown>) {
+    const set = await waitingBeside(wait);
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.agentId, set.ada.id));
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      threadId: asked.id,
-      author: { type: "agent", agentId: ada.id, runId: null, hop: 1, stretchId: null },
+      threadId: set.asked.id,
+      author: { type: "agent", agentId: set.ada.id, runId: null, hop: 1, stretchId: null },
       body: "Saiu às 14h, está em produção.",
     });
     const judge: Judge = {
       name: "fake",
       async ask(request) {
-        // Meanwhile its plan came back: it went on, and now waits on a question it asked.
-        const pending = { calls: [{ toolUseId: "t1", name: "ask_user", questionId: crypto.randomUUID() }] };
-        await f.db
-          .update(schema.agentRuns)
-          .set({ transcript: { system: [], messages: [], pending } as never })
-          .where(eq(schema.agentRuns.id, dev.id));
+        await meanwhile?.(set.dev.id);
         const people = request.state.participants as Record<string, { name: string }>;
         const key = Object.entries(people).find(([, p]) => p.name === "Ada")?.[0] ?? "nobody";
         return {
@@ -469,9 +464,32 @@ describe("release_waiting_agent: an agent that handled the ask lets the one wait
         };
       },
     };
-    await checkParkedRun({ db: f.db, pubsub: f.pubsub, judge }, dev.id);
+    return { ...set, check: () => checkParkedRun({ db: f.db, pubsub: f.pubsub, judge }, set.dev.id) };
+  }
+
+  test("a run that went on and now waits on something else isn't ended by a check judged on its old wait", async () => {
+    const { check } = await handledBeside("plan", async (id) => {
+      // Meanwhile its plan came back: it went on, and now waits on a question it asked.
+      const pending = { calls: [{ toolUseId: "t1", name: "ask_user", questionId: crypto.randomUUID() }] };
+      await f.db
+        .update(schema.agentRuns)
+        .set({ transcript: { system: [], messages: [], pending } as never })
+        .where(eq(schema.agentRuns.id, id));
+    });
+    await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+    await check();
     expect((await runsOf(f, f.agent.id))[0]?.status).toBe("waiting_input");
     expect(await closedNotes(f)).toEqual([]);
+  });
+
+  test("in line for its computer, it is checked although its next ask for room is due: that claim checks nothing", async () => {
+    const { check } = await handledBeside("queued");
+    // Its job asking the computer for room again is due now.
+    const [due] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+    expect(due?.status).toBe("pending");
+    await check();
+    expect((await runsOf(f, f.agent.id))[0]?.status).toBe("done");
+    expect(await closedNotes(f)).toHaveLength(1);
   });
 
   test("only people's asks are let go: one another agent asked stays with the agent it asked", async () => {
