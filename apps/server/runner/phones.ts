@@ -15,6 +15,7 @@ import {
   type PhoneTarget,
   type RunnerPhone,
   STREAM_CLOSE,
+  STREAM_LIMITS,
   type StreamControl,
 } from "@agenteschat/adapters/machine-protocol";
 import {
@@ -293,6 +294,8 @@ export interface PhoneManagerOptions {
   liveLogMs?: number;
   /** Only looks: changes no setting on a phone (`doctor`). */
   readOnly?: boolean;
+  /** How long a phone's screen may take to open (the server's wait, `STREAM_LIMITS.openTimeoutMs`). */
+  openMs?: number;
   /** The iPhone test helper (default: one of this OS user's, on a Mac). */
   ios?: IosHelper | null;
   /** What shows and controls an iPhone's screen (default: the test helper's, `ios`). */
@@ -413,12 +416,14 @@ export class PhoneManager {
   private readonly now: () => number;
   private readonly ios: IosHelper | null;
   private readonly iosScreen: IosScreenDriverFactory | null;
+  private readonly openMs: number;
 
   constructor(private readonly opts: PhoneManagerOptions) {
     this.env = opts.env ?? process.env;
     this.platform = opts.platform ?? process.platform;
     this.home = opts.home ?? os.homedir();
     this.now = opts.now ?? Date.now;
+    this.openMs = opts.openMs ?? STREAM_LIMITS.openTimeoutMs;
     this.ios =
       opts.ios !== undefined
         ? opts.ios
@@ -961,16 +966,29 @@ export class PhoneManager {
       mode === "control" ? await this.takeControl(key, phone, holderOf(target?.holder, this.now()), tools) : null;
     let frame: ScreenFrame;
     let socket: DataSocket;
+    // Past the server's wait for the data socket the stream is gone there (an iPhone's first test helper build takes
+    // longer): the phone goes back, and the build goes on for the next try.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        stop.abort();
+        reject(new RunnerError("phone_not_ready", OPENING_LATE));
+      }, this.openMs);
+    });
+    late.catch(() => {});
     try {
       // Someone taking control means to use it: a dark screen lights up (and a lock screen without a PIN lifts).
       if (control && platform === "android" && tools.adb) {
         await this.shell(tools.adb, this.at(phone), WAKE_SHELL, 10_000).catch(() => "");
       }
-      frame = await driver.frame(stop.signal);
-      socket = await dial();
+      frame = await Promise.race([driver.frame(stop.signal), late]);
+      socket = await Promise.race([dial(), late]);
     } catch (err) {
+      stop.abort();
       if (control) await this.endControl(key, control);
       throw err;
+    } finally {
+      clearTimeout(timer);
     }
     let unacked = 0;
     let last: Buffer | null = null;
@@ -1591,6 +1609,9 @@ export type IosScreenDriverFactory = (phone: RunnerPhone, tools: ScreenTools) =>
 
 /** A picture this big (a full-size PNG of a busy screen) waits for the last one's acknowledgement first. */
 const BIG_PICTURE = 2 << 20;
+
+export const OPENING_LATE =
+  "The phone's screen didn't open in time. An iPhone's test helper takes about a minute to build the first time: try again then.";
 
 export const NO_IOS_CONTROL =
   "Controlling an iPhone from here needs the test helper, which isn't set up on this Mac yet. You can still watch it.";

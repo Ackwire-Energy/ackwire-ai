@@ -1503,7 +1503,7 @@ function describeOp(req: MachineRequest): string {
     case "stream.open":
       return req.kind === "terminal"
         ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`
-        : `stream.open desktop (${String(req.mode)})`;
+        : `stream.open ${req.kind === "phone" ? `phone ${String(req.phone?.platform)}/${String(req.phone?.serial)}` : "desktop"} (${String(req.mode)})`;
     case "desktop.act": {
       // The kind and where it lands, its key, app or path; never typed text.
       const a: Record<string, unknown> = isRecordLike(req.action) ? req.action : {};

@@ -22,6 +22,7 @@ import {
   applyInput,
   type IosScreenDriverFactory,
   NO_IOS_CONTROL,
+  OPENING_LATE,
   type PhoneIo,
   PhoneManager,
   type PhoneRequest,
@@ -273,6 +274,7 @@ function rig(
     /** The iPhone test helper (none by default: a real iPhone is ready to the Mac alone). */
     ios?: (env: NodeJS.ProcessEnv, root: string, now: () => number) => IosHelper;
     iosScreen?: IosScreenDriverFactory;
+    openMs?: number;
   } = {},
 ) {
   const root = tempDir("phones-");
@@ -309,6 +311,7 @@ function rig(
     liveLogMs: 2000,
     ...(opts.readOnly ? { readOnly: true } : {}),
     ...(opts.iosScreen ? { iosScreen: opts.iosScreen } : {}),
+    ...(opts.openMs ? { openMs: opts.openMs } : {}),
     pairPollMs: 5,
   });
   const calls = () =>
@@ -1075,6 +1078,28 @@ test("iPhones: a simulator shows its pictures but takes no control, a real one n
   // Watching a simulator never waits for the helper's first build, even when the helper drives it.
   expect(screenDriverFor(sim, tools, "watch", () => helper)).toBeInstanceOf(SimulatorScreen);
   expect(screenDriverFor(sim, tools, "control", () => helper)).toBe(helper);
+});
+
+test("a screen that doesn't open in the server's wait (a first helper build) gives the phone back and says why", async () => {
+  const building: PhoneScreenDriver = {
+    frame: () => new Promise(() => {}),
+    tap: async () => {},
+    swipe: async () => {},
+    text: async () => {},
+    key: async () => {},
+  };
+  const r = rig(ANDROID_STATE, { iosScreen: () => building, openMs: 100 });
+  const sam = { runId: null, agentId: null, userId: "user-sam", since: "" };
+  let dialed = 0;
+  const opened = await r.manager
+    .view({ platform: "ios", serial: SIM, holder: sam }, "control", async () => {
+      dialed++;
+      return viewerSocket().socket;
+    })
+    .catch((e: RunnerError) => e);
+  expect(opened).toMatchObject({ code: "phone_not_ready", message: OPENING_LATE });
+  expect(dialed).toBe(0);
+  expect(r.manager.list().find((p) => p.serial === SIM)?.holder).toBeUndefined();
 });
 
 test("input lands where the person pressed, in the picture's own size; text is one quoted word for the phone's shell", async () => {
