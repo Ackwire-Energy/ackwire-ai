@@ -44,6 +44,7 @@ import {
   suggestedChannels,
   suggestedLevels,
 } from "@agenteschat/client/lib/setup-checklist";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   Avatar,
@@ -224,6 +225,7 @@ export function AgentSetupCard({ agent, place }: { agent: Agent; place: "dm" | "
       audience: audience.mode,
       otherOwner: !ownerIsMe && owner ? (owner.name.split(" ")[0] ?? owner.name) : null,
       onPlan,
+      personal: isPersonal(org),
     });
 
   const act = (step: AgentSetupStep) => {
@@ -649,7 +651,7 @@ function AppsDialog({
       onClose={onClose}
     >
       {ordered.length === 0 ? (
-        <p className="small muted">{t("agentSetup.apps.empty", { org: org.name })}</p>
+        <p className="small muted">{t(modeKey(org, "agentSetup.apps.empty"), { org: org.name })}</p>
       ) : (
         <ul className="level-list setup-dlg__apps" aria-label={t("access.kind.connectors")}>
           {ordered.map((r) => {
@@ -992,7 +994,7 @@ function HowDialog({ agent, onClose, onSaved }: { agent: Agent; onClose: () => v
   return (
     <StepDialog
       title={t("agentSetup.how.title", g)}
-      description={t("agentSetup.how.desc")}
+      description={t(modeKey(org, "agentSetup.how.desc"))}
       ok={t("common.save")}
       busy={busy}
       okDisabled={!budgetOk}

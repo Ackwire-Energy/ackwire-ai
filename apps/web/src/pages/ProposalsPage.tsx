@@ -10,6 +10,7 @@ import {
   proposerOf,
   sortProposals,
 } from "@agenteschat/client/lib/proposals";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
   Button,
@@ -113,7 +114,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <PageHeader title={t("approvals.title")} meta={t("proposals.subtitle", { org: org.name })} />
+      <PageHeader title={t("approvals.title")} meta={t(modeKey(org, "proposals.subtitle"), { org: org.name })} />
       <ApprovalsTabs value="proposals" />
 
       {proposals.isSuccess && list.length === 0 && (

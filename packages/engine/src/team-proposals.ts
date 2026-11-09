@@ -46,6 +46,7 @@ import { SKILL_NAME } from "./skills";
 import { billingHold } from "./standing";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { agentRuns, agentSkills, agents, channelMembers, channels, messages, skills, users } = schema;
 
@@ -69,6 +70,12 @@ export const TEAM_UNDO_MS = 24 * 3600_000;
 export const WEEKLY_CHECK_CRON = "0 17 * * 5";
 const WEEKLY_CHECK_PROMPT =
   "Write this week's check of the team for the person in this conversation, in their language: four numbers (runs, failed runs, approvals waiting, questions nobody answered), what worked, then one fix per problem (an agent stuck or in no channel, a budget near its limit, a request made by hand more than once), each as one of your cards. When there is nothing to say, write one short line.";
+/**
+ * The same in a personal workspace (ADR 0158): how the person's own agents did. An agent there may live in its DM
+ * with no channel, which is no problem to fix.
+ */
+const WEEKLY_CHECK_PROMPT_PERSONAL =
+  "Write this week's look at how their agents did for the person in this conversation, in their language: four numbers (runs, failed runs, approvals waiting, questions nobody answered), what worked, then one fix per problem (an agent stuck, a budget near its limit, something they asked for by hand more than once), each as one of your cards. When there is nothing to say, write one short line.";
 
 export interface TeamAgent {
   name: string;
@@ -78,7 +85,10 @@ export interface TeamAgent {
   line: string;
   instructions: string;
   appearance: AgentAppearance | null;
-  /** The channel it lives in, by name (created with the team when it doesn't exist). */
+  /**
+   * The channel it lives in, by name (created with the team when it doesn't exist). Empty: no channel, it lives in its
+   * DM with the person and its routines report there (a personal workspace's template, ADR 0158).
+   */
   channel: string;
   routines: ProposedRoutine[];
   /** What the receipt's "Abrir com a tarefa" types in its DM, never sent. */
@@ -239,6 +249,14 @@ const blockedError = (names: string[]) =>
     `${names.map((n) => `#${n}`).join(", ")}: a channel you can't name here (private, or archived by someone else). Pick another name.`,
   );
 
+/** The channels the team's agents live in, each once: an agent with none lives in its DM with the person. */
+const teamChannels = (agents: readonly Pick<TeamAgent, "channel">[]) => [
+  ...new Set(agents.flatMap((a) => (a.channel ? [a.channel] : []))),
+];
+
+/** Where an agent lives, as the agents read it on a card or a notice. */
+const livesIn = (a: Pick<TeamAgent, "channel"> | undefined) => (a?.channel ? `in #${a.channel}` : "in its DM");
+
 /**
  * The team as the tool (or a template) wrote it, checked as the create-agent API checks each agent: names, free and
  * distinct handles, looks, a channel name each (existing or new), their routines' schedules read now in the person's
@@ -270,8 +288,9 @@ export async function checkTeam(
     const role = str(a.role).slice(0, 200);
     const line = str(a.line).slice(0, 300);
     if (!line) throw new ValidationError(`Say in \`line\` what ${name} does, in one line.`);
+    // None: it lives in its DM with the person (a personal workspace's template, ADR 0158).
     const channel = str(a.channel).replace(/^#/, "").toLowerCase();
-    if (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-")) {
+    if (channel && (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-"))) {
       throw new ValidationError(`#${channel}: a channel name is lower-case letters, digits, - or _.`);
     }
     const routinesIn = list(a.routines);
@@ -292,9 +311,7 @@ export async function checkTeam(
       firstTask: str(a.first_task).slice(0, 500) || null,
     });
   }
-  const { fresh, blocked } = await channelPlaces(deps.db, at.orgId, at.personId, [
-    ...new Set(team.map((a) => a.channel)),
-  ]);
+  const { fresh, blocked } = await channelPlaces(deps.db, at.orgId, at.personId, teamChannels(team));
   if (blocked.length > 0) throw blockedError(blocked);
   const skillsIn = list(input.skills).map(obj);
   if (skillsIn.length > MAX_TEAM_SKILLS) throw new ValidationError(`At most ${MAX_TEAM_SKILLS} skills.`);
@@ -317,12 +334,14 @@ export async function checkTeam(
       agents: named,
     };
   });
+  // A personal workspace's weekly check looks at the person's own agents, named for them (ADR 0158).
+  const personal = input.weekly_check === true && (await isPersonalWorkspace(deps.db, at.orgId));
   const weekly =
     input.weekly_check === true
       ? await checkRoutine(deps, at, {
           schedule: WEEKLY_CHECK_CRON,
-          prompt: WEEKLY_CHECK_PROMPT,
-          title: serverText(locale, "teamPlan.weekly.name"),
+          prompt: personal ? WEEKLY_CHECK_PROMPT_PERSONAL : WEEKLY_CHECK_PROMPT,
+          title: serverText(locale, personal ? "teamPlan.weekly.namePersonal" : "teamPlan.weekly.name"),
         })
       : null;
   return {
@@ -340,7 +359,7 @@ export async function checkTeam(
 
 /** What the agents (and a notification preview) read of the card. */
 function teamBody(p: TeamParams) {
-  const who = p.agents.map((a) => `${a.name} (@${a.handle}${a.role ? `, ${a.role}` : ""}) in #${a.channel}`);
+  const who = p.agents.map((a) => `${a.name} (@${a.handle}${a.role ? `, ${a.role}` : ""}) ${livesIn(a)}`);
   return `Proposed a team${p.template ? ` from the «${p.template}» template` : ""}: ${who.join("; ")}.`;
 }
 
@@ -456,7 +475,7 @@ async function tellProposer(deps: { db: Database; pubsub?: PubSub }, message: Me
   if (!run) return;
   const notice: Notice = {
     kind: "proposal_result",
-    from: "Your team card",
+    from: (await isPersonalWorkspace(deps.db, message.orgId)) ? "Your card of agents" : "Your team card",
     text,
     refs: { messageId: message.id, runId: run.id },
   };
@@ -544,7 +563,7 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
         skillIds: [] as string[],
         agents: [] as Agent[],
       };
-      const names = [...new Set(p.agents.map((a) => a.channel))];
+      const names = teamChannels(p.agents);
       const channelStep = names.map((n) => `#${n}`).join(", ");
       const { existing, archived, outside, blocked } = await stepped(channelStep, () =>
         channelPlaces(tx, orgId, userId, names),
@@ -585,14 +604,17 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
           if (a.appearance) row = await setAgentAppearance(tx, userId, orgId, row.id, a.appearance, events);
           // An admin's team gets the apps every agent has; anyone else's starts without access (ADR 0085 §5).
           if (admin) await giveApps(tx, userId, orgId, row.id, []);
-          const channelId = channelOf.get(a.channel) as string;
-          await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
+          // With no channel it lives in its DM with the person, where its routines report (ADR 0158).
+          const channelId = a.channel ? (channelOf.get(a.channel) as string) : null;
+          if (channelId) await addChannelMember(tx, userId, orgId, channelId, { agentId: row.id }, events);
           for (const r of a.routines) {
             const routine = await createRoutine({ db: tx, pubsub: events.pubsub }, userId, orgId, {
               name: r.name,
               agentId: row.id,
               prompt: r.prompt,
-              target: { type: "conversation", channelId, threadId: null, reminder: false },
+              target: channelId
+                ? { type: "conversation", channelId, threadId: null, reminder: false }
+                : { type: "dm" },
               trigger: r.rule
                 ? { type: "schedule", rule: r.rule }
                 : { type: "schedule", phrase: r.cron, timezone: r.timezone },
@@ -685,11 +707,11 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
   await writeCard(deps, message, done, "creating");
   if ((await billingHold(deps.db, orgId)) === "payment") await queuePlanWaiting(deps.db, orgId);
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
-  const who = made.agents.map((a, i) => `@${a.handle} (${a.name}) in #${p.agents[i]?.channel}`).join(", ");
+  const who = made.agents.map((a, i) => `@${a.handle} (${a.name}) ${livesIn(p.agents[i])}`).join(", ");
   await tellProposer(
     deps,
     message,
-    `${person?.name ?? "A person"} created the team: ${who}; ${ids.routineIds.length} routines${ids.skillIds.length ? `, ${ids.skillIds.length} skills` : ""}.${skipped.includes("skills") ? " The skills wait for an admin." : ""}${skipped.includes("weekly") ? " Your weekly check wasn't made: only who manages your routines makes it." : ""} The card already offers a first task per agent and inviting the people: say it is ready in one short line, without repeating them.`,
+    `${person?.name ?? "A person"} created ${(await isPersonalWorkspace(deps.db, orgId)) ? "their agents" : "the team"}: ${who}; ${ids.routineIds.length} routines${ids.skillIds.length ? `, ${ids.skillIds.length} skills` : ""}.${skipped.includes("skills") ? " The skills wait for an admin." : ""}${skipped.includes("weekly") ? " Your weekly check wasn't made: only who manages your routines makes it." : ""} The card already offers a first task per agent${(await isPersonalWorkspace(deps.db, orgId)) ? "" : " and inviting the people"}: say it is ready in one short line, without repeating them.`,
   );
   return { card: done, noAi };
 }
@@ -818,8 +840,9 @@ export async function adjustTeamAgent(
   if (!name || name.length > 80) throw new ValidationError("Give it a name of up to 80 characters.");
   const line = patch.line !== undefined ? str(patch.line).slice(0, 300) : current.line;
   if (!line) throw new ValidationError("Say in one line what it does.");
+  // Empty keeps it in its DM with the person, with no channel (ADR 0158).
   const channel = patch.channel !== undefined ? str(patch.channel).replace(/^#/, "").toLowerCase() : current.channel;
-  if (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-")) {
+  if (channel && (!CHANNEL_NAME_PATTERN.test(channel) || channel.startsWith("dm-"))) {
     throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)", "channel.invalid_name");
   }
   const role = patch.role !== undefined ? str(patch.role).slice(0, 200) : current.role;
@@ -834,7 +857,7 @@ export async function adjustTeamAgent(
     firstTask: patch.firstTask !== undefined ? str(patch.firstTask).slice(0, 500) || null : current.firstTask,
   };
   const team = card.params.agents.map((a, i) => (i === at ? next : a));
-  const { fresh, blocked } = await channelPlaces(deps.db, orgId, userId, [...new Set(team.map((a) => a.channel))]);
+  const { fresh, blocked } = await channelPlaces(deps.db, orgId, userId, teamChannels(team));
   if (blocked.length > 0) throw blockedError(blocked);
   const updated: TeamProposalCard = { ...card, params: { ...card.params, agents: team, newChannels: fresh } };
   await writeCard(deps, message, updated, "pending");

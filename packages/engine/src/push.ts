@@ -15,6 +15,7 @@ import type { NotificationActor, NotificationLatest, NotificationSource } from "
 import { enqueue } from "./outbox";
 import { type PushTextInput, pushLocale, renderPush } from "./push-messages";
 import { accountClosed } from "./standing";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { pushDevices, notifications, agents, users, approvals, sessions } = schema;
 
@@ -423,6 +424,8 @@ export async function deliverPush(
     status: latest.statusTo ?? null,
     percent: latest.percent ?? null,
     reason: typeof latest.reason === "string" ? latest.reason : null,
+    // Read once for every device: only the words change (ADR 0158), never who is told or when.
+    personal: await isPersonalWorkspace(db, row.orgId),
   };
 
   let sent = 0;

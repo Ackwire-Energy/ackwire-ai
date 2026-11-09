@@ -30,11 +30,58 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   taskManager: "more",
 };
 
+/**
+ * The same in a personal workspace (ADR 0158): Routines and Drive in sight, Approvals while something waits, the rest
+ * in More. Only what is in sight changes: every tool is still one click away, and a choice the person made still wins.
+ */
+export const PERSONAL_SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
+  approvals: "auto",
+  proposals: "more",
+  threads: "more",
+  issues: "more",
+  wiki: "more",
+  drive: "always",
+  routines: "always",
+  calendar: "more",
+  team: "more",
+  dashboards: "more",
+  taskManager: "more",
+};
+
+/** Where each tool goes by default in a workspace of this mode (`personal`: ADR 0158). */
+export const sidebarDefaults = (personal = false) => (personal ? PERSONAL_SIDEBAR_DEFAULTS : SIDEBAR_DEFAULTS);
+
+/**
+ * The tools' default order in a personal workspace (mirrors `PERSONAL_SIDEBAR_ITEMS`, packages/engine/src/
+ * sidebar-items.ts): what waits for the person first, as in a team's, then Routines and Drive, then what More holds.
+ */
+export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
+  "approvals",
+  "proposals",
+  "routines",
+  "drive",
+  "calendar",
+  "issues",
+  "threads",
+  "team",
+  "wiki",
+  "dashboards",
+  "taskManager",
+];
+
+/** The tools' default order in a workspace of this mode: the list's and More's. */
+export const sidebarItemOrder = (personal = false) => (personal ? PERSONAL_SIDEBAR_ITEMS : SIDEBAR_ITEMS);
+
 /** The tools with a count in the sidebar: only these can wait in More until there is something (`auto`). */
 export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals", "threads"];
 
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];
+/** The same in a personal workspace (ADR 0158): the agents before the group conversations. */
+export const PERSONAL_SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "agents", "channels", "people"];
+
+/** The sections' default order in a workspace of this mode. */
+export const sidebarSections = (personal = false) => (personal ? PERSONAL_SIDEBAR_SECTIONS : SIDEBAR_SECTIONS);
 
 /** `order` with `section` (a section or a tool) moved one place up (-1) or down (+1); the same order at an end. */
 export function moveSection<T extends string>(order: readonly T[], section: T, by: -1 | 1): T[] {
@@ -47,11 +94,12 @@ export function moveSection<T extends string>(order: readonly T[], section: T, b
 }
 
 /**
- * The saved order as this build can show it: only the tools it knows, then any the order lacks. A tab left open across
- * a deploy reads a newer server's tools, and a tool it has no page for would break the sidebar.
+ * The saved order as this build can show it: only the tools it knows, then any the order lacks (in the mode's default
+ * order). A tab left open across a deploy reads a newer server's tools, and a tool it has no page for would break the
+ * sidebar.
  */
-export const knownToolOrder = (saved: readonly SidebarItem[]): SidebarItem[] => [
-  ...new Set([...saved.filter((id) => SIDEBAR_ITEMS.includes(id)), ...SIDEBAR_ITEMS]),
+export const knownToolOrder = (saved: readonly SidebarItem[], personal = false): SidebarItem[] => [
+  ...new Set([...saved.filter((id) => SIDEBAR_ITEMS.includes(id)), ...sidebarItemOrder(personal)]),
 ];
 
 export const sameOrder = (a: readonly string[], b: readonly string[]) => a.join() === b.join();
@@ -83,21 +131,26 @@ export function moveShownTool(
   return target ? placeTool(order, item, target, by < 0 ? "before" : "after") : [...order];
 }
 
-export const sidebarPlace = (items: SidebarItems | undefined, item: SidebarItem): SidebarPlace =>
-  items?.[item] ?? SIDEBAR_DEFAULTS[item];
+/** Where a tool shows: the person's choice, else the default of the workspace's mode. */
+export const sidebarPlace = (items: SidebarItems | undefined, item: SidebarItem, personal = false): SidebarPlace =>
+  items?.[item] ?? sidebarDefaults(personal)[item];
 
 /** In the list, else in More: `always`, or `auto` while its count is above zero. */
 export const inSidebarList = (place: SidebarPlace, count: number) =>
   place === "always" || (place === "auto" && count > 0);
 
-/** The choices with one tool moved. One put back on its default is dropped, so `{}` is the default. */
+/**
+ * The choices with one tool moved. One put back on its default (the mode's) is dropped, so `{}` is the default, and a
+ * workspace that changes mode shows its new defaults for every tool the person never moved.
+ */
 export function withSidebarPlace(
   items: SidebarItems | undefined,
   item: SidebarItem,
   place: SidebarPlace,
+  personal = false,
 ): SidebarItems {
   const next = { ...items };
-  if (place === SIDEBAR_DEFAULTS[item]) delete next[item];
+  if (place === sidebarDefaults(personal)[item]) delete next[item];
   else next[item] = place;
   return next;
 }

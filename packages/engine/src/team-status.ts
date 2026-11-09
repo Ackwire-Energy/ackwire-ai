@@ -15,6 +15,7 @@ import { loadTeam } from "./team";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 import { cleanOutside } from "./untrusted";
 import { liveWorksByAgent } from "./works";
+import { inWorkspaceWords } from "./workspace-mode";
 
 const { agentQuestions, agentRuns, agents, channels } = schema;
 
@@ -232,6 +233,12 @@ export function reportsUnder(team: readonly { id: string; reportsToAgentId: stri
   return out;
 }
 
+/** `team_status` as a personal workspace's right hand reads it (ADR 0158). */
+const TEAM_STATUS_PERSONAL = {
+  [TEAM_STATUS_TOOL]:
+    "What this person's agents are doing now: each agent's work, open and stuck tasks, what finished or failed today, what waits for them.",
+};
+
 /**
  * `team_status`: the tool of "what's going on". The right hand's, in the core group so it is there on the first turn
  * of any brain, and only in the person's own DM with it: in a channel, others read the reply. A supervisor's (an agent
@@ -275,7 +282,8 @@ export function createTeamStatusToolSource(): ToolSource {
     name: "team-status",
     tools: async (ctx) => {
       const [row] = await ctx.db.select({ builtin: agents.builtin }).from(agents).where(eq(agents.id, ctx.agentId));
-      if (isRightHand(row)) return [tool];
+      // A personal workspace (ADR 0158): the person's agents, not a team.
+      if (isRightHand(row)) return inWorkspaceWords(ctx.db, ctx.orgId, [tool], TEAM_STATUS_PERSONAL);
       const team = await loadTeam(ctx.db as Database, ctx.orgId);
       return team.some((a) => a.reportsToAgentId === ctx.agentId) ? [supervisorTool] : [];
     },

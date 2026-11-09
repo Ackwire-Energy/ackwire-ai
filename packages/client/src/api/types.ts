@@ -906,7 +906,7 @@ export interface TeamAgentDraft {
   line: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** The channel it lives in, by name. */
+  /** The channel it lives in, by name; empty: it lives in its DM with the person (a personal template, ADR 0158). */
   channel: string;
   routines: ProposedRoutine[];
   firstTask: string | null;

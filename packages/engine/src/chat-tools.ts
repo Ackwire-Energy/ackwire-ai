@@ -29,6 +29,7 @@ import { accountInUse } from "./standing";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 import { movableRun, moveRun } from "./works";
+import { inWorkspaceWords } from "./workspace-mode";
 
 export const POST_MESSAGE_TOOL = "post_message";
 export const SEND_DM_TOOL = "send_dm";
@@ -134,6 +135,17 @@ export async function findMember(
   if (exact.length > 0) return exact;
   return people.filter((p) => plainName(p.name).split(/\s+/)[0] === q.split(/\s+/)[0] && !q.includes(" "));
 }
+
+/** What `send_dm` does, as the model reads it. */
+const SEND_DM_DESCRIPTION =
+  'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language, unless they asked in a DM: then only what they told you to say. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.';
+/** `send_dm` as a personal workspace's agents read it (ADR 0158): the people here are the person and their family. */
+const SEND_DM_PERSONAL = {
+  [SEND_DM_TOOL]: SEND_DM_DESCRIPTION.replace(
+    "Send a direct message to a person in the organization,",
+    "Send a direct message to a person in this workspace (the person, or someone in their family),",
+  ),
+};
 
 /**
  * `post_message`: "manda no #geral" from a DM. Posts a new message (with
@@ -327,8 +339,7 @@ export function createChatToolSource(deps: {
     },
     {
       name: SEND_DM_TOOL,
-      description:
-        'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language, unless they asked in a DM: then only what they told you to say. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
+      description: SEND_DM_DESCRIPTION,
       scope: "",
       inputSchema: {
         type: "object",
@@ -480,10 +491,12 @@ export function createChatToolSource(deps: {
     name: "chat",
     tools: async (ctx) => {
       const gif = !ctx.background && ctx.runId && deps.gif ? await deps.gif.offered(ctx) : false;
-      return [gif ? postWithGif : postMessage, ...others];
+      // A personal workspace (ADR 0158): the people here are the person and maybe their family.
+      return inWorkspaceWords(ctx.db, ctx.orgId, [gif ? postWithGif : postMessage, ...others], SEND_DM_PERSONAL);
     },
   };
 }
+
 
 /** How many of the conversation's latest messages `to` looks through for its author's. */
 const REACT_LOOKBACK = 50;

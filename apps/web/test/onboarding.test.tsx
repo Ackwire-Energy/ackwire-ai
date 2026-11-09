@@ -15,6 +15,7 @@ afterEach(() => {
 });
 
 const button = (name: string | RegExp) => screen().getByRole("button", { name });
+const answer = (name: RegExp) => screen().getByRole("radio", { name });
 const click = async (el: Element, rounds = 8) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
@@ -40,6 +41,11 @@ describe("after the workspace's name", () => {
     const state = seedState({ agents: [] });
     if (state.me) state.me.organizations = [];
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    // First what it is for (ADR 0158): a company or team names it next.
+    expect(screen().getByText("Para que você vai usar o agentes.chat?")).toBeTruthy();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await click(answer(/Para minha empresa ou time/));
+    await click(button("Continuar"));
     await act(async () => fireEvent.change(screen().getByLabelText("Nome"), { target: { value: "Acme Saúde" } }));
     await click(button("Continuar"), 12);
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Acme Saúde" });
@@ -89,6 +95,35 @@ describe("after the workspace's name", () => {
     await settle(10);
     expect(screen().getByRole("dialog")).toBeTruthy();
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
+  });
+});
+
+describe("for me (ADR 0158)", () => {
+  test("no name to ask: a personal workspace, named in the person's language, opens in Lodi's DM in its words", async () => {
+    const state = seedState({ agents: [] });
+    if (state.me) state.me.organizations = [];
+    const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
+    // "For me", not "For my company or team", whose words start the same in Portuguese.
+    await click(answer(/^Para mim(?!ha)/));
+    expect(screen().queryByLabelText("Nome")).toBeNull();
+    await click(button("Continuar"), 12);
+    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal" });
+    const orgId = state.me?.organizations.at(-1)?.id;
+    expect(calls(state, "orgs.updateSettings")[0]?.args).toEqual([orgId, { timezone: expect.any(String) }]);
+    expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
+    expect(document.body.textContent).toContain("Oi, eu sou o Lodi. Monto os seus agentes com você.");
+  });
+
+  test("back from the name, the question again; the answer can change", async () => {
+    const state = seedState({ agents: [] });
+    if (state.me) state.me.organizations = [];
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await click(answer(/Para minha empresa ou time/));
+    await click(button("Continuar"));
+    expect(screen().getByLabelText("Nome")).toBeTruthy();
+    await click(button("Voltar"));
+    expect(answer(/Para minha empresa ou time/).getAttribute("aria-checked")).toBe("true");
+    expect(calls(state, "orgs.create")).toEqual([]);
   });
 });
 

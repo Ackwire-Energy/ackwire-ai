@@ -44,6 +44,7 @@ import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand"
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import { picksForMe } from "@agenteschat/client/lib/routing";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   Button,
@@ -511,7 +512,7 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
       <div className="list-col mcard__names">
         <span className="profile-card__name">{agent.name}</span>
         <span className="small muted">
-          {[`@${agent.handle}`, t("rightHand.role"), t("rightHand.label")].join(" · ")}
+          {[`@${agent.handle}`, t(modeKey(org, "rightHand.role")), t("rightHand.label")].join(" · ")}
         </span>
         {tellsNameStory(agent) && <span className="small muted">{t("rightHand.profile.nameStory")}</span>}
       </div>

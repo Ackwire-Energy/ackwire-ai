@@ -29,14 +29,20 @@ import {
   firstRunSteps,
 } from "@agenteschat/client/lib/setup-checklist";
 import {
+  aboutYouContext,
   answerAfter,
   BUSINESS_TYPES,
   type BusinessType,
   firstTasks,
   isTemplateBusiness,
+  LIFE_AREAS,
+  type LifeArea,
+  lifeAreaTemplate,
+  readAboutYou,
   teamStatus,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Field, type IconName, Input, Locked } from "@agenteschat/ui";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { Button, Field, Icon, type IconName, Input, Locked } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -56,8 +62,9 @@ import { useDirectory } from "@/hooks/useDirectory";
 /*
  * The right hand's first run (ADR 0155 §6): one checklist card inside its greeting, drawn by the app and never stored,
  * for the workspace's owners. Five rows, each opening a dialog in place, none needing a model: what the workspace
- * does, the team (a template, made in one click), an AI, apps, people. A row reads done from the data; only "Agora
- * não" is kept. On a billing hold the AI row leads to the plan and apps and people wait for it.
+ * does, the team (a template, made in one click), an AI, apps, people. A row reads done from the data; only "Not now"
+ * is kept. On a billing hold the AI row leads to the plan and apps and people wait for it. A personal workspace (ADR
+ * 0158) has four, in its words: what the person wants help with (areas of life), their agents, an AI, their apps.
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
@@ -67,6 +74,9 @@ const ROW_ICON: Record<FirstRunStep, IconName> = {
   apps: "plug",
   people: "personAdd",
 };
+
+/** A personal workspace's rows are about the person and their agents. */
+const PERSONAL_ROW_ICON: Partial<Record<FirstRunStep, IconName>> = { about: "person", team: "agent" };
 
 /** The rows this person sees on the right hand's card (none: the card isn't theirs). */
 export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
@@ -82,6 +92,7 @@ export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
     pay: may.pay,
     connectors: can(org, "manage_connectors"),
     invite: may.invite,
+    personal: isPersonal(org),
   });
 }
 
@@ -152,8 +163,9 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const burstRef = useRef<HTMLCanvasElement>(null);
   const { steps, done, held, team } = run;
   const doneHere = steps.filter((s) => done.has(s));
+  const personal = isPersonal(org);
   const said = useDoneSay(run.ready, doneHere, steps.length, agent.appearance?.color, burstRef, (step) =>
-    t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)),
+    t(modeKey(org, `agentSetup.firstRun.say.${step}`), agentGrammar(agent.name)),
   );
   if (run.state === "none") return null;
 
@@ -185,13 +197,14 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         label: thinks?.text ?? null,
         apps: appNames.length ? joinNames(appNames, t) : null,
         members: run.members,
+        personal,
       },
       agent.setup?.done.includes(s) ?? false,
     );
     const pay = state === "plan" && can(org, "manage_billing");
     return {
       key: s,
-      icon: ROW_ICON[s],
+      icon: (personal && PERSONAL_ROW_ICON[s]) || ROW_ICON[s],
       done: state === "done",
       title: words.title,
       desc: words.desc,
@@ -214,6 +227,12 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
     };
   });
 
+  // Row 1 saved: straight into the agents, once, with the template that fits the answer picked.
+  const aboutSaved = (initial: string | null) => {
+    setOpen(null);
+    if (!done.has("team") && steps.includes("team")) setTemplates(initial ? { initial } : {});
+  };
+
   const first = run.created ? firstTasks(run.created)[0] : undefined;
   const asks = firstRunAsks(done, held)
     ? [
@@ -232,8 +251,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
             ]
           : []),
         ...(["fit", "who"] as const).map((k) => ({
-          label: t(`agentSetup.firstRun.asks.${k}`),
-          onClick: () => actions?.resend(t(`agentSetup.firstRun.asks.${k}`)),
+          label: t(modeKey(org, `agentSetup.firstRun.asks.${k}`)),
+          onClick: () => actions?.resend(t(modeKey(org, `agentSetup.firstRun.asks.${k}`))),
         })),
       ]
     : [];
@@ -241,7 +260,9 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   return (
     <SetupCardView
       title={
-        run.state === "complete" ? t("agentSetup.firstRun.complete") : t("agentSetup.firstRun.title", { org: org.name })
+        run.state === "complete"
+          ? t("agentSetup.firstRun.complete")
+          : t(modeKey(org, "agentSetup.firstRun.title"), { org: org.name })
       }
       done={doneHere.length}
       total={steps.length}
@@ -250,42 +271,33 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       rows={rows}
       foot={asks.length > 0 && <SetupAsks lead={t("agentSetup.firstRun.asks.lead")} asks={asks} />}
     >
-      {open === "about" && (
-        <AboutDialog
-          context={run.context}
-          typed={run.typed}
-          onClose={() => setOpen(null)}
-          onSaved={(business) => {
-            setOpen(null);
-            // Straight into the team, once, with that business's template picked.
-            if (!done.has("team") && steps.includes("team")) {
-              setTemplates(business && isTemplateBusiness(business) ? { initial: business } : {});
-            }
-          }}
-        />
-      )}
+      {open === "about" &&
+        (personal ? (
+          <AboutYouDialog context={run.context} typed={run.typed} onClose={() => setOpen(null)} onSaved={aboutSaved} />
+        ) : (
+          <AboutDialog context={run.context} typed={run.typed} onClose={() => setOpen(null)} onSaved={aboutSaved} />
+        ))}
       {open === "apps" && <AppsDialog team={team} onClose={() => setOpen(null)} />}
       <TeamTemplatesDialog open={templates !== null} initial={templates?.initial} onClose={() => setTemplates(null)} />
     </SetupCardView>
   );
 }
 
-/**
- * Row 1: "O que a Acme faz?", the business types to tap and one optional sentence; saved as the workspace's context,
- * which every agent reads. "Outra coisa" asks for the sentence. What the person already typed to the right hand comes
- * filled in.
- */
-function AboutDialog({
-  context,
-  typed,
-  onClose,
-  onSaved,
-}: {
+/** Row 1's dialog: the workspace's context as it is, what the person typed to the right hand, and what to open next. */
+interface AboutProps {
   context: string;
   typed: string | null;
   onClose: () => void;
-  onSaved: (business: BusinessType | null) => void;
-}) {
+  /** Saved: the team template that fits the answer, if any. */
+  onSaved: (template: string | null) => void;
+}
+
+/**
+ * Row 1: "What does Acme do?", the business types to tap and one optional sentence; saved as the workspace's context,
+ * which every agent reads. "Something else" asks for the sentence. What the person already typed to the right hand
+ * comes filled in.
+ */
+function AboutDialog({ context, typed, onClose, onSaved }: AboutProps) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const save = useUpdateSettings(org.id);
@@ -301,7 +313,12 @@ function AboutDialog({
       okDisabled={!text}
       busy={save.isPending}
       onClose={onClose}
-      onOk={() => save.mutate({ context: text }, { onSuccess: () => onSaved(business) })}
+      onOk={() =>
+        save.mutate(
+          { context: text },
+          { onSuccess: () => onSaved(business && isTemplateBusiness(business) ? business : null) },
+        )
+      }
       note={save.isError ? <span className="setup-dlg__error">{errorText(t, save.error)}</span> : undefined}
     >
       <Locked when={save.isPending}>
@@ -333,6 +350,61 @@ function AboutDialog({
 }
 
 /**
+ * A personal workspace's row 1 (ADR 0158): the areas of life the person wants help with, several at once, and one
+ * optional sentence about them; saved as the workspace's context (`aboutYouContext`), which every agent reads, and
+ * read back into the same answers when opened again. "Something else" asks for the sentence.
+ */
+function AboutYouDialog({ context, typed, onClose, onSaved }: AboutProps) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const save = useUpdateSettings(org.id);
+  const [start] = useState(() => readAboutYou(t, context || typed || ""));
+  const [areas, setAreas] = useState<ReadonlySet<LifeArea>>(() => new Set(start.areas));
+  const [line, setLine] = useState(start.line);
+  const other = areas.has("other");
+  const text = aboutYouContext(t, areas, line);
+  const toggle = (a: LifeArea) =>
+    setAreas((now) => {
+      const next = new Set(now);
+      if (next.has(a)) next.delete(a);
+      else next.add(a);
+      return next;
+    });
+  return (
+    <StepDialog
+      title={t("agentSetup.firstRun.about.titlePersonal")}
+      description={t("agentSetup.firstRun.about.descPersonal")}
+      ok={t("common.save")}
+      okDisabled={!text}
+      busy={save.isPending}
+      onClose={onClose}
+      onOk={() => save.mutate({ context: text }, { onSuccess: () => onSaved(lifeAreaTemplate(areas)) })}
+      note={save.isError ? <span className="setup-dlg__error">{errorText(t, save.error)}</span> : undefined}
+    >
+      <Locked when={save.isPending}>
+        <div className="tp-chips__row">
+          {LIFE_AREAS.map((a) => (
+            <button key={a} type="button" className="tp-chip" aria-pressed={areas.has(a)} onClick={() => toggle(a)}>
+              {areas.has(a) && <Icon name="check" size={14} />}
+              <span>{t(`teamPlan.lifeArea.${a}`)}</span>
+            </button>
+          ))}
+        </div>
+        <Field
+          label={t("agentSetup.firstRun.about.linePersonal")}
+          hint={{
+            name: t("common.about", { label: t("agentSetup.firstRun.about.linePersonal") }),
+            text: other ? undefined : t("agentSetup.firstRun.about.optionalPersonal"),
+          }}
+        >
+          <Input value={line} onChange={(e) => setLine(e.target.value)} maxLength={500} required={other} />
+        </Field>
+      </Locked>
+    </StepDialog>
+  );
+}
+
+/**
  * Row 4: the apps the team just made would use (its roles' suggestions), plug-and-play ones only, each with Conectar
  * (the same connect dialog as Settings, whose last step says which agents use it: all of them, by default).
  */
@@ -348,8 +420,8 @@ function AppsDialog({ team, onClose }: { team: Agent[]; onClose: () => void }) {
   return (
     <>
       <StepDialog
-        title={t("agentSetup.firstRun.apps.title")}
-        description={t("agentSetup.firstRun.apps.desc")}
+        title={t(modeKey(org, "agentSetup.firstRun.apps.title"))}
+        description={t(modeKey(org, "agentSetup.firstRun.apps.desc"))}
         ok={t("common.close")}
         cancel={false}
         busy={false}

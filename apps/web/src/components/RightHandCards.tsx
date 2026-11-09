@@ -46,6 +46,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { settingsSectionNameKey } from "@agenteschat/client/lib/personal-view";
 import {
   cardOutcome,
   chosenRows,
@@ -725,16 +726,21 @@ export function OpenPageCardView({ card }: { card: OpenPageCard }) {
   const server = useAuthConfig().data;
   const navigate = useNavigate();
   const page = APP_PAGES[card.page];
+  const section = SETTINGS_SECTIONS.find(
+    (s) => page.web === `/settings/${s.id}` || page.web.startsWith(`/settings/${s.id}?`),
+  );
+  // A settings section by the name the settings list shows (a personal workspace's About you, ADR 0158).
+  const named =
+    section && page.label === `settings.section.${section.id}`
+      ? t(settingsSectionNameKey(org, section.id))
+      : t(page.label as never);
   const title =
     card.page === "agent"
       ? (dir.anyAgent(card.agentId ?? "")?.name ?? t("channel.unknownAgent"))
       : card.page === "channel"
         ? `#${channels.data?.find((c) => c.id === card.channelId)?.name ?? ""}`
-        : t(page.label as never);
+        : named;
   const path = appPagePath(page.web, card);
-  const section = SETTINGS_SECTIONS.find(
-    (s) => page.web === `/settings/${s.id}` || page.web.startsWith(`/settings/${s.id}?`),
-  );
   const allowed = section
     ? section.allowed(org, server) && (!page.may || can(org, page.may))
     : !page.may || can(org, page.may);

@@ -14,10 +14,12 @@ import {
   teamColumns,
   teamCounts,
   teamFailureText,
+  teamInDms,
   teamRoutines,
   teamStatus,
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AgentSticker,
   Button,
@@ -142,7 +144,11 @@ export function ReplyChips({ message }: { message: Message }) {
   );
 }
 
-/** The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. */
+/**
+ * The team on a card or a template: a row per agent, the routines, the skills and what waits for approval. An agent's
+ * channel shows only in a team's workspace and when it has one: in a personal workspace (ADR 0158) each agent is
+ * someone to talk to, not a place.
+ */
 export function TeamPlanBody({
   plan,
   onAdjust,
@@ -157,6 +163,8 @@ export function TeamPlanBody({
   const dir = useDirectory(org.id);
   const lodi = dir.agents.find(isRightHand);
   const routines = teamRoutines(plan);
+  const personal = isPersonal(org);
+  const channelOf = (a: TeamAgentDraft) => (personal ? "" : a.channel);
   return (
     <div className="tp-body">
       <ul className="tp-agents">
@@ -170,11 +178,13 @@ export function TeamPlanBody({
               <span className="ac-mediarow__meta">{a.role}</span>
             </span>
             <span className="ac-mediarow__end ac-mediarow__end--wrap">
-              <span className="tp-pill">
-                <Icon name="channel" size={14} />
-                <span>{a.channel}</span>
-                {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
-              </span>
+              {channelOf(a) && (
+                <span className="tp-pill">
+                  <Icon name="channel" size={14} />
+                  <span>{a.channel}</span>
+                  {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+                </span>
+              )}
               {onAdjust && (
                 <Button
                   size="sm"
@@ -203,8 +213,8 @@ export function TeamPlanBody({
                 <span>
                   <b>{proposedRoutineWhen(t, i18n.language, routine)}</b> ·{" "}
                   {agent
-                    ? `${agent.name}, #${agent.channel}: ${routine.name}`
-                    : `${lodi?.name ?? "Lodi"}: ${t("teamPlan.card.weekly")}`}
+                    ? `${channelOf(agent) ? `${agent.name}, #${agent.channel}` : agent.name}: ${routine.name}`
+                    : `${lodi?.name ?? "Lodi"}: ${t(modeKey(org, "teamPlan.card.weekly"))}`}
                 </span>
               </li>
             ))}
@@ -236,11 +246,12 @@ export function TeamPlanBody({
   );
 }
 
-const countsText = (t: TFunction, plan: TeamPlan) => {
+/** "3 agents · 2 new channels · 3 routines"; a personal workspace counts no channels (ADR 0158). */
+const countsText = (t: TFunction, plan: TeamPlan, personal: boolean) => {
   const n = teamCounts(plan);
   return [
     t("teamPlan.card.agents", { count: n.agents }),
-    n.newChannels > 0 ? t("teamPlan.card.newChannels", { count: n.newChannels }) : "",
+    n.newChannels > 0 && !personal ? t("teamPlan.card.newChannels", { count: n.newChannels }) : "",
     n.routines > 0 ? t("teamPlan.card.routineCount", { count: n.routines }) : "",
   ]
     .filter(Boolean)
@@ -267,6 +278,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
   const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
   const plan = card.params;
   const status = teamStatus(card);
+  const personal = isPersonal(org);
   const failed = (e: unknown) => toast.show(errorText(t, e), "error");
   const title = t("ask.kind.team");
   const names = joinNames(
@@ -329,12 +341,15 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
                     })
                   }
                 >
-                  {t(card.error ? "teamPlan.card.retry" : "teamPlan.card.create")}
+                  {t(card.error ? "teamPlan.card.retry" : modeKey(org, "teamPlan.card.create"))}
                 </Button>
               )}
-              <Button size="sm" icon="diagram" onClick={() => setMap(true)}>
-                {t("teamPlan.card.map")}
-              </Button>
+              {/* Agents that each live in a DM with the person have no map to show (ADR 0158): the list says it all. */}
+              {!teamInDms(plan) && (
+                <Button size="sm" icon="diagram" onClick={() => setMap(true)}>
+                  {t("teamPlan.card.map")}
+                </Button>
+              )}
               {(decides || card.forUserId === me.user.id) && (
                 <Button
                   size="sm"
@@ -348,7 +363,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
               )}
             </>
           }
-          end={<span className="small muted">{countsText(t, plan)}</span>}
+          end={<span className="small muted">{countsText(t, plan, personal)}</span>}
           what={names}
         />
         {adjusting && (
@@ -370,11 +385,16 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
   }
   if (status === "created") {
     const by = card.decidedByUserId === me.user.id ? null : dir.memberById.get(card.decidedByUserId ?? "")?.name;
-    const channels = joinNames(
-      plan.newChannels.map((c) => `#${c}`),
-      t,
-    );
+    const channels = personal
+      ? ""
+      : joinNames(
+          plan.newChannels.map((c) => `#${c}`),
+          t,
+        );
     const counts = teamCounts(plan);
+    const madeBy = by
+      ? t(modeKey(org, "teamPlan.card.created"), { name: by })
+      : t(modeKey(org, "teamPlan.card.createdYou"));
     const undoable = teamUndoable(card, { userId: me.user.id, admin: can(org, "manage_agents") });
     return (
       <>
@@ -393,7 +413,7 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
           }
           time={card.decidedAt ? whenAt(t, i18n.language, card.decidedAt) : undefined}
         >
-          {by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: <b>{names}</b>
+          {madeBy}: <b>{names}</b>
           {channels && ` · ${channels}`}
           {counts.routines > 0 && ` · ${t("teamPlan.card.routineCount", { count: counts.routines })}`}
         </RequestDone>
@@ -420,9 +440,9 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
     <RequestDone done={false} label={title}>
       {t(
         status === "undone"
-          ? "teamPlan.card.undone"
+          ? modeKey(org, "teamPlan.card.undone")
           : status === "denied"
-            ? "teamPlan.card.dismissed"
+            ? modeKey(org, "teamPlan.card.dismissed")
             : "approval.expired",
       )}
       : <b>{names}</b>
@@ -443,7 +463,8 @@ function FirstTaskCard({ message, card, held }: { message: Message; card: TeamPr
   const invite = useInviteDialog();
   const [later, setLater] = useState(false);
   const tasks = firstTasks(card).filter((f) => dir.agentById.has(f.agentId));
-  const people = held ? [] : card.params.invite;
+  // No "Invite …" in a personal workspace (ADR 0158): it is for one person, inviting stays in Settings.
+  const people = held || isPersonal(org) ? [] : card.params.invite;
   const example = held && tasks[0] ? card.params.example : undefined;
   if (later || (tasks.length === 0 && people.length === 0)) return null;
   const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
@@ -593,9 +614,12 @@ function AdjustDialog({
             <Field label={t("teamPlan.adjust.line")}>
               <Input value={v.line} onChange={set("line")} maxLength={300} required />
             </Field>
-            <Field label={t("teamPlan.adjust.channel")}>
-              <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
-            </Field>
+            {/* An agent with no channel lives in its DM with the person (ADR 0158): nothing to name. */}
+            {agent.channel && (
+              <Field label={t("teamPlan.adjust.channel")}>
+                <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
+              </Field>
+            )}
             <Field label={t("teamPlan.adjust.instructions")}>
               <Textarea value={v.instructions} onChange={set("instructions")} rows={5} />
             </Field>
@@ -618,8 +642,8 @@ function AdjustDialog({
 }
 
 /**
- * "Ver como mapa": the team read only, the people on top, a column per channel with its agents and routines, the
- * right hand under it as the weekly reviewer.
+ * "See as a map": the team read only, the people on top, a column per channel with its agents and routines, the
+ * right hand under it as the weekly reviewer. An agent with no channel has a column of its own, with no channel on top.
  */
 export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -630,7 +654,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("teamPlan.map.title")}
+      title={t(modeKey(org, "teamPlan.map.title"))}
       closeLabel={t("common.close")}
       width={960}
     >
@@ -645,12 +669,18 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
         </section>
         <div className="tp-map__columns">
           {teamColumns(plan).map((col) => (
-            <section key={col.channel} className="tp-map__col" aria-label={`#${col.channel}`}>
-              <h4 className="tp-pill">
-                <Icon name="channel" size={14} />
-                <span>{col.channel}</span>
-                {col.fresh && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
-              </h4>
+            <section
+              key={col.key}
+              className="tp-map__col"
+              aria-label={col.channel ? `#${col.channel}` : col.agents[0]?.name}
+            >
+              {col.channel && (
+                <h4 className="tp-pill">
+                  <Icon name="channel" size={14} />
+                  <span>{col.channel}</span>
+                  {col.fresh && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+                </h4>
+              )}
               {col.agents.map((a) => (
                 <div key={a.handle} className="tp-map__agent">
                   <span className="ac-iconline">
@@ -690,8 +720,9 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
 }
 
 /**
- * "Modelos de time": the templates by business type, one picked (`initial`: the business row 1 saved), and "Criar o
- * time" makes it at once (ADR 0155 §6). Under the list, the other ways in: an import, or one agent from scratch.
+ * "Team templates": the templates by business type, one picked (`initial`: the business row 1 saved), and "Create the
+ * team" makes it at once (ADR 0155 §6). Under the list, the other ways in: an import, or one agent from scratch. In a
+ * personal workspace (ADR 0158) the server lists them by area of life, and the words are about the person's agents.
  */
 export function TeamTemplatesDialog({
   open,
@@ -710,6 +741,7 @@ export function TeamTemplatesDialog({
   const held = usePlanHold() !== null;
   const lodi = dir.agents.find(isRightHand);
   const name = lodi?.name ?? "Lodi";
+  const personal = isPersonal(org);
   const list = useTeamTemplates(org.id, i18n.language, open);
   const use = useApplyTeamTemplate(org.id);
   const [picked, setPicked] = useState<string | null>(null);
@@ -726,7 +758,7 @@ export function TeamTemplatesDialog({
         {!held && (
           <p className={lodi ? "small muted ac-iconline" : "small muted"}>
             {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
-            <span>{t("teamPlan.templates.tailor")}</span>
+            <span>{t(modeKey(org, "teamPlan.templates.tailor"))}</span>
           </p>
         )}
       </>
@@ -736,8 +768,10 @@ export function TeamTemplatesDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("teamPlan.templates.title")}
-      description={held ? t("teamPlan.templates.heldLead") : t("teamPlan.templates.lead", { name })}
+      title={t(modeKey(org, "teamPlan.templates.title"))}
+      description={
+        held ? t(modeKey(org, "teamPlan.templates.heldLead")) : t(modeKey(org, "teamPlan.templates.lead"), { name })
+      }
       closeLabel={t("common.close")}
       width={1040}
     >
@@ -780,7 +814,7 @@ export function TeamTemplatesDialog({
                     </span>
                     <span className="tp-gallery__text">
                       <b>{t("teamPlan.templates.none")}</b>
-                      <small>{t("teamPlan.templates.noneSub", { name })}</small>
+                      <small>{t(modeKey(org, "teamPlan.templates.noneSub"), { name })}</small>
                     </span>
                   </button>
                 </li>
@@ -813,7 +847,13 @@ export function TeamTemplatesDialog({
         </DialogBody>
       </Locked>
       <DialogFooter
-        note={failed ? <span className="tp-gallery__error">{failed}</span> : chosen ? countsText(t, chosen.team) : null}
+        note={
+          failed ? (
+            <span className="tp-gallery__error">{failed}</span>
+          ) : chosen ? (
+            countsText(t, chosen.team, personal)
+          ) : null
+        }
       >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -829,7 +869,9 @@ export function TeamTemplatesDialog({
                   // A step that failed: its reason here, the card stays open in the right hand's DM.
                   if (out.state !== "created")
                     return setFailed(
-                      out.error ? teamFailureText(t, out.error, i18n.language) : t("teamPlan.templates.failed"),
+                      out.error
+                        ? teamFailureText(t, out.error, i18n.language)
+                        : t(modeKey(org, "teamPlan.templates.failed")),
                     );
                   setFailed(null);
                   onClose();
@@ -841,7 +883,7 @@ export function TeamTemplatesDialog({
             )
           }
         >
-          {t("teamPlan.templates.create")}
+          {t(modeKey(org, "teamPlan.templates.create"))}
         </Button>
       </DialogFooter>
     </Dialog>

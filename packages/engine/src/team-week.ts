@@ -603,9 +603,15 @@ export async function postTeamWeek(
   const userId = typeof payload.userId === "string" ? payload.userId : null;
   const slot = typeof payload.slot === "string" ? new Date(payload.slot) : null;
   if (!userId || !slot || Number.isNaN(slot.getTime())) return null;
-  const [member] = rowsOf<{ team_week: unknown; admin: boolean; tz: string | null; locale: string | null }>(
+  const [member] = rowsOf<{
+    team_week: unknown;
+    admin: boolean;
+    tz: string | null;
+    locale: string | null;
+    mode: string | null;
+  }>(
     await db.execute(sql`select m.team_week, ${maySql(sql`m.org_id`, sql`m.user_id`, "administrator")} as admin,
-        s.timezone as tz, u.locale
+        s.timezone as tz, u.locale, s.mode
       from organization_members m left join organization_settings s on s.org_id = m.org_id
       join users u on u.id = m.user_id
       where m.org_id = ${orgId} and m.user_id = ${userId}`),
@@ -640,6 +646,8 @@ export async function postTeamWeek(
   });
   if (!built) return null;
   const card: TeamWeekCard = { ...built, period, done: {}, dismissedAt: null };
+  // A personal workspace's week is the person's own with their agents (ADR 0158), not a team's.
+  const week = member.mode === "personal" ? "teamWeekReadyPersonal" : "teamWeekReady";
   const message = await db.transaction(async (tx) => {
     const dm = await openPersonAgentDm(tx, orgId, userId, lodi.id);
     if (await posted(tx)) return null;
@@ -648,7 +656,7 @@ export async function postTeamWeek(
       channelId: dm.id,
       author: { type: "agent", agentId: lodi.id, runId: null, hop: 1, stretchId: null },
       // Only this person reads it: the push and the conversation list say it in their language.
-      body: pushStrings(pushLocale(member.locale))[prefs.daily ? "teamDayReady" : "teamWeekReady"],
+      body: pushStrings(pushLocale(member.locale))[prefs.daily ? "teamDayReady" : week],
       meta: {
         bodyCode: TEAM_WEEK_CARD,
         bodyParams: { from: card.from, to: card.to, ...(prefs.daily ? { period: "day" } : {}) },

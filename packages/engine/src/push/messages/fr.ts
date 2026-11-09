@@ -77,4 +77,14 @@ export const strings: Partial<PushStrings> = {
   usageRefusedTitle: (a) => `${a} a refusé votre demande d’utilisation supplémentaire`,
   teamWeekReady: "La semaine de votre équipe est prête",
   teamDayReady: "Votre résumé du jour est prêt",
+  machineConnectedTitlePersonal: "Un nouvel ordinateur a été connecté",
+  computerReadyTitlePersonal: "L’ordinateur de vos agents est prêt",
+  agentUnreachedBodyPersonal:
+    "La personne qui a créé la routine ne peut pas encore parler à cet agent. Touchez pour l’autoriser.",
+  widgetFailedReasonsPersonal: {
+    creator_left: "La personne qui l’a configuré ne fait plus partie de votre espace de travail.",
+  },
+  joinRequestTitlePersonal: (name) => `${name} demande à rejoindre votre espace de travail`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} a proposé d’inviter ${name}`,
+  teamWeekReadyPersonal: "Votre semaine est prête",
 };

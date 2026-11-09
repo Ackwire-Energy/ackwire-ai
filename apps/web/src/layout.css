@@ -4011,6 +4011,18 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 .settings__link > .ac-icon {
   color: var(--ink-muted);
 }
+/* A personal workspace's Advanced row (ADR 0158) is a button that shows the other sections: a row like its links, none
+   of the browser's button look. */
+button.settings__link {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 /* Hover is a tint; the current page is a raised key (never the same look), as the agent page's current tab: its edge
    and shadow show it in light too, where a raised face is white on the white page. */
 .settings__link:hover {
@@ -12560,6 +12572,40 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   padding: 0;
   border-radius: var(--control-r-md);
 }
+/* A personal workspace's top row (ADR 0158): the person's menu where a team's workspace header is (its face as big as
+   the workspace's mark), then the bell and the collapse, bare icons on the same sky. No foot under the list. */
+.sidebar__org--person {
+  gap: 2px;
+  overflow: visible;
+}
+.sidebar__org--person .sidebar__org-button > .ac-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+.sidebar__org--person .sidebar__bell {
+  color: var(--ink);
+}
+/* The rail: the face, then the bell and the collapse as its 40px tiles, one column. */
+.sidebar[data-rail="true"] .sidebar__org--person {
+  gap: 2px;
+}
+.sidebar[data-rail="true"] .sidebar__head-collapse.ac-btn {
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--control-r-md);
+}
+/* Go to… as the list's first row in a personal workspace: its ⌘K quiet at the row's end, gone in the rail with the
+   rows' other ends (`.sidebar__item-meta`). */
+.sidebar__goto-keys {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  max-width: none;
+}
+.sidebar__goto .ac-kbd {
+  color: var(--faint);
+}
 /* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */
 .sidebar-setup {
   display: grid;
@@ -12623,6 +12669,11 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   }
   .sidebar:not([data-rail="true"]) .sidebar__collapse.ac-btn {
     width: var(--control-h-md);
+  }
+  .sidebar:not([data-rail="true"]) .sidebar__head-collapse.ac-btn {
+    width: var(--control-h-md);
+    height: var(--control-h-md);
+    border-radius: var(--control-r-md);
   }
   /* Its icon and words still in the rows' columns: 9px in, the 18px icon, 9px to the words. */
   .sidebar:not([data-rail="true"]) .sidebar__jump {

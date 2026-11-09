@@ -77,4 +77,12 @@ export const strings: Partial<PushStrings> = {
   usageRefusedTitle: (a) => `${a} heeft je verzoek om meer gebruik geweigerd`,
   teamWeekReady: "De week van je team staat klaar",
   teamDayReady: "Je dagoverzicht staat klaar",
+  machineConnectedTitlePersonal: "Er is een nieuwe computer gekoppeld",
+  computerReadyTitlePersonal: "De computer van je agents staat klaar",
+  agentUnreachedBodyPersonal:
+    "Wie de routine heeft gemaakt, kan nog niet met deze agent praten. Tik om het toe te staan.",
+  widgetFailedReasonsPersonal: { creator_left: "Wie hem heeft ingesteld, zit niet meer in je werkruimte." },
+  joinRequestTitlePersonal: (name) => `${name} wil lid worden van je werkruimte`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} heeft voorgesteld om ${name} uit te nodigen`,
+  teamWeekReadyPersonal: "Je week staat klaar",
 };

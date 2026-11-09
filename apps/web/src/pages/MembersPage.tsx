@@ -371,7 +371,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
 
 /**
  * The page's own actions for whoever may invite: copy the workspace's link (made the first time, ADR 0068) and open
- * the invite dialog.
+ * the invite dialog. In a personal workspace both ask first who is invited (ADR 0158 §4).
  */
 function InviteActions() {
   const { t } = useTranslation();
@@ -387,10 +387,14 @@ function InviteActions() {
     const url = shown ?? (await make.mutateAsync().catch(() => null))?.url;
     if (url) copy("link", url);
   };
+  const copyAsked = () => {
+    if (invite) invite.ask(() => void copyLink());
+    else void copyLink();
+  };
   return (
     <>
       {!held && (
-        <Button loading={make.isPending} onClick={() => void copyLink()}>
+        <Button loading={make.isPending} onClick={copyAsked}>
           <SwapLabel
             icon="link"
             altIcon="check"

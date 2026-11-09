@@ -120,13 +120,14 @@ html:is([data-fullscreen], [data-desktop="windows"], [data-desktop="linux"]) .ti
   display: none;
 }
 
-/* The workspace sits under the bar; ⌘K and the sidebar toggle live in the bar, so the sidebar's row goes. */
+/* The workspace sits under the bar; ⌘K and the sidebar toggle live in the bar, so the sidebar's row goes, and in a
+   personal workspace (ADR 0158) its Go to… row and the collapse beside the person. */
 html[data-desktop] .shell {
   height: calc(100vh - var(--titlebar-h));
   /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
   height: calc(100dvh - var(--titlebar-h));
 }
-html[data-desktop] .sidebar__jump-row {
+html[data-desktop] :is(.sidebar__jump-row, .sidebar__goto, .sidebar__head-collapse) {
   display: none;
 }
 /* Sign-in: the logo clears the window's buttons. */

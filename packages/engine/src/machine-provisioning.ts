@@ -5,7 +5,7 @@ import { serverText } from "@agenteschat/i18n";
 import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import { caches } from "./cache";
 import { decodeCursor, encodeCursor } from "./cursor";
-import { type EmailLocale, emailCrew, emailLocale, emailsByLocale, queueEmail } from "./email";
+import { type EmailLocale, emailCrew, emailLocale, emailsByLocale, modeStamp, queueEmail } from "./email";
 import { ConflictError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { DEVICE_CODE_TTL_MS, generateUserCode } from "./machine-device";
@@ -14,6 +14,7 @@ import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
 import { openOrg, orgStanding, STANDING_COLUMNS, workRefusal } from "./standing";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const {
   organizations,
@@ -322,10 +323,15 @@ export async function setProvisioning(
 /**
  * The workspace's computer's name until someone renames it, in its first owner's language: what the apps call
  * it (mirrors `computerSetup.title` in packages/i18n). A name like any computer's, so every message that names
- * it says a computer, never the bare workspace.
+ * it says a computer, never the bare workspace. A personal workspace's (ADR 0158) is its person's agents' computer
+ * (`computerSetup.titlePersonal`), which names no workspace, so a rename never touches it.
  */
-export const managedMachineName = (orgName: string, locale: EmailLocale) =>
-  cleanMachineName(serverText(locale, "computerSetup.title", { org: orgName }));
+export const managedMachineName = (orgName: string, locale: EmailLocale, personal = false) =>
+  cleanMachineName(
+    personal
+      ? serverText(locale, "computerSetup.titlePersonal")
+      : serverText(locale, "computerSetup.title", { org: orgName }),
+  );
 
 /** The workspace was renamed: its computer, still under the name it got for the old one, takes the new one. */
 export async function followWorkspaceName(db: Executor, orgId: string, from: string, to: string) {
@@ -381,6 +387,7 @@ export async function issueManagedMachine(
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")))
     .orderBy(asc(organizationMembers.createdAt))
     .limit(1);
+  const personal = await isPersonalWorkspace(db, orgId);
   const now = deps.now?.() ?? new Date();
   const enrollCode = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + DEVICE_CODE_TTL_MS);
@@ -391,7 +398,7 @@ export async function issueManagedMachine(
       .values({
         orgId,
         kind: "managed",
-        name: name || managedMachineName(org.name, emailLocale(owner?.locale)),
+        name: name || managedMachineName(org.name, emailLocale(owner?.locale), personal),
         createdAt: now,
         updatedAt: now,
       })
@@ -574,6 +581,7 @@ async function queueReadyEmail(
     draft.owners.map((o) => ({ email: o.email, locale: emailLocale(o.locale) })),
     `computer_ready:${machineId}:${readyAt.getTime()}`,
   );
+  const mode = await modeStamp(tx, row.orgId);
   for (const group of groups) {
     await queueEmail(tx, {
       orgId: row.orgId,
@@ -589,6 +597,7 @@ async function queueReadyEmail(
         crew: draft.crew,
         url: `${draft.publicUrl.replace(/\/$/, "")}/org/${row.orgId}`,
         ...(draft.kept ? { keptUrl: `${draft.publicUrl.replace(/\/$/, "")}${draft.kept}` } : {}),
+        ...mode,
       },
     });
   }

@@ -29,6 +29,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   BrainIcon,
   Button,
@@ -163,11 +164,12 @@ function Section({
 
 function AgentHead({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const shown = useAgentPresence(agent.id);
   const busy = useStreams((s) => agentStateIn(s, agent.id) !== "idle");
   const line = agentLine(t, shown?.line ?? null, i18n.language);
   const word = busy ? t("team.workingNow") : shown ? t(`presence.${shown.presence}`) : null;
-  const role = isRightHand(agent) ? t("rightHand.role") : agent.role || `@${agent.handle}`;
+  const role = isRightHand(agent) ? t(modeKey(org, "rightHand.role")) : agent.role || `@${agent.handle}`;
   return (
     <header className="dm-side__head">
       <div className="agp-cover dm-side__cover">

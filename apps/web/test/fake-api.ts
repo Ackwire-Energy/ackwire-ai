@@ -108,7 +108,7 @@ import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import type { PlanModel } from "@agenteschat/client/lib/plans";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
-import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
+import { sidebarItemOrder, sidebarSections } from "@agenteschat/client/lib/sidebar-items";
 import type { TeamWeekPrefs } from "@agenteschat/client/lib/team-week";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
@@ -1286,6 +1286,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
+  // A personal workspace (ADR 0158), as `me` says.
+  const personalOrg = (orgId: string) => state.me?.organizations.find((o) => o.id === orgId)?.mode === "personal";
   // A new `me` with the org's logo changed, as the server answers: what the app read before stays as it was.
   const setOrgLogo = (orgId: string, logo: string | null) => {
     if (!state.me) return;
@@ -1531,6 +1533,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           name: input.name,
           role: "owner",
           onboarding: { step: "context", generalChannelId: general },
+          // Who it is for (ADR 0158), as the server keeps it.
+          ...(input.mode ? { mode: input.mode } : {}),
         });
         state.channels.push({
           id: general,
@@ -1670,11 +1674,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
       },
-      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      // As the server: an order never saved is the default of the workspace's mode (ADR 0158).
+      sidebarOrder: async (orgId) => [...(state.sidebarOrder ?? sidebarSections(personalOrg(orgId)))],
       setSidebarOrder: async (orgId, order) => {
         log("orgs.setSidebarOrder", orgId, order);
         state.sidebarOrder = order ? [...order] : undefined;
-        return [...(order ?? ["tools", "channels", "agents", "people"])];
+        return [...(order ?? sidebarSections(personalOrg(orgId)))];
       },
       issuesView: async () => structuredClone(state.issuesView ?? ISSUES_VIEW_DEFAULT),
       setIssuesView: async (orgId, view) => {
@@ -1682,11 +1687,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.issuesView = structuredClone(view);
         return structuredClone(view);
       },
-      sidebarToolOrder: async () => [...(state.sidebarToolOrder ?? SIDEBAR_ITEMS)],
+      sidebarToolOrder: async (orgId) => [...(state.sidebarToolOrder ?? sidebarItemOrder(personalOrg(orgId)))],
       setSidebarToolOrder: async (orgId, order) => {
         log("orgs.setSidebarToolOrder", orgId, order);
         state.sidebarToolOrder = order ? [...order] : undefined;
-        return [...(order ?? SIDEBAR_ITEMS)];
+        return [...(order ?? sidebarItemOrder(personalOrg(orgId)))];
       },
       sidebarView: async () =>
         structuredClone(state.sidebarView ?? { agentSort: "workspace", showAllAgents: false, pins: null }),
@@ -1791,11 +1796,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         actionCheck: state.actionCheck ?? true,
         autoModels: state.autoModels ?? {},
         ...mediaSettings(state),
+        mode: personalOrg(orgId) ? "personal" : "team",
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
       updateSettings: async (orgId, input) => {
         log("orgs.updateSettings", orgId, input);
+        // A switch of mode (ADR 0158), with the name it may bring: `me` says them at once, as the server's.
+        const { mode, name } = input;
+        if (mode !== undefined && state.me) {
+          const named = name ? { name } : {};
+          state.me = {
+            ...state.me,
+            organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, mode, ...named } : o)),
+          };
+        }
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
@@ -1826,6 +1841,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           actionCheck: state.actionCheck ?? true,
           autoModels: state.autoModels ?? {},
           ...mediaSettings(state),
+          mode: personalOrg(orgId) ? "personal" : "team",
         };
       },
       overview: async () => ({

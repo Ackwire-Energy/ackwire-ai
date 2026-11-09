@@ -48,6 +48,7 @@ import { type PlanChoice as AiPlan, planOfKind } from "@agenteschat/client/lib/n
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
   type AgentAppearance,
@@ -949,7 +950,7 @@ function NewAgentFlow({
               </button>
               {role === "custom" && (
                 <Card as="div" className="newag__card">
-                  <Field label={t("agent.roleLabel")} id="ag-role" example={t("agent.roleHelp")}>
+                  <Field label={t("agent.roleLabel")} id="ag-role" example={t(modeKey(org, "agent.roleHelp"))}>
                     <Input
                       value={roleText}
                       maxLength={200}
@@ -1026,7 +1027,7 @@ function NewAgentFlow({
     },
     identity: () => (
       <>
-        {head(t("newAgent.steps.identity.title"), t("newAgent.steps.identity.lead"))}
+        {head(t("newAgent.steps.identity.title"), t(modeKey(org, "newAgent.steps.identity.lead")))}
         <Card as="div" className="newag__card">
           <div className="newag__grid2">
             <Field
@@ -1104,7 +1105,7 @@ function NewAgentFlow({
           {head(
             t("newAgent.steps.instructions.title", g),
             t("newAgent.steps.instructions.lead"),
-            t("agent.instructionsHelp", { ...g, org: org.name }),
+            t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
           )}
           <Textarea
             className="newag__textarea"
@@ -1283,7 +1284,7 @@ function NewAgentFlow({
     ),
     where: () => (
       <>
-        {head(t("newAgent.steps.where.title"), t("newAgent.steps.where.lead", g))}
+        {head(t("newAgent.steps.where.title"), t(modeKey(org, "newAgent.steps.where.lead"), g))}
         <div className="newag__sect newag__sect--first">
           <h2>
             <Icon name="channel" />
@@ -1933,14 +1934,14 @@ function CreatedMoment({
         <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
       </span>
       <div className="newag__born-text" ref={text}>
-        <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
+        <p className="onb__eyebrow onb__eyebrow--sky">{t(modeKey(org, "newAgent.newOnTeam"))}</p>
         <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
-          {t("newAgent.createdTitle", { name: agent.name })}
+          {t(modeKey(org, "newAgent.createdTitle"), { name: agent.name })}
         </h1>
         <p className="newag__born-lead">
           {channels.length > 0
             ? t("newAgent.createdText", { channels: names, handle: agent.handle })
-            : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
+            : t(modeKey(org, "newAgent.createdTextNoChannels"), { name: agent.name, handle: agent.handle })}
         </p>
         <div className="newag__born-actions">
           {first && (

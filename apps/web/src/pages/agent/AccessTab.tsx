@@ -1,5 +1,6 @@
 import { useAgentSkills } from "@agenteschat/client";
 import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Card, Chip, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -151,7 +152,7 @@ export function AccessTab() {
                 <CardHead
                   id="ac-connectors"
                   icon="plug"
-                  title={t("agentPage.access.connectors", { org: org.name })}
+                  title={t(modeKey(org, "agentPage.access.connectors"), { org: org.name })}
                   action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
                 />
                 {editable && resources.some((r) => r.kind === "connector") && (

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { and, eq, inArray, isNull, schema } from "@agenteschat/db";
 import {
+  BUSINESS_TEMPLATES,
   createRole,
   createSetupToolSource,
   createTeam,
@@ -10,6 +11,7 @@ import {
   OFFER_ANSWERS_TOOL,
   OFFER_INVITES_TOOL,
   openPersonAgentDm,
+  PERSONAL_TEMPLATES,
   PROPOSE_TEAM_TOOL,
   postPersonMessage,
   RIGHT_HAND,
@@ -20,6 +22,7 @@ import {
   type TeamProposalCard,
   type ToolContext,
   undoTeam,
+  updateOrgSettings,
   useTeamTemplate,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -432,7 +435,8 @@ describe("team templates", () => {
   test("six, in the person's language, each a team its card would propose", async () => {
     f = await setup({ rightHand: true });
     const list = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "pt-BR");
-    expect(list.map((t) => t.id)).toEqual([...TEAM_TEMPLATES]);
+    expect(list.map((t) => t.id)).toEqual([...BUSINESS_TEMPLATES]);
+    expect(TEAM_TEMPLATES).toEqual([...BUSINESS_TEMPLATES, ...PERSONAL_TEMPLATES]);
     const software = list.find((t) => t.id === "software");
     expect(software?.name).toBe("Software e apps");
     expect(software?.team.agents.map((a) => [a.name, a.channel])).toEqual([
@@ -464,5 +468,54 @@ describe("team templates", () => {
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, used.channelId));
     expect(rows.some((m) => m.meta.replyChips)).toBe(false);
     expect(rows.filter((m) => m.authorType === "agent")).toHaveLength(1);
+  });
+
+  test("a personal workspace lists templates for one person's life, each agent in its DM with no channel", async () => {
+    f = await setup({ rightHand: true });
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const list = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "pt-BR");
+    expect(list.map((t) => t.id)).toEqual([...PERSONAL_TEMPLATES]);
+    const life = list.find((t) => t.id === "life");
+    expect(life?.name).toBe("Vida em ordem");
+    expect(life?.team.agents.map((a) => [a.name, a.channel])).toEqual([
+      ["Clara", ""],
+      ["Duda", ""],
+    ]);
+    for (const t of list) {
+      expect(t.team.newChannels).toEqual([]);
+      expect(t.team.agents.every((a) => a.channel === "" && a.routines.length === 1)).toBe(true);
+      // The weekly check reports on a team's work: not one person's agents.
+      expect(t.team.weekly).toBeNull();
+    }
+  });
+
+  test("Create my agents in a personal workspace: no channel is made, routines report in each agent's DM", async () => {
+    f = await setup({ rightHand: true });
+    await updateOrgSettings(f.db, f.owner.id, f.org.id, { mode: "personal" });
+    const channelsBefore = await f.db.select().from(schema.channels).where(eq(schema.channels.orgId, f.org.id));
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "life", "pt-BR");
+    expect(used).toMatchObject({ state: "created", error: null });
+    const card = await cardOf(f, used.messageId);
+    expect(card.created?.agentIds).toHaveLength(2);
+    expect(card.created?.channelIds).toEqual([]);
+    const ids = card.created?.agentIds ?? [];
+    const channelsAfter = await f.db.select().from(schema.channels).where(eq(schema.channels.orgId, f.org.id));
+    // Only the right hand's DM with the person, where the card went, may be new.
+    const places = (rows: { kind: string }[]) => rows.filter((c) => c.kind !== "dm").length;
+    expect(places(channelsAfter)).toBe(places(channelsBefore));
+    const memberships = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(inArray(schema.channelMembers.agentId, ids));
+    expect(memberships).toEqual([]);
+    const routines = await f.db.select().from(schema.routines).where(inArray(schema.routines.agentId, ids));
+    expect(routines.map((r) => r.target)).toEqual([{ type: "dm" }, { type: "dm" }]);
+  });
+
+  test("a personal template works in a team's workspace too: the mode only picks the gallery's list", async () => {
+    f = await setup({ rightHand: true });
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "health", "en");
+    expect(used).toMatchObject({ state: "created", error: null });
+    expect((await cardOf(f, used.messageId)).params.agents.map((a) => a.name)).toEqual(["Léo", "Mel"]);
   });
 });

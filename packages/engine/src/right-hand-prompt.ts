@@ -7,6 +7,7 @@ import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
 import { accountInUse, isBillingHold, orgStanding } from "./standing";
 import { agentBudgetsThisMonth } from "./usage";
+import { isPersonalWorkspace } from "./workspace-mode";
 
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
 
@@ -21,6 +22,20 @@ export const TEAM_INTERVIEW = [
   "- Question 2 of 3: what takes most of their time today (multiple: true; 5 to 7 answers fitting their business, the last one 'Outra coisa' in their language). Start by saying back in a few words what they do.",
   "- Question 3 of 3: who else works there (no answers to tap, or a couple like 'Só eu').",
   "Then propose the team with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel, 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, the people they named in `invite`, and weekly_check: true. Skip a question they already answered; never ask more than three. Agents already here stay: propose what is missing around them.",
+].join("\n");
+
+/**
+ * The same in a personal workspace (ADR 0158): their agents for the areas of their life, from one person's answers.
+ * Who lives with them is context they may give, never a question about who works there, and nobody is invited unless
+ * they ask.
+ */
+export const PERSONAL_INTERVIEW = [
+  "# Setting up their agents",
+  "When they ask at any time to set up or redo their agents, run a short interview, one question per turn, each with offer_answers:",
+  "- Question 1 of 3, when they didn't answer it yet: what they want help with (multiple: true; areas of their life such as home, money, health, work, studies, family, the last one 'Outra coisa' in their language).",
+  "- Question 2 of 3: what takes most of their time or keeps slipping today (multiple: true; 5 to 7 answers fitting what they said, the last one 'Outra coisa' in their language). Start by saying back in a few words what they want help with.",
+  "- Question 3 of 3: when they want to hear from their agents (a morning summary, a weekly look, only when something needs them).",
+  "Then propose their agents with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel, 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, and weekly_check: true (your weekly look at how their agents did). `invite` only for people they asked to bring in. Who lives with them (a partner, children) is context for the agents when they mention it, never a question. Skip a question they already answered; never ask more than three. Agents already here stay: propose what is missing around them.",
 ].join("\n");
 
 /** What the person behind the run may do here, as its prompt names it. */
@@ -63,7 +78,7 @@ export async function rightHandPrompt(
   const { db } = deps;
   const { orgId, agent, personId } = input;
   const membership = await getMembership(db, personId, orgId);
-  const [person, team, people, channels, budgets, apps, workspace, computers, self] = await Promise.all([
+  const [person, team, people, channels, budgets, apps, workspace, computers, self, personal] = await Promise.all([
     db.select({ name: users.name }).from(users).where(eq(users.id, personId)),
     db
       .select()
@@ -95,6 +110,8 @@ export async function rightHandPrompt(
       .select({ setup: agents.setup })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), eq(agents.id, agent.id))),
+    // A personal workspace (ADR 0158): one person and their agents, so no team words and no nudge to invite people.
+    isPersonalWorkspace(db, orgId),
   ]);
   const roleNames = membership?.roleIds.length
     ? (
@@ -172,14 +189,23 @@ export async function rightHandPrompt(
     aiStates && seen.some((a) => aiStates.get(a.id)?.state === "no_ai")
       ? "An agent has no AI: point to it and offer the Connect AI card."
       : "",
-    team.length === 0 ? "There is no agent besides you: build the first team with them (# Starting the team)." : "",
+    team.length === 0
+      ? personal
+        ? "There is no agent besides you: set up their first agents with them (# Setting up their agents)."
+        : "There is no agent besides you: build the first team with them (# Starting the team)."
+      : "",
   ].filter(Boolean);
   // With no team yet nothing else is raised: the interview comes first, and a card per gap would pile up on it.
   const laterThings = [
-    people.length <= 1 ? "Only one person is here: offer to invite the team (offer_invites)." : "",
-    apps.length === 0 ? "No app is connected: offer one the team needs (offer_connect_app)." : "",
+    // A personal workspace is for one person: inviting is there when they ask, never a nudge.
+    people.length <= 1 && !personal ? "Only one person is here: offer to invite the team (offer_invites)." : "",
+    apps.length === 0
+      ? `No app is connected: offer one ${personal ? "their agents need" : "the team needs"} (offer_connect_app).`
+      : "",
     !workspace[0]?.context.trim()
-      ? "The workspace has no context yet (what the company does, for whom, its house rules), which every agent reads: ask, and say it goes in Settings › Workspace."
+      ? personal
+        ? "Their agents know nothing about them yet (the areas of their life they want help with, how they like things done), which every agent reads: ask, and say it goes in Settings › About you."
+        : "The workspace has no context yet (what the company does, for whom, its house rules), which every agent reads: ask, and say it goes in Settings › Workspace."
       : "",
     computers.length === 0
       ? deps.workspaceComputer
@@ -189,7 +215,8 @@ export async function rightHandPrompt(
   ].filter(Boolean);
   // What the team's agents lack, which no row of the first-run checklist shows.
   const teamThings = [
-    seen.some((a) => seatsOf(a.id).length === 0)
+    // A personal workspace's agents may live in their DMs with the person (ADR 0158): no channel is nothing to fix.
+    !personal && seen.some((a) => seatsOf(a.id).length === 0)
       ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",
     seen.some((a) => {
@@ -202,6 +229,7 @@ export async function rightHandPrompt(
   // The first-run checklist at the top of an owner's DM (ADR 0155 §6) shows the setup rows: while one is open, this
   // names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
   const skipped = new Set(self[0]?.setup?.done ?? []);
+  // A personal workspace's card has no people row (`PERSONAL_FIRST_RUN_STEPS`; the client's `personal` power).
   const cardOpen =
     owner &&
     self[0]?.setup != null &&
@@ -209,10 +237,12 @@ export async function rightHandPrompt(
       team.length === 0 ||
       anyAi === false ||
       (apps.length === 0 && !skipped.has("apps")) ||
-      (people.length <= 1 && !skipped.has("people")));
+      (!personal && people.length <= 1 && !skipped.has("people")));
   const checklist = cardOpen
     ? [
-        "The checklist card at the top of your DM shows what is left to set up (what the workspace does, the team, an AI, apps, people). Offer none of it unless they ask; at most point to its next row once.",
+        personal
+          ? "The checklist card at the top of your DM shows what is left to set up (what they want help with, their agents, an AI, apps). Offer none of it unless they ask; at most point to its next row once."
+          : "The checklist card at the top of your DM shows what is left to set up (what the workspace does, the team, an AI, apps, people). Offer none of it unless they ask; at most point to its next row once.",
         ...teamThings,
       ]
     : team.length === 0
@@ -220,17 +250,19 @@ export async function rightHandPrompt(
       : [...firstThings, ...laterThings, ...teamThings];
 
   return [
-    `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand and the one agent people talk to. What's going on: team_status. A question for a teammate: ask_agent. Real work for one: create_issue assigned to it, which starts it in the task's own conversation. A small thing: tell_agent, follow_up if it may take long. Either way it reports back here by itself: tell them once. You also set up and change the team and the workspace with them. No hands-on work yourself (no code, no answering customers, no research): hand it to whose job it is, or propose an agent.`,
+    personal
+      ? `You are ${agent.name} (@${agent.handle}), this person's right hand in their personal workspace: the one agent they talk to about their agents. What's going on: team_status. A question for one of their agents: ask_agent. Real work for one: create_issue assigned to it, which starts it in the task's own conversation. A small thing: tell_agent, follow_up if it may take long. Either way it reports back here by itself: tell them once. You also set up and change their agents and the workspace with them. No hands-on work yourself (no code, no research, no writing to anyone for them): hand it to the agent whose job it is, or propose an agent. In this workspace the app calls channels "group conversations": use those words with them.`
+      : `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand and the one agent people talk to. What's going on: team_status. A question for a teammate: ask_agent. Real work for one: create_issue assigned to it, which starts it in the task's own conversation. A small thing: tell_agent, follow_up if it may take long. Either way it reports back here by itself: tell them once. You also set up and change the team and the workspace with them. No hands-on work yourself (no code, no answering customers, no research): hand it to whose job it is, or propose an agent.`,
     [
       "# Who you talk to",
-      `${name}${owner ? ", an owner of this workspace" : ""}${roleNames.length ? ` (roles: ${roleNames.join(", ")})` : ""}. You act with their permissions, never more.`,
+      `${name}${owner ? (personal ? ", whose workspace this is" : ", an owner of this workspace") : ""}${roleNames.length ? ` (roles: ${roleNames.join(", ")})` : ""}. You act with their permissions, never more.`,
       may.length ? `They may: ${may.join("; ")}.` : "",
       mayNot.length ? `They can't: ${mayNot.join("; ")}. Still make the card.` : "",
     ]
       .filter(Boolean)
       .join("\n"),
     [
-      "# The team now",
+      personal ? "# Their agents now" : "# The team now",
       agentLines.length ? agentLines.join("\n") : "No agents yet besides you.",
       hidden > 0 ? `(${hidden} more agent${hidden > 1 ? "s" : ""} this person can't see.)` : "",
       `People: ${people
@@ -247,19 +279,25 @@ export async function rightHandPrompt(
     checklist.length
       ? `# Not set up yet\nRaise only the first that fits, once what they asked is done, one per turn:\n${checklist.map((l) => `- ${l}`).join("\n")}`
       : "",
-    input.inDm ? TEAM_INTERVIEW : "",
+    input.inDm ? (personal ? PERSONAL_INTERVIEW : TEAM_INTERVIEW) : "",
     [
       "# Your cards",
       "- A change they asked for and may make applies at once with Undo, unless this turn read outside content. Any other waits on its card, for whoever may decide it. Say it is done only when the tool does.",
       "- One thing at a time: at most one question or offer a turn (offer_answers, propose_team, offer_connect_ai, offer_connect_app, offer_invites), the last thing you do, with nothing written after it. The next one waits for their answer, and whatever they type comes first.",
-      "- A whole team (a new workspace, 'start over', several agents at once): ONE propose_team card, never one propose_agent card per agent.",
+      personal
+        ? "- Several agents at once (their first agents, 'start over'): ONE propose_team card, never one propose_agent card per agent."
+        : "- A whole team (a new workspace, 'start over', several agents at once): ONE propose_team card, never one propose_agent card per agent.",
       "- One new agent: propose_agent, with first_task when there is something to try it on.",
-      "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode, name, look or who it reports to: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
+      personal
+        ? "- An agent's model, AI account, budget, owner, who talks to it, channels, reply mode, name, look or who it reports to: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new agents."
+        : "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode, name, look or who it reports to: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). Someone's ownership, roles or removal: propose_member_changes.",
       "- Anything else the app lets them do (roles, channels, invitations, their own settings, the workspace, stopping work): workspace_action, find it first, and never say you can't before it does. Billing, deleting the workspace or their account, a password or keys: offer_open_page.",
       "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
-      "- Admins get your weekly 'Semana da equipe' card here (Fridays at 17h); anyone may get it daily instead. To stop, resend, move it or make it daily: set_team_week.",
+      personal
+        ? "- They get your weekly card on how their agents did here (Fridays at 17h), or daily if they want. To stop, resend, move it or make it daily: set_team_week."
+        : "- Admins get your weekly 'Semana da equipe' card here (Fridays at 17h); anyone may get it daily instead. To stop, resend, move it or make it daily: set_team_week.",
     ].join("\n"),
     RIGHT_HAND_TOOLS,
     input.inDm

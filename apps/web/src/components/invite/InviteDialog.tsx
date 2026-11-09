@@ -14,9 +14,11 @@ import { capitalize, joinNames, namesText } from "@agenteschat/client/lib/format
 import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
+import { personalHelperRole } from "@agenteschat/client/lib/personal-view";
 import { everyoneOf, isEveryone, roleSummary, sortRoles } from "@agenteschat/client/lib/roles";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { addressesIn, isEmail } from "@agenteschat/client/lib/text";
+import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Avatar,
   AvatarStack,
@@ -54,6 +56,7 @@ import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { MembersFull } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
+import { InviteModeQuestion } from "@/components/WorkspaceModeDialog";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEdited } from "@/hooks/useEdited";
 import { TYPED_VALUES } from "@/i18n";
@@ -77,30 +80,61 @@ export interface InviteRequest {
   channelId?: string;
 }
 
-const InviteContext = createContext<{ open: (request?: InviteRequest) => void } | null>(null);
+const InviteContext = createContext<{
+  open: (request?: InviteRequest) => void;
+  /**
+   * Before something that invites without the dialog (Members' "Copy invitation link"): in a personal workspace, the
+   * question of who is invited first (ADR 0158 §4); in a team's, `then` at once.
+   */
+  ask: (then: () => void) => void;
+} | null>(null);
 
 /** Null outside the workspace shell (a page rendered alone): nothing there opens the dialog. */
 export const useInviteDialog = () => useContext(InviteContext);
 
 /**
  * The workspace's invite dialog, for whoever may invite. Each opening starts over (`n`); it stays mounted while it
- * closes, so the focus goes back to what opened it.
+ * closes, so the focus goes back to what opened it. In a personal workspace each invitation first asks who it is for
+ * (`InviteModeQuestion`): family keeps the workspace personal, work switches it to a team's first.
  */
 export function InviteDialogProvider({ children }: { children: ReactNode }) {
   const { org } = useOrg();
   const [request, setRequest] = useState<(InviteRequest & { n: number }) | null>(null);
   const [open, setOpen] = useState(false);
+  const [asking, setAsking] = useState(false);
+  // What inviting was about to do, while the question waits for its answer.
+  const after = useRef<(() => void) | null>(null);
+  const personal = isPersonal(org);
   const show = useCallback((next: InviteRequest = {}) => {
     setRequest((current) => ({ ...next, n: (current?.n ?? 0) + 1 }));
     setOpen(true);
   }, []);
-  const value = useMemo(() => ({ open: show }), [show]);
+  const ask = useCallback(
+    (then: () => void) => {
+      if (!personal) {
+        then();
+        return;
+      }
+      after.current = then;
+      setAsking(true);
+    },
+    [personal],
+  );
+  const value = useMemo(() => ({ open: (next?: InviteRequest) => ask(() => show(next)), ask }), [ask, show]);
+  const answered = (go: boolean) => {
+    const then = after.current;
+    after.current = null;
+    setAsking(false);
+    if (go) then?.();
+  };
+  const invites = can(org, "invite_people");
   return (
     <InviteContext.Provider value={value}>
       {children}
-      {request && can(org, "invite_people") && (
+      {request && invites && (
         <InviteDialog key={request.n} request={request} open={open} onClose={() => setOpen(false)} />
       )}
+      {invites && <InviteModeQuestion open={asking} onClose={() => answered(false)} onGo={() => answered(true)} />}
     </InviteContext.Provider>
   );
 }
@@ -143,6 +177,8 @@ const hostOf = (agents: readonly Agent[]) =>
 function InviteDialog({ request, open, onClose }: { request: InviteRequest; open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  // A personal workspace's view (ADR 0158): its own words, two plain roles, and no question with only one answer.
+  const personal = isPersonal(org);
   const toast = useToast();
   const api = useApi();
   const dir = useDirectory(org.id);
@@ -166,7 +202,6 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   // Each send's own number: the last screen celebrates once per send, never on a re-render.
   const [sends, setSends] = useState(0);
   const screen: Screen = byLink ? "link" : at;
-  const index = STEPS.indexOf(screen as Step);
   // Once sent, nothing is left to lose.
   const unsaved = useEdited(open, [chips, draft, note]) && screen !== "sent";
   const emailsField = useRef<HTMLInputElement>(null);
@@ -205,21 +240,42 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   const joinRequests = useJoinRequests(org.id, open && screen === "link");
 
   const everyone = everyoneOf(orgRoles);
-  const choices: { value: string; label: string; description: string; role: OrgRole | null }[] = [
-    { value: MEMBER, label: t("roles.member"), description: t("members.chips.memberHint"), role: null },
-    ...sortRoles(orgRoles.filter((r) => !isEveryone(r) && r.givable)).map((r) => ({
-      value: r.id,
-      label: r.name,
-      description: roleSummary(t, i18n.language, r, everyone),
-      role: r,
-    })),
-  ];
+  // Personal: uses the agents (a member) or helps run it (the workspace's Admin, when this person may give it); the
+  // roles themselves, and what each one may do, stay as they are (Roles and permissions, under Advanced).
+  const helper = personal ? personalHelperRole(orgRoles) : null;
+  const plain = (value: string, r: OrgRole | null, words: "uses" | "helps") => ({
+    value,
+    label: t(`members.dialog.role.${words}`),
+    description: t(`members.dialog.role.${words}Text`),
+    role: r,
+  });
+  const choices: { value: string; label: string; description: string; role: OrgRole | null }[] = personal
+    ? [plain(MEMBER, null, "uses"), ...(helper ? [plain(helper.id, helper, "helps")] : [])]
+    : [
+        { value: MEMBER, label: t("roles.member"), description: t("members.chips.memberHint"), role: null },
+        ...sortRoles(orgRoles.filter((r) => !isEveryone(r) && r.givable)).map((r) => ({
+          value: r.id,
+          label: r.name,
+          description: roleSummary(t, i18n.language, r, everyone),
+          role: r,
+        })),
+      ];
   const roleOptions = choices.map(({ value, label, description }) => ({ value, label, description }));
   // A role no longer there (or no longer this person's to give) reads as Membro.
   const known = (id: string | undefined) => (id && choices.some((c) => c.value === id) ? id : MEMBER);
   const perPerson = each && ready.length > 1;
   const roleFor = (email: string) => known(perPerson ? (roles[email] ?? role) : role);
   const roleName = (id: string) => choices.find((c) => c.value === id)?.label ?? t("roles.member");
+  /** Why an address didn't go, in the workspace's words. */
+  const skipped = (status: Exclude<Outcome["status"], "invited">) =>
+    status === "already_member"
+      ? t(modeKey(org, "members.dialog.result.already_member"), { org: org.name })
+      : t(`members.dialog.result.${status}`, { org: org.name });
+  // A personal workspace skips a step with one answer: one role to give, or #general alone to start in.
+  const steps: readonly Step[] = personal
+    ? STEPS.filter((s) => (s !== "role" || choices.length > 1) && (s !== "where" || offered.length > 1))
+    : STEPS;
+  const index = steps.indexOf(screen as Step);
 
   const next = () => {
     if (screen === "who") {
@@ -231,11 +287,11 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
       }
       if (full || !list.some((c) => stateOf(c) === "ok")) return;
     }
-    const following = STEPS[index + 1];
+    const following = steps[index + 1];
     if (following) setAt(following);
   };
   const back = () => {
-    const before = STEPS[index - 1];
+    const before = steps[index - 1];
     if (before) setAt(before);
   };
   const perPersonOn = () => {
@@ -345,18 +401,25 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     if (screen === "who") return { title: t("members.dialog.who.title"), lead: t("members.dialog.who.lead") };
     if (screen === "role")
       return {
-        title: one ? t("members.dialog.role.titleOne", { name: one }) : t("members.dialog.role.titleMany"),
-        lead: t("members.dialog.role.lead"),
+        title: one
+          ? t(modeKey(org, "members.dialog.role.titleOne"), { name: one })
+          : t(modeKey(org, "members.dialog.role.titleMany")),
+        lead: t(modeKey(org, "members.dialog.role.lead")),
       };
     if (screen === "where")
       return {
-        title: one ? t("members.dialog.where.titleOne", { name: one }) : t("members.dialog.where.titleMany"),
+        title: one
+          ? t(modeKey(org, "members.dialog.where.titleOne"), { name: one })
+          : t(modeKey(org, "members.dialog.where.titleMany")),
         lead: t("members.dialog.where.lead", { channel: general?.name ?? "general" }),
       };
     if (screen === "note")
       return { title: t("members.dialog.noteStep.title"), lead: t("members.dialog.noteStep.lead") };
     if (screen === "link")
-      return { title: t("members.dialog.linkStep.title", { org: org.name }), lead: t("members.dialog.linkStep.lead") };
+      return {
+        title: t(modeKey(org, "members.dialog.linkStep.title"), { org: org.name }),
+        lead: t("members.dialog.linkStep.lead"),
+      };
     if (sentOk.length === 0) return { title: t("members.dialog.done.none"), lead: t("members.dialog.done.noneLead") };
     const names = namesText(
       t,
@@ -405,7 +468,8 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           soft={(chip) => stateOf(chip) !== "ok"}
           aside={(chip) => {
             const state = stateOf(chip);
-            if (state === "member") return <ChipNote>{t("members.chips.member", { org: org.name })}</ChipNote>;
+            if (state === "member")
+              return <ChipNote>{t(modeKey(org, "members.chips.member"), { org: org.name })}</ChipNote>;
             if (state === "invited") return <ChipNote>{t("members.chips.invited")}</ChipNote>;
             return null;
           }}
@@ -454,7 +518,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
         </ul>
         <button type="button" className="invite-each" aria-expanded="true" onClick={() => setEach(false)}>
           <Icon name="chevronRight" size={16} />
-          {t("members.dialog.role.same")}
+          {t(modeKey(org, "members.dialog.role.same"))}
         </button>
       </>
     ) : (
@@ -483,7 +547,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
         {ready.length > 1 && (
           <button type="button" className="invite-each" aria-expanded="false" onClick={perPersonOn}>
             <Icon name="chevronRight" size={16} />
-            {t("members.dialog.role.each")}
+            {t(modeKey(org, "members.dialog.role.each"))}
           </button>
         )}
       </>
@@ -492,7 +556,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     answer = (
       <>
         {/* biome-ignore lint/a11y/useSemanticElements: a list of checkboxes, not a fieldset */}
-        <div className="invite-chans ac-list" role="group" aria-label={t("members.dialog.where.label")}>
+        <div className="invite-chans ac-list" role="group" aria-label={t(modeKey(org, "members.dialog.where.label"))}>
           {offered.map((c, i) => {
             const always = c.id === general?.id;
             const roster = rosters[i]?.data;
@@ -563,7 +627,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
           maxLength={INVITE_NOTE_MAX}
           value={note}
           aria-label={t("members.dialog.note")}
-          placeholder={t("members.dialog.notePlaceholder", { org: org.name })}
+          placeholder={t(modeKey(org, "members.dialog.notePlaceholder"), { org: org.name })}
           onChange={(e) => setNote(e.target.value)}
         />
         <MailPreview to={ready.map((c) => c.email)} names={ready.map((c) => first(c.email))} note={note} />
@@ -616,7 +680,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
               </span>
             ) : (
               <span className="invite-state" data-skip="true">
-                {t(`members.dialog.result.${o.status}`, { org: org.name })}
+                {skipped(o.status)}
               </span>
             )}
           </li>
@@ -700,7 +764,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
       <Dialog
         open={open}
         onOpenChange={(o) => !o && onClose()}
-        title={t("members.dialog.title", { org: org.name })}
+        title={t(modeKey(org, "members.dialog.title"), { org: org.name })}
         closeLabel={t("common.close")}
         width={480}
       >
@@ -722,12 +786,12 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("members.dialog.title", { org: org.name })}
+      title={t(modeKey(org, "members.dialog.title"), { org: org.name })}
       subtitle={
         index >= 0
           ? t("members.dialog.stepOf", {
               n: index + 1,
-              total: STEPS.length,
+              total: steps.length,
               step: t(`members.dialog.steps.${screen as Step}`),
             })
           : undefined
@@ -739,7 +803,7 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
     >
       {index >= 0 && (
         <div className="ac-steps invite-steps" aria-hidden="true">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <span key={s} className="ac-steps__bar" data-done={i <= index} />
           ))}
         </div>

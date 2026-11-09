@@ -119,3 +119,43 @@ describe("the first-run checklist", () => {
     expect(card()).toBeNull();
   });
 });
+
+describe("in a personal workspace (ADR 0158)", () => {
+  const personal = () => {
+    const state = fresh();
+    const org = state.me?.organizations[0];
+    if (org) org.mode = "personal";
+    return state;
+  };
+
+  test("four rows in its words, no people row", async () => {
+    await openDm(personal());
+    expect(card().getAttribute("aria-label")).toBe("Para os seus agentes começarem");
+    expect(rows().map((r) => r.querySelector(".ac-mediarow__head")?.textContent)).toEqual([
+      "Me conte um pouco sobre você.",
+      "Escolha os seus agentes.",
+      "Penso com AutomáticoTrocar",
+      "Conecte os seus apps.",
+    ]);
+    expect(card().querySelector(".setup-cl__head small")?.textContent).toBe("1 de 4");
+    expect(screen().getByText("Oi, eu sou o Lodi. Monto os seus agentes com você.")).toBeTruthy();
+  });
+
+  test("row 1 asks the areas of life and one sentence, saved as the context; then the agents for them", async () => {
+    const state = personal();
+    await openDm(state);
+    await click(within(row("Me conte um pouco sobre você.")).getByRole("button", { name: "Contar" }));
+    const dialog = screen().getByRole("dialog", { name: "Com o que você quer ajuda?" });
+    expect((within(dialog).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(true);
+    await click(within(dialog).getByRole("button", { name: "Finanças" }));
+    await click(within(dialog).getByRole("button", { name: "Agenda e rotina" }));
+    await act(async () =>
+      fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Corro duas vezes por semana." } }),
+    );
+    await click(within(dialog).getByRole("button", { name: "Salvar" }), 12);
+    expect(calls(state, "orgs.updateSettings").map((c) => c.args[1])).toEqual([
+      { context: "Quero ajuda com: Agenda e rotina, Finanças. Corro duas vezes por semana." },
+    ]);
+    expect(screen().getByRole("dialog", { name: "Os seus agentes" })).toBeTruthy();
+  });
+});

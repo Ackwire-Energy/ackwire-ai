@@ -39,3 +39,23 @@ export const publishWorkspaceMode = (pubsub: PubSub | undefined, orgId: string, 
     orgId,
     event: { type: "org.mode", orgId, mode } satisfies WorkspaceModeEvent,
   });
+
+/**
+ * Tools as the agents of a personal workspace read them (ADR 0158): a description in `words` replaces the tool's own,
+ * so they speak of one person and their agents instead of a company and its team. Names and schemas never change: a
+ * tool works the same in both modes.
+ */
+export async function inWorkspaceWords<T extends { name: string; description: string }>(
+  db: Executor,
+  orgId: string,
+  tools: T[],
+  words: Readonly<Record<string, string>>,
+): Promise<T[]> {
+  if (!tools.some((t) => words[t.name])) return tools;
+  // Only words: a read that fails never fails the listing, which then keeps the team's.
+  if (!(await isPersonalWorkspace(db, orgId).catch(() => false))) return tools;
+  return tools.map((t) => {
+    const description = words[t.name];
+    return description ? { ...t, description } : t;
+  });
+}

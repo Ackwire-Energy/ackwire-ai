@@ -111,6 +111,7 @@ import {
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Card,
@@ -1197,7 +1198,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     if (!o?.reason) return null;
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
-      return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
+      return t("brain.reasons.no_computerCloud", {
+        computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+      });
     // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
     return (
       gateLine(t, {
@@ -2358,7 +2361,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               <SettingNote icon="alert">
                 {edition === "cloud"
                   ? t("agentPage.work.browserDialog.noComputerCloud", {
-                      computer: t("computerSetup.title", { org: org.name }),
+                      computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
                     })
                   : t("agentPage.work.browserDialog.noComputer")}
               </SettingNote>

@@ -77,4 +77,11 @@ export const strings: Partial<PushStrings> = {
   usageRefusedTitle: (a) => `${a} 拒绝了你增加用量的申请`,
   teamWeekReady: "你的团队周报已准备好",
   teamDayReady: "你的每日摘要已准备好",
+  machineConnectedTitlePersonal: "一台新电脑已连接",
+  computerReadyTitlePersonal: "你的智能体的电脑已就绪",
+  agentUnreachedBodyPersonal: "创建这项例行工作的人还不能和这个智能体对话。点按授权。",
+  widgetFailedReasonsPersonal: { creator_left: "设置它的人已不在你的工作区中。" },
+  joinRequestTitlePersonal: (name) => `${name} 请求加入你的工作区`,
+  joinSuggestionTitlePersonal: (by, name) => `${by} 建议邀请 ${name}`,
+  teamWeekReadyPersonal: "你的周报已准备好",
 };

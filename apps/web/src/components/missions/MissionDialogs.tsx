@@ -17,6 +17,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { executorName } from "@agenteschat/client/lib/missions";
 import { can } from "@agenteschat/client/lib/permissions";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
   Dialog,
@@ -82,7 +83,9 @@ export function NewMissionDialog({
   const { org } = useOrg();
   // On the Cloud every agent works on the workspace's own computer: missions wait for it, nobody connects one.
   const cloud = useComputerEdition(org.id) === "cloud";
-  const waitWords = t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) });
+  const waitWords = t("missions.waitingCloud", {
+    computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org.name }),
+  });
   // Its computer by name only where there are two to tell apart; else only one that is offline says so.
   const names = useNamesComputers(org.id);
   const api = useApi();
