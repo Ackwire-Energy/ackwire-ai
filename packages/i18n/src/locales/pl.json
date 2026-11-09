@@ -18227,5 +18227,54 @@
     },
     "approvals": "To, co trafia do klientów, czeka na twoją zgodę. Możesz to puścić później, gdy im zaufasz.",
     "approvalsPersonal": "Wszystko, co jest wysyłane, opłacane lub rezerwowane w twoim imieniu, czeka na twoją zgodę. Możesz to puścić później, gdy im zaufasz."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Jesteś tu wcześnie. Cieszymy się.",
+      "text": "agentes.chat jest w wersji beta: już da się z nim naprawdę pracować, a my wciąż go dopracowujemy.",
+      "weekly": {
+        "title": "Co tydzień jest lepiej",
+        "text": "Nowości i poprawki wychodzą cały czas."
+      },
+      "fails": {
+        "title": "Czasem coś zawodzi",
+        "text": "Jeśli coś się zawiesi albo wygląda dziwnie, to nasz problem, nie Twój."
+      },
+      "feedback": {
+        "title": "Twoja opinia decyduje, co będzie dalej",
+        "text": "Napisz, czego zabrakło albo co przeszkadzało. Czytamy wszystko."
+      },
+      "where": "Aby do nas napisać, użyj znaczka Beta obok swojego imienia."
+    },
+    "stage": {
+      "ready": "Twój zespół jest gotowy",
+      "wake": "Do pobudki brakuje mu tylko AI.",
+      "morning": "Dzień dobry, zespole",
+      "awake": "Wszyscy się obudzili i już myślą."
+    },
+    "connect": {
+      "title": "Połącz AI, żeby Twój zespół mógł myśleć",
+      "text": "Użyj subskrypcji, którą już masz. W Twoim planie nic się nie zmienia.",
+      "others": "Inny plan",
+      "free": "Zacznij za darmo",
+      "freeText": "Z darmowymi modelami OpenCode",
+      "noPlan": "Bez subskrypcji",
+      "without": "Bez AI agenci nie odpowiadają.",
+      "later": "Nie teraz"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Wyślij opinię",
+    "ask": "Czego zabrakło, co się zepsuło albo przeszkadzało?",
+    "goesCloud": "To, co napiszesz, trafi e-mailem do zespołu agentes.chat.",
+    "goesServer": "To, co napiszesz, trafi e-mailem do osoby, która prowadzi ten serwer.",
+    "placeholder": "Napisz po swojemu",
+    "goesWith": "Dołączamy Twój e-mail ({{email}}), żeby można było Ci odpowiedzieć, oraz wersję aplikacji. Żadna rozmowa nie jest wysyłana.",
+    "send": "Wyślij",
+    "thanks": "Dostarczono. Dziękujemy!",
+    "reply": "Wszystko jest czytane. Odpowiedź, jeśli będzie potrzebna, przyjdzie na {{email}}.",
+    "another": "Wyślij kolejną"
   }
 }

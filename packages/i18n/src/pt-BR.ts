@@ -17222,4 +17222,56 @@ export const ptBR = {
     approvalsPersonal:
       "O que for enviado, pago ou reservado em seu nome espera a sua aprovação. Dá para liberar depois, quando você confiar neles.",
   },
+  /** Right after the onboarding (ADR 0160): the beta notice, then Connect an AI with the team beside it. */
+  arrival: {
+    beta: {
+      word: "BETA",
+      title: "Você chegou cedo. Que bom.",
+      text: "O agentes.chat está em beta: já dá para trabalhar de verdade com ele, e ainda estamos lapidando.",
+      weekly: {
+        title: "Melhora toda semana",
+        text: "Novidades e correções saem o tempo todo.",
+      },
+      fails: {
+        title: "Às vezes algo falha",
+        text: "Se travar ou ficar estranho, o problema é nosso, não seu.",
+      },
+      feedback: {
+        title: "O seu feedback decide o que vem",
+        text: "Conte o que faltou ou incomodou. A gente lê tudo.",
+      },
+      where: "Para escrever para a gente, use o selo Beta ao lado do seu nome.",
+    },
+    stage: {
+      ready: "O seu time está pronto",
+      wake: "Só falta uma IA para ele acordar.",
+      morning: "Bom dia, time",
+      awake: "Todo mundo acordou e já pensa.",
+    },
+    connect: {
+      title: "Conecte uma IA para o seu time pensar",
+      text: "Use uma assinatura que você já tem. Nada muda no seu plano.",
+      others: "Outro plano",
+      free: "Começar grátis",
+      freeText: "Com os modelos grátis do OpenCode",
+      noPlan: "Sem assinatura",
+      without: "Sem uma IA, os agentes não respondem.",
+      later: "Agora não",
+    },
+  },
+  /** The feedback form behind the Beta mark (ADR 0160): what the person writes goes by email. */
+  feedback: {
+    mark: "Beta",
+    open: "Enviar feedback",
+    ask: "O que faltou, quebrou ou incomodou?",
+    goesCloud: "O que você escrever vai por e-mail para o time do agentes.chat.",
+    goesServer: "O que você escrever vai por e-mail para quem administra este servidor.",
+    placeholder: "Escreva do seu jeito",
+    goesWith:
+      "Vai junto o seu e-mail ({{email}}), para você receber a resposta, e a versão do app. Nenhuma conversa é enviada.",
+    send: "Enviar",
+    thanks: "Recado entregue. Obrigado!",
+    reply: "Tudo é lido. A resposta, se precisar, chega em {{email}}.",
+    another: "Enviar outro",
+  },
 } satisfies LocaleStrings;

@@ -17744,5 +17744,54 @@
     },
     "approvals": "Ciò che va ai clienti aspetta la tua approvazione. Puoi lasciarlo andare più avanti, quando ti fiderai di loro.",
     "approvalsPersonal": "Tutto ciò che viene inviato, pagato o prenotato a tuo nome aspetta la tua approvazione. Puoi lasciarlo andare più avanti, quando ti fiderai di loro."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Sei arrivato presto. Che bello.",
+      "text": "agentes.chat è in beta: puoi già lavorarci davvero, e lo stiamo ancora rifinendo.",
+      "weekly": {
+        "title": "Migliora ogni settimana",
+        "text": "Novità e correzioni escono di continuo."
+      },
+      "fails": {
+        "title": "A volte qualcosa non va",
+        "text": "Se si blocca o sembra strano, il problema è nostro, non tuo."
+      },
+      "feedback": {
+        "title": "Il tuo feedback decide cosa arriva",
+        "text": "Dicci cosa è mancato o ha dato fastidio. Leggiamo tutto."
+      },
+      "where": "Per scriverci, usa il segno Beta accanto al tuo nome."
+    },
+    "stage": {
+      "ready": "Il tuo team è pronto",
+      "wake": "Gli manca solo un'IA per svegliarsi.",
+      "morning": "Buongiorno, team",
+      "awake": "Tutti sono svegli e ragionano già."
+    },
+    "connect": {
+      "title": "Collega un'IA per far ragionare il tuo team",
+      "text": "Usa un abbonamento che hai già. Nel tuo piano non cambia nulla.",
+      "others": "Un altro piano",
+      "free": "Inizia gratis",
+      "freeText": "Con i modelli gratuiti di OpenCode",
+      "noPlan": "Senza abbonamento",
+      "without": "Senza un'IA, gli agenti non rispondono.",
+      "later": "Non ora"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Invia feedback",
+    "ask": "Cosa è mancato, si è rotto o ha dato fastidio?",
+    "goesCloud": "Quello che scrivi arriva via email al team di agentes.chat.",
+    "goesServer": "Quello che scrivi arriva via email a chi gestisce questo server.",
+    "placeholder": "Scrivilo a modo tuo",
+    "goesWith": "Insieme va la tua email ({{email}}), per poterti rispondere, e la versione dell'app. Nessuna conversazione viene inviata.",
+    "send": "Invia",
+    "thanks": "Consegnato. Grazie!",
+    "reply": "Viene letto tutto. La risposta, se serve, arriva a {{email}}.",
+    "another": "Invia un altro"
   }
 }

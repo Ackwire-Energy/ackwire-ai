@@ -17103,5 +17103,54 @@
     },
     "approvals": "Was an Kunden rausgeht, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust.",
     "approvalsPersonal": "Alles, was in deinem Namen gesendet, bezahlt oder gebucht wird, wartet auf deine Freigabe. Du kannst es später freigeben, wenn du ihnen vertraust."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Du bist früh dran. Schön, dass du da bist.",
+      "text": "agentes.chat ist in der Beta: Du kannst schon richtig damit arbeiten, und wir feilen noch daran.",
+      "weekly": {
+        "title": "Wird jede Woche besser",
+        "text": "Neues und Korrekturen kommen laufend dazu."
+      },
+      "fails": {
+        "title": "Manchmal geht etwas schief",
+        "text": "Wenn etwas hängt oder seltsam aussieht, liegt das an uns, nicht an dir."
+      },
+      "feedback": {
+        "title": "Dein Feedback entscheidet, was als Nächstes kommt",
+        "text": "Sag uns, was gefehlt oder gestört hat. Wir lesen alles."
+      },
+      "where": "Um uns zu schreiben, nutze das Beta-Zeichen neben deinem Namen."
+    },
+    "stage": {
+      "ready": "Dein Team ist bereit",
+      "wake": "Zum Aufwachen fehlt ihm nur eine KI.",
+      "morning": "Guten Morgen, Team",
+      "awake": "Alle sind wach und denken schon."
+    },
+    "connect": {
+      "title": "Verbinde eine KI, damit dein Team denken kann",
+      "text": "Nutze ein Abo, das du schon hast. An deinem Abo ändert sich nichts.",
+      "others": "Anderes Abo",
+      "free": "Kostenlos starten",
+      "freeText": "Mit den kostenlosen Modellen von OpenCode",
+      "noPlan": "Ohne Abo",
+      "without": "Ohne KI antworten die Agenten nicht.",
+      "later": "Nicht jetzt"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Feedback senden",
+    "ask": "Was hat gefehlt, ist kaputtgegangen oder hat gestört?",
+    "goesCloud": "Was du schreibst, geht per E-Mail an das Team von agentes.chat.",
+    "goesServer": "Was du schreibst, geht per E-Mail an die Person, die diesen Server betreibt.",
+    "placeholder": "Schreib es, wie du magst",
+    "goesWith": "Deine E-Mail-Adresse ({{email}}) geht mit, damit du eine Antwort bekommst, und die Version der App. Es wird keine Unterhaltung gesendet.",
+    "send": "Senden",
+    "thanks": "Zugestellt. Danke!",
+    "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
+    "another": "Noch eins senden"
   }
 }

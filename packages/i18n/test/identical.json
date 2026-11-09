@@ -265,7 +265,9 @@
       "devices.android.buildNumberSub",
       "devices.iphone.mac",
       "devices.iphone.steps.xcode",
-      "devices.iphone.connectedDone"
+      "devices.iphone.connectedDone",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "es": [
       "devices.cpus",
@@ -484,7 +486,9 @@
       "share.groupRoles",
       "settings.mode.personal",
       "onboarding.personal.name",
-      "newAgentAsk.ideas"
+      "newAgentAsk.ideas",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "fr": [
       "devices.cpus",
@@ -869,7 +873,9 @@
       "teamPlan.lifeArea.money",
       "teamTemplates.agents.rui.role",
       "newAgentAsk.idea.money.label",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "de": [
       "devices.workspace",
@@ -1270,7 +1276,9 @@
       "share.agent",
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
-      "newAgentAsk.idea.training.label"
+      "newAgentAsk.idea.training.label",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "it": [
       "devices.cpus",
@@ -1595,7 +1603,9 @@
       "browser.live.emulated.desktop",
       "artifacts.files",
       "share.fileRef",
-      "settings.mode.team"
+      "settings.mode.team",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "nl": [
       "devices.filter.computers",
@@ -2142,7 +2152,9 @@
       "settings.mode.team",
       "teamTemplates.agents.leo.role",
       "newAgentAsk.idea.training.label",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ja": [
       "devices.system.android",
@@ -2289,7 +2301,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ko": [
       "devices.system.android",
@@ -2432,7 +2446,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "zh-Hans": [
       "devices.system.android",
@@ -2567,7 +2583,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "id": [
       "devices.cpus",
@@ -2830,7 +2848,9 @@
       "team.chart.supervisor",
       "team.sectors.supervisor",
       "agentSetup.how.model",
-      "share.fileRef"
+      "share.fileRef",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "tr": [
       "devices.cpus",
@@ -2991,7 +3011,9 @@
       "routines.setup.github.url",
       "routines.setup.sentry.url",
       "browser.live.emulated.tablet",
-      "agentSetup.how.model"
+      "agentSetup.how.model",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "pl": [
       "devices.cpus",
@@ -3250,7 +3272,9 @@
       "browser.live.emulated.tablet",
       "agentSetup.how.model",
       "share.agent",
-      "agentSetup.firstRun.team.donePersonal"
+      "agentSetup.firstRun.team.donePersonal",
+      "arrival.beta.word",
+      "feedback.mark"
     ],
     "ru": [
       "devices.system.android",
@@ -3383,7 +3407,9 @@
       "routines.setup.github.secret",
       "routines.setup.github.type",
       "routines.setup.github.url",
-      "routines.setup.sentry.url"
+      "routines.setup.sentry.url",
+      "arrival.beta.word",
+      "feedback.mark"
     ]
   },
   "mobile-base": {

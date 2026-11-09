@@ -17033,5 +17033,54 @@
     },
     "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin.",
     "approvalsPersonal": "Senin adına gönderilen, ödenen veya rezerve edilen her şey onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin."
+  },
+  "arrival": {
+    "beta": {
+      "word": "BETA",
+      "title": "Erken geldiniz. Çok sevindik.",
+      "text": "agentes.chat beta aşamasında: onunla şimdiden gerçek iş yapabilirsiniz, biz de hâlâ cilalıyoruz.",
+      "weekly": {
+        "title": "Her hafta daha iyi oluyor",
+        "text": "Yenilikler ve düzeltmeler sürekli çıkıyor."
+      },
+      "fails": {
+        "title": "Bazen bir şeyler ters gider",
+        "text": "Takılırsa ya da tuhaf görünürse sorun bizde, sizde değil."
+      },
+      "feedback": {
+        "title": "Sıradakini sizin geri bildiriminiz belirler",
+        "text": "Neyin eksik kaldığını ya da rahatsız ettiğini anlatın. Hepsini okuyoruz."
+      },
+      "where": "Bize yazmak için adınızın yanındaki Beta işaretini kullanın."
+    },
+    "stage": {
+      "ready": "Ekibiniz hazır",
+      "wake": "Uyanması için tek eksiği bir yapay zeka.",
+      "morning": "Günaydın ekip",
+      "awake": "Herkes uyandı ve düşünmeye başladı."
+    },
+    "connect": {
+      "title": "Ekibiniz düşünebilsin diye bir yapay zeka bağlayın",
+      "text": "Zaten sahip olduğunuz bir aboneliği kullanın. Planınızda hiçbir şey değişmez.",
+      "others": "Başka bir plan",
+      "free": "Ücretsiz başlayın",
+      "freeText": "OpenCode'un ücretsiz modelleriyle",
+      "noPlan": "Abonelik yok",
+      "without": "Yapay zeka olmadan ajanlar yanıt vermez.",
+      "later": "Şimdi değil"
+    }
+  },
+  "feedback": {
+    "mark": "Beta",
+    "open": "Geri bildirim gönder",
+    "ask": "Ne eksikti, ne bozuldu ya da ne rahatsız etti?",
+    "goesCloud": "Yazdıklarınız e-postayla agentes.chat ekibine gider.",
+    "goesServer": "Yazdıklarınız e-postayla bu sunucuyu yöneten kişiye gider.",
+    "placeholder": "İçinizden geldiği gibi yazın",
+    "goesWith": "Size yanıt verilebilsin diye e-posta adresiniz ({{email}}) ve uygulamanın sürümü de gider. Hiçbir konuşma gönderilmez.",
+    "send": "Gönder",
+    "thanks": "Ulaştı. Teşekkürler!",
+    "reply": "Hepsi okunur. Gerekirse yanıt {{email}} adresine gelir.",
+    "another": "Bir tane daha gönder"
   }
 }

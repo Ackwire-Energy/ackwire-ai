@@ -41241,5 +41241,104 @@
   },
   "teamTemplates.approvalsPersonal": {
     "value": "Anything sent, paid or booked in your name waits for your approval. You can let it go later, once you trust them."
+  },
+  "arrival.beta.word": {
+    "value": "BETA"
+  },
+  "arrival.beta.title": {
+    "value": "You're early. We're glad."
+  },
+  "arrival.beta.text": {
+    "value": "agentes.chat is in beta: you can already do real work with it, and we're still polishing."
+  },
+  "arrival.beta.weekly.title": {
+    "value": "It gets better every week"
+  },
+  "arrival.beta.weekly.text": {
+    "value": "New things and fixes come out all the time."
+  },
+  "arrival.beta.fails.title": {
+    "value": "Sometimes something fails"
+  },
+  "arrival.beta.fails.text": {
+    "value": "If it gets stuck or looks odd, the problem is ours, not yours."
+  },
+  "arrival.beta.feedback.title": {
+    "value": "Your feedback decides what comes next"
+  },
+  "arrival.beta.feedback.text": {
+    "value": "Tell us what was missing or got in your way. We read everything."
+  },
+  "arrival.beta.where": {
+    "value": "To write to us, use the Beta mark beside your name."
+  },
+  "arrival.stage.ready": {
+    "value": "Your team is ready"
+  },
+  "arrival.stage.wake": {
+    "value": "All it needs to wake up is an AI."
+  },
+  "arrival.stage.morning": {
+    "value": "Good morning, team"
+  },
+  "arrival.stage.awake": {
+    "value": "Everyone is awake and thinking."
+  },
+  "arrival.connect.title": {
+    "value": "Connect an AI for your team to think"
+  },
+  "arrival.connect.text": {
+    "value": "Use a subscription you already have. Nothing changes in your plan."
+  },
+  "arrival.connect.others": {
+    "value": "Another plan"
+  },
+  "arrival.connect.free": {
+    "value": "Start free"
+  },
+  "arrival.connect.freeText": {
+    "value": "With OpenCode's free models"
+  },
+  "arrival.connect.noPlan": {
+    "value": "No subscription"
+  },
+  "arrival.connect.without": {
+    "value": "Without an AI, agents don't answer."
+  },
+  "arrival.connect.later": {
+    "value": "Not now"
+  },
+  "feedback.mark": {
+    "value": "Beta"
+  },
+  "feedback.open": {
+    "value": "Send feedback"
+  },
+  "feedback.ask": {
+    "value": "What was missing, broke or got in your way?"
+  },
+  "feedback.goesCloud": {
+    "value": "What you write goes by email to the agentes.chat team."
+  },
+  "feedback.goesServer": {
+    "value": "What you write goes by email to whoever runs this server."
+  },
+  "feedback.placeholder": {
+    "value": "Write it your way"
+  },
+  "feedback.goesWith": {
+    "value": "Your email ({{email}}) goes along, so you can be answered, and the app's version. No conversation is sent."
+  },
+  "feedback.send": {
+    "value": "Send"
+  },
+  "feedback.thanks": {
+    "value": "Delivered. Thank you!"
+  },
+  "feedback.reply": {
+    "value": "Everything is read. An answer, if one is needed, comes to {{email}}."
+  },
+  "feedback.another": {
+    "value": "Send another"
   }
 }
