@@ -678,5 +678,9 @@
     "bringAllToFront": "Bawa semua ke depan",
     "help": "Bantuan",
     "downloaded": "Unduhan selesai"
+  },
+  "windowTitle": {
+    "welcome": "Selamat datang",
+    "prefs": "Preferensi"
   }
 }

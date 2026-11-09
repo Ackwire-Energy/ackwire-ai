@@ -690,5 +690,9 @@
     "bringAllToFront": "Przenieś wszystko na wierzch",
     "help": "Pomoc",
     "downloaded": "Pobieranie zakończone"
+  },
+  "windowTitle": {
+    "welcome": "Witamy",
+    "prefs": "Preferencje"
   }
 }

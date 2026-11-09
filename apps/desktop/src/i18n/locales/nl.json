@@ -682,5 +682,9 @@
     "bringAllToFront": "Alles naar voorgrond",
     "help": "Help",
     "downloaded": "Download voltooid"
+  },
+  "windowTitle": {
+    "welcome": "Welkom",
+    "prefs": "Voorkeuren"
   }
 }

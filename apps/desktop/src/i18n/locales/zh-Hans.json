@@ -678,5 +678,9 @@
     "bringAllToFront": "全部置于顶层",
     "help": "帮助",
     "downloaded": "下载完成"
+  },
+  "windowTitle": {
+    "welcome": "欢迎",
+    "prefs": "偏好设置"
   }
 }

@@ -144,9 +144,32 @@ fn make_window(app: &AppHandle, name: &str) -> Result<tauri::WebviewWindow, Stri
         .find(|w| w.label == name)
         .ok_or("window not found")?
         .clone();
-    tauri::WebviewWindowBuilder::from_config(app, &config)
+    let window = tauri::WebviewWindowBuilder::from_config(app, &config)
         .and_then(|b| b.build())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Named in the app's language (the Dock's list, the Window menu): never a second "agentes.chat".
+    let key = match name {
+        "welcome" => Some("windowWelcome"),
+        "prefs" => Some("windowPrefs"),
+        _ => None,
+    };
+    if let Some(title) = key.and_then(|k| menus::labels(app).get(k).cloned()) {
+        let _ = window.set_title(&title);
+    }
+    Ok(window)
+}
+
+/// A panel (the menu bar's popover, the notch's island) stays out of the Window menu and the Dock's list of
+/// windows: only the app's real windows are listed there, each by its own name.
+#[cfg(target_os = "macos")]
+pub(crate) fn keep_out_of_window_list(ns_window: *mut std::ffi::c_void) {
+    use objc2::{msg_send, runtime::AnyObject};
+    // SAFETY: an NSWindow pointer from Tauri, used on the main thread.
+    unsafe {
+        if let Some(w) = (ns_window as *mut AnyObject).as_ref() {
+            let _: () = msg_send![w, setExcludedFromWindowsMenu: true];
+        }
+    }
 }
 
 /// The launch argument start at login passes, so a login start stays in the menu bar.
@@ -722,6 +745,10 @@ pub fn run() {
             // Before the tray (it lists them).
             servers::load(&handle);
             tray::create(&handle)?;
+            #[cfg(target_os = "macos")]
+            if let Some(ns) = handle.get_webview_window("popover").and_then(|w| w.ns_window().ok()) {
+                keep_out_of_window_list(ns);
+            }
             migrate_login_item(&handle);
             // Start at login written before the flag existed: write it again, now with the flag.
             let launcher = handle.autolaunch();

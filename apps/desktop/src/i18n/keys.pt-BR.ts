@@ -10,6 +10,8 @@ import type { LocaleStrings } from "@agenteschat/i18n/plurals";
 export const desktopPtBR = {
   /** This computer's name in the copy: "este {{device}}", "neste {{device}}" (all masculine). */
   device: { mac: "Mac", windows: "PC", linux: "computador" },
+  /** O nome das janelas do próprio app (a lista do Dock, o menu Janela, o Mission Control). */
+  windowTitle: { welcome: "Boas-vindas", prefs: "Preferências" },
   common: {
     cancel: "Cancelar",
     close: "Fechar",

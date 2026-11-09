@@ -682,5 +682,9 @@
     "bringAllToFront": "Tümünü öne getir",
     "help": "Yardım",
     "downloaded": "İndirme tamamlandı"
+  },
+  "windowTitle": {
+    "welcome": "Hoş geldiniz",
+    "prefs": "Tercihler"
   }
 }

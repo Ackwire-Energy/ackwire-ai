@@ -686,5 +686,9 @@
     "bringAllToFront": "Tout ramener au premier plan",
     "help": "Aide",
     "downloaded": "Téléchargement terminé"
+  },
+  "windowTitle": {
+    "welcome": "Bienvenue",
+    "prefs": "Préférences"
   }
 }

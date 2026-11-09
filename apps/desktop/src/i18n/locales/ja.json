@@ -678,5 +678,9 @@
     "bringAllToFront": "すべてを手前に移動",
     "help": "ヘルプ",
     "downloaded": "ダウンロード完了"
+  },
+  "windowTitle": {
+    "welcome": "ようこそ",
+    "prefs": "環境設定"
   }
 }

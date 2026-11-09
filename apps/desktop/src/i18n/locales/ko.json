@@ -678,5 +678,9 @@
     "bringAllToFront": "모두 앞으로 가져오기",
     "help": "도움말",
     "downloaded": "다운로드 완료"
+  },
+  "windowTitle": {
+    "welcome": "환영합니다",
+    "prefs": "환경설정"
   }
 }

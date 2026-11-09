@@ -3,6 +3,8 @@ import type { Widen } from "@agenteschat/i18n/widen";
 /** The desktop app's own strings in English, the source: every other language follows this shape. */
 export const desktopEn = {
   device: { mac: "Mac", windows: "PC", linux: "computer" },
+  /** The app's own windows by name (the Dock's list, the Window menu, Mission Control). */
+  windowTitle: { welcome: "Welcome", prefs: "Preferences" },
   common: {
     cancel: "Cancel",
     close: "Close",

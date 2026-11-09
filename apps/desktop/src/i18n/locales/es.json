@@ -686,5 +686,9 @@
     "bringAllToFront": "Traer todo al frente",
     "help": "Ayuda",
     "downloaded": "Descarga completa"
+  },
+  "windowTitle": {
+    "welcome": "Bienvenida",
+    "prefs": "Preferencias"
   }
 }
