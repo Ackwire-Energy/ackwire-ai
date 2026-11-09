@@ -83,7 +83,7 @@ describe("geometry check", () => {
       expect(SELF_TESTED).toContain(rule);
     for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
       expect(SELF_TESTED).toContain(rule);
-    for (const rule of ["timeedge", "panefill"]) expect(SELF_TESTED).toContain(rule);
+    for (const rule of ["timeedge", "panefill", "bleed"]) expect(SELF_TESTED).toContain(rule);
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
