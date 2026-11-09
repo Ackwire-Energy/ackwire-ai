@@ -13226,7 +13226,7 @@
       "getXcode": "Obtenir Xcode",
       "toolsDone": "Téléchargés par le Mac",
       "toolsText": "Le Mac les télécharge, environ 8 Go.",
-      "accountDone": "Connecté",
+      "accountDone": "Ajouté",
       "accountText": "Ajoutez-en un, gratuit ou payant, dans Xcode sur {{mac}} : Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Branchez l'iPhone sur {{mac}} avec un câble.",

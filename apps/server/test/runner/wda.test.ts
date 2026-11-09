@@ -75,6 +75,10 @@ test("signing: the Personal Team first, under a bundle id of its own, built for 
   const sim = buildArgs("/w/WebDriverAgent.xcodeproj", "/w/s", { kind: "simulator" });
   expect(sim).toContain("generic/platform=iOS Simulator");
   expect(sim.some((a) => a.startsWith("DEVELOPMENT_TEAM") || a.startsWith("-allowProvisioning"))).toBe(false);
+  // An Xcode 26 whose simulator platform lacks Swift Testing's interop library: WDA leaves it out.
+  expect(sim.some((a) => a.startsWith("WDA_XCTEST_EXCLUDED_2600="))).toBe(false);
+  const older = buildArgs("/w/WebDriverAgent.xcodeproj", "/w/s", { kind: "simulator", noTestingInterop: true });
+  expect(older.find((a) => a.startsWith("WDA_XCTEST_EXCLUDED_2600="))).toContain("lib_TestingInterop.dylib");
   expect(
     profileExpiry("<dict><key>ExpirationDate</key>\n\t<date>2026-11-16T04:00:00Z</date><key>Name</key></dict>"),
   ).toBe(Date.parse("2026-11-16T04:00:00Z"));
@@ -229,16 +233,15 @@ async function mac(state: Record<string, unknown> = {}) {
           .split("\n")
           .map((l) => JSON.parse(l) as unknown[])
       : [];
-  /** `need` until it stops changing (the background build or check is done). */
-  const settle = async (udid = IPHONE) => {
-    let last = JSON.stringify(helper.need(udid, xcrun));
-    for (let i = 0; i < 400; i++) {
+  /** `need` until it says `want` (the background build or check is done), or what it says after 15 s. */
+  const settle = async (want: unknown, udid = IPHONE) => {
+    let last: unknown = null;
+    for (let i = 0; i < 600; i++) {
+      last = helper.need(udid, xcrun);
+      if (JSON.stringify(last) === JSON.stringify(want)) return last;
       await Bun.sleep(25);
-      const next = JSON.stringify(helper.need(udid, xcrun));
-      if (next === last && i > 8) return JSON.parse(next) as unknown;
-      last = next;
     }
-    return JSON.parse(last) as unknown;
+    return last;
   };
   return {
     root,
@@ -261,7 +264,7 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   const m = await mac();
   // The first look starts the build: the phone shows it's being prepared.
   expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "preparing", reason: "helper_missing" });
-  expect(await m.settle()).toBe(null);
+  expect(await m.settle(null)).toBe(null);
   const build = m.calls().find((c) => c[0] === "xcrun" && c[2] === "build-for-testing") as string[];
   expect(build).toContain(`DEVELOPMENT_TEAM=${TEAM.id}`);
   expect(build).toContain(`id=${IPHONE}`);
@@ -285,36 +288,50 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   // A day before the 7-day profile ends, it's built again in the background; the phone stays ready meanwhile.
   m.tick(7 * 24 * 3600_000 - RENEW_BEFORE_MS + 1000);
   expect(m.helper.need(IPHONE, m.xcrun)).toBe(null);
-  expect(await m.settle()).toBe(null);
-  expect(m.calls().filter((c) => c[2] === "build-for-testing")).toHaveLength(2);
+  const builds = () => m.calls().filter((c) => c[2] === "build-for-testing").length;
+  for (let i = 0; i < 400 && builds() < 2; i++) await Bun.sleep(25);
+  expect(builds()).toBe(2);
+  expect(await m.settle(null)).toBe(null);
 });
 
 test("a real iPhone's helper waits on the person: no Apple Account, UI Automation off, not trusted, the app limit", async () => {
   const m = await mac();
   m.setTeams([]);
-  expect(await m.settle()).toEqual({ state: "needs_you", reason: "apple_account_missing" });
+  expect(await m.settle({ state: "needs_you", reason: "apple_account_missing" })).toEqual({
+    state: "needs_you",
+    reason: "apple_account_missing",
+  });
   expect(await errorCode(() => m.helper.run("device", IPHONE, m.xcrun))).toBe("phone_not_ready");
   // Signed in: the next try after a minute builds it.
   m.setTeams([TEAM]);
   m.setState({ wdaRunFail: "Testing failed:\n\tTimed out while enabling automation mode.\n" });
   m.tick(RETRY_MS.account);
-  expect(await m.settle()).toEqual({ state: "needs_you", reason: "ui_automation_off" });
+  expect(await m.settle({ state: "needs_you", reason: "ui_automation_off" })).toEqual({
+    state: "needs_you",
+    reason: "ui_automation_off",
+  });
   m.setState({
     wdaRunFail:
       "The request was denied. Verify that the Developer App certificate for your account is trusted on your device.",
   });
   m.tick(RETRY_MS.check);
-  expect(await m.settle()).toEqual({ state: "needs_you", reason: "helper_untrusted" });
+  expect(await m.settle({ state: "needs_you", reason: "helper_untrusted" })).toEqual({
+    state: "needs_you",
+    reason: "helper_untrusted",
+  });
   // Turned on and trusted: ready.
   m.setState({});
   m.tick(RETRY_MS.check);
-  expect(await m.settle()).toBe(null);
+  expect(await m.settle(null)).toBe(null);
   // The renewal hits the free team's limit and the profile runs out: what's needed is said.
   m.setState({
     wdaBuildFail: "error: Your maximum App ID limit has been reached. You may create up to 10 App IDs every 7 days.\n",
   });
   m.tick(8 * 24 * 3600_000);
-  expect(await m.settle()).toEqual({ state: "needs_you", reason: "team_limit" });
+  expect(await m.settle({ state: "needs_you", reason: "team_limit" })).toEqual({
+    state: "needs_you",
+    reason: "team_limit",
+  });
 });
 
 test("a simulator's helper: one build for every simulator, no signing, started on first use", async () => {

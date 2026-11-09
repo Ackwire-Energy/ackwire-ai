@@ -30955,7 +30955,7 @@
     "value": "The Mac downloads them, about 8 GB."
   },
   "devices.iphone.accountDone": {
-    "value": "Signed in"
+    "value": "Added"
   },
   "devices.iphone.accountText": {
     "value": "Add a free or paid one in Xcode on {{mac}}: Settings › Accounts."

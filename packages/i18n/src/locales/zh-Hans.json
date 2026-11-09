@@ -12366,7 +12366,7 @@
       "getXcode": "获取 Xcode",
       "toolsDone": "已由 Mac 下载",
       "toolsText": "Mac 会下载这些工具，约 8 GB。",
-      "accountDone": "已登录",
+      "accountDone": "已添加",
       "accountText": "在 {{mac}} 的 Xcode 中添加一个（免费或付费均可）：Settings › Accounts。",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "用数据线把 iPhone 连接到 {{mac}}。",

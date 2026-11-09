@@ -1,3 +1,4 @@
+import type { EventEmitter } from "node:events";
 import net from "node:net";
 import { RunnerError } from "./errors";
 import { xmlEscape, xmlUnescape } from "./xml";
@@ -189,7 +190,7 @@ export async function usbmuxForward(udid: string, port: number, socketPath = USB
     );
   });
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
+    (server as unknown as EventEmitter).once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
   });
   return {

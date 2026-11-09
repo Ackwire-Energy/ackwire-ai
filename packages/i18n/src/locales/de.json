@@ -12785,7 +12785,7 @@
       "getXcode": "Xcode holen",
       "toolsDone": "Vom Mac geladen",
       "toolsText": "Der Mac lädt sie herunter, etwa 8 GB.",
-      "accountDone": "Angemeldet",
+      "accountDone": "Hinzugefügt",
       "accountText": "Füge in Xcode auf {{mac}} einen hinzu, kostenlos oder bezahlt: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Schließ das iPhone mit einem Kabel an {{mac}} an.",

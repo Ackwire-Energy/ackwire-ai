@@ -12721,7 +12721,7 @@
       "getXcode": "Xcode'u edinin",
       "toolsDone": "Mac tarafından indirildi",
       "toolsText": "Mac bunları indirir, yaklaşık 8 GB.",
-      "accountDone": "Oturum açıldı",
+      "accountDone": "Eklendi",
       "accountText": "{{mac}} üzerindeki Xcode'da ücretsiz ya da ücretli bir tane ekleyin: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "iPhone'u kabloyla {{mac}} bilgisayarına takın.",

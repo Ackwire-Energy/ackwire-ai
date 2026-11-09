@@ -12305,7 +12305,7 @@
       "getXcode": "Xcodeを入手",
       "toolsDone": "Macがダウンロード済み",
       "toolsText": "Macがダウンロードします。約8 GBです。",
-      "accountDone": "サインイン済み",
+      "accountDone": "追加済み",
       "accountText": "{{mac}}のXcodeのSettings › Accountsで追加してください（無料でも可）。",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "ケーブルでiPhoneを{{mac}}につないでください。",

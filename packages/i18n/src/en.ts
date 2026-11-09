@@ -12521,7 +12521,7 @@ export const en = {
       getXcode: "Get Xcode",
       toolsDone: "Downloaded by the Mac",
       toolsText: "The Mac downloads them, about 8 GB.",
-      accountDone: "Signed in",
+      accountDone: "Added",
       accountText: "Add a free or paid one in Xcode on {{mac}}: Settings\u00a0›\u00a0Accounts.",
       connectedDone: "{{name}} · iOS {{version}}",
       connectedText: "Plug the iPhone into {{mac}} with a cable.",

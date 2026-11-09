@@ -150,7 +150,7 @@ export const helperBundleId = (teamId: string) => `chat.agentes.wda.${teamId.toL
 export function buildArgs(
   project: string,
   derived: string,
-  target: { kind: "simulator" } | { kind: "device"; udid: string; team: string },
+  target: { kind: "simulator"; noTestingInterop?: boolean } | { kind: "device"; udid: string; team: string },
 ): string[] {
   const common = [
     "xcodebuild",
@@ -164,7 +164,16 @@ export function buildArgs(
     "COMPILER_INDEX_STORE_ENABLE=NO",
     "GCC_TREAT_WARNINGS_AS_ERRORS=0",
   ];
-  if (target.kind === "simulator") return [...common, "-destination", "generic/platform=iOS Simulator"];
+  if (target.kind === "simulator") {
+    return [
+      ...common,
+      "-destination",
+      "generic/platform=iOS Simulator",
+      // WDA embeds Swift Testing's interop library from Xcode 26's simulator platform, which some 26.x releases
+      // don't ship: then it is left out with the frameworks WDA already leaves to Xcode.
+      ...(target.noTestingInterop ? [`WDA_XCTEST_EXCLUDED_2600=${WDA_XCODE26_EXCLUDED}`] : []),
+    ];
+  }
   return [
     ...common,
     "-destination",
@@ -176,6 +185,10 @@ export function buildArgs(
     `PRODUCT_BUNDLE_IDENTIFIER=${helperBundleId(target.team)}`,
   ];
 }
+
+/** WDA's own list for Xcode 26 simulator builds (`WDA_XCTEST_EXCLUDED_2600`), plus its Swift Testing extras. */
+const WDA_XCODE26_EXCLUDED =
+  "XCTest.framework XCTestCore.framework XCUIAutomation.framework XCTAutomationSupport.framework Testing.framework ResultDataPublisher.framework XCTestSupport.framework libXCTestSwiftSupport.dylib lib_TestingInterop.dylib _Testing_Foundation.framework";
 
 /** When a profile (`security cms -D` of an `embedded.mobileprovision`) stops working; null when unread. */
 export function profileExpiry(plist: string): number | null {
@@ -581,15 +594,18 @@ export class IosHelper {
     const derived = path.join(this.dir, key);
     await mkdir(derived, { recursive: true });
     this.opts.log(`building the iPhone test helper (${target.kind === "device" ? target.udid : "simulator"})`);
-    const r = await runTool(
-      xcrun,
-      buildArgs(
-        project,
-        derived,
-        team && target.kind === "device" ? { ...target, team: team.id } : { kind: "simulator" },
-      ),
-      { timeoutMs: BUILD_TIMEOUT_MS, env: this.opts.env },
-    );
+    let args: string[];
+    if (target.kind === "device" && team) args = buildArgs(project, derived, { ...target, team: team.id });
+    else {
+      const platform = await runTool(xcrun, ["--sdk", "iphonesimulator", "--show-sdk-platform-path"], {
+        timeoutMs: 30_000,
+        env: this.opts.env,
+      });
+      const dir = platform.code === 0 ? platform.stdout.toString("utf8").trim() : "";
+      const interop = !dir || existsSync(path.join(dir, "Developer", "usr", "lib", "lib_TestingInterop.dylib"));
+      args = buildArgs(project, derived, { kind: "simulator", noTestingInterop: !interop });
+    }
+    const r = await runTool(xcrun, args, { timeoutMs: BUILD_TIMEOUT_MS, env: this.opts.env });
     const said = `${r.stdout.toString("utf8")}\n${r.stderr}`;
     if (r.code !== 0 || r.timedOut) {
       throw new HelperFailure(helperReason(said), r.timedOut ? "The build didn't finish in time." : failureLine(said));
@@ -930,7 +946,7 @@ class HelperFailure extends Error {
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once("error", reject);
+    (server as unknown as EventEmitter).once("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const { port } = server.address() as net.AddressInfo;
       server.close(() => resolve(port));

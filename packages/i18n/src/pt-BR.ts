@@ -12626,7 +12626,7 @@ export const ptBR = {
       getXcode: "Baixar o Xcode",
       toolsDone: "Baixadas pelo Mac",
       toolsText: "O Mac baixa sozinho, uns 8 GB.",
-      accountDone: "Conectada",
+      accountDone: "Adicionada",
       accountText: "Adicione uma, gratuita ou paga, no Xcode em {{mac}}: Settings\u00a0›\u00a0Accounts.",
       connectedDone: "{{name}} · iOS {{version}}",
       connectedText: "Conecte o iPhone a {{mac}} com um cabo.",

@@ -223,6 +223,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "devices.choose.thisMac",
     "mobile.devices.reason.xcode_missing",
     "mobile.devices.reason.device_support",
+    "mobile.devices.reason.apple_account_missing",
   ],
 };
 

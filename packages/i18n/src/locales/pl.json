@@ -13677,7 +13677,7 @@
       "getXcode": "Pobierz Xcode",
       "toolsDone": "Pobrane przez Maca",
       "toolsText": "Mac je pobiera, to około 8 GB.",
-      "accountDone": "Zalogowano",
+      "accountDone": "Dodano",
       "accountText": "Dodaj je w Xcode na {{mac}}, bezpłatne lub płatne: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Podłącz iPhone'a do {{mac}} kablem.",

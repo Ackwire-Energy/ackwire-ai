@@ -49,7 +49,9 @@ test("plists: what usbmuxd is asked, and what it answers (nested, escaped, every
 test("a port on the iPhone: found by its UDID over the cable only, reached through a port on this Mac", async () => {
   const dir = tempDir("usbmux-");
   dirs.push(dir);
-  const echo = net.createServer((s) => s.on("data", (d) => s.write(Buffer.concat([Buffer.from("phone:"), d]))));
+  const echo = net.createServer((s) =>
+    s.on("data", (d) => s.write(Buffer.concat([Buffer.from("phone:"), d as Buffer]))),
+  );
   await new Promise<void>((r) => echo.listen(0, "127.0.0.1", r));
   closers.push(() => echo.close());
   const mux = await fakeUsbmuxd(

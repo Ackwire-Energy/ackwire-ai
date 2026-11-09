@@ -12359,7 +12359,7 @@
       "getXcode": "Dapatkan Xcode",
       "toolsDone": "Diunduh oleh Mac",
       "toolsText": "Mac mengunduhnya, sekitar 8 GB.",
-      "accountDone": "Sudah masuk",
+      "accountDone": "Ditambahkan",
       "accountText": "Tambahkan satu, gratis atau berbayar, di Xcode pada {{mac}}: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Colokkan iPhone ke {{mac}} dengan kabel.",

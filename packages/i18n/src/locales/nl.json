@@ -12846,7 +12846,7 @@
       "getXcode": "Xcode downloaden",
       "toolsDone": "Gedownload door de Mac",
       "toolsText": "De Mac downloadt ze, ongeveer 8 GB.",
-      "accountDone": "Ingelogd",
+      "accountDone": "Toegevoegd",
       "accountText": "Voeg er een toe in Xcode op {{mac}}, gratis of betaald: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Sluit de iPhone met een kabel aan op {{mac}}.",

@@ -13628,7 +13628,7 @@
       "getXcode": "Скачать Xcode",
       "toolsDone": "Mac их загрузил",
       "toolsText": "Mac загружает их, это около 8 ГБ.",
-      "accountDone": "Вход выполнен",
+      "accountDone": "Добавлен",
       "accountText": "Добавьте его в Xcode на {{mac}}, бесплатный или платный: Settings › Accounts.",
       "connectedDone": "{{name}} · iOS {{version}}",
       "connectedText": "Подсоедините iPhone к {{mac}} кабелем.",
