@@ -345,10 +345,11 @@ html:not([data-pointer]) .rq__more:focus-visible {
 .rq__item-acts {
   column-gap: var(--space-2);
 }
-/* On a phone a lone plated button takes the footer's width (rule 23); the time left goes under it, at the end. */
+/* On a phone a lone plated button takes the footer's width (rule 23), a ghost beside it (Depois) keeps its place on
+   the row, and the time left goes under them, at the end. */
 @media (max-width: 640px) {
   .rq__foot:not(:has(> .ac-btn:not(.ac-btn--ghost) ~ .ac-btn:not(.ac-btn--ghost))) > .ac-btn:not(.ac-btn--ghost) {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
   }
 }
 /*

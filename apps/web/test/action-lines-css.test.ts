@@ -55,7 +55,7 @@ test("buttons side by side stand 8 apart: header glyph boxes 32, bulk pairs, a r
       card,
       ".rq__foot:not(:has(> .ac-btn:not(.ac-btn--ghost) ~ .ac-btn:not(.ac-btn--ghost))) > .ac-btn:not(.ac-btn--ghost)",
     ),
-  ).toContain("flex: 1 1 100%");
+  ).toContain("flex: 1 1 auto");
   for (const [path, selector] of [
     ["components/members/members.css", ".members-sheet__acts"],
     ["pages/threads.css", ".thread-row__actions"],
