@@ -88,7 +88,7 @@ The words name no price (§6). A self-hosted server never gets any of it: holds 
 
 ## Amendment (2026-11-08): the plan picked in the app, and one way to the plan per place (§3, §7)
 
-ADR 0158: the billing link may carry `plan`, the billing service's own key for the plan picked in the onboarding,
+ADR 0162: the billing link may carry `plan`, the billing service's own key for the plan picked in the onboarding,
 passed on unread so the billing service opens that plan's Checkout. The plan's name and price come to the browser from
 the billing service's public `plans.json`, never from this server. On a hold, the hold's banner is the workspace's one
 way to the plan: the right hand's card and the first-task card offer none.

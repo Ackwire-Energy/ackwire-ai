@@ -17,7 +17,7 @@ export const Route = createFileRoute("/onboarding")({
   }),
   beforeLoad: ({ context, location }) => requireUser(context, location.href),
   loaderDeps: ({ search }) => ({ resume: search.resume, paid: search.paid }),
-  // Paid, the workspace opens in #general, where the team says hi once the plan starts (ADR 0158), the payment said as
+  // Paid, the workspace opens in #general, where the team says hi once the plan starts (ADR 0162), the payment said as
   // being confirmed until then; else its right hand's DM, or the workspace as it is. Back without paying, the
   // onboarding resumes on its plan step, unless the workspace was set up meanwhile (another tab): it opens as it is.
   loader: async ({ context, deps: { resume, paid } }) => {

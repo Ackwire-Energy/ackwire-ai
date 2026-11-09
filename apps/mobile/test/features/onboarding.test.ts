@@ -75,7 +75,7 @@ test("a step that failed says why the server refused it, else that it didn't sav
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("the phone's steps are the web's, read from the workspace's data (ADR 0158)", () => {
+test("the phone's steps are the web's, read from the workspace's data (ADR 0162)", () => {
   const base = { orgId: "o1", standing: undefined, billingUrl: null, context: "", team: 0, picked: null };
   // agentes.chat Cloud, before the workspace exists: its billing service is there, so the plan step will come.
   expect(railState({ ...base, orgId: null, billingUrl: "https://billing.example.com" }).steps).toEqual([

@@ -29,7 +29,7 @@ import { orgNameFromEmail, phoneTimezone, stepFailedText, zoneLabel } from "./lo
 import { BusinessStep, PlanStep, TeamStep } from "./steps";
 
 /**
- * The first run on the phone, signed in with no workspace to open yet (ADR 0158), the web's steps on the sign-in's own
+ * The first run on the phone, signed in with no workspace to open yet (ADR 0162), the web's steps on the sign-in's own
  * screen: the workspace's name (its time zone from the phone, said in one line; its logo later, in Configurações), the
  * keyboard's return key as the action; what it does; its team, made from a template; and, on agentes.chat Cloud, the
  * plan it waits for, in words only. Its right hand stands on the sky and says one line per step, the team joining it

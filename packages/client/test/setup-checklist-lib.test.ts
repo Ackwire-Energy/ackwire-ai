@@ -124,7 +124,7 @@ describe("setup checklist", () => {
   });
 });
 
-describe("the right hand's first run (ADR 0155 §6, ADR 0158)", () => {
+describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
   const lodi = (setup: AgentSetupChecklist | null = { role: null, done: [] }) => ({
     setup,
     builtin: "right_hand" as const,

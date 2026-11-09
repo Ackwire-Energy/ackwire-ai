@@ -54,7 +54,7 @@ describe("route guards", () => {
       const { router } = await renderApp(path, { api: as("owner") });
       await settle(10);
       expect(router.state.location.pathname).toBe("/onboarding");
-      // At what it does, its next step (ADR 0158): never the form that would make another workspace.
+      // At what it does, its next step (ADR 0162): never the form that would make another workspace.
       expect(screen().getByRole("heading", { name: "O que a Acme faz?" })).toBeTruthy();
       expect(screen().queryByRole("heading", { name: "Como se chama o seu workspace?" })).toBeNull();
       cleanup();

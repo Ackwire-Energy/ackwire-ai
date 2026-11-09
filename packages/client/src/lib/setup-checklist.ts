@@ -197,7 +197,7 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
   }
 }
 
-/* ---------- The right hand's first run (ADR 0155 §6, ADR 0158) ---------- */
+/* ---------- The right hand's first run (ADR 0155 §6, ADR 0162) ---------- */
 
 /**
  * Its rows, one order everywhere: what the onboarding's steps leave (they made the workspace, said what it does and

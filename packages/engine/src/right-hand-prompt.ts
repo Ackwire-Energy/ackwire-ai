@@ -208,7 +208,7 @@ export async function rightHandPrompt(
       ? "An agent used 80% or more of its monthly budget: say so to someone who may raise it."
       : "",
   ].filter(Boolean);
-  // The first-run checklist at the top of an owner's DM (ADR 0155 §6, ADR 0158) shows the setup rows the onboarding
+  // The first-run checklist at the top of an owner's DM (ADR 0155 §6, ADR 0162) shows the setup rows the onboarding
   // left: while one is open, this names none of them (mirror of `firstRunDone` in packages/client/src/lib/setup-checklist.ts).
   const skipped = new Set(self[0]?.setup?.done ?? []);
   const invited =

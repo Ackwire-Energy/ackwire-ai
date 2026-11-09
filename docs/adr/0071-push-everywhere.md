@@ -40,5 +40,5 @@ Phone push changes (sending straight to Firebase and Apple, a push relay for sel
 
 ## Amendment (2026-11-08): our ask waits for the first answer (§3)
 
-ADR 0158: the web's dialog of examples is gone. Our ask is a card under the first answer from an agent the person
+ADR 0162: the web's dialog of examples is gone. Our ask is a card under the first answer from an agent the person
 wrote to, then once more under the first request waiting on them, never on arrival and never on a billing hold.

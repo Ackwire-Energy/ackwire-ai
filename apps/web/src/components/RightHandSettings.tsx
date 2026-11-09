@@ -173,7 +173,7 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   } else {
     face = <Icon name="bulb" size={16} className="muted" />;
     name = t("rightHand.settings.mineNobody");
-    // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0158).
+    // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0162).
     if (held) what = t("agentSetup.firstRun.afterPlan");
     else acts = connectTo(t("rightHand.settings.connectMine"), true);
   }

@@ -4,7 +4,7 @@ import type { OrgStanding } from "../src/api/types";
 import { firstJob, landingOf, railState, railStepAt, railSteps } from "../src/lib/onboarding";
 import { aboutContext, aboutOf, templateFor } from "../src/lib/team-plan";
 
-describe("the onboarding's rail (ADR 0158)", () => {
+describe("the onboarding's rail (ADR 0162)", () => {
   test("four steps where the workspace waits for its first plan, three anywhere else (a self-hosted server)", () => {
     expect(railSteps(true)).toEqual(["name", "business", "team", "plan"]);
     expect(railSteps(false)).toEqual(["name", "business", "team"]);

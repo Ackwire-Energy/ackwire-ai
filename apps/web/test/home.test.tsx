@@ -292,7 +292,7 @@ describe("Início", () => {
     expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Seu workspace está pronto. Comece por aqui.",
     );
-    // The card's three rows (ADR 0158): an AI, apps, people.
+    // The card's three rows (ADR 0162): an AI, apps, people.
     const line = document.querySelector(".home-continue") as HTMLElement;
     expect(line.textContent).toBe("Continue de onde parou · 1 de 3");
     expect(screen().queryByRole("region", { name: "Primeiros passos" })).toBeNull();

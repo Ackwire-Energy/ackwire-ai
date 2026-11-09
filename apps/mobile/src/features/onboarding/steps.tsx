@@ -35,7 +35,7 @@ import { TextArea } from "../shared/TextArea";
 import { stepFailedText } from "./logic";
 
 /*
- * The onboarding's steps after the workspace's name (ADR 0158), as on the web, in the phone's own lists: what the
+ * The onboarding's steps after the workspace's name (ADR 0162), as on the web, in the phone's own lists: what the
  * workspace does, its team, and, where it waits for its first plan, the plan in words only.
  */
 

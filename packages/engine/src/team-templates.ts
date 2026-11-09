@@ -249,7 +249,7 @@ export async function useTeamTemplate(
   return { channelId: dm.id, messageId: card.id, state: made.card.state, error: made.card.error ?? null };
 }
 
-/* ---------- The team's hello (ADR 0158) ---------- */
+/* ---------- The team's hello (ADR 0162) ---------- */
 
 /** Between two lines in #general: one after the other, as people type. */
 export const HELLO_GAP_MS = 1100;
@@ -261,7 +261,7 @@ const memberOf = (handle: string): Member | null => {
 };
 
 /**
- * `TEAM_HELLO_JOB` (ADR 0158): the team says hi in #general, one line each, with no model call, once the team can work
+ * `TEAM_HELLO_JOB` (ADR 0162): the team says hi in #general, one line each, with no model call, once the team can work
  * (the first plan started, or a template team was made where no plan is waited for). Its first job lines the
  * greeters up, the right hand first, then each template agent in the order it was made, `HELLO_GAP_MS` apart; a custom
  * agent says nothing. Each greeter's job: a template agent joins #general answering only when called (`autoReply`

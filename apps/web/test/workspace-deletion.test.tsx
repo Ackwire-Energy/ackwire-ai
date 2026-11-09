@@ -469,7 +469,7 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     state.me.organizations = [];
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(8);
-    // The onboarding's account menu (ADR 0158): Apagar conta beside Sair.
+    // The onboarding's account menu (ADR 0162): Apagar conta beside Sair.
     const menu = await accountMenu();
     expect(within(menu).getByRole("menuitem", { name: "Sair" })).toBeTruthy();
     await click(within(menu).getByRole("menuitem", { name: "Apagar conta" }));

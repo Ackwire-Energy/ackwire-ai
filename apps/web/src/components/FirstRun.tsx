@@ -46,7 +46,7 @@ import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /*
- * The right hand's first run (ADR 0155 §6, ADR 0158): one checklist card inside its greeting, drawn by the app and
+ * The right hand's first run (ADR 0155 §6, ADR 0162): one checklist card inside its greeting, drawn by the app and
  * never stored, for the workspace's owners, with what the onboarding didn't do: an AI, apps, people. Each row opens
  * in place, none needing a model, and reads done from the data; only "Agora não" is kept. On a billing hold every row
  * waits for the plan, whose one button is the hold's banner.

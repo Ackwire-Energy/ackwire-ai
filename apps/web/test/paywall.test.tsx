@@ -284,7 +284,7 @@ describe("Lodi's DM on a hold", () => {
     expect(text).toContain("Crio os agentes, conecto os apps e convido as pessoas.");
   });
 
-  test("every row waits for the plan, whose one button is the banner's; no asks (ADR 0158)", async () => {
+  test("every row waits for the plan, whose one button is the banner's; no asks (ADR 0162)", async () => {
     await open(lodi(), dm);
     for (const waits of ["Conecte uma IA.", "Conecte os apps do trabalho.", "Chame quem trabalha com você."]) {
       expect(row(waits).textContent).toContain("Abre com o plano.");

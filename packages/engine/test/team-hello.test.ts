@@ -13,7 +13,7 @@ import {
 import { type Fixture, setup } from "./fixtures";
 
 /*
- * The team says hi in #general once it can work (ADR 0158): when the first plan starts, or when a template team is
+ * The team says hi in #general once it can work (ADR 0162): when the first plan starts, or when a template team is
  * made where no plan is waited for. One line each, Lodi first, no model call, no run, no notification.
  */
 

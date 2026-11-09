@@ -38,7 +38,7 @@ import { BusinessStep, PlanStep, TeamStep, useTemplate } from "./onboarding/step
 import "./onboarding.css";
 
 /**
- * The onboarding (ADR 0158): the blue rail with Lodi on its horizon, one step at a time, read from the workspace's own
+ * The onboarding (ADR 0162): the blue rail with Lodi on its horizon, one step at a time, read from the workspace's own
  * data so a workspace left at any step resumes there: its name (which creates it), what it does, its team (a template,
  * made in one click), and, where the workspace waits for its first plan, the plan. On wide screens its sidebar fills
  * in beside the question. It opens in #general, or in its right hand's DM when the plan was left for later.

@@ -62,6 +62,6 @@ While a row is open for an owner, the right hand's prompt names none of the setu
 
 ## Amendment (2026-11-08): the right hand's card keeps three rows (§6)
 
-ADR 0158: the onboarding asks what the workspace does and makes its team, so the card keeps an AI (for the whole
+ADR 0162: the onboarding asks what the workspace does and makes its team, so the card keeps an AI (for the whole
 team), apps and people. An invitation waiting for its answer finishes the people row, which invites one address in
 place. On a hold every row waits with no button, and "Agora não" says nothing.

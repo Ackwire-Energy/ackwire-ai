@@ -4,7 +4,7 @@ import { answerAfter, answerPicks, BUSINESS_TYPES, replyChipsOf } from "@agentes
 
 const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
 
-test("what the workspace does: the onboarding's step 2, the business types saved as its context (ADR 0158)", () => {
+test("what the workspace does: the onboarding's step 2, the business types saved as its context (ADR 0162)", () => {
   const step = src("onboarding/steps.tsx");
   expect(step).toContain("BUSINESS_TYPES.map((b) => (");
   expect(step).toContain("save.mutate({ context: text }");

@@ -137,7 +137,7 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   expect(card).toContain("apps: appNames,");
   expect(card).toContain("invited: run.invited.length ? joinNames(run.invited, t) : null,");
   // As on the web: the AI row connects the whole team, the apps row is its own screen of suggested apps, a skip says
-  // nothing, and an invitation only sent says so, the welcome kept for someone joining (ADR 0158).
+  // nothing, and an invitation only sent says so, the welcome kept for someone joining (ADR 0162).
   expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
   expect(card).toContain("firstRunBeats(doneHere, { members: run.members, invited: run.invited.length })");

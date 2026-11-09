@@ -57,7 +57,7 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
 
 /**
- * The onboarding's steps on the rail (ADR 0158), web and phone: the workspace's name, what it does, its team, and the
+ * The onboarding's steps on the rail (ADR 0162), web and phone: the workspace's name, what it does, its team, and the
  * plan, which only a workspace waiting for its first plan has (agentes.chat Cloud).
  */
 export type RailStep = "name" | "business" | "team" | "plan";

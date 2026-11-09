@@ -1,5 +1,5 @@
 /*
- * The onboarding (ADR 0158), the parts only that screen draws: the progress, Lodi on the horizon, each step's column,
+ * The onboarding (ADR 0162), the parts only that screen draws: the progress, Lodi on the horizon, each step's column,
  * the plan card and the sidebar's preview. The rail, its steps and the step headings stay in layout.css (Criar agente
  * uses them too). Unlayered, so these win over layout.css's base layer.
  */

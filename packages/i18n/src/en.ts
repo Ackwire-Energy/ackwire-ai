@@ -685,7 +685,7 @@ export const en = {
       left_other: "{{count}} steps left",
       done: "All set",
     },
-    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    /** The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview and the plan step. */
     flow: {
       steps: {
         name: "Workspace name",
@@ -16547,7 +16547,7 @@ export const en = {
       sub: "Accounting, law, consulting",
       desc: "For an office that books clients, sends proposals and bills them.",
     },
-    /** The team's hello in #general once it can work (ADR 0158): Lodi's line, then each agent's. */
+    /** The team's hello in #general once it can work (ADR 0162): Lodi's line, then each agent's. */
     hello: {
       lodi: {
         starting: "Plan active! My computer is starting up. Let's get to work!",

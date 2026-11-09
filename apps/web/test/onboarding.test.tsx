@@ -12,7 +12,7 @@ import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
 
 /*
- * The onboarding (ADR 0158): the blue rail with Lodi, its steps read from the workspace's own data, the plan only where
+ * The onboarding (ADR 0162): the blue rail with Lodi, its steps read from the workspace's own data, the plan only where
  * the workspace waits for its first one, and where the workspace opens after it.
  */
 

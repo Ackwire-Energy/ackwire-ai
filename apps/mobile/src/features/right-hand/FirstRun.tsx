@@ -45,7 +45,7 @@ import { tapHaptic } from "../shared/parts";
 import { useSendAnswer } from "./TeamCard";
 
 /*
- * The right hand's first run on the phone (ADR 0155 §6, ADR 0158), as on the web: one checklist card inside its
+ * The right hand's first run on the phone (ADR 0155 §6, ADR 0162), as on the web: one checklist card inside its
  * greeting for the workspace's owners, with what the onboarding didn't do (an AI, apps, people), each row Connect AI,
  * a pushed screen or the invite screen. On a billing hold every row waits, the AI row saying where the plan is in
  * words only (App Store 3.1.1).

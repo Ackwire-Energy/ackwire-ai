@@ -28,7 +28,7 @@ export const templateFor = <T extends { id: string }>(
 export const ANSWER_JOINER = " · ";
 
 /**
- * The context the onboarding's step 2 saves (ADR 0158): the business type's words, then the sentence, joined as tapped
+ * The context the onboarding's step 2 saves (ADR 0162): the business type's words, then the sentence, joined as tapped
  * answers are ("Loja online · Vendemos cerâmica"), so a later visit on any device reads both back (`aboutOf`).
  */
 export const aboutContext = (t: TFunction, business: BusinessType | null, line: string) =>

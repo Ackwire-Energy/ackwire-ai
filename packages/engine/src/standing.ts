@@ -336,7 +336,7 @@ export async function setOrgStanding(
   return done.after;
 }
 
-/** The team's hello in #general once it can work (`sayTeamHello` in team-templates, ADR 0158). */
+/** The team's hello in #general once it can work (`sayTeamHello` in team-templates, ADR 0162). */
 export const TEAM_HELLO_JOB = "team.hello";
 
 /**

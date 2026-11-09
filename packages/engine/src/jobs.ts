@@ -954,7 +954,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       }
       await forgetCodeEmail(deps.db, job);
     },
-    // The team says hi in #general once it can work (ADR 0158).
+    // The team says hi in #general once it can work (ADR 0162).
     [TEAM_HELLO_JOB]: async (job) => {
       await sayTeamHello(deps, orgOf(job), job.payload);
     },

@@ -678,7 +678,7 @@ export const ptBR = {
       left_other: "Faltam {{count}} etapas",
       done: "Tudo certo",
     },
-    /** The blue rail with Lodi (ADR 0158): its steps, Lodi's line on each, the preview and the plan step. */
+    /** The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview and the plan step. */
     flow: {
       steps: {
         name: "Nome do workspace",
@@ -16763,7 +16763,7 @@ export const ptBR = {
       sub: "Contabilidade, advocacia, consultoria",
       desc: "Para um escritório que agenda clientes, manda propostas e cobra.",
     },
-    /** The team's hello in #general once it can work (ADR 0158): Lodi's line, then each agent's. */
+    /** The team's hello in #general once it can work (ADR 0162): Lodi's line, then each agent's. */
     hello: {
       lodi: {
         starting: "Plano ativo! Meu computador já está iniciando. Vamos começar o trabalho!",
