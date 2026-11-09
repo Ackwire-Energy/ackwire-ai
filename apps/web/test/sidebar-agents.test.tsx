@@ -127,9 +127,10 @@ describe("Agentes and its groups", () => {
     );
     await settle(4);
     expect(head("Integrations").querySelector(".sidebar__section-working")?.textContent).toBe("1 trabalhando");
-    // Where it works sits beside its name, in words, in place of the pill; its role stays the tag under the name.
-    expect(atlas.querySelector(".sidebar__item-state")?.textContent).toBe("trabalhando em #general");
-    expect(atlas.querySelector(".sidebar__item-state")?.classList.contains("ac-tag")).toBe(false);
+    // Working: the pixel orbit beside its name, labelled with where, in place of the pill; the row keeps its height.
+    expect(atlas.querySelector(".sidebar__item-label .ac-pixspin")?.getAttribute("aria-label")).toBe(
+      "trabalhando em #general",
+    );
     expect(atlas.querySelector(".sidebar__busy")).toBeNull();
   });
 

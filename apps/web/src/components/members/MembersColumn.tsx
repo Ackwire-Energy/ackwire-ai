@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
 import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { Avatar, Button, cx, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
+import { Avatar, Button, Icon, matchesWords, PixelSpinner, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -285,9 +285,8 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
   const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  // Under the name: its role, the agent's fixed label, as a tag; with no role, its presence in words (unless a line or
-  // what it does here already says more, beside the name).
-  const under = agent.role || (line || doing ? null : word);
+  // Under the name, one line of one height: its line (why it is out, what it is on), else its role (the agent's fixed
+  // label) as a tag, else its presence. Working here is the pixel orbit beside its name, so the row never jumps.
   const shows = useId();
   return (
     <ProfileTrigger
@@ -317,14 +316,15 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
         <span className="members-side__text">
           <span className="members-side__name">
             <span className="members-side__label">{agent.name}</span>
-            {/* What it does here, or its line: words beside the name, on one line. */}
-            {line ? (
-              <StatusLine {...line} className="members-side__state" />
-            ) : (
-              doing && <span className="members-side__state">{doing}</span>
-            )}
+            {doing && <PixelSpinner size={14} color={colorOf(agent)} label={doing} className="members-side__spin" />}
           </span>
-          {under && <span className={cx("members-side__line", agent.role && "ac-tag")}>{under}</span>}
+          {line ? (
+            <StatusLine {...line} className="members-side__line" />
+          ) : agent.role ? (
+            <span className="members-side__line ac-tag">{agent.role}</span>
+          ) : (
+            word && <span className="members-side__line">{word}</span>
+          )}
         </span>
       </span>
     </ProfileTrigger>

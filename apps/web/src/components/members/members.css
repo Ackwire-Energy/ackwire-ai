@@ -160,7 +160,8 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
-  line-height: 16px;
+  /* The role's tag's height: a row keeps its height whichever of the two its second line shows. */
+  line-height: 18px;
   color: var(--muted);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -183,24 +184,9 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   font-size: 11.5px;
   line-height: 18px;
 }
-/* What an agent does here, or its line, beside its name on the name's line: the name keeps its room (the words give
-   way first, ending in "…"; the row's title has them whole). Under both, the role's tag. */
-.members-side__name > .members-side__label {
-  flex: 0 1 auto;
-}
-.members-side__state {
-  flex: 0 100 auto;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--muted);
-}
-.members-side__state.status-line {
-  display: inline-flex;
-  align-items: center;
+/* An agent working here: its pixel orbit beside its name (what it does is the orbit's label and the row's title). */
+.members-side__spin {
+  flex: none;
 }
 .members-side__inner[data-presence="offline"] {
   opacity: 0.45;
