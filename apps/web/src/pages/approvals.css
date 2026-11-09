@@ -786,19 +786,16 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-weight: 650;
   letter-spacing: -0.02em;
 }
-/* Whether it can be undone, after the title's last word (on the page and in the dialog's title), wrapping with it. */
-.ap-review__title:has(+ .ap-review__undo) {
+/* Whether it can be undone, after the title's last word (on the page and in the dialog's title), wrapping with it: a
+   space parts them, so the words read as two, and the chip's margin makes the rest of the gap. */
+.ap-review__titleline > .ap-review__title {
   display: inline;
 }
 .ap-review__undo.ac-chip {
-  margin-inline-start: 10px;
+  margin-inline-start: 4px;
   vertical-align: middle;
   letter-spacing: 0;
   font-weight: 500;
-}
-/* In the dialog's title a space parts it from the title's words, so its name reads as two: the space is the gap. */
-.ac-details__title > .ap-review__undo.ac-chip {
-  margin-inline-start: 4px;
 }
 .ap-review__body {
   display: flex;

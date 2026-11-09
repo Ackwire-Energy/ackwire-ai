@@ -1085,10 +1085,12 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
         <span className="ac-mediarow__meta">{by}</span>
       </p>
       <div className="ac-mediarow__body">
-        <h2 className="ap-review__title" title={title}>
-          {title}
-        </h2>
-        <UndoChip approval={a} />
+        <div className="ap-review__titleline">
+          <h2 className="ap-review__title" title={title}>
+            {title}
+          </h2>{" "}
+          <UndoChip approval={a} />
+        </div>
       </div>
     </header>
   );
