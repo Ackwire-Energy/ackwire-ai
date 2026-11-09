@@ -60,7 +60,8 @@ export function EmailTriggerFields({
   );
   const waiting = Boolean(agentId) && list.length > 0 && reads.isPending;
   const folders = useMailFolders(org.id, value.accountId || null);
-  // The first mailbox the agent reads, and its inbox, until the person picks.
+  // The first mailbox the agent reads, and its inbox, until the person picks. The selects show them from the first
+  // render, before these effects write them, so neither is ever an empty box.
   const first = waiting ? undefined : options[0];
   useEffect(() => {
     if (!value.accountId && first) onChange({ ...value, accountId: first.id, folder: "" });
@@ -110,14 +111,16 @@ export function EmailTriggerFields({
       <div className="grid-fields">
         <Field label={t("mail.routine.mailbox")} id="nr-mailbox">
           <Select
-            value={value.accountId || undefined}
+            value={value.accountId || first?.id}
             onValueChange={(accountId) => onChange({ ...value, accountId, folder: "" })}
             options={options.map((a) => ({ value: a.id, label: a.address }))}
+            placeholder={waiting ? t("common.loading") : undefined}
+            disabled={waiting}
           />
         </Field>
         <Field label={t("mail.routine.folder")} id="nr-folder">
           <Select
-            value={value.folder || undefined}
+            value={value.folder || inboxOf(folders.data)}
             onValueChange={(folder) => onChange({ ...value, folder })}
             options={folderOptions}
           />
