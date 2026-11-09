@@ -121,7 +121,8 @@ test("the phone's greeting draws the checklist and Conversas has one line back t
   // says nothing (ADR 0158).
   expect(card).toContain("openConnectAi(team.length > 0 ? {} : { agentId: agent.id })");
   expect(card).toContain('apps: () => openSetupStep(agent.id, "apps")');
-  expect(card).toContain("facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : \"\"");
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the card's own source text, placeholder included.
+  expect(card).toContain('facts[step] ? t(`agentSetup.firstRun.say.${step}`, agentGrammar(agent.name)) : ""');
   const steps = src("agents/setup/SetupStepScreen.tsx");
   expect(steps).toContain("firstRun ? <FirstRunAppsStep /> : <AppsStep agent={agent} />");
   expect(steps).toContain("firstRunAppList(");

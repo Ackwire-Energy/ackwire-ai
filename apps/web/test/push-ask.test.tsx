@@ -24,7 +24,10 @@ beforeAll(() => {
     ready: new Promise(() => {}),
   };
   Object.defineProperty(navigator, "serviceWorker", { value: worker, configurable: true });
-  Object.assign(window, { PushManager: () => {}, Notification: { permission: "default" } });
+  const browser = { PushManager: () => {}, Notification: { permission: "default" } };
+  Object.assign(window, browser);
+  // The page reads `Notification` as a global too.
+  Object.assign(globalThis, browser);
 });
 afterEach(() => {
   cleanup();
