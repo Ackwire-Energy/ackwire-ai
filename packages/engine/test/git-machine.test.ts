@@ -382,7 +382,7 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
     // Nothing named: the agent's first repository.
     expect((await prepareAgentCode(w.machineDeps, turn("bom dia")))?.cwd).toBe("repos/acme/app");
 
-    // A mission turn (its own folder), or a runner that fails: nothing, the turn goes on as before.
+    // A mission turn (its own folder), or a runner that fails: no code setup, the turn goes on as before.
     expect(
       await prepareAgentCode(w.machineDeps, { ...turn("x"), session: { machineId: w.paired.machineId, cwd: "m/1" } }),
     ).toBeNull();
@@ -393,6 +393,51 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       throw new Error("boom");
     };
     expect(await prepareAgentCode(w.machineDeps, turn("x"))).toBeNull();
+  });
+
+  test("a mission turn more than 6 hours after the last sync refreshes the computer's credential: its push goes through", async () => {
+    const w = await world({ scopes: ["github:git.read", "github:git.write"] });
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    w.answers.fn = (req) => req.repos.map((r) => ({ repo: r.repo, dir: r.dir, status: "updated" as const }));
+    const start = Date.now();
+    const at = (hours: number) => new Date(start + hours * 3600_000);
+    const turn = (cwd: string, hours: number) =>
+      prepareAgentCode(
+        { ...w.machineDeps, now: () => at(hours) },
+        {
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          threadRootId: null,
+          trigger: "keep going",
+          messages: [],
+          session: { machineId: w.paired.machineId, cwd },
+        },
+      );
+    // What the computer holds: the credential of the last sync it got.
+    const held = () => w.runner.syncs().at(-1)?.proxy.token ?? "";
+    const upstream = fakeUpstream();
+    const push = (hours: number) =>
+      handleGitProxy(
+        { db: f.db, secret: SECRET, connectors: w.connectors, upstream, now: () => at(hours) },
+        new Request(`${PUBLIC_URL}/api/git/${f.org.id}/${w.connection.id}/acme/app.git/git-receive-pack`, {
+          method: "POST",
+          headers: { authorization: `Basic ${Buffer.from(`agentes:${held()}`).toString("base64")}` },
+          body: new Uint8Array(
+            Buffer.from(`${pkt(`${ZERO_OID} ${"c".repeat(40)} refs/heads/agentes/dev/fix\0report-status\n`)}0000`),
+          ),
+        }),
+        { orgId: f.org.id, connectionId: w.connection.id, path: "acme/app.git/git-receive-pack" },
+      );
+
+    // The last chat turn's sync, then seven hours of mission work in its own folder.
+    await turn("", 0);
+    expect((await push(7)).status).toBe(401);
+    expect(await turn("missions/fix-login", 7)).toBeNull();
+    // Its folder's checkout isn't touched: only the credential comes along.
+    expect(w.runner.syncs().at(-1)).toMatchObject({ repos: [] });
+    expect(w.runner.syncs().at(-1)?.existing).toBeUndefined();
+    expect((await push(7)).status).toBe(200);
+    expect(upstream.calls.filter((u) => u.endsWith("/git-receive-pack"))).toHaveLength(1);
   });
 });
 
