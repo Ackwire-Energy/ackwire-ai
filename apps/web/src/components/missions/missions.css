@@ -462,10 +462,12 @@ a.mi-ref:hover code {
   flex-direction: column;
   gap: 2px;
 }
+/* Its chips go under the title when both don't fit, so a narrow header never cuts the title to a letter. */
 .mh__line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   min-width: 0;
 }
 .mh__title.channel__title {
