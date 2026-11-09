@@ -45,12 +45,13 @@
   align-items: center;
   justify-content: space-between;
 }
+/* Out over the page's side room: where the filters scroll, they slide under the work area's edges. */
 .nt-segwrap {
-  max-width: 100%;
+  max-width: calc(100% + 2 * var(--page-x));
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 2px;
-  margin: -2px;
+  padding: 2px var(--page-x);
+  margin: -2px calc(-1 * var(--page-x));
 }
 .nt-segwrap::-webkit-scrollbar {
   display: none;

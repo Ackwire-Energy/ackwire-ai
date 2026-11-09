@@ -305,8 +305,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -405,8 +405,8 @@
   .agp-subnav {
     position: static;
     flex-direction: row;
-    margin: 0 -16px;
-    padding: 2px 16px 4px;
+    margin: 0 calc(-1 * var(--agp-gutter));
+    padding: 2px var(--agp-gutter) 4px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
