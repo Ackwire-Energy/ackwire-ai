@@ -223,8 +223,8 @@
     display: none;
   }
 }
-@supports (top: 1lh) {
-  @media (max-width: 359px) {
+@media (max-width: 359px) {
+  @supports (top: 1lh) {
     .dm-who .channel__title.ac-captop {
       margin-block-start: calc(var(--cap-top) - 0.5lh);
     }
