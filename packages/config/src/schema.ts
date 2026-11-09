@@ -129,7 +129,7 @@ export const envVars = {
   SERVER_ROLE: {
     schema: z.enum(["all", "worker"]).default("all"),
     description:
-      "What this process does. `all` (default): serves the app and its API, and runs jobs. `worker`: only runs jobs (agents' runs, routines, notifications, emails), with no HTTP. When jobs keep waiting for a slot (the log says so), start one more process with `SERVER_ROLE=worker` and the same settings: jobs share out across every process on the database, each workspace taking its turn. Needs a PostgreSQL database, not the built-in one.",
+      "What this process does. `all` (default): serves the app and its API, and runs jobs. `worker`: only runs jobs (agents' runs, routines, notifications, emails), and answers nothing over HTTP but its health check (`/api/health` on `PORT`). When jobs keep waiting for a slot (the log says so), start one more process with `SERVER_ROLE=worker` and the same settings: jobs share out across every process on the database, each workspace taking its turn. Processes booting together take turns on the migrations; a worker may leave them to the app (`RUN_MIGRATIONS_ON_BOOT=false`). Needs a PostgreSQL database, not the built-in one.",
     section: "Server",
   },
   DATABASE_URL: {

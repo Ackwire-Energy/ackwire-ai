@@ -1479,12 +1479,14 @@ The app runs its jobs (agents' runs, routines, messages' routing, notifications,
 process: 48 at once to start with, 12 of them kept for the quick ones. While jobs wait for a slot, it
 gives itself more, every 30 seconds: agents' runs as far as half of its memory holds them, about 4 MB
 each while they wait on their model or their computer, and quick jobs up to 4 per database connection
-(`DATABASE_POOL_MAX`). Workspaces take turns, so one workspace's burst of routines makes only that
-workspace wait. When jobs keep waiting anyway, the log says so, with `add a worker process`, and so do
-the error reports when they are on (`SENTRY_DSN`).
+(`DATABASE_POOL_MAX`), never while its processor, its database or its memory is what jobs wait on.
+Workspaces take turns, so one workspace's burst of routines makes only that workspace wait. When jobs
+keep waiting anyway, the log says so, with `add a worker process`, and so do the error reports when
+they are on (`SENTRY_DSN`).
 
-A worker process runs jobs only, with no HTTP. Add one next to `agentes` in the compose file, with the
-same image and settings:
+A worker process runs jobs only: it answers its health check and nothing else over HTTP. Add one next
+to `agentes` in the compose file, with the same image and settings. It leaves the migrations to the app
+and starts once the app is up:
 
 ```yaml
   agentes-worker:
@@ -1494,10 +1496,13 @@ same image and settings:
       DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
       FILES_DIR: /data/files
       SERVER_ROLE: worker
+      RUN_MIGRATIONS_ON_BOOT: "false"
     volumes:
       - files:/data/files
     depends_on:
       postgres:
+        condition: service_healthy
+      agentes:
         condition: service_healthy
     networks: [default, speech]
     restart: unless-stopped
@@ -1512,12 +1517,13 @@ same image and settings:
       - /tmp
 ```
 
-Then `docker compose up -d`. Every process takes jobs from the same queue in Postgres and never the
-same one twice, so each worker adds as many jobs at once as the app runs. Each process keeps up to
-`DATABASE_POOL_MAX` connections (20): keep their sum under Postgres's `max_connections` (100 in the
-compose file's Postgres). Before a reboot, stop the worker with the app (`docker compose stop agentes
-agentes-worker`). The built-in database (on this computer, without Docker) belongs to one process and
-takes no worker.
+Then `docker compose up -d`. Every process takes jobs from the same queue in Postgres, each job on one
+process at a time (a job whose process stopped mid-way runs again once its lease ends, which jobs are
+written for), so each worker adds as many jobs at once as the app runs. Each process keeps up to
+`DATABASE_POOL_MAX` connections (20), plus one it listens on: keep their sum under Postgres's
+`max_connections` (100 in the compose file's Postgres). Before a reboot, stop the worker with the app
+(`docker compose stop agentes agentes-worker`). The built-in database (on this computer, without
+Docker) belongs to one process and takes no worker.
 
 </details>
 
