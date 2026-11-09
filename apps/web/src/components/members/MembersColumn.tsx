@@ -322,9 +322,7 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
             (line ? (
               <StatusLine {...line} className="members-side__line members-side__work" />
             ) : (
-              <span
-                className={cx("members-side__line", busy && !isRole && "members-side__work", isRole && "ac-tag")}
-              >
+              <span className={cx("members-side__line", busy && !isRole && "members-side__work", isRole && "ac-tag")}>
                 {text}
               </span>
             ))}
