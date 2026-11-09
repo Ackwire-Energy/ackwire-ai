@@ -12,7 +12,7 @@ import { jpegSize } from "./browser";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { readJson, writeJson } from "./json-file";
-import { acquireLock } from "./lock";
+import { acquireLock, pidAlive, readLock } from "./lock";
 import { type PhoneScreenDriver, REASON_WORDS, runTool, startTool } from "./phones";
 import { USBMUXD_SOCKET, usbmuxForward } from "./usbmux";
 
@@ -249,7 +249,8 @@ export interface IosScreen {
 }
 
 export class WdaClient implements IosScreen {
-  private sid: string | null = null;
+  /** Shared by concurrent calls: WDA keeps one session, and a second one opened ends the first. */
+  private sid: Promise<string> | null = null;
 
   constructor(
     readonly base: string,
@@ -291,8 +292,15 @@ export class WdaClient implements IosScreen {
     }
   }
 
-  async session() {
-    if (this.sid) return this.sid;
+  session() {
+    this.sid ??= this.openSession().catch((err: unknown) => {
+      this.sid = null;
+      throw err;
+    });
+    return this.sid;
+  }
+
+  private async openSession() {
     const res = await this.fetchImpl(`${this.base}/session`, {
       method: "POST",
       body: JSON.stringify({ capabilities: { alwaysMatch: { shouldWaitForQuiescence: false } } }),
@@ -302,7 +310,6 @@ export class WdaClient implements IosScreen {
     const json = (await res.json().catch(() => ({}))) as { sessionId?: string; value?: { sessionId?: string } };
     const sid = json.sessionId ?? json.value?.sessionId;
     if (!sid) throw new RunnerError("internal", "The test helper didn't open a session.");
-    this.sid = sid;
     return sid;
   }
 
@@ -422,6 +429,10 @@ interface Failure {
   at: number;
   /** It failed running, not building: the next try only runs it again. */
   check: boolean;
+  /** Failures in a row (`retryWait`). */
+  tries: number;
+  /** Xcode's words matched none of the reasons: `detail` is all there is to say. */
+  unknown: boolean;
 }
 
 export interface WdaRun {
@@ -432,12 +443,19 @@ export interface WdaRun {
   lastUsed: number;
   /** An op or a viewer uses it: a setup check leaves it running. */
   kept: boolean;
-  frames: { latest: Buffer | null; waiters: ((jpeg: Buffer) => void)[]; close(): void } | null;
+  frames: {
+    latest: Buffer | null;
+    waiters: ((jpeg: Buffer) => void)[];
+    close(): void;
+    idle: ReturnType<typeof setTimeout> | undefined;
+  } | null;
 }
 
 export interface IosHelperOptions {
   /** The OS user's home: builds live in `<home>/.agentes-runner/wda`, shared by every runner of this user. */
   home: string;
+  /** Where runners of this user lock the phones they hold (`PhoneManager`'s `lockDir`). */
+  phoneLocks?: string;
   env: NodeJS.ProcessEnv;
   log: (line: string) => void;
   now?: () => number;
@@ -448,6 +466,9 @@ export interface IosHelperOptions {
 }
 
 const frameTimeoutMs = 5000;
+const FRAMES_IDLE_MS = 30_000;
+/** WDA's own MJPEG settings, which the live view uses; a recording raises them while it lasts. */
+const MJPEG_DEFAULTS = { mjpegServerScreenshotQuality: 25, mjpegServerFramerate: 10 };
 
 /** Which wait a failure gets before the next try. */
 const retryOf = (f: Failure): keyof typeof RETRY_MS =>
@@ -456,6 +477,16 @@ const retryOf = (f: Failure): keyof typeof RETRY_MS =>
     : f.reason === "apple_account_missing"
       ? "account"
       : "other";
+
+/**
+ * The wait before the next try. One the person must fix (a setting on the iPhone, an account) doubles with each
+ * failure in a row: each try runs a UI test on the phone, which ends any the person runs from Xcode. A locked or busy
+ * phone is tried again soon.
+ */
+const retryWait = (f: Failure) =>
+  f.reason === "locked" || f.reason === "device_support"
+    ? RETRY_MS.check
+    : Math.min(RETRY_MS[retryOf(f)] * 2 ** (f.tries - 1), RETRY_MS.other);
 
 export class IosHelper {
   private readonly dir: string;
@@ -492,9 +523,28 @@ export class IosHelper {
 
   /** Built for this Xcode, and its profile isn't about to run out. */
   private fresh(meta: BuildMeta | null) {
-    return (
-      meta !== null && (!this.xcode || meta.xcode === this.xcode) && this.now() < this.ends(meta) - RENEW_BEFORE_MS
-    );
+    if (meta === null || (this.xcode && meta.xcode !== this.xcode)) return false;
+    const renewAt = this.ends(meta) - RENEW_BEFORE_MS;
+    // Xcode keeps a profile until it runs out: a renewal that got the same one waits for that end, not a new build
+    // every poll.
+    return this.now() < renewAt || (meta.builtAt >= renewAt && this.now() < this.ends(meta));
+  }
+
+  private fail(key: string, f: Omit<Failure, "tries" | "at">) {
+    this.failed.set(key, { ...f, at: this.now(), tries: (this.failed.get(key)?.tries ?? 0) + 1 });
+  }
+
+  /** Another runner of this OS user (another workspace) holds the phone: running the helper there would end theirs. */
+  private heldElsewhere(udid: string) {
+    const dir = this.opts.phoneLocks ?? path.join(this.opts.home, ".agentes-runner", "phone-locks");
+    const holder = readLock(dir, `ios_${udid.replace(/[^\w.-]/g, "_")}.lock`);
+    return holder !== null && holder.pid !== process.pid && pidAlive(holder.pid);
+  }
+
+  /** Why the phone's helper can't be set up, when Xcode said something none of the reasons cover. */
+  unknownFailure(udid: string): string | null {
+    const failure = this.failed.get(this.keyOf("device", udid));
+    return failure?.unknown ? failure.detail : null;
   }
 
   private async xcodeVersion(xcrun: string) {
@@ -517,20 +567,17 @@ export class IosHelper {
     const renewing = failure && !failure.check && this.usable(meta) && meta.checkedAt;
     if (failure && !renewing)
       return { state: failure.reason === "device_support" ? "preparing" : "needs_you", reason: failure.reason };
-    if (!this.usable(meta)) {
-      const reason = meta ? "helper_expired" : "helper_missing";
-      return { state: this.busy.has(key) ? "preparing" : "needs_you", reason };
-    }
+    // Not built and nothing failed: it's being built, here or by another runner of this user.
+    if (!this.usable(meta)) return { state: "preparing", reason: meta ? "helper_expired" : "helper_missing" };
     return meta.checkedAt ? null : { state: "preparing", reason: "helper_missing" };
   }
 
   private kick(key: string, xcrun: string, udid: string, meta: BuildMeta | null, failure: Failure | undefined) {
     if (!this.xcode) void this.xcodeVersion(xcrun);
     if (this.busy.has(key) || this.starting.has(udid) || this.running.has(udid)) return;
-    const wait = failure ? RETRY_MS[retryOf(failure)] : 0;
-    if (failure && this.now() - failure.at < wait) return;
+    if (failure && this.now() - failure.at < retryWait(failure)) return;
     if (!this.fresh(meta)) void this.build(key, xcrun, { kind: "device", udid });
-    else if (!meta?.checkedAt || failure) this.check(key, xcrun, udid);
+    else if ((!meta?.checkedAt || failure) && !this.heldElsewhere(udid)) this.check(key, xcrun, udid);
   }
 
   /** Builds (or renews) one helper; concurrent asks share it. A failure is kept for `need` and `run` to say. */
@@ -546,9 +593,9 @@ export class IosHelper {
       })
       .catch((err: unknown) => {
         const detail = err instanceof Error ? err.message : String(err);
-        const reason =
-          (err instanceof HelperFailure && err.reason) || (this.meta(key) ? "helper_expired" : "helper_missing");
-        this.failed.set(key, { reason, detail, at: this.now(), check: false });
+        const known = err instanceof HelperFailure ? err.reason : null;
+        const reason = known ?? (this.meta(key) ? "helper_expired" : "helper_missing");
+        this.fail(key, { reason, detail, check: false, unknown: known === null });
         this.opts.log(`iPhone test helper: ${detail}`);
       })
       .finally(() => {
@@ -655,6 +702,9 @@ export class IosHelper {
       up.kept = true;
       return up;
     }
+    if (this.heldElsewhere(udid)) {
+      throw new RunnerError("phone_busy", "Another workspace's connection on this computer is using this iPhone.");
+    }
     if (kind === "simulator") {
       if (!this.fresh(this.meta(key))) await this.build(key, xcrun, { kind: "simulator" });
       const failure = this.failed.get(key);
@@ -755,7 +805,7 @@ export class IosHelper {
       if (gone || this.now() > deadline) {
         const reason = helperReason(said);
         const detail = gone ? failureLine(said) : "The test helper didn't start in time.";
-        if (!sim) this.failed.set(key, { reason: reason ?? "helper_missing", detail, at: this.now(), check: true });
+        if (!sim) this.fail(key, { reason: reason ?? "helper_missing", detail, check: true, unknown: reason === null });
         throw fail(
           reason && reason !== "helper_expired"
             ? new RunnerError("phone_not_ready", helperWords(reason, detail))
@@ -801,7 +851,7 @@ export class IosHelper {
   nextFrame(run: WdaRun, signal?: AbortSignal): Promise<Buffer> {
     run.lastUsed = this.now();
     if (!run.frames) {
-      const frames: NonNullable<WdaRun["frames"]> = { latest: null, waiters: [], close: () => {} };
+      const frames: NonNullable<WdaRun["frames"]> = { latest: null, waiters: [], close: () => {}, idle: undefined };
       const stream = mjpegStream(run.mjpegPort, (jpeg) => {
         frames.latest = jpeg;
         for (const w of frames.waiters.splice(0)) w(jpeg);
@@ -813,6 +863,9 @@ export class IosHelper {
       run.frames = frames;
     }
     const frames = run.frames;
+    // A view that stopped asking: the phone stops filming itself for it.
+    clearTimeout(frames.idle);
+    frames.idle = setTimeout(frames.close, FRAMES_IDLE_MS);
     return new Promise<Buffer>((resolve, reject) => {
       const done = () => {
         clearTimeout(timer);
@@ -853,7 +906,8 @@ export class IosHelper {
         { session: true },
       )
       .catch(() => undefined);
-    const child = spawn(ffmpeg, ffmpegArgs(encoder, file), { stdio: ["pipe", "ignore", "pipe"], env: this.opts.env });
+    // stderr unread would fill its pipe and stall ffmpeg.
+    const child = spawn(ffmpeg, ffmpegArgs(encoder, file), { stdio: ["pipe", "ignore", "ignore"], env: this.opts.env });
     (child.stdin as unknown as EventEmitter | null)?.on("error", () => {});
     const stream = mjpegStream(run.mjpegPort, (jpeg) => {
       run.lastUsed = this.now();
@@ -869,6 +923,9 @@ export class IosHelper {
         clearTimeout(timer);
         stream.close();
         child.stdin?.end();
+        void run.client
+          .call("POST", "/appium/settings", { settings: MJPEG_DEFAULTS }, { session: true, timeoutMs: 5000 })
+          .catch(() => undefined);
         const kill = setTimeout(() => child.kill("SIGKILL"), 30_000);
         await exited;
         clearTimeout(kill);

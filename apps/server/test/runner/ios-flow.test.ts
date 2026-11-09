@@ -62,6 +62,11 @@ test("Maestro's YAML: the header's appId and env, then the commands; one documen
     commands: ["launchApp", { tapOn: "Sign in" }],
   });
   expect(parseIosFlow("- launchApp: com.acme.app\n").commands).toEqual([{ launchApp: "com.acme.app" }]);
+  // Two commands after a leading `---` are still one list, not a header and its commands.
+  expect(parseIosFlow("---\n- launchApp: com.acme.app\n- tapOn: Sign in\n").commands).toEqual([
+    { launchApp: "com.acme.app" },
+    { tapOn: "Sign in" },
+  ]);
   expect(() => parseIosFlow("appId: x\n")).toThrow("no commands");
   expect(() => parseIosFlow("- tapOn: [unclosed\n")).toThrow("valid YAML");
 });

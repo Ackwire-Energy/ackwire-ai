@@ -31,7 +31,7 @@ import { APPLE_APP, appleNeedsYou, parseDevicectl, parseSimctl } from "./apple-d
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { isExecutable } from "./executors";
-import { runIosFlow } from "./ios-flow";
+import { parseIosFlow, runIosFlow } from "./ios-flow";
 import { acquireLock, pidAlive, readLock } from "./lock";
 import { usualDirs } from "./login-path";
 import { isInside } from "./paths";
@@ -366,7 +366,7 @@ export class PhoneManager {
       opts.ios !== undefined
         ? opts.ios
         : this.platform === "darwin"
-          ? new IosHelper({ home: this.home, env: this.env, log: opts.log, now: this.now })
+          ? new IosHelper({ home: this.home, env: this.env, log: opts.log, now: this.now, phoneLocks: opts.lockDir })
           : null;
     const ios = this.ios;
     if (ios) {
@@ -668,6 +668,8 @@ export class PhoneManager {
     const helperOnly = phone.reason !== undefined && HELPER_REASONS.has(phone.reason) && !NEEDS_HELPER.has(req.op);
     const problem = helperOnly ? null : phoneNotReady(phone);
     if (problem) {
+      const broken = phone.reason && HELPER_REASONS.has(phone.reason) ? this.ios?.unknownFailure(phone.serial) : null;
+      if (broken) throw new RunnerError("internal", `The iPhone test helper couldn't be set up on this Mac: ${broken}`);
       throw new RunnerError(
         phone.state === "unsupported" ? "unsupported" : "phone_not_ready",
         `${problem.title}. ${problem.fix}`,
@@ -1010,6 +1012,8 @@ export class PhoneManager {
    */
   private async iosFlow(req: Extract<PhoneRequest, { op: "phone.flow" }>, phone: Phone, tools: Tools, io: PhoneIo) {
     const { flow, vars, timeoutSeconds } = this.flowInput(req);
+    // A flow that isn't one is refused before the helper starts and a recording begins.
+    parseIosFlow(flow);
     const yaml = await this.outFile(io, "flow", "yaml");
     await writeFile(yaml.abs, flow);
     const run = await this.helper(phone, tools);
@@ -1030,10 +1034,11 @@ export class PhoneManager {
         await writeFile(shot.abs, png);
         return shot.rel;
       },
-    }).catch((err: unknown) => {
-      if (err instanceof RunnerError && err.code === "bad_request") throw err;
-      return { passed: false, output: `FAILED  ${err instanceof Error ? err.message : String(err)}`, screenshots: [] };
-    });
+    }).catch((err: unknown) => ({
+      passed: false,
+      output: `FAILED  ${err instanceof Error ? err.message : String(err)}`,
+      screenshots: [],
+    }));
     const seconds = Math.round((this.now() - started) / 1000);
     await recorder?.stop();
     const log = yaml.rel.replace(/\.yaml$/, ".log");

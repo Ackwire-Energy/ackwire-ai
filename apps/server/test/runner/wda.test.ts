@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import {
@@ -285,6 +285,7 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   expect(tap?.[3]).toEqual({ x: 195, y: 422 });
   await driver.key("back");
   m.helper.stop(IPHONE);
+  const first = m.meta().builtAt;
   // A day before the 7-day profile ends, it's built again in the background; the phone stays ready meanwhile.
   m.tick(7 * 24 * 3600_000 - RENEW_BEFORE_MS + 1000);
   expect(m.helper.need(IPHONE, m.xcrun)).toBe(null);
@@ -292,6 +293,59 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   for (let i = 0; i < 400 && builds() < 2; i++) await Bun.sleep(25);
   expect(builds()).toBe(2);
   expect(await m.settle(null)).toBe(null);
+  for (let i = 0; i < 400 && m.meta().builtAt === first; i++) await Bun.sleep(25);
+  // Xcode kept the profile it had (it ends in 12 hours): no build again until it ends, then one.
+  const renewed = m.meta();
+  expect(renewed.builtAt).not.toBe(first);
+  const metaFile = path.join(m.root, ".agentes-runner", "wda", IPHONE, "meta.json");
+  writeFileSync(metaFile, JSON.stringify({ ...renewed, expiresAt: renewed.builtAt + RENEW_BEFORE_MS / 2 }));
+  for (let i = 0; i < 8; i++) {
+    expect(m.helper.need(IPHONE, m.xcrun)).toBe(null);
+    await Bun.sleep(25);
+  }
+  expect(builds()).toBe(2);
+  m.tick(RENEW_BEFORE_MS / 2);
+  expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "preparing", reason: "helper_expired" });
+  expect(await m.settle(null)).toBe(null);
+  expect(builds()).toBe(3);
+});
+
+test("another runner of this user builds it or holds the phone: this one waits, running nothing", async () => {
+  const m = await mac();
+  const lock = (...parts: string[]) => {
+    const file = path.join(m.root, ".agentes-runner", ...parts);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ pid: process.ppid, mode: "phone", startedAt: new Date().toISOString() }));
+    return file;
+  };
+  const building = lock("wda", "locks", `${IPHONE}.lock`);
+  const holding = lock("phone-locks", `ios_${IPHONE}.lock`);
+  expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "preparing", reason: "helper_missing" });
+  rmSync(building);
+  const metaFile = path.join(m.root, ".agentes-runner", "wda", IPHONE, "meta.json");
+  for (let i = 0; i < 400 && !existsSync(metaFile); i++) {
+    m.helper.need(IPHONE, m.xcrun);
+    await Bun.sleep(25);
+  }
+  // Built; the phone is another workspace's right now, so the check on it waits.
+  for (let i = 0; i < 8; i++) {
+    expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "preparing", reason: "helper_missing" });
+    await Bun.sleep(25);
+  }
+  expect(m.calls().some((c) => c[2] === "test-without-building")).toBe(false);
+  // Nor does a view from this workspace start it there.
+  expect(await errorCode(() => m.helper.run("device", IPHONE, m.xcrun))).toBe("phone_busy");
+  rmSync(holding);
+  expect(await m.settle(null)).toBe(null);
+});
+
+test("a build that fails for a reason Xcode's words don't name says them to the agent", async () => {
+  const m = await mac({ wdaBuildFail: "clang: error: linker command failed with exit code 1\n" });
+  expect(await m.settle({ state: "needs_you", reason: "helper_missing" })).toEqual({
+    state: "needs_you",
+    reason: "helper_missing",
+  });
+  expect(m.helper.unknownFailure(IPHONE)).toBe("clang: error: linker command failed with exit code 1");
 });
 
 test("a real iPhone's helper waits on the person: no Apple Account, UI Automation off, not trusted, the app limit", async () => {
@@ -319,8 +373,14 @@ test("a real iPhone's helper waits on the person: no Apple Account, UI Automatio
     state: "needs_you",
     reason: "helper_untrusted",
   });
-  // Turned on and trusted: ready.
+  // Turned on and trusted: ready, at the next try (each failure in a row waits twice as long).
   m.setState({});
+  const runs = () => m.calls().filter((c) => c[2] === "test-without-building").length;
+  const before = runs();
+  m.tick(RETRY_MS.check);
+  expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "needs_you", reason: "helper_untrusted" });
+  await Bun.sleep(100);
+  expect(runs()).toBe(before);
   m.tick(RETRY_MS.check);
   expect(await m.settle(null)).toBe(null);
   // The renewal hits the free team's limit and the profile runs out: what's needed is said.

@@ -63,7 +63,14 @@ export function parseIosFlow(text: string): { appId: string | null; env: Record<
       `The flow isn't valid YAML: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  const multi = /^---\s*$/m.test(text) && Array.isArray(docs) && docs.length === 2 && !Array.isArray(docs[0]);
+  // Two documents (a header, then the commands); a flow that only starts with `---` is one list.
+  const multi =
+    Array.isArray(docs) &&
+    docs.length === 2 &&
+    typeof docs[0] === "object" &&
+    docs[0] !== null &&
+    !Array.isArray(docs[0]) &&
+    Array.isArray(docs[1]);
   const header = (multi ? (docs as unknown[])[0] : null) as Record<string, unknown> | null;
   const commands = multi ? (docs as unknown[])[1] : docs;
   if (!Array.isArray(commands)) throw new RunnerError("bad_request", "The flow has no commands (a list after ---).");

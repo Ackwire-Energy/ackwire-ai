@@ -715,6 +715,14 @@ test("a real iPhone: install and launch through devicectl, the rest through its 
       .map((c) => `${c[1]} ${c[2]}`);
     expect(wdaCalls).toContain("POST /session/s1/wda/apps/launch");
     expect(wdaCalls).toContain("POST /session/s1/wda/tap");
+    // A flow that isn't YAML is refused before a recording starts.
+    const recordings = r.calls().filter((c) => c[0] === "ffmpeg").length;
+    expect(
+      await errorCode(() =>
+        r.op({ op: "phone.flow", ...t, flow: "- tapOn: [unclosed\n", record: true, timeoutSeconds: 60 }),
+      ),
+    ).toBe("bad_request");
+    expect(r.calls().filter((c) => c[0] === "ffmpeg")).toHaveLength(recordings);
     // What needs the person, in words: the developer not trusted.
     r.setState({
       ...ANDROID_STATE,
