@@ -715,12 +715,15 @@ export function createReleaseAsksToolSource(deps: { pubsub?: PubSub } = {}): Too
       const reason = cutText(String(input.reason ?? "").trim(), 300);
       let released = 0;
       for (const p of found) {
-        const ids = [p.run.triggerMessageId, ...p.run.pendingMessageIds].filter((id) => handled.includes(id));
-        const authors = await ctx.db
-          .select({ userId: messages.authorUserId })
+        const held = [p.run.triggerMessageId, ...p.run.pendingMessageIds].filter((id) => handled.includes(id));
+        // People's asks only: another agent's may be a consultation it waits to hear back on.
+        const asks = await ctx.db
+          .select({ id: messages.id, userId: messages.authorUserId })
           .from(messages)
-          .where(and(eq(messages.orgId, ctx.orgId), inArray(messages.id, ids)));
-        const askers = [...new Set(authors.flatMap((a) => (a.userId ? [a.userId] : [])))];
+          .where(and(eq(messages.orgId, ctx.orgId), inArray(messages.id, held), eq(messages.authorType, "person")));
+        const ids = asks.map((a) => a.id);
+        if (ids.length === 0) continue;
+        const askers = [...new Set(asks.flatMap((a) => (a.userId ? [a.userId] : [])))];
         const prior = transcriptOf(p.run).catchUpTriage;
         const ok = await releaseAsks({ db: ctx.db, pubsub: deps.pubsub }, p.run, {
           ids,
@@ -744,7 +747,10 @@ export function createReleaseAsksToolSource(deps: { pubsub?: PubSub } = {}): Too
         }
       }
       if (released === 0)
-        return { content: "It just moved on (it's answering now, or it already ended): nothing was released." };
+        return {
+          content:
+            "Nothing was released: it just moved on (it's answering now, or it already ended), or it waits only on what another agent asked, which it answers itself.",
+        };
       const name = found[0]?.name ?? String(input.agent);
       return {
         content: `Released: ${name} won't answer it later. Its note says you took care of it, and who asked can still ask it to answer.`,

@@ -388,6 +388,17 @@ describe("release_waiting_agent: an agent that handled the ask lets the one wait
     expect((await tool.execute({ agent: "dev", reason: "x" }, ctx)).content).toStartWith('No agent called "dev"');
     expect((await runsOf(f, f.agent.id))[0]?.status).toBe("running");
   });
+
+  test("only people's asks are let go: one another agent asked stays with the agent it asked", async () => {
+    const { ada, asked, ctx, tool } = await waitingBeside("plan");
+    await f.db
+      .update(schema.messages)
+      .set({ authorType: "agent", authorUserId: null, authorAgentId: ada.id })
+      .where(eq(schema.messages.id, asked.id));
+    expect((await tool.execute({ agent: "dev", reason: "x" }, ctx)).content).toStartWith("Nothing was released");
+    expect((await runsOf(f, f.agent.id))[0]?.status).toBe("waiting_input");
+    expect(await closedNotes(f)).toEqual([]);
+  });
 });
 
 test("an agent's own question answered meanwhile is withdrawn quietly: it reads who answered, may pass, and posts no 'nobody answered'", async () => {
