@@ -7,6 +7,7 @@ import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  checkParkedRun,
   clearPlanLimits,
   continueRun,
   createAgent,
@@ -16,6 +17,7 @@ import {
   drainOutbox,
   getMessage,
   insertMessage,
+  type Judge,
   loadReplyPolicy,
   type MachineStatus,
   parkedOnBlock,
@@ -437,6 +439,39 @@ describe("release_waiting_agent: an agent that handled the ask lets the one wait
       .where(eq(schema.agentRuns.id, dev.id));
     expect((await tool.execute({ agent: "dev", reason: "x" }, ctx)).content).toStartWith('No agent called "dev"');
     expect((await runsOf(f, f.agent.id))[0]?.status).toBe("running");
+  });
+
+  test("a run that went on and now waits on something else isn't ended by a check judged on its old wait", async () => {
+    const { asked, dev, ada } = await waitingBeside("plan");
+    await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.agentId, ada.id));
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: asked.id,
+      author: { type: "agent", agentId: ada.id, runId: null, hop: 1, stretchId: null },
+      body: "Saiu às 14h, está em produção.",
+    });
+    const judge: Judge = {
+      name: "fake",
+      async ask(request) {
+        // Meanwhile its plan came back: it went on, and now waits on a question it asked.
+        const pending = { calls: [{ toolUseId: "t1", name: "ask_user", questionId: crypto.randomUUID() }] };
+        await f.db
+          .update(schema.agentRuns)
+          .set({ transcript: { system: [], messages: [], pending } as never })
+          .where(eq(schema.agentRuns.id, dev.id));
+        const people = request.state.participants as Record<string, { name: string }>;
+        const key = Object.entries(people).find(([, p]) => p.name === "Ada")?.[0] ?? "nobody";
+        return {
+          status_a1: { choice: "solved", probabilities: { solved: 0.97, needs_agent: 0.02, not_needed: 0.01 } },
+          who_a1: { choice: key, probabilities: { [key]: 0.97 } },
+        };
+      },
+    };
+    await checkParkedRun({ db: f.db, pubsub: f.pubsub, judge }, dev.id);
+    expect((await runsOf(f, f.agent.id))[0]?.status).toBe("waiting_input");
+    expect(await closedNotes(f)).toEqual([]);
   });
 
   test("only people's asks are let go: one another agent asked stays with the agent it asked", async () => {

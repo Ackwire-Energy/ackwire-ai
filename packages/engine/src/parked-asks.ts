@@ -261,12 +261,18 @@ async function closeParked(deps: ParkedDeps, run: AgentRun, r: Release): Promise
   const { db } = deps;
   const ended = await db.transaction(async (tx) => {
     const [held] = await tx
-      .select({ pending: agentRuns.pendingMessageIds })
+      .select({
+        pending: agentRuns.pendingMessageIds,
+        status: agentRuns.status,
+        waitingMachineId: agentRuns.waitingMachineId,
+        transcript: agentRuns.transcript,
+      })
       .from(agentRuns)
       .where(eq(agentRuns.id, run.id))
       .for("update");
-    // Compare-and-set: a message that joined since it was judged makes it run instead, as the catch-up check does.
-    if (!held || held.pending.join() !== run.pendingMessageIds.join()) return null;
+    // Compare-and-set: a message that joined since it was judged makes it run instead, as the catch-up check does. Gone
+    // on meanwhile and waiting on something else (a person's answer), it isn't ended either.
+    if (!held || !parkedWaitOf(held) || held.pending.join() !== run.pendingMessageIds.join()) return null;
     // A waiting run ends only from `running` (ADR 0008): both moves in one transaction, so nobody sees it working.
     if (!(await transitionRun(tx, run.id, "waiting_input", "running"))) return null;
     return transitionRun(tx, run.id, "running", "done", {
