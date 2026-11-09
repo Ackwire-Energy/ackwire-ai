@@ -63,7 +63,7 @@ import { rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-ha
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
 import {
   Button,
   GroupedFooter,
@@ -82,6 +82,7 @@ import { router } from "@/ui/navigation";
 import { SetupWait } from "../computer/SetupWait";
 import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
+import { pickOne } from "../shared/PickerSheet";
 import { PickList } from "../shared/PickList";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
@@ -725,24 +726,15 @@ function PlanPage(
         disabled={replies.busy}
       />
     );
-  const pick = () => {
-    const names = agents.map((a) => a.name);
-    const choose = (i: number) => {
-      const a = agents[i];
-      if (a) onAgent(a.id);
-    };
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { title: t("connectAi.agent"), options: [...names, t("common.cancel")], cancelButtonIndex: names.length },
-        choose,
-      );
-    } else {
-      Alert.alert(t("connectAi.agent"), undefined, [
-        ...agents.map((a, i) => ({ text: a.name, onPress: () => choose(i) })),
-        { text: t("common.cancel"), style: "cancel" as const },
-      ]);
-    }
-  };
+  // Which agent the account is for, in the app's picker: each agent with its face.
+  const pick = () =>
+    void pickOne({
+      title: t("connectAi.agent"),
+      value: agentId ?? null,
+      options: agents.map((a) => ({ key: a.id, label: a.name, leading: { kind: "agent" as const, agentId: a.id } })),
+    }).then((key) => {
+      if (key) onAgent(key);
+    });
   if (done) {
     return (
       <View style={styles.done}>

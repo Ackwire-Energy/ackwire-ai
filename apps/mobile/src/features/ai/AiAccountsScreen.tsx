@@ -33,10 +33,11 @@ import { keyNamedAfterProvider, providerLabel } from "@agenteschat/client/lib/pr
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
+import { chooseAction } from "../settings/parts";
 import { FirstUse } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
@@ -56,34 +57,11 @@ import { alertKeyRefused, Note, PlanHoldNote, usePlanHold } from "./parts";
 
 type Account = AiAccountsView["accounts"][number];
 
-/** A choice in the system's action list (the web's row buttons). */
-function choose(
-  title: string,
-  options: { label: string; destructive?: boolean; onPress: () => void }[],
-  cancel: string,
-) {
-  if (Platform.OS === "ios") {
-    const destructive = options.findIndex((o) => o.destructive);
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title,
-        options: [...options.map((o) => o.label), cancel],
-        cancelButtonIndex: options.length,
-        ...(destructive >= 0 ? { destructiveButtonIndex: destructive } : {}),
-      },
-      (i) => options[i]?.onPress(),
-    );
-  } else {
-    Alert.alert(title, undefined, [
-      ...options.map((o) => ({
-        text: o.label,
-        style: o.destructive ? ("destructive" as const) : undefined,
-        onPress: o.onPress,
-      })),
-      { text: cancel, style: "cancel" as const },
-    ]);
-  }
-}
+/**
+ * An account's actions (the web's row buttons): the system's action sheet on iOS, the app's sheet on Android, which
+ * holds them all (Android's dialog kept three, and "Usar para …" for a fourth agent was lost).
+ */
+const choose = chooseAction;
 
 export function AiAccountsScreen() {
   const { t, i18n } = useTranslation();

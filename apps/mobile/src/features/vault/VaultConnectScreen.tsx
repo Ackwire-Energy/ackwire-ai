@@ -14,8 +14,9 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note, openPage } from "../ai/parts";
-import { chooseAction, SettingsPage } from "../settings/parts";
+import { SettingsPage } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { goBack, successHaptic, Tile } from "../shared/parts";
 import { connectInput, connectMissing, fieldKeyboard, initialValues, shownFields, vaultHref } from "./logic";
 import { InputField, ScopeRows } from "./parts";
@@ -116,15 +117,18 @@ function ConnectForm({
     );
   };
 
+  // A field with set values (a region, a kind) in the app's picker, the one chosen checked.
   const chooseValue = (f: VaultConnectField) =>
-    chooseAction(
-      say(`field.${f.id}`, f.label),
-      (f.choices ?? []).map((choice) => ({
+    void pickOne({
+      title: say(`field.${f.id}`, f.label),
+      value: values[f.id] ?? null,
+      options: (f.choices ?? []).map((choice) => ({
+        key: choice.value,
         label: say(`choice.${f.id}.${choice.value}`, choice.label),
-        onPress: () => set(f.id, choice.value),
       })),
-      t("mobile.common.cancel"),
-    );
+    }).then((key) => {
+      if (key !== null) set(f.id, key);
+    });
 
   return (
     <SettingsPage

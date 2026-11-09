@@ -8,13 +8,14 @@ import {
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
-import { Icon, type IconName, useTheme, useToast } from "@/ui";
+import { type IconName, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { type ActionItem, ActionList, goBack, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { type BoardMenuKey, boardMenuKeys, HOME, pickMenuLabel } from "./logic";
+import { type BoardMenuKey, boardMenuKeys, HOME } from "./logic";
 
 interface MenuItem {
   key: BoardMenuKey;
@@ -139,14 +140,10 @@ export interface PickItem<K extends string> {
 }
 
 /**
- * A short pick list from a form row ("Who looks after it", "Format"), as the boards' "…": the system's action sheet on
- * iOS (one line per choice, its hint after a dot), the app's own list in a sheet on Android with what goes before each
- * choice and a check on the current one (the screen hosts it: `SheetHostProvider`).
+ * A pick list from a form row ("Who looks after it", "Format"), in the app's picker on both systems: each choice with
+ * what goes before it (a kind's glyph, a face), its second line, and the check on the current one.
  */
 export function usePickMenu() {
-  const { t } = useTranslation();
-  const { colors: c } = useTheme();
-  const sheet = useSheet();
   return function open<K extends string>(
     title: string,
     items: readonly PickItem<K>[],
@@ -154,32 +151,18 @@ export function usePickMenu() {
     onPick: (key: K) => void,
   ) {
     if (items.length === 0) return;
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title,
-          options: [...items.map((i) => pickMenuLabel(i.label, i.hint)), t("mobile.common.cancel")],
-          cancelButtonIndex: items.length,
-        },
-        (i) => {
-          const item = items[i];
-          if (item) onPick(item.key);
-        },
-      );
-      return;
-    }
-    const list: ActionItem[] = items.map((i) => ({
-      key: i.key,
-      label: i.label,
-      oneLine: true,
-      ...(i.hint ? { hint: i.hint } : {}),
-      ...(i.leading ? { leading: i.leading } : {}),
-      ...(i.key === value ? { trailing: <Icon name="check" size={18} color={c.ink} /> } : {}),
-      onPress: () => {
-        sheet.close();
-        onPick(i.key);
-      },
-    }));
-    sheet.open(<ActionList items={list} />);
+    void pickOne({
+      title,
+      value,
+      options: items.map((i) => ({
+        key: i.key,
+        label: i.label,
+        ...(i.hint ? { sub: i.hint } : {}),
+        ...(i.leading ? { leading: { kind: "node" as const, node: i.leading } } : {}),
+      })),
+    }).then((key) => {
+      const item = items.find((i) => i.key === key);
+      if (item) onPick(item.key);
+    });
   };
 }

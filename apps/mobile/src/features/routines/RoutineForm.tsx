@@ -54,9 +54,9 @@ import { boldRuns } from "../chat/actions";
 import { AllowTalkAction } from "../chat/ReachLines";
 import { routineHref } from "../links/logic";
 import { ZoneList } from "../me/AccountPage";
-import { chooseAction } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
+import { pickOne } from "../shared/PickerSheet";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { EventWebhookSetup } from "./EventWebhookSetup";
@@ -277,8 +277,16 @@ function Form({ routine }: { routine: Routine | undefined }) {
     setPhrase("");
     setPhraseTyped(false);
   };
+  // Repetição, Dia, Horário and Fuso in the app's picker: the one in use checked, the long lists (days of the month,
+  // times, zones) with their search.
   const choose = (title: string, options: { label: string; checked: boolean; onPress: () => void }[]) =>
-    chooseAction(title, options, t("mobile.common.cancel"));
+    void pickOne({
+      title,
+      value: String(options.findIndex((o) => o.checked)),
+      options: options.map((o, i) => ({ key: String(i), label: o.label })),
+    }).then((key) => {
+      if (key !== null) options[Number(key)]?.onPress();
+    });
   const pickPreset = () =>
     choose(t("recurrence.frequency"), [
       ...COMMON_RULES.map((p) => ({
