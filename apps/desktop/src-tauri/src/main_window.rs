@@ -906,9 +906,9 @@ fn show_notice(app: &AppHandle, title: &str, body: &str, url: Url, stop: Option<
         if in_front || !state.on || !notice_fits(&mut state.sent, Instant::now()) {
             return;
         }
-        state.pending = Some((url, Instant::now()));
+        state.pending = Some((url.clone(), Instant::now()));
     }
-    let mut builder = app.notification().builder().title(title).body(body);
+    let mut builder = app.notification().builder().title(title).body(body).extra("url", url.as_str());
     if let (Some(stop), Some(label)) = (stop, crate::menus::labels(app).get("notifyStop").cloned()) {
         let stop_type = ActionType::builder(STOP_ACTIONS).actions(vec![Action::builder("stop", label).build()]).build();
         let _ = app.notification().register_action_types(vec![stop_type]);
@@ -917,16 +917,29 @@ fn show_notice(app: &AppHandle, title: &str, body: &str, url: Url, stop: Option<
     let _ = builder.show();
 }
 
-/// A notification's Stop: the stop the web's button makes, with the window's session for that server. When it
-/// can't (signed out, offline, no longer allowed), the phone's page opens, where Stop is.
+/// A notification's click and its Stop. With a handler registered the plugin reports every click here, and the app
+/// may not come forward by itself (`focused` would not see it): the click opens its own page. Stop: the stop the
+/// web's button makes, with the window's session for that server. When it can't (signed out, offline, no longer
+/// allowed), the phone's page opens, where Stop is.
 pub fn stop_from_notices(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.notification().on_action(move |performed| {
-        if performed.action_id() != "stop" {
+        let action = performed.action_id();
+        if action != "tap" && action != "stop" {
             return;
         }
-        let Some(stop) = performed.notification().and_then(|n| n.extra().get("stop")).cloned() else { return };
+        let extra = |key: &str| performed.notification().and_then(|n| n.extra().get(key)).cloned();
         let app = handle.clone();
+        // Handled here: the app coming forward from this click opens nothing more.
+        app.state::<Notices>().0.lock().unwrap_or_else(|e| e.into_inner()).pending = None;
+        if action == "tap" {
+            let Some(url) = extra("url").and_then(|u| u.as_str().and_then(|u| u.parse::<Url>().ok())) else { return };
+            std::thread::spawn(move || {
+                let _ = show_url(&app, url);
+            });
+            return;
+        }
+        let Some(stop) = extra("stop") else { return };
         std::thread::spawn(move || {
             let text = |key: &str| stop[key].as_str().unwrap_or_default().to_string();
             let (server, org, phone) = (text("server"), text("orgId"), text("phoneId"));
