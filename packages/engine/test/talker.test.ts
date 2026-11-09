@@ -207,6 +207,25 @@ describe("talker: fast replies while the task waits", () => {
     expect(await talkerMessages()).toHaveLength(1);
   });
 
+  test("the task's reply landed meanwhile, in the place its words first showed above the message: no fast reply", async () => {
+    // While the cheap model answers, the task posts the reply it was writing when the person wrote.
+    const landed = async () => {
+      const [asked] = await f.db.select().from(schema.messages).where(eq(schema.messages.body, "já fez o deploy?"));
+      const [run] = await f.db.select().from(schema.agentRuns);
+      await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "agent", agentId: f.agent.id, runId: run?.id ?? "", hop: 1 },
+        body: "Deploy em staging feito.",
+        createdAt: new Date((asked?.createdAt.getTime() ?? 0) - 5_000),
+      });
+    };
+    const { write, decisions } = await waitingOnQuestion(() => ({ ...replyJson(REPLY), hold: landed() }));
+    await write("já fez o deploy?");
+    expect(decisions).toEqual(["answered"]);
+    expect(await talkerMessages()).toHaveLength(0);
+  });
+
   test("one reply per run in 30 s; another after the gap, for a new message", async () => {
     let clock = new Date();
     const { write, decisions } = await waitingOnQuestion(() => replyJson(REPLY), { now: () => clock });
