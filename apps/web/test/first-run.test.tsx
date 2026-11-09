@@ -127,7 +127,7 @@ describe("the first-run checklist", () => {
     );
     await click(within(people).getByRole("button", { name: "Enviar" }), 10);
     expect(calls(state, "orgs.inviteMany").map((c) => c.args[1])).toEqual([{ emails: ["joao.lima@example.com"] }]);
-    expect(row("Convidei joao.lima@example.com · aguardando")).toBeTruthy();
+    expect(row("Convidei joao.lima · aguardando")).toBeTruthy();
     // Done: the row's own field is gone with it.
     expect(within(row("Convidei")).queryByRole("button", { name: "Mais opções" })).toBeNull();
   });

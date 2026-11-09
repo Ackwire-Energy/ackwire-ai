@@ -148,6 +148,9 @@ html:not([data-pointer]) .setup-row__link:focus-visible {
   overflow-wrap: anywhere;
 }
 .setup-invite__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
   font-size: 13px;
 }
 @keyframes setup-row-pop {

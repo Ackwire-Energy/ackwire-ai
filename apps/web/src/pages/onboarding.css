@@ -101,7 +101,7 @@ html:not([data-pointer]) .onb__me:focus-visible {
 .onb__lodi-who {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--space-1);
   margin-left: -6px;
 }
 .onb__lodi-who > b {

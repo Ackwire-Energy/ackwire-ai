@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client";
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { firstName, joinNames } from "@agenteschat/client/lib/format";
+import { emailName, firstName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf, planHoldPhoneLine } from "@agenteschat/client/lib/no-ai";
@@ -103,7 +103,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     state,
     ready: status.isSuccess && members.isSuccess,
     members: members.data?.length ?? 1,
-    invited: waiting.map((i) => i.email),
+    invited: waiting.map((i) => emailName(i.email)),
     connections: live,
     created: cards.filter((c) => c.state === "created").at(-1) ?? null,
   };

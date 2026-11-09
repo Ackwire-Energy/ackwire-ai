@@ -12,7 +12,7 @@ import {
 import { teamProposalOf } from "@agenteschat/client/lib/action-cards";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { emailName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -117,7 +117,7 @@ export function useFirstRun(agent: Agent | undefined, channelId: string | null) 
     team,
     connections: live,
     members: members.data?.length ?? 1,
-    invited: waiting.map((i) => i.email),
+    invited: waiting.map((i) => emailName(i.email)),
     created: cards.filter((c) => c.state === "created").at(-1) ?? null,
     state: steps.length === 0 ? ("none" as const) : left.length > 0 ? ("open" as const) : ("complete" as const),
   };
@@ -195,10 +195,19 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       ...(words.action && !inline && (s !== "ai" || connect) && (s !== "people" || invite)
         ? { action: { label: words.action, primary: s === next, onClick: act[s] } }
         : {}),
-      ...(words.skip && (s === "apps" || s === "people")
+      ...(words.skip && (s === "apps" || s === "people") && !inline
         ? { skip: { label: words.skip, busy: confirm.isPending, onClick: () => skip(s) } }
         : {}),
-      ...(inline ? { form: <InviteLine onMore={() => invite?.open()} /> } : {}),
+      ...(inline
+        ? {
+            form: (
+              <InviteLine
+                onMore={() => invite?.open()}
+                skip={words.skip ? { label: words.skip, busy: confirm.isPending, onClick: () => skip("people") } : null}
+              />
+            ),
+          }
+        : {}),
     };
   });
 
@@ -245,9 +254,15 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
 
 /**
  * The people row's own line: one address and Enviar invites at once with the invite dialog's defaults, the dialog
- * itself behind "Mais opções" (several people, roles, channels, a note).
+ * itself behind "Mais opções" (several people, roles, channels, a note), and "Agora não" beside it, under the field.
  */
-function InviteLine({ onMore }: { onMore: () => void }) {
+function InviteLine({
+  onMore,
+  skip,
+}: {
+  onMore: () => void;
+  skip: { label: string; busy: boolean; onClick: () => void } | null;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const send = useInviteMany(org.id);
@@ -293,9 +308,16 @@ function InviteLine({ onMore }: { onMore: () => void }) {
           {refused}
         </span>
       )}
-      <button type="button" className="ac-link setup-invite__more" onClick={onMore}>
-        {t("agentSetup.firstRun.people.more")}
-      </button>
+      <span className="setup-invite__more">
+        <button type="button" className="ac-link" onClick={onMore}>
+          {t("agentSetup.firstRun.people.more")}
+        </button>
+        {skip && (
+          <button type="button" className="ac-link" disabled={skip.busy} onClick={skip.onClick}>
+            {skip.label}
+          </button>
+        )}
+      </span>
     </form>
   );
 }
