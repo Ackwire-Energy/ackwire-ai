@@ -57,7 +57,9 @@ describe("floating layers", () => {
           <button type="button" onClick={() => setAsking(true)}>
             Salvar
           </button>
-          <Dialog open={asking} onOpenChange={setAsking} title="Usar o plano de Wagner?" closeLabel="Fechar" />
+          <Dialog open={asking} onOpenChange={setAsking} title="Usar o plano de Wagner?" closeLabel="Fechar">
+            <p>O Bento passa a pensar com ele.</p>
+          </Dialog>
         </Popover>
       );
     }
