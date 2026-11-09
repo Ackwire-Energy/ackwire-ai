@@ -292,26 +292,40 @@ pub fn news(before: &[ServerWorkspaces], after: &[ServerWorkspaces], open: Optio
     told
 }
 
-/// How a server is named to people: agentes.chat for the Cloud, its host otherwise.
-pub fn server_name(server: &str, cloud_name: &str) -> String {
+/// How a server is named to people: agentes.chat for the Cloud, the app's own server by what it is (never its
+/// local or Tailscale address), its host otherwise.
+pub fn server_name(server: &str, cloud_name: &str, here_name: Option<&str>) -> String {
     if server == servers::CLOUD {
         return cloud_name.to_string();
     }
-    server.parse::<Url>().ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| server.to_string())
+    if let Some(name) = here_name {
+        return name.to_string();
+    }
+    // Host and port, as the site names it (`serverHost`): two servers on one computer stay apart.
+    let named = |u: Url| u.host_str().map(|h| u.port().map_or_else(|| h.to_string(), |p| format!("{h}:{p}")));
+    server.parse::<Url>().ok().and_then(named).unwrap_or_else(|| server.to_string())
 }
 
 /// The notification's words: "Workspace · server" and "1 new notification" / "3 new notifications" (the
-/// popover's labels, in the app's language; nothing is told before they arrived).
-pub fn notice_text(labels: &HashMap<String, String>, server: &str, org: &str, count: u64) -> Option<(String, String)> {
+/// popover's labels, in the app's language; nothing is told before they arrived). `here`: the app's own server.
+pub fn notice_text(
+    labels: &HashMap<String, String>,
+    server: &str,
+    here: bool,
+    org: &str,
+    count: u64,
+) -> Option<(String, String)> {
     let cloud = labels.get("serversCloud")?;
     let body = if count == 1 { labels.get("workspaceNewsOne")? } else { labels.get("workspaceNewsMany")? };
-    let title: String = format!("{org} · {}", server_name(server, cloud)).chars().take(80).collect();
+    let here_name = if here { Some(labels.get("serverTitle")?.as_str()) } else { None };
+    let title: String = format!("{org} · {}", server_name(server, cloud, here_name)).chars().take(80).collect();
     Some((title, body.replace("{count}", &count.to_string())))
 }
 
 fn tell(app: &AppHandle, server: &str, org: &Org, count: u64) {
     let labels = crate::menus::labels(app);
-    let Some((title, body)) = notice_text(&labels, server, &org.name, count) else { return };
+    let here = crate::local_server::is_here(app, server);
+    let Some((title, body)) = notice_text(&labels, server, here, &org.name, count) else { return };
     let Ok(url) = format!("{server}/org/{}/notifications", org.id).parse::<Url>() else { return };
     main_window::notice(app, &title, &body, url);
 }
@@ -413,6 +427,7 @@ mod tests {
     fn notice_words() {
         let labels: HashMap<String, String> = [
             ("serversCloud", "agentes.chat"),
+            ("serverTitle", "O agentes.chat neste Mac"),
             ("workspaceNewsOne", "1 notificação nova"),
             ("workspaceNewsMany", "{count} notificações novas"),
         ]
@@ -420,13 +435,18 @@ mod tests {
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
         assert_eq!(
-            notice_text(&labels, "https://agentes.exemplo.com.br", "Oficina", 3),
+            notice_text(&labels, "https://agentes.exemplo.com.br", false, "Oficina", 3),
             Some(("Oficina · agentes.exemplo.com.br".into(), "3 notificações novas".into()))
         );
         assert_eq!(
-            notice_text(&labels, servers::CLOUD, "Acme", 1),
+            notice_text(&labels, servers::CLOUD, false, "Acme", 1),
             Some(("Acme · agentes.chat".into(), "1 notificação nova".into()))
         );
-        assert_eq!(notice_text(&HashMap::new(), servers::CLOUD, "Acme", 1), None, "before the labels arrived");
+        // The app's own server by what it is, at its local or its Tailscale address alike.
+        assert_eq!(
+            notice_text(&labels, "https://macbook-air.tail1234.ts.net", true, "Oficina", 1),
+            Some(("Oficina · O agentes.chat neste Mac".into(), "1 notificação nova".into()))
+        );
+        assert_eq!(notice_text(&HashMap::new(), servers::CLOUD, false, "Acme", 1), None, "before the labels arrived");
     }
 }

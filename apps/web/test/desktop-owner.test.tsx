@@ -69,6 +69,26 @@ describe("Entrar no servidor que o app roda neste computador", () => {
     expect(screen().queryByText(/abra o app e escolha Adicionar uma senha/)).toBeNull();
   });
 
+  test("no Google or GitHub on the server here, even with their keys set; another server keeps them", async () => {
+    const withProviders = () => {
+      const state = seedState({ me: null });
+      state.authConfig = { socialProviders: { google: true, github: true } };
+      return createFakeApi(state);
+    };
+    const google = () => screen().queryByRole("button", { name: /Continuar com Google/ });
+    inTheApp({ orgs: [], agentsHere: false, local: true });
+    await renderApp("/login", { api: withProviders() });
+    await settle(6);
+    expect(continueHere()).toBeTruthy();
+    expect(google()).toBeNull();
+    expect(screen().queryByRole("button", { name: /Continuar com GitHub/ })).toBeNull();
+    cleanup();
+    inTheApp({ orgs: [], agentsHere: true, local: false });
+    await renderApp("/login", { api: withProviders() });
+    await settle(6);
+    expect(google()).toBeTruthy();
+  });
+
   test("another server in the app, or a browser: the ordinary sign-in", async () => {
     inTheApp({ orgs: [], agentsHere: true, local: false });
     await renderApp("/login", { api: signedOut() });

@@ -236,13 +236,34 @@ pub async fn server_choose(app: AppHandle, server: String, page: Option<String>)
     crate::main_window::show_url(&app, url)
 }
 
+/// A server leaves the list: the window's sign-in there goes with it (its cookies; the account and the server stay),
+/// and a window still on it moves to the server open now, or hides when none is left. Async, with the cookies on a
+/// thread of their own: reading or deleting them from a sync command deadlocks on Windows (WebView2).
 #[tauri::command]
-pub fn server_remove(app: AppHandle, server: String) -> Result<(), String> {
+pub async fn server_remove(app: AppHandle, server: String) -> Result<(), String> {
     remove(&app, &server);
-    if get(&app).current.is_none() {
-        if let Some(window) = app.get_window(crate::main_window::LABEL) {
-            let _ = window.hide();
+    let page = app.get_webview(crate::main_window::LABEL);
+    let showing = page.as_ref().and_then(|p| p.url().ok()).is_some_and(|u| u.origin().ascii_serialization() == server);
+    // Cookies are per host, not per port: on this computer they are also the other servers' here, so they stay.
+    if let (Some(page), Ok(url), false) = (page, server.parse::<Url>(), is_loopback(&server)) {
+        tauri::async_runtime::spawn_blocking(move || {
+            for cookie in page.cookies_for_url(url).unwrap_or_default() {
+                let _ = page.delete_cookie(cookie);
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    // Its workspaces leave the window's list now, not at the next minute's read.
+    crate::workspaces::trigger(&app);
+    match current(&app) {
+        Some(next) if showing => crate::main_window::show_url(&app, next)?,
+        None => {
+            if let Some(window) = app.get_window(crate::main_window::LABEL) {
+                let _ = window.hide();
+            }
         }
+        _ => {}
     }
     Ok(())
 }

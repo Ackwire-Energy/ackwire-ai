@@ -189,13 +189,19 @@ export function AuthPage({
   } | null>(null);
   // This server runs inside the app here: the app signs its owner in.
   const [local, setLocal] = useState(false);
+  // In the app, until it said whether this is its own server: the provider buttons wait, never shown then taken away.
+  const [placeKnown, setPlaceKnown] = useState(!desktop);
   const [ownerPending, setOwnerPending] = useState(false);
+  // The server the app runs on this computer: its owner signs in with Continue on this Mac, and a provider's sign-in
+  // needs an address registered with that provider, which a computer's own server doesn't have.
+  const offeredProviders = local || !placeKnown ? [] : allProviders;
   useEffect(() => {
     if (!desktop) return;
     void thisMac
       .status()
       .then((s) => setLocal(s.local === true))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPlaceKnown(true));
   }, [desktop]);
   const continueHere = async () => {
     setOwnerPending(true);
@@ -604,12 +610,12 @@ export function AuthPage({
                 </Button>
               )}
 
-              {step === "email" && allProviders.length > 0 && (
+              {step === "email" && offeredProviders.length > 0 && (
                 <>
                   <div className="auth__or">{t("common.or")}</div>
                   <SocialButtons
                     callbackURL={redirect ?? "/"}
-                    providers={allProviders}
+                    providers={offeredProviders}
                     onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
                     earlyAccess={access}
                   />
