@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 afterEach(() => cleanup());
 
@@ -61,5 +61,90 @@ describe("a request card at its worst", () => {
     expect(pill.querySelector(".rq-done__note")?.textContent).toMatch(/^Agendado para /);
     expect(pill.querySelector(".ac-eventpill__time")?.textContent).not.toMatch(/Agendado/);
     expect(within(pill).getByRole("button", { name: "Cancelar" })).toBeTruthy();
+  });
+});
+
+/** The seed's request in #eng as one that offers Aprovar sempre: three buttons and the time left in its footer. */
+function always(state = worst("pending")) {
+  const first = state.approvals[0];
+  if (!first) throw new Error("no approval");
+  Object.assign(first, {
+    tool: "composio_COMPOSIO_MULTI_EXECUTE_TOOL",
+    scope: "custom:conn-composio:write",
+    connector: "custom:conn-composio",
+    approveAlways: { tool: "COMPOSIO_MULTI_EXECUTE_TOOL", actions: ["GITHUB_CREATE_AN_ISSUE_COMMENT"] },
+  });
+  return state;
+}
+
+describe("an email to an address that never breaks on its own", () => {
+  test("the well's title gets the card's width under the mark, the address breaks only where it must", async () => {
+    const state = seedState();
+    const first = state.approvals[0];
+    if (!first) throw new Error("no approval");
+    first.email = {
+      verb: "send",
+      mailbox: "suporte@acme.example.com",
+      provider: "Gmail",
+      from: "suporte@acme.example.com",
+      to: [LONG_ADDRESS],
+      cc: [],
+      bcc: [],
+      subject: "Seu reembolso foi aprovado",
+      body: LONG_VALUE,
+      original: null,
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.querySelector(".rq__wt b")?.textContent).toContain(LONG_ADDRESS);
+  });
+});
+
+describe("a request card's footer in long languages", () => {
+  test("three buttons and the time left, in German and Japanese: 32 tall, 8 apart, wrapping at their own widths", async () => {
+    const { services } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(always()) });
+    await settle(4);
+    const foot = () => document.querySelector('.rq[data-ask-kind="approval"] .rq__foot');
+    expect(foot()?.querySelectorAll(":scope > .ac-btn")).toHaveLength(3);
+    await showIn(services, "de");
+    expect(foot()?.querySelectorAll(":scope > .ac-btn")).toHaveLength(3);
+    await showIn(services, "ja");
+    expect(foot()?.querySelectorAll(":scope > .ac-btn")).toHaveLength(3);
+  });
+});
+
+describe("heads at their worst", () => {
+  test("a task's 96-character title: #131 inline before it, ⋯ and × beside its first line", async () => {
+    const api = createFakeApi(seedState());
+    const long = "Confirmação do agendamento por WhatsApp para pacientes da filial norte com lembrete na véspera";
+    const { list, get } = api.issues;
+    api.issues.list = async (orgId, filters) =>
+      (await list(orgId, filters)).map((i) => (i.number === 131 ? { ...i, title: long } : i));
+    api.issues.get = async (orgId, number) => {
+      const i = await get(orgId, number);
+      return i.number === 131 ? { ...i, title: long } : i;
+    };
+    await renderApp(`/org/${ORG_ID}/issues?open=131`, { api });
+    await settle(6);
+    const bar = screen().getByRole("dialog", { name: long }).querySelector(".ac-details__bar") as HTMLElement;
+    expect(bar.querySelector(".issue-bartitle__number + .issue-inplace")).not.toBeNull();
+    expect(
+      [...(bar.querySelector(".ac-details__close")?.children ?? [])].map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Mais opções", "Fechar"]);
+  });
+
+  test("a review's long Onde: each fact whole on its line, the undo trait a chip after the title", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (!merge) throw new Error("no approval");
+    Object.assign(merge, {
+      params: { ...merge.params, repo: "agentes-chat/integracao-de-pagamentos-recorrentes-com-checkout", number: 4821 },
+    });
+    await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
+    await settle(8);
+    const pane = document.querySelector(".ap-review") as HTMLElement;
+    expect(pane.querySelector(".ap-review__title + .ap-review__undo")?.textContent).toBe("Reversível");
+    expect([...pane.querySelectorAll(".ac-facts__label")].map((l) => l.textContent)).not.toContain("Desfazer");
   });
 });
