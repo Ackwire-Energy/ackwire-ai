@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Bağlantı yok. İnternetinizi kontrol edip tekrar deneyin.",
-      "generic": "Bir şeyler ters gitti. Tekrar deneyin."
+      "generic": "Bir şeyler ters gitti. Tekrar deneyin.",
+      "offlineRetry": "Şu an internet yok. Geri gelir gelmez devam ederim."
+    },
+    "flow": {
+      "email": "E-postanız nedir?",
+      "emailLead": "Giriş yapmak ya da hesabınızı oluşturmak için.",
+      "signUp": "Tanıştığımıza memnun oldum. Ekip size nasıl hitap ediyor?"
     },
     "server": {
       "line": "Sunucu: {{host}} ·",
       "change": "Değiştir",
-      "title": "Sunucunuz",
-      "subtitle": "Ekibinizin agentes.chat adresi, tarayıcıda gördüğünüzle aynısı.",
+      "title": "agentes.chat'iniz nerede?",
+      "subtitle": "Ekibinizin tarayıcıda açtığı adres.",
       "label": "Sunucu adresi",
       "placeholder": "agentes.ekibiniz.ts.net",
       "use": "Bu sunucuyu kullan",
       "checking": "Kontrol ediliyor…",
       "scan": "QR kodu tara",
       "backTo": "{{host}} sunucusuna dön",
+      "footChange": "Değiştir",
+      "footChoose": "Sunucu ve dil",
+      "footServer": "Başka bir sunucu",
+      "footLanguage": "Dil",
+      "footTeam": "Ekip sunucusu mu kullanıyorsunuz?",
+      "footTeamAction": "Onunla giriş yap",
+      "footOn": "{{host}} sunucusuna giriş yapıyorsunuz",
+      "footSwitch": "Değiştir",
       "now": "Şu an {{host}} sunucusundasınız",
       "invalid": "Adresi kontrol edin, agentes.ekibiniz.ts.net gibi bir şey olmalı.",
       "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve bağlantınızı kontrol edip tekrar deneyin.",
@@ -40,7 +54,11 @@
       "appTooOld": "{{host}} sunucusunu kullanmak için agentes uygulamasını güncelleyin.",
       "down": {
         "line": "{{host}} yanıt vermedi.",
-        "text": "Sunucu kapalı ya da ağınızın dışında olabilir. Tekrar açıldığında uygulama kendiliğinden açılır."
+        "text": "Sunucu kapalı ya da ağınızın dışında olabilir. Tekrar açıldığında uygulama kendiliğinden açılır.",
+        "tryNow": "Şimdi dene",
+        "switchServer": "Sunucuyu değiştir",
+        "retryIn_one": "{{count}} sn sonra yeniden denenecek",
+        "retryIn_other": "{{count}} sn sonra yeniden denenecek"
       }
     },
     "connect": {
@@ -49,13 +67,15 @@
       "on": "Sunucu: {{host}}",
       "leave": "Bu telefondaki mevcut hesabınızdan çıkış yapılır.",
       "confirm": "Bağlan",
+      "notNow": "Şimdi değil",
       "checking": "Sunucu kontrol ediliyor…",
       "notALink": "Bu bağlantı bir agentes.chat sunucusuna ait değil.",
       "tokenFailed": "Kodun süresi doldu ya da kod zaten kullanıldı. E-postanızla giriş yapın veya bilgisayarda yeni bir kod gösterin.",
       "signInSlow": "Giriş beklenenden uzun sürüyor. E-postanızla giriş yapın veya bilgisayarda yeni bir kod gösterin."
     },
     "scan": {
-      "hint": "Kamerayı bilgisayardaki QR koda tutun.",
+      "hint": "Kamerayı bilgisayardaki QR koda tutun",
+      "typeAddress": "Adresi yaz",
       "notOurs": "Bu QR kod bir agentes.chat sunucusuna ait değil.",
       "cameraTitle": "Kamerayı kullanın",
       "cameraText": "Yalnızca QR kodu okumak için kullanılır.",
@@ -82,6 +102,10 @@
   "push": {
     "channel": "Uyarılar",
     "channelDescription": "Sizi bekleyenler, bahsetmeler ve sohbetler.",
+    "offer": {
+      "line": "{{name}} bitirince haber verelim mi?",
+      "action": "Haber ver"
+    },
     "ask": {
       "title": "Bir ajanın size ihtiyacı olduğunda haberiniz olsun",
       "text": "Siz başka bir şeyle uğraşırken onlar çalışır. Onayınızı istediklerinde, istediğinizi bitirdiklerinde ya da sizi çağırdıklarında haber veririz.",
@@ -124,9 +148,13 @@
     "placeholder": "Bir mesaj yazın",
     "join": "Devam eden göreve ekle",
     "now": "Durdur ve gönder",
-    "choice": "Ajan çalışırken nasıl gönderilsin"
+    "choice": "Ajan çalışırken nasıl gönderilsin",
+    "holdToStop": "Durdurup göndermek için basılı tutun"
   },
   "search": {
     "placeholder": "Ara"
+  },
+  "picker": {
+    "none": "“{{text}}” ile eşleşen bir şey yok."
   }
 }

@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Pas de connexion. Vérifiez votre accès à Internet et réessayez.",
-      "generic": "Un problème est survenu. Réessayez."
+      "generic": "Un problème est survenu. Réessayez.",
+      "offlineRetry": "Pas d'Internet pour le moment. Je continue dès son retour."
+    },
+    "flow": {
+      "email": "Quel est votre e-mail ?",
+      "emailLead": "Pour vous connecter ou créer votre compte.",
+      "signUp": "Enchanté. Comment l'équipe vous appelle-t-elle ?"
     },
     "server": {
       "line": "Serveur : {{host}} ·",
       "change": "Changer",
-      "title": "Votre serveur",
-      "subtitle": "L'adresse agentes.chat de votre équipe, la même que dans le navigateur.",
+      "title": "Où est votre agentes.chat ?",
+      "subtitle": "L'adresse que votre équipe ouvre dans le navigateur.",
       "label": "Adresse du serveur",
       "placeholder": "agentes.votreequipe.ts.net",
       "use": "Utiliser ce serveur",
       "checking": "Vérification…",
       "scan": "Scanner un QR code",
       "backTo": "Revenir à {{host}}",
+      "footChange": "Changer",
+      "footChoose": "Serveur et langue",
+      "footServer": "Un autre serveur",
+      "footLanguage": "Langue",
+      "footTeam": "Vous utilisez le serveur de votre équipe ?",
+      "footTeamAction": "Se connecter par là",
+      "footOn": "Connexion à {{host}}",
+      "footSwitch": "Changer",
       "now": "Maintenant sur {{host}}",
       "invalid": "Vérifiez l'adresse, du type agentes.votreequipe.ts.net.",
       "unreachable": "Impossible de joindre {{host}}. Vérifiez l'adresse et votre connexion, puis réessayez.",
@@ -40,7 +54,11 @@
       "appTooOld": "Mettez à jour l'app agentes pour utiliser {{host}}.",
       "down": {
         "line": "{{host}} n'a pas répondu.",
-        "text": "Il est peut-être hors service ou en dehors de votre réseau. L'app s'ouvrira d'elle-même dès son retour."
+        "text": "Il est peut-être hors service ou en dehors de votre réseau. L'app s'ouvrira d'elle-même dès son retour.",
+        "tryNow": "Essayer maintenant",
+        "switchServer": "Changer de serveur",
+        "retryIn_one": "nouvel essai dans {{count}} s",
+        "retryIn_other": "nouvel essai dans {{count}} s"
       }
     },
     "connect": {
@@ -49,13 +67,15 @@
       "on": "Serveur : {{host}}",
       "leave": "Vous serez déconnecté du compte actuel sur ce téléphone.",
       "confirm": "Se connecter",
+      "notNow": "Plus tard",
       "checking": "Vérification du serveur…",
       "notALink": "Ce lien ne vient pas d'un serveur agentes.chat.",
       "tokenFailed": "Le code a expiré ou a déjà été utilisé. Connectez-vous avec votre e-mail ou affichez un nouveau code sur l'ordinateur.",
       "signInSlow": "La connexion prend plus de temps que prévu. Connectez-vous avec votre e-mail ou affichez un nouveau code sur l'ordinateur."
     },
     "scan": {
-      "hint": "Visez le QR code affiché sur l'ordinateur.",
+      "hint": "Visez le QR code sur l'ordinateur",
+      "typeAddress": "Saisir l'adresse",
       "notOurs": "Ce QR code ne vient pas d'un serveur agentes.chat.",
       "cameraTitle": "Utiliser l'appareil photo",
       "cameraText": "Il sert uniquement à lire le QR code.",
@@ -82,6 +102,10 @@
   "push": {
     "channel": "Alertes",
     "channelDescription": "Ce qui vous attend, les mentions et les conversations.",
+    "offer": {
+      "line": "Vous voulez savoir quand {{name}} aura fini ?",
+      "action": "Me prévenir"
+    },
     "ask": {
       "title": "Sachez quand un agent a besoin de vous",
       "text": "Ils travaillent pendant que vous faites autre chose. On vous prévient quand ils ont besoin de votre accord, terminent ce que vous avez demandé ou vous appellent.",
@@ -124,9 +148,13 @@
     "placeholder": "Écrire un message",
     "join": "Ajouter à la tâche en cours",
     "now": "Arrêter et envoyer",
-    "choice": "Comment envoyer pendant que l'agent travaille"
+    "choice": "Comment envoyer pendant que l'agent travaille",
+    "holdToStop": "Maintenez pour arrêter et envoyer"
   },
   "search": {
     "placeholder": "Rechercher"
+  },
+  "picker": {
+    "none": "Rien pour « {{text}} »."
   }
 }

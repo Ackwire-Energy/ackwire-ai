@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Geen verbinding. Controleer je internet en probeer het opnieuw.",
-      "generic": "Er ging iets mis. Probeer het opnieuw."
+      "generic": "Er ging iets mis. Probeer het opnieuw.",
+      "offlineRetry": "Nu geen internet. Ik ga verder zodra het terug is."
+    },
+    "flow": {
+      "email": "Wat is je e-mail?",
+      "emailLead": "Om in te loggen of je account aan te maken.",
+      "signUp": "Leuk je te ontmoeten. Hoe noemt het team je?"
     },
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Wijzigen",
-      "title": "Je server",
-      "subtitle": "Het agentes.chat-adres van je team, hetzelfde dat je in de browser ziet.",
+      "title": "Waar staat je agentes.chat?",
+      "subtitle": "Het adres dat je team in de browser opent.",
       "label": "Serveradres",
       "placeholder": "agentes.jouwteam.ts.net",
       "use": "Deze server gebruiken",
       "checking": "Controleren…",
       "scan": "QR-code scannen",
       "backTo": "Terug naar {{host}}",
+      "footChange": "Wijzigen",
+      "footChoose": "Server en taal",
+      "footServer": "Een andere server",
+      "footLanguage": "Taal",
+      "footTeam": "Gebruik je de server van je team?",
+      "footTeamAction": "Daarmee inloggen",
+      "footOn": "Inloggen op {{host}}",
+      "footSwitch": "Wijzigen",
       "now": "Nu op {{host}}",
       "invalid": "Controleer het adres, iets als agentes.jouwteam.ts.net.",
       "unreachable": "We kunnen {{host}} niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",
@@ -40,7 +54,11 @@
       "appTooOld": "Werk de agentes-app bij om {{host}} te gebruiken.",
       "down": {
         "line": "{{host}} reageerde niet.",
-        "text": "Misschien is hij offline of buiten je netwerk. De app opent vanzelf zodra hij terug is."
+        "text": "Misschien is hij offline of buiten je netwerk. De app opent vanzelf zodra hij terug is.",
+        "tryNow": "Nu proberen",
+        "switchServer": "Server wijzigen",
+        "retryIn_one": "nieuwe poging over {{count}} s",
+        "retryIn_other": "nieuwe poging over {{count}} s"
       }
     },
     "connect": {
@@ -49,13 +67,15 @@
       "on": "Server: {{host}}",
       "leave": "Je wordt op deze telefoon uitgelogd uit het huidige account.",
       "confirm": "Verbinden",
+      "notNow": "Niet nu",
       "checking": "Server controleren…",
       "notALink": "Deze link komt niet van een agentes.chat-server.",
       "tokenFailed": "De code is verlopen of al gebruikt. Log in met je e-mail of toon een nieuwe code op de computer.",
       "signInSlow": "Inloggen duurt langer dan zou moeten. Log in met je e-mail of toon een nieuwe code op de computer."
     },
     "scan": {
-      "hint": "Richt op de QR-code op de computer.",
+      "hint": "Richt op de QR-code op de computer",
+      "typeAddress": "Adres typen",
       "notOurs": "Deze QR-code komt niet van een agentes.chat-server.",
       "cameraTitle": "De camera gebruiken",
       "cameraText": "Hij wordt alleen gebruikt om de QR-code te lezen.",
@@ -82,6 +102,10 @@
   "push": {
     "channel": "Meldingen",
     "channelDescription": "Wat op je wacht, vermeldingen en gesprekken.",
+    "offer": {
+      "line": "Wil je weten wanneer {{name}} klaar is?",
+      "action": "Laat het me weten"
+    },
     "ask": {
       "title": "Weet wanneer een agent je nodig heeft",
       "text": "Ze werken terwijl jij iets anders doet. We laten het je weten als ze je akkoord nodig hebben, klaar zijn met wat je vroeg of je roepen.",
@@ -124,9 +148,13 @@
     "placeholder": "Schrijf een bericht",
     "join": "Toevoegen aan de lopende taak",
     "now": "Stoppen en versturen",
-    "choice": "Hoe versturen terwijl de agent werkt"
+    "choice": "Hoe versturen terwijl de agent werkt",
+    "holdToStop": "Ingedrukt houden om te stoppen en te versturen"
   },
   "search": {
     "placeholder": "Zoeken"
+  },
+  "picker": {
+    "none": "Niets komt overeen met “{{text}}”."
   }
 }

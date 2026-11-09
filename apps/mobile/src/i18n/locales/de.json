@@ -17,19 +17,33 @@
     },
     "errors": {
       "network": "Keine Verbindung. Prüf dein Internet und versuch es noch einmal.",
-      "generic": "Etwas ist schiefgelaufen. Versuch es noch einmal."
+      "generic": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
+      "offlineRetry": "Gerade kein Internet. Ich mache weiter, sobald es wieder da ist."
+    },
+    "flow": {
+      "email": "Wie lautet deine E-Mail?",
+      "emailLead": "Um dich anzumelden oder dein Konto zu erstellen.",
+      "signUp": "Freut mich. Wie nennt dich das Team?"
     },
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Ändern",
-      "title": "Dein Server",
-      "subtitle": "Die agentes.chat-Adresse deines Teams, dieselbe, die du im Browser siehst.",
+      "title": "Wo läuft dein agentes.chat?",
+      "subtitle": "Die Adresse, die dein Team im Browser öffnet.",
       "label": "Serveradresse",
       "placeholder": "agentes.deinteam.ts.net",
       "use": "Diesen Server nutzen",
       "checking": "Wird geprüft…",
       "scan": "QR-Code scannen",
       "backTo": "Zurück zu {{host}}",
+      "footChange": "Ändern",
+      "footChoose": "Server und Sprache",
+      "footServer": "Anderer Server",
+      "footLanguage": "Sprache",
+      "footTeam": "Nutzt du den Server deines Teams?",
+      "footTeamAction": "Darüber anmelden",
+      "footOn": "Anmeldung auf {{host}}",
+      "footSwitch": "Wechseln",
       "now": "Jetzt auf {{host}}",
       "invalid": "Prüf die Adresse, etwa agentes.deinteam.ts.net.",
       "unreachable": "Wir erreichen {{host}} nicht. Prüf die Adresse und deine Verbindung und versuch es noch einmal.",
@@ -40,7 +54,11 @@
       "appTooOld": "Aktualisiere die agentes-App, um {{host}} zu nutzen.",
       "down": {
         "line": "{{host}} hat nicht geantwortet.",
-        "text": "Er ist vielleicht offline oder außerhalb deines Netzwerks. Die App öffnet sich von selbst, sobald er wieder da ist."
+        "text": "Er ist vielleicht offline oder außerhalb deines Netzwerks. Die App öffnet sich von selbst, sobald er wieder da ist.",
+        "tryNow": "Jetzt versuchen",
+        "switchServer": "Server wechseln",
+        "retryIn_one": "neuer Versuch in {{count}} s",
+        "retryIn_other": "neuer Versuch in {{count}} s"
       }
     },
     "connect": {
@@ -49,13 +67,15 @@
       "on": "Server: {{host}}",
       "leave": "Du wirst auf diesem Handy vom aktuellen Konto abgemeldet.",
       "confirm": "Verbinden",
+      "notNow": "Nicht jetzt",
       "checking": "Server wird geprüft…",
       "notALink": "Dieser Link stammt nicht von einem agentes.chat-Server.",
       "tokenFailed": "Der Code ist abgelaufen oder wurde schon benutzt. Melde dich mit deiner E-Mail an oder lass dir auf dem Computer einen neuen Code anzeigen.",
       "signInSlow": "Die Anmeldung dauert länger als sonst. Melde dich mit deiner E-Mail an oder lass dir auf dem Computer einen neuen Code anzeigen."
     },
     "scan": {
-      "hint": "Richte die Kamera auf den QR-Code am Computer.",
+      "hint": "Richte die Kamera auf den QR-Code am Computer",
+      "typeAddress": "Adresse eingeben",
       "notOurs": "Dieser QR-Code stammt nicht von einem agentes.chat-Server.",
       "cameraTitle": "Kamera nutzen",
       "cameraText": "Sie wird nur zum Lesen des QR-Codes verwendet.",
@@ -82,6 +102,10 @@
   "push": {
     "channel": "Hinweise",
     "channelDescription": "Was auf dich wartet, Erwähnungen und Unterhaltungen.",
+    "offer": {
+      "line": "Willst du wissen, wann {{name}} fertig ist?",
+      "action": "Benachrichtigen"
+    },
     "ask": {
       "title": "Wissen, wann ein Agent dich braucht",
       "text": "Sie arbeiten, während du etwas anderes machst. Wir sagen dir Bescheid, wenn sie dein Okay brauchen, mit deinem Auftrag fertig sind oder dich rufen.",
@@ -124,9 +148,13 @@
     "placeholder": "Nachricht schreiben",
     "join": "Zur laufenden Aufgabe hinzufügen",
     "now": "Stoppen und senden",
-    "choice": "So senden, während der Agent arbeitet"
+    "choice": "So senden, während der Agent arbeitet",
+    "holdToStop": "Zum Stoppen und Senden gedrückt halten"
   },
   "search": {
     "placeholder": "Suchen"
+  },
+  "picker": {
+    "none": "Nichts passt zu „{{text}}“."
   }
 }
