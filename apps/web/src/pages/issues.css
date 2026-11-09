@@ -975,6 +975,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-bartitle {
   flex: 1;
   min-width: 0;
+  padding-right: 36px;
   font-size: 20px;
   line-height: 28px;
   color: var(--ink);
@@ -983,6 +984,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
+  padding-right: 0;
 }
 .issue-bartitle__number {
   margin-right: 6px;
@@ -1005,10 +1007,11 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-bartitle .issue-details__title {
   display: inline;
 }
+/* The pencil takes no room in the line (its room is the title's end padding), so it never wraps to a line alone. */
 .issue-bartitle .issue-inplace__pen {
   position: relative;
   inset: auto;
-  margin: -2px 0 -2px 4px;
+  margin: -2px -36px -2px 4px;
   vertical-align: top;
 }
 .issue-bartitle > .issue-inplace__title {
