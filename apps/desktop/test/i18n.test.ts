@@ -113,7 +113,7 @@ describe("desktop strings", () => {
     expect(createDesktopI18n("pt-BR", "windows").t("desktop.own.here")).toBe("Rodar o agentes.chat neste PC");
     expect(createDesktopI18n("pt-BR", "linux").t("desktop.link.chipHere")).toBe("Este computador");
     expect(createDesktopI18n("en", "linux").t("desktop.connect.httpRefused", { host: "192.168.1.20:3000" })).toBe(
-      "192.168.1.20:3000 uses plain http, which only works on this computer. Use its Tailscale address or one with https.",
+      "192.168.1.20:3000 doesn't use a secure connection (https), and only servers on this computer may go without one. Use its https address or its Tailscale one.",
     );
     for (const s of [...values(desktopPtBR), ...values(desktopEn)]) {
       // "this Mac" always through {{device}}, so Windows and Linux read right.

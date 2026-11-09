@@ -258,7 +258,7 @@ describe("the server here's Stop (ADR 0158)", () => {
       );
       await act(async () => (el.querySelector(".dk-here__more button") as HTMLElement).click());
       await until(() => el.querySelector(".dk-ph small")?.textContent?.startsWith("Stopped · back at"));
-      const start = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Start");
+      const start = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Start it");
       expect(start).toBeTruthy();
     }));
 });
