@@ -964,38 +964,57 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   font-size: 11.5px;
   color: var(--faint);
 }
-/* The dialog's bar: "#131" and the title on one row, the buttons on its first line; a long title wraps, never cut. */
-.ac-details__bar:has(.issue-bartitle) {
-  align-items: flex-start;
-}
-/* The title in the eyebrow's place, the words of the bar's action line (`.ac-actline`): its buttons go under it when
-   they don't fit beside it. */
+/*
+ * The dialog's bar: "#131" inline before the title, a word's gap from it, so a long title wraps under the number
+ * instead of in a column beside it, and the pencil after its last word. Its field, while edited, sits beside the
+ * number. The bar's ⋯ and × follow on the title's first line, 16 after it.
+ */
 .ac-details__eyebrow:has(> .issue-bartitle) {
   font-size: 20px;
 }
 .issue-bartitle {
   flex: 1;
   min-width: 0;
+  font-size: 20px;
+  line-height: 28px;
+  color: var(--ink);
+}
+.issue-bartitle:has(> .issue-inplace__title) {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  color: var(--ink);
 }
 .issue-bartitle__number {
-  flex: none;
-  font-size: 20px;
+  margin-right: 6px;
   font-weight: 500;
-  line-height: 28px;
   color: var(--faint);
 }
-/* The title's plate (on hover, and its field while editing) sits between the gaps, never on "#131" or on "Salvo":
-   its bleed to the sides, which lines its words up with the text above and below elsewhere, has nothing to line up
-   with in a row. */
-.issue-bartitle > :is(.issue-inplace, .issue-inplace__title) {
+.issue-bartitle__number:has(+ .issue-inplace__title) {
+  flex: none;
+  margin-right: 0;
+}
+/* The title's plate (on hover) on its words' lines, never on "#131" or on "Salvo". */
+.issue-bartitle > .issue-inplace {
+  display: inline;
+  position: static;
+  margin: 0;
+  padding: 2px 0;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.issue-bartitle .issue-details__title {
+  display: inline;
+}
+.issue-bartitle .issue-inplace__pen {
+  position: relative;
+  inset: auto;
+  margin: -2px 0 -2px 4px;
+  vertical-align: top;
+}
+.issue-bartitle > .issue-inplace__title {
   flex: 1;
   min-width: 0;
   margin-inline: 0;
-  padding-left: var(--space-2);
 }
 .issue-bartitle .issue-details__title,
 .issue-bartitle .issue-inplace__title {
@@ -1003,10 +1022,10 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   line-height: 28px;
   letter-spacing: -0.01em;
 }
-/* "Saved" on the title's first line (28px), not centred on a title that wraps. */
+/* "Saved" on the title's last line, hung from its top, so the empty slot never moves the line. */
 .issue-bartitle__saved {
-  flex: none;
   height: 28px;
+  vertical-align: top;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */
 .issue-details__saved {
@@ -1104,7 +1123,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin: 2px 0 4px;
+  margin: 2px 0 0;
 }
 .issue-prop {
   display: inline-flex;
@@ -1727,6 +1746,11 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 /* ── A tarefa: abas, arquivos sob a descrição, Anexos, Histórico ───────── */
 .issue-details .ac-tabpanel {
   gap: 16px;
+}
+/* The labels 16 under the header's last line, as the spec's header, toolbar and content are: the strip's own 8 of top
+   room makes the rest. */
+.issue-details .ac-tabs {
+  margin-top: -8px;
 }
 .issue-description__files {
   margin-top: 4px;

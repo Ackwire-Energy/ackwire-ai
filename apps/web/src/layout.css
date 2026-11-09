@@ -9928,7 +9928,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   top: 0;
   z-index: var(--z-sticky);
   margin: 18px 0 0;
-  padding: 0 calc(var(--agp-gutter) - 12px);
+  padding: 0 var(--agp-gutter);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;

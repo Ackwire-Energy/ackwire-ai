@@ -77,14 +77,31 @@ describe("Issues (board and list)", () => {
     expect(dialog.textContent).toContain("#131");
     expect(within(dialog).getByRole("region", { name: "Pedir a um agente" })).toBeTruthy();
     expect(within(dialog).getByRole("complementary", { name: "Detalhes da tarefa" })).toBeTruthy();
-    expect(within(dialog).getByRole("link", { name: "Abrir página da tarefa" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/issues/131`,
-    );
     expect(router.state.location.href).toContain("?open=131");
     await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
     await settle(2);
     expect(screen().queryByRole("dialog")).toBeNull();
     expect(router.state.location.href).not.toContain("open=");
+  });
+
+  test("the dialog's bar: #131 and the title, then one ⋯ beside the × with the conversation, its page and Excluir", async () => {
+    const { router } = await go("issues?open=131");
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    const close = dialog.querySelector(".ac-details__close") as HTMLElement;
+    expect([...close.querySelectorAll(".ac-btn")].map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Mais opções",
+      "Fechar",
+    ]);
+    // Nothing else on the bar: no buttons above or beside the title to squeeze it.
+    expect(dialog.querySelector(".ac-details__actions")).toBeNull();
+    const more = within(close).getByRole("button", { name: "Mais opções" });
+    more.focus();
+    await key(more, "Enter");
+    const items = within(screen().getByRole("menu")).getAllByRole("menuitem");
+    expect(items.map((m) => m.textContent)).toEqual(["Conversa", "Abrir página da tarefa", "Excluir tarefa"]);
+    await click(items[1] as HTMLElement);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/issues/131`);
   });
 
   test("an issue's link with ?open= reopens its details", async () => {
@@ -502,15 +519,16 @@ describe("Issue detail", () => {
     expect(screen().getByRole("region", { name: "Histórico" }).textContent).toContain("mudou o status para Em revisão");
   });
 
-  test("the conversation (variant B): Conversa on the bar opens the thread panel beside the details, chat's own box", async () => {
+  test("the conversation (variant B): Conversa in the bar's ⋯ opens the thread panel beside the details, chat's own box", async () => {
     const { api } = await go("issues?open=131");
     const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
     // Where Discussão was: one line that opens it.
     const summary = within(dialog).getByRole("button", { name: /Conversar sobre a tarefa/ });
     expect(summary).toBeTruthy();
-    const toggle = within(dialog).getByRole("button", { name: "Conversa" });
-    expect(toggle.getAttribute("aria-pressed")).toBe("false");
-    await click(toggle);
+    const more = within(dialog).getByRole("button", { name: "Mais opções" });
+    more.focus();
+    await key(more, "Enter");
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Conversa" }));
     await settle(6);
     expect(dialog.className).toContain("ac-details--side");
     expect(within(dialog).getByRole("heading", { name: "Conversa da tarefa" })).toBeTruthy();

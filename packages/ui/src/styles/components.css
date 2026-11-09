@@ -5867,6 +5867,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   border-radius: 2px;
   background: var(--ink);
 }
+/* The first label on the content's edge, as the title and the words above and under the strip are, not 12 in. */
+.ac-tabs > .ac-tab:first-child {
+  padding-inline-start: 0;
+}
+.ac-tabs > .ac-tab:first-child[data-state="active"]::after {
+  left: 0;
+}
+/* The strip's line already parts the first section from the tabs: no hairline of its own under it. */
+.ac-tabpanel > .ac-details__section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 
 /* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither in a full circle, its icon in white. */
 .ac-rolemark {
