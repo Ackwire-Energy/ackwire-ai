@@ -90,3 +90,58 @@ something is made, sent or done only when a call of the agent's did it. Same jud
 - The per-run block gets shorter on average (own items off topic are a title each); the cached prompt grows by the
   team's memory, capped.
 - Own items that never match now decay and archive like any unused item; what people said doesn't.
+
+## Addendum (2026-11-09): vectors across languages
+
+§5's English keys help only a request that uses a key's own words: search stays word for word, and a Portuguese
+request rarely shares one with an English memory. On MKQA (Portuguese questions, English passages), keyword search
+has the answer in its top 100 for 44.9% of questions, and the multilingual bge-m3 for 76.3% (BGE-M3 paper, table 2).
+The hybrid ranking already fuses words with vectors; what was missing was a multilingual model the Cloud and
+self-hosters can run, and search that survives the model's server.
+
+Code: providers `embeddings.ts` (`createOpenAIEmbeddings`, `EMBEDDING_CATALOG`), engine `gateway.ts` (`embed`),
+`search.ts` (`upsertWithEmbeddings`, `reindexOrg`'s kinds, `searchVisible`, `queueEmbeddingBackfill`), `jobs.ts`
+(`search.reindex`), adapters `search.ts` (the vector query), config `schema.ts` (`EMBEDDINGS_*`), server `engine.ts`
+and `start.ts`, `docker-compose.yml` (`embeddings`).
+
+1. **One adapter for OpenAI's embeddings API** (`EMBEDDINGS_PROVIDER=openai`, `EMBEDDINGS_URL`,
+   `EMBEDDINGS_API_KEY`): DeepInfra, OpenAI, or a server of one's own (text-embeddings-inference, vLLM, llama.cpp,
+   Ollama). At most 16 texts a request (text-embeddings-inference refuses more than 32 by default). A shorter vector
+   is padded with zeros to 1024, which keeps its cosine similarities, so no migration; a longer one is refused.
+   `EMBEDDING_CATALOG` holds each model's list price, size, query prefix and whether it is asked for 1024 numbers.
+2. **The model: `Qwen/Qwen3-Embedding-0.6B`** (Apache-2.0, 1024 numbers), $0.01 per million tokens on DeepInfra:
+   Portuguese↔English retrieval 94.2 / 93.4 nDCG@10 on Belebele, MMTEB 64.6. Its queries start with its instruction
+   (`Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:`, from its
+   sentence-transformers config); documents get none. If it misses, `Qwen/Qwen3-Embedding-8B` costs the same, has the
+   best published scores (MMTEB 70.9) and is asked for 1024 of its 4096 numbers. `BAAI/bge-m3` (1024) and
+   `ibm-granite/granite-embedding-311m-multilingual-r2` (768, padded; not on DeepInfra, the fastest on a CPU) are in
+   the catalog for servers of one's own, OpenAI's text-embedding-3 models (asked for 1024) for its API. Voyage stays.
+3. **What gets vectors, in this order** (`EMBEDDINGS_KINDS`, default `context_item`): memories first; then wiki
+   pages, files, tasks and the team's actions; messages last, after a migration of `search_documents.embedding` to
+   `halfvec(1024)` and a check of the disk: they are most of the documents, and their vectors and HNSW index would
+   take most of it. Other kinds keep words alone, and a query is embedded only when a kind it searches has vectors.
+4. **Words when vectors fail.** A query's vector waits at most `EMBEDDINGS_QUERY_TIMEOUT_MS` (1.5 s; a CPU server may
+   need more); when it fails or is late, search goes on with words alone, so a run never loses its searched memory to
+   the provider. A document whose vector fails is still indexed by its words, and its job retries the vector. The
+   failure that makes three in a row is reported to error reports, once until a call succeeds. Usage and cost stay
+   recorded per workspace, kind `embedding`, through the gateway.
+5. **One model's vectors at a time.** The vector query compares only documents whose `embedding_model` is the
+   query's, so a reindex half done never mixes two models. One HNSW index holds every workspace, and pgvector takes
+   its 40 nearest before filtering by workspace: the query turns on its iterative scan (`hnsw.iterative_scan =
+   relaxed_order`, `hnsw.ef_search = 100`, for that query alone) and keeps the distance cut outside a materialized
+   CTE, as pgvector advises. pgvector before 0.8 runs it without.
+6. **No reindex step.** At every start, each open workspace holding documents of `EMBEDDINGS_KINDS` that the model
+   didn't embed gets one `search.reindex` of those kinds, once per model and kinds (its dedupe key), again at a later
+   start when that one failed. Turning vectors on, changing the model or adding a kind needs nobody; a workspace on
+   hold gets it at a start after it opens again.
+7. **Self-host.** The compose file's `embeddings` profile, off by default: Hugging Face's text-embeddings-inference
+   CPU image with `EMBEDDING_MODEL` (Qwen3-Embedding-0.6B), capped at 2 CPUs and 3 GB, at
+   `http://embeddings:8080/v1`. Or `EMBEDDINGS_URL` at DeepInfra or any OpenAI-compatible server. With Postgres
+   alone, search stays full-text.
+
+Left out: translating the query with a small model, and keys written in several languages. A translated query
+still matches word for word, and keys cover only the languages written and only memories.
+
+Checked offline: 24 made-up memories, Portuguese requests for English ones and the reverse, among lookalikes that
+share their words, with a fake model that gives a translation its original's vector: every one is in the top 5 of
+the hybrid ranking, almost none by words alone. A real model is checked in production.
