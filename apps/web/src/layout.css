@@ -13643,6 +13643,29 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   .settings-row--lead:has(> .settings-row__text > .settings-row__status) > .settings-row__end {
     grid-area: 1 / 3;
   }
+  /* A line that opens something, with a status: the icon, the name and the chevron (a value before it) on one line,
+     the status under them at the row's width. */
+  .settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px var(--space-3);
+  }
+  .settings-row--lead.settings-row--open:has(> .settings-row__value):has(> .settings-row__text > .settings-row__status) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .settings-row--lead.settings-row--open > .settings-row__text:has(> .settings-row__status) {
+    display: contents;
+  }
+  .settings-row--lead.settings-row--open > .settings-row__text > .settings-row__status {
+    grid-column: 1 / -1;
+  }
+  .settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status) > .settings-row__value {
+    grid-area: 1 / 3;
+  }
+  .settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status) > .settings-row__chevron {
+    grid-area: 1 / -2;
+  }
 }
 
 /* Configurações › Mensagens de voz: who turns voice into text (ADR 0100). */
