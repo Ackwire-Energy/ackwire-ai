@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -9,6 +9,7 @@ import type { Term } from "@agenteschat/setup/src/term";
 import { TOOL_LABELS } from "./access";
 import { effectiveAccess, readStoredConfig } from "./config";
 import { shortTime } from "./daemon";
+import { errnoCode } from "./errors";
 import { detectExecutors } from "./executors";
 import { pidAlive, readLock } from "./lock";
 import { labelOf, PhoneManager, POLL_MS, phoneNotReady } from "./phones";
@@ -44,7 +45,8 @@ export interface DoctorSources {
   /** "macOS 26.1 · Apple M3 Pro · 12 CPU · 36 GB". */
   system: string;
   user: string;
-  connections(): DoctorConnection[];
+  /** Null: this user can't read the runner's home (system mode's is root's alone). */
+  connections(): DoctorConnection[] | null;
   apps(): Promise<Executors>;
   toolchains(): Promise<RunnerToolchains>;
   phones(): Promise<DoctorPhone[]>;
@@ -70,6 +72,18 @@ const deviceWord = (platform: NodeJS.Platform) =>
 function connectionChecks(s: DoctorSources): Check[] {
   const list = s.connections();
   const word = deviceWord(s.platform);
+  if (list === null) {
+    return [
+      {
+        key: "computer",
+        status: "needs",
+        title: `Only root can see this ${word}'s connection`,
+        detail: [s.system],
+        fix: "Run it as root:",
+        command: "sudo agentes-runner doctor",
+      },
+    ];
+  }
   if (list.length === 0) {
     return [
       {
@@ -182,8 +196,9 @@ function phoneChecks(phones: DoctorPhone[]): Check[] {
       const now = p.inUseSince ? `in use since ${shortTime(p.inUseSince)}` : "ready";
       return { key, status: "ok", title: `${label}: ${now}`, detail: facts };
     }
-    // It ends by itself (an emulator still starting).
-    if (p.state === "preparing") return { key, status: "skip", title: `${problem.title}. ${problem.fix}`, detail: [] };
+    // Nothing the person can do: it ends by itself (an emulator still starting), or never (an Android too old).
+    if (p.state === "preparing" || p.state === "unsupported")
+      return { key, status: "skip", title: `${problem.title}. ${problem.fix}`, detail: [] };
     const waitFor = (p.reason && WAIT_FOR[p.reason]?.(label)) || label;
     return {
       key,
@@ -303,7 +318,12 @@ export function systemLine(platform: NodeJS.Platform = process.platform): string
 }
 
 /** The connections kept here: `home`'s, and the agentes app's and this server's own (`<home>/orgs/*`, `<home>/host/orgs/*`). */
-export function connections(home: string): DoctorConnection[] {
+export function connections(home: string): DoctorConnection[] | null {
+  try {
+    accessSync(home, constants.R_OK | constants.X_OK);
+  } catch (err) {
+    if (errnoCode(err) === "EACCES") return null;
+  }
   const sub = (dir: string) => {
     try {
       return readdirSync(dir).map((name) => path.join(dir, name));

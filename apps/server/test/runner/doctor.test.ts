@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createTerm } from "@agenteschat/setup/src/term";
 import { connections, cpuName, type DoctorPhone, type DoctorSources, runDoctor } from "../../runner/doctor";
@@ -197,6 +197,27 @@ test("connections: this home and the agentes app's, running while their runner h
   ]);
   lock.release();
   expect(connections(path.join(home, "none"))).toEqual([]);
+  // System mode's home is root's alone: to anyone else it is unreadable, not unconnected.
+  if (process.platform !== "win32" && process.getuid?.() !== 0) {
+    chmodSync(home, 0o000);
+    try {
+      expect(connections(home)).toBeNull();
+    } finally {
+      chmodSync(home, 0o700);
+    }
+  }
+});
+
+test("doctor: a home only root reads says so; a phone too old for the tools needs nothing of the person", async () => {
+  const old: DoctorPhone = { ...PIXEL, state: "unsupported", reason: "os_too_old" };
+  const r = await doctor(mac({ connections: () => null }, [[old]]), { wait: true });
+  expect(r.code).toBe(1);
+  expect(r.text).toContain(
+    "■  Only root can see this Mac's connection\n   Run it as root:\n     sudo agentes-runner doctor\n",
+  );
+  expect(r.text).toContain("○  Pixel 8 can't be used. Its Android version is too old for these tools.\n");
+  expect(r.text).not.toContain("Waiting");
+  expect(r.text.trimEnd().split("\n").at(-1)).toBe("1 thing needs you");
 });
 
 test("cpu names without the marketing marks", () => {
